@@ -23,6 +23,10 @@ FEATURES & RATIONALE:
         key or a shipped path under a not_shipped entry aborts the build instead of
         producing an exe that breaks on a user's machine.
 5. --list prints the resolved selection as JSON without writing the zip.
+6. Build outputs: a required asset may name the Windows builder that writes
+        it (built_by), such as the precompiled screen vision assembly. Writing
+        the zip refuses it missing; --list, which Linux gates read, reports it
+        with its builder instead, since only a Windows job can produce it.
 ==============================================================================
 """
 
@@ -80,6 +84,7 @@ class Include:
 
     source: str
     dest: str
+    built_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -164,14 +169,19 @@ def _require_patterns(value: object, where: str) -> tuple[re.Pattern[str], ...]:
     return tuple(glob_to_regex(_require_text(g, where)) for g in value)
 
 
-def _parse_include(entry: object, where: str) -> Include:
-    """Validates one include or required entry."""
-    fields = _require_keys(entry, where, {"source", "dest"}, {"why"})
+def _parse_include(entry: object, where: str, *, may_be_built: bool = False) -> Include:
+    """Validates one include or required entry; only a required one may be built."""
+    fields = _require_keys(
+        entry, where, {"source", "dest"}, {"why", "built_by"} if may_be_built else {"why"}
+    )
     if "why" in fields:
         _require_text(fields["why"], f"{where}.why")
     return Include(
         source=_require_text(fields["source"], f"{where}.source").rstrip("/"),
         dest=_require_text(fields["dest"], f"{where}.dest").rstrip("/"),
+        built_by=_require_text(fields["built_by"], f"{where}.built_by")
+        if "built_by" in fields
+        else None,
     )
 
 
@@ -229,7 +239,8 @@ def load_manifest(path: Path) -> Manifest:
         not_shipped.append(_require_text(fields["path"], f"not_shipped[{i}].path").rstrip("/"))
 
     required = tuple(
-        _parse_include(entry, f"required[{i}]") for i, entry in enumerate(data["required"])
+        _parse_include(entry, f"required[{i}]", may_be_built=True)
+        for i, entry in enumerate(data["required"])
     )
     return Manifest(includes, tuple(excludes), tuple(not_shipped), required)
 
@@ -247,6 +258,7 @@ class Selection:
 
     files: tuple[tuple[Path, str], ...]
     excluded: dict[str, int]
+    unbuilt: tuple[Include, ...] = ()
 
 
 def _is_under(repo_path: str, prefix: str) -> bool:
@@ -254,8 +266,13 @@ def _is_under(repo_path: str, prefix: str) -> bool:
     return repo_path == prefix or repo_path.startswith(prefix + "/")
 
 
-def resolve(repo_root: Path, manifest: Manifest) -> Selection:
-    """Resolves the manifest against the working tree."""
+def resolve(repo_root: Path, manifest: Manifest, *, require_built: bool = True) -> Selection:
+    """Resolves the manifest against the working tree.
+
+    With ``require_built`` false, a required asset that names its builder and
+    is absent is returned in ``unbuilt`` instead of refused; its builder must
+    still exist, and an include must still ship it once it is built.
+    """
     files: list[tuple[Path, str]] = []
     excluded = {group.name: 0 for group in manifest.excludes}
     arcnames: dict[str, str] = {}
@@ -291,7 +308,24 @@ def resolve(repo_root: Path, manifest: Manifest) -> Selection:
             arcnames[arcname] = repo_path
             files.append((path, arcname))
 
+    unbuilt: list[Include] = []
     for required in manifest.required:
+        if required.built_by is not None and not (repo_root / required.built_by).is_file():
+            raise BundleError(
+                f"required asset '{required.source}' names the missing builder '{required.built_by}'"
+            )
+        if not (repo_root / required.source).is_file() and required.built_by and not require_built:
+            shipped = any(
+                _is_under(required.source, include.source)
+                and required.dest == include.dest + required.source[len(include.source) :]
+                for include in manifest.includes
+            )
+            if not shipped or any(g.matches(required.source) for g in manifest.excludes):
+                raise BundleError(
+                    f"required asset '{required.source}' would not be shipped at '{required.dest}'"
+                )
+            unbuilt.append(required)
+            continue
         if not (repo_root / required.source).is_file():
             raise BundleError(
                 f"required asset '{required.source}' does not exist; build or restore it"
@@ -300,7 +334,7 @@ def resolve(repo_root: Path, manifest: Manifest) -> Selection:
             raise BundleError(
                 f"required asset '{required.source}' is not shipped at '{required.dest}'"
             )
-    return Selection(tuple(files), excluded)
+    return Selection(tuple(files), excluded, tuple(unbuilt))
 
 
 def write_bundle(selection: Selection, output: Path) -> None:
@@ -372,7 +406,9 @@ def main() -> int:
 
     repo_root = args.repo_root.resolve()
     try:
-        selection = resolve(repo_root, load_manifest(repo_root / MANIFEST_REL))
+        selection = resolve(
+            repo_root, load_manifest(repo_root / MANIFEST_REL), require_built=not args.list
+        )
     except BundleError as exc:
         print(f"[bundle] ERROR: {exc}", file=sys.stderr)
         return 1
@@ -382,6 +418,10 @@ def main() -> int:
             "files": [
                 {"source": path.relative_to(repo_root).as_posix(), "arcname": arcname}
                 for path, arcname in selection.files
+            ]
+            + [
+                {"source": asset.source, "arcname": asset.dest, "built_by": asset.built_by}
+                for asset in selection.unbuilt
             ],
             "excluded": selection.excluded,
         }

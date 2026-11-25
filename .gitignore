@@ -183,6 +183,9 @@ static/ergopti_plus/windows/build/
 static/ergopti_plus/windows/vendor/keyboard_layout/*/
 static/ergopti_plus/windows/vendor/keyboard_layout/build_receipt.json
 
+# Screen vision assembly built by tools/build/build_windows_screen_vision.ps1
+static/ergopti_plus/windows/vendor/ergopti_screen_vision.dll
+
 
 
 # ======================

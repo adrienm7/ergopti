@@ -61,7 +61,7 @@
 			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
 			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 1 },
 			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
-			"inline_csharp_compile": { "pattern": "Add-Type", "max": 13 },
+			"inline_csharp_compile": { "pattern": "Add-Type", "max": 10 },
 			"pinvoke_declaration": { "pattern": "DllImport", "max": 51 },
 			"base64_decode": { "pattern": "FromBase64String", "max": 1 },
 			"powershell_mentions": { "pattern": "powershell", "max": 9 },

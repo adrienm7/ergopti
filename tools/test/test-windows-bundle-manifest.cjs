@@ -318,6 +318,67 @@ function builderContract() {
 					`builder accepts ${label} (exit ${run.status}): ${(run.stderr || '').trim()}`
 				);
 		}
+		// A build output (the screen vision assembly) is listed with its builder
+		// while absent, since only a Windows job can build it, but a bundle
+		// written without it is refused.
+		write('tools/build/build_fixture.ps1', '# fixture builder');
+		const builtAsset = {
+			source: 'tree/built.dll',
+			dest: 'static/tree/built.dll',
+			built_by: 'tools/build/build_fixture.ps1'
+		};
+		const unbuilt = list(manifestWith({ required: [builtAsset] }));
+		const unbuiltRow =
+			unbuilt.status === 0
+				? JSON.parse(unbuilt.stdout).files.find((f) => f.arcname === builtAsset.dest)
+				: undefined;
+		if (!unbuiltRow || unbuiltRow.built_by !== builtAsset.built_by)
+			problems.push(
+				`builder --list does not report an unbuilt asset with its builder: ${unbuilt.stderr}`
+			);
+		const refusedBuild = runBuilder(['--repo-root', fixture, '--output', archivePath]);
+		if (
+			refusedBuild.status === 0 ||
+			!/required asset 'tree\/built\.dll' does not exist/.test(refusedBuild.stderr)
+		)
+			problems.push(`builder writes a bundle without a built asset: ${refusedBuild.stderr}`);
+		for (const [label, asset, message] of [
+			[
+				'a built asset whose builder is missing',
+				{ ...builtAsset, built_by: 'tools/build/gone.ps1' },
+				/missing builder/
+			],
+			[
+				'a built asset no include ships',
+				{ ...builtAsset, source: 'elsewhere/built.dll' },
+				/would not be shipped/
+			],
+			[
+				'a built asset an exclude drops',
+				{ ...builtAsset, source: 'tree/x.tmp.dll', dest: 'static/tree/x.tmp.dll' },
+				null
+			]
+		]) {
+			const manifest = manifestWith({ required: [asset] });
+			if (message === null)
+				manifest.exclude.push({ name: 'dll', globs: ['**/*.dll'], why: 'fixture' });
+			const run = list(manifest);
+			if (run.status === 0 || !(message || /would not be shipped/).test(run.stderr || ''))
+				problems.push(
+					`builder accepts ${label} (exit ${run.status}): ${(run.stderr || '').trim()}`
+				);
+		}
+		const plainBuiltBy = list(
+			manifestWith({
+				include: [
+					{ source: 'tree', dest: 'static/tree', built_by: 'tools/build/build_fixture.ps1' }
+				]
+			})
+		);
+		if (plainBuiltBy.status === 0 || !/unknown key/.test(plainBuiltBy.stderr || ''))
+			problems.push(
+				'builder accepts built_by on an include, which only a required asset may carry'
+			);
 	} finally {
 		fs.rmSync(fixture, { recursive: true, force: true });
 	}
@@ -902,6 +963,21 @@ try {
 }
 
 if (selection && refs) {
+	// A build output reported with its builder (the screen vision assembly) is
+	// never tracked, so it joins the modelled trees through that report; its
+	// builder must be tracked and it must be absent from the tracked tree.
+	for (const f of selection.files.filter((row) => row.built_by)) {
+		if (
+			tracked([f.built_by]).length !== 1 ||
+			tracked([f.source]).length !== 0 ||
+			universe.has(f.arcname)
+		)
+			errors.push(
+				`${f.source} is reported as built by ${f.built_by}, which is not a tracked builder of an untracked file`
+			);
+		universe.set(arcnameOf(f.source), f.source);
+		universeArcs.push(arcnameOf(f.source));
+	}
 	const shipped = new Set(selection.files.map((f) => f.arcname));
 	for (const f of selection.files) {
 		if (arcnameOf(f.source) !== f.arcname || !universe.has(f.arcname))

@@ -8,7 +8,9 @@
 ; images in it, read its text with Windows.Media.Ocr, find text targets among
 ; the words, and import an image of any format Windows decodes. The work runs
 ; in one long-lived PowerShell worker (vendor/ergopti_screen_vision_worker.ps1)
-; that compiles the C# matcher and capture code once and keeps one OCR engine.
+; that loads the C# matcher and capture code once from vendor/ergopti_screen_vision.dll,
+; compiled at build time by tools/build/build_windows_screen_vision.ps1, and keeps
+; one OCR engine.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One owner: ScreenVisionInit() starts the worker once and refuses a second
@@ -89,8 +91,7 @@ _ScreenVisionJoin(Parts) {
 ; one of them refuses.
 _ScreenVisionWorkerFiles() {
 	global _VendorDir
-	return [_VendorDir . "\ergopti_screen_vision_worker.ps1", _VendorDir . "\ergopti_screen_vision_matcher.cs",
-		_VendorDir . "\ergopti_screen_vision_capture.cs"]
+	return [_VendorDir . "\ergopti_screen_vision_worker.ps1", _VendorDir . "\ergopti_screen_vision.dll"]
 }
 
 ; Starts the worker once.

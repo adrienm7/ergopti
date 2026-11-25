@@ -119,6 +119,13 @@ jobs:
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
 
+      # The screen vision worker loads this assembly; nothing compiles C# at
+      # run time (tools/ci/windows-exe-av-surface.json). The AHK suites and the
+      # static bundle both need it, and it is not tracked.
+      - name: Build the screen vision assembly
+        shell: pwsh
+        run: ./tools/build/build_windows_screen_vision.ps1
+
       - name: Prepare native PAC source generator
         uses: actions/setup-python@v5
         with:
@@ -512,6 +519,13 @@ jobs:
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
+
+      # The screen vision worker loads this assembly; nothing compiles C# at
+      # run time (tools/ci/windows-exe-av-surface.json). The AHK suites and the
+      # static bundle both need it, and it is not tracked.
+      - name: Build the screen vision assembly
+        shell: pwsh
+        run: ./tools/build/build_windows_screen_vision.ps1
 
       - name: Prepare native PAC source generator
         uses: actions/setup-python@v5
@@ -1005,6 +1019,13 @@ jobs:
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
+
+      # The screen vision worker loads this assembly; nothing compiles C# at
+      # run time (tools/ci/windows-exe-av-surface.json). The AHK suites and the
+      # static bundle both need it, and it is not tracked.
+      - name: Build the screen vision assembly
+        shell: pwsh
+        run: ./tools/build/build_windows_screen_vision.ps1
 
       # The stand-alone layout package every release publishes (release_asset
       # of _shared/layouts/data/windows_system_layout.json), uploaded with

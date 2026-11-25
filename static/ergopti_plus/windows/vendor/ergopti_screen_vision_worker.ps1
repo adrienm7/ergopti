@@ -9,10 +9,14 @@
 # Windows.Media.Ocr, and converts imported images to the library's PNG.
 #
 # FEATURES & RATIONALE:
-# 1. One process for the whole session: the C# matcher and capture code
-#    (ergopti_screen_vision_matcher.cs, ergopti_screen_vision_capture.cs) are
-#    compiled once and one OCR engine is created once, so a 700 ms tick pays
-#    neither again.
+# 1. One process for the whole session: the C# matcher and capture code is
+#    loaded once from ergopti_screen_vision.dll, which
+#    tools/build/build_windows_screen_vision.ps1 compiles at build time from
+#    native/ergopti_screen_vision_*.cs, and one OCR engine is created once, so
+#    a 700 ms tick pays neither again. Nothing is compiled at run time: a
+#    runtime compiler stage in the bundle is what antivirus engines score
+#    (tools/ci/windows-exe-av-surface.json), so framework assemblies are
+#    loaded by strong name as well.
 # 2. A folder protocol: the driver writes <id>.req.json into a private queue
 #    folder and reads <id>.res.json, each written beside and then renamed, so a
 #    half-written file is never read; the driver's process runner has no stdin
@@ -54,10 +58,14 @@ function Write-Answer {
 
 $Ready = @{ ok = $true; capture = @{ ok = $true }; ocr = @{ ok = $true } }
 try {
-	Add-Type -AssemblyName System.Drawing, PresentationCore, WindowsBase
-	Add-Type -Path (Join-Path $PSScriptRoot "ergopti_screen_vision_matcher.cs"), `
-		(Join-Path $PSScriptRoot "ergopti_screen_vision_capture.cs") `
-		-ReferencedAssemblies System.Drawing, PresentationCore, WindowsBase, System.Xaml
+	foreach ($Assembly in @(
+			"System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+			"PresentationCore, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+			"WindowsBase, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35",
+			"System.Xaml, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")) {
+		[void][System.Reflection.Assembly]::Load($Assembly)
+	}
+	[void][System.Reflection.Assembly]::LoadFrom((Join-Path $PSScriptRoot "ergopti_screen_vision.dll"))
 	[void][Ergopti.ScreenVision.Capture]::DeclareDpiAware()
 } catch {
 	Write-Answer "ready.json" @{ ok = $false; reason = "capture_unavailable" }
@@ -67,7 +75,8 @@ try {
 $OcrEngine = $null
 $AsTask = $null
 try {
-	Add-Type -AssemblyName System.Runtime.WindowsRuntime
+	[void][System.Reflection.Assembly]::Load(
+		"System.Runtime.WindowsRuntime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089")
 	$null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]
 	$null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics, ContentType = WindowsRuntime]
 	$null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]

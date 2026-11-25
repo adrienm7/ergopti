@@ -457,6 +457,104 @@ assert.deepEqual(
 	'the shipped Windows sources stay under every script API ceiling'
 );
 
+// 14. The screen vision worker compiles nothing at run time: it loads the
+// assembly tools/build/build_windows_screen_vision.ps1 compiles at build time,
+// the C# sources stay out of the bundle, and every Windows job that runs the
+// AHK suites or writes the bundle builds the assembly first. The worker's
+// three compiler-cmdlet calls had raised the bundle's count from 18 to 21.
+const readRepo = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const visionWorker = readRepo(
+	'static/ergopti_plus/windows/vendor/ergopti_screen_vision_worker.ps1'
+);
+assert.doesNotMatch(
+	visionWorker,
+	/Add-Type/i,
+	'the screen vision worker compiles nothing at run time'
+);
+assert.doesNotMatch(visionWorker, /\.cs["']/, 'the screen vision worker reads no C# source');
+assert.match(
+	visionWorker,
+	/\[System\.Reflection\.Assembly\]::LoadFrom\(\(Join-Path \$PSScriptRoot "ergopti_screen_vision\.dll"\)\)/,
+	'the screen vision worker loads the prebuilt assembly beside it'
+);
+const visionBuilder = readRepo('tools/build/build_windows_screen_vision.ps1');
+for (const source of ['ergopti_screen_vision_matcher.cs', 'ergopti_screen_vision_capture.cs']) {
+	assert.ok(
+		fs.existsSync(path.join(root, 'static/ergopti_plus/windows/native', source)),
+		`${source} is a native build source`
+	);
+	assert.ok(visionBuilder.includes(`"${source}"`), `the builder compiles ${source}`);
+}
+assert.match(
+	visionBuilder,
+	/Framework64\\v4\.0\.30319/,
+	'the builder uses the .NET Framework 4 compiler'
+);
+assert.match(visionBuilder, /"\/langversion:5"/, 'the builder holds the C# 5 language level');
+assert.ok(
+	visionBuilder.includes('static\\ergopti_plus\\windows\\vendor\\ergopti_screen_vision.dll'),
+	'the builder writes the assembly the worker loads'
+);
+const bundleListing = JSON.parse(listing.stdout).files;
+assert.ok(
+	bundleListing.some(
+		(file) =>
+			file.arcname === 'vendor/ergopti_screen_vision.dll' &&
+			file.source === 'static/ergopti_plus/windows/vendor/ergopti_screen_vision.dll' &&
+			(file.built_by === undefined ||
+				file.built_by === 'tools/build/build_windows_screen_vision.ps1')
+	),
+	'the bundle ships the screen vision assembly'
+);
+assert.ok(
+	!bundleListing.some((file) => /\.cs$/i.test(file.arcname)),
+	'no C# source ships in the bundle'
+);
+const visionManifest = JSON.parse(readRepo('tools/build/windows_bundle_manifest.json'));
+assert.ok(
+	visionManifest.required.some(
+		(entry) =>
+			entry.dest === 'vendor/ergopti_screen_vision.dll' &&
+			entry.built_by === 'tools/build/build_windows_screen_vision.ps1'
+	),
+	'writing the bundle requires the built assembly'
+);
+assert.match(
+	readRepo('static/ergopti_plus/windows/platform/system/vision/screen_vision.ahk'),
+	/_VendorDir \. "\\ergopti_screen_vision\.dll"/,
+	'the driver refuses screen vision when the assembly is missing'
+);
+const ignored = childProcess.spawnSync(
+	'git',
+	['check-ignore', '-q', 'static/ergopti_plus/windows/vendor/ergopti_screen_vision.dll'],
+	{ cwd: root }
+);
+assert.equal(ignored.status, 0, 'the built assembly is never committed');
+const visionBuild = 'run: ./tools/build/build_windows_screen_vision.ps1';
+for (const [file, consumers] of [
+	[
+		'.github/workflows/ci-windows.yml',
+		['tests\\run_all.ahk', 'tools/build/build_static_bundle.py']
+	],
+	['.github/workflows/windows-test-replay.yml', ['tools/build/build_static_bundle.py']]
+]) {
+	const text = readRepo(file);
+	const jobs = text.split(/\n {2}(?=[a-z][a-z0-9_-]*:\n)/);
+	let consumersSeen = 0;
+	for (const job of jobs)
+		for (const consumer of consumers) {
+			const at = job.indexOf(consumer);
+			if (at < 0) continue;
+			consumersSeen += 1;
+			const builtAt = job.indexOf(visionBuild);
+			assert.ok(
+				builtAt >= 0 && builtAt < at,
+				`${file}: a job that reads ${consumer} builds the screen vision assembly first`
+			);
+		}
+	assert.ok(consumersSeen > 0, `${file} runs a consumer of the assembly`);
+}
+
 console.log(
 	'[OK] ErgoptiPlus.exe antivirus surface: resources read, stages forbidden, ceilings held.'
 );

@@ -78,9 +78,14 @@ corpora.
   (a headless worker mode, as the Keychain worker), since the shared Lua
   matcher takes about 0.8 s per scale on Lua 5.4 for an 800 × 600 window.
   Screen Recording permission missing is `capture_permission_missing`.
-- **Windows**: GDI capture of the window rectangle, the matcher in the native
-  DLL for speed, and Windows.Media.Ocr through one long-lived bridge so the
-  engine is created once.
+- **Windows**: GDI capture of the window rectangle, the matcher in C# for
+  speed, and Windows.Media.Ocr through one long-lived bridge so the engine is
+  created once. The C# (`windows/native/ergopti_screen_vision_*.cs`) is
+  compiled at build time into `vendor/ergopti_screen_vision.dll` by
+  `tools/build/build_windows_screen_vision.ps1`; the worker loads it and never
+  compiles at run time. A source run on Windows runs that builder once after a
+  checkout or a change to the C# sources; without the assembly the service
+  refuses with `capture_unavailable` and logs the missing file.
 
 ## The « Capture → texte » action (Ctrl+O)
 

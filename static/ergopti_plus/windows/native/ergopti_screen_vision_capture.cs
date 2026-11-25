@@ -1,12 +1,13 @@
-// vendor/ergopti_screen_vision_capture.cs
+// native/ergopti_screen_vision_capture.cs
 
 // ==============================================================================
 // MODULE: Screen Vision Capture (Windows)
 // DESCRIPTION:
 // Captures a window or a screen rectangle into the shared gray image, and
 // decodes or writes library images, for the Windows screen vision worker
-// (vendor/ergopti_screen_vision_worker.ps1), which compiles it once with
-// Add-Type beside ergopti_screen_vision_matcher.cs.
+// (vendor/ergopti_screen_vision_worker.ps1), built with
+// ergopti_screen_vision_matcher.cs into vendor/ergopti_screen_vision.dll by
+// tools/build/build_windows_screen_vision.ps1.
 //
 // FEATURES & RATIONALE:
 // 1. Physical pixels: the worker declares itself per-monitor DPI aware before
@@ -18,8 +19,8 @@
 //    has (PNG, JPEG, GIF's first frame, BMP, TIFF, and WebP or HEIC when their
 //    store extensions are installed) imports a library image; any other file
 //    throws and the worker answers "import_unsupported_format".
-// 4. C# 5 only, as the matcher, for the .NET Framework compiler of Windows
-//    PowerShell 5.1.
+// 4. C# 5 only, as the matcher, for the .NET Framework compiler the builder
+//    uses.
 // ==============================================================================
 
 using System;

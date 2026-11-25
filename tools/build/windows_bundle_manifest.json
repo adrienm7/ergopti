@@ -230,12 +230,10 @@
 			"dest": "vendor/ergopti_screen_vision_worker.ps1"
 		},
 		{
-			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision_matcher.cs",
-			"dest": "vendor/ergopti_screen_vision_matcher.cs"
-		},
-		{
-			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision_capture.cs",
-			"dest": "vendor/ergopti_screen_vision_capture.cs"
+			"source": "static/ergopti_plus/windows/vendor/ergopti_screen_vision.dll",
+			"dest": "vendor/ergopti_screen_vision.dll",
+			"built_by": "tools/build/build_windows_screen_vision.ps1",
+			"why": "The screen vision worker's capture and matcher, compiled at build time so the worker never compiles C# at run time (tools/ci/windows-exe-av-surface.json)."
 		},
 		{
 			"source": "static/layouts/registry/index.json",

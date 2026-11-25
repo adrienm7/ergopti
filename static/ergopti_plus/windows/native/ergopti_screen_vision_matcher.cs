@@ -1,11 +1,13 @@
-// vendor/ergopti_screen_vision_matcher.cs
+// native/ergopti_screen_vision_matcher.cs
 
 // ==============================================================================
 // MODULE: Screen Vision Matcher (C# port)
 // DESCRIPTION:
 // C# port of _shared/shortcuts/engine/keep_awake/auto_click_matcher.lua for the Windows
-// screen vision worker (vendor/ergopti_screen_vision_worker.ps1), which
-// compiles it once with Add-Type when it starts. The AutoHotkey twin
+// screen vision worker (vendor/ergopti_screen_vision_worker.ps1), built at
+// build time into vendor/ergopti_screen_vision.dll by
+// tools/build/build_windows_screen_vision.ps1, which the worker loads without
+// compiling anything at run time. The AutoHotkey twin
 // (modules/shortcuts/auto_click_matcher.ahk) is the reference the AHK suite
 // replays; this port is the one fast enough for a 700 ms tick.
 //
@@ -16,9 +18,9 @@
 // 2. Same search: power-of-two scales, a coarse pass at every pixel phase,
 //    the strongest coarse candidates (score, then y, then x) refined at full
 //    size, ties kept in row-major order.
-// 3. C# 5 only: Windows PowerShell 5.1 compiles Add-Type sources with the
-//    .NET Framework compiler, which knows no interpolation, tuples or
-//    expression-bodied members.
+// 3. C# 5 only: the builder uses the .NET Framework compiler every Windows
+//    has (the one Windows PowerShell 5.1 itself compiles with), which knows no
+//    interpolation, tuples or expression-bodied members.
 // 4. Pinned by _shared/tests/corpus/keep_awake/auto_click_match_vectors.json.
 // ==============================================================================
 

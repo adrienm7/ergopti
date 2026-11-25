@@ -84,9 +84,16 @@ jobs:
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
 
+      # The static bundle requires the screen vision assembly, which is built,
+      # not tracked (tools/build/windows_bundle_manifest.json built_by).
+      - name: Build the screen vision assembly
+        id: screen_vision
+        shell: pwsh
+        run: ./tools/build/build_windows_screen_vision.ps1
+
       - name: Prepare the production entry and E2E inputs
         id: entry_inputs
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' && steps.screen_vision.outcome == 'success' }}
         shell: pwsh
         run: |
           npm ci
@@ -322,7 +329,7 @@ jobs:
           }
 
       - name: Replay every case alone and the selection in reverse
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' && steps.screen_vision.outcome == 'success' }}
         shell: pwsh
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine

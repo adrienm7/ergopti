@@ -222,6 +222,19 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
   three in the script and `-EncodedCommand` in the bundle. `-ExecutionPolicy Bypass` stays on the
   `-File` launches: it is process scope only, and the default Windows client policy (Restricted)
   refuses every script file without an override.
+- Done (2026-11-25, maintainer decision): the bundle's `Add-Type` ceiling (`inline_csharp_compile`
+  in `tools/ci/windows-exe-av-surface.json`) went from 18 (21 measured) to 10. The gate counts every
+  occurrence of the word in a shipped text member, comments and `-AssemblyName` loads included,
+  while binary members (`.dll`, `.exe`, `.cs`) are not scanned. The screen vision worker no longer
+  compiles its C# on start: `tools/build/build_windows_screen_vision.ps1` compiles
+  `windows/native/ergopti_screen_vision_*.cs` with the .NET Framework 4 `csc.exe` (C# 5, the
+  compiler Windows PowerShell 5.1 used) into the untracked `vendor/ergopti_screen_vision.dll`,
+  which every Windows CI job that runs the AHK suites or writes the bundle builds first and which
+  the bundle requires (`built_by` in `tools/build/windows_bundle_manifest.json`). The workers load
+  framework assemblies by strong name (`[Reflection.Assembly]::Load`) and prebuilt files with
+  `LoadFrom`. The 10 left are `-TypeDefinition` P/Invoke stages of the network, updater,
+  diagnostics and Ollama workers; moving them into prebuilt assemblies the same way is the next
+  step if the count must drop again.
 - "keystats" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
   repository occurrences in 1 350 files across the three drivers, config keys and locales). A
   rename to typing metrics is a cross-driver campaign of its own; the gate reports the count.

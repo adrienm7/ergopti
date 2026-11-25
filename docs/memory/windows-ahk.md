@@ -307,6 +307,13 @@ unzip or other dropper-like stage in the compiled exe; do the work in process
 (GDI+, `DllCall`) or in a bundled `-File` worker. `tools/ci/windows-exe-av-surface.json`
 gates the built exe; lower a ceiling when a launcher goes, and never raise one
 without a reason in the commit. Reputation comes only from signing (SignPath).
+The bundle's `Add-Type` count is textual: a comment or an `-AssemblyName`
+load counts like a compile. Load a framework assembly by strong name
+(`[Reflection.Assembly]::Load`), a prebuilt file with `LoadFrom`, and compile
+new worker C# at build time like `tools/build/build_windows_screen_vision.ps1`
+(a `built_by` required asset of the bundle manifest, built in every Windows
+job that runs the AHK suites or writes the bundle; a Windows source run builds
+it once).
 
 ### project-system-programs-start-by-absolute-path
 
