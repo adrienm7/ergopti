@@ -57,6 +57,7 @@ local TableUtil = require("core.text.engine.table_util")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Cascade = require("hotstrings.engine.matcher.cascade")
 local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 -- Lua 5.4 only: LuaJIT has no integer subtype, so the guarded use stays inert there.
 local math_type = math.type
 
@@ -684,6 +685,11 @@ function M.new()
 				-- The replacement presses a key: it is not plain text for a preview or
 				-- a cascade, and the caret is no longer behind it after it fired.
 				has_key_tokens = source.has_key_tokens == true,
+				-- An action entry (action_entry.lua): what runs after the edit, and
+				-- whether the trigger is erased first. Absent on a text entry.
+				action        = source.action,
+				workflow      = source.workflow,
+				erase_trigger = ActionEntry.erase_of(source),
 				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
 				-- stable, so two entries equal on every other key came out in an order
 				-- that depended on the sort's internals — a collision could elect a
@@ -962,7 +968,7 @@ function M.new()
 				M.CASCADE_MIN_ARROWS, M.CASCADE_MAX_ARROWS, tostring(max_arrows))
 			return first
 		end
-		if first.final_result or first.is_private or first.has_key_tokens then return first end
+		if first.final_result or first.is_private or first.has_key_tokens or first.action then return first end
 
 		local gate = options.cascade_gate
 		local consumed = options.terminator_consumed == true
@@ -1159,6 +1165,9 @@ function M.new()
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
 			has_key_tokens     = mapping.has_key_tokens,
+			action             = mapping.action,
+			workflow           = mapping.workflow,
+			erase_trigger      = mapping.erase_trigger,
 			-- The expansion delay's interval: last input letter to expander. An
 			-- earlier pause in the trigger does not count (the delay measures how
 			-- long the user waited before giving the expander); other shared-engine
@@ -1175,6 +1184,16 @@ function M.new()
 		result.replay_terminator = InjectionPlan.tail(
 			result.end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
 			result.consume_terminator, result.terminator)
+		if mapping.action then
+			-- The edit before the action: this engine always sees the event on screen.
+			local plan = ActionEntry.plan({
+				path = via_end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+				trigger_len = tlen, event_len = 1, event_on_screen = true, event_text = ch,
+				terminator = result.terminator, consume_terminator = terminator_consumed,
+				nbsp_stripped = nbsp_stripped == true, output = replacement or "", erase_trigger = mapping.erase_trigger,
+			})
+			result.backspace_count, result.replacement, result.replay_terminator = plan.erase, plan.text, plan.tail
+		end
 		return result
 	end
 

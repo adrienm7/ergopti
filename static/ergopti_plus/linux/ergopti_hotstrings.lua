@@ -311,6 +311,7 @@ local hotstrings_config = require("hotstrings.engine.catalogue.config")
 local injector          = require("hotstrings.engine.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
 local MagicKey          = require("hotstrings.engine.magic_key")
+local HotstringActions  = require("hotstrings.engine.action_runner")
 local RepeatKey         = require("hotstrings.engine.repeat_key")
 
 -- The user's own modifier chords. Hard require rather than optional: the module
@@ -1906,7 +1907,14 @@ local function main()
 			-- resetting unconditionally is why Linux could never chain, and made
 			-- final_result unobservable here.
 			if expansion_committed then
-				if result.has_key_tokens then
+				if result.action then
+					-- An action entry: the edit has landed, the action runs next, out of
+					-- the key callback. It changes the context, so nothing chains and
+					-- no undo restores a trigger the action may have acted on.
+					_undoable = nil
+					engine:reset(false)
+					HotstringActions.run(result)
+				elseif result.has_key_tokens then
 					-- The caret is somewhere the engine never saw: neither the word
 					-- buffer nor the AI context can describe the text behind it.
 					engine:reset(false)

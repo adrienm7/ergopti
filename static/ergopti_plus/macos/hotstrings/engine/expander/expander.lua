@@ -29,6 +29,7 @@ local HotstringCore = require("hotstrings.engine.matcher.engine")
 local ComposedText = require("infra.composed_text")
 local Cascade = require("hotstrings.engine.matcher.cascade")
 local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 local km_utils   = require("hotstrings.engine.expander.utils")
 local Logger     = require("core.logger.engine.logger")
 local HotPath    = require("infra.hotpath_profiler")
@@ -1146,10 +1147,24 @@ end
 --- @return table|nil plan { start, text, tail, final_result, steps }, where
 ---   `tail` is the end character still to replay (nil once its
 ---   delimiter is consumed); nil when the chain has no further step.
+--- Runs an action entry's action once its edit has landed, out of the event
+--- tap (hotstrings/engine/action_runner.lua); the buffer is dropped, since the
+--- action changes the context and nothing may chain off it.
+--- @param m table The matched mapping.
+--- @return boolean true: the expansion fired.
+local function run_entry_action(m)
+	_state.buffer = ""
+	_state.start_is_word_boundary = false
+	_state.start_is_line_start = false
+	if _state.llm_context_text ~= nil then LlmContext.reset(_state) end
+	require("hotstrings.engine.action_runner").run({ action = m.action, workflow = m.workflow })
+	return true
+end
+
 local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
 	local max_arrows = _state.CASCADE_MAX_ARROWS
 	if type(max_arrows) ~= "number" or max_arrows < 2 then return nil end
-	if first.final_result or not is_cascade_link(first) then return nil end
+	if first.final_result or first.action or not is_cascade_link(first) then return nil end
 
 	-- The loop (virtual buffer, arrow bound, same-spec guard, carried end
 	-- character, untouched prefix, net edit) is the shared Cascade; this file only
@@ -1281,6 +1296,16 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer, delay_gate)
 		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
 		event_on_screen = is_ignored == true, replacement = repl_text, final_result = is_final,
 	})
+	if m.action then
+		-- An action entry: erase and type the output, or keep the text as typed
+		-- (the held event typed back), then run the action (action_entry.lua).
+		local ok_event, event_start = pcall(utf8.offset, active_buffer, -char_len)
+		injection = ActionEntry.plan({
+			path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
+			event_on_screen = is_ignored == true, output = repl_text, erase_trigger = m.erase_trigger,
+			event_text = ok_event and event_start and active_buffer:sub(event_start) or "",
+		})
+	end
 
 	local replaced = M.perform_text_replacement(
 		injection.erase,
@@ -1305,6 +1330,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer, delay_gate)
 		is_private
 	)
 	if not replaced then return false end
+	if m.action then return run_entry_action(m) end
 	-- The auto path's plan types the replacement alone: no terminator follows it.
 	remember_undo(m.plain_repl == m.repl, typed, injection.text, nil, is_private,
 		event_prefix == "" and is_ignored ~= true, buffer_before, boundary_before)
@@ -1417,6 +1443,16 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic,
 			replacement = eff_plain, terminator = chars, consume_terminator = consume_term,
 			final_result = m.final_result, cascade = cascade_edit,
 		})
+		if m.action then
+			-- An action entry: erase and type the output, or keep the text as typed,
+			-- end character included, then run the action (action_entry.lua).
+			injection = ActionEntry.plan({
+				path = InjectionPlan.PATH_TERMINATOR, trigger_len = trig_len, event_len = char_len,
+				event_on_screen = is_ignored == true, nbsp_stripped = extra_bs_bytes > 0, event_text = chars,
+				terminator = chars, consume_terminator = consume_term, output = eff_plain,
+				erase_trigger = m.erase_trigger,
+			})
+		end
 		local to_type, replay_tail, replay_spec = injection.text, injection.tail, injection.replay
 		local is_final = injection.final_result
 		local buffer_before = _state.buffer:sub(1, start_byte - 1)
@@ -1464,6 +1500,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic,
 			replay_spec
 		)
 		if not replacement_ok then return false end
+		if m.action then return run_entry_action(m) end
 		-- A stripped no-break space is not typed back, as on Windows and Linux:
 		-- the trigger alone returns, then the replayed colon. A consumed
 		-- terminator was never typed after the output and does not come back.
