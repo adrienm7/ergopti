@@ -176,9 +176,9 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		; Checked before the trim below: the spaces of a text to type are part of it,
 		; and the key and shortcut rules trim for themselves.
 		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
-				if (SendInputParse(Spec, Value) is Map)
+				if (SendKeysParse(Spec, Value) is Map)
 						return true
-				ErrorText := GestureSendInputErrorText(Spec)
+				ErrorText := GestureSendKeysErrorText(Spec)
 				return false
 		}
 		; Syntax only, before the trim too: a padded value is not the one the
@@ -270,7 +270,7 @@ GestureActionParameterPrompt(ActionName) {
 								SendKeysVocabulary()["text_max_code_points"])
 				case "key", "shortcut":
 						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
-								"{1}", SendInputDescribeKeys())
+								"{1}", SendKeysDescribeKeys())
 				case "llm_prompt":
 						return StrReplace(t("dialog.gestures.param_llm_prompt"), "{1}",
 								LLM_Menu_PromptChoicesText())
@@ -306,7 +306,7 @@ GestureClearPickedParameter() {
 ; picker's own editor shows the same text as the native prompt.
 ; @param {String} Spec "text", "key" or "shortcut".
 ; @returns {String}
-GestureSendInputErrorText(Spec) {
+GestureSendKeysErrorText(Spec) {
 		return StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
 				SendKeysVocabulary()["text_max_code_points"])
 }

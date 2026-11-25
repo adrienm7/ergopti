@@ -77,7 +77,7 @@ SendKeysVocabularyJson() {
 ; do byte by byte, so the three drivers would read one value three ways.
 ; @param {String} Text
 ; @returns {String}
-_SendInputAsciiLower(Text) {
+_SendKeysAsciiLower(Text) {
 	Out := ""
 	loop parse Text {
 		Code := Ord(A_LoopField)
@@ -89,7 +89,7 @@ _SendInputAsciiLower(Text) {
 ; Splits a string into code points, joining each UTF-16 surrogate pair.
 ; @param {String} Text
 ; @returns {Array} One string per code point.
-_SendInputCodePoints(Text) {
+_SendKeysCodePoints(Text) {
 	Points := []
 	Index := 1
 	Length := StrLen(Text)
@@ -104,7 +104,7 @@ _SendInputCodePoints(Text) {
 
 ; @param {String} Point One code point.
 ; @returns {Boolean} True for C0 and C1 control characters.
-_SendInputIsControl(Point) {
+_SendKeysIsControl(Point) {
 	Code := Ord(Point)
 	return Code <= 0x1F || (Code >= 0x7F && Code <= 0x9F)
 }
@@ -113,7 +113,7 @@ _SendInputIsControl(Point) {
 ; @param {Array} Entries send_keys.json "keys" or "modifiers".
 ; @param {String} Wanted A lowered token.
 ; @returns {Map|String} The entry, or "" when none matches.
-_SendInputFindEntry(Entries, Wanted) {
+_SendKeysFindEntry(Entries, Wanted) {
 	for _, Entry in Entries {
 		if (Entry["id"] == Wanted)
 			return Entry
@@ -128,7 +128,7 @@ _SendInputFindEntry(Entries, Wanted) {
 ; The named keys as one line for a prompt, a run of function keys collapsed to
 ; its bounds ("f1…f20") so the list stays readable.
 ; @returns {String}
-SendInputDescribeKeys() {
+SendKeysDescribeKeys() {
 	Names := []
 	RunFirst := ""
 	RunLast := ""
@@ -162,14 +162,14 @@ SendInputDescribeKeys() {
 ; Parses a send_text value.
 ; @param {String} Value
 ; @returns {Map|String} Map("text", ..., "canonical", ...), or "" when invalid.
-SendInputParseText(Value) {
+SendKeysParseText(Value) {
 	if !(Value is String)
 		return ""
-	Points := _SendInputCodePoints(Value)
+	Points := _SendKeysCodePoints(Value)
 	if (Points.Length == 0 || Points.Length > SendKeysVocabulary()["text_max_code_points"])
 		return ""
 	for _, Point in Points {
-		if _SendInputIsControl(Point)
+		if _SendKeysIsControl(Point)
 			return ""
 	}
 	return Map("text", Value, "canonical", Value)
@@ -180,20 +180,20 @@ SendInputParseText(Value) {
 ; @param {Boolean} LowerLetter True inside a shortcut, where A names the key.
 ; @returns {Map|String} Map("named", id) or Map("char", ...), with "canonical";
 ;   "" when invalid.
-SendInputParseKey(Value, LowerLetter := false) {
+SendKeysParseKey(Value, LowerLetter := false) {
 	global SEND_INPUT_TRIM
 	if !(Value is String)
 		return ""
 	Wanted := Trim(Value, SEND_INPUT_TRIM)
 	if (Wanted == "")
 		return ""
-	Entry := _SendInputFindEntry(SendKeysVocabulary()["keys"], _SendInputAsciiLower(Wanted))
+	Entry := _SendKeysFindEntry(SendKeysVocabulary()["keys"], _SendKeysAsciiLower(Wanted))
 	if (Entry is Map)
 		return Map("named", Entry["id"], "canonical", Entry["id"])
-	Points := _SendInputCodePoints(Wanted)
-	if (Points.Length != 1 || _SendInputIsControl(Wanted))
+	Points := _SendKeysCodePoints(Wanted)
+	if (Points.Length != 1 || _SendKeysIsControl(Wanted))
 		return ""
-	Char := LowerLetter ? _SendInputAsciiLower(Wanted) : Wanted
+	Char := LowerLetter ? _SendKeysAsciiLower(Wanted) : Wanted
 	return Map("char", Char, "canonical", Char)
 }
 
@@ -201,7 +201,7 @@ SendInputParseKey(Value, LowerLetter := false) {
 ; @param {String} Value
 ; @returns {Map|String} Map("mods", [ids in vocabulary order], "named"/"char",
 ;   "canonical"), or "" when invalid.
-SendInputParseShortcut(Value) {
+SendKeysParseShortcut(Value) {
 	global SEND_INPUT_TRIM
 	if !(Value is String)
 		return ""
@@ -220,13 +220,13 @@ SendInputParseShortcut(Value) {
 	Vocabulary := SendKeysVocabulary()
 	Held := Map()
 	for _, Token in ModTokens {
-		Entry := _SendInputFindEntry(Vocabulary["modifiers"],
-			_SendInputAsciiLower(Trim(Token, SEND_INPUT_TRIM)))
+		Entry := _SendKeysFindEntry(Vocabulary["modifiers"],
+			_SendKeysAsciiLower(Trim(Token, SEND_INPUT_TRIM)))
 		if !(Entry is Map) || Held.Has(Entry["id"])
 			return ""
 		Held[Entry["id"]] := true
 	}
-	Key := SendInputParseKey(KeyToken, true)
+	Key := SendKeysParseKey(KeyToken, true)
 	if !(Key is Map)
 		return ""
 	Mods := []
@@ -248,7 +248,7 @@ SendInputParseShortcut(Value) {
 ; @param {Map|String} Entry Set to the key a {name} or {name N} names.
 ; @param {Integer} Count Set to how many times to press it.
 ; @returns {Boolean} False when the group is not a token.
-_SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
+_SendKeysReadOutputGroup(Inner, &Text, &Entry, &Count) {
 	Text := ""
 	Entry := ""
 	Count := 1
@@ -273,7 +273,7 @@ _SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
 		if (Count > Vocabulary["output_key_max_repeat"])
 			return false
 	}
-	Entry := _SendInputFindEntry(Vocabulary["keys"], _SendInputAsciiLower(Group[1]))
+	Entry := _SendKeysFindEntry(Vocabulary["keys"], _SendKeysAsciiLower(Group[1]))
 	return Entry is Map
 }
 
@@ -284,7 +284,7 @@ _SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
 ; @returns {Map} "tokens", an ordered Array of Map("kind", "text", "value", ...)
 ;   and Map("kind", "key", "id", ..., "entry", ..., "count", ...); "text", the typed
 ;   text alone; "has_keys".
-SendInputParseOutput(Value) {
+SendKeysParseOutput(Value) {
 	if !(Value is String)
 		throw TypeError("A hotstring output must be a string.")
 	Vocabulary := SendKeysVocabulary()
@@ -317,11 +317,11 @@ SendInputParseOutput(Value) {
 		Char := SubStr(Value, At, 1)
 		Index := At + 1
 		if (Char == "`t") {
-			PushKey(_SendInputFindEntry(Vocabulary["keys"], "tab"), 1)
+			PushKey(_SendKeysFindEntry(Vocabulary["keys"], "tab"), 1)
 		} else if (Char == "`r" || Char == "`n") {
 			if (Char == "`r" && SubStr(Value, Index, 1) == "`n")
 				Index += 1
-			PushKey(_SendInputFindEntry(Vocabulary["keys"], "enter"), 1)
+			PushKey(_SendKeysFindEntry(Vocabulary["keys"], "enter"), 1)
 		} else if (SubStr(Value, At, 3) == "{{}") {
 			PushText("{")
 			Index := At + 3
@@ -330,7 +330,7 @@ SendInputParseOutput(Value) {
 			Index := At + 3
 		} else {
 			Close := InStr(Value, "}", true, Index)
-			if (Close > 0 && _SendInputReadOutputGroup(SubStr(Value, Index, Close - Index),
+			if (Close > 0 && _SendKeysReadOutputGroup(SubStr(Value, Index, Close - Index),
 					&Text, &Entry, &Count)) {
 				if (Entry is Map)
 					PushKey(Entry, Count)
@@ -348,9 +348,9 @@ SendInputParseOutput(Value) {
 
 ; The Send string of a parsed output. {Text} covers the whole rest of a Send, so
 ; text and keys cannot alternate under it: the text goes out escaped instead.
-; @param {Map} Parsed A result of SendInputParseOutput.
+; @param {Map} Parsed A result of SendKeysParseOutput.
 ; @returns {String}
-SendInputOutputPayload(Parsed) {
+SendKeysOutputPayload(Parsed) {
 	Payload := ""
 	for _, Token in Parsed["tokens"] {
 		if (Token["kind"] == "text")
@@ -366,14 +366,14 @@ SendInputOutputPayload(Parsed) {
 ; @param {String} Kind "text", "key" or "shortcut".
 ; @param {String} Value
 ; @returns {Map|String} The parse, or "" when invalid.
-SendInputParse(Kind, Value) {
+SendKeysParse(Kind, Value) {
 	switch Kind {
 		case "text":
-			return SendInputParseText(Value)
+			return SendKeysParseText(Value)
 		case "key":
-			return SendInputParseKey(Value)
+			return SendKeysParseKey(Value)
 		case "shortcut":
-			return SendInputParseShortcut(Value)
+			return SendKeysParseShortcut(Value)
 	}
 	throw ValueError("No send-input parameter kind '" . Kind . "'.")
 }
@@ -394,7 +394,7 @@ SendInputParse(Kind, Value) {
 ; the braces, keeping literal braces and explicit Unicode keys safe.
 ; @param {Map} Parsed A key or shortcut parse.
 ; @returns {String}
-_SendInputAhkKey(Parsed) {
+_SendKeysAhkKey(Parsed) {
 	if Parsed.Has("char") {
 		Char := Parsed["char"]
 		if StrLen(Char) == 2 {
@@ -404,7 +404,7 @@ _SendInputAhkKey(Parsed) {
 		}
 		return Char
 	}
-	return _SendInputFindEntry(SendKeysVocabulary()["keys"], Parsed["named"])["ahk"]
+	return _SendKeysFindEntry(SendKeysVocabulary()["keys"], Parsed["named"])["ahk"]
 }
 
 ; Types or presses a parsed value through the driver's synthetic-input choke
@@ -413,26 +413,26 @@ _SendInputAhkKey(Parsed) {
 ; transaction. Both run at SendLevel 0, so the prefix watcher's I1 InputHook
 ; never reads them back as typing.
 ; @param {String} Kind "text", "key" or "shortcut".
-; @param {Map} Parsed The parse SendInputParse returned for the value.
+; @param {Map} Parsed The parse SendKeysParse returned for the value.
 ; @returns {Boolean} True when the OS accepted the input.
-SendInputEmit(Kind, Parsed) {
+SendKeysEmit(Kind, Parsed) {
 	if !(Parsed is Map)
-		throw ValueError("SendInputEmit needs a parsed value.")
+		throw ValueError("SendKeysEmit needs a parsed value.")
 	if (Kind == "text")
 		return SendFinalResult(Parsed["text"], true, true)
 	if (Kind == "key")
-		return TextPressKey(_SendInputAhkKey(Parsed), [])
+		return TextPressKey(_SendKeysAhkKey(Parsed), [])
 	if (Kind != "shortcut")
 		throw ValueError("No send-input parameter kind '" . Kind . "'.")
 	; primary and ctrl are both Control here; naming it twice would send ^^.
 	Names := []
 	Seen := Map()
 	for _, Id in Parsed["mods"] {
-		Name := _SendInputFindEntry(SendKeysVocabulary()["modifiers"], Id)["ahk"]
+		Name := _SendKeysFindEntry(SendKeysVocabulary()["modifiers"], Id)["ahk"]
 		if !Seen.Has(Name) {
 			Seen[Name] := true
 			Names.Push(Name)
 		}
 	}
-	return TextPressKey(_SendInputAhkKey(Parsed), Names)
+	return TextPressKey(_SendKeysAhkKey(Parsed), Names)
 }

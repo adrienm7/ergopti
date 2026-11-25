@@ -233,13 +233,13 @@ global GESTURE_ACTIONS := Map(
 				Fn: (BindingId := "") => GestureWrapSelection(BindingId),
 		},
 		"send_text", {
-				Fn: (BindingId := "") => GestureSendInput("send_text", BindingId),
+				Fn: (BindingId := "") => GestureSendKeys("send_text", BindingId),
 		},
 		"send_key", {
-				Fn: (BindingId := "") => GestureSendInput("send_key", BindingId),
+				Fn: (BindingId := "") => GestureSendKeys("send_key", BindingId),
 		},
 		"send_shortcut", {
-				Fn: (BindingId := "") => GestureSendInput("send_shortcut", BindingId),
+				Fn: (BindingId := "") => GestureSendKeys("send_shortcut", BindingId),
 		},
 		; The Win+D and Win+S shortcuts' own functions (modules/shortcuts/win.ahk),
 		; so a gesture and the fixed shortcut cannot drift apart.
@@ -833,16 +833,16 @@ GestureWrapSelection(BindingId := "") {
 ; @param {String} ActionName send_text, send_key or send_shortcut.
 ; @param {String} BindingId The binding whose parameter holds the value.
 ; @returns {Boolean} True when the input was sent.
-GestureSendInput(ActionName, BindingId := "") {
+GestureSendKeys(ActionName, BindingId := "") {
 		Kind := GestureActionParameterSpec(ActionName)
-		Parsed := SendInputParse(Kind, GestureGetActionParameter(BindingId, ActionName))
+		Parsed := SendKeysParse(Kind, GestureGetActionParameter(BindingId, ActionName))
 		if !(Parsed is Map) {
 				LoggerWarn("gestures", "{1} ignored for binding '{2}': no valid value is stored.", ActionName, BindingId)
 				return false
 		}
 		if !GestureReleaseOwnedCarrierModifiers()
 				return false
-		if !SendInputEmit(Kind, Parsed) {
+		if !SendKeysEmit(Kind, Parsed) {
 				LoggerError("gestures", "{1} for binding '{2}' was not sent.", ActionName, BindingId)
 				return false
 		}

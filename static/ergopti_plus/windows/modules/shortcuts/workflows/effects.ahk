@@ -192,8 +192,8 @@ _WorkflowAfter(Ms, Fn) {
 }
 
 _WorkflowSendShortcut(Combo, Done) {
-	Parsed := SendInputParseShortcut(Combo)
-	Done.Call((Parsed is Map) && SendInputEmit("shortcut", Parsed) ? true : false)
+	Parsed := SendKeysParseShortcut(Combo)
+	Done.Call((Parsed is Map) && SendKeysEmit("shortcut", Parsed) ? true : false)
 }
 
 _WorkflowTypeText(Text, Done) {

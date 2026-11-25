@@ -653,7 +653,7 @@ _ActPickWeb_ParameterStringsJson() {
 	Errors := ""
 	for _, Pair in [["text", "send_text"], ["key", "send_key"], ["shortcut", "send_shortcut"]] {
 		Prompts .= (Prompts = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureActionParameterPrompt(Pair[2]))
-		Errors .= (Errors = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureSendInputErrorText(Pair[1]))
+		Errors .= (Errors = "" ? "" : ",") . _ActPickWeb_Kv(Pair[1], GestureSendKeysErrorText(Pair[1]))
 	}
 	Prompts .= "," . _ActPickWeb_Kv("llm_prompt", GestureActionParameterPrompt("llm_prompt_prediction"))
 	Errors .= "," . _ActPickWeb_Kv("llm_prompt", t("dialog.gestures.param_err_llm_prompt"))

@@ -4,7 +4,7 @@
 ; MODULE: send_text, send_key and send_shortcut Actions (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/action_parameters/send_input_vectors.json, which
-; the macOS and Linux suites replay too, through SendInputParse and the action
+; the macOS and Linux suites replay too, through SendKeysParse and the action
 ; validator, then fires the three actions from a binding and checks the exact
 ; synthetic input: the payload SendInput receives, and that it is sent inside
 ; the hotstring buffers' synthetic transaction (Critical), which is what keeps
@@ -30,7 +30,7 @@ _SIA_ReplayCorpus() {
 	for _, Vector in Corpus["vectors"] {
 		Value := _SIA_Repeat(Vector["value"], Vector.Get("repeat", 1))
 		Valid := !Vector.Has("valid") || Vector["valid"]
-		Parsed := SendInputParse(Vector["kind"], Value)
+		Parsed := SendKeysParse(Vector["kind"], Value)
 		ErrorText := ""
 		AssertEqual(Valid, GestureValidateActionParameter(Actions[Vector["kind"]], Value, &ErrorText),
 			Vector["id"] . ": validation")
@@ -159,7 +159,7 @@ _SNK_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
-	for Symbol in ["SendInputParse", "JsonParse", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
+	for Symbol in ["SendKeysParse", "JsonParse", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The actual scalar producer must have a canonical owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"

@@ -60,7 +60,7 @@ _SNK_NativeSend(Keys) {
 _SNK_Main() {
 	global _SNK, _PrefixInputContextGeneration, _PrefixContentGeneration
 	Value := _SNK.Mode == "ascii" ? "a" : (_SNK.Mode == "bmp" ? Chr(0xE9) : Chr(0x1F44B))
-	Parsed := SendInputParse("key", Value)
+	Parsed := SendKeysParse("key", Value)
 	_SNK_Require(Parsed is Map && Parsed.Has("char") && Parsed["char"] == Value,
 		"The real shared grammar must admit this exact single scalar as a character key.")
 	_SNK.Window := Gui(, "Ergopti native send-key scalar probe")
@@ -73,7 +73,7 @@ _SNK_Main() {
 		_SNK_Target()
 		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
 			_SNK_Require(!GetKeyState(Name, "P") && !GetKeyState(Name), "Release modifiers before native scalar output.")
-		Accepted := SendInputEmit("key", Parsed)
+		Accepted := SendKeysEmit("key", Parsed)
 		Started := A_TickCount
 		while _SNK.Edit.Value != Value && A_TickCount - Started < 1000
 			Sleep(5)

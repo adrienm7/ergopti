@@ -4,7 +4,7 @@
 ; MODULE: Tokens of a Hotstring Output (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/hotstrings/output_token_vectors.json through
-; SendInputParseOutput, which the macOS and Linux suites replay too, then fires
+; SendKeysParseOutput, which the macOS and Linux suites replay too, then fires
 ; entries through the loaders' one registrar and reads the exact burst.
 ;
 ; ROOT CAUSE ENCODED:
@@ -22,7 +22,7 @@ _HOT_ReplayCorpus() {
 	Corpus := JsonParse(FileRead(Path, "UTF-8"))
 	Checked := 0
 	for _, Vector in Corpus["vectors"] {
-		Parsed := SendInputParseOutput(Vector["output"])
+		Parsed := SendKeysParseOutput(Vector["output"])
 		AssertEqual(Vector["text"], Parsed["text"], Vector["id"] . ": typed text")
 		AssertEqual(Vector["has_keys"] ? true : false, Parsed["has_keys"] ? true : false,
 			Vector["id"] . ": has_keys")

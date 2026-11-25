@@ -17,7 +17,7 @@
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []

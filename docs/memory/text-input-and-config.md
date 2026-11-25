@@ -215,7 +215,7 @@ checked `sru`, so the bundled correction still applies to that typing.
 
 A TOML output is a small grammar (`{Left}`, `{Left 2}`, `{U+27C3}`, `{{}`), one
 shared rule read by `_shared/platform/input` `parse_output` and Windows
-`SendInputParseOutput`, pinned by `output_token_vectors.json`, over the keys of
+`SendKeysParseOutput`, pinned by `output_token_vectors.json`, over the keys of
 `send_keys.json`. It is not AutoHotkey Send syntax: `+ ^ ! #` and `{Ctrl down}` stay
 text on purpose, or one OS would run what another prints. Registration resolves
 it: an output with no key becomes its characters (so the matcher, casing and

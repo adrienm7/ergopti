@@ -19,7 +19,7 @@
 ; 3. Byte bounds count UTF-8 bytes (NativeTextUtf8Length), as the Lua model's
 ;    string lengths do, never UTF-16 units.
 ; 4. A key combination uses the send_shortcut grammar of send_keys.json
-;    (SendInputParseShortcut), never a second vocabulary.
+;    (SendKeysParseShortcut), never a second vocabulary.
 ; 5. Pure: no logger, no i18n, no I/O; callers report and localize.
 ; ==============================================================================
 
@@ -242,7 +242,7 @@ class WorkflowChecker {
 			case "shortcut":
 				if !(Value is String)
 					this.Refuse("bad_type", Path)
-				if !(SendInputParseShortcut(Value) is Map)
+				if !(SendKeysParseShortcut(Value) is Map)
 					this.Refuse("bad_shortcut", Path)
 			case "integer":
 				if !_WorkflowIsInteger(Value)

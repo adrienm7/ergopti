@@ -370,12 +370,12 @@ HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
 		; OnlyText = true, and {Text} typed {Left} and {U+27C3} as characters. A caller
 		; that names OnlyText has already decided what its output is.
 		if (!Options.Has("OnlyText") and RegExMatch(Output, "[{`r`n`t]")) {
-				Parsed := SendInputParseOutput(Output)
+				Parsed := SendKeysParseOutput(Output)
 				if Parsed["has_keys"] {
 						Options := Options.Clone()
 						Options["OnlyText"] := false
 						Options["PreviewOutput"] := Parsed["text"]
-						Output := SendInputOutputPayload(Parsed)
+						Output := SendKeysOutputPayload(Parsed)
 				} else {
 						Output := Parsed["text"]
 				}
