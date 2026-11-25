@@ -287,7 +287,7 @@ AutoClickRunning() {
 }
 
 ; Starts the screen vision service once; this owner starts it for the
-; auto-clicker and for the « Capture → texte » action alike.
+; auto-clicker, the « Capture → texte » action and the workflow screen steps.
 AutoClickVision() {
 	if !AutoClickOwner.vision_started {
 		ScreenVisionInit()

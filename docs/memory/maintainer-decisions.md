@@ -237,6 +237,11 @@ open until the maintainer confirms or changes it.
   decided by the agent on 2026-11-25, to review by the maintainer: the
   gesture executor's actions return no success flag on Windows, so only an
   error stops the workflow there.
+- **A Windows « full » capture is the primary monitor** — decided by the
+  agent on 2026-11-25, to review by the maintainer, as macOS captures its
+  first screen; « region » draws the overlay of the « Capture → texte »
+  action (`RegionSelect`), and an embedded image becomes a private template
+  file in the screen vision service's cache folder, written once per image.
 - **A Windows shell step fails on a non-zero exit code** — decided by the
   agent on 2026-11-25, to review by the maintainer: its stdout, read once the
   child exits and bounded by `[limits] user_action_output_bytes` as a

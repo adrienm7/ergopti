@@ -284,6 +284,14 @@ _ScreenVisionPart(Name) {
 	return Ready[Name]
 }
 
+; The private folder of the running service, where a caller leaves a PNG it
+; hands to the service (a workflow's embedded image as a template).
+ScreenVisionCacheDir() {
+	if ScreenVisionOwner.state = "stopped" || ScreenVisionOwner.queue == ""
+		throw Error("The screen vision service is not initialised.")
+	return ScreenVisionOwner.queue
+}
+
 ; What works now: Map capture, region, ocr, each Map ok, reason.
 ScreenVisionAvailability() {
 	if ScreenVisionOwner.state = "stopped"

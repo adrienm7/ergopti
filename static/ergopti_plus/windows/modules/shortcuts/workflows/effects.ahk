@@ -12,9 +12,11 @@
 ; the binding editors, Escape and the pause.
 ;
 ; FEATURES & RATIONALE:
-; 1. A missing capability is named, never skipped: the screen steps answer
-;    screen_service_missing until the screen vision service is wired, a port
-;    that says no answers step_failed.
+; 1. A missing capability is named, never skipped: without a screen port the
+;    screen steps answer screen_service_missing, a port that says no answers
+;    step_failed. The screen port is WorkflowScreen (screen.ahk) over the screen
+;    vision service: the front window, embedded PNGs written as private
+;    template files, OCR with the shared text match, the interactive region.
 ; 2. A shell step runs `cmd.exe /d /s /c` with the run_command line
 ;    (UserActionHiddenShellLine): the command reaches the inner cmd.exe by
 ;    delayed expansion of a private variable, and the workflow variables are
@@ -65,8 +67,9 @@ WorkflowEnvironment(Variables) {
 class WorkflowEffects {
 	/**
 	 * @param {Map} Ports The WORKFLOW_REQUIRED_EFFECT_PORTS callables, and
-	 *   optionally "screen", a Map of wait_for, capture, ocr, click_target and
-	 *   visible callables (Effect, Done(Result Map)) -> cancel callable or 0.
+	 *   optionally "screen", an object (WorkflowScreen) whose wait_for,
+	 *   capture, ocr, click_target and visible methods take (Effect,
+	 *   Done(Result Map), Workflow) and return a cancel callable.
 	 */
 	__New(Ports) {
 		global WORKFLOW_REQUIRED_EFFECT_PORTS
@@ -111,9 +114,9 @@ class WorkflowEffects {
 		if WORKFLOW_SCREEN_OPS.Has(Op) || (Op == "probe" && Effect["condition"]["type"] == "visible") {
 			Name := Op == "probe" ? "visible" : Op
 			Screen := Ports.Get("screen", 0)
-			if !(Screen is Map) || !HasMethod(Screen.Get(Name, 0), "Call")
+			if !IsObject(Screen) || !HasMethod(Screen, Name)
 				return this.Finish(Effect, Done, Map("ok", false, "reason", "screen_service_missing"))
-			return this.Keep(Effect, Screen[Name].Call(Effect, (Result) => this.Finish(Effect, Done, Result)))
+			return this.Keep(Effect, Screen.%Name%(Effect, (Result) => this.Finish(Effect, Done, Result), Workflow))
 		}
 		switch Op, true {
 			case "send_keys":
@@ -358,6 +361,91 @@ _WorkflowDefaultEffectPorts() {
 		"app_front", _WorkflowAppFront)
 }
 
+; The screen vision service, started once by its owner (AutoClickVision).
+_WorkflowVisionReady() {
+	AutoClickVision()
+	return true
+}
+
+; The front window, as the auto-clicker scans it.
+_WorkflowWindowImage(Done) {
+	Hwnd := WIGetForegroundHwnd()
+	if !Hwnd
+		return Done.Call(0, "no_foreground_window")
+	_WorkflowVisionReady()
+	ScreenVisionCaptureWindow(Hwnd, Done)
+}
+
+; full: the primary monitor; window: the front window; region: the overlay the
+; « Capture → texte » action draws (RegionSelect).
+_WorkflowCapture(Mode, Done) {
+	AsCapture := (Image, Reason := "") => IsObject(Image) ? Done.Call(Map("image", Image)) : Done.Call(0, Reason)
+	if Mode == "window"
+		return _WorkflowWindowImage(AsCapture)
+	_WorkflowVisionReady()
+	if Mode == "full" {
+		Bounds := MCGetMonitorBounds(1)
+		return ScreenVisionCaptureRegion(Map("x", Bounds["left"], "y", Bounds["top"],
+			"width", Bounds["right"] - Bounds["left"], "height", Bounds["bottom"] - Bounds["top"]), AsCapture)
+	}
+	if !RegionSelect((Rect, Reason := "") => IsObject(Rect) ? ScreenVisionCaptureRegion(Rect, AsCapture)
+			: Done.Call(0, "capture_refused"))
+		Done.Call(0, "capture_refused")
+}
+
+; An embedded PNG as a template: a private file in the service's cache folder,
+; written once per image.
+_WorkflowTemplate(Bytes, Key, Done) {
+	global WORKFLOW_LOG
+	static Paths := Map(), Count := 0
+	Digest := CryptoSha256Bytes(Bytes)
+	if !Paths.Has(Digest) {
+		_WorkflowVisionReady()
+		Count += 1
+		try {
+			Path := ScreenVisionCacheDir() . "\workflow_template_" . Count . ".png"
+			FSWriteBytesStrict(Path, Bytes)
+		} catch as Err {
+			LoggerWarn(WORKFLOW_LOG, "A workflow image could not be written as a template ({1}).", Type(Err))
+			return Done.Call(0, "template_unreadable")
+		}
+		Paths[Digest] := Path
+	}
+	Done.Call(Map("path", Paths[Digest]))
+}
+
+_WorkflowMatch(Image, Templates, Done) {
+	ScreenVisionMatch(Image, Templates, WorkflowsModule.Matcher, Done)
+}
+
+; A target search reads sparse text; an ocr step reads a block.
+_WorkflowRecognize(Capture, Done) {
+	Options := Map("layout", Capture.Get("layout", "block"))
+	if Capture.Has("image")
+		return ScreenVisionRecognizeText(Capture["image"], Options, Done)
+	ScreenVisionRecognizeFile(Capture["path"], Options, Done)
+}
+
+; The service writes every capture to a PNG file: its path is the step's value.
+_WorkflowSave(Capture, Done) {
+	Done.Call(Capture.Has("path") ? Capture["path"] : Capture["image"]["source"])
+}
+
+_WorkflowClickPoint(Frame, Scale, Hit) {
+	AutoClickClickPoint(Frame["x"], Frame["y"], Scale,
+		{ X: Hit["x"], Y: Hit["y"], Width: Hit["width"], Height: Hit["height"] }, &X, &Y)
+	return [X, Y]
+}
+
+; The Windows vision ports of the screen steps.
+_WorkflowVisionPorts() {
+	return Map("window_image", _WorkflowWindowImage, "capture", _WorkflowCapture, "template", _WorkflowTemplate,
+		"match", _WorkflowMatch, "recognize", _WorkflowRecognize, "save", _WorkflowSave,
+		"click", (X, Y, Button, Done) => _WorkflowMouseClick(X, Y, Button, 1, Done),
+		"click_point", _WorkflowClickPoint, "find_text", ScreenVisionFindText, "after", _WorkflowAfter,
+		"now_ms", () => A_TickCount)
+}
+
 ; The config-folder file ports: an absent file reads as 0, any other failure raises.
 _WorkflowDefaultStorePorts() {
 	return Map("path", _WorkflowConfigPath, "read", _WorkflowReadConfigFile, "write", _WorkflowWriteConfigFile)
@@ -404,6 +492,7 @@ class WorkflowsModule {
 	static Owner := 0
 	static Given := 0
 	static Catalogue := 0
+	static Matcher := 0
 }
 
 ; The registry deadlines steps.json names, and the wait-for poll interval.
@@ -431,7 +520,7 @@ WorkflowCatalogue() {
  * @returns {WorkflowOwner}
  */
 WorkflowsInit(Overrides := 0) {
-	global WORKFLOW_LOG
+	global WORKFLOW_LOG, _SharedDir
 	if IsObject(WorkflowsModule.Owner) {
 		if IsObject(Overrides) && Overrides != WorkflowsModule.Given
 			throw Error("The workflow owner is already initialized with other ports.", -1)
@@ -448,6 +537,12 @@ WorkflowsInit(Overrides := 0) {
 	if !(Timeouts is Map)
 		Timeouts := WorkflowRegistryTimeouts()
 	StorePorts["catalogue"] := WorkflowCatalogue()
+	if !Given.Get("effects", Map()).Has("screen") {
+		WorkflowsModule.Matcher := JsonParse(FSReadStrict(_SharedDir . "\shortcuts\data\auto_click_defaults.json"))
+		EffectPorts["screen"] := WorkflowScreen(_WorkflowVisionPorts(), Map("catalogue", StorePorts["catalogue"],
+			"poll_ms", Timeouts["wait_for_poll_ms"], "text_max_distance", WorkflowsModule.Matcher["text_max_distance"],
+			"threshold", WorkflowsModule.Matcher["threshold"]))
+	}
 	StorePorts["timings"] := Map("wait_max_ms", Timeouts["wait_max_ms"])
 	WorkflowsModule.Owner := WorkflowOwner(Map("store", StorePorts, "effects", WorkflowEffects(EffectPorts),
 		"after", EffectPorts["after"], "timeouts", Timeouts,

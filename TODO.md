@@ -475,9 +475,8 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   - Windows: the model, runner, `run_workflow`, the window and its Shortcuts row are ported
     (`windows/modules/shortcuts/workflows/`, `tests/unit/modules/shortcuts/workflows/`) and run first on the
     Windows CI; left, a field check of every step kind, Escape and the window on a real Windows desktop.
-  - Screen steps on Windows: wire the AutoHotkey runner to `ScreenVision*` as
-    `_shared/shortcuts/engine/workflows/screen.lua` does on macOS and Linux; until then they stop with
-    `screen_service_missing`.
+  - Screen steps on Windows run on `ScreenVision*` through `modules/shortcuts/workflows/screen.ahk`; left, a
+    field check of wait_for, click_target, capture, ocr and « visible » on a real Windows desktop.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S01 to S26 are on dev.
       Left: S27 (install) to S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per
