@@ -299,6 +299,8 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keystats)\n"
 				.. "local ch, app_id, tooltip_preview, result, now_ms = '★', 'owned-fixture', nil, nil, 0\n"
 				.. "local opts = { dry_run = false }\n"
+				-- A key of an admitted field: the window mode feeds no prediction.
+				.. "local _metrics_admitted = true\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
 			local engine = require("hotstrings.engine.matcher").new()
 			-- The daemon's engine wrapper also carries the AI context; this slice only

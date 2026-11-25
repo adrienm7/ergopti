@@ -186,4 +186,17 @@ helpers.describe("FocusGuard: text automation without a field verdict", function
 		helpers.assert_eq(owner.current(), false)
 		helpers.assert_eq(owner.cached(), false)
 	end)
+
+	helpers.it("(text-automation-window) a key typed in the window mode never reaches the AI prediction", function()
+		-- Fed there, the prediction kept the unjoined field's empty target for
+		-- the whole word, and the pause after it asked nothing (mousepad's title
+		-- change on the first key, AI inline container proof, 2026-11-25).
+		local source = assert(helpers.read_module_source("ergopti_hotstrings"))
+		local admitted = source:find('_metrics_admitted = mode == "field"', 1, true)
+		local feed = source:find("prediction_engine.on_char(ch,", 1, true)
+		helpers.assert_true(admitted ~= nil and feed ~= nil, "the key path admits its mode and feeds the prediction")
+		local gate = source:find("if prediction_engine and _metrics_admitted then", admitted, true)
+		helpers.assert_true(gate ~= nil and gate < feed, "only the field mode feeds the prediction")
+		helpers.assert_true(source:find("prediction_engine.on_char(", feed + 1, true) == nil, "no other key path feeds it")
+	end)
 end)

@@ -1995,7 +1995,10 @@ local function main()
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
 			local start_is_boundary = engine:buffer_starts_at_word_boundary()
-			if prediction_engine then
+			-- The window mode admits the expansion, never the AI (INVARIANTS 6):
+			-- fed there, the prediction kept the unjoined field's empty target
+			-- for the whole word and refused every later request on it.
+			if prediction_engine and _metrics_admitted then
 				local predicted, prediction_err = pcall(function()
 					-- The AI completes its own typing context, not the word buffer.
 					prediction_engine.on_char(ch, engine:ai_context():text(), {
