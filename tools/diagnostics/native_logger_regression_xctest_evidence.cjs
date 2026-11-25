@@ -1,7 +1,8 @@
 // tools/diagnostics/native_logger_regression_xctest_evidence.cjs
 'use strict';
 
-/** Exact unchanged original logger29+directory13; no daemon or full-package qualification. */
+/** Exact logger22+directory13 (the seven topical-view cases retired with the topical sub-files,
+ * 2026-11-25; the scope keeps its historical forty-two name); no daemon or full-package qualification. */
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -28,16 +29,9 @@ const METHODS = Object.freeze({
 		'testShortWriteRollbackLeavesOneRecordInEverySink',
 		'testFailedShortWriteRollbackRetainsDebtBeforeRetry',
 		'testFailedRollbackSynchronizationRetainsDebtBeforeRetry',
-		'testReloadSessionAppendsToTodaysTopicalViewInsteadOfTruncatingIt',
-		'testFreshLauncherPreservesAnExistingSameDayTopicalView',
-		'testFirstRecordAfterMidnightReplacesThePriorDayTopicalView',
-		'testObservedCalendarTransitionRotatesTopicalEvenWhenOldRecordHasNewDayMtime',
-		'testSameDirectoryReconfigureRetainsObservedTopicalCalendarTransition',
-		'testReplacedDirectoryAtSamePathDoesNotReuseTopicalInitializationState',
-		'testTopicalRotationUsesMetadataObservedAfterWaitingForTheWriteLock',
 		'testDrainReceiveLoopBoundsZeroLengthDatagrams',
 		'testBoundLoopbackWorkerAcknowledgesPersistedRecord',
-		'testConfigurePurgesExpiredDailyAndStaleTopicalFiles',
+		'testConfigurePurgesExpiredDailyAndRetiredTopicalFiles',
 		'testFirstRecordOnNewWallClockDayRearmsRetentionWithoutReconfigure',
 		'testSinkReusesADescriptorAcrossAppendsAndReopensAfterUnlink',
 		'testSlowDatagramIsReportedWithItsCostBreakdown',
@@ -104,7 +98,8 @@ function evaluate(text, swiftStatus, captureStatus) {
 				/^\s*Executed (0|[1-9][0-9]*) tests, with 0 failures \(0 unexpected\) in [0-9]+(?:\.[0-9]+)?(?: \([0-9]+(?:\.[0-9]+)?\))? seconds$/.exec(
 					line
 				);
-			const expected = summary === 'root' || summary === 'bundle' ? 42 : METHODS[summary].length;
+			const expected =
+				summary === 'root' || summary === 'bundle' ? NAMES.length : METHODS[summary].length;
 			if (!count || Number(count[1]) !== expected) invalid = true;
 			if (summary === 'root') root = 'after';
 			if (summary === 'bundle') bundle = 'after';
@@ -187,8 +182,8 @@ function evaluate(text, swiftStatus, captureStatus) {
 		active === null &&
 		summary === null &&
 		suites.size === 2 &&
-		starts.size === 42 &&
-		terminals.size === 42 &&
+		starts.size === NAMES.length &&
+		terminals.size === NAMES.length &&
 		NAMES.every((name) => starts.has(name) && terminals.has(name)) &&
 		base.complete &&
 		base.failures.length === 0 &&
@@ -197,7 +192,7 @@ function evaluate(text, swiftStatus, captureStatus) {
 	return {
 		schema: 1,
 		scope: 'native-logger-original-forty-two',
-		expected: 42,
+		expected: NAMES.length,
 		observed: terminals.size,
 		complete,
 		swift_status: base.script_status,
@@ -260,7 +255,7 @@ function main(args, repository = path.resolve(__dirname, '../..')) {
 				mode: 0o600
 			});
 			console.log(
-				`LOGGER_ORIGINAL_XCTEST complete=${result.complete} cases=${result.observed}/42 packaged_ollama_qualified=false`
+				`LOGGER_ORIGINAL_XCTEST complete=${result.complete} cases=${result.observed}/${NAMES.length} packaged_ollama_qualified=false`
 			);
 			return result.exit_status;
 		}

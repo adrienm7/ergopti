@@ -31,8 +31,9 @@ final class LoggerRetentionParityTests: XCTestCase {
 	// ============================================
 	// ============================================
 
-	/// Replays the dated_retention and topical_retention cases of the shared
-	/// parity corpus through a real purge. The purge compared the archive's noon
+	/// Replays the dated_retention cases of the shared parity corpus through a
+	/// real purge; the native worker no longer keeps topical views, so it is not
+	/// one of the topical_retention drivers. The purge compared the archive's noon
 	/// with now minus N x 86,400 s, so the N-days-old archive vanished after noon
 	/// while Windows and Linux keep it all day (logger parity audit LOG-03).
 	func testRetentionReplaysTheSharedParityCorpus() throws {
@@ -42,9 +43,9 @@ final class LoggerRetentionParityTests: XCTestCase {
 		let corpus = try XCTUnwrap(
 			JSONSerialization.jsonObject(with: Data(contentsOf: corpusURL)) as? [String: Any])
 		let dated = try XCTUnwrap((corpus["dated_retention"] as? [String: Any])?["cases"] as? [[String: Any]])
-		let topical = try XCTUnwrap((corpus["topical_retention"] as? [String: Any])?["cases"] as? [[String: Any]])
 		XCTAssertFalse(dated.isEmpty)
-		XCTAssertFalse(topical.isEmpty)
+		let topicalDrivers = (corpus["topical_retention"] as? [String: Any])?["drivers"] as? [String] ?? []
+		XCTAssertFalse(topicalDrivers.contains("macos_native"))
 
 		for vector in dated {
 			let id = try XCTUnwrap(vector["id"] as? String)
@@ -60,22 +61,6 @@ final class LoggerRetentionParityTests: XCTestCase {
 			sink.performDeferredMaintenance()
 			let purged = try XCTUnwrap(vector["purged"] as? Bool)
 			XCTAssertEqual(!FileManager.default.fileExists(atPath: archive.path), purged, id)
-		}
-
-		for vector in topical {
-			let id = try XCTUnwrap(vector["id"] as? String)
-			let directory = try makeLogDirectory()
-			let view = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-			try Data("view\n".utf8).write(to: view)
-			try FileManager.default.setAttributes(
-				[.modificationDate: try corpusInstant(try XCTUnwrap(vector["modified"] as? String))],
-				ofItemAtPath: view.path)
-			let now = try corpusInstant(try XCTUnwrap(vector["now"] as? String))
-			let sink = LoggerRecordSink(now: { now })
-			XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-			sink.performDeferredMaintenance()
-			let removed = try XCTUnwrap(vector["removed"] as? Bool)
-			XCTAssertEqual(!FileManager.default.fileExists(atPath: view.path), removed, id)
 		}
 	}
 

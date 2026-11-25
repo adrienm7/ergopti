@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"core.logger.engine.logger", "core.logger.adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
-	"core.lifecycle.engine.launcher_environment", "_generated.logger_sub_files", "socket",
+	"core.lifecycle.engine.launcher_environment", "socket",
 }
 
 local function load_policy_logger()

@@ -130,6 +130,12 @@ segments = ["Library", "Logs", "{app}"]
 # Written by the native launcher before any configuration is read, so they
 # always stay in this default folder, whatever LogsDirPath says.
 launcher_log = "launcher.log"
+# The boot journal (core/logger/adapters/boot_journal.lua): every boot stage
+# appended and closed synchronously, so a boot that dies before the native
+# logger commits (os.exit() discards its queue) still leaves its trail. It used
+# to share ErgoptiPlus_boot.log with the retired [init] topical sub-file, a name
+# the retention sweep now deletes.
+boot_journal = "boot_journal.log"
 fatal_report = "hammerspoon-fatal.txt"
 # The controlled reload's synchronous stage trail (diagnostics/adapters/reload_breadcrumb.lua),
 # beside launcher.log for the same reason: a reload that loses the app leaves

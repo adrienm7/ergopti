@@ -10,7 +10,7 @@
 ---
 --- ROOT CAUSE ENCODED:
 --- Buffered DEBUG flushing was a structural false-green: Logger.error still
---- printed, opened the unified/error/topical files, flushed them, and notified
+--- printed, opened the unified and errors files, flushed them, and notified
 --- synchronously. This test observes the complete callback boundary instead of
 --- blessing one conditional inside one file-writer helper.
 --- ==============================================================================
@@ -295,18 +295,6 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			notification_message = message
 			return true
 		end)
-		local route_patterns = {}
-		for _, route in ipairs(require("_generated.logger_sub_files")) do
-			for _, pattern in ipairs(route.patterns) do route_patterns[pattern] = true end
-		end
-		local route_find_calls = 0
-		local raw_string_find = string.find
-		string.find = function(subject, pattern, ...)
-			if route_patterns[pattern] == true then
-				route_find_calls = route_find_calls + 1
-			end
-			return raw_string_find(subject, pattern, ...)
-		end
 
 		local hid_boundary_keys = {
 			"json_encode", "json_decode",
@@ -316,7 +304,6 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		}
 		local before_keydown = {}
 		for _, name in ipairs(hid_boundary_keys) do before_keydown[name] = boundary_calls[name] end
-		before_keydown.route_find = route_find_calls
 
 		local target_delivered = false
 		local body_ok, body_err = xpcall(function()
@@ -332,8 +319,6 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 				helpers.assert_eq(boundary_calls[name], before_keydown[name],
 					"keyDown must cross no " .. name .. " boundary before returning")
 			end
-			helpers.assert_eq(route_find_calls, before_keydown.route_find,
-				"keyDown must not derive topical routes before returning")
 			helpers.assert_eq(console_calls, 0, "Logger must not print before keyDown returns")
 			helpers.assert_eq(file_calls, 0, "Logger must not open a file before keyDown returns")
 			helpers.assert_eq(file_system_write_calls, 0,
@@ -344,14 +329,11 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			while Logger.async_sink_status().queued > 0 do
 				local sends_before_pump = boundary_calls.socket_send
 				local encodes_before_pump = boundary_calls.json_encode
-				local routes_before_pump = route_find_calls
 				pump()
 				helpers.assert_eq(boundary_calls.socket_send, sends_before_pump + 1,
 					"the timer-owned pump must perform the deferred socket send")
 				helpers.assert_true(boundary_calls.json_encode > encodes_before_pump,
 					"the timer-owned pump must perform deferred JSON encoding")
-				helpers.assert_true(route_find_calls > routes_before_pump,
-					"the timer-owned pump must derive the deferred topical route")
 				local decodes_before_ack = boundary_calls.json_decode
 				local records = ack_for(hs_stub, sent, receive_callback, next_sequence,
 					raw_json_encode, raw_json_decode)
@@ -368,7 +350,6 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 
 		io.open = saved_io_open
 		_G.print = saved_print
-		string.find = raw_string_find
 		hs_stub.json.encode = raw_json_encode
 		hs_stub.json.decode = raw_json_decode
 		synthetic_input.enter_callback = original_enter_callback

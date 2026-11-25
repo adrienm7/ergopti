@@ -42,6 +42,7 @@ def home_relative(segments):
 # LogsDirPath override, the driver's own logs.
 LOGS_RELATIVE = home_relative(DATA["logs"]["macos"]["segments"])
 LAUNCHER_LOG_NAME = DATA["logs"]["macos"]["launcher_log"]
+BOOT_JOURNAL_NAME = DATA["logs"]["macos"]["boot_journal"]
 # The default configuration folder and the launcher-managed paths.toml.
 CONFIG_RELATIVE = home_relative(DATA["config"]["macos"]["segments"])
 PATHS_FILE_RELATIVE = home_relative(DATA["config"]["macos"]["paths_file"])

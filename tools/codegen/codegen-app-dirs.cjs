@@ -187,6 +187,7 @@ const macos = {
 	base: requireString(data.macos, 'base', 'logs.macos'),
 	relative: relative('macos', '/'),
 	launcherLog: requireString(data.macos, 'launcher_log', 'logs.macos'),
+	bootJournal: requireString(data.macos, 'boot_journal', 'logs.macos'),
 	fatalReport: requireString(data.macos, 'fatal_report', 'logs.macos'),
 	reloadBreadcrumb: requireString(data.macos, 'reload_breadcrumb', 'logs.macos')
 };
@@ -403,6 +404,7 @@ function emitLua() {
 		`\t\tsupport_relative = ${luaStr(support.macos.relative)},\n` +
 		`\t\tcache_relative = ${luaStr(cache.macos.relative)},\n` +
 		`\t\tlauncher_log = ${luaStr(macos.launcherLog)},\n` +
+		`\t\tboot_journal = ${luaStr(macos.bootJournal)},\n` +
 		`\t\tfatal_report = ${luaStr(macos.fatalReport)},\n` +
 		`\t\treload_breadcrumb = ${luaStr(macos.reloadBreadcrumb)},\n` +
 		'\t},\n' +

@@ -48,11 +48,6 @@ package.loaded["core.logger.engine.logger"] = nil
 local Logger = require("core.logger.engine.logger")
 
 helpers.admit_logger_privacy(Logger)
--- Age (days) stamped on the fake topical sub-file so the ephemeral pass must drop it.
-local STALE_SUB_FILE_AGE_DAYS = 3
-
--- Seconds per day — mirrors the logger's own retention unit.
-local SECONDS_PER_DAY = 86400
 
 -- Retention window passed to every purge call in this file.
 local RETENTION_DAYS = 14
@@ -87,7 +82,7 @@ end
 local function with_fake_log_dir(entries, body)
 	local hs            = _G.hs
 	local saved_dir     = hs.fs.dir
-	local saved_attrs   = hs.fs.attributes
+	local saved_attrs   = hs.fs.symlinkAttributes
 	local saved_remove  = os.remove
 
 	hs.fs.dir = function(_path)
@@ -101,10 +96,10 @@ local function with_fake_log_dir(entries, body)
 			return entries[index]
 		end, dir_object
 	end
-	-- Every sub-file reports a modification date several days in the past, so the
-	-- ephemeral (today-only) pass must remove it.
-	hs.fs.attributes = function(_path)
-		return { modification = os.time() - (STALE_SUB_FILE_AGE_DAYS * SECONDS_PER_DAY) }
+	-- Every entry is a regular file modified today: a retired topical sub-file
+	-- is removed whatever its age.
+	hs.fs.symlinkAttributes = function(_path)
+		return { mode = "file", modification = os.time() }
 	end
 
 	local removed = {}
@@ -114,7 +109,7 @@ local function with_fake_log_dir(entries, body)
 
 	os.remove        = saved_remove
 	hs.fs.dir        = saved_dir
-	hs.fs.attributes = saved_attrs
+	hs.fs.symlinkAttributes = saved_attrs
 
 	if not ok then error(err, 0) end
 end
@@ -187,12 +182,46 @@ helpers.describe("logger — old-log purge is deferred AND spawns no subprocess"
 			helpers.assert_true(contains_name(removed, "ErgoptiPlus_2000-01-01.log"),
 				"a stale main daily log must still be purged")
 			helpers.assert_true(contains_name(removed, "ErgoptiPlus_llm.log"),
-				"a topical sub-file whose mtime is not today must be purged (they are ephemeral)")
+				"a retired topical sub-file must be purged even when modified today")
 
 			helpers.assert_true(not contains_name(removed, "ErgoptiPlus_" .. today .. ".log"),
 				"today's main log must NEVER be purged — it is the file being written to")
 			helpers.assert_true(not contains_name(removed, "ErgoptiPlus_errors_" .. today .. ".log"),
 				"today's errors sink must NEVER be purged")
+		end)
+	end)
+
+	helpers.it("deletes every retired topical sub-file and nothing else in the folder", function()
+		-- The retired names go by exact name and only as regular files, whatever
+		-- their age; a link named like one, a file that only shares the prefix and
+		-- today's daily log stay (one daily log only, 2026-11-25).
+		local retired = require("core.fs.engine.app_dirs").files.retired_topical_logs
+		helpers.assert_eq(#retired, 13, "the thirteen retired topical names")
+		local today_log = "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+		local entries = { ".", "..", today_log, "ErgoptiPlus_notes.txt" }
+		for _, name in ipairs(retired) do entries[#entries + 1] = name end
+		local link = TEST_LOG_DIR .. retired[1]
+
+		with_fake_log_dir(entries, function(removed)
+			local hs = _G.hs
+			local regular = hs.fs.symlinkAttributes
+			hs.fs.symlinkAttributes = function(path)
+				if path == link then return { mode = "link", modification = os.time() } end
+				return regular(path)
+			end
+			Logger._purge_old_logs(TEST_LOG_DIR, RETENTION_DAYS)
+			hs.fs.symlinkAttributes = regular
+
+			for index = 2, #retired do
+				helpers.assert_true(contains_name(removed, retired[index]),
+					retired[index] .. " must be deleted by the purge")
+			end
+			helpers.assert_true(not contains_name(removed, retired[1]),
+				"a link named like a retired file is never removed")
+			helpers.assert_true(not contains_name(removed, today_log), "today's daily log stays")
+			helpers.assert_true(not contains_name(removed, "ErgoptiPlus_notes.txt"),
+				"a file that only shares the prefix stays")
+			helpers.assert_eq(#removed, #retired - 1, "nothing else is removed")
 		end)
 	end)
 

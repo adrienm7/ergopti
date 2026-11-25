@@ -4,8 +4,8 @@
 --- MODULE: Logger synchronous file-sink write receipts
 --- DESCRIPTION:
 --- Until the native log worker owns delivery (early boot, and every headless
---- run), the Lua logger writes the unified file, the topical sub-files and the
---- errors-only mirror itself. It ignored every write/flush/close result: on a
+--- run), the Lua logger writes the unified file and the errors-only mirror
+--- itself. It ignored every write/flush/close result: on a
 --- full disk (ENOSPC) each line was lost, the refusing handle stayed cached and
 --- nothing said so (logger-write-receipt-2026-10-21). A refused channel is now
 --- retired, reported once on the console, and reopened on the next line, while
@@ -73,7 +73,7 @@ end
 
 local function unified_path(state)
 	for path in pairs(state.opens) do
-		if not path:find("error", 1, true) and not path:find("karabiner", 1, true) then return path end
+		if not path:find("error", 1, true) then return path end
 	end
 end
 
@@ -124,17 +124,15 @@ helpers.describe("Logger file sinks honour write receipts (logger-write-receipt-
 	end)
 
 	for _, case in ipairs({
-		{ channel = "unified" }, { channel = "topical" }, { channel = "errors-only" },
-		{ channel = "unified", throws = true }, { channel = "topical", throws = true },
-		{ channel = "errors-only", throws = true },
+		{ channel = "unified" }, { channel = "errors-only" },
+		{ channel = "unified", throws = true }, { channel = "errors-only", throws = true },
 	}) do
 		local channel = case.channel
 		helpers.it("reports and retries refused " .. channel .. " opens" .. (case.throws and " with exception" or " with nil") .. " (logger-open-receipt)", function()
 			local denied = true
 			local function matches(path)
 				if channel == "errors-only" then return path:find("error", 1, true) ~= nil end
-				if channel == "topical" then return path:find("karabiner", 1, true) ~= nil end
-				return not path:find("error", 1, true) and not path:find("karabiner", 1, true)
+				return not path:find("error", 1, true)
 			end
 			local state = capture(function(path, operation)
 				if denied and operation == "open" and matches(path) then

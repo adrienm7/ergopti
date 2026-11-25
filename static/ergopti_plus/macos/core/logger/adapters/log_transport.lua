@@ -6,11 +6,11 @@
 --- Moves every production logging side effect out of Hammerspoon's HID callbacks.
 --- A bounded boot-only UDP exchange proves that the native sink is ready before
 --- any input tap is armed. Runtime producers then append immutable records to an
---- in-memory deque; a timer-owned pump performs routing, encoding, socket I/O,
+--- in-memory deque; a timer-owned pump performs privacy preparation, encoding, socket I/O,
 --- retries, and delivery callbacks after the HID callback has returned.
 ---
 --- INVARIANTS:
---- 1. enqueue() performs no socket, timer, console, notification, file, or routing call.
+--- 1. enqueue() performs no socket, timer, console, notification, or file call.
 --- 2. start() succeeds only after an authenticated native configure ACK.
 --- 3. At most one bounded batch is in flight; an ACK can never reorder the retained deque.
 --- 4. A missing ACK retries the byte-identical batch with a bounded backoff and
@@ -58,8 +58,6 @@ local MAX_PREPARE_STEPS_PER_TICK = 64
 -- through this transport.
 local MAX_PREPARE_BYTES_PER_TICK = require("_generated.registry_limits").count("limits", "log_prepare_tick_bytes")
 local MAX_ENQUEUED_LINE_BYTES = MAX_PREPARE_BYTES_PER_TICK
-local DEFAULT_ROUTE_OVERLAP_BYTES = 256
-local MAX_ROUTE_OVERLAP_BYTES = 4096
 local MAX_QUEUED_RECORDS = 8192
 -- Keep a hard tail reserve for diagnostics that explain why the ordinary
 -- stream stopped progressing. Without a separate admission ceiling, DEBUG or
@@ -104,9 +102,7 @@ local _session = nil
 local _previous_session = nil
 local _log_dir = nil
 local _retention_days = nil
-local _route_line = nil
 local _prepare_line = nil
-local _route_overlap_bytes = DEFAULT_ROUTE_OVERLAP_BYTES
 local _batch_record_limit = MAX_BATCH_RECORDS
 local _on_delivered = nil
 local _on_rejected = nil
@@ -546,17 +542,6 @@ local function next_fragment_finish(value, cursor)
 	return finish
 end
 
-local function add_topics(item, routed)
-	item.topic_seen = item.topic_seen or {}
-	item.topics = item.topics or {}
-	for _, topic in ipairs(routed) do
-		if type(topic) == "string" and item.topic_seen[topic] ~= true then
-			item.topic_seen[topic] = true
-			item.topics[#item.topics + 1] = topic
-		end
-	end
-end
-
 local function begin_notification_preparation(item)
 	local notification = item.notification
 	if type(notification) ~= "table" then
@@ -580,16 +565,16 @@ local function begin_notification_preparation(item)
 end
 
 --- Performs at most one bounded fragment of preparation for one producer.
---- All scans, routing, substring allocation and UTF-8 sanitation live here on
+--- All scans, substring allocation and UTF-8 sanitation live here on
 --- the timer boundary; enqueue() publishes the original string reference and
 --- its O(1) admission-time calendar fallback.
 --- @param item table Retained producer record.
---- @return boolean progressed_or_ready False only on a contained routing error.
+--- @return boolean progressed_or_ready False only on a contained preparation error.
 local function prepare_item_step(item)
 	if item.prepared == true then return true, 0 end
 	if item.preparation_stage == nil then
 		local privacy_bytes = 0
-		-- Canonical privacy transforms run only on the owned timer, before routing,
+		-- Canonical privacy transforms run only on the owned timer, before
 		-- fragmentation or native publication. Producer admission stays O(1).
 		if _prepare_line then
 			privacy_bytes = #item.line
@@ -605,9 +590,6 @@ local function prepare_item_step(item)
 		item.fragment_count = 0
 		item.calendar_date = item.line:match("^(%d%d%d%d%-%d%d%-%d%d) ")
 			or item.enqueue_calendar_date
-		item.topics = {}
-		item.topic_seen = {}
-		item.route_tail = ""
 		-- Charge the original input even when secrets shrink to short placeholders.
 		if privacy_bytes > 0 then return true, privacy_bytes end
 	end
@@ -615,20 +597,6 @@ local function prepare_item_step(item)
 	if item.preparation_stage == "line" then
 		local cursor = item.prepare_cursor
 		local finish = next_fragment_finish(item.line, cursor)
-		local chunk = item.line:sub(cursor, finish)
-		if type(_route_line) == "function" then
-			local route_source = item.route_tail .. chunk
-			local route_ok, routed_or_err = xpcall(_route_line, debug.traceback, route_source)
-			if not route_ok or type(routed_or_err) ~= "table" then
-				set_error("topical route derivation failed: " .. tostring(routed_or_err), true)
-				return false, 0
-			end
-			add_topics(item, routed_or_err)
-			if _route_overlap_bytes > 0 then
-				local tail_start = math.max(1, #route_source - _route_overlap_bytes + 1)
-				item.route_tail = route_source:sub(tail_start)
-			end
-		end
 		item.fragment_count = item.fragment_count + 1
 		item.prepare_cursor = finish + 1
 		if item.prepare_cursor > #item.line then
@@ -758,7 +726,6 @@ local function build_next_batch()
 			line = safe_line,
 			variant = item.variant,
 		}
-		if #item.topics > 0 then wire_record.topics = item.topics end
 		wire_records[#wire_records + 1] = wire_record
 		deliveries[#deliveries + 1] = delivery
 		safe_line_bytes = safe_line_bytes + #safe_line
@@ -1186,12 +1153,6 @@ function M.start(options)
 		or batch_record_limit ~= math.floor(batch_record_limit) then
 		return false, "max_batch_records must be an integer between 1 and 64"
 	end
-	local route_overlap_bytes = tonumber(options.route_overlap_bytes)
-		or DEFAULT_ROUTE_OVERLAP_BYTES
-	if route_overlap_bytes < 0 or route_overlap_bytes > MAX_ROUTE_OVERLAP_BYTES
-		or route_overlap_bytes ~= math.floor(route_overlap_bytes) then
-		return false, "route_overlap_bytes must be an integer between 0 and 4096"
-	end
 	if type(options.clock) ~= "function"
 		and type(options.scheduler.now_ns) ~= "function"
 		and type(options.scheduler.now) ~= "function" then
@@ -1235,8 +1196,6 @@ function M.start(options)
 	_log_dir = options.log_dir
 	_retention_days = retention_days
 	_prepare_line = options.prepare_line
-	_route_line = options.route_line
-	_route_overlap_bytes = route_overlap_bytes
 	_batch_record_limit = batch_record_limit
 	_on_delivered = options.on_delivered
 	_on_rejected = options.on_rejected

@@ -15,7 +15,6 @@ local FIXTURE = "tests.support.modules.llm.backends.local_openai_backends_fixtur
 -- that real consumer tree, shared policies and direct injections with the panel;
 -- load_with_stubs separately tracks every cache write made by the loader.
 local OWNED_MODULES = {
-	"_generated.logger_sub_files",
 	"core.crypto.crypto",
 	"core.events.clock",
 	"diagnostics.adapters.event_provenance",

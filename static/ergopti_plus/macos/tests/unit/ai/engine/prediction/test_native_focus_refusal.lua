@@ -8,7 +8,6 @@ local Pipeline = require("tests.support.prediction_pipeline")
 -- injections. The existing fixture and all production entry points stay intact.
 local OWNED = {
 	"_generated.locale_table",
-	"_generated.logger_sub_files",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
 	"core.logger.adapters.log_transport",

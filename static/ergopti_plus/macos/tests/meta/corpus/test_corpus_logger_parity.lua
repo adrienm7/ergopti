@@ -85,5 +85,4 @@ dofile(shared_root .. "/tests/corpus/logger/parity_replay.lua")({
 		return assert(lines[1]:match("%[INFO%] %[LogParity%] (.*)$"), lines[1])
 	end,
 	dated_expired = Logger._dated_log_expired,
-	topical_stale = Logger._topical_log_stale,
 })
