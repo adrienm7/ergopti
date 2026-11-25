@@ -53,6 +53,7 @@ local function build(quits, source_run, startup, paused)
 	package.loaded["ui.menu.start_at_login"] = {
 		command_available = function() return true end,
 		enabled = function() return startup.enabled end,
+		snapshot = function() return { command_available = true, enabled = startup.enabled } end,
 		toggle = function()
 			startup.toggles = startup.toggles + 1
 			startup.enabled = not startup.enabled
@@ -263,6 +264,10 @@ local function with_about_parent(code, options, body)
 		package.loaded["ui.menu.start_at_login"] = {
 			command_available = function() return options.startup_available ~= false end,
 			enabled = function() state.startup_reads = state.startup_reads + 1; return state.enabled end,
+			snapshot = function()
+				state.startup_reads = state.startup_reads + 1
+				return { command_available = options.startup_available ~= false, enabled = state.enabled }
+			end,
 			toggle = function() state.toggles = state.toggles + 1; state.enabled = not state.enabled; return true end,
 		}
 		package.loaded["menu.ui.transactions.uninstall"] = { run = function(opts)

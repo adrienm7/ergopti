@@ -104,12 +104,18 @@ local function _build_layouts(ctx)
 		emulation_changed(committed)
 		return committed
 	end
+	-- One read of config.toml per build: the choice rows and the six switch
+	-- rows each read and decoded it, seven times per tray rebuild.
+	local emulation_settings = nil
+	local function current_emulation_settings()
+		emulation_settings = emulation_settings or require("infra.layout_emulation_preferences").settings()
+		return emulation_settings
+	end
 	providers["layout_emulation"] = function()
-		local Preferences = require("infra.layout_emulation_preferences")
 		local Registry = require("modules.keymap.layout_registry")
 		return EmulationRows.choice_rows({
 			t = i18n_safe,
-			settings = Preferences.settings(),
+			settings = current_emulation_settings(),
 			status = require("modules.keymap.layout_emulation").status(),
 			snapshot = Registry.snapshot(),
 			choose = choose_emulation,
@@ -124,7 +130,8 @@ local function _build_layouts(ctx)
 	local function switch_rows(path, label_key)
 		local Preferences = require("infra.layout_emulation_preferences")
 		return EmulationRows.switch_row({
-			t = i18n_safe, label_key = label_key, checked = Preferences.switch(path),
+			t = i18n_safe, label_key = label_key,
+			checked = require("layouts.engine.emulation.settings").switch_value(current_emulation_settings(), path),
 			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
 		})
 	end

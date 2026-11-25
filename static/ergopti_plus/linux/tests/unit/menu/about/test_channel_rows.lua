@@ -112,6 +112,51 @@ local function build(up, changed, source_run)
 	return bind_action_owners(items, source_run)
 end
 
+helpers.describe("tray (linux): one tray build reads the login startup once", function()
+	-- A field boot logged menu.rebuild over its budget every time (251 to 1211
+	-- ms, 24 rows). Each build asked the startup helper twice, one bash and
+	-- systemctl run per About getter. One build now pays one run: charged here
+	-- at 0.6 of the [budgets] menu_rebuild_ms each, two runs exceed it.
+	helpers.it("(menu-rebuild-budget) one build runs the startup helper once, within the rebuild budget", function()
+		local budget = require("core.timing.engine.timings").ms("budgets", "menu_rebuild_ms")
+		local Shell = require("core.process.adapters.shell_runner")
+		local real_exec = Shell.exec_checked
+		-- The genuine module, bound to this runner: an earlier suite may leave
+		-- another copy, or a double, in package.loaded.
+		local previous_startup = package.loaded["ui.menu.start_at_login"]
+		helpers.load_module("ui.menu.start_at_login")
+		local runs, charged_ms = 0, 0
+		Shell.exec_checked = function(command, ...)
+			if type(command) == "string" and command:find("start_at_login.sh", 1, true) then
+				runs = runs + 1
+				charged_ms = charged_ms + budget * 0.6
+				return true, "disabled\n"
+			end
+			return real_exec(command, ...)
+		end
+		local ok, err = pcall(build, fake_updater("dev"))
+		Shell.exec_checked = real_exec
+		package.loaded["ui.menu.start_at_login"] = previous_startup
+		if not ok then error(err, 0) end
+		helpers.assert_eq(runs, 1, "both About getters share one helper answer")
+		helpers.assert_true(charged_ms < budget, string.format("the helper alone costs %.0f ms of a %d ms budget",
+			charged_ms, budget))
+	end)
+
+	-- The Layout submenu's choice rows and six switch rows each read and
+	-- decoded config.toml: seven reads of the user's file per rebuild.
+	helpers.it("(menu-rebuild-budget) one build reads the layout emulation settings once", function()
+		local Preferences = require("infra.layout_emulation_preferences")
+		local real_snapshot = Preferences.snapshot
+		local reads = 0
+		Preferences.snapshot = function(...) reads = reads + 1; return real_snapshot(...) end
+		local ok, err = pcall(build, fake_updater("dev"))
+		Preferences.snapshot = real_snapshot
+		if not ok then error(err, 0) end
+		helpers.assert_eq(reads, 1, "the Layout submenu reads config.toml once per build")
+	end)
+end)
+
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
 
 	helpers.it("restores exact click owners after the controlled action raises", function()
@@ -813,6 +858,7 @@ local function with_source_command(alternative, callback)
 		package.loaded["ui.menu.start_at_login"] = {
 			command_available = function() return true end,
 			enabled = function() return false end,
+			snapshot = function() return { command_available = true, enabled = false } end,
 		}
 		package.loaded["menu.engine.manifest_menu"] = nil
 		local renderer = require("menu.engine.manifest_menu")
