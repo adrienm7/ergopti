@@ -419,7 +419,7 @@ helpers.describe("network field check window (Linux)", function()
 			helpers.assert_eq(#world.dialogs, 0, "the dialog opens from a fresh turn of the loop")
 			world.flush()
 			helpers.assert_eq(world.dialogs[1].title, "[menu.debug.field_check_network]")
-			helpers.assert_contains(world.dialogs[1].text, "[field_check.step.route_lookup] : selected_direct")
+			helpers.assert_contains(world.dialogs[1].text, "[field_check.step.route_lookup] : [field_check.value.selected_direct]")
 		end)
 	end)
 
