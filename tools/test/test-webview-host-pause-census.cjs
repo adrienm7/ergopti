@@ -45,6 +45,8 @@ const PAUSE_POLICY = Object.freeze({
 	'windows/settings/ui/cleanup.ahk': { configuration: true },
 	// Edits the user's workflows, as the menu would while paused (EDD-1).
 	'windows/modules/shortcuts/workflows/editor_host.ahk': { configuration: true },
+	// Edits the anti-sleep presets and button library, as the menu would while paused.
+	'windows/modules/shortcuts/keep_awake_library_window.ahk': { configuration: true },
 	// The field report progress window: it only shows a run, and the run and
 	// its Stop answer under a pause as on macOS and Linux.
 	'windows/diagnostics/ui/field_check/field_report.ahk': { configuration: true },
