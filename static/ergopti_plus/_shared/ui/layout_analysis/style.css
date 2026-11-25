@@ -2323,10 +2323,13 @@ body:has(> main.layout-analysis) {
 }
 
 /* Corpus blends (an idea seen in the Layouts Wiki playground): each part a
-   corpus picker and its weight on one wrapping line. */
+   corpus picker and its weight on one wrapping line. A fieldset's default
+   min-inline-size is min-content, so without the zero it would grow to its
+   longest corpus name and widen a phone's page (WCAG 1.4.10). */
 .la-blend-parts {
 	border: 0;
 	margin: 8px 0;
+	min-inline-size: 0;
 	padding: 0;
 }
 
