@@ -116,6 +116,13 @@ local function default_probe(path, kind)
 	return run_command("test " .. flag .. " " .. shell_quote(path))
 end
 
+-- Resolving the origin runs on every Reload, menu build and restart: its
+-- probes read metadata in process, never through a shell (a reload must not
+-- shell out before it relays).
+local function metadata_probe(path, kind)
+	return Fs.path_kind(path) == (kind == "dir" and "dir" or "file")
+end
+
 -- Where each origin that owns its own update path keeps the launcher a restart
 -- runs: the system packages' wrapper and the Flatpak's command.
 local Launchers = require("core.text.engine.identifiers").linux_launchers
@@ -167,7 +174,7 @@ end
 --- @param getenv function|nil Test hook for os.getenv.
 --- @return table context { kind, reason?, launcher?, launcher_refusal?, install_root?, parent?, wrapper?, sandbox? }.
 function M.resolve(source_path, probe, getenv)
-	probe = probe or default_probe
+	probe = probe or metadata_probe
 	getenv = getenv or os.getenv
 	local source = normalise_path((source_path or ""):gsub("^@", ""))
 	if not source then return { kind = "unmanaged", reason = Errors.UPDATER_SOURCE_PATH_RELATIVE } end

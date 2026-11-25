@@ -170,6 +170,44 @@ helpers.describe("installation origin", function()
 	end)
 end)
 
+helpers.describe("installation origin probes", function()
+	helpers.it("(install-origin-no-shell) resolves a real standalone tree from metadata, never through a shell", function()
+		-- Every Reload and menu build resolves the origin: its default probes
+		-- ran `test -f`/`test -d` through os.execute, so a Reload shelled out.
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-origin-XXXXXX"))
+		local driver = root .. "/lib/ergopti/linux"
+		local made = {}
+		local function mkdirs(path)
+			local prefix = ""
+			for part in path:gmatch("[^/]+") do
+				prefix = prefix .. "/" .. part
+				if uv.fs_mkdir(prefix, 448) then made[#made + 1] = prefix end
+			end
+		end
+		local function touch(path)
+			mkdirs(path:match("^(.*)/[^/]+$"))
+			local file = assert(io.open(path, "wb")); assert(file:close())
+		end
+		local files = { driver .. "/modules/updater/manager.lua",
+			root .. "/lib/ergopti/_shared/core/i18n/data/locales/en.json", root .. "/bin/ergopti-hotstrings" }
+		for _, path in ipairs(files) do touch(path) end
+		local shells = {}
+		local real_execute, real_popen = os.execute, io.popen
+		os.execute = function(command) shells[#shells + 1] = tostring(command); return true end
+		io.popen = function(command) shells[#shells + 1] = tostring(command); return nil, "refused" end
+		local ok, context = pcall(Installer.resolve, files[1], nil, env({}))
+		os.execute, io.popen = real_execute, real_popen
+		for _, path in ipairs(files) do os.remove(path) end
+		for index = #made, 1, -1 do uv.fs_rmdir(made[index]) end
+		uv.fs_rmdir(root)
+		helpers.assert_true(ok, tostring(context))
+		helpers.assert_eq(#shells, 0, "resolve() shelled out: " .. table.concat(shells, " | "))
+		helpers.assert_eq(context.kind, "standalone")
+		helpers.assert_eq(context.launcher, root .. "/bin/ergopti-hotstrings")
+	end)
+end)
+
 helpers.describe("installation origin launchers", function()
 	helpers.it("(install-origin-launchers) names the launchers the packagers install", function()
 		-- A packager that moved its launcher would leave every Reload of that

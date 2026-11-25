@@ -329,6 +329,21 @@ function M.exists(path)
 	return ok and present == true
 end
 
+--- Names what a path is, following symlinks as `test -f` and `test -d` do,
+--- from the file metadata alone: no shell, no open, no wait on a FIFO.
+--- @param path string Absolute path to classify.
+--- @return string|nil kind "file", "dir" or "other"; nil when nothing is there.
+function M.path_kind(path)
+	if not valid_native_path(path) then return nil end
+	if not native_stat then error("file_system.path_kind: neither lfs nor luv can read file metadata", 2) end
+	local ok, attrs = pcall(native_stat, path)
+	if not ok or type(attrs) ~= "table" then return nil end
+	local kind = attrs.type or attrs.mode
+	if kind == "file" then return "file" end
+	if kind == "directory" then return "dir" end
+	return "other"
+end
+
 --- Deletes a file. Returns true if the file was deleted or was already absent.
 --- @param path string Absolute path to the file to delete.
 --- @return boolean true on success or file-not-found, false on any other error.
