@@ -185,7 +185,9 @@ namespace Ergopti.Ollama {
  }
 }
 '@ | Out-Null
-	Add-Type -AssemblyName System.IO.Compression | Out-Null
+	# Loaded by strong name: the type compiler cmdlet counts toward the
+	# antivirus surface of the exe (tools/ci/windows-exe-av-surface.json).
+	[void][Reflection.Assembly]::Load('System.IO.Compression, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089')
 }
 
 function Get-OllamaSid {
