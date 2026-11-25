@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Ergopti 配列はインストール済み",
 	"menu.layout.user_layout_unreadable": "Ergopti 配列:状態を読み取れません(ログを参照)",
 	"platform_reason.layout_user_install_is_linux": "Linux のみ:これらの行は、配列マネージャーのウィンドウを使わずに、Ergopti 配列をユーザーのキーボードフォルダーにインストールし、有効にし、または削除します。macOS は .bundle を、Windows はシステム配列を、このメニューのそれぞれの行からインストールします。",
+	"platform_reason.component_status_rows_are_linux": "Linux のみ:これらの赤い行は、ウィンドウに必要なライブラリや読み取れなかったキーボード配列など、動作していない Ergopti+ の部分を示します。一部の Linux デスクトップでは通知だけでは消えてしまったためです。macOS と Windows はこれらの問題をそれぞれのメニューで知らせます。",
 	"menu.layout.active_layouts_unsupported_desktop": "このデスクトップでは利用できません（GNOME、KDE または X11 のみ）",
 	"menu.layout.scope_system": "システム",
 	"menu.layout.scope_user": "ユーザー",

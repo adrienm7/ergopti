@@ -6743,6 +6743,85 @@
 			"unavailable": "hide"
 		}
 	],
+	"linux_component_problems": [
+		{
+			"type": "command",
+			"id": "component_problem_windows_lgi",
+			"i18n": "startup.linux_gui_stack_windows_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_windows_webkit",
+			"i18n": "startup.linux_gui_stack_windows_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_layout_unresolved",
+			"i18n": "startup.linux_layout_unresolved_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_ergopti_layout_install_failed",
+			"i18n": "layouts.linux_ergopti_install_failed_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_ergopti_layout_activate_failed",
+			"i18n": "layouts.linux_ergopti_activate_failed_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		},
+		{
+			"type": "command",
+			"id": "component_problem_ergopti_layout_uninstall_failed",
+			"i18n": "layouts.linux_ergopti_uninstall_failed_label",
+			"caption_getter": "linux_component_health_dot",
+			"caption_layout": "suffix",
+			"caption_joiner": " ",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.component_status_rows_are_linux"
+		}
+	],
+	"linux_component_problems_end": [
+		{
+			"type": "---"
+		}
+	],
 	"linux_tray_active_header": [
 		{
 			"type": "label",

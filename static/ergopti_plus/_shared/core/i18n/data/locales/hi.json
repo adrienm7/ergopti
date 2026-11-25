@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Ergopti लेआउट इंस्टॉल है",
 	"menu.layout.user_layout_unreadable": "Ergopti लेआउट: स्थिति पढ़ी नहीं जा सकती (लॉग देखें)",
 	"platform_reason.layout_user_install_is_linux": "केवल Linux: ये पंक्तियाँ Ergopti लेआउट को उपयोगकर्ता के कीबोर्ड फ़ोल्डर में इंस्टॉल करती हैं, लेआउट प्रबंधक विंडो के बिना उसे सक्रिय करती हैं या हटाती हैं। macOS अपना .bundle और Windows अपना सिस्टम लेआउट इस मेनू की अपनी पंक्तियों से इंस्टॉल करते हैं।",
+	"platform_reason.component_status_rows_are_linux": "केवल Linux: ये लाल पंक्तियाँ Ergopti+ के उस हिस्से का नाम बताती हैं जो काम नहीं कर रहा, जैसे विंडो के लिए ज़रूरी कोई लाइब्रेरी या न पढ़ा जा सका कीबोर्ड लेआउट, क्योंकि केवल सूचना कुछ Linux डेस्कटॉप पर गायब हो जाती थी। macOS और Windows ये समस्याएँ अपने मेनू में बताते हैं।",
 	"menu.layout.active_layouts_unsupported_desktop": "इस डेस्कटॉप पर उपलब्ध नहीं (केवल GNOME, KDE या X11)",
 	"menu.layout.scope_system": "सिस्टम",
 	"menu.layout.scope_user": "उपयोगकर्ता",

@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Розкладку Ergopti встановлено",
 	"menu.layout.user_layout_unreadable": "Розкладка Ergopti: стан не читається (див. журнали)",
 	"platform_reason.layout_user_install_is_linux": "Лише Linux: ці рядки встановлюють розкладку Ergopti в папку клавіатури користувача, вмикають або видаляють її без вікна менеджера розкладок. macOS встановлює свій .bundle, а Windows — свою системну розкладку з власних рядків цього меню.",
+	"platform_reason.component_status_rows_are_linux": "Лише Linux: ці червоні рядки називають частину Ergopti+, яка не працює, наприклад бібліотеку, потрібну вікнам, або непрочитану розкладку клавіатури, бо саме сповіщення на деяких робочих столах Linux зникало. macOS і Windows повідомляють про ці проблеми у власних меню.",
 	"menu.layout.active_layouts_unsupported_desktop": "Недоступно в цьому середовищі (лише GNOME, KDE або X11)",
 	"menu.layout.scope_system": "система",
 	"menu.layout.scope_user": "користувач",

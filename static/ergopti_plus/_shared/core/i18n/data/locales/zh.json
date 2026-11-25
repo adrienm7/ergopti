@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Ergopti 布局已安装",
 	"menu.layout.user_layout_unreadable": "Ergopti 布局:状态无法读取(请查看日志)",
 	"platform_reason.layout_user_install_is_linux": "仅限 Linux:这些行无需布局管理器窗口,即可将 Ergopti 布局安装到用户的键盘文件夹、启用或移除。macOS 通过本菜单中自己的行安装其 .bundle,Windows 则安装其系统布局。",
+	"platform_reason.component_status_rows_are_linux": "仅限 Linux:这些红色行指出 Ergopti+ 中无法工作的部分,例如窗口所需的库或无法读取的键盘布局,因为在某些 Linux 桌面上仅靠通知会消失。macOS 和 Windows 在各自的菜单中报告这些问题。",
 	"menu.layout.active_layouts_unsupported_desktop": "此桌面不可用（仅限 GNOME、KDE 或 X11）",
 	"menu.layout.scope_system": "系统",
 	"menu.layout.scope_user": "用户",

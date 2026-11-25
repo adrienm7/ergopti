@@ -7,14 +7,32 @@
 --- Plasma 6 dropped without keeping it in its history (field report, Arch
 --- Linux, 2026-11-25): the user saw a tray and "nothing works". These cases pin
 --- that a reported problem is logged once, posted as a persistent notice, and
---- leads the tray menu as a red row whose click shows the explanation.
+--- leads the tray menu as its declared red row (menu.toml
+--- linux_component_problems) whose click shows the explanation.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 --- A problem as gui_stack reports it.
-local PROBLEM = { code = "windows_lgi", label = "Windows unavailable", title = "Ergopti+ needs a component",
+local PROBLEM = { code = "windows_lgi", title = "Ergopti+ needs a component",
 	body = "Install lua51-lgi: sudo pacman -S --needed lua51-lgi" }
+
+-- Every code a Linux part reports: each needs its own declared tray row.
+local REPORTED_CODES = { "windows_lgi", "windows_webkit", "layout_unresolved", "ergopti_layout_install_failed",
+	"ergopti_layout_activate_failed", "ergopti_layout_uninstall_failed" }
+
+--- The problem rows built over a status, with the status window recorded.
+--- @param Status table
+--- @return table rows, table shown
+local function problem_rows(Status)
+	local shown = {}
+	local Rows = helpers.load_module("menu.ui.builder.component_status_rows")
+	local rows = Rows.build({ status = Status, show = function(title, body)
+		shown[#shown + 1] = { title, body }
+		return true
+	end })
+	return rows, shown
+end
 
 helpers.describe("component_status: a problem stays visible", function()
 
@@ -31,33 +49,47 @@ helpers.describe("component_status: a problem stays visible", function()
 		helpers.assert_true(Status.has("windows_lgi"))
 	end)
 
-	helpers.it("leads the tray menu with a red row that shows the explanation", function()
+	helpers.it("leads the tray menu with a declared red row that shows the explanation", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
-		helpers.assert_eq(#Status.tray_rows(function() end), 0, "no row when nothing is wrong")
+		helpers.assert_eq(#problem_rows(Status), 0, "no row and no separator when nothing is wrong")
 		Status.report(PROBLEM, {})
-		local shown
-		local rows = Status.tray_rows(function(title, body) shown = { title, body } end)
+		local rows, shown = problem_rows(Status)
 		helpers.assert_eq(#rows, 2)
-		helpers.assert_eq(rows[1].title, "🔴 Windows unavailable")
+		local I18n = require("core.i18n.engine.i18n")
+		helpers.assert_eq(rows[1].label, "🔴 " .. I18n.get("startup.linux_gui_stack_windows_label"),
+			"the shared unreachable dot, then the declared label: " .. tostring(rows[1].label))
 		helpers.assert_true(rows[2].separator)
-		rows[1].fn()
-		helpers.assert_eq(shown[1], PROBLEM.title)
-		helpers.assert_eq(shown[2], PROBLEM.body)
+		rows[1].action()
+		helpers.assert_eq(shown[1][1], PROBLEM.title)
+		helpers.assert_eq(shown[1][2], PROBLEM.body)
+	end)
+
+	helpers.it("draws a row for every code a Linux part reports", function()
+		local Status = helpers.load_module("core.ui.engine.component_status")
+		for _, code in ipairs(REPORTED_CODES) do
+			Status.report({ code = code, title = "t " .. code, body = "b " .. code }, {})
+		end
+		local rows = problem_rows(Status)
+		helpers.assert_eq(#rows, #REPORTED_CODES + 1, "one row per reported problem, then the separator")
+		for index = 1, #REPORTED_CODES do
+			helpers.assert_true(type(rows[index].label) == "string" and rows[index].label:find("🔴 ", 1, true) == 1,
+				REPORTED_CODES[index] .. " shows a red row")
+		end
 	end)
 
 	helpers.it("leaves the tray once a recoverable problem recovers", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
 		local unresolved = true
-		Status.report({ code = "layout_unresolved", label = "Layout", title = "t", body = "b",
+		Status.report({ code = "layout_unresolved", title = "t", body = "b",
 			active = function() return unresolved end }, {})
-		helpers.assert_eq(#Status.tray_rows(function() end), 2)
+		helpers.assert_eq(#problem_rows(Status), 2)
 		unresolved = false
-		helpers.assert_eq(#Status.tray_rows(function() end), 0, "the layout was read later")
+		helpers.assert_eq(#problem_rows(Status), 0, "the layout was read later")
 	end)
 
 	helpers.it("refuses a problem without its explanation", function()
 		local Status = helpers.load_module("core.ui.engine.component_status")
-		local ok = pcall(Status.report, { code = "x", label = "l", title = "t" })
+		local ok = pcall(Status.report, { code = "x", title = "t" })
 		helpers.assert_true(not ok)
 	end)
 
@@ -72,6 +104,8 @@ helpers.describe("component_status: a problem stays visible", function()
 		helpers.assert_true(guard ~= nil and report ~= nil, "the last check before the grab reports it")
 		helpers.assert_true(source:find("active = function() return not keyboard_layout.is_ready() end", report, true) ~= nil,
 			"the row leaves once a layout is read")
+		helpers.assert_true(source:find("if reported and rebuild_tray_menu then rebuild_tray_menu() end", report, true) ~= nil,
+			"the tray, built before this check, is redrawn with the row")
 		local Json = require("core.text.engine.json")
 		for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no",
 			"pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
@@ -83,9 +117,15 @@ helpers.describe("component_status: a problem stays visible", function()
 		end
 	end)
 
-	helpers.it("the tray adapter publishes the rows before the menu", function()
+	helpers.it("the shared menu declares the rows and the tray adapter draws none of its own", function()
 		local source = assert(helpers.read_module_source("tray.adapters.menu"))
-		helpers.assert_true(source:find('require("core.ui.engine.component_status").tray_rows(', 1, true) ~= nil,
-			"replace_menu prepends the status rows")
+		helpers.assert_true(source:find("component_status", 1, true) == nil, "replace_menu prepends nothing")
+		local frame = require("menu.engine.manifest_menu").get_array("linux_component_problems")
+		helpers.assert_eq(#frame, #REPORTED_CODES, "one declared row per reported code")
+		for _, entry in ipairs(frame) do helpers.assert_eq(entry.platforms, { "linux" }) end
+		local builder = assert(helpers.read_module_source("menu.ui.builder.builder"))
+		local problems = builder:find('require("menu.ui.builder.component_status_rows").build()', 1, true)
+		local header = builder:find("rows[#rows + 1] = header", 1, true)
+		helpers.assert_true(problems ~= nil and header ~= nil and problems < header, "the problems lead the root, above its title")
 	end)
 end)

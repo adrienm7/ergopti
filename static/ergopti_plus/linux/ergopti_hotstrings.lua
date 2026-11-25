@@ -3808,13 +3808,14 @@ local function main()
 		if layout_i18n then
 			local function say(key) local ok, value = pcall(layout_i18n.get, key) return ok and value or key end
 			local report_label = (say("menu.debug.report_bug"):gsub("^[^%w]*%s+", ""))
-			require("core.ui.engine.component_status").report({
+			local reported = require("core.ui.engine.component_status").report({
 				code = "layout_unresolved",
-				label = say("startup.linux_layout_unresolved_label"),
 				title = say("startup.linux_layout_unresolved_label"),
 				body = (say("startup.linux_layout_unresolved_body"):gsub("{1}", function() return report_label end)),
 				active = function() return not keyboard_layout.is_ready() end,
 			}, { notifier = require("platform.system.notifier") })
+			-- The tray was built before this check: its problem row needs a redraw.
+			if reported and rebuild_tray_menu then rebuild_tray_menu() end
 		end
 	end
 	BootProfiler.stage_done("watchers")

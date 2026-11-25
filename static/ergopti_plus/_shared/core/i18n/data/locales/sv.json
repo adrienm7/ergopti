@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Ergopti-layout installerad",
 	"menu.layout.user_layout_unreadable": "Ergopti-layout: oläsligt tillstånd (se loggarna)",
 	"platform_reason.layout_user_install_is_linux": "Endast Linux: dessa rader installerar Ergopti-layouten i användarens tangentbordsmapp, aktiverar eller tar bort den utan layouthanterarens fönster. macOS installerar sitt .bundle och Windows sin systemlayout från sina egna rader i den här menyn.",
+	"platform_reason.component_status_rows_are_linux": "Endast Linux: dessa röda rader namnger en del av Ergopti+ som inte fungerar, till exempel ett bibliotek som fönstren behöver eller en tangentbordslayout som inte kunde läsas, eftersom en avisering ensam försvann på vissa Linux-skrivbord. macOS och Windows visar dessa problem i sina egna menyer.",
 	"menu.layout.active_layouts_unsupported_desktop": "Inte tillgängligt på detta skrivbord (endast GNOME, KDE eller X11)",
 	"menu.layout.scope_system": "systemomfattande",
 	"menu.layout.scope_user": "användare",

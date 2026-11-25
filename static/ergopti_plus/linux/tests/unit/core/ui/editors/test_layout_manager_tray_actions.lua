@@ -156,7 +156,7 @@ helpers.describe("layout manager without its window (Linux)", function()
 			helpers.assert_eq(#record.problems, 1, "a red tray row names the failure")
 			local problem = record.problems[1]
 			helpers.assert_eq(problem.code, "ergopti_layout_install_failed")
-			helpers.assert_eq(problem.label, "t:layouts.linux_ergopti_install_failed_label")
+			helpers.assert_eq(problem.label, nil, "the tray names it by its menu.toml row")
 			helpers.assert_eq(problem.body, "t:layouts.linux_ergopti_install_failed")
 			helpers.assert_true(problem.active(), "the row stays while Ergopti is not installed")
 			local failed = notices_of(record, "layouts.linux_ergopti_install_failed")

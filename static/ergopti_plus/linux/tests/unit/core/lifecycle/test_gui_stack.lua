@@ -108,7 +108,14 @@ helpers.describe("gui_stack: the desktop toolkit is checked at start", function(
 			.. "|lua51-lgi|sudo pacman -S --needed lua51-lgi>")
 		helpers.assert_eq(#reported, 1, "the problem stays in the tray")
 		helpers.assert_eq(reported[1].code, "windows_lgi")
-		helpers.assert_eq(reported[1].label, "<startup.linux_gui_stack_windows_label:{1}>")
+		-- The tray names it by its own declared row, not by a label the report carries.
+		helpers.assert_eq(reported[1].label, nil)
+		local declared
+		for _, entry in ipairs(require("menu.engine.manifest_menu").get_array("linux_component_problems")) do
+			if entry.id == "component_problem_" .. reported[1].code then declared = entry end
+		end
+		helpers.assert_true(declared ~= nil, "the manifest declares the problem's row")
+		helpers.assert_eq(declared.i18n, "startup.linux_gui_stack_windows_label")
 	end)
 
 	helpers.it("says that an lgi built for Lua 5.4 does not serve LuaJIT (field report, Arch's lua-lgi)", function()

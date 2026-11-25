@@ -2446,6 +2446,7 @@
 	"menu.layout.user_layout_installed": "Układ Ergopti zainstalowany",
 	"menu.layout.user_layout_unreadable": "Układ Ergopti: stan nieczytelny (zobacz dzienniki)",
 	"platform_reason.layout_user_install_is_linux": "Tylko Linux: te wiersze instalują układ Ergopti w folderze klawiatury użytkownika, aktywują go lub usuwają bez okna menedżera układów. macOS instaluje swój .bundle, a Windows swój układ systemowy z własnych wierszy tego menu.",
+	"platform_reason.component_status_rows_are_linux": "Tylko Linux: te czerwone wiersze wskazują część Ergopti+, która nie działa, na przykład bibliotekę potrzebną oknom lub nieodczytany układ klawiatury, ponieważ samo powiadomienie znikało na niektórych pulpitach Linux. macOS i Windows zgłaszają te problemy we własnych menu.",
 	"menu.layout.active_layouts_unsupported_desktop": "Niedostępne na tym pulpicie (tylko GNOME, KDE lub X11)",
 	"menu.layout.scope_system": "system",
 	"menu.layout.scope_user": "użytkownik",

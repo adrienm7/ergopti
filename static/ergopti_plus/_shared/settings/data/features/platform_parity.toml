@@ -171,6 +171,10 @@ technical = "The row downloads the unsigned MSKLC-built keyboard layout installe
 kind = "os_concept"
 technical = "The rows run the Linux layout registry's user XKB install, activation and removal without the WebKitGTK layout manager window, whose lgi and WebKitGTK a system can lack; macOS installs its .bundle and Windows its system layout from their own rows."
 
+[reasons."platform_reason.component_status_rows_are_linux"]
+kind = "os_concept"
+technical = "The Linux daemon lists the problems its parts report (core/ui/engine/component_status.lua: a missing lgi or WebKitGTK, an unread XKB layout, a failed user layout step) as red tray rows, because a freedesktop notification can vanish from a KDE Plasma 6 history; macOS and Windows report their own problems in their own menus."
+
 [reasons."platform_reason.category_master_is_a_gate_on_windows"]
 kind = "driver_storage"
 technical = "Windows keeps this master switch as the category gate in category_enabled; macOS and Linux keep it as enabled in the category's own section."
