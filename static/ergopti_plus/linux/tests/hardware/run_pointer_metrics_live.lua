@@ -144,17 +144,21 @@ if not Keyboard.is_available() then abort("/dev/uinput is not writable") end
 Keyboard.use_ffi_backend()
 if not Keyboard.open() then abort("could not create the test keyboard") end
 
--- The mouse: a private instance of the production writer, whose device carries
--- the buttons and every relative axis a wheel mouse reports, under a test name.
+-- The mouse: a private instance of the production writer. Its keyboard device
+-- carries no button and no relative axis; its separate pointer device carries
+-- the buttons and every relative axis a wheel mouse reports, so that device is
+-- the test mouse, under the test name. The pointer device is created at the
+-- first pointer report: a zero motion creates it before its node is looked up.
 local Names = require("platform.input.device_names")
 local writer_chunk = assert(loadfile("platform/input/uinput_writer.lua"))
-local production_name = Names.VIRTUAL_KEYBOARD
-Names.VIRTUAL_KEYBOARD = TEST_MOUSE
+local production_keyboard, production_pointer = Names.VIRTUAL_KEYBOARD, Names.VIRTUAL_POINTER
+Names.VIRTUAL_KEYBOARD, Names.VIRTUAL_POINTER = TEST_MOUSE .. " Keys", TEST_MOUSE
 local loaded, Mouse = pcall(writer_chunk)
-Names.VIRTUAL_KEYBOARD = production_name
+Names.VIRTUAL_KEYBOARD, Names.VIRTUAL_POINTER = production_keyboard, production_pointer
 if not loaded then abort("the mouse writer did not load: " .. tostring(Mouse)) end
 Mouse.use_ffi_backend()
 if not Mouse.open() then abort("could not create the test mouse") end
+if not Mouse.emit_relative(InputEvent.REL_X, 0) then abort("could not create the test mouse's pointer device") end
 
 -- The touchpad: a two-slot clickpad declared as the kernel's MT drivers do
 -- (run_touchpad_capability.lua), with a resolution, so the tap detector judges
