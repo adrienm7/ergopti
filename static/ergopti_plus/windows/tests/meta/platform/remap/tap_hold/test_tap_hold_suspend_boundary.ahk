@@ -103,10 +103,11 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		RawTransitionCount++
 		Pos := Found + Match.Len
 	}
-	; Six owner-internal transitions: transactional Down, retrying Up, physical
-	; Up, lift, restoration Down and unless-owned Up. Restoration compensation
-	; reuses the retrying Up and cannot bypass the pending ledger.
-	AssertEqual(6, RawTransitionCount,
+	; Seven owner-internal transitions: transactional Down, retrying Up, physical
+	; Up, lift, restoration Down, unless-owned Up and the Up of the stray LCtrl a
+	; synthetic AltGr leaves that no ledger owns (issue #109). Restoration
+	; compensation reuses the retrying Up and cannot bypass the pending ledger.
+	AssertEqual(7, RawTransitionCount,
 		"the complete driver may contain only the owner-internal sustained transitions; every other sustained transition must route through an explicit owner")
 	PhysicalRelease := _DriverFuncBody("TapHoldReleasePhysicalKey")
 	Assert(InStr(PhysicalRelease, 'Ok := TextPressKey(Key, "Up", false)') > 0,
@@ -114,7 +115,8 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 	for Owner, Transition in Map(
 			"TapHoldLiftKey", 'TextPressKey(Name, "Up", false)',
 			"TapHoldRestoreLiftedKey", 'Ok := TextPressKey([Name], "Down", false, Transition)',
-			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)') {
+			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)',
+			"_TH_ReleaseStrayAltGrLCtrl", 'Released := TextPressKey("LCtrl", "Up", false)') {
 		Body := _DriverFuncBody(Owner)
 		Assert(Body != "" and InStr(Body, Transition) > 0,
 			Owner . " must own its sustained transition and report its verdict")
