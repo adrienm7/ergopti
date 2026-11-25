@@ -474,8 +474,9 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
   - Windows: the AutoHotkey port of the validator, interpreter, runner, store, `run_workflow` and the window and
     Shortcuts row, replaying `_shared/tests/corpus/workflows/`; then drop
     `platform_reason.action_workflows_windows_pending`.
-  - Screen steps against the screen vision service ([design](docs/design/screen-vision.md)); until it is on
-    `dev` they stop with `screen_service_missing`.
+  - Screen steps on Windows: wire the AutoHotkey runner to `ScreenVision*` as
+    `_shared/shortcuts/engine/workflows/screen.lua` does on macOS and Linux; until then they stop with
+    `screen_service_missing`.
 - [ ] **Structure plan, phase 2** ([plan](docs/design/structure-plan.md), resume point
       [docs/plans/structure-migration-resume.md](docs/plans/structure-migration-resume.md)). S01 to S26 are on dev.
       Left: S27 (install) to S38, one step per commit with `tools/audit/structure/run-phase2.cjs`, two or three per

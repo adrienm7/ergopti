@@ -30,7 +30,6 @@ local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
 local Paths = require("core.fs.engine.paths")
 local ConfigPaths = require("settings.engine.paths")
-local AppDirs = require("core.fs.engine.app_dirs")
 local FileSystem = require("core.fs.adapters.file_system")
 local Timings = require("core.timing.engine.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -64,13 +63,12 @@ local function read_shared(relative)
 end
 
 local function vision()
-	local Vision = require("platform.vision.screen_vision")
+	local Session = require("platform.vision.vision_session")
 	if not _vision_started then
-		Vision.init({ cache_dir = os.getenv("HOME") .. "/" .. AppDirs.macos.cache_relative .. "/vision" })
-		Vision.refresh_availability(function() if _library then _library.changed() end end)
 		_vision_started = true
+		Session.on_availability(function() if _library then _library.changed() end end)
 	end
-	return Vision
+	return Session.service()
 end
 
 --- The screen vision service, started once by this owner (the OCR capture uses it too).
