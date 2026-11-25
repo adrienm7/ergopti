@@ -302,7 +302,8 @@ _LEX_DebugRowFollowsTheErrorsFile() {
 		AssertEqual(Errors + 1, Export, "« Export the logs (zip) » follows « open today's errors file »")
 	} finally _CTC_ReleaseMenu(Built)
 	Fallback := _DriverFuncBody("_MM_DebugFallback")
-	Assert(InStr(Fallback, "MenuCommand.EXPORT_LOGS") > 0, "the fallback order lists the export row")
+	; The source scan reads each generated constant as the literal it stands for.
+	Assert(InStr(Fallback, '"' . MenuCommand.EXPORT_LOGS . '"') > 0, "the fallback order lists the export row")
 }
 
 
