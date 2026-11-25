@@ -100,6 +100,12 @@ open until the maintainer confirms or changes it.
   empty), never by regular expression — decided by the agent on 2026-11-25,
   to review by the maintainer: Lua patterns, PCRE (AHK) and JavaScript regular
   expressions disagree, and the three drivers must take the same branch.
+- **An « Ergopti action » step runs a parameterless action** — decided by
+  the agent on 2026-11-25, to review by the maintainer. The drivers read an
+  action's parameter from the binding that fired it (`get_action_parameter`),
+  so a workflow step has no binding to carry one; text and key combinations
+  have their own steps (`type_text`, `send_keys`), and a parameter field is
+  refused as an unknown key rather than silently ignored.
 - **A step that needs the screen services refuses with a named notice while
   they are absent** — decided by the agent on 2026-11-25, to review by the
   maintainer: until the OCR and template-matching services land, the

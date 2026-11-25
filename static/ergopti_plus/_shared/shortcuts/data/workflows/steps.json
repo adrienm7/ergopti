@@ -116,8 +116,7 @@
 		},
 		"run_action": {
 			"fields": {
-				"action": { "type": "action", "required": true },
-				"parameter": { "type": "text", "required": false, "placeholders": true, "multiline": true }
+				"action": { "type": "action", "required": true }
 			},
 			"timeout": "step_timeout_ms"
 		},
