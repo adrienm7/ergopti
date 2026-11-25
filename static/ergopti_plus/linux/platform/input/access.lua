@@ -74,6 +74,23 @@ function M.missing_program(getenv)
 	return value
 end
 
+--- The command that sets up keyboard access for this installation.
+---
+--- The AppImage's driver root is its mount point, which vanishes with the
+--- process: the message told the Arch user to run an install.sh that no longer
+--- existed. Relaunching the image runs its launcher, which asks once for the
+--- authorization (install/launch.sh). The AppImage runtime names the image in
+--- APPIMAGE.
+--- @param deps table { script_dir?, getenv? }
+--- @return string
+function M.setup_command(deps)
+	local quote = require("core.process.adapters.shell_runner").quote
+	local image = (deps.getenv or os.getenv)("APPIMAGE")
+	if type(image) == "string" and image:sub(1, 1) == "/" then return quote(image) end
+	local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
+	return "bash " .. quote(root .. "/install.sh") .. " --setup-perms"
+end
+
 --- Reports an input-access failure to the user.
 --- @param deps table i18n, notifier, print; optional script_dir for an isolated caller;
 ---   program names the missing program that fills {1} of MISSING_PROGRAM_BODY_KEY.
@@ -97,9 +114,7 @@ function M.report(deps, detail)
 	if deps.program then
 		body = body:gsub("{1}", function() return deps.program end)
 	elseif body:find("{1}", 1, true) then
-		local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
-		local command = "bash " .. require("core.process.adapters.shell_runner").quote(root .. "/install.sh") .. " --setup-perms"
-		body = body:gsub("{1}", function() return command end)
+		body = body:gsub("{1}", function() return M.setup_command(deps) end)
 	end
 
 	local out = deps.print or print
@@ -107,7 +122,7 @@ function M.report(deps, detail)
 	out(body)
 
 	if deps.notifier and type(deps.notifier.send) == "function" then
-		pcall(deps.notifier.send, body, { title = notification_label, level = "error" })
+		pcall(deps.notifier.send, body, { title = notification_label, level = "error", persistent = true })
 	end
 	if deps.tray then M.hold_tray(deps, { label = notification_label, title = title, body = body }) end
 	return M.EXIT_ACCESS
