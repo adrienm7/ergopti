@@ -58,3 +58,31 @@ _KLHTP_PausedTickFlushesNothing() {
 }
 Test("keystats hook: a paused flush tick flushes nothing (metrics-timers-bypass-pause)",
 	_KLHTP_PausedTickFlushesNothing)
+
+; KL_Hook_LivePush is the debounced companion of the flush tick: it marks every
+; painted metrics window for a manifest projection. A private window entry
+; records that mark, and a busy projection job keeps the tick from launching
+; one, so a paused push must leave the entry unmarked.
+_KLHTP_PausedLivePushMarksNoWindow() {
+	SavedWindows := KLWV.windows, SavedJobs := KLPFWorker.jobs, SavedDir := KLWV.metrics_dir
+	WasSuspended := A_IsSuspended
+	Entry := Map("epoch", 77, "first_paint_done", true)
+	try {
+		KLWV.windows := Map("keystats", Entry)
+		KLPFWorker.jobs := Map("keystats", "busy")
+		KLWV.metrics_dir := A_Temp . "\ergopti_live_push_unused"
+		Suspend(true)
+		KL_Hook_LivePush()
+		AssertFalse(Entry.Has("pending_ingest_mode"), "a paused live push must not schedule a metrics projection")
+		Suspend(false)
+		KL_Hook_LivePush()
+		AssertEqual("manifest", Entry.Get("pending_ingest_mode", ""),
+			"positive control: a running live push marks the window for a manifest projection")
+	} finally {
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		KLWV.windows := SavedWindows, KLPFWorker.jobs := SavedJobs, KLWV.metrics_dir := SavedDir
+	}
+}
+Test("keystats hook: a paused live push schedules no projection (metrics-timers-bypass-pause)",
+	_KLHTP_PausedLivePushMarksNoWindow)

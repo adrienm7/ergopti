@@ -1,5 +1,5 @@
 {
-	"expected_count": 5,
+	"expected_count": 6,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -18,6 +18,10 @@
 		},
 		{
 			"contains": "a paused chord still reaches the physical check",
+			"expected_count": 1
+		},
+		{
+			"contains": "a paused live push schedules no projection",
 			"expected_count": 1
 		}
 	]
