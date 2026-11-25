@@ -17,10 +17,11 @@ function M.build()
 	-- create it before i18n is ready.
 	local ManifestMenu = require("menu.engine.manifest_menu")
 	local Mode = require("modules.shortcuts.actions.auto_click")
+	local COMMAND = require("settings.engine.keys").COMMAND
 	local commands = {
-		keep_awake_switch = function() return Mode.toggle_switch("keep_awake") end,
-		keep_awake_auto_click = function() return Mode.toggle_switch("auto_click") end,
-		keep_awake_library = function() return require("menu.ui.keep_awake_library").open() end,
+		[COMMAND.KEEP_AWAKE_SWITCH] = function() return Mode.toggle_switch("keep_awake") end,
+		[COMMAND.KEEP_AWAKE_AUTO_CLICK] = function() return Mode.toggle_switch("auto_click") end,
+		[COMMAND.KEEP_AWAKE_LIBRARY] = function() return require("menu.ui.keep_awake_library").open() end,
 	}
 	local getters = {
 		keep_awake_switch_on = function() return Mode.switch_on("keep_awake") end,

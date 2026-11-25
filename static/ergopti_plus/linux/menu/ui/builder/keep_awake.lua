@@ -18,10 +18,11 @@ if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local function _build_keep_awake()
 	if not ManifestMenu then return nil end
 	local AutoClick = require("modules.auto_click")
+	local COMMAND = require("settings.engine.keys").COMMAND
 	local commands = {
-		keep_awake_switch = function() return AutoClick.toggle_switch("keep_awake") end,
-		keep_awake_auto_click = function() return AutoClick.toggle_switch("auto_click") end,
-		keep_awake_library = function() return require("core.ui.ui.keep_awake_library_bridge").open() end,
+		[COMMAND.KEEP_AWAKE_SWITCH] = function() return AutoClick.toggle_switch("keep_awake") end,
+		[COMMAND.KEEP_AWAKE_AUTO_CLICK] = function() return AutoClick.toggle_switch("auto_click") end,
+		[COMMAND.KEEP_AWAKE_LIBRARY] = function() return require("core.ui.ui.keep_awake_library_bridge").open() end,
 	}
 	local getters = {
 		keep_awake_switch_on = function() return AutoClick.switch_on("keep_awake") end,
