@@ -269,6 +269,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.screen_text_ports",
+		contract = { "select_region", "set_clipboard" },
+		-- The « Capture → texte » action (Ctrl+O) selects a region and copies its text.
+		wired    = true,
+	},
+	{
 		id       = "adapters.apple_shortcuts",
 		contract = { "valid_identifier", "validate_reply", "new" },
 		wired    = true,

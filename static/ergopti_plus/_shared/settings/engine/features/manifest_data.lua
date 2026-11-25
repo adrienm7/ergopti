@@ -573,7 +573,13 @@ M.features = {
 		path = "shortcuts.keyboard.secondary_star", id = "secondary_star", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.secondary_star", platforms = { "hs" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none", reason_key = "platform_reason.star_slot_is_ctrl_on_macos",
 	},
 	{
-		path = "shortcuts.keyboard.primary_b", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.primary_b", id = "primary_b", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_b", platforms = { "ahk", "linux" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.primary_o", id = "primary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "ahk", "linux" }, recommended = "ocr_screenshot", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.primary_q", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.keyboard.meta_a", section = "shortcuts.keyboard", platforms = { "ahk" },
@@ -645,7 +651,10 @@ M.features = {
 		path = "shortcuts.keyboard.secondary_m", id = "secondary_m", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_m", platforms = { "hs" }, recommended = "activity_simulation", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.secondary_o", id = "secondary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_b", id = "secondary_b", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_b", platforms = { "hs" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_o", id = "secondary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = "ocr_screenshot", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.secondary_p", id = "secondary_p", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_p", platforms = { "hs" }, recommended = "display_mirror_toggle", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",

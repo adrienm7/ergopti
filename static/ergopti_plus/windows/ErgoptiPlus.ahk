@@ -414,6 +414,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include platform/system/accessibility.ahk
 #Include modules/shortcuts/text_target.ahk
 #Include platform/vision/screen_vision.ahk
+#Include platform/vision/region_select.ahk
 #Include core/ui/engine/font_scale.ahk
 #Include tray/adapters/menu.ahk
 #Include tray/state_tip.ahk

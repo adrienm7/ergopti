@@ -267,10 +267,6 @@ technical = "macOS and Linux keep the proxy override in the driver's own setting
 kind = "os_concept"
 technical = "Windows runs a file by its extension; NTFS has no POSIX executable bit to set."
 
-[reasons."platform_reason.action_text_recognition_is_live_text_on_macos"]
-kind = "os_equivalent"
-technical = "macOS Live Text (VisionKit) reads the text of any capture or image, so the capture action replaces a separate OCR action."
-
 [reasons."platform_reason.action_take_note_uses_notepad"]
 kind = "os_equivalent"
 technical = "macOS provides Quick Note (Fn+Q) instead of a plain-text notes file opened in an editor."

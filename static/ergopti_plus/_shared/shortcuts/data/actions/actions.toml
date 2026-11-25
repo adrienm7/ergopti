@@ -1228,14 +1228,13 @@ emit_linux = "Print"
 platform = "all"
 
 [sg_actions.ocr_screenshot]
-# Windows presses PowerToys Text Extractor's Win+Shift+T; Linux captures a
-# region through its screenshot cascade and reads it with tesseract. Both
-# leave the text on the clipboard.
-platform = "ahk,linux"
-reason_hs = "platform_reason.action_text_recognition_is_live_text_on_macos"
-equivalent_hs = ["screen_capture"]
+# « Capture → texte » (Ctrl+O on the three OS, maintainer's decision of
+# 2026-11-25): the user draws a region, the screen vision service reads it
+# with the OS engine (Vision, Windows.Media.Ocr, tesseract) and the text goes
+# to the clipboard with a notification; nothing read leaves the clipboard
+# unchanged. The flow is _shared/shortcuts/engine/ocr_capture.lua.
+platform = "all"
 requires_linux = ["tool:tesseract"]
-emit_ahk = "#+t"
 
 [sg_actions.open_chatgpt]
 # Opens the configured shortcuts.chatgpt_url on every driver; macOS runs it

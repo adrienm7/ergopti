@@ -566,12 +566,17 @@ switches, the click counter, the reasons), Ctrl+M running the active preset on t
 - [ ] **macOS ScreenCaptureKit:** `CGWindowListCreateImage` is obsoleted from macOS 15; move the capture to
       `SCScreenshotManager` (macOS 14+) and keep CoreGraphics below it.
 - [ ] **Linux Wayland region capture:** the xdg-desktop-portal Screenshot for a region; today a region needs X11 and
-      the Ctrl+O action keeps the screenshot tool cascade.
+      the Ctrl+O action uses the screenshot tool cascade (grim and slurp, GNOME, KDE, maim).
 - [ ] **component_status rows:** the capture and OCR problems are red rows of the « Anti-veille » submenu; add them to
       each driver's component_status list too.
 - [ ] **« Ajouter un bouton… », image import and the library/preset window** (shared WebView, 21 locales, a11y gates,
       44 px targets, export and import of a preset with its images).
-- [ ] **Ctrl+O OCR capture and the parentheses wrap on Ctrl+B** with its configuration migration.
+- [ ] **Ctrl+O « Capture → texte » field checks, one per OS** (done in code: the shared flow
+      `_shared/shortcuts/engine/ocr_capture.lua` and its corpus, Ctrl+B wraps in parentheses on the three OS): draw a
+      two-line region, the clipboard holds both lines; Escape and an empty drag change nothing; a blank region keeps the
+      clipboard with the « aucun texte reconnu » notice. macOS without the Screen Recording grant shows its refusal;
+      Windows at 100 % and 150 % on two monitors (the overlay's rectangle must match the captured pixels); Linux on
+      GNOME Wayland (grim, slurp) and X11 (maim).
 - [ ] **Field checks, one per OS**, with a real VS Code Copilot « Autoriser une fois » / « Allow once » prompt:
       choose « Anti-veille dans VS Code », Ctrl+M: the prompt is clicked once by its caption (light and dark or red
       theme), the pointer returns, the counter rises by one; a captured image target is clicked the same way; the
@@ -689,6 +694,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
       reason. (6) An unknown lock state counts as locked. The other choices: keep the auto-clicker running through
       physical input, or add 1.25 / 1.5 scales at the cost of exact integer resizing.
 
+- [ ] **The Microsoft bold remap's letter on Windows (decided by the agent on 2026-11-25, to review by the
+      maintainer).** Ctrl+B now wraps the line in parentheses, so `microsoft_bold` (Ctrl+G in Microsoft apps, Ctrl+B
+      elsewhere) is recommended on Ctrl+Q (slot `primary_q`): in French Office Ctrl+Q only removes paragraph
+      formatting, and Chrome, Edge and VS Code leave it nearly unused, while the other free letters are Office's
+      own formatting keys (E, J, K, U, I) or common commands (D, H, L). Ctrl+G was ruled out: VS Code's « go to
+      line ». A configuration that binds `primary_b = "microsoft_bold"` explicitly keeps it. Choose: keep Ctrl+Q,
+      another letter, or no recommended letter for the remap.
 - [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
       Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
       are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script

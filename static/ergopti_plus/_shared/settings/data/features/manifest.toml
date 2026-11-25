@@ -2403,15 +2403,41 @@ description_key = "menu.shortcuts.keyboard.secondary_star"
 # ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
+# Ctrl+B wraps the line in parentheses on the three OS, and Ctrl+O is the
+# « Capture → texte » action (maintainer's decision of 2026-11-25). The
+# Microsoft bold remap moved from Ctrl+B to Ctrl+Q on Windows (agent's choice,
+# to review); a config that binds primary_b explicitly keeps its binding.
 [[features.shortcuts.keyboard]]
 id = "primary_b"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "surround_parens"
+family = "feature"
+type = "action"
+description_key = "shortcuts.label_ctrl_b"
+
+[[features.shortcuts.keyboard]]
+id = "primary_o"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "ocr_screenshot"
+family = "feature"
+type = "action"
+description_key = "shortcuts.label_ctrl_o"
+
+[[features.shortcuts.keyboard]]
+id = "primary_q"
 platforms = ["ahk"]
 requires = { windows = [] }
 default = "none"
 recommended = "microsoft_bold"
 family = "feature"
 type = "action"
-description_key = "menu.shortcuts.keyboard.ctrl_b"
+description_key = "shortcuts.label_ctrl_q"
 
 [[features.shortcuts.keyboard]]
 id = "meta_a"
@@ -2657,12 +2683,23 @@ type = "action"
 description_key = "shortcuts.label_ctrl_m"
 
 [[features.shortcuts.keyboard]]
-id = "secondary_o"
+id = "secondary_b"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "surround_parens"
+family = "feature"
+type = "action"
+description_key = "shortcuts.label_ctrl_b"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_o"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "ocr_screenshot"
 family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_o"

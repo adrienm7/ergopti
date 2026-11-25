@@ -23,10 +23,11 @@
 ---    only in the folder core/fs/adapters/file_manager_folder.lua proved, start the
 ---    terminal detached in it, create the file exclusively under the first free
 ---    name, reveal it in the same Nautilus process, and say why otherwise.
---- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color,
----    screen_capture_instant and ocr_screenshot were declared for Windows and
----    macOS only. Their Linux commands run here in a real shell against stub
----    tools, so a quoting slip or a filter that ejects the system disk fails.
+--- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color and
+---    screen_capture_instant were declared for Windows and macOS only. Their
+---    Linux commands run here in a real shell against stub tools, so a quoting
+---    slip or a filter that ejects the system disk fails. ocr_screenshot has
+---    its own suite: tests/unit/modules/shortcuts/test_ocr_capture_module.lua.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -845,61 +846,6 @@ helpers.describe("Linux system actions", function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")
 			helpers.assert_true(instant:find('gnome-screenshot -wf "$f"', 1, true) ~= nil, instant)
 			helpers.assert_true(instant:find("/ergopti_win_", 1, true) ~= nil, "a window capture file name: " .. instant)
-		end)
-
-	helpers.it("ocr_screenshot puts the text of the drawn region on the clipboard (action-parity-linux-system)", function()
-		local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
-			slurp = 'echo "10,10 50x20"',
-			grim = 'for last; do :; done; printf png > "$last"',
-			tesseract = 'case "$1" in --list-langs) printf "%s\\n" "List of available languages:" eng fra osd;;'
-				.. ' *) printf "Bonjour"; esac',
-			["wl-copy"] = 'cat > "$STUBS/clipboard"',
-		})
-		local clip_fh = io.open(dir .. "/clipboard", "r")
-		local clip = clip_fh and clip_fh:read("*a")
-		if clip_fh then clip_fh:close() end
-		helpers.assert_eq(clip, "Bonjour", "the recognised text reaches the clipboard; calls: " .. log)
-		helpers.assert_true(log:find("tesseract /[^ ]+%.png %- %-l eng%+fra\n") ~= nil,
-			"tesseract reads the capture in every installed language but osd: " .. log)
-		local leftover = io.popen("ls '" .. dir .. "' | grep -c png$"):read("*l")
-		helpers.assert_true(log:find("grim %-g 10,10 50x20 /") ~= nil, "the drawn region is captured: " .. log)
-		helpers.assert_eq(leftover, "0", "the temporary capture is removed")
-	end)
-
-	helpers.it("keeps the clipboard when OCR finds no text", function()
-		local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
-			slurp = 'echo "10,10 50x20"',
-			grim = 'for last; do :; done; printf PNG > "$last"',
-			tesseract = 'case "$1" in --list-langs) printf "List:\neng\n";; *) exit 0;; esac',
-			["wl-copy"] = 'cat > "$STUBS/clipboard"',
-		})
-		helpers.assert_nil(io.open(dir .. "/clipboard", "rb"), "empty OCR must not clear the clipboard: " .. log)
-	end)
-
-	for _, signal in ipairs({ "HUP", "INT", "TERM" }) do
-		helpers.it("cleans the private OCR image on SIG" .. signal, function()
-			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, "ocr_screenshot")
-			local log, dir = run_with_stubs(command, {
-				slurp = 'echo "10,10 50x20"',
-				grim = 'for last; do :; done; printf PNG > "$last"; kill -' .. signal .. ' "$PPID"; exit 0',
-				tesseract = 'printf text', ["wl-copy"] = 'cat > "$STUBS/clipboard"',
-			})
-			local pipe = assert(io.popen("find '" .. dir .. "' -name 'ergopti-ocr.*' -print"))
-			helpers.assert_eq(pipe:read("*a"), "", "OCR capture directory must be removed on signal: " .. log)
-			pipe:close()
-		end)
-	end
-
-	helpers.it("ocr_screenshot leaves the clipboard alone when the selection is cancelled (action-parity-linux-system)",
-		function()
-			local log, dir = run_with_stubs(backgrounded(Gestures, "ocr_screenshot"), {
-				slurp = "exit 1",
-				grim = "exit 1",
-				tesseract = 'printf "x"',
-				["wl-copy"] = 'cat > "$STUBS/clipboard"',
-			})
-			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "nothing reached the clipboard: " .. log)
-			helpers.assert_true(not log:find("tesseract", 1, true), "nothing was read: " .. log)
 		end)
 
 	-- Two accepted toggles background two shells. Unserialized, both read the
