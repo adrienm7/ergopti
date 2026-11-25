@@ -153,9 +153,6 @@ try {
 		'lib/lua/5.1/lfs.so',
 		'lib/lua/5.1/posix/sys/stat.so',
 		'share/lua/5.1/posix/init.lua',
-		'lib/lua/5.1/lgi/corelgilua51.so',
-		'share/lua/5.1/lgi.lua',
-		'lib/girepository-1.0/GObject-2.0.typelib',
 		`${observedLibdir}/gio/modules/libgiolibproxy.so`,
 		`${observedLibdir}/gio/modules/libgiognutls.so`,
 		'share/glib-2.0/schemas/gschemas.compiled'
@@ -192,7 +189,7 @@ try {
 	assert.equal(installed.stdout, bashPath(path.join(prefix, 'lib/gio/modules')) + '\n');
 	assert.equal(installed.stderr, '');
 	// A lib64-only layout is not a prefix that owns its GIO: it points GIO at
-	// nothing, and the Flatpak's runtime probe refuses the missing resolver.
+	// nothing, and without the private runtime's lgi the environment refuses it.
 	fs.renameSync(path.join(prefix, 'lib/gio'), path.join(prefix, 'detached-gio'));
 	fs.mkdirSync(path.join(prefix, 'lib64/gio/modules'), { recursive: true });
 	fs.writeFileSync(
@@ -200,8 +197,9 @@ try {
 		'owned legacy path fixture'
 	);
 	const misplaced = observe();
-	assert.equal(misplaced.status, 0, misplaced.stderr);
-	assert.equal(misplaced.stdout, 'unset\n');
+	assert.notEqual(misplaced.status, 0, 'a misplaced Flatpak GIO layout fails closed');
+	assert.equal(misplaced.stdout, '');
+	assert.match(misplaced.stderr, /Required installed native package component unavailable/);
 } finally {
 	fs.rmSync(layoutFixture, { recursive: true, force: true });
 }
@@ -528,12 +526,6 @@ if (process.platform === 'linux') {
 			'lib/lua/5.1/lfs.so',
 			'lib/lua/5.1/posix/sys/stat.so',
 			'share/lua/5.1/posix/init.lua',
-			'lib/lua/5.1/lgi/corelgilua51.so',
-			'share/lua/5.1/lgi.lua',
-			'lib/girepository-1.0/GObject-2.0.typelib',
-			'lib/lua/5.1/lgi/corelgilua51.so',
-			'share/lua/5.1/lgi.lua',
-			'lib/girepository-1.0/GObject-2.0.typelib',
 			'lib/gio/modules/libgiolibproxy.so',
 			'share/glib-2.0/schemas/gschemas.compiled'
 		]) {

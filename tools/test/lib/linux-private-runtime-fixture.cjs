@@ -10,8 +10,10 @@
  * stage an existence-only AppDir instead of a real oldest-LTS build.
  *
  * FEATURES & RATIONALE:
- * 1. The component list is read from the template's own admission loop, so a
- *    component added there is staged here without a second list to forget.
+ * 1. The component list is read from the template's own admission loop and
+ *    from the components only a private runtime carries (lgi and its
+ *    typelibs), so a component added there is staged here without a second
+ *    list to forget.
  * 2. Files are existence fixtures, never executed: what native code they hold
  *    is proven by the AppImage stager on the oldest supported LTS.
  * ==============================================================================
@@ -38,7 +40,12 @@ function requiredComponents() {
 	const source = fs.readFileSync(TEMPLATE, 'utf8');
 	const loop = source.match(/for ERGOPTI_PACKAGE_COMPONENT in \\\n([\s\S]*?); do\n/);
 	if (!loop) throw new Error('the environment template has no component admission loop');
-	const components = [...loop[1].matchAll(/"\$([A-Z_]+)\/([^"]+)"/g)].map(([, name, rest]) => {
+	// The Flatpak's /app builds no lgi: the template asks it of a private runtime
+	// alone, in the multi-line list of its else branch.
+	const privateOnly = source.match(/\n {2}ERGOPTI_PACKAGE_COMPONENTS=\(\n([\s\S]*?)\n {2}\)\n/);
+	if (!privateOnly) throw new Error('the environment template has no private runtime components');
+	const listed = loop[1] + '\n' + privateOnly[1];
+	const components = [...listed.matchAll(/"\$([A-Z_]+)\/([^"]+)"/g)].map(([, name, rest]) => {
 		if (!(name in VARIABLES)) throw new Error(`unknown template variable ${name}`);
 		return path.posix.join(VARIABLES[name], rest);
 	});

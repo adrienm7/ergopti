@@ -772,6 +772,87 @@ if (process.platform === 'linux') {
 }
 passed++;
 
+// Only the private runtime's stager stages lgi and its fallback typelibs: the
+// Flatpak's /app builds neither, so the launch environment must admit it
+// without them. Requiring them of every prefix failed the Flatpak module's
+// build-time self-check (CI run 45568762252), while a private runtime that
+// lost its lgi must still be refused.
+{
+	const flatpakBuilder = read('tools/build/build-linux-flatpak.sh');
+	const flatpakModules = require('../codegen/codegen-linux-native-runtime.cjs').flatpakModules(
+		JSON.parse(read('static/ergopti_plus/_shared/core/network/data/linux_native_runtime.json'))
+	);
+	assert.ok(
+		!/\blgi\b|girepository/.test(flatpakBuilder + flatpakModules),
+		'the Flatpak manifest builds no lgi; model it in the fixture below if it does'
+	);
+}
+if (process.platform === 'linux') {
+	const { spawnSync } = require('node:child_process');
+	const { bashExecutable } = require('../lib/git-bash.cjs');
+	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-prefix-components-'));
+	try {
+		const script = path.join(sandbox, 'environment.sh');
+		fs.writeFileSync(script, environment);
+		const trust = path.join(sandbox, 'trust.pem');
+		fs.writeFileSync(trust, 'fixture');
+		const common = [
+			'bin/luajit',
+			'bin/curl',
+			'bin/sqlite3',
+			'bin/openssl',
+			'bin/zstd',
+			'lib/lua/5.1/luv.so',
+			'lib/lua/5.1/lfs.so',
+			'lib/lua/5.1/posix/sys/stat.so',
+			'share/lua/5.1/posix/init.lua'
+		];
+		const admit = (name, files) => {
+			const prefix = path.join(sandbox, name);
+			for (const file of files) {
+				fs.mkdirSync(path.dirname(path.join(prefix, file)), { recursive: true });
+				fs.writeFileSync(path.join(prefix, file), 'existence fixture, never executed');
+			}
+			return spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					'set -euo pipefail; source "$1" "$2" "$3"; echo admitted',
+					'prefix-components',
+					script,
+					prefix,
+					path.join(prefix, 'lib/ergopti')
+				],
+				{ encoding: 'utf8', env: { PATH: '/usr/bin:/bin', CURL_CA_BUNDLE: trust } }
+			);
+		};
+		const flatpak = admit('app', [
+			...common,
+			'lib/gio/modules/libgiolibproxy.so',
+			'share/glib-2.0/schemas/gschemas.compiled'
+		]);
+		assert.equal(flatpak.status, 0, flatpak.stderr);
+		assert.equal(flatpak.stdout, 'admitted\n', 'the Flatpak prefix starts without lgi');
+		const lgi = [
+			'lib/lua/5.1/lgi/corelgilua51.so',
+			'share/lua/5.1/lgi.lua',
+			'lib/girepository-1.0/GObject-2.0.typelib'
+		];
+		assert.equal(admit('private', [...common, ...lgi]).status, 0, 'a full private runtime');
+		for (const missing of lgi) {
+			const refused = admit(
+				`private-without-${path.basename(missing)}`,
+				[...common, ...lgi].filter((file) => file !== missing)
+			);
+			assert.notEqual(refused.status, 0, `a private runtime without ${missing} is refused`);
+			assert.match(refused.stderr, /Required installed native package component unavailable/);
+		}
+	} finally {
+		fs.rmSync(sandbox, { recursive: true, force: true });
+	}
+}
+passed++;
+
 // A core of the bundled luajit names only its build-id and offsets: the stager
 // records every staged ELF file's GNU build-id and package in the prefix, refuses
 // a luajit without one, and the packager prints it into the build log.

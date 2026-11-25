@@ -69,6 +69,17 @@ if [ "$ERGOPTI_PACKAGE_OWNS_GIO" = true ]; then
   export GSETTINGS_SCHEMA_DIR="$ERGOPTI_PACKAGE_PREFIX/share/glib-2.0/schemas"
   export XDG_DATA_DIRS="$ERGOPTI_PACKAGE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
   ERGOPTI_PACKAGE_COMPONENTS=("$GIO_MODULE_DIR/libgiolibproxy.so" "$GSETTINGS_SCHEMA_DIR/gschemas.compiled")
+else
+  # lgi and its fallback typelibs come from the private runtime's stager
+  # (stage-linux-network-runtime.py stage_lgi). The Flatpak builds none: its
+  # freedesktop runtime has no WebKitGTK to draw a window with, and a missing
+  # lgi only tells the windows unavailable at start. Requiring them of /app
+  # failed the Flatpak's own build-time self-check.
+  ERGOPTI_PACKAGE_COMPONENTS=(
+    "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lgi/corelgilua51.so"
+    "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/lgi.lua"
+    "$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0/GObject-2.0.typelib"
+  )
 fi
 # The prefix's lgi links the build host's libgirepository, whose built-in search
 # names only the Debian multiarch directory. The recipient's typelibs come
@@ -87,9 +98,6 @@ for ERGOPTI_PACKAGE_COMPONENT in \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lfs.so" \
   "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/posix/sys/stat.so" \
   "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/posix/init.lua" \
-  "$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/lgi/corelgilua51.so" \
-  "$ERGOPTI_PACKAGE_PREFIX/share/lua/5.1/lgi.lua" \
-  "$ERGOPTI_PACKAGE_PREFIX/lib/girepository-1.0/GObject-2.0.typelib" \
   "${ERGOPTI_PACKAGE_COMPONENTS[@]}"; do
   if [ ! -f "$ERGOPTI_PACKAGE_COMPONENT" ]; then
     echo "Required installed native package component unavailable." >&2
