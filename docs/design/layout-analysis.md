@@ -278,10 +278,15 @@ unsupported}`: a text of at most `TRACE_MAX_CHARS` (2,000) code points typed
   cannot be mixed and are left out (their scorers read the tables, as for a
   corpus of counts). A part of weight 0 is skipped; no part, a negative
   weight or all weights 0 throw. The Comparer's « Home » offers it under the
-  corpus picker (« Blend corpora »: up to three built-in corpora and their
-  weights); the blend is listed with the user's own texts, its recipe kept
-  with the conveniences (mixed again on the next visit when it was the corpus
-  compared) and carried in the share link (`blend=<id>:<weight>,…`).
+  corpus picker (« Blend corpora »: up to three corpora and their weights,
+  built-in ones or, since 2026-11-25, the user's own texts: the pasted text, a
+  loaded file, « My typing » once read, each by its keys typed); the blend is
+  listed with the user's own texts, its recipe kept with the conveniences
+  (mixed again on the next visit when it was the corpus compared and its own
+  texts are still listed, else « Blend corpora » says the text is gone) and
+  carried in the share link (`blend=<id>:<weight>,…`) only when every part is
+  built-in: a blend of the user's own text stays on the device, as the text
+  does, and its status line and the copied link's say so.
 - `pareto(points, directions)` → `[{id, layer, front, dominatedBy}]`: the
   Pareto layers of points `{id, values}` over values each `lower` or
   `higher` better (the Comparer's « Pareto » tab, an idea seen in the

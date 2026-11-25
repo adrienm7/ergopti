@@ -304,9 +304,9 @@ waits for the maintainer's review).
       own run to be checked; shirolyzer's score is undocumented.
 - [ ] **Layouts Wiki playground ideas, what is left (2026-11-25).** Done: the Comparer's « Pareto » and « Trace » tabs,
       their links, the movement table and the « Corpus words » drill-down (trace, worst n-grams, editor panel)
-      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (2) corpus blends,
-      what is left: blend the user's own text or « Ma frappe » too (done: up to three built-in corpora by weight,
-      `E.blendNgrams`, kept with the conveniences and carried in the share link); (3) magic and repeat keys: designed
+      (`docs/audits/layout-analysers/layouts-wiki-playground.md`, ranked shortlist). Left, in order: (2) corpus blends (done: up to three corpora by weight,
+      built-in or the user's own texts and « Ma frappe », `E.blendNgrams`, kept with the conveniences, carried in the
+      share link when every part is built-in); (3) magic and repeat keys: designed
       (`docs/design/magic-and-repeat-keys.md`), waiting for the maintainer's choice under « Maintainer decisions pending
       »; (4) saved layout versions in the editor beside undo (done: the editor's « Versions » tool, named snapshots kept
       in the workspace, compared key by key and restored as one undoable step); (5) task help (done: the Comparer's « Help » tab, the

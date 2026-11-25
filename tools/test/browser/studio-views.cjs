@@ -31,6 +31,9 @@
  *    same pair in « One layout ».
  * 9. Help: the « Help » tab names each task in a titled section, without the
  *    filters or the layout frame.
+ * 12. Blends of the user's own text: the pasted text is a part the blend's
+ *    pickers offer, the blend mixes it, says it stays on this device, and
+ *    the link carries no blend; the next visit mixes it again.
  * 11. Movement percentiles: « Place among the library » measures the
  *    library's complete layouts on request, the status says how far it is,
  *    and then every movement and rhythm cell carries its percentile chip,
@@ -330,6 +333,58 @@ async function exerciseBlend(browser, origin) {
 	await context.close();
 }
 
+async function exerciseBlendOwnText(browser, origin) {
+	const { context, page, errors } = await openComparer(browser, origin, `layouts=${LAYOUTS}`);
+	await page.click('#la-tab-home');
+	await page.selectOption('#la-corpus', 'custom');
+	await page.fill(
+		'#la-text',
+		'Mon propre texte, tapé souvent : des accents, des virgules et du code. '.repeat(20)
+	);
+	await page.locator('#la-blend > summary').click();
+	// The text is read after its typing pause (TEXT_DEBOUNCE_MS).
+	await page.waitForSelector('#la-blend-corpus-0 option[value="custom"]', { state: 'attached' });
+	const offered = await page.$$eval('#la-blend-corpus-0 option', (options) =>
+		options.map((option) => option.value)
+	);
+	assert.ok(
+		offered.includes('custom'),
+		`own blend: the pasted text is offered (${offered.slice(0, 5)})`
+	);
+	await page.selectOption('#la-blend-corpus-0', 'custom');
+	await page.selectOption('#la-blend-corpus-1', 'fr_nemolivier');
+	await page.fill('#la-blend-weight-0', '40');
+	await page.fill('#la-blend-weight-1', '60');
+	await page.fill('#la-blend-weight-2', '0');
+	await page.click('#la-blend-use');
+	await page.waitForFunction(() => document.getElementById('la-corpus').value === 'blend');
+	assert.ok(
+		(await page.textContent('#la-blend-status')).endsWith(
+			EN['layout_analysis.blend.done_own'].split('{title}')[1]
+		),
+		'own blend: it stays on this device, said in words'
+	);
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	await page.click('#la-share');
+	await page.waitForFunction(() => !document.getElementById('la-share-status').hidden);
+	const link = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+	assert.equal(link.searchParams.get('blend'), null, 'own blend: no link carries it');
+	assert.equal(
+		await page.textContent('#la-share-status'),
+		EN['layout_analysis.share.copied_partial'],
+		'own blend: the link says the text is left out'
+	);
+	await page.reload();
+	await page.waitForFunction(() => document.getElementById('la-corpus').value === 'blend');
+	assert.equal(
+		await page.inputValue('#la-blend-corpus-0'),
+		'custom',
+		'own blend: kept for the next visit'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
 async function exercisePanelWords(browser, origin) {
 	const { page, errors, context } = await studioUx.openOnErgopti(browser, origin);
 	const button = page.locator('.la-panel-ngrams .la-ngram-words').first();
@@ -479,6 +534,7 @@ async function exerciseMovementPercentiles(browser, origin) {
 }
 
 module.exports = {
+	exerciseBlendOwnText,
 	exerciseMovementPercentiles,
 	exerciseEditorOptimizerHelp,
 	exerciseHelp,
