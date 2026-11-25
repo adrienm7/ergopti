@@ -67,28 +67,109 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 
 
 
-; Builds the inline-table entry pattern: `output` is required, every flag and
-; `priority` optional and in any order (maintainer decision HSE-002, 2026-11-12:
+; Builds the inline-table entry pattern: `output` is required unless the entry
+; runs an action (action_entry.ahk), every flag, `priority` and the action
+; fields optional and in any order (maintainer decision HSE-002, 2026-11-12:
 ; the Lua reader defaults a missing flag to false, and an entry the editor or a
 ; user wrote in another order used to be dropped here). Each lookahead walks the
 ; table member by member, so a key spelled inside the output text is never read
-; as a flag. Group 1 is the trigger, 2 the output, then one group per name of
-; CapturedKeys in order (empty when the key is absent).
+; as a flag. Group 1 is the trigger, 2 the output (empty when absent), then one
+; group per name of CapturedKeys in order (empty when the key is absent).
 ; @param CapturedKeys {Array} Flag names (or "priority") to capture.
 ; @returns {String} The case-insensitive pattern, anchored at the line start.
 HS_EntryPattern(CapturedKeys) {
 	StrBody := '[^"\\]*(?:\\.[^"\\]*)*'
 	Member := '(?:output\s*=\s*"' . StrBody . '"'
 		. '|(?:is_word|auto_expand|is_case_sensitive|final_result|is_case_sensitive_strict)\s*=\s*(?:true|false)'
-		. '|priority\s*=\s*[0-9]+)'
+		. '|priority\s*=\s*[0-9]+'
+		. '|(?:action|workflow)\s*=\s*"' . StrBody . '"|erase_trigger\s*=\s*(?:true|false))'
 	Skip := '\{\s*(?:' . Member . '\s*,\s*)*?'
+	; The output when there is one, then the proof the entry types or runs something.
 	Pattern := 'i)^(?|"(' . StrBody . ')"|([A-Za-z0-9_\-]+))\s*=\s*'
-		. '(?=' . Skip . 'output\s*=\s*"(' . StrBody . ')")'
+		. '(?=(?:' . Skip . 'output\s*=\s*"(' . StrBody . ')")?)'
+		. '(?=' . Skip . '(?:output|action|workflow|erase_trigger)\s*=)'
 	for Key in CapturedKeys {
 		Value := (Key == "priority") ? "([0-9]+)" : "(true|false)"
 		Pattern .= '(?=(?:' . Skip . Key . '\s*=\s*' . Value . ')?)'
 	}
 	return Pattern . '\{\s*' . Member . '(?:\s*,\s*' . Member . ')*\s*\}'
+}
+
+
+
+
+
+/**
+ * The action fields of an entry whose booleans are AutoHotkey 0/1 or TOML_Bool
+ * (the personal model, a decoded TOML row), checked by HSE_ActionEntryFields.
+ * @param {Map} Entry The entry.
+ * @param {String} Refusal Set to the refusal of HSE_ActionEntryFields, "" otherwise.
+ * @returns {Map|Integer} The action fields, or 0 for an entry that runs no action.
+ */
+HS_EntryActionFields(Entry, &Refusal := "") {
+	global JSON_TRUE, JSON_FALSE
+	Probe := Map()
+	for Key in ["action", "workflow"]
+		if Entry.Has(Key)
+			Probe[Key] := Entry[Key]
+	if Entry.Has("erase_trigger") {
+		Erase := Entry["erase_trigger"]
+		if Erase is TOML_Bool
+			Erase := Erase.Value
+		Probe["erase_trigger"] := (Erase is Integer && (Erase == 0 || Erase == 1))
+			? (Erase ? JSON_TRUE : JSON_FALSE) : Erase
+	}
+	return HSE_ActionEntryFields(Probe, &Refusal)
+}
+
+/**
+ * The action fields of an entry line the entry pattern matched, read through
+ * the typed document reader so a key spelled inside the output is never one.
+ * @param {String} Line The entry line.
+ * @param {String} Refusal Set to the refusal of HSE_ActionEntryFields, or
+ *   no_output for an entry that neither types nor runs anything.
+ * @returns {Map|Integer} The action fields, or 0 for a text entry.
+ */
+HS_EntryLineAction(Line, &Refusal := "") {
+	Refusal := ""
+	if !RegExMatch(Line, "i)(?:action|workflow|erase_trigger)\s*=")
+		return 0
+	Delimiter := _TOML_AssignmentDelimiter(Line)
+	if !Delimiter
+		throw ValueError("A hotstring entry line has no assignment.")
+	Value := _TOML_DocumentValue(TOML_StripInlineComment(SubStr(Line, Delimiter + 1)))
+	if !(Value is Map)
+		throw ValueError("A hotstring entry is not an inline table.")
+	Fields := HS_EntryActionFields(Value, &Refusal)
+	if Refusal == "" && !IsObject(Fields) && !Value.Has("output")
+		Refusal := "no_output"
+	return Refusal == "" ? Fields : 0
+}
+
+/**
+ * Registers the action fields of one entry line on its options, or says why
+ * the entry is skipped; an action entry is a final result, so nothing chains
+ * off it (action_entry.ahk).
+ * @param {String} Line The entry line.
+ * @param {Map} Options The registration options, given "Action" and "FinalResult".
+ * @param {String} Where The section, for the log line.
+ * @returns {Boolean} Whether the entry is registered.
+ */
+HS_EntryApplyAction(Line, Options, Where) {
+	Refusal := ""
+	try Fields := HS_EntryLineAction(Line, &Refusal)
+	catch as Err
+		Refusal := Err.Message
+	if Refusal != "" {
+		try LoggerWarn("TomlLoader", "Section [{1}]: an entry is skipped, its action fields are refused ({2}).",
+			Where, Refusal)
+		return false
+	}
+	if IsObject(Fields) {
+		Options["Action"] := Fields
+		Options["FinalResult"] := true
+	}
+	return true
 }
 
 
@@ -638,6 +719,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				Options["Category"] := CategoryName
 				Options["Section"] := SectionName
 				Options["Priority"] := EntryPriority
+				if !HS_EntryApplyAction(Line, Options, HotstringCategoryLogName(CategoryName) . "." . SectionName)
+						continue
 
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				Loaded += 1
@@ -846,6 +929,8 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 					Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
 					Options["TimeActivationSeconds"] := Resolved.Delay
 				}
+				if !HS_EntryApplyAction(Line, Options, CurrentSection)
+						continue
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				TotalLoaded += 1
 		}

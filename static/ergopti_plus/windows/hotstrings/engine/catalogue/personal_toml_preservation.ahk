@@ -10,7 +10,10 @@
 #Requires AutoHotkey v2.0
 
 ; A typed fallback admits ordinary rows with additional inline members while
-; leaving shorthand and incomplete records outside the editor's ownership.
+; leaving shorthand and incomplete records outside the editor's ownership. An
+; action entry (action_entry.ahk) may leave out its output and its flags, which
+; read as "" and false, as the shared reader does; one with refused action
+; fields stays outside.
 _PersonalTomlTypedEntry(Line, LineIndex) {
 	Position := 1
 	Key := _TOML_DocumentToken(Line, &Position, "=", &Separated)
@@ -23,7 +26,20 @@ _PersonalTomlTypedEntry(Line, LineIndex) {
 		ValuePosition := 1
 		ValueText := _TOML_DocumentToken(SubStr(Line, Position), &ValuePosition, "")
 		Value := _TOML_DocumentValue(ValueText)
-		if !(Value is Map) || !Value.Has("output") || !(Value["output"] is String)
+		if !(Value is Map)
+			return false
+		Action := HS_EntryActionFields(Value, &ActionRefusal)
+		if ActionRefusal != ""
+			return false
+		if IsObject(Action) {
+			Value := Value.Clone()
+			if !Value.Has("output")
+				Value["output"] := ""
+			for Field in ["is_word", "auto_expand", "is_case_sensitive", "final_result"]
+				if !Value.Has(Field)
+					Value[Field] := TOML_Bool(false)
+		}
+		if !Value.Has("output") || !(Value["output"] is String)
 			return false
 		for Field in ["is_word", "auto_expand", "is_case_sensitive", "final_result"] {
 			if !Value.Has(Field) || !(Value[Field] is TOML_Bool)
@@ -39,6 +55,14 @@ _PersonalTomlTypedEntry(Line, LineIndex) {
 				? Value["is_case_sensitive_strict"].Value : false)
 		for Field in ["is_word", "auto_expand", "is_case_sensitive", "final_result"]
 			Entry[Field] := Value[Field].Value
+		; The editor's shape: erase_trigger only when the trigger is kept.
+		if IsObject(Action) {
+			Entry["action"] := Action["action"]
+			if Action.Has("workflow")
+				Entry["workflow"] := Action["workflow"]
+			if !Action["erase_trigger"]
+				Entry["erase_trigger"] := false
+		}
 		return Entry
 	} catch {
 		; This reader projects only admitted rows; the whole-document writer
@@ -60,6 +84,21 @@ _PersonalTomlEntryValue(Entry, Previous := 0) {
 		Value["priority"] := Entry["priority"]
 	else if Value.Has("priority")
 		Value.Delete("priority")
+	; An action entry writes its action and workflow, and erase_trigger only
+	; when false; clearing the action drops all three.
+	for Field in ["action", "workflow", "erase_trigger"]
+		if Value.Has(Field)
+			Value.Delete(Field)
+	Action := HS_EntryActionFields(Entry, &ActionRefusal)
+	if ActionRefusal != ""
+		throw ValueError("invalid-personal-row")
+	if IsObject(Action) {
+		Value["action"] := Action["action"]
+		if Action.Has("workflow")
+			Value["workflow"] := Action["workflow"]
+		if !Action["erase_trigger"]
+			Value["erase_trigger"] := TOML_Bool(false)
+	}
 	return Value
 }
 
@@ -73,12 +112,13 @@ _PersonalTomlRenderEntry(Entry, Original := 0) {
 	; remain typed data, including nested inline tables and literal dotted keys.
 	Members := []
 	for Field in ["output", "is_word", "auto_expand", "is_case_sensitive", "final_result",
-			"is_case_sensitive_strict", "priority"] {
+			"is_case_sensitive_strict", "priority", "action", "workflow", "erase_trigger"] {
 		if Value.Has(Field)
 			Members.Push(Field . " = " . TOML_RenderValue(Value[Field]))
 	}
 	for Field, Child in Value {
-		if !InStr("|output|is_word|auto_expand|is_case_sensitive|final_result|is_case_sensitive_strict|priority|", "|" . Field . "|")
+		if !InStr("|output|is_word|auto_expand|is_case_sensitive|final_result|is_case_sensitive_strict|priority"
+				. "|action|workflow|erase_trigger|", "|" . Field . "|")
 			Members.Push(TOML_RenderKey(Field) . " = " . TOML_RenderValue(Child))
 	}
 	Tail := "`n"

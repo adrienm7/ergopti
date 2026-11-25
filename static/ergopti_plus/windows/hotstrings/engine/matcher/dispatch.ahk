@@ -74,6 +74,9 @@ global _HSE_TerminalReplaying := false
 ; The literal expansion an immediate Backspace may still undo (HSE_UndoExpansion),
 ; "" when none: set when a literal expansion commits, taken by the very next key.
 global HSE_Undoable := ""
+; A test's recorder of the actions action entries schedule (Fields), 0 in
+; production, where the action runs on the next timer turn.
+global _HSE_EntryActionHook := 0
 ; The restored characters the undo gives the last-sent ring: as many as the
 ; catalogue's previous-character gates read (GetLastSentCharacterAt(-4)).
 global _HSE_UNDO_LSC_UNITS := 4
@@ -1507,6 +1510,57 @@ _HSE_ExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar
 		return HSE_PlanBuild(Request)
 }
 
+; The edit of an action entry before its action (HSE_ActionEntryPlan): the
+; trigger erased as a text entry's, or kept as typed with the output after it.
+; @param Spec {Object} The matched spec, with EntryAction.
+; @param Replacement {String} The resolved output.
+; @param EndChar {String} The end character, "" on the auto path.
+; @param NbspStripped {Boolean} Whether a no-break space preceded it.
+; @param ForceConsumeEndChar {Boolean} The caller swallows the end character.
+; @param EndCharOnScreen {Boolean} Whether the application already holds the end character.
+; @returns {Map} The plan.
+_HSE_ActionEntryExpansionPlan(Spec, Replacement, EndChar, NbspStripped, ForceConsumeEndChar, EndCharOnScreen) {
+		return HSE_ActionEntryPlan(Map("path", _HSE_ExpansionPath(EndChar),
+				"trigger_len", _TextCodepointLength(Spec.Trigger),
+				"event_len", _TextCodepointLength(EndChar), "event_on_screen", EndCharOnScreen ? 1 : 0,
+				"event_text", EndChar, "terminator", EndChar,
+				"consume_terminator", _HSE_EndCharConsumed(EndChar, ForceConsumeEndChar),
+				"nbsp_stripped", NbspStripped, "output", Replacement,
+				"erase_trigger", Spec.EntryAction["erase_trigger"]))
+}
+
+; The canonical effect of an action entry: the buffer is dropped, as on macOS
+; and Linux, since the action changes the context and nothing may chain off it
+; or undo it. The caller holds the buffer transaction's Critical span.
+; @param Spec {Object} The matched spec.
+; @param Plan {Map} Its HSE_ActionEntryPlan.
+; @returns {Object} The effect HSE_ApplyExpansion would return.
+_HSE_ApplyActionEntryEffect(Spec, Plan) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_PrivateAncestry
+		HSE_Buffer := ""
+		HSE_PrivateAncestry := ""
+		HSE_StartIsWordBoundary := false
+		return { IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate ? true : false, ClearAll: true,
+				DeleteFromEnd: 0, InsertedText: Plan["text"] . Plan["tail"], EndCharEmitted: Plan["tail"] != "",
+				EndCharText: "", KnownBoundaryAfter: false }
+}
+
+; Runs an action entry's action on the next timer turn, out of the key
+; callback, through the driver's executors (WorkflowsRunEntryAction).
+; @param Fields {Map} The entry's action fields.
+_HSE_ScheduleEntryAction(Fields) {
+		global _HSE_EntryActionHook
+		if _HSE_EntryActionHook
+				return _HSE_EntryActionHook.Call(Fields)
+		if !IsSet(WorkflowsRunEntryAction) {
+				LoggerError("HSE", "The action '{1}' of a hotstring cannot run: no action executor is loaded.",
+						Fields["action"])
+				return
+		}
+		Executor := WorkflowsRunEntryAction
+		SetTimer(() => Executor(Fields), -1)
+}
+
 ; The outcome of one HSE_DispatchMatch verdict for the « hotstring.expand » span
 ; line: an asynchronous owner still types it, a decline typed nothing.
 ; @param Verdict {Map|Boolean} What HSE_DispatchMatch returned.
@@ -1595,7 +1649,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; complete further hotstrings. The whole chain is resolved here and goes out
 		; as THIS burst: the same erase plus whatever typed text a later link
 		; reaches back over, and the last link's text as the replacement.
-		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
+		; An action entry never chains (action_entry.ahk).
+		EntryAction := Spec.HasOwnProp("EntryAction") ? Spec.EntryAction : 0
+		CascadePlan := IsObject(EntryAction) ? "" : _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
 		CascadeUnits := IsObject(CascadePlan) ? CascadePlan.ExtraUnits : 0
 		OutputIsFinal := IsObject(CascadePlan) ? CascadePlan.FinalResult
 				: (Spec.HasOwnProp("FinalResult") and Spec.FinalResult)
@@ -1651,8 +1707,11 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 
 				; The plan counts the NNBSP/NBSP that was stripped before matching when
 				; the end-char is a typographic punctuation (``:`` / `` ; ``).
-				Plan := _HSE_ExpansionPlan(Spec, Replacement, EndChar, HSE_TypoNbspStripped,
-						ForceConsumeEndChar, CascadePlan, EndCharOnScreen)
+				Plan := IsObject(EntryAction)
+						? _HSE_ActionEntryExpansionPlan(Spec, Replacement, EndChar, HSE_TypoNbspStripped,
+								ForceConsumeEndChar, EndCharOnScreen)
+						: _HSE_ExpansionPlan(Spec, Replacement, EndChar, HSE_TypoNbspStripped,
+								ForceConsumeEndChar, CascadePlan, EndCharOnScreen)
 				Replacement := Plan["text"]
 				EraseUnits := _HSE_ExpansionStripUnits(Spec.Length + CascadeUnits, EndChar, HSE_TypoNbspStripped)
 				BSCount := Plan["erase"]
@@ -1663,8 +1722,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; (KLHook global removed)
 				exe := OutputHost["Exe"]
 				HostTitle := OutputHost["Title"]
-				IsNotepadApp := OutputHostTakesTextByPaste(OutputHost)
-				IsTerminalApp := _HSE_IsTerminalInputHost(exe, HostTitle)
+				; An action entry's edit goes out as one atomic burst, its action after
+				; it: the Notepad and terminal owners commit a text the action replaces.
+				IsNotepadApp := !IsObject(EntryAction) && OutputHostTakesTextByPaste(OutputHost)
+				IsTerminalApp := !IsObject(EntryAction) && _HSE_IsTerminalInputHost(exe, HostTitle)
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
 					; pasting it would silently put the five characters "{Left}" on screen.
@@ -1848,7 +1909,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					try {
 							BufferBeforeFire := HSE_Buffer
 							BoundaryBeforeFire := HSE_StartIsWordBoundary
-							ExpansionEffect := HSE_ApplyExpansion(
+							ExpansionEffect := IsObject(EntryAction) ? _HSE_ApplyActionEntryEffect(Spec, Plan)
+									: HSE_ApplyExpansion(
 									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits, OutputIsFinal)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
@@ -1893,6 +1955,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						KL_ClearSynthetic(SyntheticOwner)
 		}
 		; Reached only when the replacement was actually emitted.
+		if IsObject(EntryAction)
+				_HSE_ScheduleEntryAction(EntryAction)
 		return true
 }
 

@@ -247,6 +247,15 @@ open until the maintainer confirms or changes it.
   child exits and bounded by `[limits] user_action_output_bytes` as a
   `run_command` capture, fills the step's variable without its trailing line
   breaks; stderr is not kept.
+- **A Windows action entry always types through the atomic burst** —
+  decided by the agent on 2026-11-25, to review by the maintainer: Notepad's
+  paste owner and the paced terminal owner commit a text the action then
+  replaces, so an action entry's erase and output go out as one SendInput
+  burst there too, and its action runs on the next timer turn. As on macOS
+  and Linux the buffer is dropped after it: nothing chains off an action
+  entry and Backspace does not undo it. A bundled hotstring file never
+  carries one (its cache refuses the row); an action entry of a personal or
+  extension file may leave out its output and flags, read as "" and false.
 
 ## The reading font draws the tray menus too (2026-11-24)
 

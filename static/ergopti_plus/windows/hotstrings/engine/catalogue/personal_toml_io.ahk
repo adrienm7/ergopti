@@ -1158,6 +1158,13 @@ _PersonalTomlModelFieldsAreValid(Data, CanonicalOrder, &Detail) {
 					. " has a non-Boolean is_case_sensitive_strict"
 				return false
 			}
+			HS_EntryActionFields(Entry, &ActionRefusal)
+			if ActionRefusal != "" {
+				; The code the shared personal model refuses the row with.
+				Detail := "invalid-personal-row: section '" . SectionName . "' entry " . EntryIndex
+					. " has refused action fields (" . ActionRefusal . ")"
+				return false
+			}
 		}
 	}
 	return true
@@ -2525,6 +2532,13 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 					"Section", SectionName,
 					"Priority", EntryPriority,
 				)
+				; The writer refused any other action fields; an action entry is
+				; final, as the boot loader registers it (HS_EntryApplyAction).
+				Action := HS_EntryActionFields(E, &ActionRefusal)
+				if IsObject(Action) {
+					Options["Action"] := Action
+					Options["FinalResult"] := true
+				}
 				HSE_RegisterFromTomlFlags(
 					E["is_case_sensitive"], Flags, Trigger, Output, Options)
 			}

@@ -96,7 +96,8 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 				and options["PreviewValues"] is Array) {
 			Meta.PreviewValues := options["PreviewValues"].Clone()
 		}
-		_HSE_WithPreviewOutput(Meta, IsSet(options) ? options.Get("PreviewOutput", "") : "")
+		_HSE_WithPreviewOutput(Meta, IsSet(options) ? options.Get("PreviewOutput", "") : "",
+				IsSet(options) ? options.Get("Action", 0) : 0)
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
@@ -181,13 +182,17 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 
 ; Carries the text an output with keys types, for the preview: the Replacement of
 ; such an output is a Send string the bubble cannot show. An output of keys alone
-; types nothing, so it keeps no row.
+; types nothing, so it keeps no row. Also carries the action fields of an action
+; entry (HSE_ActionEntryFields), which the dispatcher runs after the edit.
 ; @param Meta {Object} The dispatch metadata.
 ; @param PreviewOutput {String} The typed text, "" when there is none.
+; @param Action {Map|Integer} The entry's action fields, 0 for a text entry.
 ; @returns {Object} Meta.
-_HSE_WithPreviewOutput(Meta, PreviewOutput) {
+_HSE_WithPreviewOutput(Meta, PreviewOutput, Action := 0) {
 		if PreviewOutput != ""
 				Meta.PreviewOutput := PreviewOutput
+		if IsObject(Action)
+				Meta.EntryAction := Action
 		return Meta
 }
 
@@ -430,6 +435,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 
 		Rec := _HotstringRegistrar
 		PreviewOutput := IsSet(options) ? options.Get("PreviewOutput", "") : ""
+		EntryAction := IsSet(options) ? options.Get("Action", 0) : 0
 
 		; Order matters: nbsp abbreviations must trigger before bare punctuation
 		; so the engine can delete the preceding non-breaking space correctly.
@@ -472,7 +478,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset, true)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
-				_HSE_WithPreviewOutput(ConformMeta, PreviewOutput)
+				_HSE_WithPreviewOutput(ConformMeta, PreviewOutput, EntryAction)
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
@@ -506,7 +512,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				_HSE_WithPreviewOutput(_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
-				InStr(Flags, "*") > 0), Preview)
+				InStr(Flags, "*") > 0), Preview, EntryAction)
 		)
 		PreviewTitleCase := _HSE_ReplTitle(PreviewOutput)
 		PreviewUpperCase := StrUpper(PreviewOutput)

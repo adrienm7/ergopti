@@ -553,6 +553,14 @@ _HsEdWeb_InitDataJs() {
 				. ",is_case_sensitive_strict:" . ((e.Has("is_case_sensitive_strict") && e["is_case_sensitive_strict"]) ? "true" : "false")
 			if (e.Has("priority") && e["priority"] != "")
 				entry .= ",priority:" . e["priority"]
+			; An action entry's fields, erase_trigger only when the trigger is kept.
+			if e.Has("action") {
+				entry .= ",action:" . _HsEdWeb_JsStr(e["action"])
+				if e.Has("workflow")
+					entry .= ",workflow:" . _HsEdWeb_JsStr(e["workflow"])
+				if (e.Has("erase_trigger") && !e["erase_trigger"])
+					entry .= ",erase_trigger:false"
+			}
 			entry .= "}"
 			entriesJs .= (firstEntry ? "" : ",") . entry
 			firstEntry := false
@@ -580,8 +588,27 @@ _HsEdWeb_InitDataJs() {
 		. ",default_section:" . defSecJs
 		. ",default_priority:" . defPrioJs
 		. ",open_mode:" . _HsEdWeb_JsStr("menu")
+		. ",actions:" . _HsEdWeb_ChoicesJs(GestureHotstringActionChoices())
+		. ",workflows:" . _HsEdWeb_ChoicesJs(_HsEdWeb_WorkflowChoices())
 		. "})"
 	return js
+}
+
+; The workflows an entry may run; none when the store refused its file, which
+; WorkflowsChoices has told the user.
+_HsEdWeb_WorkflowChoices() {
+	Choices := WorkflowsChoices()
+	return IsObject(Choices) ? Choices : []
+}
+
+; The {value, label} rows script.js fillActionSelect reads, as a JS array.
+; @param {Array} Choices Maps "value", "label".
+; @returns {String}
+_HsEdWeb_ChoicesJs(Choices) {
+	Rows := []
+	for Choice in Choices
+		Rows.Push("{value:" . _HsEdWeb_JsStr(Choice["value"]) . ",label:" . _HsEdWeb_JsStr(Choice["label"]) . "}")
+	return "[" . ArrayJoin(Rows, ",") . "]"
 }
 
 ; The display trigger character: the user's configured magic key (the frontend

@@ -608,6 +608,30 @@ WorkflowParameterIsValid(Value) {
 }
 
 /**
+ * Runs the action of a hotstring action entry once its edit has landed
+ * (hotstrings/engine/matcher/action_entry.ahk), as the macOS and Linux
+ * action_runner.lua do: a workflow through the workflow owner, any other
+ * parameterless action through the gesture executor. The matcher calls it on
+ * the next timer turn.
+ * @param {Map} Fields "action", and "workflow" for run_workflow.
+ * @param {Map} Ports Replacements of "run_workflow", "execute" and "parameter_spec" (tests).
+ * @returns {Boolean} Ran.
+ */
+WorkflowsRunEntryAction(Fields, Ports := 0) {
+	global WORKFLOW_LOG
+	Given := (Ports is Map) ? Ports : Map()
+	Executors := Map("run_workflow", Given.Get("run_workflow", WorkflowsRun),
+		"execute", Given.Get("execute", (Action) => GestureInvokeAction(Action)),
+		"parameter_spec", Given.Get("parameter_spec", GestureActionParameterSpec))
+	Refusal := ""
+	Ran := HSE_ActionEntryDispatch(Fields, Executors, &Refusal)
+	if !Ran
+		LoggerWarn(WORKFLOW_LOG, "The action '{1}' of a hotstring did not run ({2}).", Fields["action"],
+			Refusal != "" ? Refusal : "refused")
+	return Ran
+}
+
+/**
  * The run_workflow gesture action: runs the workflow the binding stores, on the
  * next timer turn, so its keys never reach the application under the hotkey's
  * held modifiers.

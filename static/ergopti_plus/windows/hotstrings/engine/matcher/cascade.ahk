@@ -93,11 +93,14 @@ _HSE_CascadeKey(Spec) {
 }
 
 ; Whether a spec can be a link of a cascade: a literal text replacement that is
-; not private, not a raw callback and not the repeat rule.
+; not private, not a raw callback, not the repeat rule and not an action entry,
+; whose action changes the context (action_entry.ahk).
 ; @param Spec {Object} A registered hotstring spec.
 ; @returns {Boolean}
 _HSE_IsCascadeLink(Spec) {
 	if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
+		return false
+	if Spec.HasOwnProp("EntryAction")
 		return false
 	if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
 		return false
