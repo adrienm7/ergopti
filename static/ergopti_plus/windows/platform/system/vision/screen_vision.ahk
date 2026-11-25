@@ -125,7 +125,8 @@ ScreenVisionInit() {
 	ScreenVisionOwner.counter := 0
 	ScreenVisionOwner.pending := Map()
 	Spawn := IsObject(ScreenVisionOwner.spawn_fn) ? ScreenVisionOwner.spawn_fn : ShellRunner_SpawnTreeOwned
-	Args := ShellRunner_WinPsHiddenArgs(["-NoProfile", "-NonInteractive"], "-File",
+	; ShellRunner_SpawnTreeOwned starts the console with CREATE_NO_WINDOW.
+	Args := ShellRunner_WinPsArgs("-File",
 		Files[1], "-QueueDir", Queue,
 		"-ParentPid", String(DllCall("GetCurrentProcessId")),
 		"-PollMs", String(TimingsGet("screen_vision", "worker_poll_ms")))

@@ -56,7 +56,8 @@ ScreenBrightnessRequest(Action, Done := 0) {
 		Critical(PreviousCritical)
 	Spawn := IsObject(ScreenBrightnessOwner.spawn_fn)
 		? ScreenBrightnessOwner.spawn_fn : ShellRunner_SpawnTreeOwned
-	Args := ShellRunner_WinPsHiddenArgs(["-NoProfile", "-NonInteractive"], "-File",
+	; ShellRunner_SpawnTreeOwned starts the console with CREATE_NO_WINDOW.
+	Args := ShellRunner_WinPsArgs("-File",
 		_VendorDir . "\ergopti_brightness_worker.ps1", "-PolicyPath",
 		_SharedDir . "\shortcuts\data\actions\brightness.json", "-Action", Action)
 	try Handle := Spawn.Call(ShellRunner_WinPsPath(), Args,

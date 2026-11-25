@@ -387,9 +387,12 @@ ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
 
 /**
  * The one spelling of every PowerShell stage's argv: Leading, then the
- * execution policy its bundled scripts and modules need, then Args. The
- * compiled script's antivirus surface counts every other copy of the policy
- * pair, so no launch site spells it out.
+ * execution policy, then Args. RemoteSigned, for this process only, runs the
+ * local unsigned scripts Ergopti ships or writes, which the default Windows
+ * client policy (Restricted) refuses, and still refuses an unsigned script
+ * downloaded from the internet. A Group Policy setting overrides it either
+ * way. No stage asks for a hidden window style: each launcher hides the
+ * console itself (CREATE_NO_WINDOW or the "Hide" show command).
  * @param {Array} Leading The items before the policy: the stage's switches,
  *   after the executable when the caller builds a whole command line.
  * @param {String} Args The stage's own arguments (-File or -Command first).
@@ -399,7 +402,7 @@ ShellRunner_WinPsArgv(Leading, Args*) {
 	if !(Leading is Array)
 		throw TypeError("Leading arguments must be an Array", -1, Type(Leading))
 	Out := Leading.Clone()
-	Out.Push("-ExecutionPolicy", "Bypass")
+	Out.Push("-ExecutionPolicy", "RemoteSigned")
 	Out.Push(Args*)
 	return Out
 }
@@ -412,21 +415,6 @@ ShellRunner_WinPsArgv(Leading, Args*) {
  */
 ShellRunner_WinPsArgs(Args*) {
 	return ShellRunner_WinPsArgv(["-NoProfile", "-NonInteractive"], Args*)
-}
-
-/**
- * The argv of a PowerShell stage whose console window is hidden: Leading,
- * then the hidden window style, then the execution policy and Args.
- * @param {Array} Leading The stage's switches before the window style.
- * @param {String} Args The stage's own arguments (-File first).
- * @returns {Array}
- */
-ShellRunner_WinPsHiddenArgs(Leading, Args*) {
-	if !(Leading is Array)
-		throw TypeError("Leading arguments must be an Array", -1, Type(Leading))
-	Hidden := Leading.Clone()
-	Hidden.Push("-WindowStyle", "Hidden")
-	return ShellRunner_WinPsArgv(Hidden, Args*)
 }
 
 /**

@@ -17,7 +17,9 @@
 ; 3. The tools are the .ps1, .cmd and .ahk files of <config dir>/agent_tools/
 ;    (created when missing). One runs with the action's input as its only
 ;    argument, quoted for the Windows command line, never through a shell
-;    string built from the input.
+;    string built from the input. A .ps1 tool runs under the RemoteSigned
+;    execution policy, never Bypass, so one still marked as downloaded from
+;    the internet is refused with that reason until the user unblocks it.
 ; 4. Every COM, file and process call goes through windows/adapters, behind a
 ;    seam the test suite replaces. The OS retains a private temporary calendar
 ;    file: opening a handler gives no receipt that it has read the file.
@@ -60,7 +62,7 @@ global _LLM_AgentConnector_Tools := ""
 ; opens a file or URI, throws on failure. Launch: (Argv) starts a program,
 ; throws on failure. Publish: (Text) => String path.
 ; List: (Dir) => Array of file paths. EnsureDir: (Dir). Id: () => Map("uid",
-; "stamp").
+; "stamp"). Zone: (Path) => the file's Mark-of-the-Web ZoneId, 0 for none.
 global _LLM_AgentConnector_ComFn := 0
 global _LLM_AgentConnector_OpenFn := 0
 global _LLM_AgentConnector_LaunchFn := 0
@@ -69,6 +71,11 @@ global _LLM_AgentConnector_ParentFn := 0
 global _LLM_AgentConnector_ListFn := 0
 global _LLM_AgentConnector_EnsureDirFn := 0
 global _LLM_AgentConnector_IdFn := 0
+global _LLM_AgentConnector_ZoneFn := 0
+
+; The Mark-of-the-Web zones (internet, untrusted site) whose unsigned scripts
+; the RemoteSigned execution policy refuses
+global LLM_AGENT_BLOCKED_ZONE_MIN := 3
 
 
 
@@ -169,7 +176,7 @@ _LLM_AgentConnector_Mail(Action) {
 ; One of the user's tools, with the action's input as its only argument.
 ; @returns {String} "tool".
 _LLM_AgentConnector_Shortcut(Action, Config) {
-	global LLM_AGENT_CMD_UNSAFE
+	global LLM_AGENT_CMD_UNSAFE, LLM_AGENT_BLOCKED_ZONE_MIN, _LLM_AgentConnector_ZoneFn
 	Tools := LLM_AgentConnector_Tools(Config)
 	if !Tools["paths"].Has(Action["name"])
 		throw ValueError("the tool is no longer in the tools folder")
@@ -178,6 +185,15 @@ _LLM_AgentConnector_Shortcut(Action, Config) {
 	Extension := StrLower(Extension)
 	switch Extension {
 		case "ps1":
+			; A downloaded tool keeps the internet zone its browser recorded, and
+			; RemoteSigned runs it only when signed. It is refused here, signed or
+			; not, with the reason instead of a console that closes on PowerShell's
+			; error: unblocking the user's own file is the user's call, never ours.
+			Zone := HasMethod(_LLM_AgentConnector_ZoneFn, "Call")
+				? _LLM_AgentConnector_ZoneFn.Call(Path) : SystemControl().ZoneId(Path)
+			if Zone >= LLM_AGENT_BLOCKED_ZONE_MIN
+				throw ValueError("the .ps1 tool came from the internet: "
+					. "unblock it in its file properties to run it")
 			Argv := ShellRunner_WinPsArgv([ShellRunner_WinPsPath(), "-NoProfile"], "-File", Path)
 		case "ahk":
 			Argv := [A_AhkPath, Path]

@@ -57,12 +57,15 @@ _LAG_RunConnectors(Outlook, Body) {
 	global _LLM_AgentConnector_ComFn, _LLM_AgentConnector_OpenFn, _LLM_AgentConnector_LaunchFn
 	global _LLM_AgentConnector_PublishFn, _LLM_AgentConnector_ListFn
 	global _LLM_AgentConnector_EnsureDirFn, _LLM_AgentConnector_IdFn, _LLM_AgentConnector_Tools
+	global _LLM_AgentConnector_ZoneFn
 	Saved := {
 		Com: _LLM_AgentConnector_ComFn, Open: _LLM_AgentConnector_OpenFn, Launch: _LLM_AgentConnector_LaunchFn,
 		Publish: _LLM_AgentConnector_PublishFn, List: _LLM_AgentConnector_ListFn,
-		Ensure: _LLM_AgentConnector_EnsureDirFn, Id: _LLM_AgentConnector_IdFn, Tools: _LLM_AgentConnector_Tools
+		Ensure: _LLM_AgentConnector_EnsureDirFn, Id: _LLM_AgentConnector_IdFn, Tools: _LLM_AgentConnector_Tools,
+		Zone: _LLM_AgentConnector_ZoneFn
 	}
-	Fx := { Outlook: Outlook, ProgIds: [], Opened: [], Launched: [], Written: [], Deleted: [], Dirs: [] }
+	Fx := { Outlook: Outlook, ProgIds: [], Opened: [], Launched: [], Written: [], Deleted: [], Dirs: [],
+		Zone: 0, Zoned: [] }
 	try {
 		_LLM_AgentConnector_ComFn := (ProgId) => (Fx.ProgIds.Push(ProgId), Fx.Outlook)
 		_LLM_AgentConnector_OpenFn := (Target) => Fx.Opened.Push(Target)
@@ -72,6 +75,7 @@ _LAG_RunConnectors(Outlook, Body) {
 			"C:\t\notes.txt", "C:\t\Ouvrir le CRM.ahk"]
 		_LLM_AgentConnector_EnsureDirFn := (Dir) => Fx.Dirs.Push(Dir)
 		_LLM_AgentConnector_IdFn := () => Map("uid", "abc123@ergopti", "stamp", "20260929T120500Z")
+		_LLM_AgentConnector_ZoneFn := (Path) => (Fx.Zoned.Push(Path), Fx.Zone)
 		_LLM_AgentConnector_Tools := ""
 		Body.Call(Fx)
 	} finally {
@@ -83,6 +87,7 @@ _LAG_RunConnectors(Outlook, Body) {
 		_LLM_AgentConnector_EnsureDirFn := Saved.Ensure
 		_LLM_AgentConnector_IdFn := Saved.Id
 		_LLM_AgentConnector_Tools := Saved.Tools
+		_LLM_AgentConnector_ZoneFn := Saved.Zone
 	}
 }
 
@@ -170,7 +175,7 @@ _LAG_ToolConnectors() {
 		Result := LLM_AgentConnector_Execute(_LAG_Action('{"type":"shortcut","name":"Envoyer la facture",'
 			. '"input":"Facture 12 & \"urgent\""}'), Config)
 		AssertTrue(Result["ok"], "the PowerShell tool runs")
-		AssertEqual("", _LVS_DeepEqual([A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+		AssertEqual("", _LVS_DeepEqual([A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", "-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File",
 			"C:\t\Envoyer la facture.ps1", 'Facture 12 & "urgent"'], Fx.Launched[1]),
 			"with the input as its only argument")
 		LLM_AgentConnector_Execute(_LAG_Action('{"type":"shortcut","name":"Ouvrir le CRM"}'), Config)
@@ -189,6 +194,43 @@ _LAG_ToolConnectors() {
 	}
 }
 Test("LLM agent: a tool of the tools folder runs with the input as its argument", _LAG_ToolConnectors)
+
+; RemoteSigned refuses an unsigned script still marked as downloaded, so such a
+; tool is refused with that reason instead of a console closing on the error.
+_LAG_DownloadedToolRefused() {
+	_LAG_RunConnectors("", _Body)
+	_Body(Fx) {
+		Config := LLM_Agent_Config()
+		Tool := '{"type":"shortcut","name":"Envoyer la facture"}'
+		for Zone in [3, 4] {
+			Fx.Zone := Zone
+			Result := LLM_AgentConnector_Execute(_LAG_Action(Tool), Config)
+			AssertFalse(Result["ok"], "a tool of zone " . Zone . " is refused")
+			AssertTrue(InStr(Result["reason"], "came from the internet") > 0, "with its reason")
+		}
+		AssertEqual(0, Fx.Launched.Length, "and nothing runs")
+		AssertEqual("C:\t\Envoyer la facture.ps1", Fx.Zoned[1], "the tool's own file is checked")
+		Fx.Zone := 2
+		AssertTrue(LLM_AgentConnector_Execute(_LAG_Action(Tool), Config)["ok"],
+			"a trusted-site or intranet tool runs, as RemoteSigned allows")
+		AssertEqual(1, Fx.Launched.Length)
+	}
+}
+Test("LLM agent: a PowerShell tool downloaded from the internet is refused", _LAG_DownloadedToolRefused)
+
+; The real Zone.Identifier reader, on a private file with and without a stream.
+_LAG_ZoneIdReadsTheStream() {
+	Path := A_Temp . "\ergopti_agent_zone_" . DllCall("GetCurrentProcessId") . ".ps1"
+	try {
+		FileAppend("Write-Output 1", Path)
+		AssertEqual(0, SystemControl().ZoneId(Path), "a file written here carries no zone")
+		FileAppend("[ZoneTransfer]`r`nZoneId=3`r`nHostUrl=https://example.invalid/`r`n", Path . ":Zone.Identifier")
+		AssertEqual(3, SystemControl().ZoneId(Path), "a downloaded file carries the internet zone")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("LLM agent: the Mark-of-the-Web zone is read from the file's stream", _LAG_ZoneIdReadsTheStream)
 
 
 

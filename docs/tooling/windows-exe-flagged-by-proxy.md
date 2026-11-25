@@ -235,6 +235,18 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
   `LoadFrom`. The 10 left are `-TypeDefinition` P/Invoke stages of the network, updater,
   diagnostics and Ollama workers; moving them into prebuilt assemblies the same way is the next
   step if the count must drop again.
+- Done (2026-11-25): the compiled script's `ExecutionPolicy Bypass` and `WindowStyle Hidden`
+  ceilings are 0, and so is the bundle's `ExecutionPolicy Bypass`. Every PowerShell stage gets
+  `-ExecutionPolicy RemoteSigned` (process scope) from `ShellRunner_WinPsArgv`: it runs the
+  local unsigned scripts the exe ships (the bundle is `FileInstall`ed and unpacked by the exe, so
+  it carries no Mark-of-the-Web) or writes (updater swap, uninstall copy, touchpad restart), which
+  Restricted refuses, and still refuses an unsigned script marked as downloaded. A user's `.ps1`
+  agent tool with that mark is refused with the reason until the user unblocks it. No stage asks
+  for a hidden window style: the tree-owned spawn uses `CREATE_NO_WINDOW` and the elevated
+  touchpad restart passes the `Hide` show command to ShellExecute. The bundle's one
+  `WindowStyle Hidden` left is the swap worker's `Start-Process` of the new driver exe, not a
+  PowerShell console. Dev mode from a source ZIP extracted by Explorer marks every vendor script;
+  a Git checkout does not.
 - "keystats" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
   repository occurrences in 1 350 files across the three drivers, config keys and locales). A
   rename to typing metrics is a cross-driver campaign of its own; the gate reports the count.

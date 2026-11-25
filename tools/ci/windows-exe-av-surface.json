@@ -19,8 +19,8 @@
 			"download_api": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
-			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 1 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 0 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 0 },
 			"elevated_run": { "pattern": "\\*RunAs", "max": 3 },
 			"powershell_mentions": { "pattern": "powershell", "max": 44 },
 			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
@@ -58,7 +58,7 @@
 			"screen_capture_api": "BitBlt|CopyFromScreen|PrintWindow"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 0 },
 			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 1 },
 			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
 			"inline_csharp_compile": { "pattern": "Add-Type", "max": 10 },

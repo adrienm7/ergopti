@@ -220,10 +220,28 @@ assert.match(
 	scanExecutable(exe(tooMany), policy).errors.join('\n'),
 	new RegExp(`powershell_policy_bypass .* occurs ${bypassMax + 1} times, ceiling ${bypassMax}`)
 );
+const runAsMax = policy.script.ceilings.elevated_run.max;
+assert.ok(runAsMax > 0, 'the undershoot note is shown on a ceiling above zero');
 assert.ok(
 	scanExecutable(exe(CLEAN_SCRIPT), policy).notes.some((note) =>
-		note.includes('powershell_policy_bypass dropped to 0; lower its ceiling')
+		note.includes(`elevated_run dropped to 0; lower its ceiling from ${runAsMax}`)
 	)
+);
+// No PowerShell stage of the compiled exe bypasses the execution policy or
+// asks for a hidden window: RemoteSigned runs the scripts the exe ships or
+// writes, and every launcher hides the console itself. One more copy fails.
+for (const id of ['powershell_policy_bypass', 'hidden_window_style'])
+	assert.equal(policy.script.ceilings[id].max, 0, `the script ${id} ceiling is zero`);
+assert.equal(
+	policy.bundle.ceilings.powershell_policy_bypass.max,
+	0,
+	'no bundled script bypasses the execution policy'
+);
+assert.match(
+	scanExecutable(exe(CLEAN_SCRIPT + 'Args.Push("-WindowStyle", "Hidden")\n'), policy).errors.join(
+		'\n'
+	),
+	/script: hidden_window_style .* occurs 1 times, ceiling 0/
 );
 const bundleBypass = policy.bundle.ceilings.powershell_policy_bypass.max;
 assert.match(
@@ -458,18 +476,40 @@ assert.deepEqual(
 	[],
 	'the shipped Windows sources stay under every script ceiling'
 );
-// Every PowerShell stage takes its policy and hidden-window switches from the
-// shell runner's argv builders, so each pair is spelled once.
-for (const id of ['powershell_policy_bypass', 'hidden_window_style']) {
-	const files = readSourceFiles(path.join(root, 'static/ergopti_plus/windows')).filter((file) =>
-		new RegExp(policy.script.ceilings[id].pattern, 'i').test(stripAhkComments(file.text))
-	);
-	assert.deepEqual(
-		files.map((file) => file.name),
-		['core/process/adapters/shell_runner.ahk'],
-		`${id} is spelled only by the shell runner's argv builders`
-	);
-}
+// Every PowerShell stage takes its execution policy from the shell runner's
+// argv builder, the one spelling of the switch, and that policy is
+// RemoteSigned. No shipped source passes Bypass, Unrestricted or a hidden
+// window style to PowerShell, whether as one string or as separate argv
+// items, nor changes a persistent policy with Set-ExecutionPolicy.
+const shippedFiles = readSourceFiles(path.join(root, 'static/ergopti_plus/windows')).map(
+	(file) => ({ name: file.name, code: stripAhkComments(file.text) })
+);
+const filesMatching = (pattern) =>
+	shippedFiles.filter((file) => pattern.test(file.code)).map((file) => file.name);
+assert.deepEqual(
+	filesMatching(/ExecutionPolicy/i),
+	['core/process/adapters/shell_runner.ahk'],
+	'the execution policy is spelled only by the shell runner'
+);
+const runner = shippedFiles.find((file) => file.name === 'core/process/adapters/shell_runner.ahk');
+assert.equal(
+	(runner.code.match(/ExecutionPolicy/gi) ?? []).length,
+	1,
+	'the shell runner spells the execution policy once'
+);
+assert.match(
+	runner.code,
+	/Out\.Push\("-ExecutionPolicy", "RemoteSigned"\)/,
+	'every PowerShell stage runs under the RemoteSigned process policy'
+);
+// Case-sensitive: the proxy settings name their bypass list in lower case.
+for (const [what, pattern] of [
+	['a Bypass argv item', /(^|[\s,([])["']Bypass["']\s*[,)\]]/m],
+	['an Unrestricted policy', /["'][^"'\n]*\bUnrestricted\b/i],
+	['a persistent policy change', /Set-ExecutionPolicy/i],
+	['a hidden window style', /WindowStyle/i]
+])
+	assert.deepEqual(filesMatching(pattern), [], `no shipped source passes ${what} to PowerShell`);
 
 // 14. The screen vision worker compiles nothing at run time: it loads the
 // assembly tools/build/build_windows_screen_vision.ps1 compiles at build time,

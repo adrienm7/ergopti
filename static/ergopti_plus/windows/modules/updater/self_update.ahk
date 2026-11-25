@@ -2346,9 +2346,10 @@ _Updater_SwapWorkerPath() {
 ; only that name prefix to the -File worker. Environment values are data, never
 ; PowerShell source, and unlike cmd.exe arguments they are not subject to the
 ; wrapper's %VAR% expansion. No script file is written on the menu thread.
-; Bundled -File scripts still need -ExecutionPolicy Bypass: it applies to this
-; process only, and the default Windows client policy (Restricted) refuses
-; every script file without it.
+; Bundled -File scripts still need a process execution policy: the default
+; Windows client policy (Restricted) refuses every script file. RemoteSigned
+; runs them, as the bundle is extracted by this exe and carries no
+; Mark-of-the-Web, and the swap script is written by the staging worker.
 _Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,

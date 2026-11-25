@@ -84,10 +84,10 @@ _SBT_Terminal(Fake, Observed, Notices) {
 	AssertEqual(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", Fake.executable,
 		"the worker starts by its absolute path (system-program-absolute-path)")
 	AssertEqual("brightness_up", Fake.args[Fake.args.Length])
-	AssertEqual("-ExecutionPolicy", Fake.args[5])
-	AssertEqual("Bypass", Fake.args[6], "only the owned process receives the native worker policy")
-	AssertEqual("-File", Fake.args[7])
-	AssertTrue(InStr(Fake.args[8], "\ergopti_brightness_worker.ps1") > 0,
+	; No hidden window style: the tree-owned spawn has no console window at all.
+	for Index, Expected in ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File"]
+		AssertEqual(Expected, Fake.args[Index], "worker argument " . Index)
+	AssertTrue(InStr(Fake.args[6], "\ergopti_brightness_worker.ps1") > 0,
 		"the real worker, rather than an unsupported Send key, owns the effect")
 	AssertEqual(8192, Fake.max_output, "native output is bounded")
 	AssertEqual(0, Observed.Length, "acquisition is not target acknowledgement")

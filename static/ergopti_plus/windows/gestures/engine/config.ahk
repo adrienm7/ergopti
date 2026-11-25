@@ -1024,11 +1024,14 @@ _GestureRestartAbortReservation(Epoch) {
 ; The one elevated launch of the touchpad restart worker, shared by the gesture
 ; menu and the onboarding wizard: each elevation site adds to the antivirus
 ; surface of the compiled exe (tools/ci/windows-exe-av-surface.json).
+; ShellExecute's "Hide" show command reaches the elevated console, so no window
+; flashes. The script is the file this driver just wrote, with no
+; Mark-of-the-Web, so the RemoteSigned policy runs it.
 ; @param ScriptPath {String} The worker script _GestureRestartBuildPsScript wrote.
 ; @param &Pid {Integer} Receives the worker's PID; a refused UAC prompt throws.
 GestureRestartRunElevated(ScriptPath, &Pid) {
 	Switches := ""
-	for Switch in ShellRunner_WinPsHiddenArgs(["-NoProfile"], "-File")
+	for Switch in ShellRunner_WinPsArgv(["-NoProfile"], "-File")
 		Switches .= Switch . " "
 	Run('*RunAs "' . ShellRunner_WinPsPath() . '" ' . Switches . '"' . ScriptPath . '"', , "Hide", &Pid)
 }

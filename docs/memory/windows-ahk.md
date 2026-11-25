@@ -311,9 +311,12 @@ The compiled script carries code and strings, not comments or `#Include`
 lines, so a comment mentioning `SendInput` costs nothing while an identifier
 does; `test-windows-exe-av-surface.cjs` replays every script ceiling on the
 sources stripped that way. Build every PowerShell argv with
-`ShellRunner_WinPsArgs`, `ShellRunner_WinPsArgv` or `ShellRunner_WinPsHiddenArgs`
+`ShellRunner_WinPsArgs` or `ShellRunner_WinPsArgv`
 (`core/process/adapters/shell_runner.ahk`), the only spelling of the
-execution-policy and hidden-window pairs. The bundle's `Add-Type` count is textual: a comment or an `-AssemblyName`
+execution policy: `RemoteSigned`, never `Bypass` (both ceilings are 0), so a
+`-File` script must be one the exe ships or writes, never a downloaded one
+still carrying its Mark-of-the-Web. Hide the console through the launcher
+(`CREATE_NO_WINDOW`, the `Hide` show command), never `-WindowStyle Hidden`. The bundle's `Add-Type` count is textual: a comment or an `-AssemblyName`
 load counts like a compile. Load a framework assembly by strong name
 (`[Reflection.Assembly]::Load`), a prebuilt file with `LoadFrom`, and compile
 new worker C# at build time like `tools/build/build_windows_screen_vision.ps1`

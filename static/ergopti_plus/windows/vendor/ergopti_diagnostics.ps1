@@ -483,7 +483,7 @@ try {
 			# The owning GUI thread pumps while a separate native UIA client observes its receiver.
 			$taskInfo = New-Object Diagnostics.ProcessStartInfo
 			$taskInfo.FileName = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
-			$taskInfo.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $PSCommandPath + '" -SessionDirectory "' + $taskRoot + '" -UiaChild'
+			$taskInfo.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' + $PSCommandPath + '" -SessionDirectory "' + $taskRoot + '" -UiaChild'
 			$taskInfo.UseShellExecute = $false
 			$taskInfo.CreateNoWindow = $true
 			$taskInfo.RedirectStandardOutput = $true

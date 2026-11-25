@@ -33,6 +33,10 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 	Launch := _DriverFuncBody("GestureRestartRunElevated")
 	Assert(InStr(Launch, "Run('*RunAs " . Chr(34) . "' . ShellRunner_WinPsPath() . '") > 0,
 		"GestureRestartTouchpadDevice must preserve elevation for the PnP operation")
+	; PowerShell gets no hidden window style: ShellExecute's show command hides
+	; the elevated console instead.
+	Assert(InStr(Launch, ', , "Hide", &Pid)') > 0,
+		"the elevated PowerShell console must start hidden through the show command")
 	; One elevation site for both launchers: each *RunAs counts against the
 	; antivirus surface ceilings of the compiled exe.
 	for _, Launcher in ["GestureRestartTouchpadDevice", "_Onboarding_StartGestureAuto"]

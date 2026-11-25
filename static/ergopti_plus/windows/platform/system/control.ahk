@@ -52,6 +52,7 @@ global SYSTEM_CONTROL_FILE_ATTRIBUTE_NORMAL := 0x80
 global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND := 2
 global SYSTEM_CONTROL_ERROR_PATH_NOT_FOUND := 3
 global SYSTEM_CONTROL_ERROR_FILE_EXISTS := 80
+global SYSTEM_CONTROL_ERROR_INVALID_NAME := 123
 ; RegOpenKeyExW: the predefined HKEY_CURRENT_USER handle and the least right
 ; that proves a key exists.
 global SYSTEM_CONTROL_HKEY_CURRENT_USER := 0x80000001
@@ -427,6 +428,25 @@ class SystemControl {
 		if DllCall("DeleteFileW", "Str", Path . ":Zone.Identifier", "Int")
 			return "removed"
 		return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
+	}
+
+	; The security zone a file's Zone.Identifier stream (its Mark of the Web)
+	; records: 3 for the internet and 4 for an untrusted site are the zones
+	; whose unsigned scripts the RemoteSigned execution policy refuses.
+	; @returns {Integer} The ZoneId, or 0 when the file carries no zone (a
+	;   file system without streams, such as FAT, reports an invalid name).
+	ZoneId(Path) {
+		global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND, SYSTEM_CONTROL_ERROR_INVALID_NAME
+		try Stream := FileOpen(Path . ":Zone.Identifier", "r", "UTF-8")
+		catch OSError as Err {
+			if (Err.Number = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND
+					|| Err.Number = SYSTEM_CONTROL_ERROR_INVALID_NAME)
+				return 0
+			throw
+		}
+		try Text := Stream.Read(4096)
+		finally Stream.Close()
+		return RegExMatch(Text, "im)^ZoneId=(\d+)\s*$", &Match) ? Integer(Match[1]) : 0
 	}
 
 	; Creates an empty file only when no file has that name.
