@@ -21,7 +21,10 @@
 ; ROOT CAUSE ENCODED: the row must carry its own checked state at its single
 ; construction point. Fixing it by adding an UpdateTrayIcon() call to each
 ; rebuild caller would reproduce the very forgotten-sibling shape the bug is made
-; of, so the assertion is anchored on the staging site itself.
+; of. tests/unit/menu/builder/test_tray_suspend_checkmark.ahk stages the real
+; row under a real pause; this file keeps the two prerequisites that make the
+; staged check load-bearing, whose owners mutate the real tray or are not
+; loaded by the test runner.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,35 +33,9 @@
 
 
 
-; ===========================================================
-; ===========================================================
-; ======= 1/ The staged suspend row carries its state =======
-; ===========================================================
-; ===========================================================
-
-_TSC_StagedSuspendRowReassertsItsCheck() {
-	Src := _DriverFuncBody("_MI_StageSuspend")
-	Assert(Src != "", "the suspend row's staging owner must exist")
-	Anchor := InStr(Src, 'TrayMenuStage_AddAction(MenuSuspend, MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("suspend", ToggleSuspend)))')
-	Assert(Anchor > 0, "the suspend tray row must still be staged via TrayMenuStage_AddAction")
-
-	Seg := SubStr(Src, Anchor)
-	Assert(InStr(Seg, "A_IsSuspended") > 0 and InStr(Seg, "TrayMenuStage_Check(MenuSuspend)") > 0,
-		"the staged suspend row must re-assert its checked state when A_IsSuspended. "
-		. "TrayMenuStage_Publish deletes and rebuilds the whole tray root, so a rebuild while paused "
-		. "otherwise leaves the row unchecked -- and clicking it then RESUMES instead of pausing "
-		. "(tray-suspend-checkmark-cleared-by-rebuild)")
-}
-Test("tray: the staged suspend row re-asserts its checkmark when paused (tray-suspend-checkmark-cleared-by-rebuild)",
-	_TSC_StagedSuspendRowReassertsItsCheck)
-
-
-
-
-
 ; ============================================================
 ; ============================================================
-; ======= 2/ Why the row has to own it: the two causes =======
+; ======= 1/ Why the row has to own it: the two causes =======
 ; ============================================================
 ; ============================================================
 
