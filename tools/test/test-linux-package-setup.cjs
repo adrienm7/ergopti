@@ -36,7 +36,10 @@ try {
 		const stubSetup = path.join(sandbox, 'postinst-setup.sh');
 		const hook = path.join(sandbox, 'postinst');
 		const calls = path.join(sandbox, 'postinst-calls');
-		fs.writeFileSync(stubSetup, '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n');
+		fs.writeFileSync(
+			stubSetup,
+			'#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nexit "${SETUP_STATUS:-0}"\n'
+		);
 		fs.writeFileSync(
 			hook,
 			match[1].replace('/usr/lib/ergopti/install/setup_permissions.sh', bashPath(stubSetup))
@@ -60,6 +63,20 @@ try {
 				action === 'configure' ? '--active-sessions\n' : '',
 				action
 			);
+		}
+		// 75 is an account the launcher enrolls later: dpkg must finish configuring.
+		// Any other refusal (a dangling rule, no admin) still fails the hook.
+		for (const [setupStatus, hookStatus] of [
+			['75', 0],
+			['78', 78],
+			['1', 1]
+		]) {
+			const result = spawnSync(bashExecutable(), [bashPath(hook), 'configure'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, CALL_LOG: calls, SETUP_STATUS: setupStatus }
+			});
+			assert.equal(result.status, hookStatus, `setup status ${setupStatus}: ${result.stderr}`);
 		}
 	}
 	// A checkout name is data, even when it contains JavaScript quotes.
@@ -898,7 +915,11 @@ show-session) case "$2" in
 			EXTRA_SESSION: '1'
 		}
 	});
-	assert.notEqual(missingFirst.status, 0, 'an unenrolled session remains an explicit failure');
+	assert.equal(
+		missingFirst.status,
+		75,
+		'an unenrolled session is its own explicit status once the system setup is complete'
+	);
 	assert.match(missingFirst.stderr, /code=session-enrollment-failed session=1 uid=1000/);
 	assert.match(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput second/);
 	assert.doesNotMatch(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput desktop/);
@@ -914,7 +935,7 @@ show-session) case "$2" in
 			EXTRA_SESSION: '1'
 		}
 	});
-	assert.notEqual(refusedFirst.status, 0);
+	assert.equal(refusedFirst.status, 75);
 	assert.match(refusedFirst.stderr, /code=session-enrollment-failed session=1 uid=1000/);
 	assert.match(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput second/);
 

@@ -206,7 +206,14 @@ cat > "$DEB_ROOT/DEBIAN/postinst" << 'POSTINST_EOF'
 set -e
 
 case "${1:-}" in
-  configure) bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions ;;
+  configure)
+    # 75: the system setup is complete and one logged-in account was not added
+    # to the input groups (setup_permissions.sh said which); the launcher asks
+    # for it at that account's first start. Failing here would leave the
+    # package half-configured for every later apt run.
+    status=0
+    bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions || status=$?
+    if [ "$status" -ne 0 ] && [ "$status" -ne 75 ]; then exit "$status"; fi ;;
 esac
 POSTINST_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/postinst"

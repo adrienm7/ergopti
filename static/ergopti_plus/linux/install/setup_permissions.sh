@@ -145,4 +145,9 @@ fi
 
 # One session disappearing or failing enrollment must not skip later sessions,
 # but callers still need to know that setup did not complete for every user.
-[ "$enrollment_failed" = false ]
+# 75 (EX_TEMPFAIL) says only that: the groups, the rule and the module are in
+# place, and the launcher asks again for that account at its first start. A
+# package hook can then finish configuring (an sssd or LDAP account that
+# usermod refuses left dpkg with a half-configured package) while every other
+# refusal keeps its own status.
+if [ "$enrollment_failed" = true ]; then exit 75; fi
