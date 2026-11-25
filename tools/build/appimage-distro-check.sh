@@ -94,6 +94,36 @@ echo "[OK] --help exits 0 on $libc."
 # ----------------------------------------------------------------------
 # 3. A desktop launch, where apt can install an X server and GTK 3
 # ----------------------------------------------------------------------
+# The windows' binding is the image's own lgi, built for LuaJIT, beside the
+# host's typelibs (tools/build/stage-linux-network-runtime.py stage_lgi). The
+# field report this answers: Arch Linux, whose generic lua-lgi is a Lua 5.4
+# build, never opened a window from the AppImage.
+(cd "$LOG_DIR" && /tmp/ErgoptiPlus.AppImage --appimage-extract > "$LOG_DIR/extract.log" 2>&1) \
+	|| fail "ENVIRONMENT: the AppImage did not extract."
+lgi_probe() {
+	bash -c 'source "$1/usr/lib/ergopti/network-runtime-env.sh" "$1/usr" "$1/usr/lib/ergopti" && exec "$1/usr/bin/luajit" -e "$2"' \
+		lgi-probe "$LOG_DIR/squashfs-root" "$1"
+}
+if command -v pacman > /dev/null 2>&1; then
+	pacman -Sy --noconfirm --needed gtk3 webkit2gtk-4.1 xorg-server-xvfb > "$LOG_DIR/pacman.log" 2>&1 || {
+		tail -n 5 "$LOG_DIR/pacman.log" >&2
+		fail "ENVIRONMENT: GTK 3 and WebKitGTK 4.1 did not install."
+	}
+	if pacman -Q lua51-lgi > /dev/null 2>&1; then fail "ENVIRONMENT: the image must not provide lua51-lgi."; fi
+	# lgi's GTK override initialises GTK, as the daemon's tray launch has: a display.
+	Xvfb :91 -screen 0 1024x768x24 > /dev/null 2>&1 &
+	xvfb=$!
+	sleep 2
+	DISPLAY=:91 lgi_probe 'local missing = require("core.ui.engine.gui_stack").windows_missing()
+		if missing then io.stderr:write(missing, "\n") os.exit(1) end' 2> "$LOG_DIR/lgi.err" || {
+		cat "$LOG_DIR/lgi.err" >&2
+		kill "$xvfb" 2> /dev/null || true
+		fail "The windows cannot load beside the host's GTK 3 and WebKitGTK 4.1."
+	}
+	kill "$xvfb" 2> /dev/null || true
+	echo "[OK] The bundled lgi loads WebKitGTK 4.1 from the host's typelibs, without lua51-lgi."
+fi
+
 if ! command -v apt-get > /dev/null 2>&1; then
 	echo "[OK] No apt-get in this image: the desktop launch is checked on apt images only."
 	exit 0
@@ -107,6 +137,11 @@ apt-get install -y -q --no-install-recommends xvfb libgtk-3-0 x11-utils "$tray" 
 	tail -n 5 "$LOG_DIR/apt.log" >&2
 	fail "ENVIRONMENT: the desktop packages did not install."
 }
+lgi_probe 'local lgi = require("lgi"); assert(lgi.GObject.Object and lgi.GLib.MAJOR_VERSION == 2)' 2> "$LOG_DIR/lgi.err" || {
+	cat "$LOG_DIR/lgi.err" >&2
+	fail "The bundled lgi does not load beside the host's GLib."
+}
+echo "[OK] The bundled lgi loads beside the host's GLib."
 useradd --create-home tester
 cp /tmp/ErgoptiPlus.AppImage /home/tester/ErgoptiPlus.AppImage
 chown tester: /home/tester/ErgoptiPlus.AppImage

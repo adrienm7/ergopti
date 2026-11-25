@@ -1103,6 +1103,22 @@ assert.ok(
 	'the docked icon is found by its WM class'
 );
 assert.ok(!distroCheck.includes("grep -v ' 1x1+' | tail -n 1"), 'not by its size');
+// The sweep proves the windows' binding where the field report failed: on Arch,
+// with the host's GTK 3 and WebKitGTK 4.1 and no lua51-lgi, the start check of
+// the windows finds nothing missing; on apt images the bundled lgi loads.
+{
+	const arch = distroCheck.slice(distroCheck.indexOf('if command -v pacman'));
+	assert.ok(arch.length < distroCheck.length, 'the Arch branch exists');
+	assert.ok(arch.indexOf('pacman -Sy --noconfirm --needed gtk3 webkit2gtk-4.1') >= 0);
+	assert.ok(arch.indexOf('pacman -Q lua51-lgi') >= 0, 'the image must not bring its own lgi');
+	assert.ok(arch.indexOf('require("core.ui.engine.gui_stack").windows_missing()') >= 0);
+	assert.ok(
+		distroCheck.indexOf('if command -v pacman') < distroCheck.indexOf('if ! command -v apt-get'),
+		'the Arch branch runs before the non-apt exit'
+	);
+	assert.ok(distroCheck.includes('fail "The bundled lgi does not load beside the host\'s GLib."'));
+	assert.match(read('tools/build/appimage-distro-sweep.sh'), /archlinux:latest/);
+}
 if (process.platform === 'linux') {
 	const { spawnSync } = require('node:child_process');
 	const start = distroCheck.indexOf('xembed_tray_package() {');
