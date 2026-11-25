@@ -118,6 +118,9 @@ const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');
 const ENGINE_PATH = shared('ui', 'layout_analysis', 'analysis_engine.js');
 const FORMATS_PATH = shared('ui', 'layout_analysis', 'layout_formats.js');
 const ANALYSER_SCORES_PATH = shared('ui', 'layout_analysis', 'analyser_scores.js');
+// The text rule of a corpus file, shared with the page that types a built-in
+// corpus with the user's Ergopti+ shortcuts (sourceText).
+const SHORTCUT_TYPING_PATH = shared('ui', 'layout_analysis', 'shortcut_typing.js');
 const PHYSICAL_KEYS_PATH = shared('layouts', 'data', 'keycodes', 'physical_keys.json');
 const SOURCES = [
 	'layouts/data/analysis/analysis_model.json',
@@ -279,6 +282,24 @@ function loadAnalyserScores(analysers) {
 		filename: ANALYSER_SCORES_PATH
 	});
 	return vm.runInContext('LAYOUT_ANALYSER_SCORES', sandbox);
+}
+
+/**
+ * The text rule of the Studio's shortcut typing (shortcut_typing.js), loaded
+ * once as the classic script a page loads.
+ * @returns {object} LAYOUT_SHORTCUT_TYPING.
+ */
+let shortcutTyping = null;
+function loadShortcutTyping() {
+	if (!shortcutTyping) {
+		const sandbox = {};
+		vm.createContext(sandbox);
+		vm.runInContext(fs.readFileSync(SHORTCUT_TYPING_PATH, 'utf8'), sandbox, {
+			filename: SHORTCUT_TYPING_PATH
+		});
+		shortcutTyping = vm.runInContext('LAYOUT_SHORTCUT_TYPING', sandbox);
+	}
+	return shortcutTyping;
 }
 
 /**
@@ -616,19 +637,14 @@ function credit(layouts) {
 // ======= 3/ Corpora ======
 // =========================
 
-const ACCENTS = {
-	'^': { a: 'â', e: 'ê', i: 'î', o: 'ô', u: 'û', A: 'Â', E: 'Ê', I: 'Î', O: 'Ô', U: 'Û' },
-	'¨': { a: 'ä', e: 'ë', i: 'ï', o: 'ö', u: 'ü', y: 'ÿ', A: 'Ä', E: 'Ë', I: 'Ï', O: 'Ö', U: 'Ü' }
-};
-
 /**
  * Turns the two-character spellings of the old KLA conversion (^e, ¨i) back
- * into the accented letter they stand for.
+ * into the accented letter they stand for (shortcut_typing.js owns the rule).
  * @param {string} text - The corpus.
  * @returns {string} The text with its accented letters.
  */
 function restoreDeadKeyPairs(text) {
-	return text.replace(/([\^¨])([A-Za-z])/g, (pair, mark, letter) => ACCENTS[mark][letter] || pair);
+	return loadShortcutTyping().restoreDeadKeyPairs(text);
 }
 
 /**
@@ -811,10 +827,6 @@ function countTableCounts(text, id) {
  * @throws {Error} On an unknown kind or format, or a malformed entry.
  */
 function corpusText(corpus) {
-	let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/\uFEFF/g, '');
-	if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
-	// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
-	if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
 	if (!CORPUS_KINDS.includes(corpus.kind))
 		throw new Error(`corpora.json: ${corpus.id} has kind ${corpus.kind}`);
 	// Code, and only code, has no natural language.
@@ -825,21 +837,10 @@ function corpusText(corpus) {
 	const format = corpus.format || 'text';
 	if (!CORPUS_FORMATS.includes(format))
 		throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
-	// A tab-separated file (Tatoeba): one sentence per line, in one column.
-	if (format === 'tsv') {
-		if (!Number.isInteger(corpus.tsv_text_column))
-			throw new Error(`corpora.json: ${corpus.id} needs tsv_text_column`);
-		text = text
-			.split('\n')
-			.filter((line) => line !== '')
-			.map((line) => {
-				const cell = line.split('\t')[corpus.tsv_text_column];
-				if (cell === undefined) throw new Error(`corpora.json: ${corpus.id} has a short line`);
-				return cell;
-			})
-			.join('\n');
-	}
-	return text;
+	return loadShortcutTyping().sourceText(
+		fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8'),
+		corpus
+	);
 }
 
 /**
@@ -946,6 +947,19 @@ function buildCorpora(engine, scores) {
 			characters,
 			// How many words its word table keeps (0: none).
 			words: words ? Object.keys(words).length : 0,
+			// Where the site serves its text and how it is read (sourceText), for
+			// typing it with the user's Ergopti+ shortcuts; only a text has one.
+			...(format === 'text' || format === 'tsv'
+				? {
+						text: {
+							path: path.posix.relative('static', corpus.file),
+							format,
+							restore_dead_key_pairs: corpus.restore_dead_key_pairs === true,
+							strip_sentence_numbers: corpus.strip_sentence_numbers === true,
+							...(format === 'tsv' ? { tsv_text_column: corpus.tsv_text_column } : {})
+						}
+					}
+				: {}),
 			script: `_generated/corpus_${corpus.id}.js`
 		});
 	}

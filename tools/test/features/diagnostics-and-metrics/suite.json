@@ -517,7 +517,7 @@
 		},
 		{
 			"id": "log-export-contract",
-			"ordinal": 740,
+			"ordinal": 741,
 			"name": "log export archive: generated data, every scrub rule exercised, field report scrubber agrees",
 			"cmd": "node",
 			"args": ["tools/test/test-log-export-contract.cjs"],

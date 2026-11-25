@@ -271,6 +271,8 @@ const GENERATORS = [
 			'static/corpus/',
 			// textTables() counts the analysers' own skipgrams of each text corpus.
 			'static/ergopti_plus/_shared/ui/layout_analysis/analyser_scores.js',
+			// sourceText() reads each corpus file as the engine counts it.
+			'static/ergopti_plus/_shared/ui/layout_analysis/shortcut_typing.js',
 			'tools/codegen/codegen-layout-analysis-data-js.cjs'
 		],
 		outputs: [
@@ -334,6 +336,10 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_norvig_words.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_taskmaster_chat.js'
 		]
+	},
+	{
+		script: 'codegen/codegen-hotstring-catalogue-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_analysis/_generated/hotstring_catalogue.js']
 	},
 	{
 		script: 'codegen/codegen-layout-editor-tables-js.cjs',

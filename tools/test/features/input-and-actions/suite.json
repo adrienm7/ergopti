@@ -829,7 +829,7 @@
 		},
 		{
 			"id": "js-user-workflow-model",
-			"ordinal": 741,
+			"ordinal": 742,
 			"name": "a user workflow file is accepted and refused alike by the editor's JS check and the shared Lua model, which both Lua suites replay with its interpreter and runner",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-workflow-model-vectors.cjs"],
@@ -837,7 +837,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-action-entry",
-			"ordinal": 742,
+			"ordinal": 743,
 			"name": "hotstring editor stores an entry's action and its erase-trigger option",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-hotstring-editor-action-entry.cjs"],
@@ -845,7 +845,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-trigger-capture",
-			"ordinal": 743,
+			"ordinal": 744,
 			"name": "hotstring editor: only the trigger field records raw keys; every other Ergopti field keeps the emulation and the hotstrings",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-hotstring-editor-trigger-capture.cjs"],

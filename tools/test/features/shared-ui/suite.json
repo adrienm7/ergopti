@@ -751,8 +751,16 @@
 			"repro": "npm run test:layout-analysis-views"
 		},
 		{
-			"id": "js-emulation-picker-page",
+			"id": "js-shortcut-typing",
 			"ordinal": 735,
+			"name": "a corpus typed with the user's Ergopti+ shortcuts replays its shared vectors, uses only the enabled sections and personal hotstrings, and expands back to the clean text",
+			"cmd": "node",
+			"args": ["tools/test/test-shortcut-typing.cjs"],
+			"repro": "npm run test:shortcut-typing"
+		},
+		{
+			"id": "js-emulation-picker-page",
+			"ordinal": 736,
 			"name": "emulation picker page (search, keyboard, choice, refusal, 21 locales)",
 			"cmd": "node",
 			"args": ["tools/test/test-emulation-picker-page.cjs"],
@@ -760,7 +768,7 @@
 		},
 		{
 			"id": "studio-plain-language",
-			"ordinal": 736,
+			"ordinal": 737,
 			"name": "no Studio catalogue string gains a sentence of 30 words or more in any spaced locale, and the English and French sources have none (WCAG 3.1.5)",
 			"cmd": "node",
 			"args": ["tools/test/test-studio-plain-language.cjs"],
@@ -768,7 +776,7 @@
 		},
 		{
 			"id": "layout-context-keys",
-			"ordinal": 738,
+			"ordinal": 739,
 			"name": "a layout's own repeat and magic keys type what the shared vectors say, are refused when malformed, and are analysed as context-dependent ways that keep every count and never cost more than the fixed typing",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-context-keys.cjs"],
@@ -776,7 +784,7 @@
 		},
 		{
 			"id": "macos-permission-dialog-keys",
-			"ordinal": 739,
+			"ordinal": 740,
 			"name": "the macOS permission dialog answers Enter once, with the focused button, and Escape with later",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-permission-dialog-keys.cjs"],
