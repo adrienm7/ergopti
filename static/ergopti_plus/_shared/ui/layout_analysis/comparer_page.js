@@ -20,7 +20,11 @@
  * 2. Host hook: a host may define window.LAYOUT_ANALYSIS_HOST before this
  *    script runs, with `corpora` ({id, title, tables}[], listed first and the
  *    first one selected) and `layouts` (library-shape layouts, e.g. the
- *    user's own from « Éditer »). The site defines none.
+ *    user's own from « Éditer »). The site defines none. A host that can
+ *    read the user's hotstrings defines `loadHotstrings()`, a promise of
+ *    {sections: enabled « group.section » ids, personal: their own
+ *    hotstrings}, which « Typed with the Ergopti+ shortcuts » types with;
+ *    without it the visitor ticks the sections.
  * 3. Every visible string is a locale key (21 locales).
  * 4. Per-viewer conveniences (weights, selection, corpus, keyboard, the last
  *    pasted text's tables, the layouts imported from files) are kept in
@@ -92,6 +96,19 @@
 	// The score settings every Studio score reads (score_settings.js).
 	const SCORE_SETTINGS = window.LAYOUT_ANALYSIS_SCORE_SETTINGS;
 	const UNDO = window.LAYOUT_ANALYSIS_UNDO;
+	// The corpus typed with the user's Ergopti+ shortcuts (shortcut_typing.js)
+	// and the hotstring sections a user can enable (_generated/hotstring_catalogue.js).
+	const SHORTCUT_TYPING = window.LAYOUT_SHORTCUT_TYPING;
+	const HOTSTRINGS = window.LAYOUT_HOTSTRING_CATALOGUE;
+	// Why a corpus cannot be typed with the shortcuts, in words.
+	const SHORTCUT_REFUSALS = {
+		corpus_has_no_text: 'layout_analysis.plus_typing.error.corpus_has_no_text',
+		corpus_text_unavailable: 'layout_analysis.plus_typing.error.corpus_text_unavailable',
+		corpus_already_typed: 'layout_analysis.plus_typing.error.corpus_already_typed',
+		hotstrings_unreadable: 'layout_analysis.plus_typing.error.hotstrings_unreadable'
+	};
+	// How many of the most used triggers the report lists.
+	const SHORTCUT_TOP = 10;
 	const infoButton = INFO.button;
 	const STORAGE_KEY = window.LAYOUT_ANALYSIS_FILES.SETTINGS_KEY;
 	const CUSTOM_ID = 'custom';
@@ -511,6 +528,22 @@
 		></label>
 		<select id="la-corpus"></select>
 		<p id="la-corpus-info" class="la-muted"></p>
+	</div>
+	<div class="la-field la-shortcuts">
+		<label class="la-check" data-i18n-text="layout_analysis.plus_typing.label">
+			<input id="la-shortcuts" type="checkbox" aria-describedby="la-shortcuts-help" />
+		</label>
+		<p id="la-shortcuts-help" class="la-muted" data-i18n="layout_analysis.plus_typing.help"></p>
+		<p id="la-shortcuts-source" class="la-muted" hidden></p>
+		<details id="la-shortcuts-sections" hidden>
+			<summary id="la-shortcuts-sections-name" data-i18n="layout_analysis.plus_typing.sections"></summary>
+			<fieldset id="la-shortcuts-list" class="la-column-list" aria-labelledby="la-shortcuts-sections-name"></fieldset>
+		</details>
+		<p id="la-shortcuts-report" class="la-muted" hidden></p>
+		<details id="la-shortcuts-top" hidden>
+			<summary data-i18n="layout_analysis.plus_typing.top"></summary>
+			<ul id="la-shortcuts-top-list"></ul>
+		</details>
 	</div>
 	<div class="la-corpus-file">
 		<label class="la-file la-file-button la-file-primary" data-i18n-text="layout_analysis.corpus.file">
@@ -1332,6 +1365,8 @@
 						custom: state.custom,
 						textMode: state.textMode,
 						plus: Array.from(state.plus),
+						plusTyping: state.plusTyping,
+						plusSections: state.plusSections,
 						imported,
 						// The ranking table's columns and filters, and the heatmap's choice.
 						table: state.table,
@@ -1478,6 +1513,18 @@
 			// Which text each layout types, and the layouts ticked « + » (TEXT_MIXED).
 			textMode: TEXT_MODES.includes(saved.textMode) ? saved.textMode : TEXT_TYPED,
 			plus: new Set(Array.isArray(saved.plus) ? saved.plus : []),
+			// Whether the corpus is typed with the user's Ergopti+ shortcuts, and the
+			// sections the visitor ticked where no host reads the user's own.
+			plusTyping: saved.plusTyping === true,
+			plusSections: Array.isArray(saved.plusSections)
+				? saved.plusSections.filter((id) =>
+						HOTSTRINGS.sections.some((section) => section.id === id)
+					)
+				: [],
+			// The hotstrings last typed with ({sections, personal, fromHost}), and why
+			// the corpus could not be typed with them (a SHORTCUT_REFUSALS code).
+			shortcutSource: null,
+			shortcutRefusal: null,
 			tables: null,
 			// The keys typed, which the « + » layouts type in TEXT_MIXED; null otherwise.
 			rawTables: null,
@@ -1881,6 +1928,14 @@
 		 */
 		async function corpusTables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
+			shortcutTyped = null;
+			if (state.plusTyping) {
+				const typed = await typedWithShortcuts(corpus);
+				if (typed) {
+					shortcutTyped = { ngrams: typed.ngrams, report: typed.report, byChar: new Map() };
+					return { plain: E.prepareNgrams(typed.ngrams), raw: null };
+				}
+			}
 			if (corpus.host) {
 				const plain = window.LAYOUT_ANALYSIS_FILES.plainTables(
 					corpus.host.tables,
@@ -1901,6 +1956,198 @@
 				};
 			}
 			return { plain: state.custom ? E.prepareNgrams(state.custom.tables) : null, raw: null };
+		}
+
+		// The corpus typed with the shortcuts as last analysed: its n-gram counts
+		// (the magic key written ★), the transform's report, and the prepared
+		// tables by the magic key's character; null when not typed so.
+		let shortcutTyped = null;
+		// The last transform, so a weight or a layout change does not run it again.
+		let shortcutCache = null;
+
+		/**
+		 * The hotstrings to type with: the user's enabled sections and personal
+		 * hotstrings, read from their host (the app); on the site, which cannot
+		 * read them, the sections the visitor ticked.
+		 * @returns {Promise<{sections: string[], personal: object[], fromHost: boolean}>}
+		 */
+		async function activeHotstrings() {
+			if (typeof HOST.loadHotstrings !== 'function')
+				return { sections: state.plusSections.slice(), personal: [], fromHost: false };
+			let read;
+			try {
+				read = await HOST.loadHotstrings();
+			} catch {
+				throw Object.assign(new Error('hotstrings unreadable'), { code: 'hotstrings_unreadable' });
+			}
+			if (!read || !Array.isArray(read.sections) || !Array.isArray(read.personal))
+				throw Object.assign(new Error('hotstrings malformed'), { code: 'hotstrings_unreadable' });
+			return { sections: read.sections, personal: read.personal, fromHost: true };
+		}
+
+		/**
+		 * The chosen corpus typed with the user's shortcuts: its n-gram counts and
+		 * the transform's report; null when no hotstring is enabled. The text is
+		 * the pasted or imported one, or a built-in corpus's file.
+		 * @throws {Error} With a SHORTCUT_REFUSALS code when the corpus has no text here.
+		 */
+		async function typedWithShortcuts(corpus) {
+			const refuse = (code) => Object.assign(new Error(code), { code });
+			let text;
+			if (corpus.host) throw refuse('corpus_already_typed');
+			if (corpus.builtin) text = await window.LAYOUT_ANALYSIS_FILES.builtinText(corpus.builtin);
+			else {
+				text = $('la-text').value.trim();
+				if (text === '') throw refuse('corpus_text_unavailable');
+			}
+			const active = await activeHotstrings();
+			state.shortcutSource = active;
+			if (active.sections.length === 0 && active.personal.length === 0) return null;
+			const key = JSON.stringify([corpus.id, E.hashText(text), active.sections, active.personal]);
+			if (shortcutCache && shortcutCache.key === key) return shortcutCache.value;
+			const registry = SHORTCUT_TYPING.compile(
+				SHORTCUT_TYPING.catalogueMappings(HOTSTRINGS, active.sections).concat(
+					SHORTCUT_TYPING.personalMappings(active.personal)
+				),
+				{ terminators: HOTSTRINGS.terminators }
+			);
+			const out = SHORTCUT_TYPING.toTyped(text, registry);
+			const value = { ngrams: E.ngramsFromText(out.typed), report: out.report };
+			shortcutCache = { key, value };
+			return value;
+		}
+
+		/** A layout's base character on a key, or null. */
+		function baseCharacter(layout, code) {
+			const cells = layout.rows && layout.rows[code];
+			return cells && typeof cells[0] === 'string' ? cells[0] : null;
+		}
+
+		/** The character a layout types the magic key with (magic_key.json). */
+		function magicCharOf(layout) {
+			return SHORTCUT_TYPING.layoutMagicChar(
+				(code) => baseCharacter(layout, code),
+				HOTSTRINGS.magic_key
+			);
+		}
+
+		/**
+		 * The tables a layout types: the corpus typed with the shortcuts takes the
+		 * magic key on the character that layout's drivers give it.
+		 */
+		function layoutTables(layout, tables) {
+			if (!shortcutTyped || tables !== state.tables) return tables;
+			const char = magicCharOf(layout);
+			if (!shortcutTyped.byChar.has(char))
+				shortcutTyped.byChar.set(
+					char,
+					char === SHORTCUT_TYPING.MARKER
+						? tables
+						: E.prepareNgrams(SHORTCUT_TYPING.withMagicChar(shortcutTyped.ngrams, char))
+				);
+			return shortcutTyped.byChar.get(char);
+		}
+
+		/**
+		 * The layouts that cannot type the magic key, by name, with how many of
+		 * its presses they leave out (`trigger_not_typeable`), never counted silently.
+		 */
+		function triggerNotTypeable(results) {
+			if (!shortcutTyped) return [];
+			const out = [];
+			for (const result of results) {
+				const layout = layoutOf(result.layout.id);
+				const char = magicCharOf(layout);
+				const missing = (result.coverage.unsupportedChars || {})[char] || 0;
+				if (missing > 0) out.push({ name: layout.name, char, count: missing });
+			}
+			return out;
+		}
+
+		/** The shortcut option: its source, its section choice and its report. */
+		function showShortcuts() {
+			const on = state.plusTyping;
+			$('la-shortcuts').checked = on;
+			const fromHost = typeof HOST.loadHotstrings === 'function';
+			const source = $('la-shortcuts-source');
+			const active = state.shortcutSource;
+			source.textContent = fromHost
+				? active && active.fromHost
+					? t('layout_analysis.plus_typing.source_host', {
+							sections: active.sections.length,
+							personal: active.personal.length
+						})
+					: ''
+				: t('layout_analysis.plus_typing.source_choice');
+			source.hidden = !on || source.textContent === '';
+			$('la-shortcuts-sections').hidden = !on || fromHost;
+			const report = $('la-shortcuts-report');
+			const top = $('la-shortcuts-top');
+			report.hidden = !on;
+			top.hidden = true;
+			if (!on) return;
+			if (state.shortcutRefusal) {
+				report.textContent = t(SHORTCUT_REFUSALS[state.shortcutRefusal]);
+				return;
+			}
+			if (!shortcutTyped) {
+				report.textContent = t('layout_analysis.plus_typing.none');
+				return;
+			}
+			const r = shortcutTyped.report;
+			let text = t('layout_analysis.plus_typing.report', {
+				replaced: format(r.replaced, 0),
+				saved: format(r.saved, 0),
+				share: format(r.characters ? (100 * r.saved) / r.characters : 0, 1),
+				undos: format(r.undos, 0)
+			});
+			const missing = triggerNotTypeable(state.results);
+			if (missing.length)
+				text += ` ${t('layout_analysis.plus_typing.trigger_not_typeable', {
+					layouts: missing.map((m) => `${m.name} (${m.char} ×${format(m.count, 0)})`).join(', ')
+				})}`;
+			report.textContent = text;
+			$('la-shortcuts-top-list').replaceChildren(
+				...r.triggers
+					.slice(0, SHORTCUT_TOP)
+					.map((use) => el('li', '', `${use.trigger} → ${use.output} ×${format(use.count, 0)}`))
+			);
+			top.hidden = r.triggers.length === 0;
+		}
+
+		/** The section boxes the visitor ticks where no host reads the user's hotstrings. */
+		function fillShortcutSections() {
+			const list = $('la-shortcuts-list');
+			const lang = INFO.locale();
+			const labelOf = (section) => {
+				if (section.label_key) return t(section.label_key);
+				if (typeof section.label === 'string') return section.label;
+				return section.label[lang] || section.label.en || section.label.fr || section.id;
+			};
+			list.replaceChildren(
+				// A rule the drivers apply in code has no entries to type with.
+				...HOTSTRINGS.sections
+					.filter((section) => !section.driver_rule)
+					.map((section) => {
+						const label = el('label', 'la-check');
+						const box = el('input');
+						box.type = 'checkbox';
+						box.value = section.id;
+						box.checked = state.plusSections.includes(section.id);
+						box.addEventListener('change', () => {
+							const ticked = new Set(
+								Array.from(list.querySelectorAll('input:checked'), (input) => input.value)
+							);
+							state.plusSections = HOTSTRINGS.sections
+								.map((s) => s.id)
+								.filter((id) => ticked.has(id));
+							save();
+							analyse();
+						});
+						label.append(box, labelOf(section));
+						return label;
+					})
+			);
 		}
 
 		/**
@@ -1978,7 +2225,8 @@
 
 		/** The prepared tables a result was analysed on: a « + » layout types the keys typed. */
 		function tablesOf(result) {
-			return plusById.has(result.layout.id) ? state.rawTables : state.tables;
+			if (plusById.has(result.layout.id)) return state.rawTables;
+			return layoutTables(layoutOf(result.layout.id), state.tables);
 		}
 
 		/** A layout ticked « + »: the same keys under « <name>+ ». */
@@ -2043,11 +2291,21 @@
 			setBusy(true);
 			let tables;
 			let raw;
+			state.shortcutRefusal = null;
 			try {
 				({ plain: tables, raw } = await corpusTables());
-			} catch {
+			} catch (error) {
 				if (mine !== generation) return;
 				setBusy(false);
+				// A corpus that cannot be typed with the shortcuts says why beside the option.
+				if (error && SHORTCUT_REFUSALS[error.code]) {
+					state.shortcutRefusal = error.code;
+					state.results = [];
+					showShortcuts();
+					showStatus(t(SHORTCUT_REFUSALS[error.code]));
+					render();
+					return;
+				}
 				showStatus(t('layout_analysis.status.corpus_failed'));
 				return;
 			}
@@ -2076,7 +2334,7 @@
 			const options = analysisOptions();
 			// Each layout on its text: the « + » layouts on the keys typed.
 			const pending = chosen
-				.map((layout) => [layout, tables])
+				.map((layout) => [layout, layoutTables(layout, tables)])
 				.concat(Array.from(plusById.values(), (layout) => [layout, raw]));
 			// The compared layouts themselves (rows, dead keys…), for extra scorers.
 			const compared = new Map(pending.map(([layout]) => [layout.id, layout]));
@@ -2116,6 +2374,7 @@
 			}
 			state.results = E.rank(scored);
 			setBusy(false);
+			showShortcuts();
 			const ms = Math.round(performance.now() - start);
 			for (const listener of resultListeners)
 				listener(state.results, tables, {
@@ -6849,6 +7108,7 @@
 		 * of one text, or what the chosen mode does.
 		 */
 		function showTextMode() {
+			showShortcuts();
 			$('la-text-mode-field').hidden = state.corpus !== MY_TYPING_ID;
 			const select = $('la-text-mode');
 			const two = hasTwoTexts();
@@ -8203,6 +8463,12 @@
 				save();
 				analyse();
 			});
+			$('la-shortcuts').addEventListener('change', (event) => {
+				state.plusTyping = event.target.checked;
+				showShortcuts();
+				save();
+				analyse();
+			});
 			// Every keyboard of the model: the row-staggered boards, then the split,
 			// ortholinear and column-staggered ones.
 			$('la-keyboard').replaceChildren(
@@ -8755,6 +9021,7 @@
 		function start() {
 			applyStrings();
 			fillCorpora();
+			fillShortcutSections();
 			showTextMode();
 			fillLayouts();
 			fillWeights();

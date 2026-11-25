@@ -71,6 +71,10 @@ const SCRIPTS = [
 	'layout_formats.js',
 	// The PDF text reader corpus_files.js calls.
 	'pdf_text.js',
+	// The hotstring sections and the transform of « Typed with the Ergopti+
+	// shortcuts », which corpus_files.js and the Comparer read.
+	'_generated/hotstring_catalogue.js',
+	'shortcut_typing.js',
 	'corpus_files.js',
 	// The score settings every Studio score reads (the Comparer's own, shared).
 	'score_settings.js',

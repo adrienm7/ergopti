@@ -302,6 +302,24 @@ waits for the maintainer's review).
       `docs/audits/layout-analysers/layouts-wiki-playground.md` is built (its feature table says where), magic and
       repeat keys included since 2026-11-25 (`docs/design/magic-and-repeat-keys.md`; their field checks are under
       « Layout repeat and magic keys »), but dockable panes (not built, see the decision of 2026-11-25 there).
+- [ ] **« Frappe avec les raccourcis Ergopti+ », what is left (maintainer request, 2026-11-26).** Built: the pure
+      transform `_shared/ui/layout_analysis/shortcut_typing.js` (clean text to the keys typed, fewest keystrokes,
+      undone misfires, `expand` giving the text back), the generated `_generated/hotstring_catalogue.js`, the
+      Comparer's option beside the corpus picker with its report and per-layout magic key
+      (`trigger_not_typeable`), the site reading the built-in texts, the 21 locales, and the gates
+      (`npm run test:shortcut-typing`, studio-controls `plus-typing`); `docs/design/layout-analysis.md`, « Typed
+      with the Ergopti+ shortcuts ». Left, in this order:
+  - The app hosts' `LAYOUT_ANALYSIS_HOST.loadHotstrings()` on Windows, macOS and Linux: the sections enabled in the
+    user's configuration and their personal hotstrings files, read by the loader each driver already uses. Until
+    then the app window asks the user to tick the sections, as the site does.
+  - Built-in corpora in the app: their texts are not shipped (the tables are), so the app refuses them as
+    `corpus_text_unavailable`; ship or stream the texts, or let the host read them.
+  - Word lists (`word_frequencies`) are not typed (each word would be typed alone, weighted by its count).
+  - The same option in the editor's analysis panel and in the Optimiser.
+  - Not modelled yet: the cascade of `cascade_max_arrows`, the collision priority tiers, the user's own end
+    characters and `terminator_consume`, the dynamic hotstrings; a keystroke counted as one character, not as the
+    presses of the analysed layout.
+  - Run the transform off the main thread: about 1 s per 300,000 characters (Swann, every section).
 
 ## Layout analysis: best way of typing and bonuses (maintainer request, 2026-11-16)
 
@@ -697,6 +715,14 @@ Each closes on a named green hosted or native run, recorded here.
 
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
+
+- [ ] **How « Frappe avec les raccourcis Ergopti+ » chooses its triggers (decided by the agent on 2026-11-26, to
+      review by the maintainer).** Kept meanwhile (docs/design/layout-analysis.md, « Typed with the Ergopti+
+      shortcuts »): a keystroke is one character whatever the layout, so a replacement must save at least one (a
+      same-length correction such as « c' » for « c’ » or an accent is not typed); a hotstring that the text typed
+      as written fires is undone by one counted Backspace; equal-length triggers keep the catalogue order instead
+      of the priority tiers; one expansion per step (no cascade). The other choices: count the analysed layout's
+      presses (one transform per layout), or model the cascade and the tiers.
 
 - [ ] **Where the macOS auto-click and screen-text ports land in the structure plan (decided by the agent on
       2026-11-25, to review by the maintainer).** No rule placed `macos/adapters/auto_click_ports.lua` and

@@ -23,6 +23,11 @@
  * 3. (corpus-file-button) « Load a corpus file » shows on the Comparer's
  *    « Home » under a built-in corpus: tinted, bold, with an icon and the
  *    formats it reads, 4.5:1; the file it loads becomes the chosen corpus.
+ * 5. (plus-typing) « Typed with the Ergopti+ shortcuts » on a pasted text:
+ *    without a host the page asks for the sections, none ticked types the
+ *    text as written, a ticked section replaces what it writes by its
+ *    triggers and the report lists them; an unticked section's trigger never
+ *    appears.
  * 4. (no-colon-button) colonButtons lists every button, disclosure, tab and
  *    button-styled label whose text holds a colon (a drawn key typing « : »
  *    and a button naming a layout aside), for the 21-locale loops of the
@@ -450,6 +455,55 @@ async function exerciseCorpusFileButton(browser, origin) {
 }
 
 /**
+ * (plus-typing) The Comparer's « Typed with the Ergopti+ shortcuts » option on
+ * a pasted text, without a host: the visitor ticks the sections.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exercisePlusTyping(browser, origin) {
+	const en = stringsOf('en');
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const idle = () =>
+		page.waitForFunction(
+			() => document.getElementById('la-results').getAttribute('aria-busy') === 'false',
+			null,
+			{ timeout: 120000 }
+		);
+	await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en`);
+	await idle();
+	await page.selectOption('#la-corpus', 'custom');
+	await page.fill('#la-text', 'C’était très cool, c’est vrai. Quelque chose qui manque.');
+	await idle();
+	await page.check('#la-shortcuts');
+	await page.waitForFunction(
+		(none) => document.getElementById('la-shortcuts-report').textContent === none,
+		en['layout_analysis.plus_typing.none']
+	);
+	assert.equal(
+		await page.textContent('#la-shortcuts-source'),
+		en['layout_analysis.plus_typing.source_choice'],
+		'the site asks for the sections'
+	);
+	assert.equal(await page.isVisible('#la-shortcuts-sections'), true, 'the section list is shown');
+	await page.click('#la-shortcuts-sections summary');
+	await page.check('#la-shortcuts-list input[value="french_magickey.text_expansion"]');
+	await page.waitForFunction(() =>
+		document.getElementById('la-shortcuts-top-list').textContent.includes('c★ → c’est')
+	);
+	await idle();
+	const report = await page.textContent('#la-shortcuts-report');
+	assert.ok(/^4 replacements, \d+ keystrokes saved/.test(report), report);
+	const top = await page.textContent('#la-shortcuts-top-list');
+	assert.ok(top.includes('Qqch★ → Quelque chose'), top);
+	assert.ok(!/\bqe\b|\bqi\b/.test(top), `an unticked section's trigger: ${top}`);
+	assert.deepEqual(errors, [], 'page errors');
+	await context.close();
+}
+
+/**
  * (no-colon-button) The optimiser's buttons in every locale: none holds a colon.
  * @param {import('playwright').Browser} browser
  * @param {string} origin
@@ -501,6 +555,7 @@ async function main() {
 		await exerciseTabStrip(browser, origin);
 		await exerciseRestoredStartName(browser, origin);
 		await exerciseCorpusFileButton(browser, origin);
+		await exercisePlusTyping(browser, origin);
 		await exerciseOptimizerButtons(browser, origin);
 	} finally {
 		await browser.close();
@@ -519,6 +574,7 @@ module.exports = {
 	exerciseTabStrip,
 	exerciseRestoredStartName,
 	exerciseCorpusFileButton,
+	exercisePlusTyping,
 	exerciseOptimizerButtons,
 	colonButtons
 };

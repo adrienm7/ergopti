@@ -4444,6 +4444,7 @@ async function exerciseComparerLink(browser, origin) {
 		await studioControls.exerciseTabStrip(browser, origin);
 		await studioControls.exerciseRestoredStartName(browser, origin);
 		await studioControls.exerciseCorpusFileButton(browser, origin);
+		await studioControls.exercisePlusTyping(browser, origin);
 		await studioControls.exerciseOptimizerButtons(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);

@@ -309,6 +309,35 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		return tables;
 	}
 
+	// From this folder to the site's root, where static/corpus is served.
+	const SITE_ROOT = '../../../../';
+
+	/**
+	 * The text of a built-in corpus, read as its tables were counted
+	 * (LAYOUT_SHORTCUT_TYPING.sourceText), for typing it with the user's
+	 * Ergopti+ shortcuts. The site serves the texts; the app ships the tables
+	 * only, so there the text is refused as unavailable.
+	 * @param {{id: string, text?: object}} corpus - An entry of LAYOUT_ANALYSIS_DATA.corpora.
+	 * @returns {Promise<string>} The text.
+	 * @throws {Error} corpus_has_no_text (counts only, a word list), or
+	 *   corpus_text_unavailable (no URL to read it from, or a failed read).
+	 */
+	async function builtinText(corpus) {
+		if (!corpus.text) throw failure('corpus_has_no_text');
+		if (!BASE || typeof fetch !== 'function') throw failure('corpus_text_unavailable');
+		let response;
+		try {
+			response = await fetch(new URL(SITE_ROOT + corpus.text.path, BASE).href);
+		} catch {
+			throw failure('corpus_text_unavailable');
+		}
+		if (!response.ok) throw failure('corpus_text_unavailable');
+		return window.LAYOUT_SHORTCUT_TYPING.sourceText(
+			await response.text(),
+			Object.assign({ id: corpus.id }, corpus.text)
+		);
+	}
+
 	// ===================================
 	// ======= Studio shared state =======
 	// ===================================
@@ -560,6 +589,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		readText,
 		FILE_EXTENSIONS,
 		builtinTables,
+		builtinText,
 		savedFormat,
 		saveFormat,
 		handOff,

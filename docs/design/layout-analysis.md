@@ -11,15 +11,17 @@ definition and of the default weights, is
 
 ## Files
 
-| File                                                                           | Role                                                                                                                        |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `static/ergopti_plus/_shared/ui/layout_analysis/analysis_engine.js`            | The engine: classic script, global `LAYOUT_ANALYSIS`, no DOM, no fetch.                                                     |
-| `static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js`   | Generated global `LAYOUT_ANALYSIS_DATA`; load it first. `npm run codegen:layout-analysis-data:js`.                          |
-| `static/ergopti_plus/_shared/layouts/data/analysis/analysis_model.json`        | Fingers, home keys, lateral and outer keys, keyboards, keyboard formats, ideal finger load, form factors, shortcut letters… |
-| `static/ergopti_plus/_shared/layouts/data/analysis/score_weights.json`         | The default weights of the global score (one source).                                                                       |
-| `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json`        | The imported layouts (alphabetic blocks, or whole layouts), their source, and the files left out with the reason.           |
-| `static/ergopti_plus/_shared/layouts/data/analysis/sources.json`               | The references behind every metric and sourced value, shown by the « i » popovers.                                          |
-| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/metric_vectors.json` | Hand-computed reference vectors; `npm run test:layout-analysis-engine`.                                                     |
+| File                                                                               | Role                                                                                                                        |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `static/ergopti_plus/_shared/ui/layout_analysis/analysis_engine.js`                | The engine: classic script, global `LAYOUT_ANALYSIS`, no DOM, no fetch.                                                     |
+| `static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js`       | Generated global `LAYOUT_ANALYSIS_DATA`; load it first. `npm run codegen:layout-analysis-data:js`.                          |
+| `static/ergopti_plus/_shared/layouts/data/analysis/analysis_model.json`            | Fingers, home keys, lateral and outer keys, keyboards, keyboard formats, ideal finger load, form factors, shortcut letters… |
+| `static/ergopti_plus/_shared/layouts/data/analysis/score_weights.json`             | The default weights of the global score (one source).                                                                       |
+| `static/ergopti_plus/_shared/layouts/data/analysis/layout_library.json`            | The imported layouts (alphabetic blocks, or whole layouts), their source, and the files left out with the reason.           |
+| `static/ergopti_plus/_shared/layouts/data/analysis/sources.json`                   | The references behind every metric and sourced value, shown by the « i » popovers.                                          |
+| `static/ergopti_plus/_shared/tests/corpus/layout_analysis/metric_vectors.json`     | Hand-computed reference vectors; `npm run test:layout-analysis-engine`.                                                     |
+| `static/ergopti_plus/_shared/ui/layout_analysis/shortcut_typing.js`                | A text typed with the user's Ergopti+ shortcuts ([Typed with the Ergopti+ shortcuts](#typed-with-the-ergopti-shortcuts)).   |
+| `static/ergopti_plus/_shared/ui/layout_analysis/_generated/hotstring_catalogue.js` | Generated hotstring sections it types with; `npm run codegen:hotstring-catalogue:js`.                                       |
 
 Key geometry comes from `_shared/layouts/data/keycodes/physical_keys.json`; the
 registry layouts and the reference QWERTY and AZERTY join the library through
@@ -1856,6 +1858,109 @@ the full name, the definition (`layout_analysis.info.<id>`) and the formula
 share of, after the `of` of `METRICS`). `tools/test/browser/studio-numbers.cjs`
 and `studio-headers.cjs` hold this in the rendered pages.
 
+### Typed with the Ergopti+ shortcuts
+
+« Frappe avec les raccourcis Ergopti+ » (`#la-shortcuts`, saved as
+`plusTyping`; maintainer, 2026-11-26) beside the corpus picker types any
+corpus with a text as an Ergopti+ user types it: each part of the text one of
+the user's hotstrings writes is replaced by its trigger (« C’était très cool,
+c’est vrai » becomes « Ct★ t★ cool, c★ vrai »), the rest is kept as written.
+The transform is one pure module, `_shared/ui/layout_analysis/shortcut_typing.js`
+(global `LAYOUT_SHORTCUT_TYPING`, also `require`-able), and the hotstrings
+come from `_generated/hotstring_catalogue.js` (`LAYOUT_HOTSTRING_CATALOGUE`,
+`npm run codegen:hotstring-catalogue:js`): every section of the feature
+manifest's `hotstrings.<group>` rows, with the entries of the files the drivers
+load (the shared catalogue, its language packs and the Ergopti extension's
+bound files), their flags packed by `FLAGS`, the default end characters of
+`Terminators.spec.js` and the magic key rule of `magic_key.json`. A manifest
+section no file holds a table for (`space_around_symbols`, applied by the
+drivers in code) is listed with `driver_rule` and no entries; a file section
+no manifest row lists stops the codegen.
+
+**Which hotstrings** (maintainer, 2026-11-26). Only the user's own: the
+sections enabled in their configuration and their personal hotstrings, never
+the whole catalogue and no « recommended » default. A host that can read them
+defines `LAYOUT_ANALYSIS_HOST.loadHotstrings()`, a promise of `{sections:
+["group.section", …], personal: [{trigger, output, is_word, auto_expand,
+is_case_sensitive, is_case_sensitive_strict, final_result}, …]}`; the page
+then says how many it read. Without one (the site, and the app until its hosts
+answer, below), the page says it cannot read them and lists the sections to
+tick (`plusSections`), none ticked by default; with nothing enabled the text
+is typed as written.
+
+**Registration and expansion**, as the shared Lua engine
+(`hotstrings/engine/matcher`) does: `is_case_sensitive_strict` compares
+exactly, `is_case_sensitive` folds the case and types the output as written,
+any other entry registers its small, Title and capital forms with the output
+conformed (`trig_title`, `trig_upper` and the Shift signs of `'`, `,` and `.`),
+a trigger with an inner space also with each no-break space; an `is_word`
+trigger fires only after a character that is not a word character
+(`is_hotstring_word_char`: every non-ASCII code point is one, ’ and ★
+included); an `auto_expand` trigger fires on its last character, another on
+an end character (kept, or swallowed for the consumed ★), the longer of the
+two paths winning, with the no-break space before « : » and « ; » looked past;
+a `final_result` expansion resets the buffer, which keeps 256 characters.
+`expand(stream, registry, undos)` replays a stream that way. Not modelled
+(decided by the agent on 2026-11-26, to review by the maintainer): the
+cascade of `cascade_max_arrows` (each step is one expansion), the collision
+priority tiers (equal-length triggers keep the catalogue order), the
+expansion delays, the dynamic hotstrings, and outputs that press a key
+(`{Enter}`, a line break or a tab; such a hotstring is left out and counted
+in `skipped`).
+
+**Choice.** `toTyped(text, registry)` picks, by a dynamic programme over the
+text, the replacements that save the most keystrokes in all, never
+overlapping: an output is replaced only where its trigger fires (word
+boundary, and for a trigger that waits for an end character, the next
+character is one, or else the trigger is typed with ★), and only when it
+saves at least one keystroke, so a same-length correction (« c' » for « c’ »,
+an accent) is not typed (decided by the agent on 2026-11-26: keystrokes are
+counted as characters, layout-free). On a tie the longest output wins, then
+catalogue order. The stream is then typed through `expand` as it is built: a
+replacement that would not give the text back (a longer trigger reaching into
+the text before it, an expansion firing inside the trigger) is typed as
+written, and a hotstring that the text typed as written fires (« l'été »
+with the typographic apostrophe enabled, « ya » in Spanish) is undone by one
+Backspace, as the drivers allow, and counted. So `expand(typed, registry,
+undos)` always gives the text back. The report gives the characters, the
+keystrokes (Backspaces included), the keystrokes saved, the undos, and each
+trigger used with its count and saving, most saving first; the page shows the
+totals and the ten most used.
+
+**The magic key on each layout.** The stream writes ★. Each layout types it
+with the character its drivers give the magic key (`layoutMagicChar`, the
+`magic_key.json` rule: ù on an AZERTY base, ; on a QWERTY one, ★ elsewhere,
+replayed against `magic_key_vectors.json`), so the tables are renamed per
+character (`withMagicChar`) before that layout is analysed. A layout that
+cannot type that character is named in the report with its count
+(`trigger_not_typeable`): the engine leaves those presses out of its measures
+as unsupported characters, and the report says so instead of counting them
+silently. A layout's own repeat and magic keys ([Ways of
+typing](#ways-of-typing)) keep typing the stream like any text.
+
+**Which corpora.** A pasted or imported text, and a built-in corpus of
+format `text` or `tsv`, whose catalogue entry carries `text` (its path under
+`static/` and how it is read). The site serves those texts, so
+`LAYOUT_ANALYSIS_FILES.builtinText` fetches the file and reads it with
+`sourceText`, the rule the codegen counts the tables with (byte order marks,
+dead-key pairs, sentence numbers, the TSV column), one source for both. The
+app ships the tables only, so there a built-in corpus is refused as
+`corpus_text_unavailable`; a count table or a word list has no text
+(`corpus_has_no_text`); « My typing » already holds the keys typed
+(`corpus_already_typed`). Each refusal is worded beside the option. A
+transform takes about 1 s per 300,000 characters (Swann, every section): the
+last one is kept for the same text and hotstrings.
+
+Gates: `npm run test:shortcut-typing` replays
+`_shared/tests/corpus/layout_analysis/shortcut_typing_vectors.json` (accents,
+’ and ', capitals, punctuation and end characters, word boundaries, a
+disabled section, a personal hotstring, a folded case, a key token), checks
+that only the enabled sections and the personal hotstrings are used, a seeded
+property test and a 40,000-character slice of Swann with every section
+expanding back to the text, the magic key rule, and that the generated
+catalogue is current; `tools/test/browser/studio-controls.cjs`
+(`plus-typing`) drives the option on a pasted text in Chromium.
+
 ### Text modes
 
 « Text typed » (`#la-text-mode`, saved as `textMode`; maintainer, 2026-11-17)
@@ -1887,11 +1992,10 @@ Windows reader and the shared Lua projection of macOS and Linux,
 `studio_ngrams.json`). A read of one text (schema 1) greys the choice and the
 « + » boxes with the reason; a built-in corpus, a pasted text or a file hides
 them, and every layout types that text. The raw text of a built-in corpus is
-not derived from the Ergopti+ hotstring catalogue, because that is not sound
-at n-gram level: an abbreviation replaces whole words and their spaces, and a
-character trigram table does not say where a word starts or ends, so the
-counts of the abbreviated text cannot be rebuilt from it (only a text could be
-rewritten, and the corpora ship as tables). The final text of « My typing »
+not derived from its tables, because that is not sound at n-gram level: an
+abbreviation replaces whole words and their spaces, and a character trigram
+table does not say where a word starts or ends. A text is rewritten instead,
+by « Typed with the Ergopti+ shortcuts » below. The final text of « My typing »
 still counts the abbreviation a hotstring erased: the store keeps each
 token's sources, not its erasures. `corpus_files.js` owns the modes
 (`TEXT_MODES`) and `plainTables(tables, mode)`, the text the layouts not ticked
