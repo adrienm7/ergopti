@@ -46,8 +46,9 @@ local function destination_dir()
 	if downloads and FileSystem.exists(downloads) then return downloads end
 	local desktop = os.getenv("XDG_DESKTOP_DIR")
 	if type(desktop) ~= "string" or desktop == "" then
-		local home = os.getenv("HOME")
-		desktop = (type(home) == "string" and home ~= "") and (home .. "/Desktop") or nil
+		-- No temporary-directory fallback: an archive of private logs belongs in the user's own folders.
+		local home = require("settings.engine.paths").account_home()
+		desktop = home and (home .. "/Desktop") or nil
 	end
 	if desktop and FileSystem.exists(desktop) then return desktop end
 	return nil, "neither the Downloads nor the Desktop folder exists" .. (reason and (" (" .. reason .. ")") or "")
