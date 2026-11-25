@@ -21,6 +21,28 @@ local LOG = "platform.focus.atspi_focus_watch"
 local MAX_FOCUS_OUTPUT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
 
+-- The command that turns the session's accessibility switch back off. The
+-- worker turns it on when it finds it off ("enabled_now"); every application
+-- then publishes its accessibility tree for the rest of the session, which
+-- costs memory and CPU for nothing once Ergopti has stopped.
+local A11Y_RESTORE_ARGS = { "call", "--session", "--timeout", "2", "--dest", "org.a11y.Bus",
+	"--object-path", "/org/a11y/bus", "--method", "org.freedesktop.DBus.Properties.Set",
+	"org.a11y.Status", "IsEnabled", "<false>" }
+
+--- Turns the session's accessibility switch back off through gdbus.
+--- @return boolean restored
+--- @return string|nil reason Why it could not be restored.
+local function restore_accessibility_switch()
+	local ShellRunner = require("core.process.adapters.shell_runner")
+	if not ShellRunner.has_command("gdbus", true) then return false, "gdbus is not installed" end
+	local words = { "gdbus" }
+	for _, argument in ipairs(A11Y_RESTORE_ARGS) do words[#words + 1] = ShellRunner.quote(argument) end
+	if ShellRunner.run(table.concat(words, " ") .. " >/dev/null 2>&1") ~= true then
+		return false, "the accessibility bus refused the change"
+	end
+	return true
+end
+
 --- Allocates only daemon-owned FIFO endpoints with close-on-exec descriptors.
 --- @return table transport
 local function native_transport()
@@ -107,13 +129,14 @@ end
 
 --- Creates one independently owned native focus watcher.
 --- Test transports model native ownership without requiring LuaJIT or libatspi.
---- @param options table|nil { now_ms?, create_transport?, start_process? }
+--- @param options table|nil { now_ms?, create_transport?, start_process?, restore_accessibility? }
 --- @return table watcher
 function M.new(options)
 	options = options or {}
 	local now_ms = options.now_ms or Monotonic.now_ms
 	local create_transport = options.create_transport or native_transport
 	local start_process = options.start_process or OwnedProcess.start
+	local restore_accessibility = options.restore_accessibility or restore_accessibility_switch
 	local lease_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local barrier_ms = Timings.ms("privacy", "focus_barrier_timeout_ms")
 	local pause = options.pause or function()
@@ -132,6 +155,10 @@ function M.new(options)
 	local answered_kind = nil
 	-- The session's accessibility switch as the worker found it.
 	local accessibility = nil
+	-- Whether this watcher's worker turned the switch on, so stop() turns it
+	-- back off. start() does not clear it: a later worker would find the switch
+	-- on ("enabled") only because this one turned it on.
+	local switched_on = false
 	local cleanup_ok = true
 
 	local function publish(snapshot)
@@ -233,6 +260,7 @@ function M.new(options)
 			ready = true
 			accessibility = message.accessibility
 			if accessibility == "enabled_now" then
+				switched_on = true
 				Logger.info(LOG, "Accessibility (AT-SPI) was off in this session: switched on, so applications report their focused field.")
 			elseif accessibility == "unavailable" then
 				Logger.warn(LOG, "The session's accessibility switch (org.a11y.Status) could not be read; applications that report fields only while it is on stay unchecked.")
@@ -404,9 +432,24 @@ function M.new(options)
 
 	--- Fences publications and retains physical cleanup debt until acknowledged.
 	--- @return boolean settled
+	--- Turns the session's accessibility switch back off when one of this
+	--- watcher's workers turned it on: Ergopti leaves the session as it found it.
+	--- A refusal is logged, never retried, and does not hold the shutdown.
 	function watcher.stop()
 		active, ready = false, false
-		return retire()
+		local retired = retire()
+		if switched_on then
+			switched_on = false
+			Logger.info(LOG, "Turning the session's accessibility switch back off: Ergopti turned it on.")
+			local called, restored, reason = pcall(restore_accessibility)
+			if called and restored == true then
+				Logger.success(LOG, "The session's accessibility switch is off again, as Ergopti found it.")
+			else
+				Logger.warn(LOG, "The session's accessibility switch stays on: %s.",
+					called and tostring(reason or "not restored") or ErrorDescription.describe(restored))
+			end
+		end
+		return retired
 	end
 
 	--- Returns physical process, descriptor and private-directory settlement.
