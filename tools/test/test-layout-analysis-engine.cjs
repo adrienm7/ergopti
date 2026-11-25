@@ -147,10 +147,42 @@ const SPEED_CORPUS = path.join(
 const MIN_VECTORS = 20;
 const MIN_LIBRARY = 100;
 // The layouts the library held at its last import: it may only grow.
-const LIBRARY_COUNT = 787;
+const LIBRARY_COUNT = 806;
 // The collections imported from their authors' own files: each of their
 // layouts is credited from the author's page (layout_credits.json).
-const CREDITED_SOURCES = ['handsdown', 'ergol_repo'];
+const CREDITED_SOURCES = [
+	'handsdown',
+	'ergol_repo',
+	'erglace_cmoinard',
+	'erglace_lysquid',
+	'ergaie_macdamien',
+	'colemak_french_touch'
+];
+// The French layouts of tools/build/import-kalamine-layouts.cjs (Kazerty, an
+// AZERTY, is checked with AZERTY's punctuation elsewhere).
+const KALAMINE_FRENCH = [
+	'bepolar',
+	'colemak_french_touch',
+	'erglace',
+	'beopy_1dfh',
+	'beopy',
+	'ergaie',
+	'erglace_jf',
+	'erglace_nuke',
+	'erglace_jf_0_6_17',
+	'erglace_jf_0_6_14',
+	'erglace_jf_0_6_13',
+	'erglace_0_1',
+	'ergaie_miroir',
+	'ergol_0_7',
+	'ergol_0_5',
+	'ergol_0_4',
+	'ergol_0_2',
+	'ergol_0_1',
+	'optergol',
+	'ergopti_2_1_2_1dk',
+	'hypertexte_1dfh'
+];
 // Analysing the library costs 23 to 39 reference walks of its table with every
 // core of a Windows PC busy (2026-11-19: alone and inside this test, eight
 // more busy processes moved it by a tenth): the engine plans each character's
@@ -3200,6 +3232,32 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 		['ergaie', 'KeyN', 0, 'z'],
 		['kazerty', 'Quote', 0, 'dead:odk'],
 		['beopy', 'KeyW', 0, 'é'],
+		// (ergol-family-2026-11-25) The versions the authors' repositories and
+		// the Ergo-L history keep: Erglace (JF) 0.6.19's « y p » in the home
+		// row (0.6.17: « , p »), 0.6.14's z right of f, 0.6.13's x first,
+		// Lysquid's 0.1.0 « b » right of k; Ergaie (miroir) « j ** o f k »;
+		// Ergo-L 0.7 LTS « q c o p w j », 0.5 « q g o w k b », 0.4 « q m u l
+		// w b », 0.2 « q o u d w b », 0.1 « q o u p w j »; Optergol « k y o p
+		// w », Ergopti 2.1.2 (1DK) « z y o w b », HyperTexte 1DFH « z y o w ».
+		['erglace_jf', 'KeyG', 0, 'y'],
+		['erglace_jf', 'KeyH', 0, 'p'],
+		['erglace_jf_0_6_17', 'KeyG', 0, ','],
+		['erglace_jf_0_6_14', 'KeyT', 0, 'z'],
+		['erglace_jf_0_6_13', 'KeyQ', 0, 'x'],
+		['erglace_0_1', 'KeyY', 0, 'b'],
+		['ergaie_miroir', 'KeyW', 0, 'dead:odk'],
+		['ergaie_miroir', 'KeyR', 0, 'f'],
+		['ergol_0_7', 'KeyW', 0, 'c'],
+		['ergol_0_7', 'KeyY', 0, 'j'],
+		['ergol_0_5', 'KeyW', 0, 'g'],
+		['ergol_0_4', 'KeyW', 0, 'm'],
+		['ergol_0_2', 'KeyR', 0, 'd'],
+		['ergol_0_1', 'KeyR', 0, 'p'],
+		['optergol', 'KeyQ', 0, 'k'],
+		['ergopti_2_1_2_1dk', 'KeyQ', 0, 'z'],
+		['hypertexte_1dfh', 'KeyR', 0, 'w'],
+		// Colemak French Touch 0.4 (its author's): AltGr dead caron on A.
+		['colemak_french_touch', 'KeyA', 3, 'dead:caron'],
 		// cyanophage.github.io (b02780b39d), its 3 × 11 strings: Gallium
 		// « bldcvzyou,- nrtsgphaei/ », Neu « wfmpv/.q;'z rsntb,aeihj », Pine v4.
 		['gallium', 'KeyQ', 0, 'b'],
@@ -3617,6 +3675,26 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 			(left.get(`symbols/fr, ${variant}`) || {}).same_as === 'bepo',
 			`collections: fr(${variant}) is not held as the registry bépo`
 		);
+	// (kalamine-chain-2026-11-25) The 1DK typed twice enters the diaeresis
+	// (Bépolar, Erglace: « ** ** e » → ë), and Erglace's 1DK then g enters
+	// its Greek table: the import kept only the cells' own tables before.
+	for (const [id, typed, state] of [
+		['bepolar', 'dead:odk', 'diaeresis'],
+		['erglace', 'dead:odk', 'diaeresis'],
+		['erglace', 'g', 'greek'],
+		['beopy_1dfh', 'b', 'greek']
+	]) {
+		const layout = byId.get(id) || { dead: {} };
+		check(
+			((layout.dead.odk || {})[typed] || {}).dead === state &&
+				Object.keys(layout.dead[state] || {}).length > 0,
+			`collections: ${id} 1DK + ${typed} does not enter ${state} with its rules`
+		);
+	}
+	check(
+		((byId.get('erglace') || { dead: {} }).dead.diaeresis || {}).e === 'ë',
+		'collections: Erglace types no ë through its 1DK twice'
+	);
 	// Their 1DK tables, as the files' « deadkeys » state them.
 	for (const [id, typed, expected] of [
 		['bepolar', '1', '&'],
@@ -3629,17 +3707,21 @@ if (typeof E.layoutSimilarity === 'function' && typeof E.similarMarkGap === 'fun
 			`collections: ${id} 1DK + ${typed} is not ${expected}, as its keymap states`
 		);
 	// The French layouts type French with their dead keys. The ë and ï of the
-	// ISO Ergo-L, Bépolar and Erglace are their 1DK typed twice, a chain the
-	// library's dead_rules cannot state.
+	// ISO Ergo-L are its 1DK typed twice, which its XKB file types through
+	// ISO_Level5 (a chain the XKB import does not read); the Kalamine layouts
+	// type theirs so since 2026-11-25 (their 1DK twice enters the diaeresis).
+	const french = 'Ça ? Où « Noël » : être, naïf, cœur.';
 	for (const [id, text] of [
-		['azerty_afnor', 'Ça ? Où « Noël » : être, naïf, cœur.'],
-		['azerty_latin9', 'Ça ? Où « Noël » : être, naïf, cœur.'],
-		['dvorak_fr', 'Ça ? Où « Noël » : être, naïf, cœur.'],
+		['azerty_afnor', french],
+		['azerty_latin9', french],
+		['dvorak_fr', french],
 		['ergol_iso', 'Ça ? Où « Noel » : être, cœur.'],
-		['bepolar', 'Ça ? Où « Noel » : être, cœur.'],
-		['erglace', 'Ça ? Où « Noel » : être, cœur.'],
-		['ergaie', 'Ça ? Où « Noël » : être, naïf, cœur.'],
-		['colemak_french_touch', 'Ça ? Où « Noël » : être, naïf, cœur.']
+		// Béopy's file states no diaeresis (its only dead key is the comma below).
+		['beopy', 'Ça ? Où « Noel » : être, cœur.'],
+		...KALAMINE_FRENCH.filter((kalamine) => kalamine !== 'beopy').map((kalamine) => [
+			kalamine,
+			french
+		])
 	]) {
 		const result = E.analyse(byId.get(id), E.ngramsFromText(text), {});
 		check(
