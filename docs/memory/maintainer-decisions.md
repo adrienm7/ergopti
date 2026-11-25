@@ -1621,8 +1621,9 @@ apps' windows, the tooltips and the WPM widget, the API-test progress window
 and the fatal pre-boot modal. The error window, which reports a crash, still
 announces the error through a notification when WebView2 cannot open: it is
 not a window and the error must not be lost. macOS (Hammerspoon `hs.webview`, always present)
-and Linux (WebKitGTK webview manager, which logs and opens nothing when it is
-absent) have no native duplicate of a WebView page. Do not bring a native
+and Linux (WebKitGTK webview manager, which names the missing component in a
+notice, and writes the diagnostics report to an HTML file opened in the
+browser, when it is absent) have no native duplicate of a WebView page. Do not bring a native
 substitute back for a WebView window.
 
 ## Metrics rows store UTC and their recorded offset (2026-11-11)

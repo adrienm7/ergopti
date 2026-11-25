@@ -923,6 +923,7 @@ return {
 	"tests.unit.diagnostics.ui.test_healthcheck_recent_issues_source",
 	"tests.unit.diagnostics.ui.test_healthcheck_configuration",
 	"tests.unit.diagnostics.ui.test_healthcheck_report_issue",
+	"tests.unit.diagnostics.ui.test_healthcheck_windowless",
 	"tests.unit.diagnostics.ui.test_runner",
 	"tests.unit.core.ui.editors.test_layout_manager_bridge",
 	"tests.unit.core.ui.editors.test_layout_editor_source_store",

@@ -22,6 +22,9 @@
 ---    asset inlining and i18n injection.
 --- 4. Daemon state injection: passes engine, keystats, hotstrings_config, and
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
+--- 5. A refused window is delivered or explained, never a raw error: its
+---    bridge's on_window_unavailable() delivers the content another way, or a
+---    notice names the missing component (lgi, WebKitGTK 4.1).
 --- ==============================================================================
 
 local M = {}
@@ -441,6 +444,77 @@ end
 -- Exported for the pure-Lua lifecycle regression harness.
 M._release_app_ownership = _release_app_ownership
 
+--- The start check's own probe, so a refusal at a click names the same
+--- component as the notice at start.
+--- @return string|nil The missing component, nil when lgi and WebKitGTK 4.1 load.
+local function probe_missing_component()
+	return require("core.ui.engine.gui_stack").windows_missing()
+end
+local _missing_component_probe = probe_missing_component
+
+--- Replaces the missing-component probe; tests only (nil restores it).
+--- @param probe function|nil Returns the missing component name, or nil.
+function M._set_missing_component_probe_for_test(probe)
+	_missing_component_probe = probe or probe_missing_component
+end
+
+--- Tells the user, in their language, that a window needs a missing component.
+--- @param app_name string The refused page.
+--- @param component string The missing component (a product name, untranslated).
+--- @return boolean admitted Whether the notification was handed to the desktop.
+local function notify_missing_component(app_name, component)
+	local loaded, admitted = pcall(function()
+		-- M._app_title is read at call time: its local is declared further down
+		local title = M._app_title(app_name)
+		local body = require("core.i18n.engine.i18n").get("notify.window_unavailable")
+			:gsub("{1}", function() return title end)
+			:gsub("{2}", function() return component end)
+		return require("platform.focus.application_notifier").send(body, { title = title, level = "warning" })
+	end)
+	if not loaded then
+		Logger.error(LOG, "show(): the missing-component notice for '%s' failed: %s", app_name, tostring(admitted))
+	end
+	return loaded and admitted == true
+end
+
+--- Hands a page the native window refused to its windowless delivery. A page's
+--- bridge may declare on_window_unavailable(info) and answer true once it
+--- delivered its content another way (a file in the browser, a dialog); every
+--- other page is explained by a notice naming the missing component. The
+--- diagnostics must never depend on the component they diagnose, and the raw
+--- refusal the error notice used to show told the user nothing to act on.
+--- @param app_name string The refused page.
+--- @param handler table Its bridge handler.
+--- @param active_locale string The locale the page would have opened in.
+--- @param detail string Why the native window was refused.
+--- @return boolean answered Whether the user received the content or an explanation.
+local function deliver_without_window(app_name, handler, active_locale, detail)
+	local probed, missing = pcall(_missing_component_probe)
+	if not probed then
+		Logger.error(LOG, "show(): the desktop component probe raised for '%s': %s", app_name, tostring(missing))
+		missing = nil
+	end
+	if type(missing) ~= "string" or missing == "" then missing = nil end
+	if type(handler.on_window_unavailable) == "function" then
+		local called, delivered = xpcall(handler.on_window_unavailable, debug.traceback,
+			{ app_name = app_name, component = missing, locale = active_locale, detail = detail })
+		if not called then
+			Logger.error(LOG, "show(): the windowless delivery of '%s' raised: %s", app_name, tostring(delivered))
+		elseif delivered == true then
+			Logger.warn(LOG, "show(): '%s' has no native window (%s); its bridge delivered it without one.",
+				app_name, missing and ("missing " .. missing) or detail)
+			return true
+		end
+	end
+	if missing then
+		Logger.warn(LOG, "show(): '%s' cannot open: windows need %s, which this system does not provide.",
+			app_name, missing)
+		notify_missing_component(app_name, missing)
+		return true
+	end
+	return false
+end
+
 --- Builds the HTML a window loads for a shared UI app, with the page's
 --- strings: active locale over English over French, so a key the active
 --- locale lacks reads as English, not as a key. show() and the WebKitGTK
@@ -560,8 +634,15 @@ function M.show(app_name, active_locale, contextual_receipt)
 	end, debug.traceback)
 	owned.acquiring = false
 	if not create_ok or created ~= true or owned.cancelled or _windows[app_name] ~= owned then
+		-- A page closed or replaced while acquiring was withdrawn, not refused
+		local withdrawn = owned.cancelled or _windows[app_name] ~= owned
 		owned.failed = true
 		if _windows[app_name] == owned then M.hide(app_name, owned.epoch) end
+		local detail = create_ok and tostring(create_err or "the native creator declined") or tostring(created)
+		if not withdrawn and not _shutting_down and contextual_title_live(app_name, contextual_receipt)
+			and deliver_without_window(app_name, handler, active_locale, detail) then
+			return false
+		end
 		Logger.error(LOG, "show(): native window acquisition refused for '%s'.", app_name)
 		if DOCUMENT_APPS[app_name] then
 			notify_document_refusal(function()

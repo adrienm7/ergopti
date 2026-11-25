@@ -201,6 +201,13 @@ helpers.describe("field report: the Linux window", function()
 		end, { windowless = true })
 	end)
 
+	helpers.it("answers the manager's windowless delivery itself (field-report-windowless)", function()
+		with_report(fake_session(), function(Ui)
+			helpers.assert_eq(Ui.on_window_unavailable({ app_name = "field_report" }), true,
+				"run() already says the window is missing; the manager must not repeat it")
+		end)
+	end)
+
 	helpers.it("holds a run that ends before its request is known (field-report-window)", function()
 		local session = fake_session()
 		local submit = session.submit_in_app

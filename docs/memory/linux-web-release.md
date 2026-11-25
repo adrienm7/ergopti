@@ -530,6 +530,22 @@ anything loads WebKit; verify with the process `SigCgt` mask
 JSC*SIGNAL_FOR_GC=12": its option parser reads every `JSC*\*` variable, while
 WTF honours this one. A new signal the daemon handles must not be 12.
 
+### project-linux-a-refused-window-is-delivered-or-explained
+
+lgi and WebKitGTK 4.1 are system libraries an AppImage cannot carry, so a
+window can be refused on a working daemon. Every refusal ends in
+`webview_manager.show()`'s failure branch, which asks the page's bridge
+`on_window_unavailable(info)` first (`info.component` is
+`gui_stack.windows_missing()`, the start check's own probe): the diagnostics
+write their approved report as a self-contained HTML file under the logs'
+`diagnostics/` folder and open it in the browser, and the field report and
+error window answer true because their callers already go on without the
+window. Any other page gets one notice naming the missing component, logged at
+WARN; only a refusal with the toolkit present and no delivery still logs the
+ERROR whose text the error notice repeats. Action: a new page whose content
+must survive a missing toolkit declares `on_window_unavailable`; never add
+the toolkit as a dependency of the diagnostics.
+
 ### project-linux-a-corrupt-store-moves-aside-without-replacing
 
 A malformed JSON store is set aside through `core/fs/engine/corrupt_aside.lua`
