@@ -2345,3 +2345,16 @@ body:has(> main.layout-analysis) {
 .la-blend-part input {
 	width: 5em;
 }
+
+/* The Comparison layout of the frame, beside the Principal one (la-selected):
+   a dashed edge in the accent colour on its rows of every figure. */
+.la-chart-row.la-versus,
+.la-table tr.la-versus > * {
+	box-shadow: inset 0 0 0 2px var(--la-accent);
+}
+
+.la-chart-row.la-versus {
+	box-shadow: none;
+	outline: 2px dashed var(--la-accent);
+	outline-offset: -2px;
+}

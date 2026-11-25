@@ -1414,11 +1414,13 @@ penalised pair or triple outlined; aria-hidden), the same keystroke by
 keystroke as a table, and the penalised pairs and triples in words.
 « Copy the link » on either tab carries it (`tab`), the Pareto values
 (`px`, `py`) or the trace's text, with the frame's two layouts (`details`,
-`versus`), so a shared view opens as it was. Both tabs show the Principal
-and Comparison frame above their panel (`#la-frame`, an idea seen in the
-Layouts Wiki playground's Main and Comp pickers): it sets the detailed layout
-and the one it is compared with, the same two « One layout » shows, so the
-Pareto ring, the trace and « One layout » always speak of the same pair.
+`versus`), so a shared view opens as it was. Every result tab but « One
+layout » (its own pickers) and « Other analysers » shows the Principal and
+Comparison frame above its panel (`#la-frame`, `FRAME_TABS`, an idea seen in
+the Layouts Wiki playground's Main and Comp pickers): it sets the detailed
+layout and the one it is compared with, the same two « One layout » shows;
+the Principal's rows of every figure are highlighted (`la-selected`) and the
+Comparison's edged (`la-versus`), the Pareto ring and the trace follow them.
 
 **Corpus picker.** One native `<select>` (`#la-corpus`), shared by the
 Comparer, the editor's panel (`#la-panel-corpus`) and the Optimiser
