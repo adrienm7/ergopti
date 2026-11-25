@@ -226,6 +226,15 @@ local _transient_armed = false
 -- armed write probes it. The display server and the daemon's interpreter do
 -- not change while the process runs.
 local _transient_owner = nil
+-- Every previous clipboard content this process could not put back since it
+-- started, for the field run's session check.
+local _restore_failures = 0
+
+--- How many previous clipboard contents could not be put back since the start.
+--- @return integer
+function M.restore_failures()
+	return _restore_failures
+end
 
 --- The targets of one transient payload.
 --- @param text string Payload.
@@ -657,6 +666,7 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 		if busy then return false, false end
 		if restore() then return true, not stage.restore_failed end
 		restore_required, saved, stage.restore_failed = false, nil, true
+		_restore_failures = _restore_failures + 1
 		Logger.error(LOG, "The previous clipboard content could not be put back; the clipboard keeps the pasted text.")
 		return true, false
 	end
@@ -749,7 +759,10 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 		local read_ok, current = read_backend_checked(b)
 		local restored = read_ok and (current == text or current == saved.text) and restore_snapshot(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
-		if not restored then return false, "clipboard restoration failed" end
+		if not restored then
+			_restore_failures = _restore_failures + 1
+			return false, "clipboard restoration failed"
+		end
 		return false
 	end
 
@@ -772,6 +785,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	local restore_failure = nil
 	if held == nil or (held and not restore_snapshot(b, saved)) then
 		Logger.error(LOG, "paste_text(): the previous clipboard content could not be put back.")
+		_restore_failures = _restore_failures + 1
 		restore_failure = "clipboard restoration failed"
 	end
 	if not paste_ok or not issued then

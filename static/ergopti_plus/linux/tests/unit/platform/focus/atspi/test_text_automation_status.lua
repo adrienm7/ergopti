@@ -31,9 +31,12 @@ helpers.describe("text automation status", function()
 	helpers.it("(text-automation-visible) summarises open and closed with the guard's reason", function()
 		local Status = fresh()
 		helpers.assert_nil(Status.summary(), "unbound reads unknown")
+		helpers.assert_nil(Status.mode(), "unbound names no mode")
 		local state = { mode = "window", reason = "no_accessible_window" }
 		Status.bind(function() return state end)
 		helpers.assert_eq({ Status.summary() }, { "open", "no_accessible_window" })
+		-- The field run's session check names the mode itself, not only open or closed.
+		helpers.assert_eq({ Status.mode() }, { "window", "no_accessible_window" })
 		state = { mode = "field", reason = "field_admitted" }
 		helpers.assert_eq({ Status.summary() }, { "open", "field_admitted" })
 		state = { mode = "closed", reason = "password_field" }

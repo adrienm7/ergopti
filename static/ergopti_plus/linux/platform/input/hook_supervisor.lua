@@ -57,6 +57,10 @@ end
 --- How long a restarted hook must stay up before its retry budget is restored.
 M.STABLE_RESET_MS = Timings.ms("adapters", "hook_restart_stable_ms")
 
+-- What every supervisor of this process saw since it started, for the field
+-- run's session check: an outage the user never noticed still counts.
+local _lifetime = { outages = 0, restarts = 0, exhausted = 0 }
+
 
 
 
@@ -114,6 +118,7 @@ function M.new(options)
 			end
 			restarted_at = nil
 			outage = { due = now + backoff[attempts + 1] }
+			_lifetime.outages = _lifetime.outages + 1
 			Logger.error(LOG, "Keyboard hook stopped unexpectedly (%s) — restarting it in %.1f s (attempt %d of %d).",
 				tostring(stop and (stop.detail or stop.reason) or "no cause recorded"), backoff[attempts + 1] / 1000,
 				attempts + 1, #backoff)
@@ -124,12 +129,14 @@ function M.new(options)
 		local called, started, reason = pcall(restart)
 		if called and started == true and hook.isRunning() then
 			outage, restarted_at = nil, now
+			_lifetime.restarts = _lifetime.restarts + 1
 			Logger.success(LOG, "Keyboard hook restarted (attempt %d of %d).", attempts, #backoff)
 			return "restarted"
 		end
 		local why = called and tostring(reason or "start refused") or ("restart raised: " .. tostring(started))
 		if attempts >= #backoff then
 			exhausted = true
+			_lifetime.exhausted = _lifetime.exhausted + 1
 			Logger.error(LOG, "Keyboard hook restart failed (%s); giving up after %d attempt(s).", why, attempts)
 			return "exhausted"
 		end
@@ -140,6 +147,18 @@ function M.new(options)
 	end
 
 	return supervisor
+end
+
+--- The outages, restarts and spent budgets every supervisor of this process
+--- recorded since it started.
+--- @return table figures { outages, restarts, exhausted } (a copy).
+function M.lifetime()
+	return { outages = _lifetime.outages, restarts = _lifetime.restarts, exhausted = _lifetime.exhausted }
+end
+
+--- Forgets the lifetime figures (test seam).
+function M._reset_lifetime_for_test()
+	_lifetime = { outages = 0, restarts = 0, exhausted = 0 }
 end
 
 return M

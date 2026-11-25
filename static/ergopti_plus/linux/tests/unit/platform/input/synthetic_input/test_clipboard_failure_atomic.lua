@@ -101,7 +101,7 @@ helpers.describe("clipboard paste snapshot", function()
 		end)
 	end)
 
-	helpers.it("does not overwrite a copy when the ownership read fails", function()
+	helpers.it("does not overwrite a copy when the ownership read fails (clipboard-restore-count)", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
 			local original, reads = shell.exec_checked, 0
 			shell.exec_checked = function(command)
@@ -117,6 +117,8 @@ helpers.describe("clipboard paste snapshot", function()
 			helpers.assert_eq(why, "clipboard restoration failed")
 			helpers.assert_eq(shell.value, "external copy")
 			helpers.assert_eq(#shell.writes, 1)
+			-- The field run's session check reads the lost restores of the whole run.
+			helpers.assert_eq(clipboard.restore_failures(), 1, "the given-up restore is counted")
 		end)
 	end)
 
@@ -130,6 +132,7 @@ helpers.describe("clipboard paste snapshot", function()
 			helpers.assert_eq(result, true, "the paste itself succeeded")
 			helpers.assert_eq(#shell.writes, 1, "nothing is restored over the other application's copy")
 			helpers.assert_eq(shell.value, "copied elsewhere")
+			helpers.assert_eq(clipboard.restore_failures(), 0, "a kept foreign copy is no lost restore")
 		end)
 	end)
 

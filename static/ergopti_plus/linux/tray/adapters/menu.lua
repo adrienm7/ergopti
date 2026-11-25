@@ -51,6 +51,8 @@ local LOG = "tray.adapters.menu"
 -- The application id panels use to remember this icon's position between
 -- sessions. Stable on purpose: a generated one makes the icon jump every start.
 local INDICATOR_ID = "ergopti-plus"
+-- The same id, which the field run's tray check finds the exported item by.
+M.INDICATOR_ID = INDICATOR_ID
 
 -- The freedesktop themed icon drawn when a state's logo file is missing. A
 -- themed name always resolves to something, where a missing file resolves to
