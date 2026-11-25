@@ -937,6 +937,68 @@ characters, and English Alice) before and after:
 
 The library holds 793 layouts (VCKB and VCKB2 joined on 2026-11-25).
 
+**The Ergo-L family and its francophone neighbours, read again from their
+upstreams** (2026-11-25, the maintainer's « are our layouts the most complete
+possible, notably from the Ergo-L repository? »). The Ergo-L repository's
+`main` is still 03c6c7c8b3, the commit imported on 2026-11-19; its history
+(every branch and tag, 115 distinct Kalamine files since 2015, each built by
+Kalamine 0.40 and compared by letters and digits with the library), the
+authors' repositories it links, ergol.org, optimot.fr, bepo.fr and
+OneDeadKey's repositories were read. `tools/build/import-kalamine-layouts.cjs`
+now re-encodes the whole family from those files, each pinned by commit and
+SHA-256, through the Studio's Kalamine JSON reader; a TOML without its JSON
+is built by `kalamine build`, the command of the Ergo-L Makefile, after the
+run checks that this Kalamine rebuilds the Ergo-L repository's own
+`erglace_jf.json` (`--check` compares the library with the files). The import
+now keeps the rules that enter another dead key (the 1DK typed twice enters
+the diaeresis: ë, ï; Erglace's and Béopy 1DFH's 1DK then g or b enters their
+Greek table), which the entries of 2026-11-19 dropped: the eight re-encoded
+layouts of the family changed in `library_golden.json`, and only they (on
+_Don Quichotte_, Erglace's unsupported share 0.013 % → 0, distinct characters
+488 → 555; Bépolar 0.013 % → 0). « AirGlass version NucleoSquid » is
+Erglace (Nuke): ergol.org's Erglace page names Nuclear-Squid as the author of
+this « variante AIE », whose TOML kept Lysquid's header, so its credit now
+names Nuclear-Squid. 806 layouts.
+
+| Layout                    | Source (licence)                                                                     | Before                                    | After                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------- |
+| Ergo-L 1.0.2              | registry (ergol-v1.0.2 keylayout, WTFPL)                                             | held, complete                            | unchanged (latest release)                                    |
+| Ergo-L (ISO)              | xkeyboard-config `fr(ergol_iso)` (MIT)                                               | held, ë ï missing (ISO_Level5 chain)      | unchanged                                                     |
+| Ergo-L 0.7 LTS            | ergol 4eaf924e61 `0_7_0/ergol.json` (WTFPL)                                          | missing                                   | added; 0.6 (`layouts/ergolv06.json`) has its letters, listed  |
+| Ergo-L 0.5, 0.4, 0.2, 0.1 | ergol 4eaf924e61 `layouts/ergolv05`, `v03_4`, `v02`, `v01.json` (WTFPL)              | missing                                   | added (0.3 has 0.4's letters)                                 |
+| Ergo-L 0.99.2, 0.99.3     | ergol `0_99_2/` (main), `layouts/ergol_0_99_3.toml` (dev branch only)                | missing                                   | not added: 0.7 LTS's letters and digits                       |
+| Erglace 0.4.0 (Lysquid)   | ergol 03c6c7c8b3 `keymaps/fr/erglace.json` = Lysquid/Erglace v0.4.0 (no licence)     | held, chains missing                      | complete; Lysquid's tags 0.2.0–0.3.3 have its letters         |
+| Erglace 0.1               | Lysquid/Erglace tag v0.1.0 `erglace.toml` (no licence)                               | missing                                   | added                                                         |
+| Erglace (JF)              | cmoinard/Erglace 5ec95161ac `erglace.toml` 0.6.19 (no licence)                       | 0.6.17 (Ergo-L copy), outdated            | updated to 0.6.19 (its `dist/erglace.json` is stale: built)   |
+| Erglace (JF) 0.6.17       | ergol 03c6c7c8b3 `keymaps/fr.contrib/erglace_jf.json`                                | held as « Erglace (JF) »                  | kept as a version                                             |
+| Erglace (JF) 0.6.14, 13   | cmoinard/Erglace `Historique/0.6.14`, `0.6.13` (no licence)                          | missing                                   | added (its `Historique/0.4.0` is Lysquid's 0.4.0)             |
+| Erglace (Nuke) 0.5.0      | ergol `keymaps/fr.contrib/erglace_nuke.json`                                         | held, credited to Lysquid, chains missing | complete, credited to Nuclear-Squid                           |
+| Erglace (Wismill)         | ergol.org Erglace page (1DK under a thumb)                                           | missing                                   | not added: no file found                                      |
+| Ergaie 0.1.9              | ergol `keymaps/fr.contrib/ergaie.json` = MacDamien/Ergaie `layouts/ergaie.json`      | held, Greek missing                       | complete (upstream 0.1.9.7: the same keymap)                  |
+| Ergaie (miroir)           | MacDamien/Ergaie 4bb64d98eb `layouts/ergaie_miroir.json` (no licence)                | missing                                   | added                                                         |
+| Ergaie 0.1.0, prototypes  | ergol `data/layouts/ergaie.toml` (2024-02), MacDamien `layouts/prototypes/`          | missing                                   | not added: superseded draft and unpublished experiments       |
+| Bépolar 0.7.0             | ergol `keymaps/fr/bepolar.json` = Ced-C/Bepolar `dist/bepolar.json` (no licence)     | held, chains missing                      | complete (same keymap upstream)                               |
+| Colemak French Touch      | cedricr/colemak-french-touch e3bfbd4385 `dist/colemkft.json` 0.4 (MIT)               | 0.3.1 (Ergo-L copy), outdated             | updated to 0.4; 0.3.1 has its letters, listed                 |
+| Béopy 1.0.0, 1DFH 1.2.1   | ergol `keymaps/fr.contrib/beopy.json`, `beopy-l.json` (WTFPL)                        | held; 1DFH's Greek missing                | complete (Béopy's file states no diaeresis: ë ï as upstream)  |
+| Kazerty 1.0               | ergol `keymaps/fr.contrib/kazerty.json` (WTFPL)                                      | held, 1DK twice missing                   | complete                                                      |
+| Optergol 0.2              | ergol e561e4b305 `keymaps/fr.contrib/optergol.json` (tags v1.0.1, v1.0.2; WTFPL)     | missing                                   | added                                                         |
+| Ergopti 2.1.2 (1DK)       | ergol e561e4b305 `keymaps/fr.contrib/ergo_1dk.json` (WTFPL)                          | missing                                   | added                                                         |
+| HyperTexte 1DFH 1.1.2     | ergol e078a83b74 `layouts/fr.contrib/hypertexte_1dk.json` (WTFPL)                    | missing                                   | added                                                         |
+| Bépo42, Colemak-Lafayette | ergol `dev` branch only (2024-03): `bepo42`, `colemak-lafayette(-kaze)`, `optimot42` | missing                                   | not added: never on `main` or a tag; Bépolar, Colemak FT next |
+| Ergo-L-42, Qourg42        | ergol history 2020–2023 (`ergol42.yaml`, `qourg.yaml`)                               | —                                         | not added: the letters of Ergo-L 0.1 to 0.4                   |
+| Ergoléo, Ergolak (i/m/o)  | ergol history 2023-02-12                                                             | missing                                   | not added: Kalamine 0.40 cannot read them; experiments        |
+| Hypergol                  | ergol.org (Kanata and QMK configuration, combos, magic key)                          | missing                                   | not added: no letter layout file; needs combos                |
+| QWERTY-Lafayette          | ergol `keymaps/fr/lafayette.json`; OneDeadKey/1dk (MIT)                              | held as QWERTY                            | unchanged: QWERTY's letters and digits (its 1DK differs)      |
+| OneDeadKey 1dk, prog      | OneDeadKey/1dk `layouts/` (MIT; QWERTY per language, Transalp, Dvorak-1dk-fr)        | held as QWERTY or Dvorak                  | unchanged: their letters and digits                           |
+| Arsenik, Selenium         | OneDeadKey/arsenik, selenium (Unlicense)                                             | —                                         | not added: thumb and layer configurations over a base layout  |
+| Optimot 1.8               | optimot.fr 1.8.0 Linux driver (CC BY-NC-SA)                                          | held, complete                            | unchanged: 1.8 is current (1.8.1 is a macOS driver fix)       |
+| Optimot (ANSI copy)       | ergol `keymaps/fr.nonfree/optimot.json`                                              | —                                         | not added: the ANSI copy of optimot.fr's layout               |
+| bépo 1.1rc2, 1.0rc2       | registry; xkeyboard-config `fr(bepo)`, `bepo_afnor`, `bepo_latin9`                   | held, complete                            | unchanged: bepo.fr's « Version 1.1 » is still 1.1rc2          |
+| AZERTY AFNOR (NF Z71-300) | xkeyboard-config `fr(afnor)`; ergol branch `afnor` (2026-09)                         | held, complete                            | unchanged                                                     |
+| Adextre                   | KLAnext's ErgoDox file                                                               | held (ErgoDox only)                       | unchanged: adextre.fr refused the session (403)               |
+| Engram (fr)               | binarybottle/engram (MIT) holds engram-en and engram-es only                         | —                                         | not added: no French Engram found                             |
+| Ergopti, Ergopti+         | registry                                                                             | held                                      | unchanged; the Optim7 drafts of `static/layouts/0_old` stay   |
+
 **Basis for re-encoding** (TODO « Read every common layout format »): the
 maintainer recalls a public discussion holding that a key arrangement is not
 protected by copyright, only its implementation, and points to _SAS Institute
