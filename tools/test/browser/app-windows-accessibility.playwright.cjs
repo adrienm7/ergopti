@@ -26,7 +26,9 @@
  *    list box, menu, grid, tree and radio group, and Escape that closes an
  *    open modal dialog;
  * 6. checked for text alternatives: every image, drawing and chart canvas
- *    named or hidden from assistive technology.
+ *    named or hidden from assistive technology;
+ * 7. measured for the 44 px pointer targets of WCAG 2.5.5 (lib/target-size.cjs),
+ *    which axe's target-size rule (24 px, 2.5.8) does not check.
  * Every axe rule's node count and every window's walk problems are counted
  * and compared with the committed baseline beside this file: a new row or a
  * higher count fails, so the violations can only go down. The maintainer
@@ -56,6 +58,8 @@ const { WINDOWS } = require('./app-windows-fixtures.cjs');
 const { serveStatic, installFakeHost } = require('../lib/app-window-host.cjs');
 // WCAG 2.2 level AAA is the target: the tags axe runs (A, AA and AAA).
 const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
+// The 44 px targets of WCAG 2.5.5, which axe does not measure.
+const targetSize = require('../lib/target-size.cjs');
 
 // --root=dir serves another copy of static/ (an older commit's, to prove a fix
 // by scanning the code it replaced); the fixtures and the baseline stay these.
@@ -390,6 +394,21 @@ async function auditWindows(chromium, windows, family, port) {
 									nodes: images.length,
 									targets: images
 								});
+							const small = await page.evaluate(
+								targetSize.targetSizeProblems,
+								targetSize.MINIMUM_PX
+							);
+							if (small.length)
+								findings.push({
+									window: target.id,
+									scheme,
+									state: state.name,
+									rule: targetSize.TARGET_SIZE_RULE,
+									impact: 'minor',
+									help: 'Pointer targets of at least 44 by 44 px (WCAG 2.5.5)',
+									nodes: small.length,
+									targets: small
+								});
 							// The arrow keys and Escape change the state: they come last.
 							const operable = [
 								...(await page.evaluate(appChecks.operabilityProblems)),
@@ -567,6 +586,23 @@ async function selfCheck(chromium) {
 		assert.doesNotMatch(judged, /#o1|#editor/, 'A driven option and a rich editor pass');
 		assert.match(judged, /li#o2/, 'An option no field drives fails');
 		assert.match(judged, /div#pulled/, 'An editor out of the Tab order fails');
+		// The 44 px targets of WCAG 2.5.5: a small button fails, a large one, a
+		// link inside a sentence, a small box with its label and a hidden button
+		// pass.
+		const sized = await browser.newPage();
+		await sized.setContent(`<main><h1>Sizes</h1>
+			<button id="small" style="width: 30px; height: 30px">S</button>
+			<button id="large" style="width: 48px; height: 44px">L</button>
+			<p>Read <a href="#x" id="inline">the notes</a> before you start.</p>
+			<label style="display: inline-block; padding: 12px 20px"><input type="checkbox" id="boxed"> A long enough label</label>
+			<button id="away" hidden>H</button>
+			<button class="row" style="width: 20px; height: 20px">1</button>
+			<button class="row" style="width: 20px; height: 20px">2</button></main>`);
+		assert.deepEqual(
+			await sized.evaluate(targetSize.targetSizeProblems, targetSize.MINIMUM_PX),
+			['button#small «S» 30×30', 'button «1» 20×20 (and 1 more alike)'],
+			'Only the small buttons are below 44 px, the alike ones counted once'
+		);
 	} finally {
 		await browser.close();
 	}
@@ -668,7 +704,9 @@ async function main(args = process.argv.slice(2)) {
 	assert.ok(Number.isSafeInteger(port) && port >= 0 && port < 65536, 'Bad port');
 	await selfCheck(require('playwright').chromium);
 	if (args.includes('--self-check')) {
-		console.log('App windows accessibility: the operability and image checks see each failure.');
+		console.log(
+			'App windows accessibility: the operability, image and target size checks see each failure.'
+		);
 		return;
 	}
 	const findings = await auditWindows(require('playwright').chromium, windows, family, port);
@@ -718,6 +756,7 @@ module.exports = {
 	OPERABILITY_RULE,
 	OPERABLE_RULE,
 	IMAGES_RULE,
+	TARGET_SIZE_RULE: targetSize.TARGET_SIZE_RULE,
 	selfCheck,
 	rowKey,
 	countsOf,

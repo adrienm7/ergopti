@@ -19,7 +19,10 @@
  * characters, no sentence of 30 words or more in a page's running text and
  * nothing placed under the sticky header covered by it; those counts have
  * their own ratchet (site-reading-baseline.json), per page, mode, frame and
- * check.
+ * check. Every page and frame is also measured, in the light scheme, for the
+ * 44 px pointer targets of WCAG 2.5.5 (lib/target-size.cjs), which axe's
+ * target-size rule (the 24 px of 2.5.8) does not check; they are counted in
+ * the axe baseline under their own rule.
  * ==============================================================================
  */
 
@@ -34,6 +37,8 @@ const reading = require('./site-reading.cjs');
 const { SITE_ROUTES } = require('../../ci/site-artifact.cjs');
 // WCAG 2.2 level AAA is the target: the tags axe runs (A, AA and AAA).
 const { WCAG_TAGS } = require('../lib/wcag-tags.cjs');
+// The 44 px targets of WCAG 2.5.5, which axe does not measure.
+const targetSize = require('../lib/target-size.cjs');
 
 // Pages audited: every real page of the site, plus the pages the artifact
 // smoke list does not carry (the Optimiser tab, the accessibility statement).
@@ -192,6 +197,20 @@ async function scanRoute(context, origin, basePath, route, scheme, inflight, axe
 			});
 			for (const violation of await scanFrame(frame, axeSource))
 				findings.push({ route, scheme, frame: name, ...violation });
+			// The sizes do not depend on the colours: once per page and frame.
+			if (scheme !== 'light') continue;
+			const small = await frame.evaluate(targetSize.targetSizeProblems, targetSize.MINIMUM_PX);
+			if (small.length)
+				findings.push({
+					route,
+					scheme,
+					frame: name,
+					rule: targetSize.TARGET_SIZE_RULE,
+					impact: 'minor',
+					help: 'Pointer targets of at least 44 by 44 px (WCAG 2.5.5)',
+					nodes: small.length,
+					targets: small
+				});
 		}
 		return findings;
 	} finally {
@@ -904,6 +923,7 @@ module.exports = {
 	AUDITED_ROUTES,
 	COLOR_SCHEMES,
 	WCAG_TAGS,
+	TARGET_SIZE_RULE: targetSize.TARGET_SIZE_RULE,
 	BASELINE_PATH,
 	READING_BASELINE_PATH,
 	rowKey,

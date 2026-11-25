@@ -77,7 +77,10 @@ function checkComparison() {
 	);
 	assert.equal(scan.OPERABLE_RULE, 'keyboard-operable');
 	assert.equal(scan.IMAGES_RULE, 'text-alternatives');
+	// The 44 px targets of WCAG 2.5.5 (axe stops at the 24 px of 2.5.8).
+	assert.equal(scan.TARGET_SIZE_RULE, 'target-size-enhanced');
 	for (const call of [
+		/page\.evaluate\(\s*targetSize\.targetSizeProblems,\s*targetSize\.MINIMUM_PX\s*\)/,
 		/page\.evaluate\(appChecks\.operabilityProblems\)/,
 		/appChecks\.arrowProblems\(page\)/,
 		/appChecks\.escapeProblems\(page\)/,
@@ -86,7 +89,7 @@ function checkComparison() {
 		/await selfCheck\(require\('playwright'\)\.chromium\);\s+if \(args\.includes\('--self-check'\)\)/
 	])
 		assert.match(source, call, 'The scan wires ' + call.source);
-	for (const rule of [scan.OPERABLE_RULE, scan.IMAGES_RULE]) {
+	for (const rule of [scan.OPERABLE_RULE, scan.IMAGES_RULE, scan.TARGET_SIZE_RULE]) {
 		const row = scan.compareWithBaseline(
 			{ ...baseline, ['a | light | filled | ' + rule]: 1 },
 			baseline
