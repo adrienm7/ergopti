@@ -2900,7 +2900,7 @@ local function main()
 		end
 		return true
 	end
-	local function consume_ordinary(detail)
+	local on_consume = input_capture_gate.guard(function(detail)
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
 		-- under the Shortcuts master like the keyboard slots, on the keys whose
@@ -2944,11 +2944,7 @@ local function main()
 				release_callback = emulated_release }
 		end
 		return wrap_on_type.on_key(detail) == true
-	end
-	-- An Ergopti window holding the capture gate withholds every consumer but
-	-- the layout emulation, which types there too (modules/keymap/emulation_admission.lua).
-	local on_consume = require("modules.keymap.emulation_admission").consumer(input_capture_gate,
-		function(detail) return require("modules.keymap.layout_emulation").on_key(detail) end, consume_ordinary)
+	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token
 	local function hold_admission()

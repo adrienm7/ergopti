@@ -207,12 +207,6 @@ function M.run(options)
 				record("signals.stop"); observed.signal_stops = observed.signal_stops + 1
 				observed.signals_active = false; return true
 			end }
-		elseif name == "modules.keymap.emulation_admission" then
-			-- Pure: it only composes the consumption callback over the gate.
-			return require(name)
-		elseif name == "modules.keymap.layout_emulation" then
-			-- No layout is emulated: a key the gate holds passes raw.
-			return { on_key = function() return false end }
 		elseif name == "core.ui.engine.gui_stack" then
 			-- The desktop toolkit is present: its refusal has its own cases
 			-- (tests/unit/core/lifecycle/test_gui_stack.lua).

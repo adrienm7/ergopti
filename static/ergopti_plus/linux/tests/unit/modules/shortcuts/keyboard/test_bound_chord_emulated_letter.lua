@@ -20,7 +20,7 @@ local function compile(emulation, offered)
 	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 	local source = assert(file:read("*a")); assert(file:close())
 	local first = assert(source:find("\tlocal function consume_bound_chord(detail)", 1, true))
-	local last = assert(source:find("\n\tlocal function consume_ordinary", first, true))
+	local last = assert(source:find("\n\tlocal on_consume", first, true))
 	local body = source:sub(first, last) .. "\nreturn consume_bound_chord"
 	local environment = setmetatable({
 		shortcuts = { is_enabled = function() return true end, configuration_admitted = function() return true end },

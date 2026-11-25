@@ -758,7 +758,6 @@ return {
 	"tests.unit.modules.keymap.test_keylayout_emulation",
 	"tests.unit.hotstrings.engine.expander.test_source_emulation",
 	"tests.unit.modules.keymap.test_layout_emulation",
-	"tests.unit.modules.keymap.test_emulation_admission",
 	"tests.unit.modules.keymap.test_layout_emulation_shortcut_output",
 	"tests.unit.modules.keymap.test_keylayout_parser",
 	"tests.unit.modules.keymap.test_xkb_converter",
