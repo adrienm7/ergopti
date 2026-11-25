@@ -62,5 +62,14 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 		-- GNOME refuses to load an extension that does not list the running
 		-- version; the module syntax the extension uses needs 45 or later.
 		helpers.assert_eq(gnome["shell-version"][1], "45")
+		-- Every major version from there on, through 51: Fedora 44 and Ubuntu
+		-- 26.04 ship GNOME 50, rawhide 51, and a list that stopped at 49 left
+		-- the extension OUT_OF_DATE there, with per-application rules and the
+		-- layout switch silently off (proved loading on 50.6 and 51.1 in
+		-- headless Fedora sessions, 2026-11-25).
+		for index, version in ipairs(gnome["shell-version"]) do
+			helpers.assert_eq(version, tostring(44 + index), "contiguous shell versions")
+		end
+		helpers.assert_true(#gnome["shell-version"] >= 7, "GNOME 50 and 51 are listed")
 	end)
 end)
