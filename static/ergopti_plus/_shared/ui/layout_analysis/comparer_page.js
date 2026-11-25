@@ -1059,6 +1059,11 @@
 		<details class="la-section">
 			<summary id="la-movement-name" data-i18n="layout_analysis.movement.title"></summary>
 			<p class="la-muted" data-i18n="layout_analysis.movement.caption"></p>
+			<p class="la-movement-rank">
+				<button type="button" id="la-movement-rank" aria-describedby="la-movement-rank-note" data-i18n="layout_analysis.movement.rank"></button>
+			</p>
+			<p id="la-movement-rank-note" class="la-muted" data-i18n="layout_analysis.movement.rank_note"></p>
+			<p id="la-movement-rank-status" class="la-muted" role="status"></p>
 			<section class="la-table-wrap" tabindex="0" aria-labelledby="la-movement-name">
 				<table id="la-movement" class="la-table"></table>
 			</section>
@@ -4933,18 +4938,117 @@
 		 * screen; every pair is also in a sortable table, and each cell names
 		 * its pair, share, count, kind and points to assistive technology.
 		 */
+		/** A result's movement table, kept with its other figures. */
+		function movementOf(r) {
+			return cachedFigure(r, 'movement', () =>
+				E.movementTable(layoutOf(r.layout.id), tablesOf(r), analysisOptions())
+			);
+		}
+
+		// The movement tables of the library's complete layouts of this
+		// comparison (the percentiles' references, the user's own left out),
+		// measured on request: one layout per slice, so the page keeps answering
+		// (movementTable takes 20 to 60 ms a layout on a large corpus).
+		// {results, weights, tables, done}; null before a request.
+		let movementLibrary = null;
+
+		/** The measured references, when they belong to the comparison shown. */
+		function placedMovement() {
+			const run = movementLibrary;
+			return run &&
+				run.done &&
+				run.results === state.results &&
+				run.weights === JSON.stringify(state.weights)
+				? run
+				: null;
+		}
+
+		/**
+		 * « Place among the library »: measures every complete library layout of
+		 * the comparison, then shows each movement and rhythm cell's percentile.
+		 * A change of the comparison while it runs ends the run unfinished.
+		 */
+		async function placeMovementAmongLibrary() {
+			const results = state.results;
+			const references = results.filter((r) => !r.incomplete && !isPersonal(r));
+			const status = $('la-movement-rank-status');
+			if (references.length < E.PERCENTILE_MIN_REFERENCES) {
+				status.textContent = t('layout_analysis.movement.rank_too_few', {
+					count: references.length,
+					min: E.PERCENTILE_MIN_REFERENCES
+				});
+				return;
+			}
+			const run = { results, weights: JSON.stringify(state.weights), tables: [], done: false };
+			movementLibrary = run;
+			const button = $('la-movement-rank');
+			button.disabled = true;
+			try {
+				for (const [index, reference] of references.entries()) {
+					if (movementLibrary !== run || state.results !== results) return;
+					run.tables.push(movementOf(reference));
+					status.textContent = t('layout_analysis.movement.rank_progress', {
+						done: index + 1,
+						count: references.length
+					});
+					// Lets the page answer between two layouts.
+					await new Promise((resolve) => setTimeout(resolve, 0));
+				}
+				if (movementLibrary !== run || state.results !== results) return;
+				run.done = true;
+				const shown = state.results.find((r) => r.layout.id === state.details);
+				if (shown) renderMovement(shown);
+			} finally {
+				button.disabled = false;
+			}
+		}
+
+		/**
+		 * A cell's percentile chip among the measured references: in the class's
+		 * direction (E.movementBetter), neutral when no direction is better.
+		 * @param {object|null} placed - placedMovement().
+		 * @param {function(object): object} column - The table's column of classes.
+		 * @param {string} id - The class.
+		 * @param {number} value - The cell's value.
+		 * @param {string} label - The class and column, as the chip names them.
+		 * @returns {HTMLButtonElement|null}
+		 */
+		function movementChip(placed, column, id, value, label) {
+			if (!placed) return null;
+			const better = E.movementBetter(id);
+			const standing = E.rankAmong(
+				better,
+				placed.tables.map((m) => column(m)[id])
+			)(value);
+			return standing ? INFO.percentile(label, standing, better === 'none') : null;
+		}
+
+		/** A cell of a movement or rhythm table: its share, then its percentile when placed. */
+		function movementCell(text, chip) {
+			const cell = el('td', 'la-num', text);
+			if (chip) cell.append(chip);
+			return cell;
+		}
+
 		/**
 		 * The movement table (an idea seen in the Layouts Wiki playground): each
 		 * pair class over adjacent key pairs and over skipgrams, for the detailed
-		 * layout and the one it is compared with, with their difference.
+		 * layout and the one it is compared with, with their difference; once
+		 * placed among the library, each cell carries its percentile.
 		 */
 		function renderMovement(result) {
 			const versus = state.results.find((r) => r.layout.id === state.versus) || null;
-			const tableOf = (r) =>
-				cachedFigure(r, 'movement', () =>
-					E.movementTable(layoutOf(r.layout.id), tablesOf(r), analysisOptions())
-				);
-			const shown = [result].concat(versus ? [versus] : []).map((r) => ({ r, m: tableOf(r) }));
+			const shown = [result].concat(versus ? [versus] : []).map((r) => ({ r, m: movementOf(r) }));
+			const placed = placedMovement();
+			const running =
+				movementLibrary !== null &&
+				!movementLibrary.done &&
+				movementLibrary.results === state.results;
+			if (!placed && !running) $('la-movement-rank-status').textContent = '';
+			if (placed)
+				$('la-movement-rank-status').textContent = t('layout_analysis.movement.rank_done', {
+					count: placed.tables.length
+				});
 			const table = $('la-movement');
 			table.replaceChildren();
 			const head = el('tr');
@@ -4977,10 +5081,30 @@
 				const name = el('th', '', className(id));
 				name.scope = 'row';
 				row.append(name);
-				for (const { m } of shown)
+				for (const { r, m } of shown)
 					row.append(
-						el('td', 'la-num', pct(m.bigram[id])),
-						el('td', 'la-num', pct(m.skipgram[id]))
+						movementCell(
+							pct(m.bigram[id]),
+							movementChip(
+								placed,
+								(x) => x.bigram,
+								id,
+								m.bigram[id],
+								t('layout_analysis.movement.bigrams', { layout: r.layout.name }) +
+									` · ${className(id)}`
+							)
+						),
+						movementCell(
+							pct(m.skipgram[id]),
+							movementChip(
+								placed,
+								(x) => x.skipgram,
+								id,
+								m.skipgram[id],
+								t('layout_analysis.movement.skipgrams', { layout: r.layout.name }) +
+									` · ${className(id)}`
+							)
+						)
 					);
 				if (versus) {
 					const [a, b] = shown.map(({ m }) => m);
@@ -4992,7 +5116,7 @@
 				body.append(row);
 			}
 			table.append(thead, body);
-			renderRhythm(shown);
+			renderRhythm(shown, placed);
 		}
 
 		/**
@@ -5000,7 +5124,7 @@
 		 * those whose ends are the same finger) over all trigrams and over those
 		 * without a thumb, for the detailed layout and its comparison.
 		 */
-		function renderRhythm(shown) {
+		function renderRhythm(shown, placed) {
 			const table = $('la-rhythm');
 			table.replaceChildren();
 			const head = el('tr');
@@ -5027,10 +5151,29 @@
 				const header = el('th', '', name(id));
 				header.scope = 'row';
 				row.append(header);
-				for (const { m } of shown)
+				for (const { r, m } of shown)
 					row.append(
-						el('td', 'la-num', pct(m.rhythm.all[id])),
-						el('td', 'la-num', pct(m.rhythm.noThumbs[id]))
+						movementCell(
+							pct(m.rhythm.all[id]),
+							movementChip(
+								placed,
+								(x) => x.rhythm.all,
+								id,
+								m.rhythm.all[id],
+								t('layout_analysis.movement.all', { layout: r.layout.name }) + ` · ${name(id)}`
+							)
+						),
+						movementCell(
+							pct(m.rhythm.noThumbs[id]),
+							movementChip(
+								placed,
+								(x) => x.rhythm.noThumbs,
+								id,
+								m.rhythm.noThumbs[id],
+								t('layout_analysis.movement.no_thumbs', { layout: r.layout.name }) +
+									` · ${name(id)}`
+							)
+						)
 					);
 				if (shown.length === 2) {
 					const delta = shown[1].m.rhythm.all[id] - shown[0].m.rhythm.all[id];
@@ -7371,6 +7514,15 @@
 				renderDetails();
 			});
 			$('la-share').addEventListener('click', share);
+			// A failed measure is said in words, then raised to the page's error report.
+			$('la-movement-rank').addEventListener('click', () =>
+				placeMovementAmongLibrary().catch((error) => {
+					$('la-movement-rank-status').textContent = t('layout_analysis.movement.rank_failed', {
+						reason: error && error.message ? error.message : String(error)
+					});
+					throw error;
+				})
+			);
 			// Every layout or none, whatever the search shows.
 			for (const [id, tick] of [
 				['la-every', true],

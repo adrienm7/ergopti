@@ -4394,24 +4394,23 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * A metric's percentile against reference layouts (the library's complete
-	 * ones, ux-study item 9): for a value, the share of the references it does
-	 * better than, a tie counting half, so P100 is better than all of them and
-	 * P0 worse than all. Sorted once, each value is placed by two binary searches.
-	 * @param {string} metric - A metric whose `better` is higher or lower.
-	 * @param {number[]} references - The references' values of that metric.
+	 * A value's percentile among reference values for a direction: the share
+	 * of the references it does better than, a tie counting half ('higher' or
+	 * 'lower' is better), or, with 'none', the share it is higher than. Sorted
+	 * once, each value is placed by two binary searches.
+	 * @param {'higher'|'lower'|'none'} better - Which way is better.
+	 * @param {number[]} references - The references' values.
 	 * @returns {function(number): ({percent: number, count: number}|null)} Null
 	 *   for every value when there are fewer than PERCENTILE_MIN_REFERENCES
-	 *   references, or for a metric that is not scored.
-	 * @throws {Error} On an unknown metric or a reference that is not a number.
+	 *   references, and for a value that is not a number.
+	 * @throws {Error} On an unknown direction or a reference that is not a number.
 	 */
-	function percentiles(metric, references) {
-		const definition = METRICS[metric];
-		if (!definition) throw new Error(`layout_analysis: percentiles of an unknown metric ${metric}`);
+	function rankAmong(better, references) {
+		if (!['higher', 'lower', 'none'].includes(better))
+			throw new Error(`layout_analysis: rankAmong of an unknown direction ${better}`);
 		if (!references.every(Number.isFinite))
-			throw new Error(`layout_analysis: percentiles of ${metric} need numbers`);
-		if (definition.better === 'none' || references.length < PERCENTILE_MIN_REFERENCES)
-			return () => null;
+			throw new Error('layout_analysis: rankAmong needs numbers');
+		if (references.length < PERCENTILE_MIN_REFERENCES) return () => null;
 		const sorted = references.slice().sort((a, b) => a - b);
 		// The number of references below (strictly) a value, and at or below it.
 		const below = (value, orEqual) => {
@@ -4428,12 +4427,33 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!Number.isFinite(value)) return null;
 			const less = below(value, false);
 			const ties = below(value, true) - less;
-			const worse = definition.better === 'lower' ? sorted.length - less - ties : less;
+			const worse = better === 'lower' ? sorted.length - less - ties : less;
 			return {
 				percent: Math.round((100 * (worse + ties / 2)) / sorted.length),
 				count: sorted.length
 			};
 		};
+	}
+
+	/**
+	 * A metric's percentile against reference layouts (the library's complete
+	 * ones, ux-study item 9): for a value, the share of the references it does
+	 * better than, a tie counting half, so P100 is better than all of them and
+	 * P0 worse than all (rankAmong in the metric's direction).
+	 * @param {string} metric - A metric whose `better` is higher or lower.
+	 * @param {number[]} references - The references' values of that metric.
+	 * @returns {function(number): ({percent: number, count: number}|null)} Null
+	 *   for every value when there are fewer than PERCENTILE_MIN_REFERENCES
+	 *   references, or for a metric that is not scored.
+	 * @throws {Error} On an unknown metric or a reference that is not a number.
+	 */
+	function percentiles(metric, references) {
+		const definition = METRICS[metric];
+		if (!definition) throw new Error(`layout_analysis: percentiles of an unknown metric ${metric}`);
+		if (!references.every(Number.isFinite))
+			throw new Error(`layout_analysis: percentiles of ${metric} need numbers`);
+		if (definition.better === 'none') return () => null;
+		return rankAmong(definition.better, references);
 	}
 
 	/**
@@ -4887,6 +4907,36 @@ var LAYOUT_ANALYSIS = (function () {
 		'redirect_bad',
 		'redirect_bad_sfs'
 	];
+	// Which way is better for the movement table's own classes, for their
+	// percentiles against the library (the scored classes take their metric's):
+	// a discordant row change and a same-finger end are costs; a row change as
+	// such and a concordant one are neither.
+	const MOVEMENT_BETTER = {
+		row_change: 'none',
+		row_change_concordant: 'none',
+		row_change_discordant: 'lower',
+		alternation_sfs: 'lower',
+		redirect_sfs: 'lower',
+		redirect_bad_sfs: 'lower'
+	};
+
+	/**
+	 * Which way is better for a class of the movement table or of its trigram
+	 * rhythm: its metric's direction, else the table's own (MOVEMENT_BETTER).
+	 * @param {string} id - A class of MOVEMENT_CLASSES, MOVEMENT_EXTRA or RHYTHM_CLASSES.
+	 * @returns {'higher'|'lower'|'none'}
+	 * @throws {Error} On another id.
+	 */
+	function movementBetter(id) {
+		if (Object.prototype.hasOwnProperty.call(MOVEMENT_BETTER, id)) return MOVEMENT_BETTER[id];
+		if (
+			!MOVEMENT_CLASSES.includes(id) &&
+			!MOVEMENT_EXTRA.includes(id) &&
+			!RHYTHM_CLASSES.includes(id)
+		)
+			throw new Error(`layout_analysis: ${id} is not a movement class`);
+		return METRICS[id].better;
+	}
 
 	/**
 	 * The movement table of a layout on a corpus (an idea seen in the Layouts
@@ -8276,6 +8326,8 @@ var LAYOUT_ANALYSIS = (function () {
 		MOVEMENT_EXTRA,
 		RHYTHM_CLASSES,
 		movementTable,
+		movementBetter,
+		rankAmong,
 		wordsWithKeys,
 		blendNgrams,
 		BLEND_CHARS,

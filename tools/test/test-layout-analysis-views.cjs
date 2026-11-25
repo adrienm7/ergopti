@@ -351,6 +351,49 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	throws(() => E.blendNgrams([{ ngrams: a, weight: 0 }]), 'blend: all weights 0 throw');
 }
 
+// ===========================================
+// ======= Movement percentiles ==============
+// ===========================================
+
+// The movement cells' percentiles against the library (an idea seen in the
+// Layouts Wiki playground): rankAmong in the class's direction, E.percentiles
+// for a scored metric, the share below for a class with no better way.
+{
+	const values = Array.from({ length: 40 }, (_, n) => n);
+	const lower = E.rankAmong('lower', values);
+	const higher = E.rankAmong('higher', values);
+	const none = E.rankAmong('none', values);
+	check(lower(-1).percent === 100 && lower(40).percent === 0, 'rankAmong: lower is better');
+	check(higher(40).percent === 100 && higher(-1).percent === 0, 'rankAmong: higher is better');
+	check(none(30).percent === higher(30).percent, 'rankAmong: none ranks the value as higher');
+	check(lower(10).count === 40, 'rankAmong: the count of references');
+	check(E.rankAmong('lower', values.slice(0, 19))(3) === null, 'rankAmong: too few references');
+	check(lower(Number.NaN) === null, 'rankAmong: no percentile for a value that is not a number');
+	throws(() => E.rankAmong('sideways', values), 'rankAmong: an unknown direction throws');
+	throws(
+		() => E.rankAmong('lower', [1, 'x']),
+		'rankAmong: a reference that is not a number throws'
+	);
+	// The same answer as E.percentiles for a scored metric.
+	const sfb = E.percentiles('sfb', values);
+	check(
+		values.every((v) => sfb(v + 0.5).percent === lower(v + 0.5).percent),
+		'rankAmong: the metric percentiles in their direction'
+	);
+	for (const id of E.MOVEMENT_CLASSES.concat(E.MOVEMENT_EXTRA, E.RHYTHM_CLASSES))
+		check(
+			['higher', 'lower', 'none'].includes(E.movementBetter(id)),
+			`movementBetter: ${id} has a direction`
+		);
+	check(E.movementBetter('sfb') === 'lower', 'movementBetter: a metric keeps its direction');
+	check(
+		E.movementBetter('redirect_sfs') === 'lower',
+		'movementBetter: a same-finger end is a cost'
+	);
+	check(E.movementBetter('row_change') === 'none', 'movementBetter: a row change is neither');
+	throws(() => E.movementBetter('sfb_typo'), 'movementBetter: another id throws');
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-views: ${errors.length} problem(s)`);
