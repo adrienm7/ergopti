@@ -310,6 +310,20 @@ helpers.describe("input_access: the service does not loop on it", function()
 			"the burst must be reachable at the restart delay, or the limit never trips")
 	end)
 
+	helpers.it("an unwritable /dev/uinput exits with the access status, not the restarted 1", function()
+		-- The report's status was dropped and the error unwound to os.exit(1),
+		-- which the unit restarts: a missing uinput group or module looped all session.
+		local src = read("ergopti_hotstrings.lua")
+		local refusal = src:find("Cannot open /dev/uinput", 1, true)
+		helpers.assert_true(refusal ~= nil, "the uinput refusal is where this test reads it")
+		local branch = src:sub(refusal, (src:find("\n\tend\n", refusal, true)))
+		helpers.assert_contains(branch, 'startup_refusal_status = require("platform.input.access").report(')
+		helpers.assert_contains(src, "os.exit(startup_refusal_status or 1)")
+		local declared = src:find("\nlocal startup_refusal_status = nil\n", 1, true)
+		helpers.assert_true(declared ~= nil and declared < refusal,
+			"declared above its writer, or the write lands in a nil global")
+	end)
+
 	helpers.it("is what the daemon reports at every access check", function()
 		local src = read("ergopti_hotstrings.lua")
 		-- The whole module name, quoted, so a move that renames it renames it here.
