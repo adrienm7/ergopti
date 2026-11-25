@@ -591,3 +591,50 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		helpers.assert_eq(state.started, 2)
 	end)
 end)
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Authority Reasons ==============
+-- ===========================================
+-- ===========================================
+
+helpers.describe("AT-SPI focus watcher: the authority it holds", function()
+	-- Field report, KDE Plasma Wayland, 2026-11-25: every withheld hotstring
+	-- looked alike. The guard names the reason from this answer.
+	helpers.it("(text-automation-window) names a window on no application of the bus as absent", function()
+		local state = fixture()
+		helpers.assert_eq(state.watch.authority(), "unavailable", "no worker yet")
+		state.ready()
+		helpers.assert_eq(state.watch.authority(), "field")
+		state.on_pause = function()
+			if not state.answered then state.answered = true; state.message("absent") end
+		end
+		helpers.assert_eq(state.watch.barrier(), nil)
+		helpers.assert_eq(state.watch.authority(), "absent")
+		state.answered = false
+		state.on_pause = function()
+			if not state.answered then state.answered = true; state.message("unknown") end
+		end
+		helpers.assert_eq(state.watch.barrier(), nil)
+		helpers.assert_eq(state.watch.authority(), "unanswered", "an inconclusive walk is not an absent window")
+	end)
+
+	helpers.it("(text-automation-window) reports the session's accessibility switch from readiness", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		helpers.assert_eq(state.watch.accessibility(), "enabled_now")
+	end)
+
+	helpers.it("(text-automation-window) refuses an unknown accessibility state", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "maybe" })
+		state.watch.pump()
+		helpers.assert_eq(state.watch.authority(), "unavailable")
+	end)
+end)

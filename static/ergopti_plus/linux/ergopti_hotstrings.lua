@@ -1260,6 +1260,13 @@ local function main()
 	-- captures it as an upvalue — otherwise on_char would read a never-assigned
 	-- global that stays nil, silently disabling password-app suppression.
 	local _cached_app_id = nil
+	-- The focused window as the compositor poll alone names it (never the
+	-- accessibility context): the window mode's policy reads it, since a
+	-- window without a field verdict has no joined context to name it.
+	local _polled_window = { app = nil, title = nil }
+	-- Whether the keystroke being handled may feed the metrics: false in the
+	-- focus guard's window mode, where only text automation is admitted.
+	local _metrics_admitted = false
 	local user_hotstring_native
 
 	-- The expansion that just fired, kept only until the next keystroke. A
@@ -1460,6 +1467,9 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
+	-- Says why text automation is open or withheld: the log, the diagnostics
+	-- page and a red tray row of a lasting condition.
+	local TextAutomationStatus = require("platform.focus.text_automation_status")
 	privacy_owners.watch = require("platform.focus.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
 		watch      = privacy_owners.watch,
@@ -1488,8 +1498,24 @@ local function main()
 			if llm_overlay then llm_overlay.hide() end
 			engine:reset(false)
 		end,
+		-- Without a field verdict, the password-app list and the private-window
+		-- filter still judge the window the compositor names; a session that
+		-- names none admits text automation, metrics staying closed (TODO.md,
+		-- decided 2026-11-25).
+		window_policy = function()
+			local app = _polled_window.app
+			if app == nil then return true end
+			if keystats.is_context_protected(app, _polled_window.title or "") ~= false then
+				return false, "protected_context"
+			end
+			return true
+		end,
+		on_state = function(mode, reason) TextAutomationStatus.publish(mode, reason) end,
 	})
 	privacy_owners.context = secure_focus_guard
+	TextAutomationStatus.bind(secure_focus_guard.automation_state, privacy_owners.watch.accessibility)
+	-- A lasting condition gets its red tray row (component_status) at once.
+	TextAutomationStatus.set_notice_listener(function() if rebuild_tray_menu then rebuild_tray_menu() end end)
 	-- Attribute time only after the native field and its application/title have
 	-- been joined. Until then the previous context is retired and no new interval
 	-- may start, including when the asynchronous probe settles after startup.
@@ -1610,11 +1636,18 @@ local function main()
 				require("infra.typed_input_withheld").record("press_not_admitted")
 				return
 			end
-		elseif secure_focus_guard.blocks_text() then
-			keystats.discard_roi()
-			require("infra.typed_input_withheld").record("field_not_admitted")
-			return
+			_metrics_admitted = admission.metrics == true
+		else
+			local allowed, mode = secure_focus_guard.text_automation()
+			if not allowed then
+				keystats.discard_roi()
+				require("infra.typed_input_withheld").record("field_not_admitted")
+				return
+			end
+			_metrics_admitted = mode == "field"
 		end
+		-- The window mode admits the expansion, never the metrics of its text.
+		if not _metrics_admitted then keystats.discard_roi() end
 
 		-- Retain this field before preview, metrics or prediction callbacks yield.
 		local destination = secure_focus_guard.capture_text_owner()
@@ -1668,9 +1701,11 @@ local function main()
 			keystats.unsuppress()
 		end
 
-		keystats.on_keydown(ch, now_ms, app_id, scancode)
-		keystats.record_roi_text(ch, secure_focus_guard.current_context(),
-			function(word) return engine:is_known_trigger(word) end)
+		if _metrics_admitted then
+			keystats.on_keydown(ch, now_ms, app_id, scancode)
+			keystats.record_roi_text(ch, secure_focus_guard.current_context(),
+				function(word) return engine:is_known_trigger(word) end)
+		end
 
 		-- `is_terminator` opens the engine's end-char path, where a trigger that
 		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
@@ -1803,9 +1838,11 @@ local function main()
 					-- Logical telemetry and undo are commit records: publishing either
 					-- before the last checked SYN_REPORT invents an expansion the target
 					-- application may never have received.
-					keystats.record_hotstring(app_id, result.trigger,
+					if _metrics_admitted then
+						keystats.record_hotstring(app_id, result.trigger,
 							parsed_output and parsed_output.text or result.replacement,
 							now_ms, result.group, result.backspace_count, result.is_private, replay_terminator)
+					end
 					-- Undo erases what it typed, counted back from the caret: a pressed
 					-- key has moved the caret, so that count would delete the wrong text.
 					-- hotstrings.backspace_restore_enabled off keeps no record at all, so
@@ -1927,7 +1964,7 @@ local function main()
 				local offered = type(top) == "table" and (top.trigger or top.key or top.label) or tostring(top)
 				if offered and offered ~= _last_offered then
 					_last_offered = offered
-					keystats.record_suggestion(app_id, "hotstring", now_ms)
+					if _metrics_admitted then keystats.record_suggestion(app_id, "hotstring", now_ms) end
 				end
 			end)
 			if not ok_preview then
@@ -1978,7 +2015,7 @@ local function main()
 					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination, dynamic_within_delay)
 				end)
 				if ok_dh2 and expanded then
-					if dynamic_event and not dynamic_event.pending_user then
+					if dynamic_event and not dynamic_event.pending_user and _metrics_admitted then
 						-- The seventh argument is not optional, whatever its default
 						-- says. The STATIC path a hundred lines up has always passed
 						-- `result.is_private`; this one never did, so every @-tag
@@ -2057,10 +2094,12 @@ local function main()
 		-- Any key press ends a gesture's click hold, as on Windows.
 		if gestures then gestures.release_clicks_on_activity() end
 		capture_owned_scancodes[scancode] = nil
-		local allowed = not secure_focus_guard.blocks_text()
-		physical_privacy_admission = { code = scancode, allowed = allowed }
+		local allowed, mode = secure_focus_guard.text_automation()
+		physical_privacy_admission = { code = scancode, allowed = allowed, metrics = mode == "field" }
 		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
+		-- The window mode admits the expansion, never the key's metrics.
+		if mode ~= "field" then return end
 		-- A paused driver feeds neither the heatmap nor the live WPM (EDD-1).
 		if script_actions.is_paused() then return end
 		local app_id = _cached_app_id or "Unknown"
@@ -3576,6 +3615,8 @@ local function main()
 			if llm_overlay then llm_overlay.hide() end
 			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
+			_polled_window.app, _polled_window.title = _cached_app_id, type(windowTitle) == "string" and windowTitle or nil
+			secure_focus_guard.window_changed()
 			-- Close the previous title using the existing transition policy. The
 			-- privacy fence below retires the tentative new title until admission.
 			keystats.set_window_title(_cached_app_id, windowTitle,
@@ -3598,7 +3639,9 @@ local function main()
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
 		if not privacy_owners.startup_checkpoint() then return end
-		_cached_app_id = foreground and foreground.appId or nil
+		_cached_app_id = foreground and foreground.appId ~= "" and foreground.appId or nil
+		_polled_window.app = _cached_app_id
+		_polled_window.title = foreground and foreground.windowTitle or nil
 		keystats.observe_hold_focus(_cached_app_id)
 		keystats.set_private_window(
 			keystats.is_private_window(foreground and foreground.windowTitle))
@@ -3646,6 +3689,12 @@ local function main()
 		-- after the shared focus-settle deadline; idle consumes retained results.
 		-- Unknown and probe failure stay fail-closed.
 		refresh_admitted_focus(false)
+		RuntimeGuard.call("text automation notice", TextAutomationStatus.tick)
+		if window_info and type(window_info.compositor_script_state) == "function" then
+			RuntimeGuard.call("desktop focus notice", function()
+				TextAutomationStatus.check_desktop_focus(window_info.compositor_script_state())
+			end)
+		end
 		if file_watchers then
 			local owner = file_watchers
 			local function retire()

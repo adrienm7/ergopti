@@ -18,6 +18,15 @@
 ---    never outlives it (tap-click-touch-context); a withdrawal that carries
 ---    no news of the field, the focus worker's answer to an invalidation,
 ---    passes read = false.
+--- 6. Text automation has three modes (text_automation): "field" when the
+---    focused field is admitted; "window" when no field verdict exists for a
+---    reason that is the desktop's (no accessibility worker, a window on no
+---    application of the bus, an unanswered or ambiguous query, a context that
+---    cannot be joined) and the window policy admits the focused window; and
+---    "closed" otherwise. A password field seen and not yet left, a protected
+---    context, the settle delay after navigation and a stopped guard always
+---    close. Metrics and every other blocks_text() reader stay closed outside
+---    "field" (decided 2026-11-25, see TODO.md).
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +38,14 @@ local M = {}
 -- the Backspaces just sent to it. With the input budget an expansion failed
 -- at random there as programmable_publication_stale (real-GTK field test).
 local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
+
+-- The closing reasons that are the desktop's, not the field's: with them alone
+-- the window policy may still admit ordinary text automation (INVARIANTS 6).
+local WINDOW_REASONS = {
+	atspi_unavailable = true, no_accessible_window = true, no_focus_answer = true,
+	context_pending = true, context_unavailable = true, field_unknown = true,
+}
+M.WINDOW_REASONS = WINDOW_REASONS
 
 
 
@@ -43,8 +60,12 @@ local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "a
 --- Creates one daemon-owned focus guard.
 --- @param opts table {
 ---   detector, keystats, prediction?, reset_text?, now_ms, settle_ms?,
----   capture_context?, capture_context_async?, retry_ms?, publish_context?
+---   capture_context?, capture_context_async?, retry_ms?, publish_context?,
+---   window_policy?, on_state?
 --- }
+--- window_policy() -> allowed, reason: whether the focused window, as the
+--- compositor names it, admits text automation without a field verdict.
+--- on_state(mode, reason): called when the text automation mode changes.
 --- @return table guard
 function M.new(opts)
 	local options = type(opts) == "table" and opts or {}
@@ -77,6 +98,12 @@ function M.new(opts)
 	if asynchronous and (type(options.retry_ms) ~= "number" or options.retry_ms <= 0 or options.retry_ms % 1 ~= 0) then
 		error("asynchronous focus context requires a positive integer retry interval")
 	end
+	if options.window_policy ~= nil and type(options.window_policy) ~= "function" then
+		error("focus_guard window_policy must be a function")
+	end
+	if options.on_state ~= nil and type(options.on_state) ~= "function" then
+		error("focus_guard on_state must be a function")
+	end
 	local context_pending = contextual
 	local context_generation = 0
 	local joining_context = false
@@ -88,6 +115,12 @@ function M.new(opts)
 	local stopped = false
 	local refreshing_context, retiring_context, notifying_context = false, false, false
 	local retry_not_before_ms = nil
+	-- A password field seen and not left for another field: it closes even the
+	-- window mode, whatever later answers fail to say (INVARIANTS 6).
+	local password_latched = false
+	-- Context joins that settled without a context since the last success.
+	local context_failures = 0
+	local state_mode, state_reason = "closed", "starting"
 
 	local guard = {}
 	local context_owner = "focus-context:" .. tostring(guard)
@@ -181,7 +214,7 @@ function M.new(opts)
 			local context = request.context
 			request.context = nil
 			retry_not_before_ms = options.now_ms() + options.retry_ms
-			if not request.completed or type(context) ~= "table" then return false end
+			if not request.completed or type(context) ~= "table" then context_failures = context_failures + 1; return false end
 			local after = watch.barrier()
 			if identity(after) ~= request.expected or context_generation ~= request.generation
 				or detector.currentEpoch() ~= request.epoch then return false end
@@ -192,6 +225,7 @@ function M.new(opts)
 			if not admitted or committed ~= true or context_generation ~= request.generation then return false end
 			joining_context, joining_identity = false, nil
 			retry_not_before_ms = nil
+			context_failures = 0
 			observed, context_pending, pending_epoch = request.expected, false, nil
 			joined_context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
 			joined_field = { bus = request.before.bus, path = request.before.path, role = request.before.role,
@@ -227,7 +261,11 @@ function M.new(opts)
 					request.context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
 				end
 			end)
-		if not called or operation == nil then request.dispatch_failed = called; return false end
+		if not called or operation == nil then
+			request.dispatch_failed = called
+			context_failures = context_failures + 1
+			return false
+		end
 		if type(operation) ~= "table" then return false end
 		request.operation = operation
 		if type(operation.cancel) ~= "function" or type(operation.is_settled) ~= "function" then return false end
@@ -259,6 +297,7 @@ function M.new(opts)
 			if not contextual then return accept_watch(snapshot) end
 			local previous_notifying = notifying_context
 			notifying_context = true
+			if snapshot then password_latched = snapshot.role == 40 end
 			if snapshot and snapshot.role == 40 then keystats.set_secure_field(true, true) end
 			if identity(snapshot) ~= (joining_context and joining_identity or observed) or snapshot == nil then
 				revoke_context(true)
@@ -368,37 +407,114 @@ function M.new(opts)
 		return guard.refresh(true)
 	end
 
+	--- Names the closing reason when no fresh field receipt exists.
+	--- @return string reason
+	local function authority_reason()
+		local authority = watch and type(watch.authority) == "function" and watch.authority() or "unavailable"
+		if authority == "unavailable" then return "atspi_unavailable" end
+		if authority == "absent" then return "no_accessible_window" end
+		return "no_focus_answer"
+	end
+
+	--- Names the closing reason while the field's context is not joined.
+	--- @return string reason
+	local function context_reason()
+		return context_failures > 0 and "context_unavailable" or "context_pending"
+	end
+
 	--- Checks live privacy and retains the exact receipt from its single barrier.
 	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
 	--- @return boolean blocked
 	--- @return table|nil snapshot Fresh resident native receipt.
+	--- @return string reason Why text is admitted or withheld (INVARIANTS 6).
 	local function text_admission(budget_ms)
-		if stopped then return true end
-		if joining_context then return true end
+		if stopped then return true, nil, "stopped" end
+		if joining_context then return true, nil, context_reason() end
 		local snapshot
+		local protected = false
 		if watch then
 			watch.pump()
-			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true end
+			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true, nil, "settling" end
 			snapshot = watch.barrier(budget_ms)
+			if snapshot then password_latched = snapshot.role == 40 end
 			if contextual then
 				if not snapshot or identity(snapshot) ~= observed then
 					if not context_pending then revoke_context() end
-					return true
+					if snapshot and snapshot.role == 40 then return true, snapshot, "password_field" end
+					return true, snapshot, snapshot and context_reason() or authority_reason()
 				end
-				if context_pending then return true end
+				if context_pending then
+					return true, snapshot, snapshot.role == 40 and "password_field" or context_reason()
+				end
 				-- User filter choices can change without moving the native field.
 				-- Re-evaluate policy in RAM, retaining the already joined metadata.
-				local checked, protected = pcall(keystats.is_context_protected, joined_context.app_id, joined_context.title)
-				if not checked or type(protected) ~= "boolean" then revoke_context(); return true end
+				local checked
+				checked, protected = pcall(keystats.is_context_protected, joined_context.app_id, joined_context.title)
+				if not checked or type(protected) ~= "boolean" then revoke_context(); return true, snapshot, "context_pending" end
 				local epoch = detector and type(detector.currentEpoch) == "function" and detector.currentEpoch() or nil
 				local published, accepted = pcall(function() return detector.publishFocus(snapshot.role, epoch, protected) end)
-				if not published or accepted ~= true then revoke_context(); return true end
+				if not published or accepted ~= true then revoke_context(); return true, snapshot, "context_pending" end
 				keystats.set_secure_field(snapshot.role == 40 or protected, true)
-			elseif not accept_watch(snapshot) then return true end
+			elseif not accept_watch(snapshot) then return true, snapshot, snapshot and "field_unknown" or authority_reason() end
 		end
-		if not detector or type(detector.isSecureField) ~= "function" then return true end
+		if not detector or type(detector.isSecureField) ~= "function" then return true, snapshot, "no_detector" end
 		local ok, secure = pcall(detector.isSecureField)
-		return not ok or secure ~= false, snapshot
+		if ok and secure == false then return false, snapshot, "field_admitted" end
+		if snapshot and snapshot.role == 40 then return true, snapshot, "password_field" end
+		if protected then return true, snapshot, "protected_context" end
+		return true, snapshot, (snapshot or not watch) and "field_unknown" or authority_reason()
+	end
+
+	--- Records the text automation mode, telling on_state of a change.
+	--- @param mode string "field", "window" or "closed".
+	--- @param reason string
+	local function publish_state(mode, reason)
+		if mode == state_mode and reason == state_reason then return end
+		state_mode, state_reason = mode, reason
+		if options.on_state then options.on_state(mode, reason) end
+	end
+
+	--- Decides the window mode for a reason that left no field verdict.
+	--- @param reason string The field admission's closing reason.
+	--- @return boolean allowed
+	--- @return string reason
+	local function window_admission(reason)
+		if not WINDOW_REASONS[reason] then return false, reason end
+		-- A window on no application of the bus holds no field of one: an old
+		-- password field cannot be focused there.
+		if reason == "no_accessible_window" then password_latched = false end
+		if password_latched then return false, "password_field" end
+		if not options.window_policy then return false, reason end
+		local called, allowed, why = pcall(options.window_policy)
+		if not called then return false, "window_policy_failed" end
+		if allowed ~= true then return false, type(why) == "string" and why or "protected_context" end
+		return true, reason
+	end
+
+	--- Decides whether ordinary text automation (hotstrings, their erase and
+	--- output) may act on the focused control right now (INVARIANTS 6).
+	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
+	--- @return boolean allowed
+	--- @return string mode "field", "window" or "closed".
+	--- @return string reason
+	function guard.text_automation(budget_ms)
+		local blocked, _, reason = text_admission(budget_ms)
+		if not blocked then publish_state("field", reason); return true, "field", reason end
+		local allowed, why = window_admission(reason)
+		local mode = allowed and "window" or "closed"
+		publish_state(mode, why)
+		return allowed, mode, why
+	end
+
+	--- The last text automation mode and its reason, read from RAM.
+	--- @return table state { mode, reason }
+	function guard.automation_state()
+		return { mode = state_mode, reason = state_reason }
+	end
+
+	--- Forgets a password field once the compositor reports another window.
+	function guard.window_changed()
+		password_latched = false
 	end
 
 	--- Returns whether text automation must be withheld right now.
@@ -445,6 +561,30 @@ function M.new(opts)
 	--- @param expected_focus string|nil Exact target retained by an originating action.
 	--- @return table|nil owner Full-phase and cached-key publication guards.
 	function guard.capture_text_owner(expected_focus)
+		local owner = guard.capture_field_owner(expected_focus)
+		if owner or expected_focus ~= nil or state_mode ~= "window" or stopped then return owner end
+		-- The window mode retains no field: its owner holds while no navigation,
+		-- revocation or field verdict moves the guard, and the mode still holds.
+		local generation = context_generation
+		local window_owner = {}
+		function window_owner.cached()
+			if stopped or context_generation ~= generation or state_mode ~= "window" or password_latched then return false end
+			if not options.window_policy then return false end
+			local called, allowed = pcall(options.window_policy)
+			return called and allowed == true
+		end
+		function window_owner.current()
+			if not window_owner.cached() then return false end
+			local allowed, mode = guard.text_automation(OUTPUT_BARRIER_MS)
+			return allowed and mode == "window" and window_owner.cached()
+		end
+		return window_owner.cached() and window_owner or nil
+	end
+
+	--- Retains one exact admitted field across blocking injection phases.
+	--- @param expected_focus string|nil Exact target retained by an originating action.
+	--- @return table|nil owner Full-phase and cached-key publication guards.
+	function guard.capture_field_owner(expected_focus)
 		if not contextual or not watch or not detector then return nil end
 		local focus, barrier, pump, snapshot = text_owner_ports.focus, text_owner_ports.barrier, text_owner_ports.pump, text_owner_ports.snapshot
 		local epoch, verdict, policy = text_owner_ports.epoch, text_owner_ports.verdict, text_owner_ports.policy
@@ -498,6 +638,7 @@ function M.new(opts)
 	--- @return boolean settled
 	function guard.stop()
 		stopped = true
+		publish_state("closed", "stopped")
 		if contextual then revoke_context() end
 		keystats.set_secure_field(true)
 		return retire_context()

@@ -654,6 +654,27 @@ Each question names the default kept meanwhile; an answer moves into the item or
       0.0007, but `fidelity` (`analyser_models.json`) is one value per analyser and no page shows it. Kept meanwhile:
       both stay `close` (the word lists and count tables keep the trigrams' chain), the text-corpus result stated in
       docs/design/analyser-scores.md. The other choice is a `fidelity` per corpus kind, with genkey `exact` on texts.
+- [ ] **Linux hotstrings without an accessibility field verdict (decided by the agent on 2026-11-25, to review by
+      the maintainer).** Field report (Arch, KDE Plasma 6.8 Wayland): no hotstring ever fired, silently, because the
+      focus guard admitted text only after an AT-SPI field verdict joined its window context, and a window that is
+      not on the accessibility bus (or a worker that does not answer) never gives one. Kept meanwhile
+      (`modules/keystats/focus_guard.lua` INVARIANTS 6): hotstrings expand in a « window » mode when the reason is
+      the desktop's (`atspi_unavailable`, `no_accessible_window`, `no_focus_answer`, `context_pending`,
+      `context_unavailable`, `field_unknown`), unless a password field was the last field seen, the compositor names
+      a password manager or a private window, or the settle delay runs; metrics, AI, wrap-on-type and selection
+      actions stay closed outside a field verdict; a window the compositor does not name (no KWin script) admits
+      hotstrings. The focus worker also switches the session's `org.a11y.Status IsEnabled` on when it is off, so Qt,
+      Chromium and Firefox put their windows on the bus. A lasting reason is a red tray row (component_status), never
+      a notification. Choose:
+  1. **(recommended) Keep the window mode as described.**
+  2. Close the window mode whenever the compositor names no application (KDE without the KWin script, GNOME
+     without the extension): no hotstring there until the integration runs.
+  3. Leave `org.a11y.Status` as the user set it and only say in the tray row that turning it on would help.
+- [ ] **[macOS] The same silent withholding on an unreadable AX focus (found by the agent on 2026-11-25).** When
+      `AXFocusedUIElement` cannot be read, `hotstrings/engine/expander/utils.lua` leaves the secure-field cache
+      unclassified and `expander/init.lua` withholds every hotstring in that application with a debug line only.
+      Give it the Linux treatment (a window-mode admission outside a known secure field and password apps, and a
+      red menu row for a lasting reason), checked on a real Mac.
 
 ## Backlog, far future: 100 % coverage and mutation gates (maintainer request, 2026-11-23, deferred 2026-11-24)
 

@@ -107,6 +107,30 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_eq(conclusive, false)
 	end)
 
+	helpers.it("(text-automation-window) names a focused window that no listed application owns", function()
+		-- KDE Plasma Wayland field report, 2026-11-25: the focused window was on
+		-- no application of the bus, and the watcher answered "unknown", the
+		-- same word as a failed walk. "absent" lets the guard name it.
+		local tree = { id = "desktop", children = {
+			{ id = "editor", children = { { id = "editor-frame", children = { { id = "t", role = 61 } } } } },
+		} }
+		local fake = backend(tree)
+		fake.active = function() return false end
+		fake.clear_tree = function() end
+		AtspiFocus._set_backend_for_test(fake)
+		local snapshot, conclusive, _, absent = AtspiFocus._get_native_watch_snapshot()
+		helpers.assert_nil(snapshot)
+		helpers.assert_eq(conclusive, false)
+		helpers.assert_eq(absent, true)
+		-- Without a window manager one focused field found desktop-wide stays conclusive.
+		tree.children[1].children[1].children[1].focused = true
+		snapshot, conclusive, _, absent = AtspiFocus._get_native_watch_snapshot()
+		helpers.assert_eq(conclusive, true)
+		helpers.assert_eq(snapshot.role, 61)
+		helpers.assert_eq(absent, nil)
+		AtspiFocus._set_backend_for_test(nil)
+	end)
+
 	helpers.it("rejects no focus, duplicate focus, and traversal failure", function()
 		local cases = {
 			{ id = "none", children = { { id = "plain", role = 57 } } },

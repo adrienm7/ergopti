@@ -125,6 +125,11 @@ function M.new(options)
 	local receipt, last_at, sequence, request = nil, nil, 0, 0
 	local pending, received = "", false
 	local answered_request, answered_at = -1, nil
+	-- The kind of the answer to answered_request: "snapshot", "unknown" or
+	-- "absent" (the focused window is on no application of the bus).
+	local answered_kind = nil
+	-- The session's accessibility switch as the worker found it.
+	local accessibility = nil
 	local cleanup_ok = true
 
 	local function publish(snapshot)
@@ -177,7 +182,7 @@ function M.new(options)
 		active, ready, failed = true, false, false
 		operation = nil
 		receipt, last_at, sequence, request, pending, received = nil, nil, 0, 0, "", false
-		answered_request, answered_at = -1, nil
+		answered_request, answered_at, answered_kind = -1, nil, nil
 		watcher.started_at = now_ms()
 		local ok, owned = pcall(create_transport)
 		if not ok or type(owned) ~= "table" then fail("transport unavailable"); return false end
@@ -215,13 +220,21 @@ function M.new(options)
 				and type(message.path) == "string" and message.path:match("^/[%w_/]+$") then
 				candidate = { role = message.role, bus = message.bus, path = message.path }
 			end
-		elseif kind ~= "ready" and kind ~= "heartbeat" and kind ~= "unknown" then return false end
+		elseif kind ~= "ready" and kind ~= "heartbeat" and kind ~= "unknown" and kind ~= "absent" then return false end
+		if kind == "ready" and message.accessibility ~= nil and message.accessibility ~= "enabled"
+			and message.accessibility ~= "enabled_now" and message.accessibility ~= "unavailable" then return false end
 		sequence, last_at = message.sequence, message.at_ms
 		if kind == "ready" then
 			-- Both ends are open now. Unlink the private names before admitting
 			-- input, so an unclean daemon death leaves no FIFO or directory.
 			if transport.cleanup() ~= true then return false end
 			ready = true
+			accessibility = message.accessibility
+			if accessibility == "enabled_now" then
+				Logger.info(LOG, "Accessibility (AT-SPI) was off in this session: switched on, so applications report their focused field.")
+			elseif accessibility == "unavailable" then
+				Logger.warn(LOG, "The session's accessibility switch (org.a11y.Status) could not be read; applications that report fields only while it is on stay unchecked.")
+			end
 		end
 		if now - message.at_ms > lease_ms then
 			-- A busy daemon can accumulate honest old frames while its resident
@@ -231,7 +244,7 @@ function M.new(options)
 			return true
 		end
 		if kind == "ready" or message.request ~= request or kind == "heartbeat" then return true end
-		answered_request, answered_at = request, message.at_ms
+		answered_request, answered_at, answered_kind = request, message.at_ms, kind
 		publish(kind == "snapshot" and candidate or nil)
 		return true
 	end
@@ -328,6 +341,23 @@ function M.new(options)
 		if not ready or failed or not receipt or last_at == nil or now_ms() - last_at > lease_ms then return nil end
 		return { role = receipt.role, bus = receipt.bus, path = receipt.path }
 	end
+
+	--- Says, from RAM only, what authority the watcher holds over the focus.
+	--- @return string "field" (a fresh exact receipt), "absent" (the worker's
+	--- fresh answer to the latest request: the focused window is on no
+	--- application of the bus), "unanswered" (no fresh answer to the latest
+	--- request, or an inconclusive one) or "unavailable" (no running worker).
+	function watcher.authority()
+		if not active or failed or not transport or not ready then return "unavailable" end
+		if watcher.snapshot() then return "field" end
+		if answered_request == request and answered_kind == "absent" and answered_at ~= nil
+			and now_ms() - answered_at <= lease_ms then return "absent" end
+		return "unanswered"
+	end
+
+	--- The session's accessibility switch as the worker found it at startup.
+	--- @return string|nil "enabled", "enabled_now", "unavailable" or nil before readiness.
+	function watcher.accessibility() return accessibility end
 
 	--- Waits only during daemon startup, before entering the native event loop.
 	--- @return boolean ready

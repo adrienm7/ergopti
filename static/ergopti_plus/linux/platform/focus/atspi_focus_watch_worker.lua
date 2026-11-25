@@ -17,6 +17,75 @@ end
 
 local M = {}
 
+local G_BUS_TYPE_SESSION = 2
+local A11Y_BUS, A11Y_PATH, A11Y_STATUS = "org.a11y.Bus", "/org/a11y/bus", "org.a11y.Status"
+
+--- Turns the session's accessibility switch on when it is off, the supported
+--- way an on-screen keyboard or a screen reader does: org.a11y.Status IsEnabled
+--- on the session bus. Qt, Chromium and Firefox put their windows on the
+--- accessibility bus only while it is on, and a window that is not there has no
+--- field the password check could read (decided 2026-11-25, see TODO.md).
+--- @param ffi table LuaJIT FFI, with the worker's GLib declarations loaded.
+--- @param glib table libglib-2.0.
+--- @param gobject table libgobject-2.0.
+--- @param timeout_ms number Bound of each bus call.
+--- @return string status "enabled", "enabled_now" or "unavailable".
+function M.ensure_accessibility(ffi, glib, gobject, timeout_ms)
+	local loaded, gio = pcall(ffi.load, "libgio-2.0.so.0")
+	if not loaded then return "unavailable" end
+	ffi.cdef([[
+		void *g_bus_get_sync(int bus_type, void *cancellable, void **error);
+		void *g_dbus_connection_call_sync(void *connection, const char *bus_name, const char *path,
+			const char *iface, const char *method, void *parameters, void *reply_type, int flags,
+			int timeout_ms, void *cancellable, void **error);
+		void *g_variant_new_string(const char *value);
+		void *g_variant_new_boolean(int value);
+		void *g_variant_new_variant(void *value);
+		void *g_variant_new_tuple(void **children, size_t count);
+		void *g_variant_get_child_value(void *value, size_t index);
+		void *g_variant_get_variant(void *value);
+		int g_variant_get_boolean(void *value);
+		const char *g_variant_get_type_string(void *value);
+		void g_variant_unref(void *value);
+	]])
+	local error_slot = ffi.new("void *[1]")
+	local connection = gio.g_bus_get_sync(G_BUS_TYPE_SESSION, nil, error_slot)
+	if error_slot[0] ~= nil then glib.g_error_free(error_slot[0]) end
+	if connection == nil then return "unavailable" end
+	local function call(method, children)
+		local slot = ffi.new("void *[1]")
+		local arguments = ffi.new("void *[?]", #children)
+		for index, child in ipairs(children) do arguments[index - 1] = child end
+		local reply = gio.g_dbus_connection_call_sync(connection, A11Y_BUS, A11Y_PATH,
+			"org.freedesktop.DBus.Properties", method, glib.g_variant_new_tuple(arguments, #children),
+			nil, 0, timeout_ms, nil, slot)
+		if slot[0] ~= nil then glib.g_error_free(slot[0]) end
+		return reply
+	end
+	local status = "unavailable"
+	local reply = call("Get", { glib.g_variant_new_string(A11Y_STATUS), glib.g_variant_new_string("IsEnabled") })
+	if reply ~= nil then
+		local enabled = nil
+		if ffi.string(glib.g_variant_get_type_string(reply)) == "(v)" then
+			local boxed = glib.g_variant_get_child_value(reply, 0)
+			local value = glib.g_variant_get_variant(boxed)
+			if ffi.string(glib.g_variant_get_type_string(value)) == "b" then enabled = glib.g_variant_get_boolean(value) ~= 0 end
+			glib.g_variant_unref(value)
+			glib.g_variant_unref(boxed)
+		end
+		glib.g_variant_unref(reply)
+		if enabled == true then
+			status = "enabled"
+		elseif enabled == false then
+			local set = call("Set", { glib.g_variant_new_string(A11Y_STATUS), glib.g_variant_new_string("IsEnabled"),
+				glib.g_variant_new_variant(glib.g_variant_new_boolean(1)) })
+			if set ~= nil then glib.g_variant_unref(set); status = "enabled_now" end
+		end
+	end
+	gobject.g_object_unref(connection)
+	return status
+end
+
 --- Owns one native AT-SPI listener until its parent or accessibility bus leaves.
 --- @param pipe_path string Private daemon-owned FIFO.
 --- @param parent_pid number Exact native daemon process.
@@ -87,9 +156,11 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 		"object:property-change:accessible-name" }
 	local registered = {}
 
+	local accessibility = nil
 	local function emit(kind, snapshot)
 		sequence = sequence + 1
 		local message = { kind = kind, sequence = sequence, request = request, at_ms = Monotonic.now_ms() }
+		if kind == "ready" then message.accessibility = accessibility end
 		if snapshot then
 			message.role = snapshot.role
 			message.active_scope = snapshot.active_scope == true
@@ -119,7 +190,7 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 			emit("unknown")
 			return
 		end
-		local snapshot, conclusive, retained = Focus._get_native_watch_snapshot()
+		local snapshot, conclusive, retained, absent = Focus._get_native_watch_snapshot()
 		if generation ~= focus_generation or captured_request ~= request then
 			Focus._release_native_watch_focus(retained)
 			needs_scan, dirty = true, true
@@ -127,7 +198,9 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 		end
 		handles = retained
 		needs_scan = false
-		if conclusive == true then emit("snapshot", snapshot) else emit("unknown") end
+		-- "absent": the focused window is on no application of the bus, a fact
+		-- the daemon reports, unlike a walk that failed or found two fields.
+		if conclusive == true then emit("snapshot", snapshot) elseif absent == true then emit("absent") else emit("unknown") end
 	end
 	local function publish()
 		if publishing then dirty = true; return end
@@ -149,6 +222,11 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 	end
 	local ok, error_message = pcall(function()
 		emit("unknown")
+		-- Before the listener starts: an application that registers on the
+		-- switch then appears in the first scan. A refused switch is reported,
+		-- never fatal: GTK windows are on the bus either way.
+		local switched, status = pcall(M.ensure_accessibility, ffi, glib, gobject, timeout_ms)
+		accessibility = switched and status or "unavailable"
 		atspi.atspi_set_timeout(timeout_ms, timeout_ms)
 		assert(atspi.atspi_init() == 0, "AT-SPI listener initialization failed")
 		loop = assert(glib.g_main_loop_new(nil, 0))

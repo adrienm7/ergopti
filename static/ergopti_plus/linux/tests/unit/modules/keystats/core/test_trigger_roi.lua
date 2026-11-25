@@ -220,6 +220,10 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return paused end },
 			secure_focus_guard = { blocks_text = function() return not admitted end,
+				text_automation = function()
+					if admitted then return true, "field", "field_admitted" end
+					return false, "closed", "password_field"
+				end,
 				capture_text_owner = function() return {} end, current_context = context,
 				invalidate = collector.discard_roi },
 			TapHold = { observe_copy_activity = function() end },

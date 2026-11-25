@@ -709,6 +709,8 @@ return {
 	"tests.unit.modules.keystats.privacy.test_focus_guard_text_owner",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_expected_text_owner",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_app_context",
+	"tests.unit.modules.keystats.privacy.test_focus_guard_window_mode",
+	"tests.unit.platform.focus.text_automation.test_text_automation_status",
 	"tests.unit.modules.keystats.privacy.test_paused_driver_records_no_keys",
 	"tests.unit.modules.keystats.privacy.test_resident_text_identity",
 	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_ngram_nine_families",

@@ -88,6 +88,7 @@ helpers.describe("window titles: what is counted", function()
 				process_lifecycle = { getForegroundApp = function() return { appId = "code", windowTitle = "Startup document" } end,
 					start = function() return true end },
 				privacy_owners = { startup_checkpoint = function() return true end },
+				_polled_window = {},
 				secure_focus_guard = { prime = function() return true end, blocks_text = function() return false end,
 					current_context = function() return { app_id = "code", title = "Startup document" } end },
 				Monotonic = { now_ms = function() return 1000 end },
@@ -114,7 +115,9 @@ helpers.describe("window titles: what is counted", function()
 				process_lifecycle = { onFocusChange = function(callback) callback("code", "Protected field title") end },
 				wrap_on_type = { end_selection_window = function() end },
 				engine = { reset = function() end }, keystats = keystats,
-				secure_focus_guard = { prime = function() keystats.set_secure_field(true); return false end },
+				_polled_window = {},
+				secure_focus_guard = { prime = function() keystats.set_secure_field(true); return false end,
+					window_changed = function() end },
 				Monotonic = { now_ms = function() return 1000 end },
 			}, { __index = _G })
 			local chunk

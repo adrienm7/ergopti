@@ -290,7 +290,8 @@ local function run_hold(transition, expected, options)
 			TapHold = { set_paused = noop, observe_copy_activity = noop },
 			Logger = helpers.make_logger_stub(),
 			engine = { reset = noop },
-			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end },
+			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end,
+				text_automation = function() return true, "field", "field_admitted" end },
 		}
 		local block = assert(main:match("input_capture_gate = InputCaptureGate.new%({%s*on_block = function(.-)\n\t\tend,"))
 		local gate = require("platform.input.capture_gate").new({ on_block = source_callback(block, environment) })

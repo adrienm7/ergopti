@@ -46,7 +46,8 @@ local function environment_for(state, recorded)
 		InputEvent = { VALUE_DOWN = 1 },
 		TapHold = { observe_copy_activity = function() end },
 		gestures = { release_clicks_on_activity = function() end },
-		secure_focus_guard = { blocks_text = function() return false end },
+		secure_focus_guard = { blocks_text = function() return false end,
+			text_automation = function() return true, "field", "field_admitted" end },
 		user_hotstring_native = nil,
 		keystats = {
 			is_unrecorded_app = function() return false end,
