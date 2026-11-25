@@ -17,6 +17,10 @@
 
 const ctx = require('./context.cjs');
 
+/** The workflow editor page and the step catalogue its key families come from. */
+const WORKFLOWS_PAGE = 'static/ergopti_plus/_shared/ui/user_workflows/script.js';
+const WORKFLOW_STEPS = 'static/ergopti_plus/_shared/shortcuts/data/workflows/steps.json';
+
 const ROOT = 'static/ergopti_plus/';
 const SCHEMA = ROOT + '_shared/diagnostics/data/schema.json';
 const MODEL = ROOT + '_shared/ui/healthcheck/model.js';
@@ -126,6 +130,50 @@ function constantBlock(rel, comment, line) {
 // ==========================================
 
 module.exports = [
+	{
+		prefix: 'workflows.field.',
+		files: [WORKFLOWS_PAGE],
+		source:
+			'the field names of every step kind, target and condition of steps.json, plus the type selector',
+		keys: () => {
+			const steps = ctx.json(WORKFLOW_STEPS);
+			const names = new Set(['type']);
+			for (const kind of Object.values(steps.kinds))
+				for (const name of Object.keys(kind.fields || {})) names.add(name);
+			for (const table of [steps.targets, steps.conditions])
+				for (const entry of Object.values(table))
+					for (const name of Object.keys(entry.fields || entry)) names.add(name);
+			return ctx.keysOf('workflows.field.', [...names]);
+		}
+	},
+	{
+		prefix: 'workflows.step.',
+		files: [WORKFLOWS_PAGE],
+		source: 'the step kinds of steps.json',
+		keys: () => ctx.keysOf('workflows.step.', Object.keys(ctx.json(WORKFLOW_STEPS).kinds))
+	},
+	{
+		prefix: 'workflows.value.',
+		files: [WORKFLOWS_PAGE],
+		source: 'the target and condition types of the shared workflow step catalogue (steps.json)',
+		keys: () =>
+			ctx.keysOf('workflows.value.', [
+				...Object.keys(ctx.json(WORKFLOW_STEPS).targets),
+				...Object.keys(ctx.json(WORKFLOW_STEPS).conditions)
+			])
+	},
+	{
+		prefix: 'workflows.refusal.',
+		files: [WORKFLOWS_PAGE],
+		source: 'the validation reasons of the shared workflow step catalogue (steps.json reasons)',
+		keys: () => ctx.keysOf('workflows.refusal.', ctx.json(WORKFLOW_STEPS).reasons)
+	},
+	{
+		prefix: 'workflows.reason.',
+		files: [WORKFLOWS_PAGE],
+		source: 'the run reasons of the shared workflow step catalogue (steps.json run_reasons)',
+		keys: () => ctx.keysOf('workflows.reason.', ctx.json(WORKFLOW_STEPS).run_reasons)
+	},
 	{
 		prefix: 'app_category.',
 		files: [APPS_HELPERS],
