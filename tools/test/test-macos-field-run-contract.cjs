@@ -74,7 +74,6 @@ const BUNDLED_SAMPLE =
 // The folders and log names come from their shared declarations.
 const FIELD_PATHS = 'tools/dev/field-report-paths.py';
 const APP_DIRS = 'static/ergopti_plus/_shared/core/fs/data/paths/app_dirs.toml';
-const SUB_FILES = 'static/ergopti_plus/_shared/core/logger/data/sub_files.toml';
 // The readiness budget covers the boot's Accessibility wait, read from its owner.
 const ACCESSIBILITY_WAIT = 'static/ergopti_plus/macos/infra/accessibility_wait.lua';
 
@@ -151,7 +150,6 @@ function fixture(name, { onDev = false } = {}) {
 		BUNDLED_SAMPLE,
 		FIELD_PATHS,
 		APP_DIRS,
-		SUB_FILES,
 		ACCESSIBILITY_WAIT,
 		ANALYSER,
 		STEPS_LIB,
