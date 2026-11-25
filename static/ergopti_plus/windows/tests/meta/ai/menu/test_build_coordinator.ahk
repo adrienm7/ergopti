@@ -311,7 +311,7 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu", "LLM_Menu_TrayTitle",
 			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm",
 			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
-			"TrayMenuRebindSubmenu", "MenuDeferOrBuild"] {
+			"TrayMenuRebindSubmenu", "MenuDeferOrBuild", "TrayMenuStage_Length"] {
 		Body := ReadBody.Call(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
@@ -422,6 +422,8 @@ _MI_StageAbout() => 0
 _MI_StageSuspend() => 0
 _MI_StageReload() => 0
 _MI_StageQuit() => 0
+; The keyboard core runs in this child: its status row stages nothing.
+_MI_StageKeyboardCoreStatus() => 0
 _MI_StageErgoptiStudio() => 0
 _MI_StageDebug() => 0
 _MI_StageMetrics() {

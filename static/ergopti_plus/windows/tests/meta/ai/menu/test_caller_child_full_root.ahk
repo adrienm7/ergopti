@@ -62,7 +62,7 @@ _LMCC_Script(Framework, Receipt) {
 			"initMenu", "_MI_TopLevelBuilders", "_MI_StageTopLevel",
 			"_MI_StageLlm", "_MI_StagePrebuiltLlm", "LLM_Menu_TrayTitle",
 			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
-			"TrayMenuRebindSubmenu",
+			"TrayMenuRebindSubmenu", "TrayMenuStage_Length",
 			"RebuildTrayMenu", "_TrayRootRequestAndTryAcquire", "_TrayRootClaimLatest",
 			"_TrayRootDrain", "_TrayRootBuildOnce", "_TrayRootPublishAuthorized",
 			"_TrayRootRelease", "_TrayRootTryReleaseFailed",
@@ -182,6 +182,8 @@ _MI_StageAbout() => 0
 _MI_StageSuspend() => 0
 _MI_StageReload() => 0
 _MI_StageQuit() => 0
+; The keyboard core runs in this child: its status row stages nothing.
+_MI_StageKeyboardCoreStatus() => 0
 _MI_StageErgoptiStudio() => 0
 _MI_StageDebug() => 0
 _MI_StageMetrics() => TrayMenuStage_Add("metrics", Menu())
