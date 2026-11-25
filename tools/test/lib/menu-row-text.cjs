@@ -89,9 +89,11 @@ function rowTextDefect(text, identifiers, allowlist) {
 	if (allowlist.some((pattern) => pattern.test(text))) return '';
 	// A hotstring row ends with its entry count, which is no part of the label.
 	const label = text.replace(/\s*\(\d+\)$/, '').trim();
+	if (label === '') return 'is empty';
 	if (identifiers.has(label)) return 'equals an id or a config path';
-	// Segments start with a letter: « v2.2.1 » is a version, not a key.
-	if (/(^|\s)[a-z][a-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+(\s|$)/.test(label))
+	// Segments start with a letter: « v2.2.1 » is a version, not a key. A key's
+	// first segment is a word, so « e.g. » is an abbreviation.
+	if (/(^|\s)[a-z][a-z0-9_]+(\.[A-Za-z][A-Za-z0-9_]*)+(\s|$)/.test(label))
 		return 'reads as a dotted key';
 	if (/(^|[^\p{L}\p{N}_])[a-z0-9]+(_[a-z0-9]+)+($|[^\p{L}\p{N}_])/u.test(label))
 		return 'reads as snake_case';

@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "기본 지연 (자체 지연이 없는 그룹)",
 	"menu.hotstrings.tooltip_magic": "매직 키(★) 미리보기",
 	"menu.hotstrings.uncheck_all": "□ 모두 해제",
+	"menu.hotstrings.unnamed_entry": "(파일에 이름 없음)",
 	"menu.hotstrings.word_delimiters": "단어 구분자",
 	"menu.hotstrings.word_expanders": "확장기",
 	"menu.hotstrings.magic_key": "매직 키",

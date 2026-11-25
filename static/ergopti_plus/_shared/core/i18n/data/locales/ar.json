@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "التأخير الأساسي (المجموعات بلا تأخير خاص)",
 	"menu.hotstrings.tooltip_magic": "معاينة المفتاح السحري (★)",
 	"menu.hotstrings.uncheck_all": "□ إلغاء تحديد الكل",
+	"menu.hotstrings.unnamed_entry": "(بلا اسم في ملفه)",
 	"menu.hotstrings.word_delimiters": "محددات الكلمات",
 	"menu.hotstrings.word_expanders": "موسّعات",
 	"menu.hotstrings.magic_key": "المفتاح السحري",

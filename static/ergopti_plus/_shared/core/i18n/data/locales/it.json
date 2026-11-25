@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Ritardo di base (gruppi senza uno proprio)",
 	"menu.hotstrings.tooltip_magic": "Anteprima del tasto magico (★)",
 	"menu.hotstrings.uncheck_all": "□ Deseleziona tutto",
+	"menu.hotstrings.unnamed_entry": "(senza nome nel suo file)",
 	"menu.hotstrings.word_delimiters": "Delimitatori di parole",
 	"menu.hotstrings.word_expanders": "Espansori",
 	"menu.hotstrings.magic_key": "Tasto magico",

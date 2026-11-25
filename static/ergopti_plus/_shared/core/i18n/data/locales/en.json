@@ -2661,6 +2661,7 @@
 	"menu.hotstrings.tooltip_default": "Base delay (groups without their own)",
 	"menu.hotstrings.tooltip_magic": "Magic key (★) preview",
 	"menu.hotstrings.uncheck_all": "□ Uncheck all",
+	"menu.hotstrings.unnamed_entry": "(no name in its file)",
 	"menu.hotstrings.word_delimiters": "Word delimiters",
 	"menu.hotstrings.word_expanders": "Expanders",
 	"menu.hotstrings.magic_key": "Magic key",

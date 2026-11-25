@@ -39,6 +39,10 @@ local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "hotstrings.ui.menu.hotstrings"
 
+-- The categories and sections already reported without a name, each once per
+-- process: the tray rebuilds on every toggle.
+local _unnamed_reported = {}
+
 --- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
 --- @return string
@@ -163,6 +167,23 @@ local function _manifest_hotstring_rows(ctx, config)
 		return set
 	end
 
+	--- What a category or section without a name in its file is called: a
+	--- translated « no name » with an error naming the id for the log, never
+	--- the id itself, which reads as a defect in the menu (AGENTS.md: no silent
+	--- fallback).
+	--- @param kind string "category" or "section".
+	--- @param id string Its id.
+	--- @return string
+	local function unnamed(kind, id)
+		local key = kind .. ":" .. tostring(id)
+		if not _unnamed_reported[key] then
+			_unnamed_reported[key] = true
+			Logger.error(LOG, "Hotstring %s '%s' has no description in its file; the tray names it as unnamed.",
+				kind, tostring(id))
+		end
+		return i18n_safe("menu.hotstrings.unnamed_entry")
+	end
+
 	--- The name to show for a category, in the user's language.
 	---
 	--- The packs carry a description in 21 locales and the menu used to print the
@@ -186,7 +207,8 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(description) ~= "table" then
 			local translated = i18n_safe("category." .. id)
 			if translated ~= "category." .. id then return translated end
-			return id
+			if type(description) == "string" and description ~= "" then return description end
+			return unnamed("category", id)
 		end
 		local locale = "en"
 		local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
@@ -194,13 +216,15 @@ local function _manifest_hotstring_rows(ctx, config)
 			local current = i18n_mod.get_locale()
 			if type(current) == "string" and current ~= "" then locale = current end
 		end
-		return description[locale] or description.en or id
+		local text = description[locale] or description.en
+		if type(text) == "string" and text ~= "" then return text end
+		return unnamed("category", id)
 	end
 
 	--- The display name of a section: its catalogue description in the user's
-	--- language, as the macOS and Windows menus show it. The id is the last
-	--- resort, spaced, never the row's label as it stands: the Arch tester read
-	--- « text_expansion (530) » under « ★ key and text expansion ».
+	--- language, as the macOS and Windows menus show it. Never the section id:
+	--- the Arch tester read « text_expansion (530) » under « ★ key and text
+	--- expansion », the row having used the id as its label.
 	--- @param name string Section id.
 	--- @param section table|nil The loader's section record.
 	--- @return string
@@ -211,7 +235,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			description = description[locale] or description.en
 		end
 		if type(description) == "string" and description ~= "" then return description end
-		return (tostring(name):gsub("_", " "))
+		return unnamed("section", name)
 	end
 
 	--- The display name of an installed extension.

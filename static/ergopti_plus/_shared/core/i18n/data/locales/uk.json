@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Базова затримка (групи без власної)",
 	"menu.hotstrings.tooltip_magic": "Попередній перегляд чарівної клавіші (★)",
 	"menu.hotstrings.uncheck_all": "□ Зняти всі",
+	"menu.hotstrings.unnamed_entry": "(без назви у своєму файлі)",
 	"menu.hotstrings.word_delimiters": "Роздільники слів",
 	"menu.hotstrings.word_expanders": "Розширювачі",
 	"menu.hotstrings.magic_key": "Чарівна клавіша",

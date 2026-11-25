@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Базовая задержка (группы без своей)",
 	"menu.hotstrings.tooltip_magic": "Предпросмотр волшебной клавиши (★)",
 	"menu.hotstrings.uncheck_all": "□ Снять все",
+	"menu.hotstrings.unnamed_entry": "(без названия в своём файле)",
 	"menu.hotstrings.word_delimiters": "Разделители слов",
 	"menu.hotstrings.word_expanders": "Расширители",
 	"menu.hotstrings.magic_key": "Волшебная клавиша",

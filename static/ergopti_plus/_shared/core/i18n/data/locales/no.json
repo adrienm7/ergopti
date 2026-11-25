@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Grunnforsinkelse (grupper uten egen)",
 	"menu.hotstrings.tooltip_magic": "Forhåndsvisning av den magiske tasten (★)",
 	"menu.hotstrings.uncheck_all": "□ Fjern alle valg",
+	"menu.hotstrings.unnamed_entry": "(uten navn i filen)",
 	"menu.hotstrings.word_delimiters": "Ordskilletegn",
 	"menu.hotstrings.word_expanders": "Stutsinger",
 	"menu.hotstrings.magic_key": "Magisk tast",

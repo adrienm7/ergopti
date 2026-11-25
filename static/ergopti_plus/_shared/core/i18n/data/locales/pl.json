@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Opóźnienie bazowe (grupy bez własnego)",
 	"menu.hotstrings.tooltip_magic": "Podgląd magicznego klawisza (★)",
 	"menu.hotstrings.uncheck_all": "□ Odznacz wszystko",
+	"menu.hotstrings.unnamed_entry": "(bez nazwy w swoim pliku)",
 	"menu.hotstrings.word_delimiters": "Separatory wyrazów",
 	"menu.hotstrings.word_expanders": "Rozszerzacze",
 	"menu.hotstrings.magic_key": "Klawisz magiczny",

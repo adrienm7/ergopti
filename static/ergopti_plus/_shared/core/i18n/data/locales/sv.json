@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Basfördröjning (grupper utan egen)",
 	"menu.hotstrings.tooltip_magic": "Förhandsvisning av magiska tangenten (★)",
 	"menu.hotstrings.uncheck_all": "□ Avmarkera alla",
+	"menu.hotstrings.unnamed_entry": "(utan namn i sin fil)",
 	"menu.hotstrings.word_delimiters": "Ordavgränsare",
 	"menu.hotstrings.word_expanders": "Expandrar",
 	"menu.hotstrings.magic_key": "Magisk tangent",

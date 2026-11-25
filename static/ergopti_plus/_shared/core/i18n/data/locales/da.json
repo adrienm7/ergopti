@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Basisforsinkelse (grupper uden egen)",
 	"menu.hotstrings.tooltip_magic": "Forhåndsvisning af den magiske tast (★)",
 	"menu.hotstrings.uncheck_all": "□ Fravælg alle",
+	"menu.hotstrings.unnamed_entry": "(uden navn i sin fil)",
 	"menu.hotstrings.word_delimiters": "Ordafgrænsere",
 	"menu.hotstrings.word_expanders": "Expandere",
 	"menu.hotstrings.magic_key": "Magisk tast",

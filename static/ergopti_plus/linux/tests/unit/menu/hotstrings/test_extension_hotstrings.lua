@@ -32,16 +32,18 @@ local function fake_config(with_ergopti)
 	local ergopti = { id = shipped.id, name = shipped.name }
 	local categories = {
 		magickey = { id = "magickey", count = 3, sections_order = { "symbols" },
-			sections = { symbols = { count = 3 } } },
+			sections = { symbols = { count = 3, description = "Symbols" } } },
 	}
 	if with_ergopti then
 		categories.magickey.count = 17
 		categories.magickey.sections_order = { "repeat_corrections", "symbols" }
-		categories.magickey.sections.repeat_corrections = { count = 14, extension = ergopti }
+		categories.magickey.sections.repeat_corrections = { count = 14, extension = ergopti,
+			description = "Repeat corrections" }
 		categories.sfbsreduction = { id = "sfbsreduction", count = 5, extension = ergopti,
-			sections_order = { "comma" }, sections = { comma = { count = 5 } } }
+			description = { en = "SFB reduction", fr = "SFB reduction" },
+			sections_order = { "comma" }, sections = { comma = { count = 5, description = "Comma" } } }
 		categories.rolls = { id = "rolls", count = 7, extension = ergopti,
-			sections_order = { "hc" }, sections = { hc = { count = 7 } } }
+			sections_order = { "hc" }, sections = { hc = { count = 7, description = "Rolls" } } }
 	end
 	return {
 		get_groups = function()
@@ -102,7 +104,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		-- The rows are the categories' own submenus, labelled by their category.
 		helpers.assert_true(text:find(" (7)", 1, true) ~= nil, "rolls: " .. text)
 		helpers.assert_true(text:find(" (5)", 1, true) ~= nil, "SFB reduction: " .. text)
-		helpers.assert_true(text:find("repeat_corrections (14)", 1, true) ~= nil, "repeat corrections: " .. text)
+		helpers.assert_true(text:find("Repeat corrections (14)", 1, true) ~= nil, "repeat corrections: " .. text)
 		-- The menu manifest's order, which Windows walks too and every driver
 		-- listed before the move, although rolls loads first here.
 		helpers.assert_true(text:find(" (5)", 1, true) < text:find(" (7)", 1, true),
@@ -115,11 +117,11 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 		local label = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local seen = 0
 		for _, row in ipairs(titles(built)) do
-			if row.title:find("repeat_corrections", 1, true) then seen = seen + 1 end
+			if row.title:find("Repeat corrections", 1, true) then seen = seen + 1 end
 		end
 		helpers.assert_eq(seen, 1, "the section is drawn once, in the Ergopti submenu")
 		helpers.assert_true(row_starting(built, label) ~= nil)
-		local symbols = row_starting(built, "symbols (3)")
+		local symbols = row_starting(built, "Symbols (3)")
 		helpers.assert_true(symbols ~= nil, "the magic key keeps its own sections")
 	end)
 
@@ -576,9 +578,9 @@ helpers.describe("shared Linux empty extension status", function()
 			helpers.assert_eq(count_extension_empty(rows, ExtensionEmptyCorpus.captions.en), 0)
 			local extension = assert(row_starting(rows, string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
 			helpers.assert_eq(#extension.menu, 7)
-			helpers.assert_eq(extension.menu[4].title, "sfbsreduction (5)")
+			helpers.assert_eq(extension.menu[4].title, "SFB reduction (5)")
 			helpers.assert_eq(extension.menu[5].title, require("core.i18n.engine.i18n").get("category.rolls") .. " (7)")
-			helpers.assert_eq(extension.menu[7].title, "repeat_corrections (14)")
+			helpers.assert_eq(extension.menu[7].title, "Repeat corrections (14)")
 			helpers.assert_eq(extension.menu[1].fn(), true)
 			helpers.assert_eq(extension.menu[2].fn(), true)
 			helpers.assert_eq(state.writes, {

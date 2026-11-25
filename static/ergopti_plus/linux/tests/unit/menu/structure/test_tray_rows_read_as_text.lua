@@ -54,21 +54,50 @@ end
 --- Builds the tray with one real catalogue behind i18n.
 --- @param locale string Locale code.
 --- @return table Rendered rows.
-local function tray(locale)
+--- @param context table|nil Menu context; every_category_on() by default.
+local function tray(locale, context)
 	local decode = require("core.text.engine.json").decode
 	local catalogue = check.catalogue(SHARED_ROOT, locale, decode)
 	local i18n = require("core.i18n.engine.i18n")
-	local previous = i18n.get
+	local previous, previous_locale = i18n.get, i18n.get_locale
 	i18n.get = function(key)
 		local text = catalogue[key]
 		return (text == nil or text == "") and key or text
 	end
+	-- A catalogue description is picked by the current locale, not by get().
+	i18n.get_locale = function() return locale end
 	local ok, rows = pcall(function()
-		return helpers.load_module("menu.ui.builder.builder").build(every_category_on())
+		return helpers.load_module("menu.ui.builder.builder").build(context or every_category_on())
 	end)
-	i18n.get = previous
+	i18n.get, i18n.get_locale = previous, previous_locale
 	helpers.assert_true(ok, "the tray must build: " .. tostring(rows))
 	return rows
+end
+
+--- A tray context as a user's machine draws it: the bundled hotstring
+--- catalogue with every category and every section of every language on, the
+--- real gesture manager, the rest of every_category_on(). The stub context
+--- holds no hotstring category at all, which is how « text_expansion (530) »
+--- reached the Arch tester's tray past every text gate of this file.
+--- @return table context, table ids Every category and section id of the catalogue.
+local function realistic_context()
+	local Config = helpers.load_module("hotstrings.engine.catalogue.config")
+	helpers.assert_true(Config.init(helpers.load_module("hotstrings.engine.engine").new(), nil, function() end))
+	helpers.assert_eq(select(2, Config.load_all(nil, true)), true, "the bundled catalogue loads")
+	local ids = {}
+	for _, group in ipairs(Config.get_groups()) do
+		ids[group] = true
+		helpers.assert_true(Config.enable_group(group), "the gate opens: " .. group)
+		local category = Config.get_category(group)
+		for name in pairs(category and category.sections or {}) do
+			ids[name] = true
+			if not Config.is_section_checked(group, name) then helpers.assert_true(Config.toggle_section(group, name)) end
+		end
+	end
+	local context = every_category_on()
+	context.config = Config
+	context.gestures = require("gestures.engine.manager")
+	return context, ids
 end
 
 helpers.describe("the real Linux tray reads as text", function()
@@ -280,36 +309,42 @@ helpers.describe("the real Linux tray reads as text", function()
 	end)
 	-- Arch field report of 2026-11-25: Hotstrings › Français › « ★ key and text
 	-- expansion » listed « text_expansion (530) », « text_expansion_emojis
-	-- (271) »: the section ids, where macOS and Windows show the catalogue's
-	-- own description of each section.
-	helpers.it("names every hotstring section by its catalogue description, never its id", function()
-		local Config = helpers.load_module("hotstrings.engine.catalogue.config")
-		helpers.assert_true(Config.init(helpers.load_module("hotstrings.engine.engine").new(), nil, function() end))
-		helpers.assert_eq(select(2, Config.load_all(nil, true)), true, "the bundled catalogue loads")
-		local ids = {}
-		for _, group in ipairs(Config.get_groups()) do
-			Config.enable_group(group)
-			local category = Config.get_category(group)
-			for name in pairs(category and category.sections or {}) do ids[name] = true end
-		end
-		helpers.assert_true(ids.text_expansion and ids.text_expansion_emojis, "the walk reaches the reported sections")
-		local context = every_category_on()
-		context.config = Config
-		local rows = helpers.load_module("menu.ui.builder.builder").build(context)
-		local raw, sections = {}, 0
-		local function walk(items, path)
-			for _, row in ipairs(items or {}) do
-				local title = type(row.title) == "string" and row.title or ""
-				local head = title:match("^(.-) %(%d+%)") or title
-				if ids[head] then raw[#raw + 1] = path .. " > " .. title end
-				if title:find("c★ = c’est", 1, true) then sections = sections + 1 end
-				walk(row.menu, path .. " > " .. title)
+	-- (271) »: section ids, where macOS and Windows show the catalogue's own
+	-- description. Every row of a realistic tray, in French and in English, is
+	-- judged by the shared rule and against every id of the catalogue.
+	for _, locale in ipairs({ "fr", "en" }) do
+		helpers.it("a realistic tray shows no id, key, empty or unnamed row in " .. locale, function()
+			local context, ids = realistic_context()
+			helpers.assert_true(ids.text_expansion and ids.text_expansion_emojis, "the walk reaches the reported sections")
+			local rows = tray(locale, context)
+			local decode = require("core.text.engine.json").decode
+			local defects, count = check.defects(rows, SHARED_ROOT, decode, locale, ids)
+			helpers.assert_true(count >= 400, "the walk reached the catalogue's rows: " .. count)
+			helpers.assert_eq(defects, {}, "a row must read as text")
+			local unnamed = check.catalogue(SHARED_ROOT, locale, decode)["menu.hotstrings.unnamed_entry"]
+			local nameless, sections = {}, 0
+			local function walk(items, path)
+				for _, row in ipairs(items or {}) do
+					local title = type(row.title) == "string" and row.title or ""
+					if title:find(unnamed, 1, true) then nameless[#nameless + 1] = path .. " > " .. title end
+					if title:find("c★ = c’est", 1, true) then sections = sections + 1 end
+					walk(row.menu, path .. " > " .. title)
+				end
 			end
-		end
-		walk(rows, "")
-		helpers.assert_eq(raw, {}, "a section row reads as text")
-		helpers.assert_true(sections >= 1, "the text expansion section is drawn by its description")
+			walk(rows, "")
+			helpers.assert_eq(nameless, {}, "every category and section of the catalogue carries its name")
+			helpers.assert_true(sections >= 1, "the text expansion section is drawn by its description")
+		end)
+	end
+
+	helpers.it("the rule refuses a row named by a catalogue id and an empty row", function()
+		local decode = require("core.text.engine.json").decode
+		local defects = check.defects({ { title = "Touche", menu = {
+			{ title = "text_expansion (530)" }, { title = "emojis (271)" }, { title = "" }, { title = "Expansion (2)" },
+		} } }, SHARED_ROOT, decode, nil, { emojis = true })
+		helpers.assert_eq(#defects, 3, "the id, the bare id and the empty row: " .. table.concat(defects, " | "))
 	end)
+
 	-- Arch field report of 2026-11-25: the five rows of « Raccourcis sur é è
 	-- ê à ★ » each read « Tous les raccourcis sur la touche È correspondent à
 	-- ceux de … »; KDE Plasma cut them before the letter and they read alike,
@@ -341,7 +376,7 @@ helpers.describe("the real Linux tray reads as text", function()
 					walk(row.menu, path .. " > " .. title)
 				end
 			end
-			walk(tray(locale), "")
+			walk(tray(locale, (realistic_context())), "")
 			helpers.assert_true(rows >= MIN_ROWS, "the walk stopped early at " .. rows .. " rows")
 			helpers.assert_eq(alike, {}, "two rows of one menu must differ in what a panel shows of them")
 			helpers.assert_eq(long, {}, "a row wider than a panel can show")

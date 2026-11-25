@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "基本遅延（独自の遅延がないグループ）",
 	"menu.hotstrings.tooltip_magic": "マジックキー（★）のプレビュー",
 	"menu.hotstrings.uncheck_all": "□ すべて解除",
+	"menu.hotstrings.unnamed_entry": "（ファイルに名前がありません）",
 	"menu.hotstrings.word_delimiters": "単語区切り文字",
 	"menu.hotstrings.word_expanders": "エクスパンダー",
 	"menu.hotstrings.magic_key": "マジックキー",

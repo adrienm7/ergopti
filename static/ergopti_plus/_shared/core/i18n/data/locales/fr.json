@@ -2661,6 +2661,7 @@
 	"menu.hotstrings.tooltip_default": "Délai de base (groupes sans délai propre)",
 	"menu.hotstrings.tooltip_magic": "Aperçu de la touche magique (★)",
 	"menu.hotstrings.uncheck_all": "□ Tout décocher",
+	"menu.hotstrings.unnamed_entry": "(sans nom dans son fichier)",
 	"menu.hotstrings.word_delimiters": "Délimiteurs de mots",
 	"menu.hotstrings.word_expanders": "Expanseurs",
 	"menu.hotstrings.magic_key": "Touche magique",

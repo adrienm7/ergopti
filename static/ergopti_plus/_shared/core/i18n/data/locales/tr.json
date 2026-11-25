@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Temel gecikme (kendi gecikmesi olmayan gruplar)",
 	"menu.hotstrings.tooltip_magic": "Sihirli tuş (★) önizlemesi",
 	"menu.hotstrings.uncheck_all": "□ Tümünün işaretini kaldır",
+	"menu.hotstrings.unnamed_entry": "(dosyasında adı yok)",
 	"menu.hotstrings.word_delimiters": "Sözcük sınırlayıcıları",
 	"menu.hotstrings.word_expanders": "Genişleticiler",
 	"menu.hotstrings.magic_key": "Sihirli tuş",

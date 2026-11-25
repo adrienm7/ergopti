@@ -2666,6 +2666,7 @@
 	"menu.hotstrings.tooltip_default": "Základní zpoždění (skupiny bez vlastního)",
 	"menu.hotstrings.tooltip_magic": "Náhled magické klávesy (★)",
 	"menu.hotstrings.uncheck_all": "□ Zrušit výběr",
+	"menu.hotstrings.unnamed_entry": "(bez názvu ve svém souboru)",
 	"menu.hotstrings.word_delimiters": "Oddělovače slov",
 	"menu.hotstrings.word_expanders": "Expandéry",
 	"menu.hotstrings.magic_key": "Kouzelná klávesa",
