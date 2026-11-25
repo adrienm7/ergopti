@@ -385,6 +385,28 @@ assert.match(
 	/lua_modules \+= stage_lgi\(binaries\[0\], prefix, owners\)/,
 	'the stager stages lgi'
 );
+{
+	// The native qualification runs this stager on the runner (E2E updater shard):
+	// without lua-lgi and the introspection packages its LuaJIT lgi admission
+	// refused, and the shard failed on "Native packaging command refused: luajit"
+	// (2026-11-25).
+	const ciLinux = read('.github/workflows/ci-linux.yml');
+	const start = ciLinux.indexOf('- name: Install portable network staging prerequisites');
+	assert.ok(start >= 0, 'the updater shard installs the staging prerequisites');
+	const step = ciLinux.slice(start, ciLinux.indexOf('\n      - name:', start));
+	for (const pkg of [
+		'lua-lgi',
+		'libgirepository1.0-dev',
+		'gir1.2-glib-2.0',
+		'gir1.2-girepository-2.0',
+		'gir1.2-freedesktop'
+	])
+		assert.match(
+			step,
+			new RegExp(`\\s${pkg.replace(/[.]/g, '\\.')}(\\s|$)`),
+			`the staging runner installs ${pkg}`
+		);
+}
 for (const typelib of [
 	'GLib-2.0',
 	'GObject-2.0',

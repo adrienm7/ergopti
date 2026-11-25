@@ -4465,9 +4465,13 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
+          # The stager admits and stages LuaJIT's lgi with the GLib and
+          # freedesktop typelibs (stage_lgi): lua-lgi, and the introspection
+          # packages whose pkg-config names the typelib folder.
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
-            luajit lua-luv lua-filesystem lua-posix curl sqlite3 openssl zstd \
+            luajit lua-luv lua-filesystem lua-posix lua-lgi curl sqlite3 openssl zstd \
             binutils patchelf pkg-config libglib2.0-dev \
+            libgirepository1.0-dev gir1.2-glib-2.0 gir1.2-girepository-2.0 gir1.2-freedesktop \
             glib-networking dconf-gsettings-backend gsettings-desktop-schemas \
             libayatana-appindicator3-1
           else
