@@ -465,6 +465,47 @@ async function auditWindows(chromium, windows, family, port) {
  * Proves, on a small page, that the operability and text alternative checks
  * see each failure they count, so a window counted at zero was really read.
  */
+/**
+ * HTML_CodeSniffer's contrast and rendering (lib/htmlcs.cjs): a color-mix()
+ * text and a translucent text are measured, black text on a translucent wash
+ * passes once composited, SVG text stays unmeasured, and an empty heading in
+ * a hidden section only goes to the report.
+ * @param {object} browser - A launched Playwright browser.
+ * @returns {Promise<void>}
+ */
+async function htmlcsSelfCheck(browser) {
+	const page = await browser.newPage();
+	await page.setContent(`<html lang="en"><head><title>Contrast</title></head>
+		<body style="background: #fff"><main><h1>Contrast</h1>
+		<p id="mixed" style="color: color-mix(in srgb, #777 50%, #888)">Mixed grey</p>
+		<p id="faint" style="color: rgba(0, 0, 0, 0.3)">Faint text</p>
+		<p id="wash" style="color: #000; background: rgba(255, 0, 0, 0.1)">On a wash</p>
+		<svg role="img" aria-label="Key"><text id="label" x="1" y="12" fill="#000" style="color: #eee">A</text></svg>
+		<section hidden><h2 id="later"></h2></section></main></body></html>`);
+	const { errors, others } = await htmlcs.scanHtmlcs(page, htmlcs.htmlcsSource());
+	const targetsOf = (rule) => errors.find((row) => row.rule === rule)?.targets ?? [];
+	const measured = htmlcs.HTMLCS_RULE_PREFIX + 'WCAG2AAA.Principle1.Guideline1_4.1_4_6.G17.Fail';
+	assert.deepEqual(
+		targetsOf(measured),
+		['p#mixed', 'p#faint'],
+		'A color-mix() and a translucent text are measured; black on a wash passes'
+	);
+	assert.deepEqual(
+		targetsOf(measured + htmlcs.UNMEASURED_SUFFIX),
+		['text#label'],
+		'SVG text, painted over sibling shapes, stays unmeasured'
+	);
+	assert.ok(
+		!errors.some((row) => row.targets.includes('h2#later')),
+		'An empty heading in a hidden section is not counted'
+	);
+	assert.ok(
+		others.some((row) => row.type === htmlcs.UNRENDERED_TYPE && row.targets.includes('h2#later')),
+		'It is reported as an error on an unrendered element'
+	);
+	await page.close();
+}
+
 async function selfCheck(chromium) {
 	const browser = await chromium.launch();
 	try {
@@ -624,6 +665,7 @@ async function selfCheck(chromium) {
 			['button#small «S» 30×30', 'button «1» 20×20 (and 1 more alike)'],
 			'Only the small buttons are below 44 px, the alike ones counted once'
 		);
+		await htmlcsSelfCheck(browser);
 	} finally {
 		await browser.close();
 	}

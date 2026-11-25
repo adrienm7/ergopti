@@ -101,9 +101,10 @@ function checkHtmlcs() {
 	);
 	assert.match(
 		source,
-		/\}\)\.call\(window, undefined, undefined, undefined\);$/,
-		'The bundle ignores AMD'
+		/\}\)\.call\(window, undefined, undefined, undefined\);\n\(function resolveColours\(\)/,
+		'The bundle ignores AMD, and its colours are resolved by the browser once it is installed'
 	);
+	assert.ok(source.endsWith(')();'), 'The colour resolver runs as the bundle loads');
 	assert.equal(htmlcs.HTMLCS_STANDARD, 'WCAG2AAA');
 	assert.ok(htmlcs.CONTRAST_CODE.test('WCAG2AAA.Principle1.Guideline1_4.1_4_6.G17.Fail'));
 	assert.ok(htmlcs.CONTRAST_CODE.test('WCAG2AAA.Principle1.Guideline1_4.1_4_6.G18.Fail'));

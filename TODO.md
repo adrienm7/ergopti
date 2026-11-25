@@ -128,7 +128,13 @@ site, Ergopti+ and every app window); every new page or window is held to it fro
       site and in its frames, 391 in the app windows' states; the public statement `/accessibilite`, which names AAA
       as the target, lists them among its known gaps until then). The tool survey and every AAA criterion no tool
       measures, with its check, are in [aaa-criteria.md](docs/audits/accessibility/aaa-criteria.md); those checks
-      belong to the manual audit below.
+      belong to the manual audit below. HTML_CodeSniffer's AAA errors (its own ratchet, fifteenth pass of the audit)
+      now measure what axe skipped: the contrast it read as « NaN:1 » is measured through the browser's colours, and
+      the real failures it then found (one-letter key chips, the typing dashboard's errors, chips and badges, the
+      diagnostics' « checking ») hold 7:1. Left there, each a limit of the tool rather than of the page: contrast it
+      cannot measure (SVG key labels over their key shapes, translucent layers over a gradient or an image), a
+      release body's headings read at their level through `aria-level` (G141) and the model browser's row groups
+      (`scope="rowgroup"`, H43).
 
 The site and the Studio pages are scanned by axe-core in CI (tools/test/browser/site-accessibility.playwright.cjs,
 ratchet baseline beside it, findings in [docs/audits/accessibility/](docs/audits/accessibility/README.md)); lower the
@@ -627,6 +633,13 @@ Each question names the default kept meanwhile; an answer moves into the item or
   1. **(recommended) Keep it as described**, no row for a removal Windows does not report.
   2. Add a 🔴 row from the idle-counter comparison, accepting false alarms under remote desktop or other injectors.
   3. Reinstall the hooks periodically (`InstallKeybdHook(true, true)`), at the cost of a reset of the hook's key state.
+- [ ] **What HTML_CodeSniffer's ratchet counts (decided by the agent on 2026-11-25, to review by the maintainer).**
+      Its errors on an element the page does not render (inside a `hidden` screen, a closed dialog, a folded panel)
+      are listed in the gates' reports, not counted: it judges such markup as if shown (an empty heading a script
+      fills when its screen opens), axe skips it, and the state that shows the screen is scanned with it rendered.
+      A contrast error on SVG text is counted as `.Unmeasured`: its glyphs are painted over sibling shapes the tool
+      never sees. Kept meanwhile: both, proved by the app windows gate's self-check. The other choice is to count
+      them and add a fixture state per hidden screen and a pixel check for SVG labels.
 - [ ] **44 px targets in the app windows and the site (decided by the agent on 2026-11-25, to review by the
       maintainer).** The `target-size-enhanced` rows (WCAG 2.5.5, 220 kinds on the site, 391 in the app windows) are
       nearly all ordinary buttons, lists and fields 20 to 36 px tall. Zero means a 44 px minimum height and width for
