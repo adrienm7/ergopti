@@ -11,6 +11,12 @@
  * docs/audits/accessibility/tray-settings-help-review.json; this test requires exactly one
  * entry per setting row, so a new row fails until it is reviewed and a removed
  * row cannot leave a stale entry behind.
+ *
+ * Each « needs_help » row carries its help in its own label, the same on the
+ * three trays (the agent's decision of 2026-11-25 in TODO.md: Win32 menus and
+ * dbusmenu have no item tooltips). Its entry names the label key the row draws
+ * and the text that key held in each locale before the help was written: the
+ * row must still draw that key, and no locale may keep the old text.
  * ==============================================================================
  */
 
@@ -40,6 +46,19 @@ const REVIEW_PATH = path.join(
 	'accessibility',
 	'tray-settings-help-review.json'
 );
+const LOCALES_DIR = path.join(
+	__dirname,
+	'..',
+	'..',
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'core',
+	'i18n',
+	'data',
+	'locales'
+);
+const LOCALE_COUNT = 21;
 const SETTING_TYPES = new Set(['check', 'choice', 'toggle']);
 const VERDICTS = new Set(['self_explained', 'needs_help']);
 
@@ -49,14 +68,56 @@ const VERDICTS = new Set(['self_explained', 'needs_help']);
  * @returns {Set<string>} The row names.
  */
 function settingRows(menu) {
-	const rows = new Set();
+	return new Set(settingLabelKeys(menu).keys());
+}
+
+/**
+ * Maps each setting row of a menu declaration to the label key it draws.
+ * @param {Record<string, unknown>} menu The parsed [menu] table.
+ * @returns {Map<string, string>} « array.id » to its i18n key.
+ */
+function settingLabelKeys(menu) {
+	const rows = new Map();
 	for (const [array, entries] of Object.entries(menu)) {
 		if (!Array.isArray(entries)) continue;
 		for (const entry of entries) {
-			if (entry && SETTING_TYPES.has(entry.type)) rows.add(`${array}.${entry.id}`);
+			if (entry && SETTING_TYPES.has(entry.type)) rows.set(`${array}.${entry.id}`, entry.i18n);
 		}
 	}
 	return rows;
+}
+
+/**
+ * Checks that every « needs_help » row now says its effect in its label.
+ * @param {Map<string, string>} labelKeys Each setting row's label key.
+ * @param {Record<string, {verdict: string, help?: {label_key: string, before: Record<string, string>}}>} review The reviewed rows.
+ * @param {Record<string, Record<string, string>>} catalogues Each locale's catalogue.
+ * @returns {string[]} What is wrong, empty when every such row has its help.
+ */
+function helpProblems(labelKeys, review, catalogues) {
+	const found = [];
+	const locales = Object.keys(catalogues).sort();
+	for (const [row, entry] of Object.entries(review)) {
+		if (entry.verdict !== 'needs_help') continue;
+		const help = entry.help;
+		if (!help || typeof help.label_key !== 'string') {
+			found.push(`no help text for ${row}`);
+			continue;
+		}
+		if (labelKeys.has(row) && labelKeys.get(row) !== help.label_key)
+			found.push(`${row} draws ${labelKeys.get(row)}, not its help key ${help.label_key}`);
+		const before = help.before || {};
+		if (Object.keys(before).sort().join() !== locales.join())
+			found.push(`${row} does not record its old label in every locale`);
+		for (const locale of locales) {
+			const text = catalogues[locale][help.label_key];
+			if (typeof text !== 'string' || text.trim() === '')
+				found.push(`${row}: ${help.label_key} is missing in ${locale}`);
+			else if (text === before[locale])
+				found.push(`${row}: the ${locale} label still lacks its help (« ${text} »)`);
+		}
+	}
+	return found;
 }
 
 /**
@@ -100,11 +161,44 @@ assert.deepEqual(
 	['x.c']
 );
 
+// A needs_help row without its help, with its old label kept in one locale,
+// or drawing another key than its help key is refused.
+const catalogues = { en: { k: 'Words per minute (WPM)' }, fr: { k: 'MPM' } };
+const helped = (before) => ({
+	'a.b': { verdict: 'needs_help', why: 'an abbreviation', help: { label_key: 'k', before } }
+});
+assert.deepEqual(
+	helpProblems(new Map([['a.b', 'k']]), helped({ en: 'WPM', fr: 'MPM' }), catalogues),
+	['a.b: the fr label still lacks its help (« MPM »)']
+);
+assert.deepEqual(
+	helpProblems(new Map(), { 'a.b': { verdict: 'needs_help', why: 'an abbreviation' } }, catalogues),
+	['no help text for a.b']
+);
+assert.deepEqual(
+	helpProblems(new Map([['a.b', 'other']]), helped({ en: 'WPM', fr: 'Mots' }), catalogues),
+	['a.b draws other, not its help key k']
+);
+assert.deepEqual(helpProblems(new Map([['a.b', 'k']]), helped({ en: 'WPM' }), catalogues), [
+	'a.b does not record its old label in every locale'
+]);
+
 const menu = parse(fs.readFileSync(path.join(MENU_DATA, 'menu.toml'), 'utf8')).menu;
 const review = JSON.parse(fs.readFileSync(REVIEW_PATH, 'utf8')).rows;
 const rows = settingRows(menu);
 assert.ok(rows.size > 50, `menu.toml must declare its setting rows (found ${rows.size})`);
-const found = problems(rows, review);
+const localeFiles = fs.readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'));
+assert.equal(localeFiles.length, LOCALE_COUNT, `expected ${LOCALE_COUNT} locale catalogues`);
+const localeCatalogues = Object.fromEntries(
+	localeFiles.map((name) => [
+		path.basename(name, '.json'),
+		JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, name), 'utf8'))
+	])
+);
+const found = [
+	...problems(rows, review),
+	...helpProblems(settingLabelKeys(menu), review, localeCatalogues)
+];
 if (found.length > 0) {
 	console.error(
 		'Tray setting rows and their help review (tray-settings-help-review.json) differ:\n  ' +
@@ -114,5 +208,5 @@ if (found.length > 0) {
 }
 const needing = Object.values(review).filter((entry) => entry.verdict === 'needs_help').length;
 console.log(
-	`test-menu-settings-help-review: OK — ${rows.size} setting rows reviewed, ${needing} need a help text.`
+	`test-menu-settings-help-review: OK — ${rows.size} setting rows reviewed, the ${needing} that need a help text carry it in their label in ${LOCALE_COUNT} locales.`
 );

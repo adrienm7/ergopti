@@ -337,7 +337,7 @@ function M.register(helpers, driver)
 					installed_build = function() return true end } }
 				local rows = menu.build("about_update_channel_menu", "", {}, {}, ctx)
 				helpers.assert_eq(#rows, 1)
-				helpers.assert_eq(rows[1].title, "Update channel: Stable")
+				helpers.assert_eq(rows[1].title, "Update channel (pre-releases are less tested): Stable")
 				helpers.assert_eq(#rows[1].menu, 2)
 				helpers.assert_eq(rows[1].menu[1].checked, true)
 				helpers.assert_eq(rows[1].menu[2].checked, false)

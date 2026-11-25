@@ -323,7 +323,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `toggle_capslock` | ⇪ Toggle CapsLock | yes | yes | yes |
 | `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R22 | no, R22 |
 | `one_shot_shift` | ⇧ OneShotShift | yes | no, R4; use `sticky_shift` | yes |
-| `caps_word` | ⇪★ CapsWord | yes | no, R4; use `capsword` | yes |
+| `caps_word` | ⇪★ CapsWord (capitals to the end of the word) | yes | no, R4; use `capsword` | yes |
 | `ctrl_backspace` | ⌫ Ctrl+BackSpace | yes | no, R6; use `opt_backspace` | yes |
 | `ctrl_delete` | ⌦ Ctrl+Delete | yes | no, R6; use `opt_delete_fwd` | yes |
 | `space` | ␣ Space | yes | yes | yes |

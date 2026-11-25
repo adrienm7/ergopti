@@ -67,108 +67,108 @@
 	],
 	"captions": {
 		"ar": {
-			"mode_x1": "الوضع: إجراء واحد (x1)",
-			"mode_incremental": "الوضع: إرسال تدريجي (مسافة)",
+			"mode_x1": "الوضع: إجراء واحد (مرة واحدة، مهما كان طول السحب)",
+			"mode_incremental": "الوضع: إرسال متكرر (السحب الأطول يرسل أكثر)",
 			"sensitivity_3_5": "الحساسية: 3.5"
 		},
 		"cs": {
-			"mode_x1": "Režim: Jednoduchá akce (x1)",
-			"mode_incremental": "Režim: Inkrementální odeslání (vzdálenost)",
+			"mode_x1": "Režim: Jednoduchá akce (jednou, bez ohledu na délku přejetí)",
+			"mode_incremental": "Režim: Opakované odeslání (delší přejetí odešle víc)",
 			"sensitivity_3_5": "Citlivost: 3.5"
 		},
 		"da": {
-			"mode_x1": "Tilstand: Enkelt handling (x1)",
-			"mode_incremental": "Tilstand: Inkrementel afsendelse (afstand)",
+			"mode_x1": "Tilstand: Enkelt handling (én gang, uanset swipets længde)",
+			"mode_incremental": "Tilstand: Gentaget afsendelse (et længere swipe sender mere)",
 			"sensitivity_3_5": "Følsomhed: 3.5"
 		},
 		"de": {
-			"mode_x1": "Modus: Einzelaktion (x1)",
-			"mode_incremental": "Modus: Inkrementell senden (Distanz)",
+			"mode_x1": "Modus: Einzelaktion (einmal, egal wie lang die Wischbewegung ist)",
+			"mode_incremental": "Modus: Wiederholtes Senden (eine längere Wischbewegung sendet mehr)",
 			"sensitivity_3_5": "Empfindlichkeit: 3.5"
 		},
 		"en": {
-			"mode_x1": "Mode: Single action (x1)",
-			"mode_incremental": "Mode: Incremental send (distance)",
+			"mode_x1": "Mode: Single action (once, whatever the swipe length)",
+			"mode_incremental": "Mode: Repeated send (a longer swipe sends more)",
 			"sensitivity_3_5": "Sensitivity: 3.5"
 		},
 		"es": {
-			"mode_x1": "Modo: Acción única (x1)",
-			"mode_incremental": "Modo: Envío incremental (distancia)",
+			"mode_x1": "Modo: Acción única (una vez, sea cual sea la longitud del deslizamiento)",
+			"mode_incremental": "Modo: Envío repetido (un deslizamiento más largo envía más)",
 			"sensitivity_3_5": "Sensibilidad: 3.5"
 		},
 		"fr": {
-			"mode_x1": "Mode : Action unique (x1)",
-			"mode_incremental": "Mode : Envoi incrémental (distance)",
+			"mode_x1": "Mode : Action unique (une fois, quelle que soit la longueur du geste)",
+			"mode_incremental": "Mode : Envoi répété (un geste plus long envoie plus)",
 			"sensitivity_3_5": "Sensibilité : 3.5"
 		},
 		"he": {
-			"mode_x1": "מצב: פעולה יחידה (x1)",
-			"mode_incremental": "מצב: שליחה מצטברת (מרחק)",
+			"mode_x1": "מצב: פעולה יחידה (פעם אחת, בכל אורך החלקה)",
+			"mode_incremental": "מצב: שליחה חוזרת (החלקה ארוכה יותר שולחת יותר)",
 			"sensitivity_3_5": "רגישות: 3.5"
 		},
 		"hi": {
-			"mode_x1": "मोड: एकल क्रिया (x1)",
-			"mode_incremental": "मोड: वृद्धिशील भेजना (दूरी)",
+			"mode_x1": "मोड: एकल क्रिया (एक बार, स्वाइप कितना भी लंबा हो)",
+			"mode_incremental": "मोड: दोहराकर भेजना (लंबा स्वाइप अधिक भेजता है)",
 			"sensitivity_3_5": "संवेदनशीलता: 3.5"
 		},
 		"it": {
-			"mode_x1": "Modalità: Azione singola (x1)",
-			"mode_incremental": "Modalità: Invio incrementale (distanza)",
+			"mode_x1": "Modalità: Azione singola (una volta, qualunque sia la lunghezza dello scorrimento)",
+			"mode_incremental": "Modalità: Invio ripetuto (uno scorrimento più lungo invia di più)",
 			"sensitivity_3_5": "Sensibilità: 3.5"
 		},
 		"ja": {
-			"mode_x1": "モード: シングルアクション (x1)",
-			"mode_incremental": "モード: インクリメンタル送信（距離）",
+			"mode_x1": "モード: シングルアクション（スワイプの長さに関係なく 1 回）",
+			"mode_incremental": "モード: 繰り返し送信（長くスワイプするほど多く送信）",
 			"sensitivity_3_5": "感度: 3.5"
 		},
 		"ko": {
-			"mode_x1": "모드: 단일 동작 (x1)",
-			"mode_incremental": "모드: 점진적 전송 (거리)",
+			"mode_x1": "모드: 단일 동작 (미는 길이와 관계없이 한 번)",
+			"mode_incremental": "모드: 반복 전송 (길게 밀수록 더 많이 전송)",
 			"sensitivity_3_5": "감도: 3.5"
 		},
 		"nl": {
-			"mode_x1": "Modus: Enkele actie (x1)",
-			"mode_incremental": "Modus: Incrementeel verzenden (afstand)",
+			"mode_x1": "Modus: Enkele actie (één keer, hoe lang de veeg ook is)",
+			"mode_incremental": "Modus: Herhaald verzenden (een langere veeg verzendt meer)",
 			"sensitivity_3_5": "Gevoeligheid: 3.5"
 		},
 		"no": {
-			"mode_x1": "Modus: Enkel handling (x1)",
-			"mode_incremental": "Modus: Inkrementell sending (avstand)",
+			"mode_x1": "Modus: Enkel handling (én gang, uansett lengden på sveipet)",
+			"mode_incremental": "Modus: Gjentatt sending (et lengre sveip sender mer)",
 			"sensitivity_3_5": "Følsomhet: 3.5"
 		},
 		"pl": {
-			"mode_x1": "Tryb: Pojedyncza akcja (x1)",
-			"mode_incremental": "Tryb: Wysyłanie przyrostowe (odległość)",
+			"mode_x1": "Tryb: Pojedyncza akcja (raz, bez względu na długość przesunięcia)",
+			"mode_incremental": "Tryb: Wysyłanie powtarzane (dłuższe przesunięcie wysyła więcej)",
 			"sensitivity_3_5": "Czułość: 3.5"
 		},
 		"pt": {
-			"mode_x1": "Modo: Ação única (x1)",
-			"mode_incremental": "Modo: Envio incremental (distância)",
+			"mode_x1": "Modo: Ação única (uma vez, seja qual for o comprimento do deslize)",
+			"mode_incremental": "Modo: Envio repetido (um deslize mais longo envia mais)",
 			"sensitivity_3_5": "Sensibilidade: 3.5"
 		},
 		"ru": {
-			"mode_x1": "Режим: Единственное действие (x1)",
-			"mode_incremental": "Режим: Инкрементальная отправка (расстояние)",
+			"mode_x1": "Режим: Единственное действие (один раз, какой бы ни была длина жеста)",
+			"mode_incremental": "Режим: Повторная отправка (более длинный жест отправляет больше)",
 			"sensitivity_3_5": "Чувствительность: 3.5"
 		},
 		"sv": {
-			"mode_x1": "Läge: Enskild åtgärd (x1)",
-			"mode_incremental": "Läge: Inkrementell skickning (distans)",
+			"mode_x1": "Läge: Enskild åtgärd (en gång, oavsett svepets längd)",
+			"mode_incremental": "Läge: Upprepad skickning (ett längre svep skickar mer)",
 			"sensitivity_3_5": "Känslighet: 3.5"
 		},
 		"tr": {
-			"mode_x1": "Mod: Tek eylem (x1)",
-			"mode_incremental": "Mod: Artımlı gönderme (mesafe)",
+			"mode_x1": "Mod: Tek eylem (kaydırma uzunluğu ne olursa olsun bir kez)",
+			"mode_incremental": "Mod: Tekrarlı gönderme (daha uzun kaydırma daha fazla gönderir)",
 			"sensitivity_3_5": "Hassasiyet: 3.5"
 		},
 		"uk": {
-			"mode_x1": "Режим: Одинична дія (x1)",
-			"mode_incremental": "Режим: Інкрементальне надсилання (відстань)",
+			"mode_x1": "Режим: Одинична дія (один раз, хоч якої довжини жест)",
+			"mode_incremental": "Режим: Повторне надсилання (довший жест надсилає більше)",
 			"sensitivity_3_5": "Чутливість: 3.5"
 		},
 		"zh": {
-			"mode_x1": "模式：单次动作（x1）",
-			"mode_incremental": "模式：增量发送（距离）",
+			"mode_x1": "模式：单次动作（无论滑动多长都只执行一次）",
+			"mode_incremental": "模式：重复发送（滑动越长发送越多）",
 			"sensitivity_3_5": "灵敏度：3.5"
 		}
 	}

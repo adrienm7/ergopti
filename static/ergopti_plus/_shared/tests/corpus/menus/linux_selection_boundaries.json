@@ -3,7 +3,7 @@
 	"selection_child_order": [
 		{
 			"key": "sg_actions.caps_word",
-			"english": "⇪★ CapsWord",
+			"english": "⇪★ CapsWord (majuscules jusqu’à la fin du mot)",
 			"type": "check"
 		},
 		{

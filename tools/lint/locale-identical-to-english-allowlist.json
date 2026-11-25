@@ -2391,10 +2391,6 @@
 				"zh"
 			]
 		},
-		"sg_actions.caps_word": {
-			"reason": "keyboard-key-name",
-			"locales": "*"
-		},
 		"sg_actions.capsword": {
 			"reason": "keyboard-key-name",
 			"locales": "*"

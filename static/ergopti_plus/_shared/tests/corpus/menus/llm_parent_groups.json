@@ -415,7 +415,7 @@
 					"checked": false
 				},
 				{
-					"title": "✍️ Saisie automatique en ligne (style Copilot)",
+					"title": "✍️ Taper les suggestions de l’IA automatiquement (sans touche pour les accepter)",
 					"callback": true,
 					"checked": false
 				},
@@ -485,7 +485,7 @@
 					"callback": false
 				},
 				{
-					"title": "Indentation de la suggestion sélectionnée : Aucune indentation",
+					"title": "Indentation de la suggestion sélectionnée dans la liste des suggestions : Aucune indentation",
 					"callback": false,
 					"children": [
 						{
