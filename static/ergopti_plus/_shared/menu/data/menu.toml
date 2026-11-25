@@ -249,9 +249,12 @@ platforms = ["ahk"]
 unavailable = "hide"
 boot_deferred = true
 
+# The separator that closes the status row's group belongs to it, so it carries
+# the same restriction and the same reason.
 [[menu.top_level]]
 id = "---"
 platforms = ["ahk"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
