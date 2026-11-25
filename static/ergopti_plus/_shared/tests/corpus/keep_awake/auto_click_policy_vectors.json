@@ -1,0 +1,154 @@
+{
+	"_comment": "Decisions of the anti-sleep auto-clicker policy (_shared/shortcuts/engine/auto_click_policy.lua and its Windows twin). base is a state that may click; each vector overrides some of its fields (null removes one) and pins the decision and its reason, a word of the policy's closed vocabulary. Times are monotonic milliseconds.",
+	"base": {
+		"app_id": "com.microsoft.VSCode",
+		"allowed_apps": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
+		"has_window": true,
+		"locked": false,
+		"paused": false,
+		"secure_field": false,
+		"window": {
+			"width": 800,
+			"height": 600
+		},
+		"match": {
+			"x": 700,
+			"y": 560,
+			"width": 80,
+			"height": 24
+		},
+		"image_id": "allow_once",
+		"last_clicks": {},
+		"now_ms": 100000,
+		"cooldown_ms": 3000
+	},
+	"vectors": [
+		{
+			"id": "allowed_app_clicks",
+			"state": {},
+			"click": true,
+			"reason": "click"
+		},
+		{
+			"id": "app_compared_without_case",
+			"state": {
+				"app_id": "COM.MICROSOFT.VSCODE"
+			},
+			"click": true,
+			"reason": "click"
+		},
+		{
+			"id": "disallowed_app",
+			"state": {
+				"app_id": "com.apple.systempreferences"
+			},
+			"click": false,
+			"reason": "app_not_allowed"
+		},
+		{
+			"id": "no_app",
+			"state": {
+				"app_id": null
+			},
+			"click": false,
+			"reason": "app_not_allowed"
+		},
+		{
+			"id": "no_window",
+			"state": {
+				"has_window": false
+			},
+			"click": false,
+			"reason": "no_foreground_window"
+		},
+		{
+			"id": "locked_screen",
+			"state": {
+				"locked": true
+			},
+			"click": false,
+			"reason": "screen_locked"
+		},
+		{
+			"id": "locked_wins_over_disallowed_app",
+			"state": {
+				"locked": true,
+				"app_id": "other"
+			},
+			"click": false,
+			"reason": "screen_locked"
+		},
+		{
+			"id": "paused",
+			"state": {
+				"paused": true
+			},
+			"click": false,
+			"reason": "paused"
+		},
+		{
+			"id": "secure_field",
+			"state": {
+				"secure_field": true
+			},
+			"click": false,
+			"reason": "secure_field"
+		},
+		{
+			"id": "match_past_right_edge",
+			"state": {
+				"match": {
+					"x": 721,
+					"y": 10,
+					"width": 80,
+					"height": 24
+				}
+			},
+			"click": false,
+			"reason": "outside_window"
+		},
+		{
+			"id": "match_on_bottom_edge",
+			"state": {
+				"match": {
+					"x": 0,
+					"y": 576,
+					"width": 80,
+					"height": 24
+				}
+			},
+			"click": true,
+			"reason": "click"
+		},
+		{
+			"id": "cooldown_running",
+			"state": {
+				"last_clicks": {
+					"allow_once": 97001
+				}
+			},
+			"click": false,
+			"reason": "cooldown"
+		},
+		{
+			"id": "cooldown_elapsed",
+			"state": {
+				"last_clicks": {
+					"allow_once": 97000
+				}
+			},
+			"click": true,
+			"reason": "click"
+		},
+		{
+			"id": "cooldown_is_per_image",
+			"state": {
+				"last_clicks": {
+					"allow_once_en": 99999
+				}
+			},
+			"click": true,
+			"reason": "click"
+		}
+	]
+}

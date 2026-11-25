@@ -612,6 +612,7 @@ return {
 	"tests.unit.gestures.engine.actions.test_pointer_spotlight",
 	"tests.unit.gestures.engine.actions.test_take_note",
 	"tests.unit.gestures.engine.actions.test_keep_awake",
+	"tests.unit.modules.shortcuts.test_auto_click_contract",
 	"tests.unit.gestures.engine.actions.test_click_hold_pointer_release",
 	"tests.unit.modules.shortcuts.keyboard.test_accented_shortcuts",
 	"tests.unit.modules.shortcuts.keyboard.test_bound_chord_emulated_letter",
