@@ -303,7 +303,13 @@ const ADAPTER_FEATURES = [
 		'ai',
 		/^(llm_|managed_ollama|ollama_|python_|native_python|native_bootstrap_pty|prediction_tooltip|mlx|source_alias_owner|suspended_image_owner|trusted_native_guardian)/
 	],
-	['shortcuts', /^(apple_shortcuts|physical_|window_switch|screen_brightness|mouse_control)/],
+	// The auto-click and screen-text ports bind hs.* for the shortcut actions:
+	// they stay in an adapters/ folder, which the OS-API purity ledger exempts,
+	// rather than falling to the platform/system default (decided 2026-11-25).
+	[
+		'shortcuts',
+		/^(apple_shortcuts|physical_|window_switch|screen_brightness|mouse_control|auto_click_ports|screen_text_ports)/
+	],
 	['metrics', /^(wpm_surface|keystats)/],
 	['updater', /^(updater_|update_launcher|release_stage)/],
 	['apps', /^(bundled_apps|app_launcher|desktop_opener|desktop_application)/],

@@ -659,6 +659,13 @@ Each closes on a named green hosted or native run, recorded here.
 Each question names the default kept meanwhile; an answer moves into the item or into
 [maintainer decisions](docs/memory/maintainer-decisions.md).
 
+- [ ] **Where the macOS auto-click and screen-text ports land in the structure plan (decided by the agent on
+      2026-11-25, to review by the maintainer).** No rule placed `macos/adapters/auto_click_ports.lua` and
+      `screen_text_ports.lua`, so they fell to the `platform/system/` default, outside every `adapters/` folder,
+      where their hs.\* lines would rise in the OS-API purity ledger that only goes down. Kept meanwhile:
+      `tools/audit/structure/rules.cjs` places them in `shortcuts/adapters/`, beside the shortcut actions they serve
+      (auto-click, Ctrl+O capture); they stay in `adapters/` until the shortcuts step moves them. The other choice:
+      split each into a pure port under `platform/system/` and an hs.\* adapter, two files for 130 lines.
 - [ ] **How the Studio's keycraft score reads a layout (decided by the agent on 2026-11-25, to review by the
       maintainer).** keycraft's grid holds three letter rows of twelve keys and six thumb keys, and its `.klf` reader
       takes one ASCII byte per key. Kept meanwhile (docs/design/analyser-scores.md, « keycraft »): the base layer of

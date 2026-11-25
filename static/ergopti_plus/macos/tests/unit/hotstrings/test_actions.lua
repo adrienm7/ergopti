@@ -1,4 +1,4 @@
---- tests/unit/hotstrings/test_hotstring_actions.lua
+--- tests/unit/hotstrings/test_actions.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Actions (macOS)

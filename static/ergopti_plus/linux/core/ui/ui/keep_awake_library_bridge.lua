@@ -1,4 +1,4 @@
---- ui/keep_awake_library_bridge.lua
+--- core/ui/ui/keep_awake_library_bridge.lua
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Anti-Sleep Library Window (Linux)

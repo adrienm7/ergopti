@@ -20,7 +20,7 @@ function M.build()
 	local commands = {
 		keep_awake_switch = function() return Mode.toggle_switch("keep_awake") end,
 		keep_awake_auto_click = function() return Mode.toggle_switch("auto_click") end,
-		keep_awake_library = function() return require("ui.menu.menu_keep_awake_library").open() end,
+		keep_awake_library = function() return require("menu.ui.keep_awake_library").open() end,
 	}
 	local getters = {
 		keep_awake_switch_on = function() return Mode.switch_on("keep_awake") end,

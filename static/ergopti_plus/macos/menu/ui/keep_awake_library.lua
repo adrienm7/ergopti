@@ -1,4 +1,4 @@
---- ui/menu/menu_keep_awake_library.lua
+--- menu/ui/keep_awake_library.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Library Window (macOS)
@@ -24,7 +24,7 @@ local Paths = require("core.fs.engine.paths")
 
 local M = {}
 
-local LOG = "ui.menu.keep_awake_library"
+local LOG = "menu.ui.keep_awake_library"
 
 local LibraryHost = require("shortcuts.engine.keep_awake.library_host")
 local APP_ID = LibraryHost.APP_ID

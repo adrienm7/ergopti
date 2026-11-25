@@ -375,7 +375,7 @@ local BRIDGE_MODULES = {
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
 	prompt_editor         = "ai.ui.prompt_editor.bridge",
 	user_workflows        = "ui.user_workflows_bridge",
-	keep_awake_library    = "ui.keep_awake_library_bridge",
+	keep_awake_library    = "core.ui.ui.keep_awake_library_bridge",
 	update_check          = "ui.update_check.bridge",
 }
 

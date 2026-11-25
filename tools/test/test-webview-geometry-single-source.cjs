@@ -259,7 +259,7 @@ const MACOS_MODULES = {
 	download_window: 'ui/download_window/init.lua',
 	update_check: 'ui/update_check/init.lua',
 	user_workflows: 'ui/menu/menu_user_workflows.lua',
-	keep_awake_library: 'ui/menu/menu_keep_awake_library.lua'
+	keep_awake_library: 'menu/ui/keep_awake_library.lua'
 };
 
 // Apps deliberately not value-checked on macOS, each with the reason. A stale

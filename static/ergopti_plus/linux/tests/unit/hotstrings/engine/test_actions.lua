@@ -1,4 +1,4 @@
---- tests/unit/hotstrings/engine/test_hotstring_actions.lua
+--- tests/unit/hotstrings/engine/test_actions.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Actions (Linux)
