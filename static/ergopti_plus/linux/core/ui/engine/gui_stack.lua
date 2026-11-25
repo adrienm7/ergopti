@@ -3,10 +3,12 @@
 --- ==============================================================================
 --- MODULE: Desktop Toolkit Start Check (Linux)
 --- DESCRIPTION:
---- GTK 3, libayatana-appindicator3, lgi and WebKitGTK 4.1 are system libraries
---- the package formats cannot carry: they must match the host's GLib, GL and C
+--- GTK 3, libayatana-appindicator3 and WebKitGTK 4.1 are system libraries the
+--- package formats cannot carry: they must match the host's GLib, GL and C
 --- library. The owned-runtimes registry decides them as SYS: checked at start,
---- refused in words. This module is that check and that refusal.
+--- refused in words. lgi is the private runtime's (PIN) in every package and
+--- the host's only in a source install. This module is that check and that
+--- refusal.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The tray needs GTK 3 and libayatana-appindicator3. Without either there
@@ -42,6 +44,50 @@ M.WEBKIT_COMPONENT = "WebKitGTK " .. M.WEBKIT_VERSION
 M.TITLE_KEY = "startup.linux_gui_stack_title"
 M.TRAY_BODY_KEY = "startup.linux_gui_stack_tray_body"
 M.WINDOWS_BODY_KEY = "startup.linux_gui_stack_windows_body"
+--- The windows body when the distribution is known: {2} the package, {3} the command.
+M.WINDOWS_PACKAGE_BODY_KEY = "startup.linux_gui_stack_windows_package_body"
+--- Appended when lgi is installed for another Lua: {1} its version, {2} the package.
+M.OTHER_LUA_KEY = "startup.linux_gui_stack_lgi_other_lua"
+--- The tray row that stays while the windows are unavailable.
+M.WINDOWS_LABEL_KEY = "startup.linux_gui_stack_windows_label"
+
+--- The host package that provides each component for LuaJIT, per distribution
+--- family. The generic lua-lgi is a Lua 5.4 build on Arch, Fedora and openSUSE:
+--- a user who installed it after the generic sentence still had no windows
+--- (field report, Arch Linux, 2026-11-25). The first candidate of install.sh's
+--- _lua_module_candidates and _desktop_backend_package for the same manager;
+--- tests/unit/core/lifecycle/test_gui_stack.lua holds the two to each other.
+M.HOST_PACKAGES = {
+	lgi = {
+		arch = "lua51-lgi", debian = "lua-lgi", fedora = "lua-lgi-compat",
+		suse = "luajit-lgi", alpine = "lua5.1-lgi", void = "lua51-lgi",
+	},
+	webkit = {
+		arch = "webkit2gtk-4.1", debian = "gir1.2-webkit2-4.1", fedora = "webkit2gtk4.1",
+		suse = "typelib-1_0-WebKit2-4_1", alpine = "webkit2gtk-4.1", void = "libwebkit2gtk41",
+	},
+}
+
+--- The package manager of each family, as install.sh names it.
+M.FAMILY_MANAGERS = { arch = "pacman", debian = "apt", fedora = "dnf", suse = "zypper", alpine = "apk", void = "xbps" }
+
+--- The command line a user types to install one package.
+local INSTALL_COMMANDS = {
+	arch = "sudo pacman -S --needed %s", debian = "sudo apt install %s", fedora = "sudo dnf install %s",
+	suse = "sudo zypper install %s", alpine = "sudo apk add %s", void = "sudo xbps-install %s",
+}
+
+--- /etc/os-release ID and ID_LIKE tokens, mapped to a family.
+local FAMILY_OF_ID = {
+	arch = "arch", debian = "debian", ubuntu = "debian", fedora = "fedora", rhel = "fedora", centos = "fedora",
+	suse = "suse", opensuse = "suse", ["opensuse-leap"] = "suse", ["opensuse-tumbleweed"] = "suse", sles = "suse",
+	alpine = "alpine", void = "void",
+}
+
+--- The Lua versions other than LuaJIT's 5.1 an lgi package may be built for,
+--- and the module directories distributions install them in.
+local OTHER_LUA_VERSIONS = { "5.4", "5.3", "5.2", "5.5" }
+local LUA_MODULE_ROOTS = { "/usr/lib/lua", "/usr/lib64/lua", "/usr/lib/x86_64-linux-gnu/lua", "/usr/local/lib/lua" }
 
 
 
@@ -64,12 +110,58 @@ end
 --- The library the windows cannot load.
 --- @param load_lgi function|nil Returns ok, lgi like pcall(require, "lgi"); a test seam.
 --- @return string|nil The component name, nil when WebKitGTK 4.1 loads.
+--- @return string|nil "lgi" or "webkit", the key of M.HOST_PACKAGES.
 function M.windows_missing(load_lgi)
 	local ok, lgi = (load_lgi or function() return pcall(require, "lgi") end)()
-	if not ok or type(lgi) ~= "table" or type(lgi.require) ~= "function" then return M.LGI_COMPONENT end
+	if not ok or type(lgi) ~= "table" or type(lgi.require) ~= "function" then return M.LGI_COMPONENT, "lgi" end
 	local loaded, namespace = pcall(lgi.require, M.WEBKIT_NAMESPACE, M.WEBKIT_VERSION)
-	if not loaded or namespace == nil then return M.WEBKIT_COMPONENT end
+	if not loaded or namespace == nil then return M.WEBKIT_COMPONENT, "webkit" end
 	return nil
+end
+
+--- The distribution family /etc/os-release describes.
+--- @param text string|nil The file's content.
+--- @return string|nil A key of M.FAMILY_MANAGERS, nil when unknown.
+function M.distro_family(text)
+	if type(text) ~= "string" then return nil end
+	local fields = {}
+	for key, value in text:gmatch("([%w_]+)=([^\n]*)") do
+		fields[key] = value:gsub('^["\']', ""):gsub('["\']$', ""):lower()
+	end
+	local tokens = { fields.ID }
+	for token in (fields.ID_LIKE or ""):gmatch("%S+") do tokens[#tokens + 1] = token end
+	for _, token in ipairs(tokens) do
+		local family = FAMILY_OF_ID[token]
+		if family then return family end
+	end
+	return nil
+end
+
+--- The Lua version an lgi on this system was built for, when it is not 5.1.
+--- @param exists function|nil Returns whether a path is a file; a test seam.
+--- @return string|nil "5.4" and the like, nil when no other build is present.
+function M.foreign_lgi(exists)
+	exists = exists or function(path)
+		local handle = io.open(path, "rb")
+		if handle then handle:close() return true end
+		return false
+	end
+	for _, version in ipairs(OTHER_LUA_VERSIONS) do
+		for _, root in ipairs(LUA_MODULE_ROOTS) do
+			if exists(root .. "/" .. version .. "/lgi/corelgilua51.so") then return version end
+		end
+	end
+	return nil
+end
+
+--- Reads /etc/os-release.
+--- @return string|nil
+local function read_os_release()
+	local handle = io.open("/etc/os-release", "r") or io.open("/usr/lib/os-release", "r")
+	if not handle then return nil end
+	local text = handle:read("*a")
+	handle:close()
+	return text
 end
 
 
@@ -81,53 +173,78 @@ end
 -- =====================================
 -- =====================================
 
---- A translated text with {1} filled, or the key when the catalogue cannot answer.
+--- A translated text with {1}, {2}, ... filled, or the key when the catalogue cannot answer.
 --- @param i18n table|nil
 --- @param key string
---- @param component string|nil
+--- @param ... string The slot values.
 --- @return string
-local function text(i18n, key, component)
+local function text(i18n, key, ...)
 	local value = key
 	if i18n then
 		local ok, translated = pcall(i18n.get, key)
 		if ok and type(translated) == "string" then value = translated end
 	end
-	if component then value = value:gsub("{1}", function() return component end) end
+	local slots = { ... }
+	value = value:gsub("{(%d)}", function(index)
+		local slot = slots[tonumber(index)]
+		return slot ~= nil and slot or nil
+	end)
 	return value
 end
 
---- Tells the user, in their language, what is missing and what follows.
---- @param deps table { i18n, notifier, print, logger }; each optional but logger.
---- @param body_key string M.TRAY_BODY_KEY or M.WINDOWS_BODY_KEY.
---- @param component string The missing component.
---- @param level string "error" or "warning", for the notification.
-local function tell(deps, body_key, component, level)
-	local title = text(deps.i18n, M.TITLE_KEY)
-	local body = text(deps.i18n, body_key, component)
-	local out = deps.print or print
-	out(title)
-	out(body)
-	if deps.notifier and type(deps.notifier.send) == "function" then
-		pcall(deps.notifier.send, body, { title = title, level = level })
+--- The windows explanation: the exact package and command when the family is
+--- known, and why an installed lgi does not count when it is another Lua's.
+--- @param deps table { i18n, os_release, file_exists }
+--- @param component string
+--- @param what string "lgi" or "webkit"
+--- @return string
+function M.windows_body(deps, component, what)
+	local family = M.distro_family(deps.os_release ~= nil and deps.os_release or read_os_release())
+	local package = family and M.HOST_PACKAGES[what][family]
+	local body
+	if package then
+		body = text(deps.i18n, M.WINDOWS_PACKAGE_BODY_KEY, component, package, INSTALL_COMMANDS[family]:format(package))
+	else
+		body = text(deps.i18n, M.WINDOWS_BODY_KEY, component)
 	end
+	if what == "lgi" then
+		local version = M.foreign_lgi(deps.file_exists)
+		if version then
+			body = body .. " " .. text(deps.i18n, M.OTHER_LUA_KEY, version, package or M.HOST_PACKAGES.lgi.debian)
+		end
+	end
+	return body
 end
 
 --- Runs the start check of a --tray launch.
---- @param deps table { i18n, notifier, print, load_lgi, logger, indicator }; indicator
----   is platform.tray.appindicator unless a test supplies a double.
+--- @param deps table { i18n, notifier, print, load_lgi, logger, indicator, status,
+---   os_release, file_exists }; indicator is platform.tray.appindicator and status
+---   core.ui.engine.component_status unless a test supplies a double.
 --- @return integer|nil The exit status when the daemon must not start, nil to continue.
 function M.check_at_start(deps)
 	local Logger = deps.logger or require("core.logger.engine.shim")
+	local out = deps.print or print
 	local tray = M.tray_missing(deps.indicator or require("tray.adapters.appindicator"))
 	if tray then
 		Logger.error(LOG, "Start refused: the tray needs %s, which this system does not provide.", tray)
-		tell(deps, M.TRAY_BODY_KEY, tray, "error")
+		local title, body = text(deps.i18n, M.TITLE_KEY), text(deps.i18n, M.TRAY_BODY_KEY, tray)
+		out(title)
+		out(body)
+		-- The daemon exits: the notice is the only surface left, so it stays.
+		if deps.notifier and type(deps.notifier.send) == "function" then
+			pcall(deps.notifier.send, body, { title = title, level = "error", persistent = true })
+		end
 		return M.EXIT_UNAVAILABLE
 	end
-	local windows = M.windows_missing(deps.load_lgi)
+	local windows, what = M.windows_missing(deps.load_lgi)
 	if windows then
 		Logger.warn(LOG, "Windows unavailable: they need %s, which this system does not provide.", windows)
-		tell(deps, M.WINDOWS_BODY_KEY, windows, "warning")
+		local title, body = text(deps.i18n, M.TITLE_KEY), M.windows_body(deps, windows, what)
+		out(title)
+		out(body)
+		local status = deps.status or require("core.ui.engine.component_status")
+		status.report({ code = "windows_" .. what, label = text(deps.i18n, M.WINDOWS_LABEL_KEY),
+			title = title, body = body }, { notifier = deps.notifier })
 		return nil
 	end
 	Logger.debug(LOG, "Desktop toolkit present: GTK 3, libayatana-appindicator3, lgi and %s.", M.WEBKIT_COMPONENT)
