@@ -876,10 +876,11 @@ test('a workspace stores each tab as its source and reads back the same tabs', (
 	assert.deepEqual(plain(W.parse(text)), {
 		active: 1,
 		tabs: [
-			{ text: mine, dirty: true },
-			{ text: imported, dirty: false }
+			{ text: mine, dirty: true, versions: [] },
+			{ text: imported, dirty: false, versions: [] }
 		]
 	});
+	assert.ok(!text.includes('versions'), 'a tab without versions is stored as before them');
 	assert.equal(
 		IO.parse(W.parse(text).tabs[1].text).ok,
 		true,
@@ -902,6 +903,94 @@ test('a stored workspace that does not read is refused, naming what', () => {
 	refusal('{"schema":1,"active":1,"tabs":[{"text":"a","dirty":false}]}', 'active');
 	refuses(() => W.serialize([], 0), 'workspace_invalid');
 	refuses(() => W.serialize([{ text: 'a', dirty: false }], 2), 'workspace_invalid');
+	refusal(
+		'{"schema":1,"active":0,"tabs":[{"text":"a","dirty":false,"versions":{}}]}',
+		'tabs[0].versions'
+	);
+	refusal(
+		'{"schema":1,"active":0,"tabs":[{"text":"a","dirty":false,"versions":[{"name":" ","text":"a","at":1}]}]}',
+		'tabs[0].versions[0]'
+	);
+	refusal(
+		'{"schema":1,"active":0,"tabs":[{"text":"a","dirty":false,"versions":[{"name":"v","text":"a","at":-1}]}]}',
+		'tabs[0].versions[0]'
+	);
+});
+
+// (layout-editor-versions) Saved versions (an idea seen in the Layouts Wiki
+// playground): kept with their tab in the stored text, bounded, never dropped.
+test('a tab keeps its saved versions in the stored workspace, at most MAX_VERSIONS', () => {
+	const first = IO.serialize(IO.create('mine', 'Mine'));
+	const second = IO.serialize(
+		M.setMapping(IO.create('mine', 'Mine'), 'base', 'KeyA', { text: 'é' }, null)
+	);
+	const versions = [
+		{ name: 'Before the swap', text: first, at: Date.UTC(2026, 10, 25, 9, 0) },
+		{ name: 'é on A', text: second, at: Date.UTC(2026, 10, 25, 10, 0) }
+	];
+	const text = W.serialize([{ text: second, dirty: true, versions }], 0);
+	assert.deepEqual(plain(W.parse(text).tabs[0].versions), versions, 'read back in order');
+	const many = Array.from({ length: W.MAX_VERSIONS + 1 }, (_, n) => ({
+		name: `v${n}`,
+		text: first,
+		at: n
+	}));
+	refuses(
+		() => W.serialize([{ text: first, dirty: false, versions: many }], 0),
+		'workspace_invalid'
+	);
+	refuses(
+		() =>
+			W.serialize(
+				[
+					{
+						text: first,
+						dirty: false,
+						versions: [{ name: 'x'.repeat(W.MAX_VERSION_NAME + 1), text: first, at: 0 }]
+					}
+				],
+				0
+			),
+		'workspace_invalid'
+	);
+});
+
+test('the differences of two layouts list each key mapped differently, per layer and OS', () => {
+	const base = IO.create('mine', 'Mine');
+	const edited = M.setMapping(
+		M.setMapping(
+			M.setMapping(base, 'base', 'KeyA', { text: 'é' }, null),
+			'base',
+			'KeyB',
+			{ text: 'b' },
+			null
+		),
+		'base',
+		'KeyA',
+		{ text: 'à' },
+		'macos'
+	);
+	assert.equal(M.differences(base, base).length, 0, 'a layout against itself');
+	const found = M.differences(base, edited).map((change) => [
+		change.layer,
+		change.scope,
+		change.code,
+		change.before,
+		change.after
+	]);
+	const before = (code) =>
+		base.layers[0].keys[code] === undefined ? null : base.layers[0].keys[code];
+	assert.deepEqual(
+		plain(found),
+		plain([
+			['base', 'all', 'KeyA', before('KeyA'), { text: 'é' }],
+			['base', 'all', 'KeyB', before('KeyB'), { text: 'b' }],
+			['base', 'macos', 'KeyA', null, { text: 'à' }]
+		])
+	);
+	const back = M.differences(edited, base);
+	assert.equal(back.length, 3, 'the other way lists the same keys');
+	assert.deepEqual(plain(back[2].before), { text: 'à' });
 });
 
 /** A one-entry ZIP whose entry is deflated, as archivers other than the editor write it. */

@@ -986,6 +986,40 @@ body {
 	top: 0;
 }
 
+/* « Versions »: the saved versions and a version's differences with the
+   layout, tables that scroll in their own box like the board's table. */
+.le-versions table {
+	border-collapse: collapse;
+}
+
+.le-versions th,
+.le-versions td {
+	border-bottom: 1px solid var(--le-border);
+	padding: 3px 8px;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.le-versions thead th {
+	background: var(--le-surface);
+	position: sticky;
+	top: 0;
+}
+
+.le-version-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.le-version-shown > th {
+	font-weight: 700;
+}
+
+.le-version-diff {
+	margin-top: 12px;
+}
+
 /* =============================== */
 /* =============================== */
 /* ======= 7/ Tools & Panels ===== */

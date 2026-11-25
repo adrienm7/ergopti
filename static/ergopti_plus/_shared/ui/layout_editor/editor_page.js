@@ -111,8 +111,10 @@ var LayoutEditorPage = (function () {
 	const FILL_LEVELS = ['base', 'shift', 'altgr', 'shift_altgr', 'command'];
 	const STICKER_MAX_MM = 30;
 	// The secondary tools under the board, in tab order; the first one opens by default.
+	// « Versions » (saved snapshots) is an idea seen in the Layouts Wiki playground.
 	const TOOLS = [
 		'details',
+		'versions',
 		'layers',
 		'modifiers',
 		'dead_keys',
@@ -523,9 +525,13 @@ var LayoutEditorPage = (function () {
 			// The analysis panel's key colours ({values, max, titles}), null when off.
 			heat: null,
 			// The last edit's name and the document it made ({doc, text}), for the score chip.
-			lastEdit: null
+			lastEdit: null,
+			// « Versions »: the name typed for the next snapshot, and the saved
+			// version whose differences with the layout are listed (its index, or null).
+			versionName: '',
+			versionShown: null
 		};
-		state.tabs.push({ history: state.history, dirty: false });
+		state.tabs.push({ history: state.history, dirty: false, versions: [] });
 		const doc = () => state.history.current();
 		// The live analysis beside the board, on the pages that load its scripts.
 		const analysisPanel =
@@ -725,7 +731,7 @@ var LayoutEditorPage = (function () {
 		/** The tab at an index, the shown one read from the live state. */
 		function tabAt(index) {
 			return index === state.active
-				? { history: state.history, dirty: state.dirty }
+				? { history: state.history, dirty: state.dirty, versions: state.tabs[index].versions }
 				: state.tabs[index];
 		}
 
@@ -743,6 +749,7 @@ var LayoutEditorPage = (function () {
 			state.starting = false;
 			state.confirm = null;
 			state.historySaid = null;
+			state.versionShown = null;
 			resetView(doc(), null);
 		}
 
@@ -755,9 +762,16 @@ var LayoutEditorPage = (function () {
 			render();
 		}
 
-		/** A tab for a document, with a history of its own. */
-		function newTab(document, dirty) {
-			return { history: LayoutEditorModel.createHistory(document), dirty };
+		/**
+		 * A tab for a document, with a history of its own and its saved versions
+		 * ({name, text, at}, oldest first; none for a new document).
+		 */
+		function newTab(document, dirty, versions) {
+			return {
+				history: LayoutEditorModel.createHistory(document),
+				dirty,
+				versions: versions || []
+			};
 		}
 
 		/** A blank layout, as « New » makes it. */
@@ -996,7 +1010,8 @@ var LayoutEditorPage = (function () {
 			return [state.active].concat(
 				...state.tabs.map((stored, index) => {
 					const tab = tabAt(index);
-					return [tab.history.current(), tab.dirty];
+					// A saved version is a new array (see saveVersion), so identity is enough.
+					return [tab.history.current(), tab.dirty, tab.versions];
 				})
 			);
 		}
@@ -1033,7 +1048,11 @@ var LayoutEditorPage = (function () {
 				text = LayoutEditorWorkspace.serialize(
 					state.tabs.map((stored, index) => {
 						const tab = tabAt(index);
-						return { text: sourceText(tab.history.current()), dirty: tab.dirty };
+						return {
+							text: sourceText(tab.history.current()),
+							dirty: tab.dirty,
+							versions: tab.versions
+						};
 					}),
 					state.active
 				);
@@ -1104,7 +1123,7 @@ var LayoutEditorPage = (function () {
 					const parsed = LayoutSourceIO.parse(tab.text);
 					if (!parsed.ok)
 						throw { code: parsed.error.code, path: `${index + 1}: ${parsed.error.path}` };
-					return newTab(parsed.doc, tab.dirty);
+					return newTab(parsed.doc, tab.dirty, tab.versions);
 				});
 			} catch (error) {
 				refuseWorkspace(error);
@@ -2485,6 +2504,285 @@ var LayoutEditorPage = (function () {
 			]);
 		}
 
+		// ============================
+		// ======= 7b/ Versions =======
+		// ============================
+
+		/** The shown tab's saved versions, oldest first. */
+		function versions() {
+			return state.tabs[state.active].versions;
+		}
+
+		/** A version's time in the page's language (« 25 Nov 2026, 14:05 »). */
+		function versionTime(at) {
+			return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+				dateStyle: 'medium',
+				timeStyle: 'short'
+			}).format(new Date(at));
+		}
+
+		/**
+		 * « Save this version »: a named snapshot of the layout shown, beside the
+		 * undo history; the workspace keeps it with the tab. A full list or a
+		 * name too long is refused, naming why; nothing is dropped in silence.
+		 */
+		function saveVersion() {
+			commitFocused();
+			const list = versions();
+			const typed = state.versionName.trim();
+			const name = typed || tl('versions.default_name', { n: list.length + 1 });
+			if (list.length >= LayoutEditorWorkspace.MAX_VERSIONS) {
+				notify('error', tl('versions.full', { max: LayoutEditorWorkspace.MAX_VERSIONS }));
+				return;
+			}
+			if ([...name].length > LayoutEditorWorkspace.MAX_VERSION_NAME) {
+				notify(
+					'error',
+					tl('versions.name_too_long', { max: LayoutEditorWorkspace.MAX_VERSION_NAME })
+				);
+				return;
+			}
+			// A new array, so the workspace sees the change (workspaceShape).
+			state.tabs[state.active].versions = list.concat([
+				{ name, text: sourceText(doc()), at: Date.now() }
+			]);
+			state.versionName = '';
+			notify('ok', tl('versions.saved', { name }));
+		}
+
+		/** The document a saved version holds; a version that no longer reads is refused. */
+		function versionDoc(version) {
+			const parsed = LayoutSourceIO.parse(version.text);
+			if (!parsed.ok) throw { code: parsed.error.code, path: parsed.error.path };
+			return parsed.doc;
+		}
+
+		/** « Restore »: the version becomes the layout, one step Undo takes back. */
+		function restoreVersion(index) {
+			const version = versions()[index];
+			let next;
+			try {
+				next = versionDoc(version);
+			} catch (error) {
+				notify('error', problemText(error));
+				return;
+			}
+			commitFocused();
+			state.history.push(next, step('edit_history.step.restore', { name: version.name }));
+			state.lastEdit = null;
+			state.dirty = true;
+			state.historySaid = null;
+			resetView(next, null);
+			notify('ok', tl('versions.restored', { name: version.name }));
+		}
+
+		/** « Delete »: asked first, the version cannot come back. */
+		function deleteVersion(index) {
+			const version = versions()[index];
+			ask(tl('versions.confirm_delete', { name: version.name }), () => {
+				const tab = state.tabs[state.active];
+				tab.versions = tab.versions.filter((_, at) => at !== index);
+				state.versionShown = null;
+				notify('ok', tl('versions.deleted', { name: version.name }));
+			});
+		}
+
+		/** What a mapping types, in words, for the differences table. */
+		function differenceCell(d, mapping) {
+			return mapping ? spokenMapping(mapping) || legend(mapping, d) : tl('versions.unmapped');
+		}
+
+		/**
+		 * The differences of a saved version with the layout shown: one row per
+		 * key mapped differently (its layer, its OS when an override differs,
+		 * what it typed then and what it types now).
+		 */
+		function versionDifferences(version) {
+			let before;
+			try {
+				before = versionDoc(version);
+			} catch (error) {
+				return el('p', { class: 'le-note', role: 'alert', text: problemText(error) });
+			}
+			const now = doc();
+			const heading = el('h3', {
+				id: 'le-version-diff-title',
+				text: tl('versions.diff_title', { name: version.name })
+			});
+			if (sourceText(before) === sourceText(now))
+				return el('section', { class: 'le-version-diff', id: 'le-version-diff' }, [
+					heading,
+					el('p', { class: 'le-note', text: tl('versions.same') })
+				]);
+			// An imported .keylayout keeps its mappings in its XML: only « differs » is known.
+			if (LayoutSourceIO.isPreserved(before) || LayoutSourceIO.isPreserved(now))
+				return el('section', { class: 'le-version-diff', id: 'le-version-diff' }, [
+					heading,
+					el('p', { class: 'le-note', text: tl('versions.differs_preserved') })
+				]);
+			const found = LayoutEditorModel.differences(before, now);
+			// A layer by its level's name when the layout shown has it, else by its modifiers.
+			const layerTitle = (d, id) => {
+				const level = LayoutSourceIO.LEVEL_LAYERS.find((each) => {
+					const layer = levelLayer(each);
+					return layer !== null && layer.id === id;
+				});
+				if (level && d === now) return tl(`fill.level.${level.id}`);
+				const layer = (d.layers || []).find((entry) => entry.id === id);
+				return layer ? layerLabel(layer) : id;
+			};
+			const rows = found.map((change) => {
+				// A layer the version had and the layout lost is named as the version named it.
+				const owner = now.layers.some((layer) => layer.id === change.layer) ? now : before;
+				const layer = layerTitle(owner, change.layer);
+				return el('tr', {}, [
+					el('th', { scope: 'row', text: keyName(change.code) }),
+					el('td', {
+						text: change.scope === 'all' ? layer : `${layer} (${tl(`scope.${change.scope}`)})`
+					}),
+					el('td', { text: differenceCell(before, change.before) }),
+					el('td', { text: differenceCell(now, change.after) })
+				]);
+			});
+			return el('section', { class: 'le-version-diff', id: 'le-version-diff' }, [
+				heading,
+				el('p', {
+					class: 'le-note',
+					text: found.length
+						? tl('versions.diff_count', { count: found.length })
+						: tl('versions.differs_outside_keys')
+				}),
+				found.length
+					? el(
+							'section',
+							{
+								class: 'le-board-table-wrap',
+								tabindex: '0',
+								'aria-labelledby': 'le-version-diff-title'
+							},
+							[
+								el('table', { id: 'le-version-diff-table' }, [
+									el('thead', {}, [
+										el('tr', {}, [
+											el('th', { scope: 'col', text: tl('board.table_key') }),
+											el('th', { scope: 'col', text: tl('versions.col_layer') }),
+											el('th', { scope: 'col', text: tl('versions.col_before') }),
+											el('th', { scope: 'col', text: tl('versions.col_after') })
+										])
+									]),
+									el('tbody', {}, rows)
+								])
+							]
+						)
+					: null
+			]);
+		}
+
+		/**
+		 * « Versions » (an idea seen in the Layouts Wiki playground's Versions
+		 * pane): named snapshots of the tab's layout, kept with the tab beside
+		 * the undo history, each compared with the layout key by key, restored
+		 * as one step Undo takes back, or deleted.
+		 */
+		function versionsTool() {
+			const list = versions();
+			const full = list.length >= LayoutEditorWorkspace.MAX_VERSIONS;
+			const kept = host.workspace ? 'versions.kept' : 'versions.kept_session';
+			const rows = list.map((version, index) =>
+				el('tr', { class: index === state.versionShown ? 'le-version-shown' : null }, [
+					el('th', { scope: 'row', text: version.name }),
+					el('td', {}, [
+						el('time', {
+							datetime: new Date(version.at).toISOString(),
+							text: versionTime(version.at)
+						})
+					]),
+					el('td', { class: 'le-version-actions' }, [
+						el('button', {
+							type: 'button',
+							id: `le-version-diff-${index}`,
+							text: tl('versions.compare'),
+							'aria-label': tl('versions.compare_named', { name: version.name }),
+							'aria-pressed': String(index === state.versionShown),
+							onclick: () => {
+								state.versionShown = state.versionShown === index ? null : index;
+								render();
+							}
+						}),
+						el('button', {
+							type: 'button',
+							id: `le-version-restore-${index}`,
+							text: tl('versions.restore'),
+							'aria-label': tl('versions.restore_named', { name: version.name }),
+							onclick: () => restoreVersion(index)
+						}),
+						el('button', {
+							type: 'button',
+							id: `le-version-delete-${index}`,
+							text: tl('versions.delete'),
+							'aria-label': tl('versions.delete_named', { name: version.name }),
+							onclick: () => deleteVersion(index)
+						})
+					])
+				])
+			);
+			return el('section', { class: 'le-panel le-versions', id: 'le-versions' }, [
+				el('h2', { text: tl('tools.versions') }),
+				el('p', { class: 'le-note', text: tl('versions.note') }),
+				el('p', { class: 'le-note', text: tl(kept, { max: LayoutEditorWorkspace.MAX_VERSIONS }) }),
+				el('p', { class: 'le-buttons' }, [
+					el('label', { class: 'le-inline' }, [
+						tl('versions.name'),
+						el('input', {
+							type: 'text',
+							id: 'le-version-name',
+							maxlength: String(LayoutEditorWorkspace.MAX_VERSION_NAME),
+							placeholder: tl('versions.default_name', { n: list.length + 1 }),
+							value: state.versionName,
+							oninput: (event) => {
+								state.versionName = event.target.value;
+							},
+							onkeydown: (event) => {
+								if (event.key !== 'Enter') return;
+								event.preventDefault();
+								saveVersion();
+							}
+						})
+					]),
+					el('button', {
+						type: 'button',
+						id: 'le-version-save',
+						class: 'primary',
+						text: tl('versions.save'),
+						disabled: full,
+						onclick: saveVersion
+					})
+				]),
+				list.length
+					? el(
+							'section',
+							{ class: 'le-board-table-wrap', tabindex: '0', 'aria-label': tl('versions.list') },
+							[
+								el('table', { id: 'le-versions-table' }, [
+									el('caption', { class: 'theme-sr-only', text: tl('versions.list') }),
+									el('thead', {}, [
+										el('tr', {}, [
+											el('th', { scope: 'col', text: tl('versions.col_name') }),
+											el('th', { scope: 'col', text: tl('versions.col_time') }),
+											el('th', { scope: 'col', text: tl('versions.col_actions') })
+										])
+									]),
+									el('tbody', {}, rows)
+								])
+							]
+						)
+					: el('p', { class: 'le-note', id: 'le-versions-empty', text: tl('versions.empty') }),
+				state.versionShown !== null && list[state.versionShown]
+					? versionDifferences(list[state.versionShown])
+					: null
+			]);
+		}
+
 		/** Shows one secondary tool. */
 		function showTool(id) {
 			state.tool = id;
@@ -2498,6 +2796,7 @@ var LayoutEditorPage = (function () {
 			const preserved = LayoutSourceIO.isPreserved(doc());
 			const builders = {
 				details: metadata,
+				versions: versionsTool,
 				layers: preserved ? null : layersTool,
 				modifiers: preserved ? null : modifiersPanel,
 				dead_keys: preserved ? null : deadKeysPanel,

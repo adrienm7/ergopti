@@ -333,6 +333,15 @@ bar's place and the backup format were decided by the agent on 2026-11-15, to re
   (uncompressed) and read everywhere; an archive deflated by another tool needs the webview's `DecompressionStream`
   (Chromium, WebView2, Safari 16.4 and WebKitGTK 2.40 or later), and an older webview refuses it with
   `backup_deflate_unsupported` instead of reading it wrong.
+- Saved versions (2026-11-25, an idea seen in the Layouts Wiki playground's Versions pane): the « Versions » tool
+  keeps up to `LayoutEditorWorkspace.MAX_VERSIONS` (20) named snapshots per tab beside the undo history, each its
+  TOML source and the time it was taken, stored in the same workspace text (`tabs[i].versions: [{name, text, at}]`,
+  absent when a tab has none, so a workspace without versions is stored as before), hence bounded by
+  `studio.max_workspace_bytes` like the tabs on the three OS and in IndexedDB; a host without a workspace keeps them
+  until the page closes and says so. « Compare » lists the keys a version maps differently from the layout
+  (`LayoutEditorModel.differences`, per layer and OS override) in a table; « Restore » makes the version the layout
+  as one step Undo takes back (« restore {name} »); « Delete » asks first. A 21st version or a name over 80
+  characters is refused with the reason, never dropped in silence.
 
 ## Limits stated to the user
 

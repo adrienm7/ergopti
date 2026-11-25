@@ -16,6 +16,10 @@
  *    by the buttons and the keys, each named.
  * 3. Optimiser: a settings change is a step, undone by Ctrl+Z and redone by
  *    Ctrl+Shift+Z.
+ * 4. Editor « Versions » (an idea seen in the Layouts Wiki playground): a
+ *    named snapshot is listed with its time, survives a reload in the
+ *    workspace, lists the keys mapped differently from the layout in a table,
+ *    and « Restore » is one step Undo takes back; deleting asks first.
  * Page errors and requests outside the loopback origin fail the gate.
  * ==============================================================================
  */
@@ -180,6 +184,70 @@ async function editor(browser, origin) {
 	await context.close();
 }
 
+/** The editor's saved versions: save, reload, compare, restore and undo, delete. */
+async function versions(browser, origin) {
+	const ready = () =>
+		document.title &&
+		!document.title.startsWith('layout_editor.') &&
+		document.querySelector('#le-board .le-key');
+	const { page, errors, context } = await open(browser, origin, 'layout_editor/index.html', ready);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	const map = async (code, text) => {
+		await page.click(`#le-board [data-code="${code}"]`);
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', text);
+		await page.click('#le-apply');
+	};
+	await page.click('#le-tool-tab-versions');
+	assert.ok(await page.isVisible('#le-versions-empty'), 'no version at first');
+	const original = await legend('KeyQ');
+	await page.fill('#le-version-name', 'Before ¤');
+	await page.keyboard.press('Enter');
+	await page.waitForSelector('#le-versions-table');
+	assert.deepEqual(
+		await page.$$eval('#le-versions-table tbody th', (cells) =>
+			cells.map((cell) => cell.textContent)
+		),
+		['Before ¤'],
+		'the version is listed by its name'
+	);
+	assert.ok(
+		await page.getAttribute('#le-versions-table time', 'datetime'),
+		'the version carries the time it was saved'
+	);
+	await map('KeyQ', '¤');
+	// The workspace keeps the version with its tab across a reload.
+	await page.waitForFunction(() => document.querySelector('.le-autosave.saved'));
+	await page.reload();
+	await page.waitForFunction(ready);
+	await page.click('#le-tool-tab-versions');
+	await page.waitForSelector('#le-versions-table');
+	assert.equal(await legend('KeyQ'), '¤', 'the edit survived the reload');
+	await page.click('#le-version-diff-0');
+	await page.waitForSelector('#le-version-diff-table');
+	const rows = await page.$$eval('#le-version-diff-table tbody tr', (trs) =>
+		trs.map((tr) => [...tr.children].map((cell) => cell.textContent))
+	);
+	assert.equal(rows.length, 1, `one key differs: ${JSON.stringify(rows)}`);
+	assert.equal(rows[0][3], '¤', 'what the key types now');
+	assert.equal(await page.getAttribute('#le-version-diff-0', 'aria-pressed'), 'true');
+	await page.click('#le-version-restore-0');
+	assert.equal(await legend('KeyQ'), original, 'the version came back');
+	assert.match(
+		await name(page, '#le-undo'),
+		/^Undo: restore Before ¤ /,
+		'a restore is a named step'
+	);
+	await page.click('#le-undo');
+	assert.equal(await legend('KeyQ'), '¤', 'Undo takes the restore back');
+	await page.click('#le-version-delete-0');
+	await page.waitForSelector('#le-confirm-no');
+	await page.click('#le-confirm-yes');
+	await page.waitForSelector('#le-versions-empty');
+	assert.deepEqual(errors, [], 'versions page errors');
+	await context.close();
+}
+
 /** The Comparer: a weight edit and a restore are named steps. */
 async function comparer(browser, origin) {
 	const { page, errors, context } = await open(
@@ -268,6 +336,8 @@ async function main() {
 	try {
 		await editor(browser, origin);
 		console.log('ok - editor history');
+		await versions(browser, origin);
+		console.log('ok - editor versions');
 		await comparer(browser, origin);
 		console.log('ok - Comparer history');
 		await optimizer(browser, origin);
