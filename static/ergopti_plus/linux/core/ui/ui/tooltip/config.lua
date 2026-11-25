@@ -25,7 +25,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Paths = require("core.fs.engine.paths")
-local TomlReader = require("core.text.engine.toml_codec.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
 local KeyNames = require("platform.input.keycodes.key_names")
 

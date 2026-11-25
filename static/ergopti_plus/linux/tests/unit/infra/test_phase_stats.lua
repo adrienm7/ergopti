@@ -181,6 +181,29 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		helpers.assert_eq(stats.figures("toml.parse").n, 1)
 	end)
 
+	-- The tooltip constants, the timing registry and the two hotstring windows
+	-- parsed through the shared reader itself, so the phase summary missed
+	-- them; macOS reads each through its timed reader (parity TXT-01).
+	helpers.it("every production module parses TOML through the timed reader (txt-01)", function()
+		local root = (helpers.driver_root():gsub("[/\\]$", ""))
+		local paths = assert(require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true }))
+		local shim, bypassing = 0, {}
+		for _, path in ipairs(paths) do
+			local handle = assert(io.open(path, "rb"))
+			local body = assert(handle:read("*a"))
+			handle:close()
+			if body:find("MODULE: Timed TOML Reader (Linux)", 1, true) then
+				shim = shim + 1
+			elseif body:find("core.text.engine.toml_codec.reader", 1, true) then
+				bypassing[#bypassing + 1] = path:sub(#root + 2)
+			end
+		end
+		helpers.assert_eq(shim, 1, "the timed reader is found by its banner")
+		helpers.assert_eq(table.concat(bypassing, ", "), "", "modules reading the shared reader untimed")
+	end)
+
 	helpers.it("records every closed boot stage as boot.stage with its CPU time as boot.stage_cpu", function()
 		local stats = fixture(20)
 		package.loaded["core.logger.engine.boot_profiler"] = nil
