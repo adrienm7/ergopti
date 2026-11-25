@@ -272,6 +272,46 @@ const byId = new Map(E.libraryLayouts().map((layout) => [layout.id, layout]));
 	throws(() => E.wordsWithKeys(qwerty, words, ['KeyD', 'Nope']), 'words: an unknown code throws');
 }
 
+// ===================================
+// ======= 5/ Corpus blends ===========
+// ===================================
+
+{
+	const a = E.ngramsFromText('le chat dort');
+	const b = E.ngramsFromText('the cat sleeps');
+	a.words = { chat: 4, dort: 1 };
+	b.words = { cat: 1 };
+	const total = (table) => Object.values(table).reduce((sum, n) => sum + n, 0);
+	const blend = E.blendNgrams([
+		{ ngrams: a, weight: 3 },
+		{ ngrams: b, weight: 1 },
+		{ ngrams: E.ngramsFromText('zzz'), weight: 0 }
+	]);
+	check(Math.abs(total(blend.chars) - E.BLEND_CHARS) < 1e-6, 'blend: BLEND_CHARS characters');
+	// « o » is French only: 3/4 of the characters, one of the 12 French ones.
+	check(
+		Math.abs(blend.chars.o - (E.BLEND_CHARS * 0.75) / 12) < 1e-6,
+		`blend: a part weighs its share of the characters (${blend.chars.o})`
+	);
+	check(!('z' in blend.chars), 'blend: a part of weight 0 is skipped');
+	check(
+		Object.keys(blend.words)[0] === 'chat' && 'cat' in blend.words,
+		'blend: the word tables are mixed'
+	);
+	// A blend of one corpus measures as that corpus.
+	const alone = E.blendNgrams([{ ngrams: a, weight: 1 }]);
+	const layout = byId.get('azerty');
+	const r1 = E.analyse(layout, a, { keyboard: 'iso' });
+	const r2 = E.analyse(layout, alone, { keyboard: 'iso' });
+	check(
+		Object.keys(r1.metrics).every((id) => Math.abs(r1.metrics[id] - r2.metrics[id]) <= 1e-9),
+		'blend: one corpus alone measures the same'
+	);
+	throws(() => E.blendNgrams([]), 'blend: no part throws');
+	throws(() => E.blendNgrams([{ ngrams: a, weight: -1 }]), 'blend: a negative weight throws');
+	throws(() => E.blendNgrams([{ ngrams: a, weight: 0 }]), 'blend: all weights 0 throw');
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-analysis-views: ${errors.length} problem(s)`);

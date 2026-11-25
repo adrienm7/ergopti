@@ -2321,3 +2321,27 @@ body:has(> main.layout-analysis) {
 	text-align: right;
 	white-space: nowrap;
 }
+
+/* Corpus blends (an idea seen in the Layouts Wiki playground): each part a
+   corpus picker and its weight on one wrapping line. */
+.la-blend-parts {
+	border: 0;
+	margin: 8px 0;
+	padding: 0;
+}
+
+.la-blend-part {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	margin: 0 0 8px;
+}
+
+.la-blend-part select {
+	max-width: 100%;
+}
+
+.la-blend-part input {
+	width: 5em;
+}

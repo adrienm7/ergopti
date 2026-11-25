@@ -425,6 +425,11 @@
 	// The trace tab (an idea seen in the Layouts Wiki playground): the text it
 	// types when the visitor has written none.
 	const TRACE_SAMPLE_KEY = 'layout_analysis.trace.sample';
+	// Corpus blends (an idea seen in the Layouts Wiki playground): how many
+	// corpora a blend mixes, its id in the corpus list, and the first parts.
+	const BLEND_PARTS = 3;
+	const BLEND_ID = 'blend';
+	const BLEND_DEFAULT_WEIGHTS = [50, 50, 0];
 	// How many corpus words the drill-down of a penalised group names.
 	const TRACE_WORDS_SHOWN = 12;
 	// A filter set to this value keeps everything.
@@ -490,6 +495,32 @@
 			data-i18n-placeholder="layout_analysis.corpus.paste_placeholder"
 		></textarea>
 	</p>
+	<details id="la-blend" class="la-section la-blend">
+		<summary id="la-blend-name" data-i18n="layout_analysis.blend.title"></summary>
+		<p id="la-blend-caption" class="la-muted" data-i18n="layout_analysis.blend.caption"></p>
+		<fieldset class="la-blend-parts" aria-labelledby="la-blend-name" aria-describedby="la-blend-caption">
+			<p class="la-blend-part">
+				<label id="la-blend-corpus-label-0" for="la-blend-corpus-0"></label>
+				<select id="la-blend-corpus-0"></select>
+				<label id="la-blend-weight-label-0" for="la-blend-weight-0"></label>
+				<input id="la-blend-weight-0" type="number" min="0" max="100" step="5" inputmode="numeric" />
+			</p>
+			<p class="la-blend-part">
+				<label id="la-blend-corpus-label-1" for="la-blend-corpus-1"></label>
+				<select id="la-blend-corpus-1"></select>
+				<label id="la-blend-weight-label-1" for="la-blend-weight-1"></label>
+				<input id="la-blend-weight-1" type="number" min="0" max="100" step="5" inputmode="numeric" />
+			</p>
+			<p class="la-blend-part">
+				<label id="la-blend-corpus-label-2" for="la-blend-corpus-2"></label>
+				<select id="la-blend-corpus-2"></select>
+				<label id="la-blend-weight-label-2" for="la-blend-weight-2"></label>
+				<input id="la-blend-weight-2" type="number" min="0" max="100" step="5" inputmode="numeric" />
+			</p>
+		</fieldset>
+		<button id="la-blend-use" type="button" data-i18n-text="layout_analysis.blend.use"></button>
+		<p id="la-blend-status" class="la-muted" role="status"></p>
+	</details>
 </section>
 
 <section class="la-card la-options" aria-labelledby="la-options-label">
@@ -5510,6 +5541,76 @@
 			});
 			$('la-corpus').classList.toggle('la-corpus-mine', state.corpus === MY_TYPING_ID);
 			showCorpusInfo();
+			fillBlend();
+		}
+
+		/** The blend's parts: each a built-in corpus picker and its weight. */
+		function fillBlend() {
+			const builtins = corpora.filter((c) => c.builtin);
+			for (let i = 0; i < BLEND_PARTS; i++) {
+				$(`la-blend-corpus-label-${i}`).textContent = t('layout_analysis.blend.corpus', {
+					n: i + 1
+				});
+				$(`la-blend-weight-label-${i}`).textContent = t('layout_analysis.blend.weight', {
+					n: i + 1
+				});
+				const select = $(`la-blend-corpus-${i}`);
+				const chosen = select.value || (builtins[i] || builtins[0]).id;
+				window.LAYOUT_ANALYSIS_FILES.fillCorpusPicker(select, {
+					mine: [],
+					builtins: builtins.map((c) => c.builtin),
+					value: chosen,
+					t,
+					locale: INFO.locale()
+				});
+				const weight = $(`la-blend-weight-${i}`);
+				if (weight.value === '') weight.value = String(BLEND_DEFAULT_WEIGHTS[i]);
+			}
+		}
+
+		/**
+		 * Mixes the chosen built-in corpora by their weights (E.blendNgrams) and
+		 * compares on the blend, listed with the user's own texts.
+		 */
+		async function useBlend() {
+			const status = $('la-blend-status');
+			const parts = [];
+			for (let i = 0; i < BLEND_PARTS; i++) {
+				const weight = Number($(`la-blend-weight-${i}`).value);
+				if (!Number.isFinite(weight) || weight < 0) {
+					status.textContent = t('layout_analysis.blend.weight_invalid', { n: i + 1 });
+					return;
+				}
+				if (weight === 0) continue;
+				const select = $(`la-blend-corpus-${i}`);
+				const corpus = corpora.find((c) => c.id === select.value);
+				parts.push({ corpus, weight, name: select.selectedOptions[0].textContent });
+			}
+			if (parts.length === 0) {
+				status.textContent = t('layout_analysis.blend.empty');
+				return;
+			}
+			status.textContent = t('layout_analysis.blend.loading');
+			const loaded = await Promise.all(
+				parts.map((part) => window.LAYOUT_ANALYSIS_FILES.builtinTables(part.corpus.builtin))
+			);
+			const all = parts.reduce((sum, part) => sum + part.weight, 0);
+			const tables = E.blendNgrams(
+				loaded.map((ngrams, i) => ({ ngrams, weight: parts[i].weight }))
+			);
+			const title = t('layout_analysis.blend.entry', {
+				parts: parts
+					.map((part) =>
+						t('layout_analysis.blend.entry_part', {
+							name: part.name,
+							share: measure((100 * part.weight) / all, 0, '%')
+						})
+					)
+					.join(', ')
+			});
+			state.corpus = BLEND_ID;
+			setCorpus({ id: BLEND_ID, title, tables, default: true });
+			status.textContent = t('layout_analysis.blend.done', { title });
 		}
 
 		/**
@@ -6973,6 +7074,12 @@
 				renderDetails();
 			});
 			$('la-worst-event').addEventListener('change', renderDetails);
+			$('la-blend-use').addEventListener('click', () => {
+				useBlend().catch((error) => {
+					$('la-blend-status').textContent = t('layout_analysis.blend.failed');
+					throw error;
+				});
+			});
 			// The Pareto tab's choices, kept with the other conveniences.
 			$('la-pareto-x').addEventListener('change', (event) => {
 				state.pareto.x = event.target.value;
