@@ -1,4 +1,4 @@
---- tests/unit/modules/shortcuts/auto_click/test_auto_click_mode.lua
+--- tests/unit/modules/shortcuts/test_auto_click_mode.lua
 
 --- ==============================================================================
 --- MODULE: Anti-Sleep Mode Tests (macOS)
