@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Provedená automatická kliknutí: {1}",
 	"menu.keep_awake.library": "Knihovna…",
 	"keepawake.preset.simple": "Jednoduché zabránění uspání",
-	"keepawake.preset.vscode": "Zabránit uspání ve VS Code",
+	"keepawake.preset.vscode": "Automatické přijetí + zabránění uspání (VS Code)",
 	"keepawake.preset_empty": "Tato předvolba nebrání uspání ani nic nekliká: zapněte jednu z jejích voleb v nabídce « Zabránit uspání ».",
 	"keepawake.auto_click_refused": "Automatická kliknutí se nepodařilo spustit: nabídka « Zabránit uspání » uvádí proč.",
 	"keepawake.auto_click_unavailable": "V této relaci není k dispozici: červený řádek níže uvádí proč.",

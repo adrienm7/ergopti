@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Automatische Klicks: {1}",
 	"menu.keep_awake.library": "Bibliothek…",
 	"keepawake.preset.simple": "Einfaches Wachhalten",
-	"keepawake.preset.vscode": "Wachhalten in VS Code",
+	"keepawake.preset.vscode": "Automatisch annehmen + Wachhalten (VS Code)",
 	"keepawake.preset_empty": "Diese Voreinstellung verhindert weder den Ruhezustand noch klickt sie: Aktivieren Sie eine ihrer Optionen im Menü « Wachhalten ».",
 	"keepawake.auto_click_refused": "Automatische Klicks konnten nicht starten: Das Menü « Wachhalten » nennt den Grund.",
 	"keepawake.auto_click_unavailable": "In dieser Sitzung nicht verfügbar: Die rote Zeile darunter nennt den Grund.",

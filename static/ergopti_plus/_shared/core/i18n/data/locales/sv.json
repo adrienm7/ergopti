@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Automatiska klick gjorda: {1}",
 	"menu.keep_awake.library": "Bibliotek…",
 	"keepawake.preset.simple": "Enkel håll vaken",
-	"keepawake.preset.vscode": "Håll vaken i VS Code",
+	"keepawake.preset.vscode": "Automatiskt godkännande + håll vaken (VS Code)",
 	"keepawake.preset_empty": "Den här förinställningen förhindrar inte viloläge och klickar inte: aktivera ett av dess alternativ i menyn « Håll vaken ».",
 	"keepawake.auto_click_refused": "Automatiska klick kunde inte starta: menyn « Håll vaken » anger varför.",
 	"keepawake.auto_click_unavailable": "Inte tillgängligt i den här sessionen: den röda raden nedan säger varför.",

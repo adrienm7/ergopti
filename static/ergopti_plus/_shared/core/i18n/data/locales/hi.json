@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "किए गए स्वचालित क्लिक: {1}",
 	"menu.keep_awake.library": "लाइब्रेरी…",
 	"keepawake.preset.simple": "साधारण जागृत रखें",
-	"keepawake.preset.vscode": "VS Code में जागृत रखें",
+	"keepawake.preset.vscode": "स्वतः स्वीकृति + जागृत रखें (VS Code)",
 	"keepawake.preset_empty": "यह प्रीसेट न स्लीप रोकता है न कुछ क्लिक करता है: « जागृत रखें » मेनू में इसका कोई विकल्प चालू करें।",
 	"keepawake.auto_click_refused": "स्वचालित क्लिक शुरू नहीं हो सके: कारण « जागृत रखें » मेनू में है।",
 	"keepawake.auto_click_unavailable": "इस सत्र में उपलब्ध नहीं: नीचे की लाल पंक्ति कारण बताती है।",

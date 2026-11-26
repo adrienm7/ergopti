@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "לחיצות אוטומטיות שבוצעו: {1}",
 	"menu.keep_awake.library": "ספרייה…",
 	"keepawake.preset.simple": "מניעת שינה פשוטה",
-	"keepawake.preset.vscode": "מניעת שינה ב-VS Code",
+	"keepawake.preset.vscode": "אישור אוטומטי + מניעת שינה (VS Code)",
 	"keepawake.preset_empty": "הגדרה זו אינה מונעת שינה ואינה לוחצת על דבר: הפעילו אחת מהאפשרויות שלה בתפריט « מניעת שינה ».",
 	"keepawake.auto_click_refused": "לא ניתן להפעיל לחיצות אוטומטיות: הסיבה מופיעה בתפריט « מניעת שינה ».",
 	"keepawake.auto_click_unavailable": "לא זמין בהפעלה זו: השורה האדומה למטה מסבירה מדוע.",

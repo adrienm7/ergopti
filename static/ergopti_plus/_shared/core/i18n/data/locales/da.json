@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Automatiske klik udført: {1}",
 	"menu.keep_awake.library": "Bibliotek…",
 	"keepawake.preset.simple": "Enkel hold vågen",
-	"keepawake.preset.vscode": "Hold vågen i VS Code",
+	"keepawake.preset.vscode": "Automatisk accept + hold vågen (VS Code)",
 	"keepawake.preset_empty": "Denne forudindstilling forhindrer ikke dvale og klikker ikke: slå en af dens indstillinger til i menuen « Hold vågen ».",
 	"keepawake.auto_click_refused": "Automatiske klik kunne ikke starte: menuen « Hold vågen » viser hvorfor.",
 	"keepawake.auto_click_unavailable": "Ikke tilgængelig i denne session: den røde linje nedenfor siger hvorfor.",

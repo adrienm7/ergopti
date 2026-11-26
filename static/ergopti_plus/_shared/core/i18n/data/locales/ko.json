@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "수행한 자동 클릭: {1}",
 	"menu.keep_awake.library": "라이브러리…",
 	"keepawake.preset.simple": "기본 절전 방지",
-	"keepawake.preset.vscode": "VS Code에서 절전 방지",
+	"keepawake.preset.vscode": "자동 수락 + 절전 방지 (VS Code)",
 	"keepawake.preset_empty": "이 프리셋은 절전을 막지도, 클릭하지도 않습니다. « 절전 방지 » 메뉴에서 옵션 중 하나를 켜세요.",
 	"keepawake.auto_click_refused": "자동 클릭을 시작할 수 없습니다. 이유는 « 절전 방지 » 메뉴에 표시됩니다.",
 	"keepawake.auto_click_unavailable": "이 세션에서는 사용할 수 없습니다: 아래 빨간 줄에 이유가 있습니다.",

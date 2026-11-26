@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Wykonane automatyczne kliknięcia: {1}",
 	"menu.keep_awake.library": "Biblioteka…",
 	"keepawake.preset.simple": "Proste zapobieganie uśpieniu",
-	"keepawake.preset.vscode": "Zapobieganie uśpieniu w VS Code",
+	"keepawake.preset.vscode": "Automatyczna akceptacja + zapobieganie uśpieniu (VS Code)",
 	"keepawake.preset_empty": "To ustawienie nie zapobiega uśpieniu ani niczego nie klika: włącz jedną z jego opcji w menu « Zapobieganie uśpieniu ».",
 	"keepawake.auto_click_refused": "Nie udało się uruchomić automatycznych kliknięć: menu « Zapobieganie uśpieniu » podaje przyczynę.",
 	"keepawake.auto_click_unavailable": "Niedostępne w tej sesji: czerwony wiersz poniżej podaje powód.",

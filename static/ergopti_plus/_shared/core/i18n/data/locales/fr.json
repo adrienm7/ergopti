@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Clics automatiques effectués : {1}",
 	"menu.keep_awake.library": "Bibliothèque…",
 	"keepawake.preset.simple": "Anti-veille simple",
-	"keepawake.preset.vscode": "Anti-veille dans VS Code",
+	"keepawake.preset.vscode": "Acceptation auto + anti-veille (VS Code)",
 	"keepawake.preset_empty": "Ce préréglage n’empêche pas la mise en veille et ne clique rien : activez l’une de ses options dans le menu « Anti-veille ».",
 	"keepawake.auto_click_refused": "Les clics automatiques n’ont pas pu démarrer : le menu « Anti-veille » indique pourquoi.",
 	"keepawake.auto_click_unavailable": "Indisponible dans cette session : la ligne rouge ci-dessous indique pourquoi.",

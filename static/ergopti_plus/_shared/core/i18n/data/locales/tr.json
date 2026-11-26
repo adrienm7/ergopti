@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Yapılan otomatik tıklamalar: {1}",
 	"menu.keep_awake.library": "Kitaplık…",
 	"keepawake.preset.simple": "Basit uyku engelleme",
-	"keepawake.preset.vscode": "VS Code'da uyku engelleme",
+	"keepawake.preset.vscode": "Otomatik onay + uyku engelleme (VS Code)",
 	"keepawake.preset_empty": "Bu ön ayar uykuyu engellemiyor ve hiçbir şeye tıklamıyor: « Uyku engelleme » menüsünden seçeneklerinden birini açın.",
 	"keepawake.auto_click_refused": "Otomatik tıklamalar başlatılamadı: nedeni « Uyku engelleme » menüsünde yazıyor.",
 	"keepawake.auto_click_unavailable": "Bu oturumda kullanılamıyor: nedeni aşağıdaki kırmızı satırda.",

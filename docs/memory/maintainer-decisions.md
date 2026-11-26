@@ -153,7 +153,11 @@ auto-click (off by default), persisted through the single defaults source
 - Presets: the library persists; named presets hold the allowed apps, the
   targets and the keep-awake and auto-click switches. Starters are data
   (`_shared/shortcuts/data/keep_awake_presets.json`): « Anti-veille simple »
-  and « Anti-veille dans VS Code » (Copilot captions, auto-click on). « Anti-veille
+  and « Acceptation auto + anti-veille (VS Code) » (Copilot captions,
+  auto-click on), renamed from « Anti-veille dans VS Code » on 2026-11-26
+  (maintainer) because it also auto-accepts « Autoriser une fois »; its id
+  stays `vscode`, which saved active choices and user copies name, and only
+  the `keepawake.preset.vscode` text changed. « Anti-veille
   dans Teams » was removed on 2026-11-26 (maintainer): keep-awake only, it did
   what « simple » does. A user document that copied it keeps it, active or not;
   its name key is gone, so the store names that copy after its id (`teams`)

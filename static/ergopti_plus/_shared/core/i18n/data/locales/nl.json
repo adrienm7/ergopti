@@ -6661,7 +6661,7 @@
 	"menu.keep_awake.click_count": "Automatische klikken: {1}",
 	"menu.keep_awake.library": "Bibliotheek…",
 	"keepawake.preset.simple": "Eenvoudig wakker houden",
-	"keepawake.preset.vscode": "Wakker houden in VS Code",
+	"keepawake.preset.vscode": "Automatisch accepteren + wakker houden (VS Code)",
 	"keepawake.preset_empty": "Deze voorinstelling voorkomt de slaapstand niet en klikt nergens op: schakel een van de opties in via het menu « Wakker houden ».",
 	"keepawake.auto_click_refused": "Automatische klikken konden niet starten: het menu « Wakker houden » vermeldt waarom.",
 	"keepawake.auto_click_unavailable": "Niet beschikbaar in deze sessie: de rode regel hieronder zegt waarom.",
