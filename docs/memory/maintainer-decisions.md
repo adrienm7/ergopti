@@ -5,6 +5,64 @@
 Settled product and engineering choices. Do not raise them again unless the
 named constraint changes; a change of mind comes from the maintainer.
 
+## Touches de jeu: held keys, a choice per game (2026-11-26)
+
+Decided by the maintainer on 2026-11-26, for v1.0.10. Games read two channels:
+a key identity for controls (a scan code, an evdev code, a macOS key code, or a
+layout-dependent virtual key in Unreal-type games) and a character for chat.
+Ergopti always types its character; « Touches de jeu » chooses the identity:
+`layout.game_keys` = `physical` (default: the key keeps its physical place, WASD
+stays WASD) or `letters` (the key that types the Ergopti letter on the system
+layout), and `layout.game_keys_apps` (the manifest's first `map` type:
+application identity, the executable on Windows, the bundle identifier on
+macOS, the WM class or app_id on Linux, to a choice). An application listed
+there is a game: its tap-holds are skipped on Windows (`_TapHoldGameSkips`)
+and Linux (`tap_hold_manager.set_game`); macOS and the per-application
+hotstring switch are open in TODO.md. Mechanisms, one source each:
+
+- The route table and the held-key rule are
+  `_shared/layouts/engine/emulation/game_keys.lua` and its Windows twin
+  `windows/modules/keymap/keylayout/game_keys.ahk`, held together by
+  `_shared/tests/corpus/layouts/game_keys_vectors.json`.
+- Held keys in the emulation (the bug: Windows sent each emulated character as
+  a `{Text}` Unicode packet, scan code 0, down and up at once; Linux typed a tap
+  and forwarded no release): a character the system layout types with exactly
+  the modifiers the hand holds goes out as that layout's key, down on the
+  press, again on each repeat of the physical key, up on its release. Windows
+  `GameKeys_TryHold` (`{vkXX down}`, or the split event `{vkXXscYYY down}` for
+  `physical`, released by one Suspend-exempt `*SCxxx Up` hotkey per key, and
+  by `GameKeys_ReleaseAll` on a pause); Linux the keyboard hook's `hold_code`
+  receipt (the consumed press holds that key on the wire like a pass-through
+  key, its up only while the forwarded-down record is still the one its down
+  wrote, so a reset never owes a second up). Any other character keeps the
+  text route.
+- Per OS and mode: Windows emulation `letters` sends the system layout's key;
+  `physical` sends the split event (physical scan code, the letter's VK:
+  unproven, field check in TODO-tests-windows.md) or, in a game with the
+  Ergopti system layout installed, switches that window to it and lets its
+  keys through (`GameKeys_PassThrough`). Linux emulation `letters` holds the
+  session layout's key; `physical` in a game switches the session to the
+  installed Ergopti XKB layout while the game has the focus
+  (`modules/keymap/game_keys_focus.lua`), and is greyed with
+  `platform_reason.game_keys_physical_needs_installed_layout` without one.
+  macOS keeps the physical key code (`physical`) or rewrites the down, repeat
+  and up key codes to the input source's key of the character (`letters`),
+  over the emulation and the installed layout (US positions there).
+  `letters` over the installed layout on Windows and Linux is greyed with
+  `platform_reason.game_keys_letters_needs_base_layout` (one code carries both
+  channels; the emulation over a QWERTY or AZERTY layout is the way).
+  Unreal-type games follow the letters on Windows and GameController games
+  keep the physical place on macOS: a greyed note row under the checked
+  choice.
+- The menu: one `list` row `layout_game_keys` in the tuning section of
+  « Dispositions et émulation » on the three OS (`menu.lua` `game_keys_rows`,
+  Windows `_LAY_GameKeysRows`): the global choice as a single-choice group,
+  then the application last in front with « Comme les autres applications »
+  and the two choices.
+
+Action: a new emitter of an emulated character goes through the held-key
+primitive first; never send an emulated down without its release owner.
+
 ## Ergopti's own fields type like any other; only recording fields are raw (2026-11-25)
 
 Decided by the maintainer on 2026-11-25: the layout emulation and the

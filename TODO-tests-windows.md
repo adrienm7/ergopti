@@ -22,7 +22,9 @@ integrates. Every commit keeps the AHK UTF-8 BOM, reseals a touched updater sour
    (fixed, 2.1 % after); the commit left a stale index (fixed). Left: the `pwsh` run (PowerShell 7 is not installed
    on the PC), and the boot cost (3,010 ms at start, 3,895 ms after the reload, budget 2,500 ms) measured on an idle
    PC before reading it as a regression: this one ran beside a terminal, an editor and 3.3 GB of free RAM.
-3. The Windows items of « Remaining code work » in TODO.md.
+3. The Windows items of « Remaining code work » and « Touches de jeu » in TODO.md: the split event
+   (`{vkXXscYYY}`, physical scan code with the Ergopti letter's VK) read by a probe window (`WM_INPUT` MakeCode
+   and VKey, `WM_KEYDOWN` lParam, `WM_CHAR`, DirectInput8) and the held keys in a scan-code game.
 4. The checks below and the [standing checks](docs/tooling/windows-maintainer-checks.md#standing-checks) 1 to 15
    (`node tools/maintainer/windows-live-checks.cjs` runs the automatable ones). On 2026-11-23 its 41 checks pass:
    five had stale expectations (the « 🌐 Layouts and emulation » menu, the magic key that follows the OS layout

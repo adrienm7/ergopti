@@ -339,6 +339,44 @@ simplicity bonuses ».
   - the trigram metrics of a layout with choices complete a fourth character as a Markov chain (SFS within 0.04
     points of the text’s own stream on Swann and Nemolivier).
 
+## Touches de jeu (maintainer decision, 2026-11-26, for v1.0.10)
+
+Held emulated keys and the « Touches de jeu » choice (`layout.game_keys`, `layout.game_keys_apps`) are delivered on
+the three OS ([decision](docs/memory/maintainer-decisions.md#touches-de-jeu-held-keys-a-choice-per-game-2026-11-26)).
+Left open, by OS:
+
+- [ ] **[Windows] Field check of the split event** (unproven, `GameKeys_TryHold` with `physical`): with the
+      emulation over AZERTY, a probe window logging `WM_INPUT` MakeCode and VKey, the `WM_KEYDOWN` lParam scan code,
+      `WM_CHAR` and a DirectInput8 device reads the physical scan code, the Ergopti letter's VK and the Ergopti
+      character for one `{vkXXscYYY}` event. If a game or an API sees the VK and the scan code disagree, the
+      report's fallback is the installed Ergopti layout per game window (`GameKeys_PassThrough`, already wired when
+      it is installed); say which titles need it. Details in [TODO-tests-windows.md](TODO-tests-windows.md).
+- [ ] **[Windows] Field check of the held keys:** in a scan-code game (DirectInput or raw input) over AZERTY with
+      the emulation, WASD-like movement holds and stops on release, Shift+key (sprint) holds too, binding a key
+      records it, a pause releases a held key, chat types Ergopti, ★ and typographic signs still type; in a game
+      listed with « physical » and the Ergopti system layout installed, the window switches to it and back
+      (the first key after a focus change may still be emulated). The AHK suite runs `test_game_keys.ahk` and the
+      `_RemapHeldEmit` serialization meta-test, never run (no AutoHotkey in the cloud container).
+- [ ] **[Linux] Field check (Arch, KDE Plasma Wayland):** with the emulation over us or fr, a held key in Unciv or
+      an SDL game moves until release with no runaway repeat, a repeat stops with the key; an application listed
+      « physical » with the Ergopti XKB layout installed switches to it while focused and back after; its tap-holds
+      are skipped while it has the focus. Greyed row without the installed layout.
+- [ ] **[macOS] Field check:** « letters » rewrites the key code a keyCode game (SDL) binds, down, repeat and up
+      alike, over the emulation and over the installed Ergopti layout; « physical » leaves it; GameController games
+      keep the physical place (the greyed note).
+- [ ] **[macOS] Tap-holds in games:** not delivered. The tap-holds are Karabiner rules; a game needs a
+      `frontmost_application_unless` condition with the listed bundle identifiers on each tap-hold manipulator
+      (`platform/remap/generator.lua`), regenerated when `layout.game_keys_apps` changes. Windows
+      (`_TapHoldGameSkips`) and Linux (`tap_hold_manager.set_game`) skip them.
+- [ ] **[All] Hotstrings off per application:** not delivered (no per-app hotstring rule exists yet). Add
+      `hotstrings.disabled_apps` (array, as `metrics.disabled_apps`), its exclusion rows on the three OS (Linux
+      `apps/ui/menu/exclusion_rows.lua`, macOS AppPickerLib, Windows the metrics app picker) and one gate per
+      driver before a match fires (Windows `_OnPrefixChar` and the HSE end-character path, Linux the engine feed of
+      `ergopti_hotstrings.lua`, macOS the expander).
+- [ ] **[Windows, Linux] « letters » over the installed Ergopti layout:** greyed with
+      `platform_reason.game_keys_letters_needs_base_layout`. Delivering it needs a per-game switch to a QWERTY or
+      AZERTY layout of the user's list and the emulation of Ergopti in that window only.
+
 ## Layout repeat and magic keys (maintainer choice, 2026-11-25)
 
 Design: [docs/design/magic-and-repeat-keys.md](docs/design/magic-and-repeat-keys.md). Done: the analysis (the
