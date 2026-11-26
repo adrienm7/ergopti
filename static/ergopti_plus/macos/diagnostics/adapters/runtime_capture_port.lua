@@ -9,7 +9,7 @@
 --- admitted stream and its loss, and stops it with exact settlement. The
 --- session, the accounting mode, the privacy and pause history and the periodic
 --- lease rotation are the existing physical_* modules; this adapter only drives
---- them. Required only when the user opts in to the owned runtime.
+--- them. Required at every owned boot, the default unless `runtime = "shared"`.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pinned Declaration Only: the executable is the bundle-bound launcher, the

@@ -317,7 +317,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "diagnostics.adapters.runtime_capture_port",
 		contract = { "new" },
-		-- Built by the owned runtime ports; dormant at default boot.
+		-- Built by the owned runtime ports, at every owned boot (the default unless `runtime = "shared"`).
 		wired    = true,
 	},
 	{
