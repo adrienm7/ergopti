@@ -886,7 +886,7 @@
 		"@stryker-mutator/core": "^9.6.1",
 		"@sveltejs/adapter-static": "^4.0.1",
 		"@sveltejs/enhanced-img": "^1.0.0",
-		"@sveltejs/kit": "^3.1.0",
+		"@sveltejs/kit": "^3.4.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@types/aos": "^3.0.7",
 		"axe-core": "4.14.0",
