@@ -87,8 +87,21 @@ body {
 	position: relative;
 }
 
+/* The name column takes what the fixed columns leave (script.js draws three
+   numeric ones). In a window narrower than their sum, it fell to 0 px and its
+   44 px sort button ran over « Disque »: the table keeps the name column's
+   minimum and scrolls sideways in #table-wrap instead. */
 table {
+	--col-current-width: 64px;
+	--col-status-width: 140px;
+	--col-actions-width: 230px;
+	--col-num-width: 88px;
+	--col-name-min-width: 10em;
 	border-collapse: collapse;
+	min-inline-size: calc(
+		var(--col-current-width) + var(--col-name-min-width) + 3 * var(--col-num-width) +
+			var(--col-status-width) + var(--col-actions-width)
+	);
 	table-layout: fixed;
 	width: 100%;
 }
@@ -129,18 +142,18 @@ thead th.sorted-desc::after {
 
 .col-current {
 	text-align: center;
-	width: 64px;
+	width: var(--col-current-width);
 }
 .col-status {
 	text-align: center;
-	width: 140px;
+	width: var(--col-status-width);
 }
 .col-actions {
-	width: 230px;
+	width: var(--col-actions-width);
 }
 .col-num {
 	text-align: end;
-	width: 88px;
+	width: var(--col-num-width);
 }
 
 /* A model's name, family or size wraps in its fixed column rather than being
