@@ -97,6 +97,24 @@ Test("hotstring languages: every bundled hotstring section ships disabled (hs-la
 ; French pack ships no distancesreduction.toml: its tray row read « (0) », an
 ; empty name, in the Windows tray walk.
 _HLP_ExtensionLanguageCategoryHasATitle() {
+	; The unit run does not execute tray_menu.ahk's body, which assigns the
+	; neutral category map; the test gives it the two neutral categories it reads.
+	global _V1CatToV2CatMap
+	HadMap := IsSet(_V1CatToV2CatMap)
+	if HadMap
+		SavedMap := _V1CatToV2CatMap
+	_V1CatToV2CatMap := Map("Autocorrection", "autocorrection",
+		"DistancesReduction", ConfigLeaf.DISTANCES_REDUCTION)
+	try _HLP_AssertLanguageCategoryTitles()
+	finally {
+		if HadMap
+			_V1CatToV2CatMap := SavedMap
+		else
+			_V1CatToV2CatMap := unset
+	}
+}
+
+_HLP_AssertLanguageCategoryTitles() {
 	AssertEqual(t("category.distances_reduction"), GetCategoryTitle("FrenchDistancesReduction"),
 		"a language category an extension supplies takes its neutral category's title")
 	AssertEqual(t("category.autocorrection"), GetCategoryTitle("FrenchAutocorrection"),
