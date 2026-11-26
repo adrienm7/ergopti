@@ -17,8 +17,8 @@
 --- injector over a fake uinput channel and a clock that a barrier advances by
 --- the budget it waits: the held trigger is released long before a desktop
 --- would repeat it, every key pressed is released, and an expansion waits on
---- no focus query at all, since a key's check reads the last receipt (each
---- expansion used to wait three times the output budget, three seconds).
+--- no focus query at all once the worker left one unanswered (each expansion
+--- used to wait three times the output budget, three seconds, by eye).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -52,8 +52,9 @@ local function window_owner(clock)
 			return nil
 		end,
 		authority = function() return "unanswered" end,
-		-- The real worker's last receipt: nothing ever answers.
-		snapshot = function() return nil end,
+		-- The real worker's non-waiting read: nothing ever answers.
+		poll = function() return nil, false end,
+		answered = function() return false end,
 	}
 	local epoch = 0
 	local guard = require("modules.keystats.focus_guard").new({

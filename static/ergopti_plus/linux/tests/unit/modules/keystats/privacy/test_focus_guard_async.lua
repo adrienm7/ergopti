@@ -18,7 +18,6 @@ local function fixture(body)
 			if state.changed then state.changed = false; listener(snapshot()) end
 		end,
 		barrier = function() state.barriers = state.barriers + 1; local field = snapshot(); listener(field); return field end,
-		snapshot = function() return snapshot() end,
 	}
 	guard = require("modules.keystats.focus_guard").new({ watch = watch, retry_ms = 1000,
 		detector = {

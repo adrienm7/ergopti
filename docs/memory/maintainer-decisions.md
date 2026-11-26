@@ -3324,6 +3324,12 @@ The maintainer answered the agent decisions pending on 2026-11-25.
 
 ## A Linux key never waits for the accessibility focus (2026-11-25)
 
+Reverted on 2026-11-26 before the v1.0.10 release: a control that becomes a
+password field on the same accessible object sends no focus event, so a key
+reading the last receipt typed into it (secure focus e2e). The per-key barrier
+is back; the decision stands for when the worker reports role and state
+changes of the focused object. The original text follows.
+
 Maintainer decision (Arch, KDE Plasma Wayland field report: Brave and Discord
 answer a fresh AT-SPI query in about 20 ms, and each key waited for one):
 the focus guard's key checks read the last receipt the focus worker already

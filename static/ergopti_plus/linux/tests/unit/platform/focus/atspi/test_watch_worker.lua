@@ -72,11 +72,7 @@ helpers.describe("resident focus worker: causal publication", function()
 	helpers.it("(focus-publication) actual parent Guard blocks password callbacks crossing a newer request", function()
 		local guard, worker, race, cleanup = parent_fixture()
 		local ok, reason = pcall(function()
-			-- A key sends no query (decided 2026-11-25): the race crosses the
-			-- focus refresh's barrier, the request that remains.
-			guard.invalidate()
 			race()
-			helpers.assert_eq(guard.refresh(true), false, "the refresh cannot join old ordinary A as the new field")
 			helpers.assert_true(guard.blocks_text(), "old-request unknown cannot let the parent accept old ordinary text as a new password query")
 			helpers.assert_eq(worker.current, "B")
 		end)

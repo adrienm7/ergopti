@@ -601,7 +601,11 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `pacman -Q lua51-lgi webkit2gtk-4.1 libayatana-appindicator` must list all three packages. Unproved here: the
       pkexec prompt under KDE's polkit agent, `sg` acquiring the new groups in the same session, and KWin Wayland's
       layout read (a failure shows « Disposition clavier non lue »).
-- [ ] **[FIELD] Linux keys never wait for the accessibility focus (maintainer decision, 2026-11-25).** Arch,
+- [ ] **Linux keys never wait for the accessibility focus (maintainer decision, 2026-11-25; reverted 2026-11-26).**
+      Reverted before the v1.0.10 release: a control that turns into a password field on the same object sends no
+      focus event, so keys read a stale receipt and typed into it (`run_secure_focus_watch.py`, « same native object
+      changes to password role »). To re-land: have the focus worker report role and state changes of the focused
+      object (AT-SPI `object:state-changed` / role property events), then read the receipt again. Original item: Arch,
       KDE Plasma Wayland, Brave and Discord: every key waited the 20 ms barrier (`focus_barrier_timeout_ms`) for a
       fresh AT-SPI answer, twice per character (`Slow input.char 21.44 ms own`, `input.dispatch` about 21 ms).
       Decided: a key reads the last receipt the focus worker already sent (`watch.snapshot()`), never a barrier; the

@@ -326,31 +326,23 @@ Action: name the problem from that answer (compositor_focus_worker
 
 ### project-linux-focus-barrier-budget-is-per-caller
 
-A physical key never waits for the focus worker (maintainer, 2026-11-25): the
-guard's key checks (`text_automation()`, `blocks_text()`,
-`focused_text_identity()` with no budget) read `watch.snapshot()`, the last
-receipt the worker sent. Its listener sends one on every AT-SPI focus,
-activation and active-window name event, and its heartbeats keep that receipt's
-lease. Chromium and Electron answer a fresh query in about 20 ms, the whole
-`focus_barrier_timeout_ms`, so each key used to wait it twice (the physical
-check, then the character's owner capture). Action: never call
-`watch.barrier()` from a key callback; the password latch and the RAM
-application/title policy still close it.
-
-`barrier()` stays for the off-key callers. The focus refresh keeps the 20 ms
-default because it runs on the loop that reads the keyboard. Right after the
-injector's erase, GTK is still drawing the Backspaces it was sent, so that
-budget failed expansions at random as `programmable_publication_stale`.
-Action: an output boundary of a retained field (`capture_field_owner`'s
-`current()`) passes the native query deadline (`atspi_probe_timeout_ms`).
+`atspi_focus_watch.barrier()` waits 20 ms (`focus_barrier_timeout_ms`) for the
+worker's fresh answer, because an input callback holds a physical key while it
+waits; a timeout publishes no receipt and revokes the joined field for good.
+Right after the injector's erase, GTK is still drawing the Backspaces it was
+sent, so that budget failed expansions at random as
+`programmable_publication_stale`. Action: an output boundary of a retained
+destination (`capture_text_owner`'s `current()`) passes the native query
+deadline (`atspi_probe_timeout_ms`); input callbacks keep the default.
 
 That long budget is for the field mode only. The window mode exists because
 the worker gives no field answer (KDE Wayland), so the barrier only timed out:
 three seconds per expansion, the first while the trigger's forwarded key-down
 was still held on the virtual keyboard, which KDE autorepeated (`,e` gave
-`,eeeeeeeeeje`, 2026-11-25). Action: the window-mode owner checks as a key
-does; never put a wait of the desktop's autorepeat delay (about 600 ms)
-between a forwarded key-down and the transaction's held-key release.
+`,eeeeeeeeeje`, 2026-11-25). Action: the window-mode owner checks with the
+input budget, which polls once the worker left a barrier unanswered; never put
+a wait of the desktop's autorepeat delay (about 600 ms) between a forwarded
+key-down and the transaction's held-key release.
 
 ### project-linux-first-install-needs-luajit-module-builds
 
