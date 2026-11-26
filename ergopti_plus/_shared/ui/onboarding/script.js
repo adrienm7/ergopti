@@ -25,6 +25,8 @@ var STEP_LANGUAGE = 'language';
 var STEP_CONFIG = 'config';
 
 // Radio value of the custom trigger-character row.
+// The default trigger the driver resolved from its layout, "" when none was passed.
+var _magicKeyDefault = '';
 var CUSTOM_MAGIC_VALUE = '__custom__';
 
 // Locale strings injected by the host (initData / applyStrings).
@@ -346,25 +348,15 @@ function _asks(page) {
 }
 
 /**
- * The trigger character a page proposes when the configuration names none:
- * the Ergopti key when the Ergopti layout is used, ù on French layouts, ;
- * elsewhere.
+ * The trigger character a page proposes when the configuration names none: the
+ * default the driver resolved from its layout (_shared/hotstrings/data/magic_key.json:
+ * ù on AZERTY, ; on QWERTY, ★ elsewhere), which the host passes as
+ * magic_key_default. The page never guesses it from a layout name.
  * @param {object} choice The page's magic_key descriptor.
  * @returns {string}
  */
 function _contextMagicKey(choice) {
-	var layoutPage = _pageState.keyboard_layout;
-	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
-	var emulated = layoutPage && layoutPage.controls ? layoutPage.controls.emulated_layout : null;
-	var emulatesErgopti = typeof emulated === 'string' && emulated.indexOf('ergopti') === 0;
-	if ((layoutPage && layoutPage.answer && emulatesErgopti) || system.indexOf('ergopti') !== -1)
-		return choice.recommended;
-	var candidate = system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1 ? 'ù' : ';';
-	return choice.options.some(function (option) {
-		return option.value === candidate;
-	})
-		? candidate
-		: choice.recommended;
+	return _magicKeyDefault || choice.recommended;
 }
 
 /**
@@ -454,11 +446,9 @@ function _operations() {
 			}
 		});
 		// An outdated stored value is preserved until the trigger itself is
-		// edited; a display recommendation never grants permission to replace it.
-		if (
-			page.magic_key &&
-			(state.magicChanged || !Object.prototype.hasOwnProperty.call(_current, page.magic_key.path))
-		) {
+		// edited, and an untouched choice stays sparse: the driver's layout
+		// default then applies, as the page proposed it.
+		if (page.magic_key && state.magicChanged) {
 			var chosen = _magicValue(page);
 			if (chosen !== _currentValue(page.magic_key)) {
 				operations.push({ path: page.magic_key.path, value: chosen });
@@ -487,17 +477,56 @@ function _pageAt(index) {
 	return null;
 }
 
-/** Draws one dot per step, marking the done and active ones. */
+/**
+ * Draws one dot per step, marking the done and active ones. The bar is a
+ * progress bar for assistive technology: « Step 3 of 8 », where the dots
+ * alone told it nothing.
+ */
 function _renderStepBar() {
 	var bar = document.getElementById('step-bar');
 	bar.innerHTML = '';
+	bar.setAttribute('role', 'progressbar');
+	// A progress bar needs a name of its own (WCAG 4.1.2): the wizard's.
+	bar.setAttribute('aria-label', _t('onboarding.window_title'));
+	bar.setAttribute('aria-valuemin', '1');
+	bar.setAttribute('aria-valuemax', String(_steps.length));
+	bar.setAttribute('aria-valuenow', String(_stepIndex + 1));
+	bar.setAttribute(
+		'aria-valuetext',
+		_t('onboarding.step_progress')
+			.replace('{1}', String(_stepIndex + 1))
+			.replace('{2}', String(_steps.length))
+	);
 	_steps.forEach(function (_id, index) {
-		var dot = document.createElement('div');
+		var dot = document.createElement('li');
 		dot.className = 'step-dot';
+		dot.setAttribute('aria-hidden', 'true');
 		if (index < _stepIndex) dot.classList.add('done');
 		else if (index === _stepIndex) dot.classList.add('active');
 		bar.appendChild(dot);
 	});
+}
+
+/**
+ * Shows or clears the refusal of a custom trigger character, in words beside
+ * the red edge (WCAG 1.4.1, 3.3.1).
+ * @param {HTMLInputElement} input
+ * @param {number} maxCharacters
+ * @param {boolean} invalid
+ */
+function _setMagicInvalid(input, maxCharacters, invalid) {
+	var message = document.getElementById('page-magic-error');
+	input.classList.toggle('invalid', invalid);
+	if (invalid) {
+		message.textContent = _t('onboarding.magic_key.invalid').replace('{1}', String(maxCharacters));
+		input.setAttribute('aria-invalid', 'true');
+		input.setAttribute('aria-describedby', 'page-magic-error');
+	} else {
+		message.textContent = '';
+		input.removeAttribute('aria-invalid');
+		input.removeAttribute('aria-describedby');
+	}
+	message.classList.toggle('hidden', !invalid);
 }
 
 /** Shows the current step and its footer buttons. */
@@ -545,12 +574,18 @@ function _renderLanguage() {
 	var list = document.getElementById('lang-list');
 	list.innerHTML = '';
 	LOCALES.forEach(function (loc) {
-		var row = document.createElement('div');
+		// A button the keyboard reaches and a screen reader names as pressed or
+		// not: the rows were plain blocks only a pointer could choose (WCAG 2.1.1).
+		var row = document.createElement('button');
+		row.type = 'button';
 		row.className = 'lang-item' + (loc.code === _selectedLocale ? ' selected' : '');
+		row.setAttribute('aria-pressed', loc.code === _selectedLocale ? 'true' : 'false');
 		row.dataset.code = loc.code;
 
 		var flag = document.createElement('span');
 		flag.className = 'lang-flag';
+		// The flag only decorates the language's name, which is read.
+		flag.setAttribute('aria-hidden', 'true');
 		// Windows has no flag-emoji font, so its host injects a flag_url.
 		if (loc.flag_url) {
 			var flagImg = document.createElement('img');
@@ -581,6 +616,49 @@ function _renderLanguage() {
 	// The step's name is its heading, as on every later step: the window title
 	// already names the product and the wizard.
 	document.getElementById('language-title').textContent = _t('onboarding.welcome.heading');
+	_renderReading();
+}
+
+// The reading choices offered above the languages, by a11y_prefs.js name;
+// each list is #reading-<name>, labelled by #reading-<name>-label.
+var READING_CHOICES = ['font', 'spacing'];
+
+/**
+ * Fills the reading choices above the languages: each list offers the values
+ * of a11y_prefs.js and shows the window's current one (its host's seed).
+ */
+function _renderReading() {
+	var prefs = window.ErgoptiA11yPrefs;
+	var current = prefs.read();
+	READING_CHOICES.forEach(function (name) {
+		var key = 'menu.configuration.reading_' + name;
+		var select = document.getElementById('reading-' + name);
+		document.getElementById('reading-' + name + '-label').textContent = _t(key);
+		select.innerHTML = '';
+		prefs.PREFERENCES[name].values.forEach(function (value) {
+			var option = document.createElement('option');
+			option.value = value;
+			option.textContent = _t(key + '.' + value);
+			select.appendChild(option);
+		});
+		select.value = current[name] || prefs.PREFERENCES[name].values[0];
+	});
+}
+
+/**
+ * Applies a reading choice to this window at once and asks the host to save
+ * it as the Configuration menu does; the host then pushes it to every open
+ * window, this one included (with the font inlined where the page has no
+ * address to link it from).
+ * @param {string} name The a11y_prefs.js name of the choice.
+ * @param {string} value The chosen value.
+ */
+function _chooseReading(name, value) {
+	var prefs = window.ErgoptiA11yPrefs;
+	var choices = prefs.read();
+	choices[name] = value;
+	prefs.receiveHost(choices);
+	_post({ action: 'setReadingPreference', name: name, value: value });
 }
 
 /** Refreshes the configuration-folder step from the answers. */
@@ -671,7 +749,9 @@ function _renderControls(page, state) {
 	box.classList.toggle('hidden', controls.length === 0);
 	box.innerHTML = '';
 	controls.forEach(function (control) {
-		var group = document.createElement('div');
+		// A fieldset: the control's choices are one group, named by its legend.
+		// A lone checkbox is no group: its row names it, in a plain block.
+		var group = document.createElement(control.kind === 'check' ? 'div' : 'fieldset');
 		group.className = 'control-group';
 		group.dataset.control = control.id;
 		var availability = _controlState(control);
@@ -690,7 +770,7 @@ function _renderControls(page, state) {
 				)
 			);
 		} else {
-			var label = document.createElement('p');
+			var label = document.createElement('legend');
 			label.className = 'question-label';
 			label.textContent = _t(control.label_key);
 			group.appendChild(label);
@@ -781,9 +861,8 @@ function _renderMagicKey(page, state) {
 	var input = document.createElement('input');
 	input.type = 'text';
 	input.className = 'magic-input';
-	// A supplementary Unicode symbol occupies two browser UTF-16 units, but
-	// the Linux runtime still validates exactly one scalar before saving.
-	input.maxLength = choice.max_characters * (choice.validation === 'safe_magic_key' ? 2 : 1);
+	// maxlength counts UTF-16 code units; one accepted Unicode scalar may need two.
+	input.maxLength = choice.max_characters * 2;
 	input.value = isPreset
 		? state.custom
 		: state.magic === CUSTOM_MAGIC_VALUE
@@ -794,7 +873,7 @@ function _renderMagicKey(page, state) {
 		state.magicChanged = true;
 		state.magic = CUSTOM_MAGIC_VALUE;
 		state.custom = input.value;
-		input.classList.remove('invalid');
+		_setMagicInvalid(input, choice.max_characters, false);
 	});
 	custom.appendChild(input);
 	container.appendChild(custom);
@@ -872,9 +951,14 @@ function _renderChecklist(page, state) {
  * @returns {object} The group element.
  */
 function _groupNode(page, group, state, depth) {
+	// A group: the boxes belong together, named by its header's text. Its
+	// header is a checkbox of its own, not a legend, so the name is ARIA's; a
+	// group without a label is a plain block.
 	var node = document.createElement('div');
 	node.className = 'checklist-group depth-' + depth;
 	if (group.label) {
+		node.setAttribute('role', 'group');
+		node.setAttribute('aria-label', _label(group.label));
 		var counts = _countItems(group, state);
 		var header = _checkRow(
 			{ text: _label(group.label) },
@@ -937,10 +1021,13 @@ function _checkRow(parts, checked, mixed, disabled, onChange) {
 	if (typeof parts.text === 'string') {
 		label.textContent = parts.text;
 	} else {
-		label.appendChild(_textSpan('item-trigger', parts.trigger));
+		// What the user types, then what it does.
+		label.appendChild(_textElement('kbd', 'item-trigger', parts.trigger));
 		// Spaces inside the separator keep a line break possible on each side.
-		label.appendChild(_textSpan('value-separator', ' ' + _catalogue().value_separator + ' '));
-		label.appendChild(_textSpan('item-action', parts.action));
+		label.appendChild(
+			_textElement('b', 'value-separator', ' ' + _catalogue().value_separator + ' ')
+		);
+		label.appendChild(_textElement('samp', 'item-action', parts.action));
 	}
 	row.appendChild(box);
 	row.appendChild(label);
@@ -948,16 +1035,17 @@ function _checkRow(parts, checked, mixed, disabled, onChange) {
 }
 
 /**
- * A span showing a text literally.
+ * An element showing a text literally.
+ * @param {string} tag
  * @param {string} className
  * @param {string} text
- * @returns {object} The span.
+ * @returns {object} The element.
  */
-function _textSpan(className, text) {
-	var span = document.createElement('span');
-	span.className = className;
-	span.textContent = text;
-	return span;
+function _textElement(tag, className, text) {
+	var element = document.createElement(tag);
+	element.className = className;
+	element.textContent = text;
+	return element;
 }
 
 // ======================================
@@ -977,6 +1065,8 @@ window.applyStrings = function (payload) {
 	if (payload && typeof payload.strings === 'object' && typeof payload.locale === 'string') {
 		if (payload.locale !== _selectedLocale) return;
 		strings = payload.strings;
+		// The previewed language lays the wizard out in its own direction (PCK-22).
+		window.setPageLocale(payload.locale);
 	} else {
 		strings = payload || {};
 	}
@@ -1017,10 +1107,13 @@ window.initData = function (data) {
 			return page.id;
 		})
 	);
-	if (typeof data.locale === 'string') _selectedLocale = data.locale;
+	if (typeof data.locale === 'string') {
+		_selectedLocale = data.locale;
+		window.setPageLocale(data.locale);
+	}
 	if (Array.isArray(data.locales) && data.locales.length > 0) LOCALES = data.locales;
 	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
-	window.SYSTEM_LAYOUT = data.system_layout || '';
+	_magicKeyDefault = typeof data.magic_key_default === 'string' ? data.magic_key_default : '';
 	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
 	_emptyConfigDir = data.empty_config_dir;
 	_loadedDir = _configDir;
@@ -1096,9 +1189,16 @@ window.setGestureRegisterStatus = function (ok) {
 // ======================================
 // ======================================
 
+/** Reads an absolute Unix path literally: trailing spaces are valid names. */
+function _configInputValue() {
+	var value = document.getElementById('config-input').value || '';
+	if (_capabilities.literal_absolute_paths === true && value.charAt(0) === '/') return value;
+	return value.trim();
+}
+
 /** Leaves the config step: the folder's configuration and metrics store. */
 function _leaveConfig() {
-	_configDir = (document.getElementById('config-input').value || '').trim();
+	_configDir = _configInputValue();
 	if (_configPending || _configDir !== _loadedDir) {
 		// A requested folder is not an admitted configuration. Retire prior
 		// values and choices now, and allow the config step to retry the same
@@ -1126,10 +1226,20 @@ function _pageComplete(page) {
 		Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)
 	)
 		return true;
-	if (_magicValue(page) !== '') return true;
+	var value = _magicValue(page);
+	var scalars = Array.from(value);
+	if (
+		scalars.length > 0 &&
+		scalars.length <= page.magic_key.max_characters &&
+		scalars.every(function (scalar) {
+			var cp = scalar.codePointAt(0);
+			return cp > 0x1f && !(cp >= 0x7f && cp <= 0x9f) && !(cp >= 0xd800 && cp <= 0xdfff);
+		})
+	)
+		return true;
 	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
 	if (input) {
-		input.classList.add('invalid');
+		_setMagicInvalid(input, page.magic_key.max_characters, true);
 		input.focus();
 	}
 	return false;
@@ -1157,7 +1267,7 @@ document.getElementById('btn-next').addEventListener('click', function () {
 
 document.getElementById('btn-back').addEventListener('click', function () {
 	if (_steps[_stepIndex] === STEP_CONFIG) {
-		_configDir = (document.getElementById('config-input').value || '').trim();
+		_configDir = _configInputValue();
 	}
 	if (_stepIndex > 0) _go(_stepIndex - 1);
 });
@@ -1178,6 +1288,13 @@ document.getElementById('config-browse').addEventListener('click', function () {
 		if (!page) return;
 		_setAnswer(page, document.getElementById('page-yes').checked);
 		_renderPage(page);
+	});
+});
+
+READING_CHOICES.forEach(function (name) {
+	var select = document.getElementById('reading-' + name);
+	select.addEventListener('change', function () {
+		_chooseReading(name, select.value);
 	});
 });
 

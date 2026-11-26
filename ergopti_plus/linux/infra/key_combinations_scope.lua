@@ -2,31 +2,35 @@
 
 --- Ordered-pair edits use the shared conditional publisher and acknowledged
 --- inverse. Pair input stays fenced until both source and delivery ACKs settle.
-local Transaction = require("config_scope_transaction")
-local Shared = require("tap_hold.key_combinations")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local KeyPath = require("toml_codec.key_path")
-local Updates = require("shortcuts.physical_availability")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Shared = require("tap_hold.engine.key_combinations")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Updates = require("shortcuts.engine.physical_availability")
+local ConfigKeys = require("settings.engine.keys")
+local Logger = require("core.logger.engine.shim")
+local LOG = "infra.key_combinations_scope"
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
-require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
+require("settings.engine.scope.registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
 --- Creates one exact ordered-pair publication owner. Native and source
 --- inverses retain their lease until literal acknowledgement.
---- @param options table Canonical path, backup, pause and owner ports.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Canonical path, backup and owner ports.
 --- @return table owner Edit, inverse and retained-debt controls.
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function")
+	assert(type(options) == "table")
 	local combinations = options.combinations or require("modules.shortcuts.key_combinations")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
 		assert(type(combinations[name]) == "function", "combination configuration owner is incomplete")
 	end
-	local manifest = options.manifest or require("infra.manifest_reader")
+	local manifest = options.manifest or require("menu.engine.manifest_reader")
 	local function declared()
 		if type(manifest.find_entry_by_path) ~= "function" then return false end
-		local entry = manifest.find_entry_by_path("category_enabled.key_combinations")
+		local entry = manifest.find_entry_by_path(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 		return type(entry) == "table" and entry.type == "boolean" and entry.default == true
 	end
 	local gate_value, frame, published_frame, publication_acked
@@ -140,10 +144,10 @@ function M.new(options)
 		return parameters.apply_parameter_configuration(owner,snapshot.parameters) == true
 	end
 	local transaction = Transaction.new({path=options.path,backup_path=options.backup_path,
-		files=options.files or require("adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
+		files=options.files or require("core.fs.adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
-				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }
+				return { presets = {}, operations = {manifest.sparse_operation(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS,gate_value)} }
 			end
 			if scope == "key_combinations_chord" then
 				assert(mode == "configured" and type(chord_operations) == "table")
@@ -203,7 +207,6 @@ function M.new(options)
 			return false
 		end,
 		apply=function(config,updates,_,candidate_bytes)
-			if options.is_paused() ~= false then return false end
 			local candidate = { pairs = combinations.configuration_candidate(config,true),
 				parameters = parameters.parameter_configuration_snapshot(owner) }
 			if type(candidate.parameters) ~= "table" then return false end
@@ -231,8 +234,6 @@ function M.new(options)
 		if owner.pending() then return false end
 		busy = true
 		no_op_frame = nil
-		local observed, paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
 		if options.expected_source then
 			local checked, current = pcall(options.expected_source.guard)
 			if not checked or current ~= true then busy = false; return false end
@@ -283,20 +284,30 @@ function M.new(options)
 	function owner.copy_taps_to_chords()
 		if not chord_declared() or type(combinations.configuration_entries) ~= "function"
 			or type(combinations.chord_settings) ~= "function" then return false end
+		-- Every known participant must be admitted by the actual source owner.
+		local function admitted_by_every(kind,action)
+			for _,entry in ipairs(combinations.configuration_entries()) do
+				if combinations.validate_slot(kind,entry.id,action) ~= true then return false end
+			end
+			return true
+		end
 		return perform(function()
 			local captured = combinations.configuration_source(owner)
 			if type(captured) ~= "table" then return false end
 			local plan = Shared.plan_chord_copy(captured.status=="ok" and captured.content or "",{
 				entries=combinations.configuration_entries(),settings=combinations.chord_settings(),tap_section=Shared.TAP_SECTION,
+				-- A stored slot holds an action some pair slot admits; a copied tap
+				-- must also be one a chord runs, else its pair keeps its chord.
 				is_action=function(action)
-					-- Every known participant must be admitted by the actual source owner.
-					for _,entry in ipairs(combinations.configuration_entries()) do
-						if combinations.validate_slot("combo",entry.id,action) ~= true then return false end
-					end
-					return true
+					return admitted_by_every("tap",action) or admitted_by_every("combo",action)
 				end,
+				is_chord_action=function(action) return admitted_by_every("combo",action) end,
 			})
 			if combinations.configuration_source_matches(owner,captured) ~= true then return false end
+			for _,skip in ipairs(plan.skipped) do
+				Logger.warn(LOG,"Pair '%s' tap '%s' cannot run as a chord — its chord is left as it is.",
+					skip.id,skip.action)
+			end
 			if plan.changes == 0 then
 				local doc=captured.status=="ok" and Codec.decode(captured.content) or {}
 				if parameters.parameter_configuration_matches(owner,doc,function() return true end)~=true
@@ -341,8 +352,6 @@ function M.new(options)
 	function owner.revert()
 		if owner.pending() then return false end
 		busy = true
-		local observed,paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
 		local called,reverted = pcall(transaction.revert)
 		busy = false
 		return called and reverted == true
@@ -356,24 +365,22 @@ end
 --- Retains exact compensation/acquisition debt across picker sessions. A fresh
 --- edit cannot replace its private native token while retirement is unresolved.
 --- @param rows table Dense canonical slot and parameter assignments.
---- @param is_paused function Current daemon pause getter.
 --- @return boolean committed
 
-local function session(is_paused,expected_source)
-	if type(is_paused) ~= "function" or is_paused() ~= false then return nil end
+local function session(expected_source)
 	if retained and retained.pending() and retained.retry_restore() ~= true then return nil end
 	if retained and retained.release() ~= true then return nil end
 	sequence = sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
-	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",is_paused=is_paused,expected_source=expected_source})
+	local path = require("settings.engine.paths").config("config.toml")
+	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",expected_source=expected_source})
 	return retained
 end
 
-local function operate(is_paused,expected_source,apply)
+local function operate(expected_source,apply)
 	if session_busy then return false end
 	session_busy = true
 	local called, committed = pcall(function()
-		local owner = session(is_paused,expected_source)
+		local owner = session(expected_source)
 		return owner ~= nil and apply(owner) == true
 	end)
 	session_busy = false
@@ -391,24 +398,24 @@ function M.retry_restore()
 	session_busy = false
 	return called and settled == true
 end
-function M.edit(rows,is_paused,expected_source)
+function M.edit(rows,expected_source)
 	rows=Updates.capture_updates(rows);if rows==nil then return false end
-	return operate(is_paused,expected_source,function(owner) return owner.edit(rows) end)
+	return operate(expected_source,function(owner) return owner.edit(rows) end)
 end
-function M.set_enabled(enabled,is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.set_enabled(enabled) end)
+function M.set_enabled(enabled,expected_source)
+	return operate(expected_source,function(owner) return owner.set_enabled(enabled) end)
 end
-function M.set_chord_settings(values,is_paused,expected_source)
+function M.set_chord_settings(values,expected_source)
 	if type(values)~="table" or getmetatable(values)~=nil then return false end
 	for key in pairs(values) do if key~=ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key~=ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 	local called,detached=pcall(Shared.chord_settings,values);if not called then return false end
 	values=detached
-	return operate(is_paused,expected_source,function(owner) return owner.set_chord_settings(values) end)
+	return operate(expected_source,function(owner) return owner.set_chord_settings(values) end)
 end
-function M.copy_taps_to_chords(is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.copy_taps_to_chords() end)
+function M.copy_taps_to_chords(expected_source)
+	return operate(expected_source,function(owner) return owner.copy_taps_to_chords() end)
 end
-function M.apply(mode,is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.apply(mode) end)
+function M.apply(mode,expected_source)
+	return operate(expected_source,function(owner) return owner.apply(mode) end)
 end
 return M

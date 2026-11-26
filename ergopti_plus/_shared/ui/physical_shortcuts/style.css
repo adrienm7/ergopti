@@ -12,14 +12,31 @@ select {
 	margin: 4px;
 	padding: 8px 12px;
 }
+/* The browser's own dark button and list are white on #6b6b6b, 5.3:1: a
+   darker ground gives their label 7:1 (WCAG 1.4.6). */
+@media (prefers-color-scheme: dark) {
+	button,
+	select {
+		background: var(--theme-gray4-dark);
+		border: 1px solid var(--theme-grey-888);
+		border-radius: 4px;
+		color: var(--theme-white);
+	}
+}
+#entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
 .entry {
 	align-items: center;
 	display: flex;
 	gap: 8px;
 	margin: 12px 0;
 }
-.entry span {
+.entry p {
 	flex: 1;
+	margin: 0;
 	overflow-wrap: anywhere;
 }
 fieldset {
@@ -28,7 +45,7 @@ fieldset {
 fieldset label {
 	display: inline-flex;
 	gap: 4px;
-	margin-right: 12px;
+	margin-inline-end: 12px;
 }
 #capture-reason,
 #manual-hint {

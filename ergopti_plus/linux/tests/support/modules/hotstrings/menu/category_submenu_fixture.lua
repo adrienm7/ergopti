@@ -46,7 +46,7 @@ local function fake_config(opts)
 				path = "/home/u/.config/ergopti/hotstrings/rolls.toml",
 				description = { en = "Rolls", fr = "Roulements" },
 				sections_order = { "hc", "sx" },
-				sections = { hc = { count = 12 }, sx = { count = 3 } },
+				sections = { hc = { count = 12, description = "hc" }, sx = { count = 3, description = "sx" } },
 				count = 15,
 				-- Rolls come from the Ergopti layout extension, whose submenu lists them.
 				extension = { id = "ergopti", name = "Ergopti" },
@@ -61,7 +61,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil row
 local function rolls_row(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -87,14 +87,14 @@ end
 --- Runs an actual shared renderer over an independently changed command label.
 --- @param body function Real native-provider observations and assertions.
 local function with_file_command(body, change_label)
-	local saved = package.loaded["infra.manifest_menu"]
+	local saved = package.loaded["menu.engine.manifest_menu"]
 	local ok, err = xpcall(function()
-		local path = require("infra.paths").shared("modules/menu/menu_manifest.json")
-		local native_captions = require("infra.i18n")
-		local renderer = assert(require("menu.renderer").new({
+		local path = require("core.fs.engine.paths").shared("menu/data/menu_manifest.json")
+		local native_captions = require("core.i18n.engine.i18n")
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux", manifest_path = function() return path end,
 			json_decode = function(bytes)
-				local document = require("json").decode(bytes)
+				local document = require("core.text.engine.json").decode(bytes)
 				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
 				return document
 			end,
@@ -105,13 +105,13 @@ local function with_file_command(body, change_label)
 					or key == "menu.builder.title_paused" then return native_captions.get(key) end
 				return key
 			end, section = function(key) return key end },
-			logger = require("logger.shim"),
+			logger = require("core.logger.engine.shim"),
 		}))
-		package.loaded["infra.manifest_menu"] = renderer
+		package.loaded["menu.engine.manifest_menu"] = renderer
 		body()
 	end, debug.traceback)
-	package.loaded["infra.manifest_menu"] = saved
-	package.loaded["ui.menu.builder"] = nil
+	package.loaded["menu.engine.manifest_menu"] = saved
+	package.loaded["menu.ui.builder.builder"] = nil
 	if not ok then error(err, 0) end
 end
 

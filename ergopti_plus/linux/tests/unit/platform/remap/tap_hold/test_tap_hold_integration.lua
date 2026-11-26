@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local EV_KEY = 1
 local DOWN, UP, REPEAT = 1, 0, 2
 
@@ -21,8 +21,10 @@ local KEY_A, KEY_J, KEY_K, KEY_U = 30, 36, 37, 22
 
 --- Starts a hook + manager + writer session on a user file holding `user_text`.
 local function session(user_text)
+	-- The switch and the timings the scenario spells go to config.toml beside it.
+	local config_text = require("tests.support.tap_hold_fixture").config(user_text)
 	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
-	local Hook = helpers.load_module("adapters.keyboard_hook")
+	local Hook = helpers.load_module("platform.input.keyboard_hook")
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local Writer = helpers.load_module("platform.remap.tap_hold_writer")
 	local dir = os.tmpname()
@@ -31,12 +33,10 @@ local function session(user_text)
 	assert(made == true or made == 0, "the isolated configuration folder must exist")
 	local path = dir .. "/tap_hold.toml"
 	require("tests.support.nav_layer_fixture").write(dir)
-	if user_text then
-		local fh = assert(io.open(path, "w"))
-		fh:write(user_text)
+	for file, content in pairs({ [path] = user_text, [dir .. "/config.toml"] = config_text }) do
+		local fh = assert(io.open(file, "w"))
+		fh:write(content)
 		fh:close()
-	else
-		os.remove(path)
 	end
 	local actions = {}
 	-- The capitals the scenarios type, where a US layout has them: the one-shot
@@ -81,6 +81,7 @@ local function session(user_text)
 		Manager._reset_for_test()
 		Writer._reset_for_test()
 		os.remove(path)
+		os.remove(dir .. "/config.toml")
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
 	end
@@ -225,7 +226,7 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 		end)
 	end)
 
-	-- The results come from _shared/tap_hold/one_shot_shift.json, which the
+	-- The results come from _shared/tap_hold/data/one_shot_shift.json, which the
 	-- Windows one-shot reads too (one-shot-results-shared).
 	helpers.it("types the shared one-shot results, and hands the injector what the layout lacks", function()
 		with_session(nil, function(s)
@@ -234,9 +235,9 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 				["-"] = { keycode = 12, level = 1, mods = {} }, [" "] = { keycode = 57, level = 1, mods = {} },
 				[":"] = { keycode = 39, level = 2, mods = { "shift" } },
 			})
-			local saved = package.loaded["modules.hotstrings.injector"]
+			local saved = package.loaded["hotstrings.engine.injector"]
 			local injected = {}
-			package.loaded["modules.hotstrings.injector"] = {
+			package.loaded["hotstrings.engine.injector"] = {
 				inject = function(erase, text) injected[#injected + 1] = erase .. ":" .. text; return { ok = true } end,
 			}
 			local ok, err = pcall(function()
@@ -251,7 +252,7 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 					"then = types nothing on the keyboard")
 				helpers.assert_eq(injected, { "0:º" }, "the injector types º, which the layout has no key for")
 			end)
-			package.loaded["modules.hotstrings.injector"] = saved
+			package.loaded["hotstrings.engine.injector"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -358,25 +359,26 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 	helpers.it("clears everything, then restores the recommended preset", function()
 		with_session(nil, function(s)
 			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
-			local function scope(mode, rows)
+			-- The switch is a config.toml row the scope publishes beside the keys.
+			local function scope(mode, config)
 				local path = s.manager.user_path()
 				local fh = assert(io.open(path, "r"))
-				local document = require("toml_codec").decode(fh:read("*a"))
+				local document = require("core.text.engine.toml_codec").decode(fh:read("*a"))
 				fh:close()
 				helpers.assert_true(s.manager.apply_configuration(
-					require("toml_codec").decode(s.writer.render_scope(mode, document, rows, preset))))
+					require("core.text.engine.toml_codec").decode(s.writer.render_scope(mode, document, {}, preset)), nil, config))
 			end
-			scope("clear", { { section = "tap_holds", key = "enabled", delete = true } })
+			scope("clear", {})
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")
 			s.drive({ tap(LSHIFT, 500) })
 			helpers.assert_eq(#s.actions, 0)
-			scope("recommended", { { section = "tap_holds", key = "enabled", value = true } })
+			scope("recommended", { tap_holds = { enabled = true } })
 			s.drive({ tap(LSHIFT, 1000) })
 			helpers.assert_eq(s.actions[1], "copy")
 		end)
 	end)
 
-	helpers.it("switches the feature off and on from the file", function()
+	helpers.it("switches the feature off and on from config.toml", function()
 		with_session(nil, function(s)
 			helpers.assert_true(s.writer.set_enabled(false))
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")
@@ -385,7 +387,7 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 		end)
 	end)
 
-	helpers.it("starts off when the user's file says so", function()
+	helpers.it("starts off when config.toml says so", function()
 		with_session("[tap_hold]\nenabled = false\n", function(s)
 			helpers.assert_true(not s.manager.is_active())
 			helpers.assert_eq(s.drive({ tap(CAPS, 0) }), "58:1 58:0")
@@ -509,12 +511,41 @@ end)
 -- The maintainer's rule of 2026-10-01: whatever option the hold picker offers
 -- (one modifier, every combination, the layer, none) is the hold the key has
 -- after the pick, on a key that held another one before.
+--
+-- Space is a typing key, decided by the order of the releases, and the
+-- installed manager decides one only from a native-origin receipt of its key
+-- press. The hook's _test_drive reads through a custom backend, which never
+-- mints one, so Space stayed itself whatever was picked: this case drives the
+-- controlled native Reader instead.
+
+--- Runs `body(s)` on the real Manager over the controlled native Reader, with
+--- the real writer on the same user file; s.drive feeds { code, value, at_ms }.
+local function with_native_session(user_text, body)
+	require("tests.support.input_owner_fixture").with_manager_session({ tap_hold_text = user_text, nav_fixture = true },
+		function(s)
+			local Writer = helpers.load_module("platform.remap.tap_hold_writer")
+			Writer.init({ path = s.tap_path, reload = s.manager.reload, is_tap_action = s.manager.is_tap_action,
+				canonical_hold = s.manager.canonical_hold })
+			s.writer = Writer
+			function s.drive(events)
+				local before, emitted = #s.rows, {}
+				for _, event in ipairs(events) do s.edge("a", event[1], event[2], event[3]) end
+				for index = before + 1, #s.rows do emitted[#emitted + 1] = s.rows[index][1] .. ":" .. s.rows[index][2] end
+				s.last = emitted
+				return table.concat(emitted, " ")
+			end
+			local ok, err = pcall(body, s)
+			Writer._reset_for_test()
+			if not ok then error(err, 0) end
+		end)
+end
+
 helpers.describe("tap-holds end to end: every option of the hold picker", function()
 
 	helpers.it("(hold-picker-every-option-2026-10-01) the hold a key gets is the option picked, after Shift", function()
 		local Engine = require("platform.remap.tap_hold_engine")
 		local SPACE = Engine.KEY_CODES.space
-		with_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
+		with_native_session('[tap_hold.keys.space]\nhold_modifier = "shift"\n', function(s)
 			local options = s.manager.hold_options()
 			local kinds = { none = 0, modifier = 0, layer = 0 }
 			for index, option in ipairs(options) do

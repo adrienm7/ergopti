@@ -13,8 +13,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local Export = helpers.load_with_stubs("modules.keystats.export")
 package.loaded["modules.keystats.ledger_replay"] = nil
 local LedgerReplay = require("modules.keystats.ledger_replay")
@@ -82,7 +82,7 @@ local STEP_ALLOCATION_BLOCKS = 6
 --- allocation, measured over the same paused window.
 local function run_replay(path, size, options)
 	local applied, steps, max_cpu_ms, max_step_bytes, max_step_kb = {}, 0, 0, 0, 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local state = LedgerReplay.new_state()
 	while true do
 		local before = state.offset
@@ -111,6 +111,22 @@ end
 
 helpers.describe("keystats: bounded local ledger replay (L64)", function()
 	local cursor = cursor_function()
+	helpers.it("refuses forged marker lines in persisted replay state", function()
+		local batch = "-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 9, 1 entry(ies)) ==="
+		local forged = "unrelated\n-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 999, 1 entry(ies)) ==="
+		helpers.assert_eq(cursor(forged, #forged).offset, 999, "the injected line would advance the cursor")
+		local state = {version = LedgerReplay.STATE_VERSION, offset = 1, first_batch = forged, last_batch = forged}
+		helpers.assert_eq(LedgerReplay.is_state(state), false)
+		local status = LedgerReplay.step({state = state, size = 1, cursor = cursor})
+		helpers.assert_eq(status, "failed")
+		state.first_batch, state.last_batch = batch .. batch, batch .. batch
+		helpers.assert_eq(LedgerReplay.is_state(state), false, "one stored marker cannot contain a second marker")
+		state.first_batch, state.last_batch = batch, batch
+		helpers.assert_eq(LedgerReplay.is_state(state), true)
+		local outcome, result = LedgerReplay.step({state = state, size = 1, cursor = cursor})
+		helpers.assert_eq(outcome, "done")
+		helpers.assert_eq(result.offset, 9)
+	end)
 	local ledger = synthetic_ledger(6000, "\n-- === ingest batch 2026-10-16 10:00:00.000 (offset 0 -> 9, 1 entry(ies)) ===\n"
 		.. "BEGIN TRANSACTION;\nINSERT OR IGNORE INTO events_typing VALUES ('device', 99999, 'torn');\n")
 	local path = temp_file(ledger)

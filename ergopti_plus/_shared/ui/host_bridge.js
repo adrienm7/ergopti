@@ -18,12 +18,15 @@
 //   changelog_bridge          — _shared/ui/changelog
 //   config_cleanup_bridge     — _shared/ui/config_cleanup
 //   dl_bridge                 — _shared/ui/download_window
+//   emulation_picker_bridge   — _shared/ui/emulation_picker
 //   error_dialog              — _shared/ui/error_dialog
 //   hsEditor                  — _shared/ui/hotstring_editor
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding
-//   layer_editor_bridge       — _shared/ui/layer_editor
+//   layout_editor_window_bridge — _shared/ui/layout_editor_window
 //   hsPaths                   — _shared/ui/paths_editor
+//   hsWorkflows               — _shared/ui/user_workflows
+//   hsKeepAwake               — _shared/ui/keep_awake_library
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   layout_manager_bridge     — _shared/ui/layout_manager
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
@@ -62,7 +65,12 @@ function hostHasCapability(name) {
 // Other hosts and pages keep the original payload contract. This private state
 // belongs to this exact JS document.
 const linuxDocumentBridges = new Map();
-const linuxDocumentBridgeNames = ['changelog_bridge', 'dl_bridge', 'model_browser_bridge'];
+const linuxDocumentBridgeNames = [
+	'changelog_bridge',
+	'dl_bridge',
+	'model_browser_bridge',
+	'hsPersonalInfo'
+];
 
 function getLinuxDocumentNonce(name) {
 	if (!hostHasCapability('document_bridge') || !linuxDocumentBridgeNames.includes(name))
@@ -231,4 +239,32 @@ function createVisibilityPoller(callback, delayMs, runImmediately = true) {
 	window.addEventListener('pageshow', start);
 	start();
 	return { stop };
+}
+
+/**
+ * Whether the native context menu may open on a target: only in a text field,
+ * where it carries the editing items (cut, copy, paste, spelling).
+ * @param {EventTarget|null} target
+ * @returns {boolean}
+ */
+function contextMenuAllowedOn(target) {
+	return (
+		!!target &&
+		typeof target.closest === 'function' &&
+		target.closest('input, textarea, [contenteditable=""], [contenteditable="true"]') !== null
+	);
+}
+
+// The host windows are applications, not browsers: Windows turns WebView2's
+// default context menu off (AreDefaultContextMenusEnabled), while WKWebView and
+// WebKitGTK offered Reload, Back and Forward on every page, and a reload drops
+// an unsaved draft (WVH-003). Outside a text field the menu stays closed.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+	document.addEventListener(
+		'contextmenu',
+		function (event) {
+			if (!contextMenuAllowedOn(event.target)) event.preventDefault();
+		},
+		true
+	);
 }

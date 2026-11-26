@@ -1,0 +1,433 @@
+--- diagnostics/ui/healthcheck/report.lua
+
+--- ==============================================================================
+--- MODULE: Diagnostics Exports And GitHub Forms (macOS)
+--- DESCRIPTION:
+--- What the diagnostics page's buttons do on this machine once
+--- healthcheck.actions accepted them: copy the report, save it as a Markdown
+--- file under the logs folder and reveal it, report it on GitHub (copy it,
+--- then save an approved local attachment and open the short bug form), open a folder or a
+--- settings page. Also the Debug menu's "Report a bug", which runs that same
+--- report action on a fresh snapshot without the window, "Suggest a feature",
+--- and the field report window's « Create a GitHub issue » (report_field_run).
+---
+--- FEATURES & RATIONALE:
+--- 1. Shared output is rebuilt from the host snapshot through a closed typed
+---    policy. Free text, paths and unknown fields are excluded regardless of
+---    the page or details checkbox. Only approved technical content leaves.
+--- 2. The clipboard and local attachment hold the complete approved report.
+---    The form is prefilled with the host version, OS and driver and the compact
+---    report (tables, no JSON block), cut to the URL budget with a note that the
+---    complete report is on the clipboard and in the saved file. The browser opens
+---    after attachment completion and reveal, without an automatic upload.
+--- 3. Paths come from the snapshot the host collected, by field id; a folder
+---    that does not exist yet is created before it is opened; a file that does
+---    not exist yet (today's errors file before the day's first warning) is
+---    said to the page, not logged as a failure.
+--- 4. Side effects are one table so a test can observe each of them; the
+---    browser opens last, after the clipboard holds what it asks for, and
+---    nothing follows it that could take the focus back.
+--- 5. Without a window (hs.webview refused it) the same approved report is
+---    written as a self-contained HTML file and opened in the browser, as on
+---    Linux; when even that fails, or a window that has no file to fall back
+---    on cannot open, a native alert names the log and offers « Report a bug »
+---    (maintainer, 2026-11-25): a click that opens nothing reads as a dead
+---    driver.
+--- ==============================================================================
+
+local M = {}
+
+local hs          = hs
+local Logger      = require("core.logger.engine.logger")
+local IssueLink   = require("diagnostics.engine.reports.issue_link")
+local Redact      = require("diagnostics.engine.reports.redact")
+local Share       = require("diagnostics.engine.healthcheck.share")
+local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ReportPage  = require("diagnostics.engine.healthcheck.report_page")
+local ConfigKeys = require("settings.engine.keys")
+
+local LOG = "diagnostics.engine.healthcheck.report"
+
+-- The executable that reveals a file in Finder and opens folders and URLs
+local OPEN_BIN = "/usr/bin/open"
+
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 1/ Side Effects =======
+-- ===============================
+-- ===============================
+
+--- Creates a folder and its parents in-process.
+--- @param dir string Absolute folder path.
+--- @return boolean created True when the folder exists afterwards.
+local function make_dir(dir)
+	local built = dir:sub(1, 1) == "/" and "/" or ""
+	for part in dir:gmatch("[^/]+") do
+		built = built .. part .. "/"
+		if hs.fs.attributes(built, "mode") == nil then hs.fs.mkdir(built) end
+	end
+	return hs.fs.attributes(dir, "mode") == "directory"
+end
+
+-- Retain exact native cleanup debt after logical cancellation. A subsequent
+-- opener retries those handles; native settlement alone releases the registry.
+local retained_openers = {}
+
+--- Runs /usr/bin/open to its terminal receipt without blocking the native UI.
+--- @param args table Literal arguments, without shell interpolation.
+--- @param done function Receives the exact launcher outcome.
+--- @param current function Exact action owner predicate.
+--- @return table request Cancellable native opener.
+local function open_with(args, done, current)
+	local timeout = require("core.timing.engine.timings").sec("ui", "desktop_open_timeout_ms")
+	local cleanup = {}
+	for request, retired in pairs(retained_openers) do
+		if retired() then cleanup[#cleanup + 1] = request end
+	end
+	for _, request in ipairs(cleanup) do request.cancel() end
+	local Scheduler = require("core.events.timer_scheduler")
+	local request, task, timer = {}, nil, nil
+	local active, terminal, retiring, forced_error = true, false, false, nil
+	local function stop_timer()
+		local owned = timer
+		if owned then
+			local ok, stopped = pcall(Scheduler.cancel, owned)
+			if ok and stopped == true then timer = nil
+			else Logger.error(LOG, "Desktop opener timer cleanup refused; exact handle retained.") end
+		end
+	end
+	local function release()
+		local settled = task == nil
+		if task then
+			local ok, result = pcall(task.isSettled)
+			settled = ok and result == true
+		end
+		if settled then
+			stop_timer()
+			if timer == nil then retained_openers[request] = nil end
+		end
+	end
+	local function terminate()
+		if task then
+			local ok, stopped = pcall(task.terminate)
+			if not ok or stopped ~= true then
+				Logger.error(LOG, "Desktop opener cleanup refused; exact task retained.")
+			end
+		end
+	end
+	function request.cancel()
+		active, retiring = false, true
+		stop_timer()
+		terminate()
+		release()
+	end
+	local function complete(code, detail)
+		if terminal then return end
+		terminal, retiring = true, true
+		stop_timer()
+		local admitted = active
+		active = false
+		release()
+		if admitted then
+			local settled = task == nil or task.isSettled() == true
+			done({ ok = forced_error == nil and code == 0, code = code,
+				error = forced_error or detail, cleanup_pending = not settled or nil })
+		end
+	end
+	local function refuse(detail)
+		forced_error, retiring = detail, true
+		terminate()
+		complete(nil, detail)
+	end
+	retained_openers[request] = function() return retiring end
+	if current() ~= true then request.cancel(); return request end
+	local built, candidate = pcall(require("core.process.adapters.shell_runner").spawn, OPEN_BIN, args, function(code)
+		complete(code, code ~= 0 and "desktop opener refused" or nil)
+	end)
+	if not built or type(candidate) ~= "table" or type(candidate.start) ~= "function"
+		or type(candidate.terminate) ~= "function" or type(candidate.isSettled) ~= "function"
+		or type(candidate.onSettled) ~= "function" then
+		refuse("desktop opener construction refused")
+		return request
+	end
+	task = candidate
+	local observed, accepted = pcall(task.onSettled, release)
+	if not observed or accepted ~= true then refuse("desktop opener settlement observer refused"); return request end
+	local probed, settled = pcall(task.isSettled)
+	if not probed or settled == true then refuse("desktop opener construction refused"); return request end
+	if current() ~= true then request.cancel(); return request end
+	local scheduled, handle, committed = pcall(Scheduler.after, timeout, function()
+			if not active or terminal then release(); return end
+			refuse("desktop opener deadline")
+		end)
+	timer = scheduled and handle or nil
+	if terminal or not active then stop_timer(); release(); return request end
+	if current() ~= true then request.cancel(); return request end
+	if not scheduled or committed ~= true then refuse("desktop opener deadline refused"); return request end
+	local started, admitted = pcall(task.start)
+	if not started and terminal then
+		Logger.error(LOG, "The completed desktop opener start failed: %s", tostring(admitted))
+	elseif not terminal and (not started or admitted ~= true) then
+		refuse("desktop opener launch refused")
+	end
+	return request
+end
+
+--- The production side effects; a test replaces any of them.
+local DEFAULT_EFFECTS = {
+	copy = function(text) return require("clipboard.adapters.clipboard").write(text) == true end,
+	save = function(dir, name, text)
+		if not make_dir(dir) then return nil, "cannot create " .. dir end
+		local stem, extension = name:match("^(.*)(%.[^.]+)$")
+		stem, extension = stem or name, extension or ""
+		local files = require("core.fs.adapters.file_system")
+		for index = 0, 999 do
+			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
+			-- This probe only skips a visibly occupied name; creation still belongs
+			-- to the exclusive owner, which revalidates every native path.
+			local occupied = false
+			if hs.fs and type(hs.fs.symlinkAttributes) == "function" then
+				local checked, attributes = pcall(hs.fs.symlinkAttributes, path)
+				occupied = checked and type(attributes) == "table"
+			end
+			if not occupied then
+				local created, status, detail = files.create_if_absent(path, text)
+				if created == true then return path end
+				if status ~= "exists" then return nil, tostring(detail or status) end
+			end
+		end
+		return nil, "no unused diagnostic report name"
+	end,
+	make_dir = make_dir,
+	exists = function(path) return hs.fs.attributes(path, "mode") ~= nil end,
+	reveal = function(path, done, current) return open_with({ "-R", path }, done, current) end,
+	open = function(target, done, current) return open_with({ target }, done, current) end,
+	open_url = function(url, done)
+		done({ ok = require("core.ui.ui.builder").open_http_url(url) == true })
+		return { cancel = function() end }
+	end,
+	notify = function(title, body, kind)
+		return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
+	end,
+	-- The default button first: hs.dialog.blockAlert answers with the label clicked
+	alert = function(title, body, default_button, other_button)
+		return require("core.ui.engine.dialog_util").block_alert(title, body, default_button, other_button, "warning")
+	end,
+	identity = function()
+		local ConfigPaths = require("settings.engine.paths")
+		return {
+			home = os.getenv("HOME"), user = os.getenv("USER"),
+			config_dir = ConfigPaths.is_initialized() and ConfigPaths.get_config_dir() or nil,
+		}
+	end,
+}
+
+--- Merges test overrides over the production effects.
+--- @param overrides table|nil
+--- @return table
+local function effects_with(overrides)
+	local effects = {}
+	for name, fn in pairs(DEFAULT_EFFECTS) do effects[name] = fn end
+	for name, fn in pairs(overrides or {}) do effects[name] = fn end
+	return effects
+end
+
+--- What identifies this machine in paths and text, for redaction.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @return table { home, user, config_dir, case_insensitive }
+function M.redaction_context(overrides)
+	local identity = effects_with(overrides).identity()
+	-- Without the home folder nothing would remove it, and every path under it
+	-- would be published
+	if type(identity.home) ~= "string" or identity.home == "" then
+		error("the home folder is unknown, so nothing could be redacted")
+	end
+	-- APFS is case-insensitive by default, and so is every path a user types
+	return { home = identity.home, user = identity.user, config_dir = identity.config_dir, case_insensitive = true }
+end
+
+--- Reveals one file in Finder through the owned desktop opener, for the other
+--- Debug menu exports (« Export the logs (zip) »).
+--- @param path string Absolute file path.
+--- @param done function Receives { ok, code, error, cleanup_pending }.
+--- @param current function Exact action owner predicate.
+--- @return table request Cancellable native opener.
+function M.reveal_in_finder(path, done, current)
+	return DEFAULT_EFFECTS.reveal(path, done, current)
+end
+
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 2/ Page Actions =======
+-- ===============================
+-- ===============================
+
+-- The diagnostics runner shared with the other desktop driver; this driver
+-- supplies its effects and how a failed Finder reveal is judged.
+local Runner = ReportRunner.new({
+	logger = Logger,
+	log = LOG,
+	effects_with = effects_with,
+	url_effects = { open_settings = "open" },
+	module_current = function() return package.loaded["diagnostics.ui.healthcheck.report"] == M end,
+	perform_requires_loaded_owner = true,
+	reveal_outcome = function(receipt, path, finish)
+		if receipt.cleanup_pending then
+			finish({ ok = false, path = path }, "desktop reveal retirement remains pending")
+			return true
+		end
+		if receipt.ok ~= true then
+			Logger.warn(LOG, "The saved report could not be revealed in Finder (status=%s, reason=%s).",
+				tostring(receipt.code), tostring(receipt.error))
+		end
+		return false
+	end,
+})
+
+--- Performs one action through an explicit completion and retained owner.
+--- @param owner table { current = function(): boolean, complete = function(result) }
+--- @return table operation { cancel = function() }
+function M.perform(action, paths, documents, context, overrides, snapshot, owner)
+	return Runner.perform(action, paths, documents, context, overrides, snapshot, owner)
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 3/ Debug Menu =======
+-- =============================
+-- =============================
+
+local menu_request = Runner.menu_request
+
+--- Reports a bug exactly as the diagnostics page's report button does, without
+--- the window: the approved report of a fresh snapshot is copied, saved and
+--- revealed, then the bug form opens with the host version, OS and driver.
+--- @param opts table|nil { state = menu state|nil }, for the features section.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request
+function M.report_bug(opts, overrides, complete)
+	local state = type(opts) == "table" and opts.state or nil
+	return menu_request(ConfigKeys.COMMAND.REPORT_BUG, overrides, complete, function(owner)
+		local bridge = require("diagnostics.ui.healthcheck.core")
+		local documents = bridge.config()
+		local snapshot = bridge.run({ state = state, complete_local = true })
+		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
+			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
+		local document = Share.document(snapshot, documents.schema,
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
+		return M.perform({ action = "report", text = document.text, fields = document.fields },
+			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
+	end)
+end
+
+--- Opens the bug form for a finished field report
+--- (diagnostics/ui/field_check/field_report_window.lua): this Mac's version,
+--- OS and driver and the run's evidence line, the redacted report on the
+--- clipboard, through the shared runner as on Linux.
+--- @param line string The run's evidence line.
+--- @param text string The complete report.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request
+function M.report_field_run(line, text, overrides, complete)
+	return Runner.report_field_run(line, text, function()
+		local bridge = require("diagnostics.ui.healthcheck.core")
+		-- The versions are the local_state probe's, as for « Suggest a feature »
+		return bridge.run({ local_state = true }), bridge.config(), M.redaction_context(overrides)
+	end, overrides, complete)
+end
+
+--- Opens the GitHub feature form with the version and the system prefilled.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request; completion receives the child outcome.
+function M.suggest_feature(overrides, complete)
+	return menu_request(ConfigKeys.COMMAND.SUGGEST_FEATURE, overrides, complete, function(owner)
+		local bridge = require("diagnostics.ui.healthcheck.core")
+		local documents = bridge.config()
+		-- The versions are the local_state probe's: without it the form said
+		-- "unknown" for the version the bug form shows
+		local document = Share.document(bridge.run({ local_state = true }), documents.schema,
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
+		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
+		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
+	end)
+end
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 4/ Without A Window =======
+-- ===================================
+-- ===================================
+
+--- Delivers the diagnostics report when no window can show it: the approved
+--- report of a fresh snapshot is written as a self-contained HTML file in the
+--- logs' diagnostics folder, opened in the default browser, and a notice names
+--- the file. The diagnostics must never depend on the window they may be
+--- diagnosing (the Linux fallback, maintainer 2026-11-25).
+--- @param opts table|nil { state = menu state|nil }, for the features section.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @return boolean delivered Whether the file was written and its opening asked.
+function M.deliver_without_window(opts, overrides)
+	local effects = effects_with(overrides)
+	local i18n = require("core.i18n.engine.i18n")
+	local state = type(opts) == "table" and opts.state or nil
+	local title = i18n.get("menu.debug.healthcheck")
+	return ReportPage.deliver({
+		logger = Logger, log = LOG, title = title, lead = i18n.get("healthcheck.file_fallback.lead"),
+		locale = i18n.get_locale(), translate = i18n.get, save = effects.save, open = effects.open,
+		collect = function()
+			local bridge = require("diagnostics.ui.healthcheck.core")
+			return bridge.run({ state = state, complete_local = true }), bridge.config()
+		end,
+		notify = function(path) return effects.notify(title, i18n.format("healthcheck.file_fallback.notice", path), "info") end,
+	})
+end
+
+--- Says in a native alert that a window could not open, where its failure is
+--- logged, and offers « Report a bug », which needs no window: it copies and
+--- saves the report, then opens the bug form in the browser.
+--- @param window_id string The window's apps.manifest id, for the log lines.
+--- @param body string The localized explanation, naming the log file.
+--- @param opts table|nil { state = menu state|nil }, for the bug report.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @return boolean reported Whether the user asked to report the bug.
+function M.alert_window_unavailable(window_id, body, opts, overrides)
+	local effects = effects_with(overrides)
+	local i18n = require("core.i18n.engine.i18n")
+	local close_label, report_label = i18n.get("common.close"), i18n.get("menu.debug.report_bug")
+	Logger.warn(LOG, "The %s window could not open: telling the user where it is logged.", tostring(window_id))
+	local clicked = effects.alert(i18n.get("dialog.window_unavailable.title"), body, close_label, report_label)
+	if clicked ~= report_label then return false end
+	Logger.info(LOG, "Reporting the %s window failure as a bug, as the user asked.", tostring(window_id))
+	M.report_bug(opts, overrides)
+	return true
+end
+
+--- The log file to name in a window-unavailable alert: today's log, else the
+--- logs folder.
+--- @return string path
+function M.log_path_for_alert()
+	local path = Logger.today_log_path() or Logger.logs_dir()
+	if type(path) ~= "string" or path == "" then error("no log file or folder is known") end
+	return path
+end
+
+return M

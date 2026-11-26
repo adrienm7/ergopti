@@ -37,13 +37,14 @@ end
 local function fresh_mouse_owner()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.system_mouse",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
 		"adapters.mouse_control",
-		"adapters.synthetic_input",
-		"infra.logger",
-		"infra.notifications",
-		"infra.i18n",
+		"platform.input.synthetic_input",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
+		"core.ui.adapters.system_accessibility",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -64,6 +65,7 @@ local function fresh_mouse_owner()
 		start_hook = nil,
 		boundary_hook = nil,
 		nested_pause_result = nil,
+		spoken = {},
 	}
 
 	--- Queues one native timer behavior for the next TimerScheduler acquisition.
@@ -344,8 +346,8 @@ local function fresh_mouse_owner()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
@@ -354,7 +356,13 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.adapters.system_accessibility"] = {
+		announce_event = function(text)
+			fixture.spoken[#fixture.spoken + 1] = text
+			return true
+		end,
+	}
 	package.loaded["adapters.mouse_control"] = {
 		setPos = function()
 			if type(fixture.boundary_hook) == "function" then
@@ -364,7 +372,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function()
 			if type(fixture.boundary_hook) == "function" then
 				fixture.boundary_hook("emoji")
@@ -373,12 +381,12 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = shell_runner
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = shell_runner
+	package.loaded["core.events.timer_scheduler"] = nil
 	fixture.python = helpers.healthy_python_resolver()
-	package.loaded["adapters.python_interpreter"] = fixture.python
+	package.loaded["ai.adapters.python_interpreter"] = fixture.python
 	fixture.python_offers = {}
-	package.loaded["ui.python_runtime_offer"] = {
+	package.loaded["ai.ui.python_runtime_offer"] = {
 		offer = function(state)
 			fixture.python_offers[#fixture.python_offers + 1] = state
 			return true
@@ -474,6 +482,22 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		helpers.assert_eq(handle.args[2]:find("/tmp/_hs_", 1, true), nil)
 		helpers.assert_eq(fixture.io_open_calls, 0,
 			"inline dispatch must not publish a filesystem script before start")
+		handle:deliver(0, "single_screen\n", "")
+	end)
+
+	helpers.it("reports CoreGraphics failures instead of a successful mirror toggle", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
+		local handle = fixture.shells[1]
+		local quote = require("core.text.engine.utils").shell_quote
+		local command = "python3 -B " .. quote(helpers.driver_root()
+			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
+			.. " " .. quote(handle.args[2]) .. " 2>&1"
+		local process = assert(io.popen(command, "r"))
+		local output = assert(process:read("a"))
+		local closed, reason, status = process:close()
+		helpers.assert_true(closed == true and reason == "exit" and status == 0,
+			"the dispatched Python must handle each native result: " .. output)
 		handle:deliver(0, "single_screen\n", "")
 	end)
 
@@ -766,6 +790,31 @@ end)
 
 
 helpers.describe("SystemMouse owner: parent isolation", function()
+	helpers.it("refuses a disconnected screen while resolving a teleport", function()
+		local fixture = fresh_mouse_owner()
+		hs.screen.allScreens = function()
+			return { hs.mouse.getCurrentScreen(), { id = function() return 2 end,
+				frame = function() error("display disconnected") end } }
+		end
+		local ok, result = pcall(fixture.subject.teleport_mouse, "gestures")
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(fixture.mouse_moves, 0)
+	end)
+
+	helpers.it("does not teleport after a pause during screen resolution", function()
+		local fixture = fresh_mouse_owner()
+		local current = hs.mouse.getCurrentScreen()
+		hs.screen.allScreens = function()
+			return { current, { id = function() return 2 end, frame = function()
+				fixture.subject.pause_mouse_actions("gestures")
+				fixture.subject.resume_mouse_actions("gestures")
+				return { x = 0, y = 0, w = 100, h = 100 }
+			end, name = function() return "screen" end } }
+		end
+		helpers.assert_eq(fixture.subject.teleport_mouse("gestures"), false)
+		helpers.assert_eq(fixture.mouse_moves, 0)
+	end)
 	helpers.it("keeps gesture spotlight and teleport live while shortcuts pause", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(
@@ -852,6 +901,21 @@ helpers.describe("SystemMouse synchronous native boundary ownership", function()
 		helpers.assert_eq(fixture.lock_calls, 1)
 		helpers.assert_eq(
 			fixture.subject.is_mouse_actions_paused("gestures"), false)
+	end)
+end)
+
+-- The overlay is pixels VoiceOver cannot reach: each spotlight the user calls
+-- is said once it is fully up, as Windows says it (a11y-macos-spotlight).
+helpers.describe("SystemMouse spotlight for VoiceOver (a11y-macos-spotlight)", function()
+	helpers.it("(a11y-macos-spotlight) says each shown spotlight, never a refused one", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), true)
+		helpers.assert_eq(fixture.spoken, { "accessibility.spotlight_shown" })
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), true)
+		helpers.assert_eq(#fixture.spoken, 2, "a second press is a second event, said again")
+		helpers.assert_eq(fixture.subject.pause_mouse_actions(), true)
+		helpers.assert_eq(fixture.subject.spotlight_mouse(4), false)
+		helpers.assert_eq(#fixture.spoken, 2, "a spotlight that never showed is not said")
 	end)
 end)
 

@@ -45,7 +45,7 @@ _SICG_ProbeRunsBeforeTheSnapshot() {
 	Assert(Body != "", "SendInstant() must exist in the driver source")
 
 	ProbePos := InStr(Body, "CB_IsBusy(")
-	SnapPos := InStr(Body, "CB_SaveAll(")
+	SnapPos := InStr(Body, "CB_SavePlainSnapshot(")
 	Assert(ProbePos > 0,
 		"SendInstant must probe for clipboard contention via CB_IsBusy - the Notepad caller holds Critical across this call, so a contended clipboard starves the keyboard hook for as long as A_Clipboard keeps retrying")
 	Assert(SnapPos > 0, "SendInstant must still snapshot the clipboard on its normal path")

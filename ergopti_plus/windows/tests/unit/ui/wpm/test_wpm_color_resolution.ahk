@@ -40,17 +40,23 @@ _WCR_WithCategory(Body) {
 	Category := _WCR_Category()
 	SavedShared := _SharedDir
 	Root := A_Temp . "\" . Category
-	DirCreate(Root . "\modules\hotstrings")
-	File := Root . "\modules\hotstrings\" . Category . ".toml"
+	DirCreate(Root . "\hotstrings\data\catalogue")
+	File := Root . "\hotstrings\data\catalogue\" . Category . ".toml"
 	; The path owner reads the language packs here, and the logger its redaction rules.
-	DirCreate(Root . "\modules\diagnostics")
-	FileCopy(SavedShared . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
-	FileCopy(SavedShared . "\modules\diagnostics\redaction.json", Root . "\modules\diagnostics\redaction.json")
+	DirCreate(Root . "\diagnostics\data")
+	FileCopy(SavedShared . "\hotstrings\data\catalogue\_index.toml", Root . "\hotstrings\data\catalogue\_index.toml")
+	FileCopy(SavedShared . "\diagnostics\data\redaction.json", Root . "\diagnostics\data\redaction.json")
+	; The logger admits its privacy policy once per shared source and refuses a
+	; later swap, so the body runs under a policy admitted from the temporary root
+	; (a missing-file read logs) and the inherited admission comes back after it.
+	Policy := _LoggerPrivacyState(), SavedPolicy := [Policy["config"], Policy["root"]]
 	try {
 		_SharedDir := Root
+		Policy["config"] := 0, Policy["root"] := ""
 		Body.Call(Category, File)
 	} finally {
 		_SharedDir := SavedShared
+		Policy["config"] := SavedPolicy[1], Policy["root"] := SavedPolicy[2]
 		_HotstringsOverrides.Delete(Category)
 		HotstringsResolveBumpGen()
 		DirDelete(Root, true)

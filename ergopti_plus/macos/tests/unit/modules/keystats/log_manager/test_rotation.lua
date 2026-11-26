@@ -27,8 +27,8 @@ local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 -- =====================================
 -- =====================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local ROT = helpers.load_with_stubs("modules.keystats.rotation")
 
@@ -276,8 +276,8 @@ end)
 --- @param callback function Receives the fresh Rotation module and exact fixture controls.
 local function with_rollover_owner(callback)
 	return helpers.with_stub_scope({
-		"modules.keystats.rotation", "adapters.ledger_append", "infra.logger",
-		"modules.keystats.timestamp", "adapters.timer_scheduler", "error_description", "number_policy",
+		"modules.keystats.rotation", "core.fs.adapters.ledger_append", "core.logger.engine.logger",
+		"modules.keystats.timestamp", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}, function()
 		local real_open, real_date = io.open, os.date
 		local controls = {
@@ -297,7 +297,7 @@ local function with_rollover_owner(callback)
 				controls.origins = controls.origins + 1
 				return true
 			end
-			package.loaded["adapters.ledger_append"] = {
+			package.loaded["core.fs.adapters.ledger_append"] = {
 				rollover = function(data_sql, today_path, offset, previous_date, next_date, checked_reset, origin)
 					helpers.assert_eq(data_sql, "/tmp/test_data.sql")
 					helpers.assert_eq(today_path, "/tmp/today.log")
@@ -326,7 +326,7 @@ local function with_rollover_owner(callback)
 					return checked_reset("2024-07-01", completion) == true
 				end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- Rebind Timestamp's scheduler and its native hs capture before native IO ports.
 			local r = helpers.load_with_stubs("modules.keystats.rotation")
 			io.open = function(path, mode)

@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Keyboard Layout Switch Adapter
 ; DESCRIPTION:
-; KLS_LayoutId, KLS_Choices and KLS_Select through fake list, registry and
-; post ports: a layout is offered and selected by its KLID, a custom layout id
+; KLS_LayoutId, KLS_Choices, KLS_ActiveId, KLS_OpenSettings and KLS_Select
+; through fake list, registry, resolve, run and post ports: a layout is offered and selected by its KLID, a custom layout id
 ; is resolved through the registry, and a refusal is false, never a pretended
 ; switch.
 ; ==============================================================================
@@ -73,7 +73,30 @@ _KLST_Refusals() {
 	AssertThrows(() => KLS_Select("", () => _KLST_HKLS, Throwing, _KLST_Lookup), "an empty id is refused")
 }
 
+/** The active layout is named by its KLID; no resolved handle is no id. */
+_KLST_ActiveId() {
+	AssertEqual("A000040C", KLS_ActiveId(() => 0xF0C0040C, _KLST_Lookup))
+	AssertEqual("0000040C", KLS_ActiveId(() => 0x040C040C, _KLST_Lookup))
+	AssertEqual("", KLS_ActiveId(() => 0, _KLST_Lookup), "no foreground or default layout")
+}
+
+/** The settings URI is opened, and a refusal is false. */
+_KLST_OpenSettings() {
+	Opened := []
+	OpenOk(Target) {
+		Opened.Push(Target)
+	}
+	OpenRefused(Target) {
+		throw Error("no handler")
+	}
+	AssertTrue(KLS_OpenSettings(OpenOk))
+	AssertEqual("ms-settings:regionlanguage", Opened[1])
+	AssertFalse(KLS_OpenSettings(OpenRefused), "a refused URI is false")
+}
+
 Test("keyboard layout switch: KLID of standard and custom layouts", _KLST_LayoutIds)
+Test("keyboard layout switch: the active layout's KLID", _KLST_ActiveId)
+Test("keyboard layout switch: open the keyboard settings", _KLST_OpenSettings)
 Test("keyboard layout switch: installed choices", _KLST_Choices)
 Test("keyboard layout switch: select posts the installed handle", _KLST_Select)
 Test("keyboard layout switch: refusals are false", _KLST_Refusals)

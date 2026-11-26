@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/cs.msg
-# AUTO-GENERATED from _shared/data/locales/cs.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/cs.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Síťový modul LuaJIT sestaven ze zdrojových kódů.
 build_luv.recipe_required=Nativní sestavení luv vyžaduje svůj zdrojový recept.
 install.already_installed={1} — již nainstalováno
 install.archive_digest_unavailable=aktualizace s ponechaným deskriptorem vyžadují skutečné běhové prostředí OpenSSL3; funkce zůstává nedostupná.
+install.bytecode_skipped=Předkompilované moduly se nepodařilo vytvořit — Ergopti se spouští ze zdrojového kódu, o něco pomaleji.
 install.capability_verified={1} — funkce ověřena
 install.command_still_missing={1} byl nainstalován, ale '{2}' stále nelze najít.
 install.daemon_manual=Službu ručně spustíte příkazem:
 install.daemon_running=Služba běží na pozadí. Stav zjistíte příkazem:
+install.focus_integration_enabled=integrace fokusu {1} zapnuta
+install.focus_integration_failed=Integraci fokusu {1} se nepodařilo zapnout — pravidla pro jednotlivé aplikace zůstávají na tomto prostředí neaktivní.
+install.focus_integration_next_login=integrace fokusu {1} nainstalována (platí od příštího přihlášení)
+install.focus_integration_updated=integrace fokusu {1} aktualizována
 install.gnome_extension_active=rozšíření GNOME AppIndicator — již aktivní
 install.gnome_extension_enabled=rozšíření GNOME AppIndicator zapnuto
 install.gnome_extension_failed=Rozšíření AppIndicator nelze zapnout — bez něj GNOME ikonu nezobrazí.
 install.gnome_extension_missing=chybí rozšíření GNOME AppIndicator — instaluje se {1}…
 install.gnome_extension_next_login=rozšíření GNOME AppIndicator zapnuto (platí od příštího přihlášení)
+install.gnome_extension_not_installed=Žádný balíček této distribuce neobsahuje rozšíření GNOME AppIndicator: nainstalujte AppIndicator and KStatusNotifierItem Support z {1}, pak se odhlaste a znovu přihlaste — bez něj GNOME ikonu nezobrazí.
 install.gnome_without_extensions=GNOME bez gnome-extensions — zapněte rozšíření AppIndicator, abyste ikonu viděli.
 install.help_help=Zobrazí tuto nápovědu
 install.help_no_deps=Neinstaluje žádné závislosti (zajistíte je sami)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — kontrola závislostí
 install.section_deps_skipped=Závislosti přeskočeny (--no-deps)
 install.section_done=Instalace dokončena
 install.section_files=Instalace souborů
+install.section_focus=Aktivní aplikace pod Waylandem (GNOME, KDE)
 install.section_lua_deps=Volitelné závislosti Lua (smyčka událostí, časovače, webview, signály)
 install.section_permissions=Oprávnění vstupu (vyžaduje sudo)
 install.section_services=Vytváření uživatelských služeb systemd
@@ -63,6 +70,7 @@ install.section_tray=Ikona v oznamovací oblasti a okna
 install.security_warning_body=Členství ve skupině „input“ umožňuje číst KAŽDÝ stisk klávesy v relaci, včetně hesel zadaných v libovolné aplikaci. Přesně to potřebuje modul hotstringů a stejně fungují i keyd a xremap.
 install.security_warning_title=BEZPEČNOSTNÍ UPOZORNĚNÍ
 install.service_started=služba ergopti-hotstrings zapnuta a spuštěna
+install.session_without_graphical_target=Tato relace nikdy nespouští graphical-session.target systemd (i3, Openbox, Xfce, sway bez správce relace), takže by se uživatelská jednotka nikdy nespustila: Ergopti+ se místo toho spustí z položky automatického spuštění XDG při příštím přihlášení. Správce oken, který automatické spuštění XDG ignoruje (i3, sway), potřebuje ve své konfiguraci řádek exec {1}.
 install.source_toolchain_unavailable=nainstalovaný kompilátor nedokáže sestavit nativní archivační modul.
 install.startup_choice_unreadable=Volbu spouštění nelze přečíst.
 install.summary_config=Konfigurace: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=automatické spuštění XDG: {1}
 launch.already_running=Ergopti+ již v této relaci běží ({1} je obsazen); toto spuštění bylo odmítnuto.
 launch.authorization_failed=Autorizace přístupu ke vstupu byla zrušena nebo selhala.
 launch.groups_unavailable=Relace nemohla získat své nakonfigurované vstupní skupiny.
+launch.restarting=Ergopti+ už v této relaci běží; bude požádán o ukončení a poté znovu spuštěn.
+launch.session_lock_invalid=Adresář zámku relace musí být absolutní cesta.
 launcher.dependencies_installed=Závislosti nainstalovány.
 launcher.driver_missing=Chyba: adresář ovladače pro Linux nebyl nalezen: {1}
 launcher.install_deps_hint=Spusťte: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Instalační cesta prochází symbolickým odkazem.
 uninstall.system_prefix=Systémová instalační předpona byla odmítnuta.
 uninstall.unsafe_path=Nebezpečná cesta vlastnictví.
 uninstall.unsupported_argument=Nepodporovaný argument odinstalace: {1}
+xkb_helpers.not_found=Instalační soubory rozložení klávesnice nebyly nalezeny vedle {1} ani v {2}: bez nich nelze nainstalovat žádné rozložení.

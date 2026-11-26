@@ -124,6 +124,14 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
 - Without a Developer ID, `SMAppService.daemon` may refuse the self-signed
   runtime; the fallback is an administrator-prompted
   `launchctl bootstrap system`, and Login Items show an unidentified developer.
+  What a Developer ID would change, should the maintainer revisit decision 4
+  (noted 2026-11-04): `SMAppService.daemon` for both jobs from
+  `Contents/Library/LaunchDaemons` (no password, one « Ergopti » Login Items
+  group; launchd kills the SMAppService jobs of a bundle with no Team ID,
+  `RemapLeaseGuardian.swift`), and an Ergopti-signed DriverKit extension in
+  `Contents/Library/SystemExtensions` activated with `OSSystemExtensionRequest`
+  (needs Apple's DriverKit HID entitlements for the team). The root Core keeps
+  its own Input Monitoring row either way: launchd starts it, not Ergopti.
 - Because the runtime is self-signed, the upstream `same_team_id` check (which
   trusts every peer when the daemon has no verified Team ID) must be replaced by
   a designated-requirement check pinned to the Ergopti certificate leaf before
@@ -139,6 +147,12 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
+  **Revised by the maintainer for the release after 1.0.9:** owned becomes the
+  default (`Config.RUNTIME_DEFAULT`), shared stays readable as a hand-written
+  `runtime = "shared"`, and the Configuration rows that switched and cleaned
+  the user's Karabiner-Elements are deleted. The flip lands on its own commit
+  so it can wait for the native install and acceptance
+  (`docs/tooling/next-release-handoff.md`).
 - An incompatible VirtualHIDDevice (only one version can be active system-wide)
   blocks owned mode in an explicit named unavailable state with an explanation.
   The decided policy offers a driver-only update requiring explicit confirmation:

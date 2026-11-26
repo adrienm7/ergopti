@@ -25,25 +25,30 @@
 ---    page still gets the counts that were read, flagged so it says the
 ---    history is incomplete; the snapshot is not saved and the projection
 ---    cache is left as it was, so the next open retries a full read.
+--- 6. A missing store is an incomplete read, not an empty history: nothing
+---    certifies that no rows exist, so the page says so and nothing is saved,
+---    as Linux does (MET-11). An empty manifest published as complete and
+---    fresh hid the notice and became the next open's snapshot.
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
-local RunningApplication = require("adapters.running_application")
-local OwnWindow = require("adapters.own_window")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local RunningApplication = require("platform.focus.running_application")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
-local Json       = require("json")
-local FileSystem = require("adapters.file_system")
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local i18n       = require("infra.i18n")
-local TimerScheduler = require("adapters.timer_scheduler")
-local PacedJob   = require("infra.paced_job")
-local PacedJson  = require("infra.paced_json")
+local Json       = require("core.text.engine.json")
+local FileSystem = require("core.fs.adapters.file_system")
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local i18n       = require("core.i18n.engine.i18n")
+local TimerScheduler = require("core.events.timer_scheduler")
+local PacedJob   = require("core.timing.engine.paced_job")
+local PacedJson  = require("core.timing.engine.paced_json")
 local Projection = require("ui.metrics_typing.projection")
 local Snapshot   = require("ui.metrics_typing.snapshot")
 
@@ -211,6 +216,10 @@ local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
 	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
+	-- Ergopti Studio's saved « My typing » read is derived from the same store.
+	if removed then
+		removed = require("modules.keystats.studio_snapshot").retire(_get_log_manager().get_sqlite_path())
+	end
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
 		Projection.reset()
@@ -222,6 +231,26 @@ local function reset_caches(generation, webview)
 		Logger.error(LOG, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
 	end
 	return false
+end
+
+--- The dashboard's Export and Purge: log_manager, the single writer, owns
+--- both, and the page learns the outcome through complete_metrics_maintenance.
+local MAINTENANCE = { metrics_export = "export", metrics_purge = "purge" }
+
+local function request_maintenance(generation, webview, action, maintenance_id)
+	if type(maintenance_id) ~= "number" or maintenance_id <= 0 or maintenance_id % 1 ~= 0
+		or maintenance_id > JS_MAX_SAFE_INTEGER then
+		delivery_failure(generation, webview, "metrics maintenance", "invalid owner")
+		return
+	end
+	local function answer(success, path)
+		local encoded_path = type(path) == "string" and encode_delivery(generation, webview, "metrics maintenance", path)
+		submit_javascript(generation, webview, "metrics maintenance completion", string.format(
+			"window.complete_metrics_maintenance&&window.complete_metrics_maintenance(%d,%s,%s);",
+			maintenance_id, tostring(success == true), encoded_path or "null"))
+	end
+	local accepted = _get_log_manager().request_metrics_maintenance(MAINTENANCE[action], answer)
+	if accepted ~= true then answer(false) end
 end
 
 local function clear_cache(generation, webview, reset_id)
@@ -471,6 +500,8 @@ local function compute_full(pacer)
 	if sqlite_path then
 		session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path, today, pacer)
 		manifest, manifest_json, manifest_complete = session.manifest()
+	else
+		manifest_complete, range_complete = false, false
 	end
 
 	-- App icons + apps list + first_date computed from manifest. The apps list
@@ -483,12 +514,13 @@ local function compute_full(pacer)
 	local all_apps_list  = {}
 	for date_str, day_data in pairs(manifest) do
 		if first_date == nil or date_str < first_date then first_date = date_str end
-		for app_name, _ in pairs(day_data) do
-			if not EXCLUDED_APPS[app_name] and not all_apps_set[app_name] then
+		for app_key, _ in pairs(day_data) do
+			local app_name = ManifestKeys.decode(app_key)
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and not all_apps_set[app_name] then
 				all_apps_set[app_name] = true
 				table.insert(all_apps_list, app_name)
 			end
-			if app_name ~= "Unknown" and app_icons[app_name] == nil then
+			if not EXCLUDED_APPS[app_key] and app_name ~= "Unknown" and app_icons[app_name] == nil then
 				local cached = M._app_icon_cache[app_name]
 				if cached ~= nil then
 					if cached then app_icons[app_name] = cached end
@@ -536,7 +568,7 @@ end
 --- @return table result { payload = publication object text, complete = boolean }.
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
+	if not sqlite_path then return { payload = '{"manifest":{},"manifest_incomplete":true}', complete = false } end
 	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local _, manifest_json, manifest_complete = session.manifest()
@@ -553,7 +585,9 @@ end
 --- @return table result { payload = encoded range data, complete = boolean }.
 local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
+	if not sqlite_path then
+		return { payload = '{"historical":[],"today":[],"incomplete":true}', complete = false }
+	end
 	local apps = type(query.apps) == "table" and query.apps or nil
 	-- The page names the history it holds, so an unchanged one is not resent
 	local held = math.tointeger(query.historical_serial)
@@ -937,7 +971,7 @@ function M.show()
 		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
-		return TimerScheduler.every(require("infra.timings").sec("ui", "metrics_typing_poll_ms"), function()
+		return TimerScheduler.every(require("core.timing.engine.timings").sec("ui", "metrics_typing_poll_ms"), function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)
@@ -957,6 +991,8 @@ function M.show()
 						if ok and query then
 							if query.action == "clear_cache" then
 								clear_cache(generation, webview, query.reset_id)
+							elseif MAINTENANCE[query.action] then
+								request_maintenance(generation, webview, query.action, query.maintenance_id)
 							else
 								local request_id = tonumber(query.request_id)
 								if not (request_id and request_id > 0 and request_id % 1 == 0) then

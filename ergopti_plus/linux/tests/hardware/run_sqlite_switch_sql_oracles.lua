@@ -12,7 +12,7 @@ local root=assert(uv.fs_mkdtemp("/tmp/ergopti-switch-sql-XXXXXX"))
 for _,name in ipairs({"CONFIG","DATA","CACHE","STATE"}) do assert(uv.os_setenv("XDG_"..name.."_HOME",root.."/"..name:lower())) end
 local W=require("modules.keystats.sqlite_writer")
 local R=require("modules.keystats.sqlite_reader")
-local J=require("json")
+local J=require("core.text.engine.json")
 local db=root.."/metrics.sqlite"
 local source,dest,zero="owned café' source","owned destination","owned zero"
 assert(W.open_db(db))

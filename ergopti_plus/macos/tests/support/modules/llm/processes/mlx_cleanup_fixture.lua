@@ -10,14 +10,14 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
-	"infra.text_utils", "infra.timings", "infra.paths", "adapters.storage",
-	"adapters.http_client", "adapters.json_codec", "adapters.shell_runner",
-	"adapters.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
-	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
-	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
-	"modules.llm.api_mlx", "modules.llm.boot_cleanup",
-	"ui.menu.menu_llm.models_manager_mlx_server",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "settings.engine.paths",
+	"core.text.engine.utils", "core.timing.engine.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
+	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
+	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "ai.engine.settings.profiles",
+	"ai.engine.api.common", "ai.engine.api.mlx_inference", "ai.engine.api.mlx_fetch",
+	"ai.engine.api.mlx_discovery", "ai.engine.local_servers.mlx_stream_retirement",
+	"ai.engine.api.mlx", "ai.engine.bootstrap.boot_cleanup",
+	"ai.ui.menu.models.manager_mlx_server",
 }
 
 --- Quotes one opaque argument for the receiving POSIX shell.
@@ -43,49 +43,49 @@ function M.with_commands(callback)
 				if type(fn) ~= "function" then return false end
 				return pcall(fn, ...)
 			end
-			package.loaded["infra.logger"] = {
+			package.loaded["core.logger.engine.logger"] = {
 				debug = noop, info = noop, warn = noop, error = noop,
 				callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 				today_log_path = function() return "/fixture/log.txt" end,
 			}
-			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
-			package.loaded["infra.text_utils"] = { shell_quote = M.quote }
-			package.loaded["infra.timings"] = { sec = function() return 1 end }
-			package.loaded["infra.paths"] = { shared = function() return nil end }
-			package.loaded["adapters.storage"] = { get = function() return nil end }
-			package.loaded["adapters.http_client"] = { new = function() return {} end }
-			package.loaded["adapters.json_codec"] = { decode = function() return nil end }
-			package.loaded["adapters.shell_runner"] = { spawn = capture }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["settings.engine.paths"] = { get = function() return "/fixture/model.txt" end }
+			package.loaded["core.text.engine.utils"] = { shell_quote = M.quote }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+			package.loaded["core.fs.adapters.storage"] = { get = function() return nil end }
+			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+			package.loaded["core.fs.adapters.json_codec"] = { decode = function() return nil end }
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = capture }
+			package.loaded["core.events.timer_scheduler"] = {
 				awake_time = function() return 100 end,
 				after = function() return { timer = {} }, true end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(_, executable, _, third, fourth)
 					return capture(executable, fourth or third)
 				end,
 				start = function(task) return task.start() end,
 			}
-			package.loaded["modules.llm.profiles"] = {}
-			package.loaded["modules.llm.api_common"] = { protected_call = protected }
-			package.loaded["modules.llm.mlx_stream_retirement"] = {}
+			package.loaded["ai.engine.settings.profiles"] = {}
+			package.loaded["ai.engine.api.common"] = { protected_call = protected }
+			package.loaded["ai.engine.local_servers.mlx_stream_retirement"] = {}
 			for _, name in ipairs({ "inference", "fetch", "discovery" }) do
-				package.loaded["modules.llm.api_mlx_" .. name] = { init = noop }
+				package.loaded["ai.engine.api.mlx_" .. name] = { init = noop }
 			end
-			local api = require("modules.llm.api_mlx")
+			local api = require("ai.engine.api.mlx")
 			api.set_active_server_pgid(700)
 			helpers.assert_eq(#commands, 1, "the guarded API must emit its real cleanup")
 			local guarded = commands[1]
-			helpers.assert_true(require("modules.llm.boot_cleanup").run_selective_cleanup(noop))
+			helpers.assert_true(require("ai.engine.bootstrap.boot_cleanup").run_selective_cleanup(noop))
 			helpers.assert_eq(#commands, 2)
 			local boot = commands[2]
 			api.reset_endpoints = function() return true end
 			api.set_model_hf_path = noop
 			_G.hs = { execute = function() return "" end }
 			local obj = { get_mlx_repo = function() return "fixture/repo" end }
-			require("ui.menu.menu_llm.models_manager_mlx_server").install({
+			require("ai.ui.menu.models.manager_mlx_server").install({
 				obj = obj, deps = { active_tasks = {} }, active_tasks_gc_root = {},
 				project_venv_python_escaped = "/Users/Example/Library/Application Support/mlx/bin/python3",
 			})

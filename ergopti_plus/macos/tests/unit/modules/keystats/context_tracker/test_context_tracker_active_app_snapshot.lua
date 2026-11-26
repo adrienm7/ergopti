@@ -29,6 +29,15 @@ helpers.describe("context_tracker: active app snapshot", function()
 		helpers.assert_eq(snapshot.duration_ms, 6250)
 	end)
 
+	helpers.it("says it is started only once keystats initialized it", function()
+		local tracker = helpers.load_with_stubs("modules.keystats.context_tracker", {
+			timer = { absoluteTime = function() return 7250000000 end },
+		})
+		helpers.assert_eq(tracker.is_initialized(), false)
+		tracker.init({}, {}, NOT_PAUSED)
+		helpers.assert_eq(tracker.is_initialized(), true)
+	end)
+
 	helpers.it("does not invent an interval without a tracked foreground application", function()
 		local tracker = helpers.load_with_stubs("modules.keystats.context_tracker", {
 			timer = { absoluteTime = function() return 7250000000 end },

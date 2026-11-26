@@ -16,10 +16,11 @@
 --- 4. A layer the rule builder rejects fails the build instead of dropping it.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers  = require("tests.helpers")
+local Sequence = require("tests.support.script_chord_sequence")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local DATA_DIR = "/fake/data_dir/"
 local LEGACY_LAYER = {
@@ -35,7 +36,7 @@ local LEGACY_LAYER = {
 }
 local files = {}
 
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function(path) return files[path] end,
 	read_with_status = function(path)
 		if files[path] then return files[path], "ok" end
@@ -43,10 +44,10 @@ package.loaded["adapters.file_system"] = {
 	end,
 	write = function() return true end,
 }
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	to_name                 = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN    = 105,
 	F14_KARABINER_BACKSPACE = 107,
@@ -80,11 +81,12 @@ local function make_state(nav_layer)
 	}
 end
 
---- The deployed manipulators firing on a key code.
+--- The deployed manipulators firing on a key code, outside the rule ending
+--- the script chord sequence, which takes every key.
 local function manipulators_on(config, key_code)
 	local found = {}
 	for _, rule in ipairs(config.profiles[1].complex_modifications.rules) do
-		for _, manipulator in ipairs(rule.manipulators or {}) do
+		for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 			if manipulator.from and manipulator.from.key_code == key_code then found[#found + 1] = manipulator end
 		end
 	end
@@ -106,7 +108,8 @@ helpers.describe("Navigation layer in the generated Karabiner config", function(
 		helpers.assert_nil(err)
 		local on_h = manipulators_on(config, "h")
 		helpers.assert_eq(#on_h, 1, "KeyH is bound once")
-		helpers.assert_eq(on_h[1].to[1].key_code, "left_arrow")
+		helpers.assert_true(Sequence.is_sequence_event(on_h[1].to[1]), "the layer key ends a script chord sequence")
+		helpers.assert_eq(Sequence.without_sequence(on_h[1].to)[1].key_code, "left_arrow")
 		helpers.assert_true(has_condition(on_h[1], "ergopti_layer_active_" .. TOKEN, 1),
 			"the layer reads this generation's layer variable")
 		helpers.assert_true(has_condition(on_h[1], "ergopti_mode_" .. TOKEN, 1),
@@ -144,7 +147,7 @@ helpers.describe("Navigation layer in the generated Karabiner config", function(
 
 	helpers.it("fails the build on a layer the rule builder rejects", function()
 		local config, err = Generator.build_karabiner_json(make_state({
-			bindings = { KeyH = { kind = "repeat_count", count = 2 } }, registry = REGISTRY,
+			bindings = { KeyH = { kind = "call", handler = "maximize_window" } }, registry = REGISTRY,
 		}), ACTIONS, {}, {}, {}, DATA_DIR, TOKEN)
 		helpers.assert_nil(config, "a navigation layer that cannot be built must not be dropped silently")
 		helpers.assert_true(type(err) == "string" and err:find("navigation layer", 1, true) ~= nil, tostring(err))

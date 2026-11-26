@@ -25,7 +25,7 @@ _KFPO_EmbeddableOwnerSource(Owner) {
 _KFPO_ChildSource() {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["MF_ShouldFilter", "TimerAfter", "WallClockTimestamp"] {
+	for Symbol in ["MF_ShouldFilter", "TimerAfter", "WallClockTimestamp", "_KL_DetachBufferSnapshot"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child needs the unique actual owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"

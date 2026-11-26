@@ -13,7 +13,7 @@ local with_changelog = require("tests.support.changelog_fixture").with_changelog
 --- @return table logs Observable lifecycle and error records.
 local function observe_logs()
 	local logs = { errors = {}, done = 0 }
-	local logger = package.loaded["infra.logger"]
+	local logger = package.loaded["core.logger.engine.logger"]
 	logger.error = function(_, message, ...) logs.errors[#logs.errors + 1] = string.format(message, ...) end
 	logger.done = function() logs.done = logs.done + 1 end
 	return logs
@@ -134,7 +134,7 @@ helpers.describe("changelog JavaScript delivery", function()
 			state.callbacks[1](200, state.main_body, {})
 			local old = state.javascript_callbacks[1]
 			helpers.assert_type(old, "function")
-			local logger, first = package.loaded["infra.logger"], true
+			local logger, first = package.loaded["core.logger.engine.logger"], true
 			local report = logger.error
 			logger.error = function(...)
 				report(...)

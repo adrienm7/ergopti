@@ -52,12 +52,15 @@ _SICO_RequestCopy(Phase) {
 	_SICO.WriterSequence := Identity.Sequence
 }
 
-; Decorate only the complete genuine publisher. The native bool and every
-; value remain unchanged; this exposes its unlocked return to the real copier.
-CB_Write(Text) {
+; Keep the seed setter genuine. The actual payload publication uses native CAS;
+; observe its complete unlocked return before the original authentication step.
+CB_Write(Text) => _SICO_ActualWrite(Text)
+
+_CB_PlainNativeMutationCAS(Record, Text) {
 	global _SICO
 	try {
-		Published := _SICO_ActualWrite(Text)
+		Result := _SICO_ActualNativeMutationCAS(Record, Text)
+		Published := Record["published"] && !Record["lease_unknown"] && !IsObject(Record["failure"])
 		if Published && IsSet(_SICO) && _SICO.Armed {
 			_SICO_Require(A_IsCritical == _SICO.CallerCritical && A_IsCritical > 0,
 				"The setter boundary must retain the genuine caller's Critical state.")
@@ -78,7 +81,7 @@ CB_Write(Text) {
 			else
 				_SICO.Armed := false
 		}
-		return Published
+		return Result
 	} catch Any as Failure {
 		if IsSet(_SICO) && !IsObject(_SICO.Failure)
 			_SICO.Failure := Failure
@@ -170,25 +173,18 @@ _SICO_Settle(CheckFailure := true) {
 
 _SICO_RestoreIncoming(Snapshot) {
 	global _SICO
-	; Never detach a live client's owner or guess its anonymous restore callback.
-	; An unknown retirement retains the incoming snapshot without overwriting it.
 	_SICO_Settle(false)
-	Text := CB_Read(), Sequence := CB_GetSequenceNumber(), Known := false
-	_SICO_Require(CB_OpenClipboardWithin(A_ScriptHwnd), "Cleanup must acquire its own actual native lease.")
-	try {
-		Owner := DllCall("User32\GetClipboardOwner", "Ptr")
-		Known := (Text == _SICO.Seed || Text == _SICO.Payload || Text == _SICO.Foreign)
-			&& Sequence > 0 && CB_GetSequenceNumber() == Sequence
-			&& (Owner == A_ScriptHwnd || Owner == _SICO.Writer.Hwnd)
-	} finally {
-		_SICO_Require(DllCall("User32\CloseClipboard", "Int") != 0, "Cleanup must release only its own read lease.")
-	}
-	if Known {
-		CB_RestoreOwnedAllEventually(Snapshot, Sequence, 0, "sendinstant_clipboard_fixture", false)
+	; Only the retained independent copy receipt authorizes this fixture's
+	; incoming restore. The actual ClipboardAll restore supplies no new receipt.
+	Expected := _SICO.Copied ? _SICO.WriterSequence : 0
+	Observed := CB_GetSequenceNumber()
+	if Expected {
+		CB_RestoreOwnedAllEventually(Snapshot, Expected, 0, "sendinstant_clipboard_fixture", true, false)
 		_SICO_Settle(false)
 	}
-	FileAppend("CLEANUP sendinstant-clipboard-owner known=" . (Known ? 1 : 0)
-		. " unknown_preserved=" . (Known ? 0 : 1) . " debt=0 active=0`n", "*", "UTF-8-RAW")
+	FileAppend("CLEANUP sendinstant-clipboard-owner expected_sequence=" . Expected . " observed_sequence=" . Observed
+		. " receipt_current=" . (Expected && Expected == Observed) . " unknown_preserved=" . (!Expected || Expected != Observed)
+		. " debt=0 active=0`n", "*", "UTF-8-RAW")
 }
 
 ; Add a genuine non-text format to the original clipboard, not to the payload.

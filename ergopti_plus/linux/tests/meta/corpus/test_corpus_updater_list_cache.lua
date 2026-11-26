@@ -14,12 +14,12 @@ local helpers = require("tests.helpers")
 local corpus_path = helpers.driver_root() .. "/../_shared/tests/corpus/updater/list_cache_vectors.json"
 
 local handle = assert(io.open(corpus_path, "r"), "cannot open corpus at " .. corpus_path)
-local corpus = require("json").decode(handle:read("*a"))
+local corpus = require("core.text.engine.json").decode(handle:read("*a"))
 handle:close()
 
 local function load_module()
-	package.loaded["updater.list_cache"] = nil
-	return require("updater.list_cache")
+	package.loaded["updater.engine.list_cache"] = nil
+	return require("updater.engine.list_cache")
 end
 
 helpers.describe("updater list copy corpus: the shared validation on Linux", function()

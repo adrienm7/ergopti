@@ -11,7 +11,7 @@
 ; WHY CNG RATHER THAN A SUBPROCESS:
 ; The other two drivers shell out to openssl. Windows has no openssl by default,
 ; so the AES and PBKDF2 primitives come from bcrypt.dll — wrapped in
-; adapters/crypto.ahk, since the OS-purity ratchet keeps every DllCall inside
+; core/crypto/crypto.ahk, since the OS-purity ratchet keeps every DllCall inside
 ; adapters/. That spawns no process at all, which makes this the fastest of the
 ; three — and it produces the SAME bytes: PBKDF2 with a 32-byte output is exactly
 ; the first block openssl derives, so the same machine id yields the same key,
@@ -38,7 +38,7 @@
 ; ==============================================================================
 ; ==============================================================================
 
-; Envelope format. MUST match _shared/lua/keystats/text_crypto.lua; the parity
+; Envelope format. MUST match _shared/metrics/engine/privacy/text_crypto.lua; the parity
 ; gate tools/test/test-text-crypto-envelope-parity.cjs fails if they drift.
 global KL_ENC_MARKER      := "ergopti-enc-v1"
 global KL_ENC_SEPARATOR   := ":"
@@ -209,7 +209,10 @@ KL_Enc_IsAvailable() {
 		return _KL_Enc_EnsureKey() != ""
 }
 
-; Encrypts one value for storage.
+; Encrypts one raw value for storage. Typed text may begin with the marker or
+; copy a whole envelope, so a content prefix proves nothing about provenance:
+; every nonempty raw value is sealed. Skipping an already stored envelope is the
+; migration's job, the one caller that reads stored values.
 ; @return String|"" The envelope, the untouched plaintext when disabled, or ""
 ;   when encryption is enabled but impossible — the caller must NOT store the
 ;   plaintext in that case.
@@ -217,8 +220,6 @@ KL_Enc_Encrypt(deviceId, eventId, plaintext) {
 		if (!KL_ENC_Enabled)
 				return plaintext
 		if (Type(plaintext) != "String" || StrLen(plaintext) = 0)
-				return plaintext
-		if (KL_Enc_IsEncrypted(plaintext))
 				return plaintext
 
 		key := _KL_Enc_EnsureKey()

@@ -80,18 +80,19 @@ _LclCorpus_PopulateCaches(Vec) {
 	if Vec.Has("trigger") {
 		Trig := Vec["trigger"]
 		if (Type(Trig) = "String" and Trig != "") {
-			; Pre-substitute ★ in all caches (mimicking what _I18nLoadFile does)
+			; Show ★ in all caches as the real loader does (_I18nLoadFile): the
+			; shared « ★ (£) » display, literal marker keys untouched.
 			for Key, Val in _I18nCache {
 				if InStr(Val, "★")
-					_I18nCache[Key] := StrReplace(Val, "★", Trig)
+					_I18nCache[Key] := MagicKeyShownText(Val, Trig, Key)
 			}
 			for Key, Val in _I18nCacheEn {
 				if InStr(Val, "★")
-					_I18nCacheEn[Key] := StrReplace(Val, "★", Trig)
+					_I18nCacheEn[Key] := MagicKeyShownText(Val, Trig, Key)
 			}
 			for Key, Val in _I18nCacheFr {
 				if InStr(Val, "★")
-					_I18nCacheFr[Key] := StrReplace(Val, "★", Trig)
+					_I18nCacheFr[Key] := MagicKeyShownText(Val, Trig, Key)
 			}
 		}
 	}

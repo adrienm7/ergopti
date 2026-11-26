@@ -28,6 +28,9 @@ local function fake_shortcuts(log)
 		select_line         = function() log.line = true end,
 		paste_plain         = function() log.paste = true end,
 		wrap_selection      = function(l, r) log.wrapped = l .. r end,
+		get_wrap_pair_list  = function()
+			return { { left = "(", right = ")" }, { left = "«", right = "»" } }
+		end,
 		get_wrap_pairs      = function()
 			return {
 				["("] = { left = "(", right = ")" },
@@ -36,6 +39,21 @@ local function fake_shortcuts(log)
 				["»"] = { left = "«", right = "»" },
 			}
 		end,
+		get_wrap_groups     = function()
+			return { { i18n = "menu.shortcuts.wrap_symbols_title",
+				pairs = { { left = "(", right = ")" }, { left = "«", right = "»" } } } }
+		end,
+		-- The stored wrap choices, changed only through commit_wrap_choices.
+		get_wrap_choices    = function() return { states = log.wrap_states or {}, custom = log.wrap_custom or {} } end,
+		commit_wrap_choices = function(mutate)
+			local candidate = { wrap_symbol_states = {}, custom_wrap_symbols = {} }
+			for key, value in pairs(log.wrap_states or {}) do candidate.wrap_symbol_states[key] = value end
+			for index, pair in ipairs(log.wrap_custom or {}) do candidate.custom_wrap_symbols[index] = pair end
+			if mutate(candidate) ~= true then return false end
+			log.wrap_states, log.wrap_custom = candidate.wrap_symbol_states, candidate.custom_wrap_symbols
+			log.wrap_commits = (log.wrap_commits or 0) + 1
+			return true
+		end,
 	}
 end
 
@@ -43,11 +61,11 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows
 local function shortcuts_menu(ctx_extra)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local ctx = { _version = "9.9.9", shortcuts = fake_shortcuts() }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
-	local wanted = require("infra.i18n").get("menu.shortcuts.select_word")
+	local wanted = require("core.i18n.engine.i18n").get("menu.shortcuts.select_word")
 	for _, item in ipairs(mb.build(ctx)) do
 		if type(item.menu) == "table" then
 			for _, row in ipairs(item.menu) do
@@ -95,23 +113,23 @@ end
 --- @param prompt function|nil Controlled prompt; nil uses the application chooser.
 --- @param body function Assertions while the actual owners and private source remain live.
 local function with_keyboard_slot_picker(prompt, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Writer = require("toml_codec.writer")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local source = '[shortcuts.keyboard]\nprimary_k = "none"\n[gesture_parameters]\nkeyboard__primary_k__open_url = "https://old.example"\n[unrelated]\nkeep = 42\n'
 	local ok, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
-			for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
-				"modules.shortcuts.manager", "modules.hotstrings.magic_key", "infra.program_binding_transaction",
-				"infra.manifest_menu" }) do package.loaded[name] = nil end
-			package.loaded["logger.shim"] = helpers.make_logger_stub()
-			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("menu fixture must not close input") end }
+			for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.keyboard_shortcuts",
+				"modules.shortcuts.manager", "hotstrings.engine.magic_key", "settings.engine.preferences.program_binding_transaction",
+				"menu.engine.manifest_menu" }) do package.loaded[name] = nil end
+			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("menu fixture must not close input") end }
 			local scene = { events = {} }
 			local events, backups, publications = scene.events, {}, 0
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = function(target) return Writer.read_classified(target) end,
 				read_with_status = function(target) return Writer.read_classified(target) end,
 				write = function() error("menu fixture forbids unconditional publication") end,
@@ -123,7 +141,7 @@ local function with_keyboard_slot_picker(prompt, body)
 				end,
 			}
 			local called, result = pcall(function()
-				local gestures = require("modules.gestures.manager")
+				local gestures = require("gestures.engine.manager")
 				gestures.init({ persist = true, config_path = path, enabled = false })
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 				-- A one-row presentation still delegates all ownership/domain policy.
@@ -178,7 +196,7 @@ local function with_keyboard_slot_picker(prompt, body)
 					return prompt(binding, action, spec, prior)
 				end end
 				local built = shortcuts_menu(ctx)
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local slot_row = find_row_prefix(built, "Ctrl+K")
 				helpers.assert_not_nil(slot_row, "the keyboard slot must be drawn")
 				local picker_choice = find_row(slot_row.menu, picker_label)
@@ -190,7 +208,7 @@ local function with_keyboard_slot_picker(prompt, body)
 				helpers.assert_not_nil(scene.picker, "clicking the production row must open the picker host")
 				body(scene)
 				helpers.assert_eq(publications, 1, "the actual retained owner publishes the joint candidate once")
-				local document = require("toml_codec").decode(Sandbox.read_bytes(path))
+				local document = require("core.text.engine.toml_codec").decode(Sandbox.read_bytes(path))
 				helpers.assert_eq(document.shortcuts.keyboard.primary_k, keyboard.get_action("primary_k"))
 				for key, value in pairs(gestures.get_all_action_parameters()) do
 					helpers.assert_eq(document.gesture_parameters[key], value, "disk and actual parameter owner agree")
@@ -208,12 +226,12 @@ end
 
 -- Own the genuine native translation cohort while exercising cold and warm trays.
 local function with_shortcut_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "menu.ui.builder.builder" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		native = require("infra.i18n")
+		native = require("core.i18n.engine.i18n")
 		native.init()
 		owner = { pending = function() return false end }
 		assert(native.scope_acquire(owner))

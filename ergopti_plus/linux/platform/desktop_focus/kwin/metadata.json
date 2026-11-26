@@ -1,0 +1,14 @@
+{
+	"KPackageStructure": "KWin/Script",
+	"KPlugin": {
+		"Description": "Tells the Ergopti daemon which window has focus (class, title and process), so its per-application rules work under Wayland.",
+		"EnabledByDefault": false,
+		"Id": "ergopti-focus",
+		"License": "MIT",
+		"Name": "Ergopti focus",
+		"Version": "1",
+		"Website": "https://ergopti.fr"
+	},
+	"X-Plasma-API": "javascript",
+	"X-Plasma-MainScript": "code/main.js"
+}

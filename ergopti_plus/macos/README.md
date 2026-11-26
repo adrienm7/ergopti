@@ -18,20 +18,21 @@ The macOS implementation of ErgoptiPlus.
 Releases are published as casks in the
 [`adrienm7/homebrew-ergopti`](https://github.com/adrienm7/homebrew-ergopti) tap,
 one cask per update channel of
-[`_shared/modules/updater/channels.json`](../_shared/modules/updater/channels.json):
+[`_shared/updater/data/channels.json`](../_shared/updater/data/channels.json):
 
 ```bash
 brew tap adrienm7/ergopti
 brew install --cask ergoptiplus        # main (stable) channel
-brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prerelease
+brew install --cask ergoptiplus@dev   # dev channel: every X.Y.Z-dev.N prerelease
 ```
 
 - **Channel.** The cask installs that channel's newest build, and a build
   follows its own channel until another one is picked in the app's About menu.
   The two casks conflict: to switch, `brew uninstall --cask ergoptiplus@dev`
   then `brew install --cask ergoptiplus` (or the reverse); the settings in
-  `~/.config/ergopti_plus/` stay. A channel chosen in the About menu is kept in
-  `config.toml` and wins over the installed build's channel. The stable cask
+  `~/Library/Application Support/Ergopti/config/` stay. A channel chosen in
+  the About menu is kept in `config.toml` and wins over the installed build's
+  channel. The stable cask
   exists once the first stable release is published.
 - **Updates.** Two paths update the same app. `brew upgrade` updates it with
   the other casks: brew quits the app, replaces it and relaunches it if it was
@@ -42,8 +43,9 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
 - **Gatekeeper.** The app is not notarised; the cask clears its quarantine
   flag after installing, as the manual `xattr` step does.
 - **Uninstall.** `brew uninstall --cask ergoptiplus` removes the app;
-  `--zap` also removes `~/.config/ergopti_plus/` and the launcher's
-  preferences and caches.
+  `--zap` also removes the Ergopti folders
+  (`~/Library/Application Support/Ergopti/`, `~/Library/Logs/Ergopti/`,
+  `~/Library/Caches/Ergopti/`) and the launcher's preferences and caches.
 
 The release job (`Publish Homebrew cask` in
 [`ci-release.yml`](../../../.github/workflows/ci-release.yml)) renders the released channel's
@@ -73,16 +75,16 @@ feature logic lives in the modules it loads.
 
 > AI runtimes: neither is bundled, and neither is fetched at startup, when the
 > AI is enabled with another backend, or after an update. The first selection
-> of the MLX backend runs `modules/llm/ensure-mlx-deps.sh`, which builds the
+> of the MLX backend runs `ai/engine/ensure-mlx-deps.sh`, which builds the
 > venv from the pinned `pyproject.toml`; later selections reuse it. When its
 > packages stop importing (a `uv.lock` bump in an update, a partial venv), the
 > model check marks it not installed and the next MLX selection rebuilds it.
 > A backend row switches only after its runtime install succeeds. The first
 > selection of the Ollama backend reuses Ergopti's own installed runtime
-> (`modules/llm/ollama_binary.lua`; a user's own Ollama is never used) or offers
-> to install it (`modules/llm/ensure-ollama-native-deps.sh`).
-> `ui/menu/menu_llm/runtime_install_offer.lua` is the only caller of the
-> checkers' install entries. `modules/llm/mlx_deps_checker.lua`
+> (`ai/engine/ollama/binary.lua`; a user's own Ollama is never used) or offers
+> to install it (`ai/engine/ensure-ollama-native-deps.sh`).
+> `ai/ui/menu/runtime_install_offer.lua` is the only caller of the
+> checkers' install entries. `ai/engine/local_servers/mlx_deps_checker.lua`
 > resolves its script relative to the Hammerspoon root, so moving these files
 > requires updating their path resolution — the Lua unit suite does not exercise
 > the bash/venv runtime.
@@ -101,7 +103,7 @@ commands for every layer live in [`../../../docs/TESTING.md`](../../../docs/TEST
 Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md), macOS
 semantics in the
 [`hammerspoon-driver` skill](../../../.agents/skills/hammerspoon-driver/SKILL.md),
-and logging in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
+and logging in the shared [`logger contract`](../_shared/core/logger/data/SPEC.md).
 Hard-won gotchas live in
 [`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under

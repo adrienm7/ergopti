@@ -2,13 +2,13 @@
 
 --- Scoped X11 window operations retain exact native retirement ownership.
 local M = {}
-local Worker = require("native_worker_owner")
-local Runner = require("adapters.program_runner")
-local Policy = require("cursor_window_policy")
-local Display = require("infra.display_server")
-local Shell = require("adapters.shell_runner")
-local Paths = require("infra.paths")
-local Timings = require("infra.timings")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
+local Runner = require("core.process.adapters.program_runner")
+local Policy = require("core.ui.engine.cursor_window_policy")
+local Display = require("core.ui.engine.display_server")
+local Shell = require("core.process.adapters.shell_runner")
+local Paths = require("core.fs.engine.paths")
+local Timings = require("core.timing.engine.timings")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end
 local TOOLS = { "timeout", "xdotool", "xrandr", "xprop", "xwininfo", "sha256sum" }

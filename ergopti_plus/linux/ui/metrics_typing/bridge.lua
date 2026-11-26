@@ -20,6 +20,15 @@
 ---    reset is a clean rebuild.
 --- 4. A payload built from an incomplete SQLite read is answered (the page says
 ---    the history is incomplete) but never kept, so the next opening retries.
+--- 5. The heatmap names the keys the user types: every answer carries
+---    `keycode_layout`, evdev code → the legend the running layout emulation
+---    types there, else the loaded XKB keymap's, as Windows sends its active
+---    layout and macOS `hs.keycodes.map`. Linux sent none, so the page kept
+---    the static QWERTY names on every layout (MET-09).
+--- 6. The page's 2 s poll follows the typing: its refresh carries today's
+---    n-grams, without the history the page already holds, as Windows pushes
+---    them. It carried the manifest alone, so the character, bigram and word
+---    tables stood still while the window was open (MET-10).
 --- ==============================================================================
 
 local M = {}
@@ -27,7 +36,7 @@ M.bridge_name = "metrics_typing_bridge"
 
 local AppsBridge = require("ui.metrics_apps.bridge")
 local Flush = require("ui.metrics_flush_bridge")
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.metrics_typing"
 
 local APP_NAME = "metrics_typing"
@@ -35,6 +44,10 @@ local APP_NAME = "metrics_typing"
 -- How long the refresh waits after a cached answer: long enough for WebKit to
 -- run the reply and paint, short enough that the numbers catch up at once.
 local REFRESH_DELAY_MS = 250
+
+-- The evdev codes the heatmap can name: 1 to 88 are the PC scan codes the page
+-- maps onto its keyboard (SC_TO_KC), as Windows reads scan codes 1 to 87.
+local LAYOUT_LAST_CODE = 88
 
 -- The last complete "ready" payload, and the generation of the latest refresh
 -- (a newer request supersedes an older pending one).
@@ -63,15 +76,64 @@ local function payload_complete(payload)
 	return complete
 end
 
+--- What a plain press of a key types now: the layout emulation's legend when
+--- it types that key, else the loaded XKB keymap's symbol (a dead key reads
+--- as its resting accent).
+--- @param code integer evdev key code.
+--- @return string|nil legend nil when the key types nothing printable.
+local function default_legend(code)
+	local emulated = require("modules.keymap.layout_emulation").legend_for_evdev(code)
+	if emulated ~= nil then return emulated end
+	local base = require("adapters.keyboard_layout").base_symbol(code)
+	return type(base) == "table" and base.text or nil
+end
+
+--- Builds the heatmap's legend map from the active layout.
+--- @return table { [evdev code string] = legend }
+local function keycode_layout()
+	local out = {}
+	for code = 1, LAYOUT_LAST_CODE do
+		local legend = M._legend(code)
+		if type(legend) == "string" and legend ~= "" then out[tostring(code)] = legend end
+	end
+	return out
+end
+
 --- Builds the dashboard payload from the daemon state.
 --- @param state table
 --- @param include_prefetch boolean
 --- @return table|nil
 local function build_payload(state, include_prefetch)
+	local payload
 	if state.keystats and type(state.keystats.get_dashboard_payload) == "function" then
-		return state.keystats.get_dashboard_payload({ include_prefetch = include_prefetch })
+		payload = state.keystats.get_dashboard_payload({ include_prefetch = include_prefetch })
+	else
+		payload = AppsBridge.build_payload(state)
 	end
-	return AppsBridge.build_payload(state)
+	if type(payload) == "table" then payload.keycode_layout = keycode_layout() end
+	return payload
+end
+
+--- Builds the poll's refresh: the manifest and today's n-grams. Without
+--- `historical` the page keeps the history it holds and replaces today's.
+--- @param state table
+--- @return table|nil
+local function build_refresh(state)
+	local refreshed = build_payload(state, false)
+	if type(refreshed) ~= "table" then return refreshed end
+	local keystats = state.keystats
+	if not keystats or type(keystats.get_today_payload) ~= "function" then
+		Logger.error(LOG, "The keystats exposes no get_today_payload; the refresh carries the manifest alone.")
+		return refreshed
+	end
+	local today, err = keystats.get_today_payload()
+	if type(today) == "table" then
+		refreshed._prefetch_data = today
+	else
+		Logger.warn(LOG, "Today's n-grams unavailable for the refresh (%s); the tables keep their last counts.",
+			tostring(err))
+	end
+	return refreshed
 end
 
 --- Builds the dashboard payload with whether it may be kept for the next opening.
@@ -87,7 +149,7 @@ end
 --- @param delay_ms number
 --- @return boolean
 local function default_defer(fn, delay_ms)
-	local ok_loop, EventLoop = pcall(require, "adapters.event_loop")
+	local ok_loop, EventLoop = pcall(require, "core.events.loop")
 	if not ok_loop or type(EventLoop.defer) ~= "function" then
 		Logger.error(LOG, "Cannot schedule the dashboard refresh: the event loop has no defer().")
 		return false
@@ -102,9 +164,11 @@ local function default_push(payload, state, context)
 	return Flush.push(APP_NAME, M.bridge_name, payload, state, context)
 end
 
--- Injectable seams for tests; production uses the event loop and WebKit.
+-- Injectable seams for tests; production uses the event loop, WebKit and the
+-- running layout.
 M._defer = default_defer
 M._push = default_push
+M._legend = default_legend
 local Requests = Flush.new(APP_NAME, function(...) return M._push(...) end,
 	function(reply, cache, keystats, generation)
 		if cache then
@@ -131,6 +195,22 @@ local function schedule_refresh(state, context, request)
 	end
 end
 
+--- Ends one range request the page is waiting for as failed. A nil answer sent
+--- nothing, so the page kept its loader for the 120 s watchdog, where Windows
+--- sends its range_terminal and macOS receive_range_data(null) at once (MET-05).
+--- @param payload table The range request, with its request_id.
+--- @param state table
+--- @param context table|nil
+--- @param reason string Logged cause, never the user's selection.
+--- @return nil
+local function fail_range(payload, state, context, reason)
+	Logger.warn(LOG, "Typing metrics range request #%s refused: %s.", tostring(payload.request_id), reason)
+	if type(payload.request_id) == "number" then
+		Flush.call(APP_NAME, "complete_range_request", { payload.request_id, "failed" }, state, context)
+	end
+	return nil
+end
+
 --- Handles a ready or refresh request from the shared typing dashboard.
 --- @param payload any Request payload from the WebKit bridge.
 --- @param state table Daemon state.
@@ -149,7 +229,7 @@ local function handle(payload, state, context, request)
 	end
 	if action == "refresh" then
 		Logger.debug(LOG, "Typing metrics UI requested refresh.")
-		local refreshed = build_payload(state, false)
+		local refreshed = build_refresh(state)
 		payload_complete(refreshed)
 		return refreshed
 	end
@@ -160,19 +240,35 @@ local function handle(payload, state, context, request)
 	-- one observable effect was that resetting changed nothing.
 	-- The answer is the rebuilt payload itself: the page applies every reply as
 	-- dashboard data, and a bare { cleared = true } emptied the dashboard.
+	-- It names the page's Reset and its outcome: the page holds its range until
+	-- then, and read neither, so a failed purge was never told (MET-19).
 	if action == "clear_cache" then
+		local reset_id = payload.reset_id
+		if type(reset_id) ~= "number" or reset_id <= 0 or reset_id % 1 ~= 0 then
+			Logger.error(LOG, "A dashboard reset without a valid reset id was refused — nothing was cleared.")
+			return nil
+		end
 		_refresh_generation = _refresh_generation + 1
 		local cleared = false
 		if state.keystats and type(state.keystats.clear_cache) == "function" then
 			local ok, result = pcall(state.keystats.clear_cache)
 			cleared = ok and result == true
-			if cleared then Logger.info(LOG, "Dashboard caches cleared by user reset.") end
+			if cleared then
+				Logger.info(LOG, "Dashboard caches cleared by user reset.")
+			else
+				Logger.error(LOG, "Dashboard reset failed: the caches were not cleared (%s).",
+					ok and "the keystats refused while it flushes" or tostring(result))
+			end
 		else
 			Logger.error(LOG, "Reset requested but the keystats exposes no clear_cache — nothing was cleared.")
 		end
 		if not request.valid() then return nil end
 		local fresh, complete = build_ready(state)
-		if not fresh then return nil end
+		if not fresh then
+			Flush.call(APP_NAME, "complete_cache_reset", { reset_id, cleared }, state, context)
+			return nil
+		end
+		fresh.reset_id = reset_id
 		fresh.cleared = cleared
 		return fresh, cleared and complete
 	end
@@ -180,22 +276,53 @@ local function handle(payload, state, context, request)
 	if action == "range" and type(payload) == "table" then
 		if state.keystats and type(state.keystats.get_range_payload) == "function" then
 			local range = state.keystats.get_range_payload(payload.start_date, payload.end_date, payload.apps)
-			if not range or not request.valid() then return nil end
+			if not request.valid() then return nil end
+			if not range then return fail_range(payload, state, context, "the range read failed") end
 			local dashboard = build_payload(state, false)
-			if not dashboard then return nil end
+			if not dashboard then return fail_range(payload, state, context, "the dashboard read failed") end
 			local reply = {
 				metrics_manifest = dashboard.metrics_manifest,
 				metrics_manifest_incomplete = dashboard.metrics_manifest_incomplete,
 				app_icons = {},
 				_prefetch_data = range,
+				keycode_layout = dashboard.keycode_layout,
 				range_request_id = payload.request_id,
-				driver_meta = { os = "linux", heatmap_id = "kc" },
+				-- The page replaces its driver metadata with each reply's: the
+				-- dashboard's keeps the scan-code heatmap and the unmeasured KPIs.
+				driver_meta = dashboard.driver_meta,
 			}
 			payload_complete(reply)
 			return reply
 		end
+		Logger.error(LOG, "The keystats exposes no get_range_payload; the range request is answered as failed.")
+		return fail_range(payload, state, context, "no range reader")
 	end
 	return nil
+end
+
+--- The dashboard's Export and Purge: the keystats writer owns both, and the
+--- page learns the outcome through complete_metrics_maintenance.
+local MAINTENANCE = { metrics_export = "export", metrics_purge = "purge" }
+
+--- Hands one Export or Purge to the writer and answers the page once.
+--- @param payload table { action, maintenance_id }
+--- @param state table
+--- @param context table|nil
+local function request_maintenance(payload, state, context)
+	local id = payload.maintenance_id
+	if type(id) ~= "number" or id <= 0 or id % 1 ~= 0 then
+		Logger.error(LOG, "Dashboard maintenance request without a valid owner id; ignored.")
+		return
+	end
+	local function answer(success, path)
+		Flush.call(APP_NAME, "complete_metrics_maintenance", { id, success == true, path }, state, context)
+	end
+	local k = state.keystats
+	if not k or type(k.request_metrics_maintenance) ~= "function" then
+		Logger.error(LOG, "The keystats exposes no request_metrics_maintenance; the dashboard is told it failed.")
+		return answer(false)
+	end
+	if k.request_metrics_maintenance(MAINTENANCE[payload.action], answer) ~= true then answer(false) end
 end
 
 --- Defers requests until the database/RAM view and native page are both current.
@@ -211,9 +338,11 @@ function M.on_message(payload, state, context)
 			for key, value in pairs(payload.apps) do apps[key] = value end
 		end
 		payload = { action = payload.action, start_date = payload.start_date, end_date = payload.end_date,
-			request_id = payload.request_id, apps = apps }
+			request_id = payload.request_id, apps = apps, maintenance_id = payload.maintenance_id,
+			reset_id = payload.reset_id }
 	end
 	local action = type(payload) == "table" and payload.action or payload
+	if MAINTENANCE[action] then return request_maintenance(payload, state, context) end
 	if action ~= "ready" and action ~= "refresh" and action ~= "clear_cache" and action ~= "range" then return nil end
 	return Requests.run(state, context, function(request)
 		return handle(payload, state, request.context, request)
@@ -232,6 +361,7 @@ function M._reset()
 	_incomplete_reported = false
 	M._defer = default_defer
 	M._push = default_push
+	M._legend = default_legend
 end
 
 return M

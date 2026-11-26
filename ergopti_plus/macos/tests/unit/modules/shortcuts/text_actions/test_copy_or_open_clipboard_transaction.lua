@@ -14,22 +14,22 @@ local helpers = require("tests.helpers")
 local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "adapters.timer_scheduler", "infra.logger",
+		"modules.shortcuts.actions.apps", "platform.focus.window_info",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "clipboard.adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
 		["public.html"] = "<b>ORIGINAL</b>",
 	}
-	local current = original
+	local current, generation = original, 0
 	local timers = {}
 	local now = 0
 	local timer_calls = 0
 	local restore_calls = 0
 	local copies = 0
 	local snapshots = 0
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.window_info"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = "TextEdit" } end,
 	}
 	local function complete(tx, status)
@@ -38,7 +38,7 @@ local function load_fixture(options)
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)
@@ -65,18 +65,20 @@ local function load_fixture(options)
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
 	local pasteboard = {
+		changeCount = function() return generation end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function() snapshots = snapshots + 1; return original end,
-		clearContents = function() current = {} end,
+		clearContents = function() current = {}; generation = generation + 1 end,
 		getContents = function() return "selected words" end,
 		writeAllData = function(snapshot)
 			restore_calls = restore_calls + 1
 			local outcome = options.restore_outcomes and options.restore_outcomes[restore_calls]
 			if outcome == "false" then return false end
-			current = snapshot
+			current = snapshot; generation = generation + 1
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]

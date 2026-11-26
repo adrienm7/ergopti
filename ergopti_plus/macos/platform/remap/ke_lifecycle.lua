@@ -22,13 +22,13 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("infra.logger")
-local Storage       = require("adapters.storage")
-local Notifications = require("infra.notifications")
-local i18n          = require("infra.i18n")
-local text_utils    = require("infra.text_utils")
+local Logger        = require("core.logger.engine.logger")
+local Storage       = require("core.fs.adapters.storage")
+local Notifications = require("core.ui.engine.notifications")
+local i18n          = require("core.i18n.engine.i18n")
+local text_utils    = require("core.text.engine.utils")
 local KePaths       = require("platform.remap.ke_paths")
-local Timings       = require("infra.timings")
+local Timings       = require("core.timing.engine.timings")
 
 local LOG = "karabiner"
 

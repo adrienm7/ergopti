@@ -6,6 +6,9 @@
 ; Owns one exact Startup-folder command for the source script or installed build.
 ; Reads never create it, updates never restore it, and disabling refuses foreign
 ; shortcuts. Windows' separate Startup Apps approval stays under user control.
+; An isolated profile (a startup smoke or a live check) never reaches the user's
+; Startup folder: APPDATA is not redirected for it, so its toggle would add or
+; remove the real login shortcut. It uses its profile's private folder instead.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\_generated\identifiers.ahk
@@ -199,12 +202,12 @@ _StartupOtherSourceIdentity(Script, ReadFn := FSReadBounded) {
 	; A fixed upper bound is a parser input limit, never an execution capability.
 	Limit := 1048576
 	Entry := ReadFn.Call(Script, Limit)
-	Bundle := ReadFn.Call(Directory . "\infra\bundle.ahk", Limit)
-	Defaults := ReadFn.Call(Directory . "\..\_shared\modules\updater\defaults.json", Limit)
+	Bundle := ReadFn.Call(Directory . "\core\lifecycle\engine\bundle.ahk", Limit)
+	Defaults := ReadFn.Call(Directory . "\..\_shared\updater\data\defaults.json", Limit)
 	if !(Entry is String) || !(Bundle is String) || !(Defaults is String)
 		return false
 	if !RegExMatch(Entry, "im)^#Requires\s+Autohotkey\s+v2\.0\+")
-		|| !RegExMatch(Entry, "im)^#Include\s+infra/bundle\.ahk\s*$")
+		|| !RegExMatch(Entry, "im)^#Include\s+core/lifecycle/engine/bundle\.ahk\s*$")
 		|| !RegExMatch(Entry, "im)^#Include\s+modules/updater\.ahk\s*$")
 		|| !RegExMatch(Bundle, 'm)^global BUNDLE_VERSION\s*:=\s*"__BUNDLE_VERSION__"\s*$')
 		return false
@@ -250,17 +253,60 @@ StartupOtherSourceConfigured(Folder, Command, ApprovalFn := _StartupReadApproval
 	return false
 }
 
+; The folder that stands for the user's Startup folder in an isolated profile,
+; or "" for a real one. ERGOPTI_STARTUP_SMOKE_DIR already moves the paths, logs
+; and configuration of a startup smoke or a live check into its scratch folder
+; (core/lifecycle/engine/boot.ahk); the login shortcut follows, so the harness can read it there.
+; @returns {String} Absolute path, or "" when the driver owns the real profile.
+StartAtLoginPrivateFolder() {
+	global _DriverStartupSmokeDir
+	if !IsSet(_DriverStartupSmokeDir) || _DriverStartupSmokeDir == ""
+		return ""
+	return _DriverStartupSmokeDir . "\startup_private"
+}
+
+; Windows' Startup Apps approval governs the real Startup folder only: a private
+; folder has none, so its state is its shortcut alone.
+; @returns {String} The approval of a shortcut nothing has disabled.
+_StartupPrivateApproval(*) {
+	return ""
+}
+
+; Replaces the Startup folder and approval reader of an isolated profile with
+; its private ones. A caller's own ports are replaced too: both name the user's
+; machine state, which an isolated driver must never reach.
+; @param Ports {Object} Folder (A_Startup) and Approval (_StartupReadApproval).
+; @param Announce {Boolean} Creates the private folder and logs which
+;   folder the writes of this call reach.
+; @returns {Object} The ports to use, the given ones for a real profile.
+_StartAtLoginIsolate(Ports, Announce := false) {
+	if !(Ports.HasOwnProp("Folder") && Ports.HasOwnProp("Approval"))
+		throw ValueError("Login startup ports are Folder and Approval")
+	Folder := StartAtLoginPrivateFolder()
+	if (Folder == "")
+		return Ports
+	if Announce {
+		FSEnsureDirectoryStrict(Folder)
+		LoggerInfo("Startup",
+			"Isolated profile: the login startup shortcut goes to the private folder '{1}', never to the user's Startup folder.",
+			Folder)
+	}
+	return {Folder: Folder, Approval: _StartupPrivateApproval}
+}
+
 ; Reads conflict state without transferring shortcut ownership.
 StartAtLoginCommandAvailable(*) {
 	Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
-	return !StartupOtherSourceConfigured(A_Startup, Command)
+	Startup := _StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval})
+	return !StartupOtherSourceConfigured(Startup.Folder, Command, Startup.Approval)
 }
 
 ; Reads the effective state without changing the Startup folder or registry.
 StartAtLoginEnabled(*) {
 	try {
 		Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
-		return StartupFolderEnabled(A_Startup, Command)
+		Startup := _StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval})
+		return StartupFolderEnabled(Startup.Folder, Command, Startup.Approval)
 	} catch as Err {
 		LoggerError("Startup", "Startup state could not be read: {1}.", Err.Message)
 		return false
@@ -287,28 +333,55 @@ SetStartupShortcut(Enabled, Link, Target, Arguments := "", Directory := "") {
 
 ; Menu mutation only: changing future login startup never exits the live driver.
 ToggleStartAtLogin(*) {
+	return StartAtLoginToggle()
+}
+
+; The toggle itself; the seams keep a test off the tray menu and modal dialogs.
+; @param RebuildFn {Object} Tray menu rebuild, called once the state changed.
+; @param NoticeFn {Object} Failure dialog, fn(Text, Title, Options).
+; @returns {Boolean} Whether the requested state is confirmed.
+StartAtLoginToggle(RebuildFn := RebuildTrayMenu, NoticeFn := Ui_MsgBox) {
 	try {
 		Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
-		if StartupOtherSourceConfigured(A_Startup, Command)
+		Startup := _StartAtLoginIsolate({Folder: A_Startup, Approval: _StartupReadApproval}, true)
+		if StartupOtherSourceConfigured(Startup.Folder, Command, Startup.Approval)
 			throw Error("Another startup command is configured")
 		Enabled := StartAtLoginEnabled()
 		if !Enabled {
-			if !SetStartupFolder(true, A_Startup, Command)
+			if !SetStartupFolder(true, Startup.Folder, Command)
 				throw Error("Startup shortcut creation was not confirmed")
-			if !StartupFolderEnabled(A_Startup, Command) {
+			if !StartupFolderEnabled(Startup.Folder, Command, Startup.Approval) {
 				Run("ms-settings:startupapps")
-				throw Error("Windows Startup Apps requires user approval")
+				throw StartupApprovalPending("Windows Startup Apps requires user approval")
 			}
 		}
-		if !SetStartupFolder(!Enabled, A_Startup, Command)
+		if !SetStartupFolder(!Enabled, Startup.Folder, Command)
 			throw Error("Startup shortcut change was not confirmed")
 		if StartAtLoginEnabled() != !Enabled
 			throw Error("Windows did not confirm the requested startup state")
-		RebuildTrayMenu()
+		RebuildFn.Call()
 		return true
 	} catch as Err {
-		LoggerError("Startup", "Startup setting could not be changed: {1}.", Err.Message)
-		Ui_MsgBox(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
+		_StartAtLoginReportFailure(Err, NoticeFn)
 		return false
 	}
+}
+
+; Startup Apps keeps the new shortcut disabled until the user allows it in the
+; settings page the toggle just opened: that is a step for the user, not a failure.
+class StartupApprovalPending extends Error {
+}
+
+; Tells why the toggle did not confirm the state: the approval to give in the
+; opened Startup Apps page (informational, as macOS), else the failure (SAW-001).
+; @param Err {Error} What stopped the toggle.
+; @param NoticeFn {Object} Dialog, fn(Text, Title, Options).
+_StartAtLoginReportFailure(Err, NoticeFn) {
+	if Err is StartupApprovalPending {
+		LoggerInfo("Startup", "Startup waits for the user's approval in Startup Apps.")
+		NoticeFn.Call(t("dialog.start_at_login.approval"), t("menu.global.start_at_login"), "Iconi")
+		return
+	}
+	LoggerError("Startup", "Startup setting could not be changed: {1}.", Err.Message)
+	NoticeFn.Call(t("dialog.start_at_login.failed"), t("menu.global.start_at_login"), "Icon!")
 }

@@ -13,21 +13,21 @@ local helpers = require("tests.helpers")
 --- @param scenario function Scenario receiving watcher, shared state and fixture.
 local function with_fixture(scenario)
 	local names = {
-		"infra.logger", "infra.timings", "adapters.task_lifecycle",
-		"adapters.timer_scheduler", "modules.keystats.log_manager",
+		"core.logger.engine.logger", "core.timing.engine.timings", "core.process.adapters.task_lifecycle",
+		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.watchers",
 	}
 	local saved, saved_hs = {}, _G.hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { tasks = {}, events = {}, paused = false, now = 1000000000 }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop, error = noop,
 		pcall = function(_, callback) return pcall(callback) end,
 	}
-	package.loaded["infra.timings"] = { ms = function() return 1 end }
-	package.loaded["adapters.timer_scheduler"] = { cancel = function() return true end }
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1 end }
+	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(_, _, callback)
 			local task = { complete = callback }
 			fixture.tasks[#fixture.tasks + 1] = task

@@ -22,12 +22,12 @@ local function load_lifecycle()
 			return ctx.phase, { phase = ctx.phase, token = ctx.token }
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() ctx.notifications = ctx.notifications + 1 end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 
 	local lifecycle = helpers.load_with_stubs("platform.remap.ke_lifecycle", {
 		settings = { get = function() return true end },

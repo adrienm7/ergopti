@@ -13,8 +13,8 @@
 local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
-local MODULES = { "ui.legacy_rules_cleanup", "infra.logger", "infra.i18n", "infra.dialog_util",
-	"infra.deferred_work" }
+local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+	"core.timing.engine.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
 --- @param h table Harness receiving the recordings.
@@ -27,15 +27,15 @@ local function load_cleanup(h)
 			h.logs[#h.logs + 1] = { level = level, message = string.format(message, ...) }
 		end
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(message, informative, first, second, style)
 			h.alerts[#h.alerts + 1] = { message = message, informative = informative, first = first,
 				second = second, style = style, during_remap_callback = h.in_remap_callback == true }
 			return h.answer
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, callback, label)
 			h.deferred[#h.deferred + 1] = { delay = delay, callback = callback, label = label }
 			return true
@@ -44,7 +44,7 @@ local function load_cleanup(h)
 	local cleanup = helpers.load_with_stubs("ui.legacy_rules_cleanup")
 	-- The loader installs its echoing i18n stub, which the module captured:
 	-- give that same table a format that shows its arguments.
-	package.loaded["infra.i18n"].format = function(key, ...)
+	package.loaded["core.i18n.engine.i18n"].format = function(key, ...)
 		local parts = { key }
 		for index = 1, select("#", ...) do parts[#parts + 1] = tostring(select(index, ...)) end
 		return table.concat(parts, "|")
@@ -148,8 +148,13 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 			local cleanup = load_cleanup(h)
 			cleanup.open(make_remap(h, PENDING))
 			fire_deferred(h)
-			helpers.assert_eq(h.alerts[2].informative,
-				"karabiner.legacy_cleanup.removal_failed|karabiner.json publication refused: source changed")
+			-- SNU-06: the bridge's technical reason is the log's, never the dialog's.
+			helpers.assert_eq(h.alerts[2].informative, "karabiner.legacy_cleanup.removal_failed")
+			local logged = false
+			for _, entry in ipairs(h.logs) do
+				if entry.level == "error" and entry.message:find("source changed", 1, true) then logged = true end
+			end
+			helpers.assert_true(logged, "the removal's reason is logged")
 
 			h.alerts, h.outcome = {}, { stage = "regeneration", reason = "script-paused", removed_count = 3,
 				backup_path = "/b.bak" }
@@ -157,8 +162,34 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 			fire_deferred(h)
 			local informative = h.alerts[2].informative
 			helpers.assert_true(informative:find("karabiner.legacy_cleanup.removed|3|/b.bak", 1, true) ~= nil)
-			helpers.assert_true(informative:find("karabiner.legacy_cleanup.apply_failed|script-paused", 1, true) ~= nil,
+			helpers.assert_true(informative:find("karabiner.legacy_cleanup.apply_failed", 1, true) ~= nil,
 				"a removal whose regeneration failed says both: " .. informative)
+			helpers.assert_true(informative:find("script-paused", 1, true) == nil,
+				"no technical reason reaches the dialog (snu-06): " .. informative)
+		end)
+	end)
+
+	-- SNU-15: the deferred report ran its alert unprotected, so a dialog that
+	-- raised left only the scheduler's generic callback line.
+	helpers.it("logs a result dialog that raises as its own error (snu-15)", function()
+		helpers.with_fresh_modules(MODULES, function()
+			local h = { answer = "karabiner.legacy_cleanup.remove", outcome_ok = true,
+				outcome = { stage = "regeneration", reason = "ready", removed_count = 1, backup_path = "/b.bak" } }
+			local cleanup = load_cleanup(h)
+			helpers.assert_true(cleanup.open(make_remap(h, PENDING)))
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function()
+				error("alert window refused")
+			end
+			local fired = pcall(fire_deferred, h)
+			helpers.assert_true(fired, "the failure stays inside the report callback")
+			local logged = false
+			for _, entry in ipairs(h.logs) do
+				if entry.level == "error" and entry.message:find("result could not be shown", 1, true)
+					and entry.message:find("alert window refused", 1, true) then
+					logged = true
+				end
+			end
+			helpers.assert_true(logged, "the lost result is this module's error line, with its cause")
 		end)
 	end)
 
@@ -174,12 +205,17 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 	end)
 
 	helpers.it("keeps the maintainer's reference wording (karabiner-legacy-cleanup)", function()
-		local locales = helpers.driver_root() .. "../_shared/data/locales/"
+		local locales = helpers.driver_root() .. "../_shared/core/i18n/data/locales/"
 		local fr = hs.json.decode(SourceFile.read(locales .. "fr.json"))
 		local en = hs.json.decode(SourceFile.read(locales .. "en.json"))
 		helpers.assert_eq(fr["karabiner.legacy_cleanup.remove"], "Retirer les anciennes règles")
 		helpers.assert_eq(fr["common.later"], "Plus tard")
 		helpers.assert_eq(en["karabiner.legacy_cleanup.remove"], "Remove the old rules")
+		for _, key in ipairs({ "karabiner.legacy_cleanup.removal_failed", "karabiner.legacy_cleanup.apply_failed" }) do
+			for _, texts in ipairs({ fr, en }) do
+				helpers.assert_true(texts[key]:find("{1}", 1, true) == nil, key .. " holds no technical reason")
+			end
+		end
 		for _, key in ipairs({ "karabiner.legacy_cleanup.body_one", "karabiner.legacy_cleanup.body_other" }) do
 			helpers.assert_true(fr[key]:find("sauvegarde", 1, true) ~= nil, key .. " says a backup is made")
 			helpers.assert_true(en[key]:find("backup", 1, true) ~= nil, key .. " says a backup is made")

@@ -3,7 +3,7 @@
 --- Retains observed privacy decisions for delayed physical input, without guessing
 --- the OS focus-transition time from asynchronous watcher delivery.
 local M = {}
-local Interval = require("keystats.physical_interval")
+local Interval = require("metrics.engine.capture.physical_interval")
 
 local function timestamp(value)
 	assert(math.type(value) == "integer" and value >= 0, "Invalid physical context timestamp")

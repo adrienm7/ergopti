@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_step_skips_others/case.toml
-
-[case]
-description = "The v20 conversion is a macOS step: a Windows or Linux file only moves its stamp."
-drivers = ["ahk", "linux"]
-outcome = "migrated"
-from_version = 19
-to_version = 20

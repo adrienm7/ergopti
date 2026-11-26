@@ -132,6 +132,10 @@ UninstallCommit(*) {
 _LifecycleForceReleaseHeldInput(*) {
 	return 1
 }
+; The keep-awake stop that credits a running session at exit (SNU-11).
+StopActivitySimulation(*) {
+	return true
+}
 KL_Stop(*) {
 	return true
 }
@@ -139,6 +143,9 @@ SFD_Stop(*) {
 	return true
 }
 AltGrFamilyStopFollowing(*) {
+	return true
+}
+LayoutRegistryWatch_Stop(*) {
 	return true
 }
 MenuPopulation_Shutdown(*) {
@@ -157,6 +164,12 @@ HealthCheck_StopWindowControl(*) {
 	return true
 }
 WebView_StopBrowserWarmup(*) {
+	return true
+}
+WPMTrayReadout_Shutdown(*) {
+	return true
+}
+RawTouchpadStop(*) {
 	return true
 }
 MenuDispatcher_Shutdown(*) {

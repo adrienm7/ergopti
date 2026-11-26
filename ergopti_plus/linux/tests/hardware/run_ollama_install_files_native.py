@@ -18,7 +18,7 @@ parser.add_argument("--native-shared", type=Path)
 parser.add_argument("--lua", default="luajit")
 args = parser.parse_args()
 driver = args.driver.resolve()
-shared = (args.shared_lua or driver.parent / "_shared/lua").resolve()
+shared = (args.shared_lua or driver.parent / "_shared").resolve()
 native_driver = (args.native_driver or driver).resolve()
 native_shared = (args.native_shared or shared).resolve()
 if (

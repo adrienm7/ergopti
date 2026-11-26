@@ -19,7 +19,7 @@ import threading
 
 PROXY_REQUEST = r"""
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 local result, callbacks = nil, 0
 assert(HTTP.get("http://ergopti-native-proxy.invalid/native", {},
 	{ owner = "native-curlrc-proxy", timeout_ms = 2000 },
@@ -41,7 +41,7 @@ def main():
         retained = b"Synthetic retained output bytes"
         env = dict(os.environ)
         env["CURL_HOME"] = str(root)
-        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
         def check(name, test):
             nonlocal checks, failures
@@ -68,11 +68,11 @@ def main():
             assert expected in child.stdout, "native child did not execute its complete receipt set"
 
         check(
-            "personal location cannot override credential or no-follow policy (native40)",
+            "personal location cannot override credential or no-follow policy (native42)",
             lambda: receipt(
                 "location\n",
                 [interpreter, "tests/hardware/run_http_redirect_receipts.lua"],
-                "Native HTTP redirect receipts: 40 checks, 0 failures",
+                "Native HTTP redirect receipts: 42 checks, 0 failures",
             ),
         )
         check(

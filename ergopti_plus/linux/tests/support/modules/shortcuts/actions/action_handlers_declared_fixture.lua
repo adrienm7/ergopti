@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local function with_recorded_shell(body)
 	local commands = {}
 	local real = os.execute
-	local Process = require("adapters.owned_process")
+	local Process = require("core.process.adapters.owned_process")
 	local start = Process.start
 	Process.start = function(executable, args, options, callback)
 		if executable ~= "xdotool" then return start(executable, args, options, callback) end
@@ -47,7 +47,7 @@ end
 --- Restores the exact previous page owner even when acquisition or the callback raises.
 --- @param body function Receives the actual webview manager.
 local function with_unavailable_webview(body)
-	local name = "ui.webview_manager"
+	local name = "core.ui.ui.webview_manager"
 	local previous_webview = package.loaded[name]
 	local ok, err = pcall(function()
 		local Webview = helpers.load_module_with_dependency(name, "lgi", false)
@@ -70,13 +70,13 @@ end
 --- @param configure function|nil Installs daemon handlers after native doubles.
 --- @return table unknown, table pressed Chords sent, by action id.
 local function run_every_action(Gestures, ids, configure)
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
-		emitter = package.loaded["modules.gestures.combo_emitter"],
-		manager = package.loaded["modules.gestures.manager"],
+		emitter = package.loaded["gestures.engine.combo_emitter"],
+		manager = package.loaded["gestures.engine.manager"],
 		shortcuts = package.loaded["modules.shortcuts.manager"],
-		webview = package.loaded["ui.webview_manager"], popen = io.popen,
+		webview = package.loaded["core.ui.ui.webview_manager"], popen = io.popen,
 	}
 	-- Loaded again under the recording emitter below, since it keeps its own.
 	package.loaded["modules.shortcuts.manager"] = nil
@@ -86,15 +86,15 @@ local function run_every_action(Gestures, ids, configure)
 	end
 	Logger.debug = function(_, fmt) spy(fmt) end
 	Logger.warn = function(_, fmt) spy(fmt) end
-	package.loaded["modules.gestures.combo_emitter"] = {
+	package.loaded["gestures.engine.combo_emitter"] = {
 		press = function(combo) pressed[current] = combo; return true end,
 	}
-	package.loaded["ui.webview_manager"] = { show = function() return true end }
+	package.loaded["core.ui.ui.webview_manager"] = { show = function() return true end }
 	io.popen = function()
 		return { read = function() return "selection" end, close = function() return true end }
 	end
 	local ok, err = pcall(with_recorded_shell, function()
-		Gestures = helpers.load_module("modules.gestures.manager")
+		Gestures = helpers.load_module("gestures.engine.manager")
 		if configure then configure(Gestures) end
 		for _, id in ipairs(ids) do
 			current = id
@@ -102,10 +102,10 @@ local function run_every_action(Gestures, ids, configure)
 		end
 	end)
 	Logger.debug, Logger.warn = saved.debug, saved.warn
-	package.loaded["modules.gestures.combo_emitter"] = saved.emitter
-	package.loaded["modules.gestures.manager"] = saved.manager
+	package.loaded["gestures.engine.combo_emitter"] = saved.emitter
+	package.loaded["gestures.engine.manager"] = saved.manager
 	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
-	package.loaded["ui.webview_manager"] = saved.webview
+	package.loaded["core.ui.ui.webview_manager"] = saved.webview
 	io.popen = saved.popen
 	if not ok then error(err, 0) end
 	return unknown, pressed

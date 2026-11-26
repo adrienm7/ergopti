@@ -33,8 +33,8 @@ end
 --- @return table fixture Loaded module and native tap observations.
 local function load_fixture(plans, timer_plans)
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_contract = require("tests.stubs.hs")
@@ -114,12 +114,12 @@ local function load_fixture(plans, timer_plans)
 			return native
 		end,
 	})
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		STATUS_FOREIGN = "foreign",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return {} end,
 		emit_key_stroke = function() return true end,
 		seal = function() return true end,
@@ -168,7 +168,6 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 	helpers.it("rejects every single-tap factory when native start returns false", function()
 		local factories = {
 			function(system) return system.bind_tap_keys(nil, NO_TAP_KEY) end,
-			function(system) return system.bind_cmd_star() end,
 			function(system) return system.bind_wrap_text_if_selected() end,
 		}
 		for index, factory in ipairs(factories) do
@@ -194,14 +193,14 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 		local fixture = load_fixture({{ enable_on_start = false }})
 		local errors = {}
 		local saved_permission = package.loaded["adapters.accessibility_permission"]
-		local saved_error = package.loaded["infra.logger"].error
+		local saved_error = package.loaded["core.logger.engine.logger"].error
 		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return false end }
-		package.loaded["infra.logger"].error = function(_, text, ...)
+		package.loaded["core.logger.engine.logger"].error = function(_, text, ...)
 			errors[#errors + 1] = string.format(text, ...)
 		end
-		local ok, owner = pcall(fixture.system.bind_cmd_star)
+		local ok, owner = pcall(fixture.system.bind_wrap_text_if_selected)
 		package.loaded["adapters.accessibility_permission"] = saved_permission
-		package.loaded["infra.logger"].error = saved_error
+		package.loaded["core.logger.engine.logger"].error = saved_error
 		helpers.assert_true(ok)
 		helpers.assert_nil(owner)
 		helpers.assert_true(table.concat(errors, " | "):find("accessibility_trusted=false", 1, true) ~= nil,
@@ -218,7 +217,7 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 			helpers.assert_true(call_ok, "constructor refusal must not escape the factory")
 			helpers.assert_nil(owner, "a false or throwing constructor cannot publish an owner")
 
-			local replacement = fixture.system.bind_cmd_star()
+			local replacement = fixture.system.bind_wrap_text_if_selected()
 			helpers.assert_not_nil(replacement,
 				"a non-resource constructor result must not block the next acquisition")
 			helpers.assert_eq(fixture.created(), 2)
@@ -242,7 +241,7 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 		helpers.assert_true(fixture.taps[1].enabled,
 			"the fixture must prove native activation survived the first failed rollback")
 
-		local replacement = fixture.system.bind_cmd_star()
+		local replacement = fixture.system.bind_wrap_text_if_selected()
 		helpers.assert_not_nil(replacement,
 			"a later acquisition may proceed after the exact retained tap is settled")
 		helpers.assert_eq(fixture.taps[1].stop_calls, 2,
@@ -300,7 +299,7 @@ helpers.describe("layer-wheel eventtap acquisition leaves nothing behind", funct
 			{ start_result = false, enable_on_start = true },
 		})
 		-- The same module table system.lua holds, so the spy sees its calls.
-		local Sentinels = require("modules.keymap.control_sentinels")
+		local Sentinels = require("hotstrings.engine.expander.control_sentinels")
 		local real_set_listener = Sentinels.set_listener
 		local listener_calls = {}
 		Sentinels.set_listener = function(name, callback)

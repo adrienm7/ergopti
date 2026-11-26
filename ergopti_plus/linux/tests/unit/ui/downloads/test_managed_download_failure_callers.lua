@@ -20,9 +20,9 @@ local function isolated(body)
 		if saved[name] == nil then saved[name] = package.loaded[name] or false end
 		package.loaded[name] = value
 	end
-	replace("logger.shim", { debug = function() end, info = function() end, warn = function() end,
+	replace("core.logger.engine.shim", { debug = function() end, info = function() end, warn = function() end,
 		error = function() end, start = function() end, success = function() end, done = function() end })
-	replace("infra.i18n", { get = function(key) return key end })
+	replace("core.i18n.engine.i18n", { get = function(key) return key end })
 	local ok, err = xpcall(function() body(replace) end, debug.traceback)
 	for index = #fixture_cleanups, 1, -1 do
 		local closed, failure = pcall(fixture_cleanups[index])
@@ -38,9 +38,9 @@ local function bridge_fixture(replace)
 		diagnostics_available = false, evaluated = {} }
 	-- Restore exact known native fixture ports even if construction throws
 	-- before the fixture can return its owned close callback.
-	for _, name in ipairs({ "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
-		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
-		"infra.manifest_reader" }) do
+	for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
+		"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
+		"menu.engine.manifest_reader" }) do
 		replace(name, package.loaded[name])
 	end
 	replace("ui.download_window.bridge", nil)
@@ -96,7 +96,7 @@ local function model_fixture(replace)
 		end,
 	}
 	world.owned_http = {}
-	replace("adapters.http_client", require("tests.support.owned_http_fixture").attach(http, world.owned_http))
+	replace("core.network.adapters.http_client", require("tests.support.owned_http_fixture").attach(http, world.owned_http))
 	replace("ui.download_window.bridge", {
 		show = function(opts) world.options = opts; return 47 end,
 		session_id = function() return 47 end,
@@ -104,15 +104,15 @@ local function model_fixture(replace)
 		complete = function(...) world.completions[#world.completions + 1] = { ... }; return true end,
 		retire = function() world.retired = true; return true end,
 	})
-	replace("modules.llm.model_download", nil)
-	return require("modules.llm.model_download"), world
+	replace("ai.engine.local_servers.model_download", nil)
+	return require("ai.engine.local_servers.model_download"), world
 end
 
 local function updater_fixture(replace)
 	local world = { state = "available", starts = {}, completions = {}, installs = 0, channel = "dev" }
 	world.release = { tag = "v0.0.0-dev.150", download_url = "https://example.invalid/archive",
 		checksum_url = "https://example.invalid/checksum" }
-	replace("infra.installation", { is_source_run = function() return false end })
+	replace("core.lifecycle.engine.installation", { is_source_run = function() return false end })
 	replace("ui.download_window.bridge", {
 		show = function(opts) world.options = opts; return 53 end,
 		complete = function(...)
@@ -394,9 +394,9 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 	local function actual_bridge_fixture(replace)
 		local _, world = model_fixture(replace)
 		world.evaluated = {}
-		for _, name in ipairs({ "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
-			"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
-			"infra.manifest_reader" }) do
+		for _, name in ipairs({ "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
+			"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
+			"menu.engine.manifest_reader" }) do
 			replace(name, package.loaded[name])
 		end
 		replace("ui.download_window.bridge", nil)
@@ -408,8 +408,8 @@ helpers.describe("actual model cancellation preserves caller UI ownership", func
 		local bridge = setmetatable({ on_message = function(payload, state)
 			return routed.on_message(payload, state)
 		end }, { __index = native_bridge })
-		replace("modules.llm.model_download", nil)
-		return require("modules.llm.model_download"), world, bridge
+		replace("ai.engine.local_servers.model_download", nil)
+		return require("ai.engine.local_servers.model_download"), world, bridge
 	end
 
 	helpers.it("model-cancel-settlement: synchronous ACK leaves actual UI caller its cancellation presentation", function()

@@ -17,15 +17,15 @@
 --- @return number typed_ms
 local typing_origin_ms
 local function typed_at(offset_ms)
-	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	typing_origin_ms = typing_origin_ms or math.floor(require("core.logger.engine.monotonic").now_ms()) - 10000
 	return typing_origin_ms + offset_ms
 end
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
-local Codec = require("keystats.text_crypto")
-local Base64 = require("compat.base64")
-local OpenSSL = require("infra.openssl_command")
+local Shell = require("core.process.adapters.shell_runner")
+local Codec = require("metrics.engine.privacy.text_crypto")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local OpenSSL = require("core.network.engine.openssl_command")
 assert(uv.getuid() ~= 0, "native at-rest tests require an ordinary user")
 local real = assert(Shell.exec_line("command -v openssl"))
 local previous_path = assert(os.getenv("PATH"))
@@ -65,6 +65,15 @@ local function check(name, test)
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
 end
+-- Public synthetic machine ID only. Reference generated independently with
+-- PBKDF2-HMAC-SHA256, 600000 rounds and the first eight salt bytes.
+check("historical CLI KDF remains readable with the eight-byte salt", function()
+	mode(0)
+	local output = assert(OpenSSL.exec(assert(Codec.derive_key_command("file:" .. root .. "/machine-id"))))
+	local derived = assert(Codec.parse_derived_key(output))
+	local reference = "060ACFFC9DBC932EDC05FB8D6651DABF8A2A60803749D19D0C71AB3DD34C6AF3"
+	assert(derived == reference, "historical synthetic KDF answer changed")
+end)
 for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL" }) do
 	check("failed native derivation refuses useful key stdout " .. fault, function()
 		mode(fault); cipher = fresh()
@@ -115,7 +124,7 @@ end
 
 -- The proxy runs the REAL primitive before refusing its acknowledgement. Unlike
 -- a fake cipher, this proves useful actual output cannot survive a failed ACK.
-local Native = require("infra.openssl_library")
+local Native = require("core.network.engine.openssl_library")
 local fault, observed, freed = nil, false, 0
 local proxy = setmetatable({}, { __index = Native.library })
 for _, stage in ipairs({ "Init", "Update", "Final" }) do
@@ -128,10 +137,10 @@ for _, stage in ipairs({ "Init", "Update", "Final" }) do
 	end
 end
 proxy.EVP_CIPHER_CTX_free = function(context) freed = freed + 1; Native.library.EVP_CIPHER_CTX_free(context) end
-package.loaded["infra.openssl_library"] = { ffi = Native.ffi, library = proxy }
-package.loaded["infra.openssl_cipher"] = nil
-local AES = require("infra.openssl_cipher")
-package.loaded["infra.openssl_library"] = Native
+package.loaded["core.network.engine.openssl_library"] = { ffi = Native.ffi, library = proxy }
+package.loaded["core.network.engine.openssl_cipher"] = nil
+local AES = require("core.network.engine.openssl_cipher")
+package.loaded["core.network.engine.openssl_library"] = Native
 assert(AES.available, "real native AES capability required")
 mode(0); cipher = fresh(); assert(cipher.is_available()); assert(cipher.set_enabled(true))
 
@@ -165,7 +174,7 @@ check("production envelopes use the unchanged cached CLI KDF and shared IV/Base6
 	local value = "Synthetic envelope\0payload\n\n"
 	local envelope = assert(cipher.encrypt("synthetic-device", 7, value))
 	local iv, payload = Codec.unwrap(envelope)
-	assert(iv == Codec.iv_for("synthetic-device", 7, require("adapters.crypto").sha256))
+	assert(iv == Codec.iv_for("synthetic-device", 7, require("core.crypto.crypto").sha256))
 	assert(payload == Base64.encode(oracle(key, iv, value, false)))
 	assert(cipher.decrypt(Codec.wrap(iv, Base64.encode(oracle(key, iv, value, false)))) == value)
 end)
@@ -228,7 +237,7 @@ check("actual SQLite refuses failed EVP and admits exactly one healthy encrypted
 	assert(#rows == 1 and Codec.is_encrypted(rows[1]) and cipher.decrypt(rows[1]) == "Synthetic\0receipt text")
 end)
 check("saved ON without EVP keeps real collector SQL closed and recovers retained input once", function()
-	require("compat.utf8").install()
+	require("core.lifecycle.engine.compat.utf8").install()
 	writer.close_db() -- The next owner opens a distinct database and schema.
 	local preferences = require("tests.support.metrics_preferences_fixture").new({ initial = {
 		["metrics.encrypt"] = true, ["metrics.enabled"] = true,

@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub adapters.file_system so load_json_file never hits the real disk.
 -- Tests that need a classified read to return data override _fs_data below.
 local _fs_data = {}
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function(path) return _fs_data[path] end,
 	read_with_status = function(path)
 		local content = _fs_data[path]
@@ -28,12 +28,12 @@ package.loaded["adapters.file_system"] = {
 
 -- Stub ui.menu.menu_paths (required at module load time to compute the
 -- KE_PHYSICAL_KC_LOG constant — it must not hit the filesystem).
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
 
 -- Stub lib.keycodes with the minimal surface used by generator.lua.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	to_name              = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN   = 105,
 	F14_KARABINER_BACKSPACE = 107,

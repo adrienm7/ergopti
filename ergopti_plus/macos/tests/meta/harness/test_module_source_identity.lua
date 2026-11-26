@@ -7,4 +7,4 @@
 --- Source coordinates never grant filesystem or configuration authority.
 --- ==============================================================================
 
-require("test.module_source_identity_contract").register(require("tests.helpers"))
+require("tests.lua.core_fs.module_source_identity_contract").register(require("tests.helpers"))

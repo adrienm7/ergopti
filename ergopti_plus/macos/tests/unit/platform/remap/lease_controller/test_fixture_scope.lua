@@ -9,10 +9,10 @@
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.lease_controller_fixture").with_fixture
 local OWNERS = {
-	"hs", "tests.stubs.hs", "infra.i18n", "infra.paths",
-	"platform.remap.lease_controller", "adapters.shell_runner", "adapters.storage",
-	"adapters.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
-	"infra.logger",
+	"hs", "tests.stubs.hs", "core.i18n.engine.i18n", "core.fs.engine.paths",
+	"platform.remap.lease_controller", "core.process.adapters.shell_runner", "core.fs.adapters.storage",
+	"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
+	"core.logger.engine.logger",
 }
 
 local function with_observer(callback)
@@ -66,15 +66,15 @@ helpers.describe("Lease controller fixture isolation", function()
 			with_fixture(function(load_controller)
 				local shared = {}
 				local first = load_controller({ settings_store = shared })
-				local storage = require("adapters.storage")
+				local storage = require("core.fs.adapters.storage")
 				helpers.assert_eq(storage.set("fixture_probe", "retained"), true)
 				local second = load_controller({ settings_store = shared })
-				local reloaded = require("adapters.storage")
+				local reloaded = require("core.fs.adapters.storage")
 				helpers.assert_true(first ~= second)
 				helpers.assert_true(storage ~= reloaded)
 				helpers.assert_eq(reloaded.get("fixture_probe"), "retained")
 				load_controller()
-				helpers.assert_nil(require("adapters.storage").get("fixture_probe"),
+				helpers.assert_nil(require("core.fs.adapters.storage").get("fixture_probe"),
 					"a separate native store must not inherit the shared reload ledger")
 			end)
 			for _, name in ipairs(OWNERS) do helpers.assert_nil(package.loaded[name], name) end

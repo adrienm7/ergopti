@@ -48,6 +48,7 @@ M.OUTCOME_FAILED = "failed"
 -- the first time an application asks, and resetting again while the user is
 -- still deciding would remove the switch they are about to turn on.
 local _permission_prompt_requested = false
+local _permission_reset_pending = false
 
 
 
@@ -59,9 +60,9 @@ local _permission_prompt_requested = false
 -- ===================================
 -- ===================================
 
-local function capture_adapter() return require("adapters.screen_capture") end
-local function file_system() return require("adapters.file_system") end
-local function logger() return require("infra.logger") end
+local function capture_adapter() return require("platform.system.screen_capture") end
+local function file_system() return require("core.fs.adapters.file_system") end
+local function logger() return require("core.logger.engine.logger") end
 
 --- Sends one notification; a notifier failure is logged, never raised.
 --- @param title string Notification title or message.
@@ -70,7 +71,7 @@ local function logger() return require("infra.logger") end
 --- @param on_click function|nil What a click on the notification does.
 local function notify(title, body, kind, on_click)
 	local ok, err = pcall(function()
-		return require("infra.notifications").notify(title, body, kind, on_click)
+		return require("core.ui.engine.notifications").notify(title, body, kind, on_click)
 	end)
 	if not ok then
 		logger().error(LOG, "Screen capture notification failed: %s.", tostring(err))
@@ -81,7 +82,7 @@ end
 --- @param key string Locale key.
 --- @return string text
 local function text(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 
@@ -132,7 +133,9 @@ local function reset_then_prompt(Adapter)
 		return
 	end
 	Logger.start(LOG, "Resetting the Screen Recording entry of %s…", bundle_id)
+	_permission_reset_pending = true
 	local started = Adapter.reset_permission(bundle_id, function(ok, detail)
+		_permission_reset_pending = false
 		if ok then
 			Logger.success(LOG, "Screen Recording entry of %s reset.", bundle_id)
 			prompt_user(Adapter, "shortcuts.screen_recording_reset")
@@ -142,6 +145,7 @@ local function reset_then_prompt(Adapter)
 		prompt_user(Adapter, "shortcuts.screen_recording_required")
 	end)
 	if started ~= true then
+		_permission_reset_pending = false
 		Logger.warn(LOG, "tccutil could not be started; prompting without resetting %s.", bundle_id)
 		prompt_user(Adapter, "shortcuts.screen_recording_required")
 	end
@@ -156,6 +160,12 @@ end
 function M.ensure_permission(context)
 	local Adapter = capture_adapter()
 	local Logger = logger()
+	-- A positive read during tccutil's reset can be revoked before capture.
+	if _permission_reset_pending then
+		Logger.warn(LOG, "%s refused: the Screen Recording grant reset is still pending.", tostring(context))
+		notify_refusal("shortcuts.screen_recording_required")
+		return false
+	end
 	local granted, detail = Adapter.permission_state()
 	if granted == true then return true end
 
@@ -253,7 +263,7 @@ local function clipboard_received_capture(mark)
 	if mark == nil then return false end
 	local Adapter = capture_adapter()
 	local now = Adapter.clipboard_change_count()
-	if now == nil or now == mark then return false end
+	if now == nil or now <= mark then return false end
 	return Adapter.clipboard_has_image() == true
 end
 
@@ -283,7 +293,8 @@ function M.settle(capture)
 
 	if state == "image" then
 		if capture.destination ~= "clipboard" then return M.OUTCOME_SAVED end
-		local copied, copy_err = capture_adapter().copy_image_file_to_clipboard(capture.path)
+		if capture.authorized and capture.authorized() ~= true then return M.OUTCOME_CANCELLED end
+		local copied, copy_err = capture_adapter().copy_image_file_to_clipboard(capture.path, capture.authorized)
 		if copied then return M.OUTCOME_COPIED end
 		return M.OUTCOME_FAILED, "clipboard write not verified: " .. tostring(copy_err)
 	end

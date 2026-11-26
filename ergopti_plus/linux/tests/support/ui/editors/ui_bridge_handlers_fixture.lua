@@ -17,12 +17,14 @@ local OPENING_FOREIGN = OPENING_SOURCE .. '[outside]\n"future" = { output = "ind
 
 local function opening_model(output)
 	return { sections_order = { "english" }, sections = {
-		english = { description = "English", entries = { { trigger = "old", output = output } } },
+		english = { description = "English", entries = { { trigger = "old", output = output,
+			is_word = true, auto_expand = false, is_case_sensitive = false,
+			final_result = false, is_case_sensitive_strict = false } } },
 	} }
 end
 
 local function with_opening_file(callback)
-	local Shell, Writer = require("adapters.shell_runner"), require("toml_codec.writer")
+	local Shell, Writer = require("core.process.adapters.shell_runner"), require("core.text.engine.toml_codec.writer")
 	local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-view-consent"
 	assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
 	local path = directory .. "/personal.toml"
@@ -33,8 +35,8 @@ local function with_opening_file(callback)
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 	end
 	put(OPENING_SOURCE)
-	local manager, previous = package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
-	local writer_previous = package.loaded["toml_codec.writer"]
+	local manager, previous = package.loaded["core.ui.ui.webview_manager"], package.loaded["hotstrings.ui.hotstring_editor.bridge"]
+	local writer_previous = package.loaded["core.text.engine.toml_codec.writer"]
 	local seen = { epoch = 51, deliveries = {}, alerts = {}, reloads = 0, writes = 0 }
 	local publisher = {}
 	for key, value in pairs(Writer) do publisher[key] = value end
@@ -42,9 +44,10 @@ local function with_opening_file(callback)
 		seen.writes = seen.writes + 1
 		return Writer.write(...)
 	end
-	package.loaded["toml_codec.writer"] = publisher
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.text.engine.toml_codec.writer"] = publisher
+	package.loaded["core.ui.ui.webview_manager"] = {
 		current_epoch = function() return seen.epoch end,
+		page_current = function(app, epoch) return app == "hotstring_editor" and epoch == seen.epoch end,
 		eval_js = function(_, js)
 			if js:find("window.initData(", 1, true) then
 				seen.deliveries[#seen.deliveries + 1] = js
@@ -57,8 +60,8 @@ local function with_opening_file(callback)
 			seen.alerts[#seen.alerts + 1] = js; return true
 		end,
 	}
-	package.loaded["ui.hotstring_editor.bridge"] = nil
-	local handler = require("ui.hotstring_editor.bridge")
+	package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+	local handler = require("hotstrings.ui.hotstring_editor.bridge")
 	local context = { app_name = "hotstring_editor", epoch = 51 }
 	local state = { config = { get_config_dir = function() return directory end,
 		reload = function() seen.reloads = seen.reloads + 1; if seen.reload_throw then error("inert reload refusal") end; return true end } }
@@ -67,12 +70,13 @@ local function with_opening_file(callback)
 	f.ready = function() return handler.push_init(state, context) end
 	f.save = function(output, selected) return handler.on_message({ action = "save", data = opening_model(output) }, state, selected or context) end
 	local ok, err = pcall(callback, f)
-	package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["toml_codec.writer"] = manager, previous, writer_previous
+	package.loaded["core.ui.ui.webview_manager"], package.loaded["hotstrings.ui.hotstring_editor.bridge"], package.loaded["core.text.engine.toml_codec.writer"] = manager, previous, writer_previous
 	assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
 	if not ok then error(err, 0) end
 end
 
 local function build_mock_state()
+  local metrics_suspended = false
   return {
     engine    = { loaded = true },
     keystats = require("tests.fakes.metrics_keystats").synchronous({
@@ -88,7 +92,10 @@ local function build_mock_state()
           },
           app_icons = {},
           _prefetch_data = { historical = {}, today = {} },
-          driver_meta = { os = "linux", heatmap_id = "sc_kb" },
+          driver_meta = {
+            os = "linux", heatmap_id = "sc_kb",
+            unmeasured = { space_switches = "linux.space_switches_unmeasured" },
+          },
         }
       end,
 		get_range_payload = function(start_date, end_date, apps)
@@ -100,6 +107,9 @@ local function build_mock_state()
       is_suppressed     = function() return false end,
       suppress          = function() end,
       unsuppress        = function() end,
+      suspend_collection = function() metrics_suspended = true end,
+      resume_collection = function() metrics_suspended = false end,
+      is_collection_suspended = function() return metrics_suspended end,
       reset_session     = function() return true end,
       export_json       = function() return '{"keystrokes":42}' end,
     }),
@@ -140,8 +150,8 @@ end
 
 local function make_spies(write_result, write_err)
   local captured = {}
-  local snapshot_parser = require("toml_codec.reader").parse_text
-  local classified_read = require("toml_codec.writer").read_classified
+  local snapshot_parser = require("core.text.engine.toml_codec.reader").parse_text
+  local classified_read = require("core.text.engine.toml_codec.writer").read_classified
   local reader = {
     parse_text = snapshot_parser,
     parse = function(_path)
@@ -177,34 +187,34 @@ end
 -- Injects the spies into package.loaded, loads the handler fresh so its lazy
 -- _get_reader/_get_writer resolve to the spies, runs fn(handler), then restores.
 local function with_spies(module_name, reader, writer, fn)
-  local prev_r = package.loaded["toml_codec.reader"]
-  local prev_w = package.loaded["toml_codec.writer"]
-  package.loaded["toml_codec.reader"] = reader
-  package.loaded["toml_codec.writer"] = writer
+  local prev_r = package.loaded["core.text.engine.toml_codec.reader"]
+  local prev_w = package.loaded["core.text.engine.toml_codec.writer"]
+  package.loaded["core.text.engine.toml_codec.reader"] = reader
+  package.loaded["core.text.engine.toml_codec.writer"] = writer
   local handler = helpers.load_module(module_name)
   local ok, err = pcall(fn, handler)
-  package.loaded["toml_codec.reader"] = prev_r
-  package.loaded["toml_codec.writer"] = prev_w
+  package.loaded["core.text.engine.toml_codec.reader"] = prev_r
+  package.loaded["core.text.engine.toml_codec.writer"] = prev_w
   if not ok then error(err, 0) end
 end
 
 -- Existing personal persistence tests now enter through an accepted displayed source.
 local function with_opened_spies(reader, writer, state, fn)
-  local RealWriter = require("toml_codec.writer")
-  local Shell = require("adapters.shell_runner")
+  local RealWriter = require("core.text.engine.toml_codec.writer")
+  local Shell = require("core.process.adapters.shell_runner")
   local directory = os.tmpname(); assert(os.remove(directory)); directory = directory .. "-personal-opening"
   assert(Shell.run("mkdir -p " .. Shell.quote(directory)) == true)
   local path = directory .. "/personal.toml"
   local file = assert(io.open(path, "wb"))
   assert(file:write('[_meta]\nsections_order = ["english"]\n[english]\n"omw" = { output = "on my way", is_word = true, auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }\n"ty" = { output = "thank you", is_word = true, final_result = false }\n'))
   assert(file:close())
-  local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["ui.webview_manager"], writer.write
+  local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["core.ui.ui.webview_manager"], writer.write
   local previous_prepare = writer.prepare_batch
   -- Preserve the actual planner capability while spying on its publication.
   writer.prepare_batch = RealWriter.prepare_batch
   state.config.get_config_dir = function() return directory end
   local context = { app_name = "hotstring_editor", epoch = 41 }
-  package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+  package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 41 end,
     eval_js = function() return true end }
   writer.write = function(...)
     local accepted, detail = native_write(...)
@@ -212,12 +222,12 @@ local function with_opened_spies(reader, writer, state, fn)
     return RealWriter.write(...)
   end
   local ok, err = pcall(function()
-    with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+    with_spies("hotstrings.ui.hotstring_editor.bridge", reader, writer, function(h)
       assert(h.push_init(state, context) == true, "The original save case requires an accepted opening")
       fn(h, context)
     end)
   end)
-  writer.write, writer.prepare_batch, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, previous_prepare, old_dir, manager
+  writer.write, writer.prepare_batch, state.config.get_config_dir, package.loaded["core.ui.ui.webview_manager"] = native_write, previous_prepare, old_dir, manager
   assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
   if not ok then error(err, 0) end
 end

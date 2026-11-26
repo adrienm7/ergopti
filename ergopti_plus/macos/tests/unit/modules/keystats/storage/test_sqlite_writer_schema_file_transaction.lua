@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 --- @param schedule table Mutable native file failure schedule.
 --- @param check function Assertions against the writer and observed owners.
 local function observe(schedule, check)
-	helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 		local state = { opens = 0, reads = 0, closes = 0, db_opens = 0, db_closes = 0, errors = {} }
 		state.file_exists = schedule.existing_partial == true
 		state.meta_exists = schedule.existing_partial == true
 		state.schema_applied = false
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer", {
 			fs = { attributes = function() return state.file_exists and { mode = "file" } or nil end },
 			sqlite3 = { OK = 0, DONE = 101, ROW = 100,
@@ -36,6 +36,8 @@ local function observe(schedule, check)
 					end,
 						nrows = function(_, sql)
 							local row
+							-- The raw tables lacking the UTC offset column (KMD-1): the fixture has none.
+							if sql:find("pragma_table_info", 1, true) then return function() return nil end end
 							if sql:find("sqlite_master", 1, true) and state.meta_exists then row = { name = "meta" } end
 							if sql:find("key='schema_version'", 1, true) and state.schema_applied then row = { value = "1" } end
 							return function() local result = row; row = nil; return result end

@@ -29,8 +29,8 @@ function M.run(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
 		"modules.keystats.context_tracker", "modules.keystats.watchers", "modules.keystats.log_manager",
-		"adapters.secure_field_detector", "adapters.task_lifecycle", "adapters.timer_scheduler",
-		"infra.logger", "infra.timings", "keystats.private_window", "keystats.physical_lifecycle_observation",
+		"platform.focus.secure_field_detector", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
+		"core.logger.engine.logger", "core.timing.engine.timings", "metrics.engine.view.private_window", "metrics.engine.capture.physical_lifecycle_observation",
 	}, function()
 		local original_date, original_time = os.date, os.time
 		local state = { rows = {}, errors = {}, flushes = 0, rollover_calls = 0, rollover_accepted = false,
@@ -66,8 +66,8 @@ function M.run(options, callback)
 		local result = table.pack(xpcall(function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
-			package.loaded["adapters.secure_field_detector"] = {
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["platform.focus.secure_field_detector"] = {
 				refresh = function() end, isSecureField = function() return false end,
 				isSecureApp = function() return false end,
 			}
@@ -83,9 +83,9 @@ function M.run(options, callback)
 				mouse = { absolutePosition = function() return { x = 0, y = 0 } end },
 			})
 			local function dormant() error("Maintenance must not activate a native timer or task") end
-			package.loaded["adapters.task_lifecycle"] = { native = dormant, start = dormant }
-			package.loaded["adapters.timer_scheduler"] = { after = dormant, cancel = dormant }
-			package.loaded["infra.timings"] = { ms = function() return 1000 end }
+			package.loaded["core.process.adapters.task_lifecycle"] = { native = dormant, start = dormant }
+			package.loaded["core.events.timer_scheduler"] = { after = dormant, cancel = dormant }
+			package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end }
 			local manager = {
 				append_log = function() end,
 				flush_buffer = function() state.flushes = state.flushes + 1 end,

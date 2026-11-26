@@ -1,0 +1,1 @@
+var e=Object.freeze([`corpus`,`keyboard`,`format`,`layouts`,`details`,`versus`,`tab`,`px`,`py`,`text`,`blend`]);function t(t,n,r){let i=new URLSearchParams(n),a=new URLSearchParams(r);for(let t of e){let e=a.get(t);e!==null&&i.set(t,e)}return`${t}?${i.toString().replace(/%2C/g,`,`)}`}export{t};

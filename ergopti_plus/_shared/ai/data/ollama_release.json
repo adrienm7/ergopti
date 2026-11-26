@@ -1,0 +1,36 @@
+{
+	"schema_version": 1,
+	"version": "0.40.6",
+	"assets": {
+		"macos-universal": {
+			"filename": "ollama-darwin.tgz",
+			"sha256": "b2b55434865a668decb494110d7fd970eed3ecc8837be2872f672ccbb95df974",
+			"bytes": 174459907,
+			"unpacked_bytes": 523379721
+		},
+		"linux-amd64": {
+			"filename": "ollama-linux-amd64.tar.zst",
+			"sha256": "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0",
+			"bytes": 1438364593,
+			"unpacked_bytes": 4315093779
+		},
+		"linux-arm64": {
+			"filename": "ollama-linux-arm64.tar.zst",
+			"sha256": "0a279d9428ad17b06fdb7dddf3b059b2c148433585fa3b30676a102fc459bb9f",
+			"bytes": 1560414226,
+			"unpacked_bytes": 4681242678
+		},
+		"windows-amd64": {
+			"filename": "ollama-windows-amd64.zip",
+			"sha256": "e359637575302f288d76c0007c408a4be9c7376d59c4f28684d63b232a44b427",
+			"bytes": 1471164488,
+			"unpacked_bytes": 4413493464
+		},
+		"windows-arm64": {
+			"filename": "ollama-windows-arm64.zip",
+			"sha256": "82cace1a134f88e7e7092dcf79304eff5950b88dbfabc03f19be09f8be20ee65",
+			"bytes": 210482819,
+			"unpacked_bytes": 631448457
+		}
+	}
+}

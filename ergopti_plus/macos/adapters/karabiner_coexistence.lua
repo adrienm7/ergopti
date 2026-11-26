@@ -29,7 +29,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 
 local LOG = "adapters.karabiner_coexistence"
@@ -77,9 +77,9 @@ M.RESTORE_STEP = "register-core-agents"
 --- @return table port { detect, close, restore, describe }.
 function M.new(dependencies)
 	dependencies = dependencies or {}
-	local exec = dependencies.exec or require("adapters.field_check_ports").exec
-	local exists = dependencies.exists or require("adapters.file_system").exists
-	local timer = dependencies.timer or require("adapters.timer_scheduler")
+	local exec = dependencies.exec or require("diagnostics.adapters.field_check_ports").exec
+	local exists = dependencies.exists or require("core.fs.adapters.file_system").exists
+	local timer = dependencies.timer or require("core.events.timer_scheduler")
 	local port = {}
 
 	--- Counts the active official user-side processes.
@@ -107,7 +107,10 @@ function M.new(dependencies)
 			end)
 			if committed ~= true then
 				Logger.error(LOG, "The wait for the official Karabiner to exit could not be scheduled.")
-				callback(false)
+				-- Core unregister already succeeded. Preserve that fact so the
+				-- activation owner records its restoration debt; admission still
+				-- performs its own fresh process probe before starting capture.
+				callback(true)
 			end
 		end)
 	end

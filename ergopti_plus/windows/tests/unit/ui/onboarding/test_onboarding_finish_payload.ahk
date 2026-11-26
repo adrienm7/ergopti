@@ -48,8 +48,8 @@ _TOFP_EmptyFolderInitDestination(Custom) {
 	DirCreate(Directory)
 	try {
 		_ob_locale := "en"
-		_DefaultConfigDir := "C:\Users\fixture\.config\ergopti_plus\"
-		_ConfigDir := Custom ? "E:\Custom-B\" : "C:\Users\fixture\.config\ergopti_plus\"
+		_DefaultConfigDir := "C:\Users\fixture\AppData\Local\Ergopti\config\"
+		_ConfigDir := Custom ? "E:\Custom-B\" : "C:\Users\fixture\AppData\Local\Ergopti\config\"
 		ConfigurationFile := Directory . "\config.toml"
 		_OnbWeb_Ready := false, _OnbWeb_Queue := [], _OnboardingCatalogue := ""
 		_OnbWeb_InjectInitData()
@@ -58,12 +58,18 @@ _TOFP_EmptyFolderInitDestination(Custom) {
 		Script := _OnbWeb_Queue[1]
 		Assert(InStr(Script, "window.initData({") == 1, "the observed publication must initialize the wizard")
 		AssertEqual(_TOFP_InitDataStringField(Script, "empty_config_dir"),
-			"C:\Users\fixture\.config\ergopti_plus\",
+			"C:\Users\fixture\AppData\Local\Ergopti\config\",
 			"clearing the Windows field selects the OS default even from a custom boot folder")
 		AssertEqual(_TOFP_InitDataStringField(Script, "default_config_dir"),
-			"C:\Users\fixture\.config\ergopti_plus\")
+			"C:\Users\fixture\AppData\Local\Ergopti\config\")
 		AssertEqual(_TOFP_InitDataStringField(Script, "config_dir"), Custom ? "E:\Custom-B\" : "",
 			"the original custom-choice payload is preserved")
+		; The page proposes the layout default the driver applies to an absent
+		; trigger_char, no longer a guess from the OS language (2026-11-21).
+		AssertEqual(_TOFP_InitDataStringField(Script, "magic_key_default"),
+			MagicKeyLayoutDefaultFor(false, KS_ResolveKeyboardLayout()),
+			"the wizard proposes the driver's layout default of the magic key")
+		AssertFalse(InStr(Script, "system_layout:"), "the OS language guess is gone")
 		Assert(InStr(Script, ",capabilities:{gesture_registration:true},"),
 			"the Windows host tells the page it registers gestures with the system")
 		AssertFalse(FileExist(ConfigurationFile), "initial presentation cannot create configuration")

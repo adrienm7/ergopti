@@ -11,13 +11,13 @@
 --- libxkbcommon reads first (user_layout_installer.py), without sudo.
 ---
 --- FEATURES & RATIONALE:
---- 1. The catalogue decisions are shared with macOS (_shared/lua/layouts/
+--- 1. The catalogue decisions are shared with macOS (_shared/layouts/engine/
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the package.
 --- 2. The conversion is Lua: the .keylayout is read by the parser shared with
----    macOS (_shared/lua/layouts/keylayout.lua) and written as XKB and XCompose
----    by _shared/lua/layouts/xkb_converter.lua, byte for byte what the Python
+---    macOS (_shared/layouts/engine/composer/keylayout.lua) and written as XKB and XCompose
+---    by _shared/layouts/engine/composer/xkb_converter.lua, byte for byte what the Python
 ---    converter writes (tools/test/test-keylayout-canonical-parity.cjs). Python
 ---    3.8 or newer is still required by the user XKB installer that follows,
 ---    which edits the user tree and the desktop configuration; a missing or
@@ -29,29 +29,31 @@
 ---    injectable, so tests replay operations without network, luv or python3.
 --- ==============================================================================
 
-local Logger        = require("logger.shim")
-local Paths         = require("infra.paths")
-local ConfigPaths   = require("infra.config_paths")
-local I18n          = require("infra.i18n")
-local FileSystem    = require("adapters.file_system")
-local HttpClient    = require("adapters.http_client")
-local FileDigest    = require("adapters.file_digest")
-local ShellRunner   = require("adapters.shell_runner")
-local ProcessRunner = require("adapters.process_runner")
-local Json          = require("json")
-local Keylayout     = require("layouts.keylayout")
-local XkbConverter  = require("layouts.xkb_converter")
+local Logger        = require("core.logger.engine.shim")
+local Paths         = require("core.fs.engine.paths")
+local ConfigPaths   = require("settings.engine.paths")
+local I18n          = require("core.i18n.engine.i18n")
+local FileSystem    = require("core.fs.adapters.file_system")
+local HttpClient    = require("core.network.adapters.http_client")
+local FileDigest    = require("core.fs.adapters.file_digest")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local ProcessRunner = require("core.process.adapters.runner")
+local Json          = require("core.text.engine.json")
+local TomlCodec     = require("core.text.engine.toml_codec")
+local Keylayout     = require("layouts.engine.composer.keylayout")
+local XkbConverter  = require("layouts.engine.composer.xkb_converter")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
-local Registry      = require("layouts.registry")
-local Catalogue     = require("layouts.catalogue")
-local Extension     = require("layouts.extension")
-local Composer      = require("layouts.composer")
-local RegistryStore = require("layouts.registry_store")
+local Registry      = require("layouts.engine.registry.registry_core")
+local Catalogue     = require("layouts.engine.composer.catalogue")
+local Extension     = require("layouts.engine.composer.extension")
+local Composer      = require("layouts.engine.composer.composer")
+local SourceStore   = require("layouts.engine.composer.source_store")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local M = {}
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "layout_registry"
 local REQUEST_OWNER = "layout_registry"
@@ -93,26 +95,12 @@ local CHILD_TIMEOUT_MS = 60000
 -- The platform name registry entries list when Linux can install them.
 local PLATFORM = "linux"
 
--- Stable failure codes the layout manager translates.
-M.FAILURE_BUSY = "busy"
-M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
-M.FAILURE_NOT_INSTALLED = "not_installed"
-M.FAILURE_UNSUPPORTED = "unsupported_platform"
-M.FAILURE_DOWNLOAD = "download_failed"
-M.FAILURE_WRITE = "write_failed"
-M.FAILURE_RECORD = "record_failed"
-M.FAILURE_PYTHON = "python_missing"
-M.FAILURE_CONVERSION = "conversion_failed"
-M.FAILURE_INSTALLER = "installer_failed"
-M.FAILURE_FOREIGN_FILE = "foreign_file"
-M.FAILURE_XORG_SESSION = "xorg_session"
-M.FAILURE_SELECT = "select_failed"
-M.FAILURE_INVALID = "invalid"
--- Live number-row options (apply_rows): no layout to apply them to, a session that
--- cannot load a user layout live, or the live load that the X server did not keep.
-M.FAILURE_NO_SOURCE = "no_source_layout"
-M.FAILURE_SESSION = "session_unsupported"
-M.FAILURE_LIVE = "live_apply_failed"
+-- Stable failure codes the layout manager translates: M.FAILURE_<NAME> is
+-- registry.failures.<name> of _shared/layouts/data/defaults.json, read on first
+-- use (section 3). Among them: helpers_missing, the conversion data or the user
+-- XKB installer missing from this installation (an install.sh run from a
+-- checkout before install/xkb_helpers.sh), where reinstalling is the fix; and
+-- no_source, session and live for the live number-row options (apply_rows).
 
 
 
@@ -237,22 +225,43 @@ local function read_shared_json(rel)
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
 	local known = _shared_json[path]
 	if known ~= nil and known.raw == raw then return known.decoded, nil end
-	-- The shared json.lua answers nil to invalid JSON rather than raising.
+	-- The shared core/text/engine/json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	_shared_json[path] = { raw = raw, decoded = decoded }
 	return decoded, nil
 end
 
+-- M.FAILURE_<NAME> resolves registry.failures.<name>; a name the defaults do
+-- not declare raises, so a typo is a crash at its first use, never a nil code.
+setmetatable(M, { __index = function(_, key)
+	local name = type(key) == "string" and key:match("^FAILURE_([%u_]+)$") or nil
+	if name == nil then return nil end
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
+	local failures = type(layouts) == "table" and type(layouts.registry) == "table" and layouts.registry.failures or nil
+	local code = type(failures) == "table" and failures[name:lower()] or nil
+	if type(code) ~= "string" or not code:match("^[a-z_]+$") then
+		error("_shared/layouts/data/defaults.json declares no registry.failures." .. name:lower()
+			.. (layouts_err and (": " .. layouts_err) or ""), 2)
+	end
+	return code
+end })
+
 --- The registry settings, resolved from the shared defaults.
 --- @return table|nil settings
 --- @return string|nil error
 function M.settings()
-	local layouts, layouts_err = read_shared_json("modules/layouts/defaults.json")
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
 	if not layouts then return nil, layouts_err end
-	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
+	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
-	return Registry.resolve(layouts, updater, require("modules.updater.manager").installed_channel())
+	-- The daemon runs without the updater (Main loads it optionally), so its
+	-- absence is this function's refusal, not a raise that ends the daemon.
+	local loaded, Updater = pcall(require, "modules.updater.manager")
+	if not loaded or type(Updater) ~= "table" or type(Updater.installed_channel) ~= "function" then
+		return nil, "the updater cannot name the installed channel: " .. tostring(loaded and "no installed_channel" or Updater)
+	end
+	return Registry.resolve(layouts, updater, Updater.installed_channel())
 end
 
 --- The first candidate path that exists under the driver root.
@@ -332,7 +341,7 @@ end
 --- @param bytes number The archive's size.
 --- @return boolean accepted
 local function confirm_python_download(bytes)
-	local Dialogs = require("ui.menu.menu_dialogs")
+	local Dialogs = require("menu.ui.builder.dialogs")
 	local megabytes = string.format("%d", math.ceil(bytes / 1048576))
 	local text = I18n.get("layouts.managed_python_offer"):gsub("{1}", function() return megabytes end)
 	return Dialogs.ask_yes_no(I18n.get("layouts.managed_python_title"), Dialogs.plain_markup(text),
@@ -344,8 +353,30 @@ end
 --- @param confirm function|nil The consent; the owned dialog by default.
 --- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
 local function managed_python(confirm)
-	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("adapters", "managed_python_download_timeout_ms")
 	local native = require("luv")
+	local function managed_process(program, args, callback)
+		local delivered, constructing, pending = false, true, nil
+		local function deliver(result)
+			if delivered then return end
+			if constructing then pending = pending or result; return end
+			delivered = true
+			callback(result)
+		end
+		local started = ProcessRunner.run(program, args, { timeout_ms = timeout_ms }, deliver)
+		constructing = false
+		if pending ~= nil then
+			if started == true then deliver(pending)
+			else deliver({ exit_code = -1, error = "process was not admitted" }) end
+		elseif started ~= true and not delivered then
+			-- A false start may still retain native debt. Only a globally settled
+			-- runner proves that no process can still touch the staging tree.
+			local observed, settled = pcall(ProcessRunner.is_settled)
+			if observed and settled == true and not delivered then
+				deliver({ exit_code = -1, error = "process was not admitted" })
+			end
+		end
+	end
 	local deps = {
 		pin = require("_generated.native_runtime").managed_python,
 		data_dir = ConfigPaths.data(),
@@ -365,16 +396,33 @@ local function managed_python(confirm)
 		end,
 		unpack = function(archive, into, callback)
 			if not ShellRunner.has_command("tar") then callback(false, "tar is not installed") return end
-			ProcessRunner.run("tar", { "-xzf", archive, "-C", into, "--no-same-owner" }, { timeout_ms = timeout_ms },
+			managed_process("tar", { "-xzf", archive, "-C", into, "--no-same-owner" },
 				function(result) callback(result.exit_code == 0 and result.error == nil, result.error or result.stderr) end)
 		end,
-		ensure_dir = ensure_dir,
+		create_stage = function(root)
+			local parent = NativePath.dirname(root)
+			if not parent or not ensure_dir(parent) or type(native.fs_mkdtemp) ~= "function"
+				or type(native.fs_lstat) ~= "function" then return nil end
+			local stage = native.fs_mkdtemp(root .. ".staging.XXXXXX")
+			if type(stage) ~= "string" then return nil end
+			local identity = native.fs_lstat(stage)
+			local function exact_integer(value)
+				return type(value) == "number" and value >= 0 and value < 2 ^ 53 and value % 1 == 0
+			end
+			if type(identity) ~= "table" or identity.type ~= "directory"
+				or not exact_integer(identity.dev) or not exact_integer(identity.ino) then return nil end
+			local dev, ino = identity.dev, identity.ino
+			return stage, function()
+				local now = native.fs_lstat(stage)
+				return type(now) == "table" and now.type == "directory" and now.dev == dev and now.ino == ino
+			end
+		end,
 		remove_tree = function(path, callback)
-			ProcessRunner.run("rm", { "-rf", "--", path }, { timeout_ms = timeout_ms },
+			managed_process("rm", { "-rf", "--", path },
 				function(result) callback(result.exit_code == 0 and result.error == nil) end)
 		end,
 		delete = FileSystem.delete,
-		rename = os.rename,
+		rename = require("core.fs.engine.no_replace_move").move,
 	}
 	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
 end
@@ -398,7 +446,9 @@ local function default_deps(settings)
 	local etag_capture = local_dir .. ".index.etag.download"
 	return {
 		settings = settings,
-		local_source = require("infra.installation").is_source_run(),
+		local_source = require("core.lifecycle.engine.installation").is_source_run(),
+		-- Re-applies a layout loaded live on X11 when the desktop replaces it.
+		keep_x11_layout = function(id) require("modules.keymap.x11_layout_reapply").arm(id) end,
 		-- The asynchronous runner: the refresh shares the daemon's loop with the
 		-- grabbed keyboard, so a blocking git would delay keys.
 		registry_changes = function(dir, callback)
@@ -442,6 +492,7 @@ local function default_deps(settings)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = FileSystem.read,
+		read_bounded = FileSystem.read_bounded,
 		write = write,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
@@ -452,7 +503,7 @@ local function default_deps(settings)
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
 		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
 		installer = M.installer_path(driver_root, FileSystem.exists),
-		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
+		keycodes = Paths.shared("layouts/data/mac_keycodes.json"),
 		translate = I18n.get,
 	}
 end
@@ -567,7 +618,10 @@ end
 --- The whole conversion runs in Lua (layouts.keylayout parses the file,
 --- layouts.xkb_converter writes the XKB symbols and XCompose text): no child
 --- process, so a machine without python3 still converts, and only the user XKB
---- installer that follows needs it.
+--- installer that follows needs it. The composed layout of a layout source is
+--- written from the converter target the page compiled straight from the
+--- source (composer.lua check_target), which keeps the levels its .keylayout
+--- cannot hold (XKB's fifth level); its .keylayout stays the record's file.
 --- @param deps table
 --- @param entry table
 --- @param layout_path string
@@ -576,18 +630,32 @@ end
 local function convert(deps, entry, layout_path, on_done, rows)
 	local data_dir = deps.converter_data
 	if not data_dir then
-		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the XKB conversion data is not shipped with this driver")
 		return
 	end
-	local text = deps.read(layout_path)
-	if type(text) ~= "string" then
-		on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
-		return
+	local canonical, level5
+	local composer_settings = entry.id ~= nil and M.composer_settings() or nil
+	if composer_settings ~= nil and entry.id == composer_settings.id then
+		local target, target_err = Composer.read_target(composer_settings,
+			deps.config_dir or (ConfigPaths.config("") .. "/"), deps)
+		if target_err ~= nil then
+			on_done(false, M.FAILURE_CONVERSION, target_err)
+			return
+		end
+		if target ~= nil then canonical, level5 = target.canonical, target.level5 end
 	end
-	local canonical, parse_err = Keylayout.parse(text)
-	if not canonical then
-		on_done(false, M.FAILURE_CONVERSION, parse_err)
-		return
+	if canonical == nil then
+		local text = deps.read(layout_path)
+		if type(text) ~= "string" then
+			on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
+			return
+		end
+		local parse_err
+		canonical, parse_err = Keylayout.parse(text)
+		if not canonical then
+			on_done(false, M.FAILURE_CONVERSION, parse_err)
+			return
+		end
 	end
 	local function decode_file(path)
 		local raw = deps.read(path)
@@ -602,7 +670,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	local template = deps.read(data_dir .. "/xkb_symbols.txt")
 	local types = deps.read(data_dir .. "/xkb_types.txt")
 	if type(template) ~= "string" or type(types) ~= "string" then
-		on_done(false, M.FAILURE_CONVERSION, "the XKB template or key types are not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the XKB template or key types are not shipped with this driver")
 		return
 	end
 	local keycodes, keycodes_err = XkbConverter.keycodes(keycode_table, entry.keycode_convention)
@@ -610,13 +678,21 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	local result, convert_err = XkbConverter.convert(canonical, {
 		keycodes = keycodes,
 		keysyms = keysym_table.keysyms,
+		locale_extended_prefixes = keysym_table.locale_extended_prefixes,
 		template = template,
 		layout_id = entry.id,
 		display_name = entry.name,
 		hints = entry.xkb,
 		rows = rows,
+		level5 = level5,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	local types_ok, shipped_types = pcall(XkbConverter.types_text, types, level5)
+	if not types_ok then
+		on_done(false, M.FAILURE_CONVERSION, tostring(type(shipped_types) == "table" and shipped_types.keylayout_error
+			or shipped_types))
+		return
+	end
 	-- What the conversion could not carry is named, never silently lost.
 	if #result.unplaced > 0 then
 		Logger.warn(LOG, "Layout '%s': %d key(s) have no Linux key name and are left out (macOS codes %s).",
@@ -630,7 +706,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	for _, file in ipairs({
 		{ entry.id .. ".xkb", result.symbols_text },
 		{ entry.id .. ".XCompose", result.compose_text },
-		{ "xkb_types.txt", types },
+		{ "xkb_types.txt", shipped_types },
 	}) do
 		local written, write_err = write_file(deps, out_dir .. file[1], file[2])
 		if not written then on_done(false, M.FAILURE_WRITE, write_err) return end
@@ -644,7 +720,7 @@ end
 --- @param on_done function on_done(ok, report_or_code, detail)
 local function run_installer(deps, args, on_done)
 	if not deps.installer then
-		on_done(false, M.FAILURE_INSTALLER, "the user XKB installer is not shipped with this driver")
+		on_done(false, M.FAILURE_HELPERS_MISSING, "the user XKB installer is not shipped with this driver")
 		return
 	end
 	local argv = { deps.installer }
@@ -769,6 +845,18 @@ local function user_message(deps, code)
 	return nil
 end
 
+--- The installer arguments with the X11 permission when this session is X11:
+--- Xorg reads no user XKB tree, so the daemon loads the layout into the running
+--- server itself (select and apply_rows run apply-x11 and keep it there), and
+--- the installer refuses the tree to every other caller of an Xorg session.
+--- @param deps table Resolved collaborators.
+--- @param args table Installer arguments, extended in place.
+--- @return table args
+local function with_x11_permission(deps, args)
+	if M.live_path(deps) == "x11" then args[#args + 1] = "--allow-xorg" end
+	return args
+end
+
 --- Installs (or updates) one registry layout in the user XKB tree.
 --- on_done(true, { entry, source, verified }) or
 --- on_done(false, failure_code, detail, user_message) runs once unless terminal
@@ -870,7 +958,7 @@ function M.install(id, on_done, deps)
 					args[#args + 1] = "--language"
 					args[#args + 1] = language
 				end
-				run_installer(deps, args, function(installed, report, install_err)
+				run_installer(deps, with_x11_permission(deps, args), function(installed, report, install_err)
 					if not current(epoch) then return end
 					if not installed then
 						finish(false, report, install_err)
@@ -889,6 +977,40 @@ function M.install(id, on_done, deps)
 		end)
 	end, deps)
 	return true
+end
+
+--- Whether this session forgets a selected layout when it ends: the X server
+--- (apply-x11 lasts for one X session, Xorg reads no user XKB tree) and Hyprland
+--- (its runtime kb_layout lasts until it reads its configuration file again).
+--- GNOME and KDE keep the selection in their own setting.
+--- @param deps table Resolved collaborators.
+--- @return boolean
+local function selection_is_transient(deps)
+	local path = M.live_path(deps)
+	if path == "x11" then return true end
+	local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
+	return path == "wayland" and desktop_is("hyprland")
+end
+
+--- Records the layout this daemon just selected in a session that forgets it.
+--- @param deps table Resolved collaborators.
+--- @param id string
+local function remember_session_selection(deps, id)
+	local ok, err = deps.write(deps.local_dir .. deps.settings.session_selection_file, id .. "\n")
+	if not ok then
+		Logger.warn(LOG, "The layout '%s' is selected but not recorded for the next session: %s.", id, tostring(err))
+	end
+end
+
+--- Forgets the recorded session layout when it is `id`.
+--- @param deps table Resolved collaborators.
+--- @param id string
+local function forget_session_selection(deps, id)
+	local path = deps.local_dir .. deps.settings.session_selection_file
+	local text = deps.read(path)
+	if type(text) == "string" and TextUtils.trim(text) == id and not deps.delete(path) then
+		Logger.warn(LOG, "Cannot delete %s.", path)
+	end
 end
 
 --- Uninstalls one registry layout: removes it from the user XKB tree and the
@@ -946,6 +1068,7 @@ function M.uninstall(id, on_done, deps)
 			return
 		end
 		if _active == id then _active = "" end
+		forget_session_selection(deps, id)
 		Logger.success(LOG, "Uninstalled the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
@@ -976,19 +1099,88 @@ function M.select(id, on_done, deps)
 	end
 	if not acquire_slot(id, "select", on_done) then return false end
 	Logger.start(LOG, "Activating the '%s' layout…", id)
-	run_installer(deps, { "activate", "--layout-id", id }, function(ok, report, detail)
+	-- No X11 desktop setting reads the user tree: the layout is compiled into
+	-- the running server instead, and kept there when the desktop puts its own back.
+	local x11 = M.live_path(deps) == "x11"
+	local transient = selection_is_transient(deps)
+	local args = x11 and { "apply-x11", "--layout-id", id } or { "activate", "--layout-id", id }
+	run_installer(deps, args, function(ok, report, detail, live_code)
 		if not current(epoch) then return end
 		_busy = nil
 		if not ok then
 			Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
-			on_done(false, M.FAILURE_SELECT, detail, user_message(deps, report))
+			-- A compositor that selects its layout only in its own file (Sway,
+			-- niri, river...) is named: the page says why, the layout stays installed.
+			local code = live_code == M.FAILURE_SESSION and M.FAILURE_SESSION or M.FAILURE_SELECT
+			on_done(false, code, detail, user_message(deps, report))
 			return
 		end
 		_active = id
+		if transient then remember_session_selection(deps, id) end
+		if x11 and deps.keep_x11_layout then deps.keep_x11_layout(id) end
 		Logger.success(LOG, "Activated the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
 	return true
+end
+
+
+
+
+
+--- Selects again, at the daemon's start, the layout recorded by the last
+--- selection in a session that forgets it (registry session_selection_file):
+--- apply-x11 lasts for one X session, and Hyprland's runtime kb_layout until its
+--- configuration file is read again. Nothing runs on GNOME, KDE or another
+--- session, when nothing is recorded, or when the recorded layout is no longer
+--- installed.
+--- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
+--- runs once when a selection was dispatched.
+--- @param on_done function|nil
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.restore_session_selection(on_done, deps)
+	if _stopping then return false end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		Logger.error(LOG, "The layout of the last session cannot be selected again: %s.", tostring(deps_err))
+		return false
+	end
+	if not selection_is_transient(resolved) then return false end
+	local path = resolved.local_dir .. resolved.settings.session_selection_file
+	local text = resolved.read(path)
+	if type(text) ~= "string" then return false end
+	local id = TextUtils.trim(text)
+	local record = read_installed(resolved)
+	if not (Registry.is_valid_id(id) and record and record.layouts[id]) then
+		Logger.warn(LOG, "The layout recorded for this session ('%s') is not installed: it is forgotten.", id)
+		if not resolved.delete(path) then Logger.warn(LOG, "Cannot delete %s.", path) end
+		return false
+	end
+	Logger.info(LOG, "Selecting again the '%s' layout chosen in an earlier session…", id)
+	return M.select(id, on_done or function(ok, _, detail)
+		if not ok then Logger.error(LOG, "The layout '%s' was not selected again: %s.", id, tostring(detail)) end
+	end, deps)
+end
+
+--- Selects the recorded layout again after each Hyprland configuration reload:
+--- reading hyprland.conf puts its own kb_layout back over the runtime one the
+--- layout manager set. Started once at the daemon's start, only on Hyprland;
+--- ended by M.shutdown.
+--- @param deps table|nil
+--- @return boolean watching False off Hyprland or when the socket is unreachable.
+function M.watch_session_reloads(deps)
+	if _stopping then return false end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		Logger.error(LOG, "Hyprland reloads cannot be watched: %s.", tostring(deps_err))
+		return false
+	end
+	if M.live_path(resolved) ~= "wayland" then return false end
+	local desktop_is = resolved.desktop_is or require("core.ui.engine.display_server").desktop_is
+	if not desktop_is("hyprland") then return false end
+	local watch = resolved.reload_watch or require("modules.keymap.hyprland_reload_watch")
+	return watch.start(function() M.restore_session_selection(nil, deps) end)
 end
 
 
@@ -1008,9 +1200,11 @@ local function session_type()
 end
 
 --- How this session loads a user layout live: "x11" (the server's keymap is
---- replaced), "wayland" (GNOME or KDE select it through their own setting), or nil
---- with the declared session type. The installer decides again from the full
---- desktop identity and refuses with session_unsupported where it has no path.
+--- replaced), "wayland" (GNOME, KDE or Hyprland select it through their own
+--- setting), or nil with the declared session type. Sway, niri, river and the
+--- other compositors select a layout only in their own configuration file. The
+--- installer decides again from the full desktop identity and refuses with
+--- session_unsupported where it has no path.
 --- @param deps table|nil { session_type, desktop_is } (tests replace them).
 --- @return string|nil path
 --- @return string session
@@ -1019,8 +1213,8 @@ function M.live_path(deps)
 	local session = (deps.session_type or session_type)()
 	if session == "x11" then return "x11", session end
 	if session == "wayland" then
-		local desktop_is = deps.desktop_is or require("infra.display_server").desktop_is
-		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
+		local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
+		if desktop_is("gnome") or desktop_is("kde") or desktop_is("hyprland") then return "wayland", session end
 	end
 	return nil, session
 end
@@ -1044,15 +1238,15 @@ end
 --- Applies the number-row options to an installed layout and loads it into the
 --- running session: the layout is converted again with the options, then on X11
 --- installed in the user XKB tree and compiled into the running server (apply-x11),
---- and on GNOME or KDE Wayland installed under the live slot the desktop does not use
---- and selected through the desktop setting (apply-wayland). Either succeeds only once
---- the keymap read back from the session (the server, or XWayland which receives the
+--- and on GNOME, KDE or Hyprland Wayland installed under the live slot the desktop
+--- does not use and selected through the desktop setting (apply-wayland). Either
+--- succeeds only once the keymap read back from the session (the server, or XWayland which receives the
 --- compositor's) holds the new cells. Nothing is written where the session has no live
 --- path; the stored choice is kept by the caller.
 --- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
 --- user_message, live_code) runs once unless terminal shutdown cancels its delivery.
 --- live_code is the installer's closed code (not_loaded, stale_keymap, select_refused,
---- ...) when the load failed.
+--- gnome_extension_missing, ...) when the load failed.
 --- @param id string|nil Installed layout id; nil takes the active or the only one.
 --- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
 --- @param on_done function
@@ -1122,6 +1316,7 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				if selection_is_transient(deps) then remember_session_selection(deps, base) end
 				finish(true, { id = base, rows = report, slot = applied_report.slot })
 			end)
 			return
@@ -1140,6 +1335,10 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				remember_session_selection(deps, base)
+				-- GNOME and Plasma under X11 put their own layouts back on a new
+				-- keyboard (W4): keep this one loaded from now on.
+				if deps.keep_x11_layout then deps.keep_x11_layout(base) end
 				finish(true, { id = base, rows = report })
 			end)
 		end)
@@ -1221,8 +1420,8 @@ function M.install_local(entry, text, on_done, deps)
 				finish(false, code, convert_err)
 				return
 			end
-			run_installer(deps, { "install", "--layout-id", id, "--display-name", entry.name,
-				"--source-dir", deps.local_dir .. id }, function(installed, report, install_err)
+			run_installer(deps, with_x11_permission(deps, { "install", "--layout-id", id, "--display-name", entry.name,
+				"--source-dir", deps.local_dir .. id }), function(installed, report, install_err)
 				if not current(epoch) then return end
 				if not installed then
 					finish(false, report, install_err)
@@ -1242,12 +1441,12 @@ function M.install_local(entry, text, on_done, deps)
 	return true
 end
 
---- The composer's ports over this module (see layouts/composer.lua).
+--- The composer's ports over this module (see layouts/engine/composer/composer.lua).
 --- @param deps table Resolved collaborators.
 --- @return table|nil operations
 --- @return string|nil error
 local function composer_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = Composer.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1263,6 +1462,8 @@ local function composer_operations(deps)
 		shortcuts = "single",
 		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
 		decode_json = deps.decode_json,
+		-- The page may save an Ergopti layout source in place of a composition.
+		decode_toml = TomlCodec.decode,
 		read = deps.read,
 		exists = deps.exists,
 		delete = deps.delete,
@@ -1313,9 +1514,33 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.composer_settings()
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	return Composer.settings(layout_defaults)
+end
+
+--- The emulation table stored with the composed layout's source, for the layout
+--- emulation; nil when the composed layout has none.
+--- @param deps table|nil
+--- @return table|nil table_
+--- @return string|nil error
+function M.composer_emulation(deps)
+	local settings, settings_err = M.composer_settings()
+	if not settings then return nil, settings_err end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.read_emulation(settings, resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved)
+end
+
+--- The composed layout stored for the emulation alone (composer_emulate), for
+--- the layout emulation while the composed layout is not installed.
+--- @param deps table|nil
+--- @return table|nil composed { text, convention } nil when none is stored.
+--- @return string|nil error
+function M.composer_copy(deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.registry_copy((M.composer_settings()), resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved, TomlCodec.decode)
 end
 
 --- The text of an installed layout's copy, for the Debug check of the composer.
@@ -1329,6 +1554,27 @@ function M.read_local_copy(id, deps)
 	local text = resolved.read(resolved.local_dir .. id .. ".keylayout")
 	if type(text) ~= "string" then return nil, "the installed copy of '" .. tostring(id) .. "' is unreadable" end
 	return text, nil
+end
+
+--- The text and index entry of a layout the app ships, read from the shipped
+--- registry the offline install uses (the layout emulation's source of a layout
+--- the layout manager has not installed). macOS has the same function.
+--- @param id string Registry id.
+--- @param deps table|nil
+--- @return table|nil shipped { entry, text }
+--- @return string|nil error
+function M.shipped_layout(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local index = bundled_index(resolved)
+	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+		if entry.id == id then
+			local text = type(resolved.bundled_dir) == "string" and resolved.read(resolved.bundled_dir .. entry.file) or nil
+			if type(text) ~= "string" then return nil, "the shipped " .. id .. " layout is unreadable" end
+			return { entry = entry, text = text }, nil
+		end
+	end
+	return nil, "the app ships no " .. tostring(id) .. " layout"
 end
 
 --- The digest of a text, through the driver's own digest port (the Debug check of
@@ -1363,6 +1609,17 @@ function M.composer_save(payload, on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail, false) end)
 end
 
+--- Stores a layout source for the layout emulation alone: nothing is installed
+--- in the system (layouts/engine/composer/composer.lua store).
+--- @param payload table { source, keylayout [, emulation] }
+--- @param on_done function on_done(ok, code, detail, id)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_emulate(payload, on_done, deps)
+	return with_composer(deps, function(operations) operations.store(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
 --- Removes the composition.
 --- @param on_done function on_done(ok, code, detail)
 --- @param deps table|nil
@@ -1372,6 +1629,167 @@ function M.composer_remove(on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
+--- The layout editor's file store over this module (see layouts/engine/composer/source_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function source_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = SourceStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return SourceStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		read = deps.read,
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- The editor's downloads land where the metrics export does.
+		downloads_dir = deps.downloads_dir or function()
+			return require("metrics.engine.maintenance").downloads_dir(os.getenv)
+		end,
+	})
+end
+
+--- Runs a layout editor file operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_source(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = source_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout editor store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Sends the layout editor the last source it saved.
+--- @param on_done function on_done({ text, filename, folder })
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_open(on_done, deps)
+	return with_source(deps, function(operations) operations.open(on_done) end,
+		function() on_done({}) end)
+end
+
+--- Stores one file of the layout editor (its source or an export).
+--- @param payload table { filename, text }
+--- @param on_done function on_done(ok, code, detail, filename)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_save(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Writes one download of the layout editor (XKB archive, KLC, DLL images,
+--- macOS bundle) to the user's Downloads folder, never over a file there.
+--- @param payload table { filename, data } with data the bytes as base64.
+--- @param on_done function on_done(ok, code, detail, path)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_export(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.export(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Ergopti Studio's personal layouts over this module (see layouts/engine/composer/studio_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function studio_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local settings, settings_err = StudioStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return StudioStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		-- The root of _shared, where the built-in corpus tables are generated.
+		shared_dir = deps.shared_dir or (Paths.shared_root() and Paths.shared_root() .. "/"),
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs an Ergopti Studio layout operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_studio(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = studio_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The Ergopti Studio layout store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Lists Ergopti Studio's personal layouts, as the JSON texts the page saved.
+--- @param on_done function on_done(ok, texts_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_list(on_done, deps)
+	return with_studio(deps, function(operations) operations.list(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores one Ergopti Studio personal layout.
+--- @param payload table { id, text }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Removes one Ergopti Studio personal layout.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_remove(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.remove(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads one built-in corpus's generated tables for the Ergopti Studio page.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_corpus(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.corpus(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- The layout editor's XKB and KLC export step, built once for both Lua drivers
+--- (layouts/engine/composer/export_step.lua), with this driver's Lua.
+require("layouts.engine.composer.export_step").registry_entry(M,
+	function() return read_shared_json("layouts/data/defaults.json") end, Logger, LOG, M.FAILURE_INVALID)
+
+-- The Studio's documents the page keeps as given: studio_profile_load and
+-- studio_profile_save (the fingering profile), studio_workspace_load and
+-- studio_workspace_save (the editor's tabs), built once for both Lua drivers.
+require("layouts.engine.composer.studio_store").document_entries(M, with_studio, M.FAILURE_WRITE)
+
 --- Revokes every registry workflow before cancelling its external transports.
 --- HTTP and digest cancellation fence delivery only; this ACK covers the native
 --- install/activation helpers owned by ProcessRunner, not network retirement.
@@ -1379,6 +1797,12 @@ end
 --- @return boolean acknowledged Every install/activation helper physically retired.
 function M.shutdown()
 	if not _stopping then _stopping = true; _epoch = _epoch + 1 end
+	local Reapply = package.loaded["modules.keymap.x11_layout_reapply"]
+	if Reapply then Reapply.shutdown() end
+	local ReloadWatch = package.loaded["modules.keymap.hyprland_reload_watch"]
+	if ReloadWatch then ReloadWatch.shutdown() end
+	local KdeWatch = package.loaded["modules.keymap.kde_layout_watch"]
+	if KdeWatch then KdeWatch.shutdown() end
 	if _checking_shutdown then return false end
 	_checking_shutdown = true
 	if not _transports_cancelled then
@@ -1420,9 +1844,9 @@ function M.shipped_extension_root(deps)
 	if resolved == nil then
 		-- Offline shipped data belongs to the local registry. Its source path
 		-- never needs the updater's initialized transport or installed channel.
-		local layouts, layouts_error = read_shared_json("modules/layouts/defaults.json")
+		local layouts, layouts_error = read_shared_json("layouts/data/defaults.json")
 		if not layouts then error(layouts_error, 0) end
-		local updater, updater_error = read_shared_json("modules/updater/defaults.json")
+		local updater, updater_error = read_shared_json("updater/data/defaults.json")
 		if not updater then error(updater_error, 0) end
 		local settings, settings_error = Registry.resolve(layouts, updater)
 		if not settings then error(settings_error, 0) end

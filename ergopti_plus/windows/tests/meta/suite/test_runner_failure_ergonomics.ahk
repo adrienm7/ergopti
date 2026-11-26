@@ -45,16 +45,28 @@ Test("runner failure: call site parses a path containing spaces", _TRFE_HandlesW
 ; A test that leaves an LLM auxiliary request current fails its own case: the
 ; request's completion would otherwise run, and launch, inside a later test.
 _TRFE_LlmWorkerLeak() {
+	global _LLM_AuxOwnerCounter
 	Earlier := LLM_AuxBegin("runner-leak-earlier")
 	try {
 		Mark := _TestLlmAuxMark()
-		AssertTrue(Mark >= 0, "the runner reads the real LLM auxiliary owner registry")
+		AssertTrue(Mark is Map, "the runner reads the real LLM auxiliary owner registry")
 		AssertEqual("", _TestLlmAuxLeaked(Mark), "a request opened before the test is not charged to it")
 		Opened := LLM_AuxBegin("runner-leak-probe")
 		try AssertEqual("runner-leak-probe", _TestLlmAuxLeaked(Mark),
 			"a request the test opened and left current names the leak")
 		finally LLM_AuxFinish(Opened)
 		AssertEqual("", _TestLlmAuxLeaked(Mark), "a request the test retired is not a leak")
+		; Isolation helpers rewind the owner counter: a request opened after the
+		; rewind carries a small token and must still be charged to the test.
+		SavedCounter := _LLM_AuxOwnerCounter
+		_LLM_AuxOwnerCounter := 0
+		Rewound := LLM_AuxBegin("runner-leak-rewound")
+		try AssertEqual("runner-leak-rewound", _TestLlmAuxLeaked(Mark),
+			"a request opened after a counter rewind still names the leak")
+		finally {
+			LLM_AuxFinish(Rewound)
+			_LLM_AuxOwnerCounter := Max(SavedCounter, _LLM_AuxOwnerCounter)
+		}
 	} finally LLM_AuxFinish(Earlier)
 	Source := _DriverDirConcat("tests")
 	AssertTrue(Source != "", "registered test owners must be readable")
@@ -319,9 +331,9 @@ Test("runner receipt sharing: incomplete reset is refused and closed (receipt-sh
 ; The native desktop cohort is a third real entry, not an assertion-library owner.
 _TRFE_ReceiptBootstrapPatterns() {
 	return Map(
-		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)",
+		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./core/lifecycle/engine/app_state\.ahk(?=[ \t]*\r?$)",
 		"e2e", "(?im)^#Include[ \t]+\.\./test_framework\.ahk\s*\r?\n\s*global[ \t]+TEST_RESULTS_FILE[ \t]*:=[ \t]*_TestResultsPath\([ \t]*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./\.\./modules/keystats/keystats_hook\.ahk(?=[ \t]*\r?$)",
-		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)")
+		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./core/lifecycle/engine/app_state\.ahk(?=[ \t]*\r?$)")
 }
 
 _TRFE_ReceiptBootstrapOwned(ReceiptBootstrapCode) {

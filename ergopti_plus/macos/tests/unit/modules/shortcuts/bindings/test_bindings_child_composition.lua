@@ -202,7 +202,6 @@ local function complete_system_facade(ctx, system, options)
 		bind_tap_keys = "tap_keys",
 		bind_layer_wheel = "layer_wheel",
 		bind_wrap_text_if_selected = "wrap_text_if_selected",
-		bind_cmd_star = "cmd_star",
 	}) do
 		system[method] = function(...)
 			local args = {...}
@@ -307,14 +306,14 @@ local function load_subject(options)
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
-		"infra.i18n",
-		"infra.logger",
+		"core.i18n.engine.i18n",
+		"core.logger.engine.logger",
 	}, function()
 		package.loaded["modules.shortcuts.actions.text"] = text
 		package.loaded["modules.shortcuts.actions.apps"] = apps
 		package.loaded["modules.shortcuts.actions.system"] = system
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings", {
 			hotkey = {
 				bind = function()
@@ -627,7 +626,7 @@ end)
 
 helpers.describe("shortcut bindings: raw owner release identity", function()
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " callback when its factory reenters pause", function()
 			local options = { reenter_raw_factory = id }
@@ -647,7 +646,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		helpers.it("fences a raw " .. id .. " enable factory that reenters pause", function()
 			local options = {}
@@ -669,7 +668,7 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 	end
 
 	for _, id in ipairs({
-		"tap_keys", "layer_wheel", "cmd_star", "wrap_text_if_selected",
+		"tap_keys", "wrap_text_if_selected",
 	}) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
 			helpers.it("retains " .. id .. " on pause delete " .. mode, function()

@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(source:match("^(.*)/tests/fixtures/native_event_loop_sleep_receipts%.lua$"))
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver_root .. "/../_shared/?.lua;" .. driver_root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local ffi_ok = pcall(require, "ffi")
 local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-native-nap-XXXXXX"))
@@ -51,14 +51,14 @@ end
 
 local function load_loop(branch)
 	local loaded, preload = package.loaded.ffi, package.preload.ffi
-	package.loaded["adapters.event_loop"] = nil
+	package.loaded["core.events.loop"] = nil
 	if branch == "no-FFI" and ffi_ok then
 		package.loaded.ffi = nil
 		package.preload.ffi = function() error("explicit test selects command fallback") end
 	elseif branch == "cdef refusal" then
 		package.loaded.ffi = { cdef = function() error("controlled native declaration refusal") end }
 	end
-	local ok, loop = pcall(require, "adapters.event_loop")
+	local ok, loop = pcall(require, "core.events.loop")
 	package.loaded.ffi, package.preload.ffi = loaded, preload
 	if not ok then error(loop, 0) end
 	return loop

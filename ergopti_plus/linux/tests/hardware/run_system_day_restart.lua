@@ -3,16 +3,17 @@
 --- MODULE: Native System-Day Restart Hydration (Linux)
 --- DESCRIPTION:
 --- Actual public collector, sampler and SQLite operations in separate processes.
---- Elapsed awake time is native; historical sensor rows are supplied software data.
+--- Elapsed awake time is native (one keep-awake session of the measured
+--- interval); historical sensor rows are supplied software data.
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
-local Json = require("json")
-local Clock = require("infra.monotonic")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
+local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local K = require("modules.keystats.keystats")
-local Metrics = require("modules.keystats.system_metrics")
+local Metrics = require("modules.keystats.system.system_metrics")
 local W = require("modules.keystats.sqlite_writer")
 -- Metrics flushes are asynchronous owned SQLite batches: a read must wait for
 -- the physical acknowledgement, as every native SQLite fixture does.
@@ -40,14 +41,20 @@ local function row(device, day)
 end
 init(database)
 local device = assert(W.query_rows("SELECT device_id FROM devices WHERE os='linux';"))[1]
-assert(device and device:match("^linux%-[a-zA-Z0-9_.%-]+$"))
+-- The collector's own device: the ledger identity, or linux-<host> without one.
+assert(device and device == K.ledger_status().device_id)
 assert(Clock.backend() == "luv.hrtime")
 local observation
 if phase == "first" then
 	assert(Metrics.current() == nil)
 	assert(Metrics.sample())
+	local started = uv.hrtime()
 	uv.sleep(30080)
-	local day = assert(Metrics.sample())
+	assert(Metrics.sample())
+	-- awake_ms is keep-awake time (KMD-3): the genuine elapsed interval is
+	-- credited as one session through the collector's own entry point.
+	assert(Metrics.record_awake_session((uv.hrtime() - started) / 1e6))
+	local day = assert(Metrics.current())
 	assert(os.date("%Y-%m-%d") == date)
 	Drain.flush(K)
 	check("native awake time accumulates before restart", function()
@@ -145,13 +152,16 @@ else
 	check("modeled next-date baseline is isolated without old clock handoff", function()
 		assert(type(W.read_system_day) == "function")
 		local capture = Calendar.capture
-		local clock = capture()
+		-- Where the runtime has the suspend-aware boot clock, the sampler took it
+		-- at its first real sample, so the modeled midnight keeps the boot reading
+		-- of the same instant; elsewhere both readings are the monotonic clock.
+		local clock = capture(true)
 		local midnight = Calendar.next_midnight(clock.wall_ms)
 		local next_date = os.date("%Y-%m-%d", midnight / 1000)
 		assert(W.upsert_system_day(device, { date = next_date, awake_ms = 888 }))
-		Calendar.capture = function()
-			return { mono_ms = clock.mono_ms, wall_ms = midnight, date = next_date,
-				ts = os.date("!%Y-%m-%d %H:%M:%S", midnight / 1000) }
+		Calendar.capture = function(include_boot)
+			return { mono_ms = clock.mono_ms, boot_ms = include_boot and clock.boot_ms or nil, wall_ms = midnight,
+				date = next_date, ts = os.date("!%Y-%m-%d %H:%M:%S", midnight / 1000) }
 		end
 		local ok, next_day = pcall(Metrics.sample)
 		Calendar.capture = capture

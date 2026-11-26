@@ -13,14 +13,14 @@
 
 local M = {}
 
-local i18n            = require("infra.i18n")
-local ManifestMenu    = require("infra.manifest_menu")
+local i18n            = require("core.i18n.engine.i18n")
+local ManifestMenu    = require("menu.engine.manifest_menu")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
-local CapsWordPolicy  = require("caps_word.auto_off")
-local Manifest        = require("infra.manifest_reader")
+local CapsWordPolicy  = require("keyboard.engine.caps_word_auto_off")
+local Manifest        = require("menu.engine.manifest_reader")
 
 --- Builds the group's rows.
---- @param ctx table Menu context (state, save_prefs, updateMenu, state_getters, applyTriggerChar).
+--- @param ctx table Menu context (state, save_prefs, updateMenu, state_getters).
 --- @return table|nil rows Rendered rows for the group.
 function M.build(ctx)
 	local state = ctx.state
@@ -42,11 +42,11 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
+		[require("settings.engine.keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters[require("config_keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
+	render_ctx.state_getters[require("settings.engine.keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
 		return state[CapsWordAutoOff.IDLE_KEY]
 	end
 	local providers = {
@@ -60,7 +60,9 @@ function M.build(ctx)
 					for _, separator in ipairs(boundary) do rows[#rows + 1] = separator end
 				else
 					rows[#rows + 1] = {
-						label = ctx.applyTriggerChar(i18n.get(row.label_key)),
+						-- The star delimiter is the literal built-in ★ on every OS, as the
+						-- policy reads it: the caption never takes a renamed magic key (CWS-002).
+						label = i18n.get(row.label_key),
 						checked = checked[row.key] or nil,
 						action = function()
 							local list = CapsWordPolicy.with_terminator(

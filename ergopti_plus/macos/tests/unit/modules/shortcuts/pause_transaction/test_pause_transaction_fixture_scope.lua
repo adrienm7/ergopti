@@ -10,24 +10,24 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.pause_transaction_fixture")
 local OWNERS = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
-	"infra.notifications",
-	"infra.keycodes",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
-	"adapters.key_state",
-	"adapters.synthetic_input",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"platform.input.keycodes",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.event_provenance",
-	"adapters.timer_scheduler",
+	"diagnostics.adapters.event_provenance",
+	"core.events.timer_scheduler",
 	"hs", "tests.stubs.hs", "hs.timer",
 }
 
@@ -40,7 +40,7 @@ helpers.describe("Pause transaction fixture ownership", function()
 					if predecessor_kind == "false" then predecessor = false end
 					if predecessor_kind == "table" then predecessor = {} end
 					for _, name in ipairs(OWNERS) do
-						if name ~= "adapters.event_provenance" and name ~= "adapters.timer_scheduler" then
+						if name ~= "diagnostics.adapters.event_provenance" and name ~= "core.events.timer_scheduler" then
 							package.loaded[name] = predecessor
 						end
 					end
@@ -92,8 +92,8 @@ helpers.describe("Pause transaction fixture ownership", function()
 
 	helpers.it("(pause-fixture-scope) dispatches deferred pause on the current native timer host", function()
 		helpers.with_stub_scope(OWNERS, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			local predecessor_scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			local predecessor_scheduler = helpers.load_with_stubs("core.events.timer_scheduler")
 			local predecessor_hs = hs
 			local fired = 0
 			local handle, committed = predecessor_scheduler.after(0, function() fired = fired + 1 end)
@@ -110,7 +110,7 @@ helpers.describe("Pause transaction fixture ownership", function()
 				helpers.assert_eq(control.is_paused(), true)
 				helpers.assert_true(control.stop())
 			end)
-			helpers.assert_eq(package.loaded["adapters.timer_scheduler"], predecessor_scheduler)
+			helpers.assert_eq(package.loaded["core.events.timer_scheduler"], predecessor_scheduler)
 			helpers.assert_eq(hs, predecessor_hs)
 			handle.timer:fire()
 			helpers.assert_eq(fired, 1, "the predecessor still owns its original callback")

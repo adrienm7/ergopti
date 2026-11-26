@@ -9,13 +9,13 @@
 --- This qualifies kernel virtual keyboards, never physical hardware or discovery.
 --- ==============================================================================
 
-local Input = require("infra.input_event")
-local Names = require("infra.device_names")
-local Finder = require("modules.hotstrings.device_finder")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
-local Hook = require("adapters.keyboard_hook")
+local Input = require("platform.input.event")
+local Names = require("platform.input.device_names")
+local Finder = require("hotstrings.engine.device_finder")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
+local Hook = require("platform.input.keyboard_hook")
 
 -- Match the existing uinput round-trip's node publication bound. This probe runs
 -- before the live daemon/tray host; its existing deadlines remain unchanged.
@@ -177,7 +177,7 @@ local function run()
 	-- The hook logs why it refuses to start and only answers false: keep its
 	-- errors so a hosted failure names the reason (run 41141808375 showed
 	-- this assertion alone).
-	local Shim = require("logger.shim")
+	local Shim = require("core.logger.engine.shim")
 	local shim_error, refusals = Shim.error, {}
 	Shim.error = function(tag, fmt, ...)
 		local formatted, text = pcall(string.format, fmt, ...)
@@ -210,7 +210,7 @@ local function run()
 	ack_observer = function(code, value)
 		if code == 30 and value == 1 and not fired then fired = true; original(a, 42, 0) end
 	end
-	local combo = require("modules.gestures.combo_emitter")
+	local combo = require("gestures.engine.combo_emitter")
 	check(combo.press_codes({ 42 }, { 30 }, "native queued original UP"), "Combo acknowledges real queued retirement")
 	ack_observer = nil
 	check(fired, "native synthetic DOWN ACK delivered the reentrant source callback")
@@ -227,7 +227,7 @@ local function run()
 	ack_observer = function(code, value)
 		if code == 45 and value == 1 and not fired then fired = true; original(a, 42, 0) end
 	end
-	local tx = require("modules.hotstrings.output_transaction").new(Writer)
+	local tx = require("hotstrings.engine.output_transaction").new(Writer)
 	assert(tx.neutralize({ 42 }), "native original suspension")
 	assert(tx.emit(45, 1)); assert(tx.emit(45, 0))
 	local result = tx.finish(); ack_observer = nil

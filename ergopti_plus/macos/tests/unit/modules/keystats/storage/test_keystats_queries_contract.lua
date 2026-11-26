@@ -9,5 +9,5 @@
 
 local helpers = require("tests.helpers")
 
-require("test.keystats_queries_contract").register(helpers,
+require("tests.lua.metrics.queries_contract").register(helpers,
 	helpers.shared("tests/corpus/keystats/write_query_vectors.json"))

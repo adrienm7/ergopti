@@ -9,7 +9,7 @@ a plain "^" and the circumflex dead key collided on one sequence inside a third
 dead key; and an action whose one-character id is not what it types was
 composed from its id. The expected sequences below are written by hand from the
 fixture, not taken from the converter, and the Lua converter replays the same
-vectors (_shared/lua/test/xkb_converter_contract.lua).
+vectors (_shared/tests/lua/layouts/xkb_converter_contract.lua).
 """
 
 from __future__ import annotations
@@ -44,13 +44,20 @@ EXPECTED_SEQUENCES = {
     ("infinity", "asciicircum"): "⃗",
     ("infinity", "dead_circumflex"): "→",
     ("infinity", "U26A0"): "⃕",
+    # A key with no composition in the state: macOS types the terminator,
+    # then what the key types (the plain "^" key, then a).
+    ("dead_circumflex", "asciicircum"): "^^",
+    ("dead_diaeresis", "a"): "¨a",
 }
-# The sequences the old converter wrote instead: nobody can type them.
-UNTYPABLE_SEQUENCES = {
-    ("dead_circumflex", "asciicircum"),
-    ("dead_circumflex", "diaeresis"),
-    ("dead_diaeresis", "diaeresis"),
-    ("infinity", "U262D"),
+# What the old converter wrote for a dead key pressed inside a dead state,
+# naming the character the key types instead of the keysym it sends. The plain
+# "^" key does send asciicircum, so that sequence now exists, but only with its
+# terminator fallback, never the chained output.
+OLD_CHAINED_SEQUENCES = {
+    ("dead_circumflex", "asciicircum"): "^",
+    ("dead_circumflex", "diaeresis"): "/",
+    ("dead_diaeresis", "diaeresis"): "¨",
+    ("infinity", "U262D"): "⃕",
 }
 
 
@@ -76,7 +83,10 @@ class ChainedDeadKeyTests(unittest.TestCase):
         cls.compose = parse_compose(cls.result.compose_text)
 
     def test_the_keys_send_the_keysyms_the_expectations_name(self):
-        names = {code: xkb for xkb, code in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso")}
+        names = {
+            code: xkb
+            for xkb, code, _optional in keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "iso")
+        }
         base = {code: self.result.key_symbols[names[code]][0] for code in (0, 2, 3, 4, 5, 8)}
         self.assertEqual(
             base,
@@ -95,8 +105,10 @@ class ChainedDeadKeyTests(unittest.TestCase):
             with self.subTest(sequence=sequence):
                 self.assertEqual(self.compose.get(sequence), output)
 
-    def test_no_sequence_names_a_keysym_no_key_sends(self):
-        self.assertEqual(UNTYPABLE_SEQUENCES & set(self.compose), set())
+    def test_no_chained_output_names_the_character_a_dead_key_types(self):
+        for sequence, chained in OLD_CHAINED_SEQUENCES.items():
+            with self.subTest(sequence=sequence):
+                self.assertNotEqual(self.compose.get(sequence), chained)
 
     def test_a_plain_key_and_a_dead_key_with_one_base_keysym_do_not_collide(self):
         self.assertEqual(self.result.conflicts, [])

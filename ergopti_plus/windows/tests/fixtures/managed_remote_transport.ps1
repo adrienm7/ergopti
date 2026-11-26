@@ -295,6 +295,14 @@ public class ErgoptiFixtureNetworkStream : NetworkStream {
     private int retired;
     public int DiscardedInputBytes { get; private set; }
     public ErgoptiFixtureNetworkStream(Socket socket):base(socket,true) { }
+    // Our FIN follows every byte already written; the peer can still send its close.
+    public void HalfClose() { Socket.Shutdown(SocketShutdown.Send); }
+    // -1 when nothing came within the budget, 0 at the peer's FIN or reset, else the queued byte count.
+    public int WaitPeer(int milliseconds) {
+        if (milliseconds<=0) return -1;
+        if (!Socket.Poll(checked(milliseconds*1000),SelectMode.SelectRead)) return -1;
+        return Socket.Available;
+    }
     protected override void Dispose(bool disposing) {
         if (System.Threading.Interlocked.Exchange(ref retired,1)!=0) return;
         Exception primary=null, cleanup=null;
@@ -756,7 +764,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
             throw;
         }
     }
-    public Stream Open(NetworkStream network, Func<bool> trustAdmitted)
+    public Stream Open(ErgoptiFixtureNetworkStream network, Func<bool> trustAdmitted)
     {
         lock (gate) {
             if (closed || context == IntPtr.Zero) throw new ObjectDisposedException("Owned native TLS fixture");
@@ -796,7 +804,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
     private sealed class NativeStream : Stream
     {
         public readonly ErgoptiFixtureOpenSsl Owner;
-        private readonly NetworkStream network;
+        private readonly ErgoptiFixtureNetworkStream network;
         private readonly Func<bool> trustAdmitted;
         private IntPtr ssl;
         private IntPtr input;
@@ -805,10 +813,21 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         private bool disposed;
         private bool authenticated;
         private int receivedEncrypted, writtenEncrypted;
-        public NativeStream(ErgoptiFixtureOpenSsl owner, NetworkStream network, Func<bool> trustAdmitted)
+        // Closing while the client's own TLS close is still in flight resets the
+        // connection (10054 at the client or its relay): after our close the
+        // stream half-closes and waits this long at most for the client's close.
+        // Loopback clients answer in milliseconds; the bound only ends the wait
+        // for a client that never closes.
+        private const int PeerCloseWaitMilliseconds = 2000;
+        private int peerCloseWaitMs;
+        // How the peer wait ended: received (before the wait), peer_close_notify,
+        // peer_closed (FIN or reset) or wait_expired; null when no TLS close ran.
+        private string peerClose;
+        public NativeStream(ErgoptiFixtureOpenSsl owner, ErgoptiFixtureNetworkStream network, Func<bool> trustAdmitted)
         {
             if (network == null || trustAdmitted == null) throw new ArgumentNullException();
             Owner = owner; this.network = network; this.trustAdmitted = trustAdmitted;
+            peerCloseWaitMs = PeerCloseWaitMilliseconds;
             bool attached = false;
             try {
                 ssl = owner.sslNew(owner.context);
@@ -927,6 +946,32 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                 }
             } finally { pin.Free(); }
         }
+        // Our close_notify is written: half-close, then admit the client's input
+        // until its close_notify, its FIN or the bound, whichever comes first.
+        // A TLS fault in that input stays an error; only the bound is waived.
+        private string AwaitPeerClose(ref int shutdownResult, ref int shutdownError)
+        {
+            if (peerCloseWaitMs <= 0 || peerCloseWaitMs > PeerCloseWaitMilliseconds)
+                throw new InvalidOperationException("Native TLS peer close wait budget refused.");
+            network.HalfClose();
+            System.Diagnostics.Stopwatch elapsed = System.Diagnostics.Stopwatch.StartNew();
+            for (int attempts=0; attempts<512; attempts++) {
+                int available = network.WaitPeer(peerCloseWaitMs - (int)Math.Min(elapsed.ElapsedMilliseconds, peerCloseWaitMs));
+                if (available < 0) return "wait_expired";
+                if (available == 0) return "peer_closed";
+                Receive();
+                Owner.clearError();
+                int result=Owner.shutdown(ssl);
+                int error=result<0 ? Owner.sslError(ssl,result) : 0;
+                shutdownResult=result; shutdownError=error;
+                if (result<0 && error!=2 && error!=3 && error!=6)
+                    throw new InvalidOperationException("Native TLS close notification refused.");
+                // Nothing is left to send after our alert; output here fails on the half-closed socket.
+                Drain();
+                if (result==1 || error==6) return "peer_close_notify";
+            }
+            throw new InvalidDataException("Native TLS peer close progress ceiling exceeded.");
+        }
         protected override void Dispose(bool disposing)
         {
             if (disposed) return;
@@ -957,6 +1002,8 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                                 settled=true; break;
                             }
                             if (!settled) throw new InvalidDataException("Native TLS shutdown progress ceiling exceeded.");
+                            peerClose = shutdownResult==1 || shutdownError==6 ? "received"
+                                : AwaitPeerClose(ref shutdownResult, ref shutdownError);
                         } finally {
                             closeWritten=writtenEncrypted==Int32.MaxValue ? -1 : writtenEncrypted-priorWritten;
                         }

@@ -8,10 +8,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Manifest = require("infra.manifest_reader")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Manifest = require("menu.engine.manifest_reader")
 local SOURCE = '[shortcuts]\nchatgpt_url = "https://old.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 
 --- Runs a real canonical reader/writer over an exclusive temporary file.
@@ -24,12 +24,12 @@ local function with_subject(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local controls = { commands = {}, legacy_writes = 0, legacy_url = "https://legacy.example" }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return controls.legacy_url or default end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) controls.commands[#controls.commands + 1] = command; return true end,
@@ -89,11 +89,24 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 
 	helpers.it("refuses invalid setter values without changing the configuration", function()
 		with_subject(SOURCE, function(subject, controls, path)
-			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url" }) do
+			-- The last one passes the declared 2048 characters.
+			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+				"https://example.invalid/" .. string.rep("a", 2048) }) do
 				helpers.assert_eq(subject.set_url(value), false)
 			end
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 			helpers.assert_eq(controls.legacy_writes, 0)
+		end)
+	end)
+
+	helpers.it("rejects a NUL-bearing URL before it reaches a shell command", function()
+		with_subject('[shortcuts]\nchatgpt_url = "https://example.invalid/\\u0000tail"\n', function(subject, controls)
+			helpers.assert_eq(subject.get_url(), subject.DEFAULT_URL)
+			helpers.assert_eq(subject.is_valid("https://example.invalid/" .. string.char(0) .. "tail"), false)
+			helpers.assert_eq(subject.set_url("https://example.invalid/" .. string.char(0) .. "tail"), false)
+			helpers.assert_true(subject.open())
+			helpers.assert_eq(#controls.commands, 1)
+			helpers.assert_eq(controls.commands[1]:find(string.char(0), 1, true), nil)
 		end)
 	end)
 
@@ -145,8 +158,8 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 
 	helpers.it("retains the consumed URL during actual unused-key detection", function()
 		with_subject(SOURCE, function(_, _, path)
-			package.loaded["ui.menu.unused_keys_cleanup"] = nil
-			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			package.loaded["settings.ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("settings.ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			local found = {}
 			for _, entry in ipairs(scan.keys) do found[table.concat(entry.path, ".")] = true end

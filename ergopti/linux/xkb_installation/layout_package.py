@@ -915,3 +915,216 @@ def remove_generation_two_links(system_root: Path) -> int:
         except OSError:
             continue
     return removed
+
+
+# ---------------------------------------------------------------------------
+# Owned ~/.XCompose block
+# ---------------------------------------------------------------------------
+
+# GTK 3's built-in input method (gtk-im-context-simple, used wherever IBus is
+# not) reads only the rules written in ~/.XCompose itself and ignores an
+# ``include`` of another file, while libX11 and Qt read includes. Its table
+# also overflows on a large set of multi-character outputs (Bépo's 21,742
+# abort GTK 3 applications with "buffer overflow detected"). The owned block
+# therefore includes each layout file, as libX11 and Qt need, then repeats its
+# single-character rules inline for GTK 3; multi-character outputs stay
+# libX11's and Qt's (IBus and GTK 4 read includes). The repeated rules are the
+# included file's own, in its order, so libX11 and Qt end in the same state.
+LOCALE_INCLUDE = 'include "%L"'
+_COMPOSE_VALUE = re.compile(r':\s*"((?:[^"\\]|\\.)*)"')
+
+
+def compose_include_line(path: Path) -> str:
+    """An XCompose include of one file."""
+    escaped = str(path).replace("\\", "\\\\").replace('"', '\\"')
+    return f'include "{escaped}"'
+
+
+def single_character_rules(text: str) -> list[str]:
+    """The rules of one XCompose file whose output is one character."""
+    rules = []
+    for line in text.splitlines():
+        match = _COMPOSE_VALUE.search(line)
+        if match and len(re.sub(r"\\(.)", r"\1", match.group(1))) == 1:
+            rules.append(line)
+    return rules
+
+
+def xcompose_end_marker(marker: str) -> str:
+    """The line closing an owned block opened by ``marker`` ("# X" -> "# End of X")."""
+    return "# End of " + marker.lstrip("# ")
+
+
+def inline_xcompose_block(marker: str, composes: list[tuple[Path, str]]) -> list[str]:
+    """The owned block: the marker, the locale include, then per layout file its
+    include and its single-character rules, then the end marker.
+
+    ``composes`` holds each layout's generated XCompose path and text.
+    """
+    if not composes:
+        return []
+    lines = [marker, LOCALE_INCLUDE]
+    for path, text in composes:
+        lines.append(compose_include_line(path))
+        lines.extend(single_character_rules(text))
+    lines.append(xcompose_end_marker(marker))
+    return lines
+
+
+def strip_xcompose_block(content: str, marker: str) -> tuple[list[str], bool]:
+    """Removes the owned block, never adjacent user lines.
+
+    A block that has an end marker runs to it; one written before the rules
+    were inlined is the marker and the include lines right after it.
+    """
+    lines = content.splitlines()
+    end = xcompose_end_marker(marker)
+    kept: list[str] = []
+    removed = False
+    index = 0
+    while index < len(lines):
+        if lines[index].strip() != marker:
+            kept.append(lines[index])
+            index += 1
+            continue
+        removed = True
+        closing = next(
+            (
+                position
+                for position in range(index + 1, len(lines))
+                if lines[position].strip() == end
+            ),
+            None,
+        )
+        if closing is not None:
+            index = closing + 1
+            continue
+        index += 1
+        while index < len(lines) and lines[index].lstrip().startswith('include "'):
+            index += 1
+    return kept, removed
+
+
+# ---------------------------------------------------------------------------
+# Compose input method for GTK 3
+# ---------------------------------------------------------------------------
+
+# The inlined single-character rules above are all GTK 3's built-in input
+# method can compose; IBus reads the whole ~/.XCompose, includes and
+# multi-character outputs too. When the session runs no input method at all,
+# the user installer therefore points GTK at IBus (GTK_IM_MODULE through
+# systemd's environment.d, read at the next login) and starts its daemon with
+# the session, keeping the system layout. An active input method is never
+# replaced: fcitx5 or any other is left alone and an Ergopti IBus setting
+# already written is withdrawn. Decided by the agent on 2026-11-13, to review
+# by the maintainer: GTK_IM_MODULE only (Qt and libX11 read the includes),
+# and only from the user installer, which runs inside the session; the site's
+# system installer runs as root and cannot see the session's input method.
+IM_ENVIRONMENT_FILE = Path("environment.d") / "90-ergopti-ibus.conf"
+IM_AUTOSTART_FILE = Path("autostart") / "ergopti-ibus.desktop"
+IM_OWNER_MARKER = "# Ergopti: IBus for Compose, written while no input method was active"
+IM_ENVIRONMENT_TEXT = IM_OWNER_MARKER + "\nGTK_IM_MODULE=ibus\n"
+IM_AUTOSTART_TEXT = (
+    "[Desktop Entry]\n"
+    + IM_OWNER_MARKER
+    + "\nType=Application\nName=IBus (Ergopti Compose)\nNoDisplay=true\n"
+    # IBus keeps the system layout rather than imposing its engine's own.
+    + "Exec=sh -c 'gsettings set org.freedesktop.ibus.general use-system-keyboard-layout true;"
+    + " exec ibus-daemon --daemonize'\n"
+)
+# Process names (as /proc/<pid>/comm spells them) of input methods other than IBus.
+OTHER_INPUT_METHODS = ("fcitx5", "fcitx", "uim-xim", "kime", "nimf", "scim", "hime", "gcin")
+# GTK_IM_MODULE values that are GTK's own built-in method, not an input method.
+GTK_BUILTIN_MODULES = ("", "simple", "gtk-im-context-simple")
+
+# The states publish_compose_input_method reports.
+IM_STATE_NONE = "none"
+IM_STATE_IBUS_ACTIVE = "ibus_active"
+IM_STATE_IBUS_ENABLED = "ibus_enabled"
+IM_STATE_OTHER_ACTIVE = "other_active"
+IM_STATE_NO_IBUS = "no_ibus"
+
+
+def running_process_names(proc: Path = Path("/proc")) -> set[str]:
+    """The command names of the processes this user can see."""
+    names = set()
+    for entry in proc.iterdir() if proc.is_dir() else ():
+        if not entry.name.isdigit():
+            continue
+        try:
+            names.add((entry / "comm").read_text(encoding="utf-8").strip())
+        except OSError:
+            continue
+    return names
+
+
+def session_input_method(environ: dict[str, str], running: set[str]) -> str | None:
+    """The input method the session runs: "ibus", another one's name, or None.
+
+    Another input method wins over IBus: a session showing both is one where
+    the user chose the other, and Ergopti must not compete with it.
+    """
+    module = environ.get("GTK_IM_MODULE", "").strip().lower()
+    xmodifiers = environ.get("XMODIFIERS", "").strip().lower()
+    xim = xmodifiers[len("@im=") :] if xmodifiers.startswith("@im=") else ""
+    for name in OTHER_INPUT_METHODS:
+        if name in running:
+            return name
+    for value in (module, xim):
+        if value and value not in GTK_BUILTIN_MODULES and value not in ("ibus", "none"):
+            return value
+    desktops = environ.get("XDG_CURRENT_DESKTOP", "").lower().split(":")
+    # GNOME Shell runs IBus itself and routes every toolkit's input through it.
+    if module == "ibus" or xim == "ibus" or "ibus-daemon" in running or "gnome" in desktops:
+        return "ibus"
+    return None
+
+
+def _owned(path: Path) -> bool:
+    try:
+        return IM_OWNER_MARKER in path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
+def publish_compose_input_method(
+    config_home: Path,
+    wanted: bool,
+    environ: dict[str, str],
+    running: set[str],
+    ibus_daemon: str | None,
+    write: Callable[[Path, str], None],
+) -> str:
+    """Writes or withdraws the Ergopti IBus setting and says which state holds.
+
+    ``wanted`` is whether a managed Compose block exists; ``ibus_daemon`` the
+    path of ibus-daemon, None when IBus is not installed. A file of the same
+    name the user wrote (no owner marker) is never touched.
+    """
+    paths = (config_home / IM_ENVIRONMENT_FILE, config_home / IM_AUTOSTART_FILE)
+    ours = [path for path in paths if path.exists() and _owned(path)]
+
+    def withdraw() -> None:
+        for path in ours:
+            path.unlink()
+
+    if not wanted:
+        withdraw()
+        return IM_STATE_NONE
+    active = session_input_method(environ, running)
+    if active is not None and active != "ibus":
+        withdraw()
+        return IM_STATE_OTHER_ACTIVE
+    if len(ours) == len(paths):
+        return IM_STATE_IBUS_ENABLED
+    if active == "ibus":
+        return IM_STATE_IBUS_ACTIVE
+    if ibus_daemon is None:
+        withdraw()
+        return IM_STATE_NO_IBUS
+    for path, text in zip(paths, (IM_ENVIRONMENT_TEXT, IM_AUTOSTART_TEXT)):
+        if path.exists() and not _owned(path):
+            raise OSError(f"{path} exists and was not written by Ergopti")
+    for path, text in zip(paths, (IM_ENVIRONMENT_TEXT, IM_AUTOSTART_TEXT)):
+        write(path, text)
+    return IM_STATE_IBUS_ENABLED

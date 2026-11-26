@@ -75,14 +75,7 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; The physical magic key as the boot resolves it (feature_state.ahk and
-    ; LayoutRegistry_MagicKeySource): automatic, not chosen, on the shipped key.
-    "MagicKeySource", "auto",
-    "MagicKeySourceScan", "SC02E",
-    "MagicKeySourceChar", "j",
-    "MagicKeySourceChosen", false,
-    "MagicKeySourceFollowsOsLayout", false,
-    "MagicKeySourceOverridesEmulation", false,
+    "MagicKeyDefault", "★",
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",
@@ -97,7 +90,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; Features directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
-; any new feature added to static/ergopti_plus/_shared/modules/features/manifest.toml
+; any new feature added to static/ergopti_plus/_shared/settings/data/features/manifest.toml
 ; so existing tests don't break when a new HotIf reads Features["…"].
 global Features := Map(
     "layout", Map(
@@ -121,7 +114,7 @@ global Features := Map(
         ),
         "take_note", Map(
             "dated_notes",        false,
-            "destination_folder", "D:\\Bureau",
+            "destination_folder", "",
         ),
         ; Letter pickers (phase 11) — accented base-layer keys, configurable
         ; target latin letter consumed by ErgoptiBaseMapping.
@@ -129,6 +122,7 @@ global Features := Map(
         "e_circ",   Map("enabled", true, "letter", "x"),
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
+        "star",     Map("enabled", false, "letter", "s"),
         ; The number-row tap keys: an action id per key, "none" when unassigned.
         "tap_keys", Map(
             "number_row_left",    "screen_capture",
@@ -136,10 +130,10 @@ global Features := Map(
             "number_row_right_2", "none",
         ),
     ),
-    ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
+    ; hotstrings/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
-    ; (time_activation_seconds, pattern_max_length) from the manifest, but
+    ; (time_activation_seconds) from the manifest, but
     ; tests don't exercise those — the "enabled" key alone is enough to
     ; satisfy the migrated `if Features["hotstrings"][...][...]["enabled"]`
     ; gates without crashing.
@@ -168,8 +162,6 @@ global Features := Map(
             "ez",                       Map("enabled", true),
             "ct",                       Map("enabled", true),
             "close_chevron_tag",        Map("enabled", true),
-            "chevron_less",             Map("enabled", true),
-            "chevron_greater",          Map("enabled", true),
             "chevron_equal",            Map("enabled", true),
             "comment_open",             Map("enabled", true),
             "comment_close",            Map("enabled", true),
@@ -201,7 +193,6 @@ global Features := Map(
             "multiple_punctuation_marks", Map("enabled", true),
         ),
         "magic_key", Map(
-            "replace",                      Map("enabled", true),
             "repeat_corrections",           Map("enabled", true),
             "text_expansion",               Map("enabled", true),
             "text_expansion_auto",          Map("enabled", true),
@@ -216,19 +207,19 @@ global Features := Map(
             "iban_prefixes",                     Map("enabled", true),
             "phone_prefixes",                    Map("enabled", true),
             "ssn_prefixes",                      Map("enabled", true),
-            "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
+            "text_expansion_personal_information", Map("enabled", true),
         ),
         ; Personal sub-Map — in production this is populated from the user's
         ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures
         ; + the reverse mirror); tests pre-seed a representative shape so the
-        ; v2 read sites in modules/hotstrings.ahk and
-        ; ui/personal_toml_editor.ahk find a configured Map.
+        ; v2 read sites in hotstrings/hotstrings.ahk and
+        ; hotstrings/ui/personal_toml_editor.ahk find a configured Map.
         "personal", Map(
             "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
         ),
     ),
-    ; ui/tray_menu.ahk's LLM tray populator now reads from this
+    ; menu/ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the
     ; legacy _LlmSavedOpts shape that LLM_Menu_Init expects. Manifest
     ; defaults match production; tests don't fire the LLM menu but the
@@ -307,10 +298,10 @@ global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 
 ; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
-; infra/i18n.ahk to build the path to the locale JSON files. Without this stub,
+; core/i18n/engine/i18n.ahk to build the path to the locale JSON files. Without this stub,
 ; the very first t() call (e.g. from modules/gestures.ahk's top-level
 ; GESTURE_SLOT_LABELS builder) raised "global variable has not been assigned a
-; value" inside infra/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
+; value" inside core/i18n/engine/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
 ; error as a MsgBox under default settings — invisible but blocking on the
 ; headless CI runner, which is the root cause of the recurring "5-minute
 ; timeout" failures of the AHK test suite.
@@ -336,8 +327,8 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
-; Mirrors the pruning thresholds of infra/boot.ahk: AppState_TouchLastSentKey
-; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
+; Mirrors the pruning thresholds of core/lifecycle/engine/boot.ahk: AppState_TouchLastSentKey
+; (hotstrings/engine/matcher/send.ahk) reads them on every timestamp write.
 global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 global RemappedList := Map()
@@ -381,6 +372,13 @@ global _OB_ALTGR_PASSTHROUGH := false
 IsOnboardingActive() {
 	global _OB_ALTGR_PASSTHROUGH
 	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
+}
+; The Configuration menu binds the wizard's menu entry by name; a test that
+; builds that menu records a click instead of opening the wizard.
+global _Stub_OnboardingMenuOpens := 0
+Onboarding_ShowFromMenu(*) {
+	global _Stub_OnboardingMenuOpens
+	_Stub_OnboardingMenuOpens += 1
 }
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
@@ -471,7 +469,7 @@ ToggleSuspend() {
     _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
-; The pause-preserving reload. The real one lives in infra/lifecycle.ahk, which
+; The pause-preserving reload. The real one lives in core/lifecycle/engine/lifecycle.ahk, which
 ; this runner cannot include: it defines ToggleSuspend, colliding with the stub
 ; above, and loading the genuine article would let a test actually Suspend(1) the
 ; runner and arm its watchdog timers. Stubbed rather than IsSet-guarded at the
@@ -609,7 +607,7 @@ SimulateMicrosoftOffice() {
 ; =============================================
 ; =============================================
 
-; Replaces the injectable send primitives from adapters/text_sender.ahk with
+; Replaces the injectable send primitives from platform/input/text_sender.ahk with
 ; no-ops so no real keystroke ever reaches the OS while tests are running.
 ; This mirrors the _SendHook pattern used for hotstring engine tests.
 ; _AHK_SendText and _AHK_SendInput are declared as globals in text_sender.ahk
@@ -619,13 +617,30 @@ SimulateMicrosoftOffice() {
 ; dedicated function called from run_all.ahk's body).
 global _AHK_SendText  := (Text) => 0   ; no-op — never reaches SendText()
 global _AHK_SendInput := (Keys) => 0   ; no-op — never reaches SendInput()
+global _AHK_SendEvent := (Keys) => 0   ; no-op — never reaches SendEvent()
+global _AHK_InputHookFactory := (Options) => _NoOpInputHook()
+
+; Stands in for the InputHook an expansion burst holds the user's keys with: a
+; real one would take the keys typed on the desktop while a test dispatches.
+class _NoOpInputHook {
+    Input := ""
+    InProgress := false
+    EndReason := ""
+    EndKey := ""
+    EndMods := ""
+    KeyOpt(Keys, KeyOptions) => 0
+    Start() => 0
+    Stop() => 0
+}
 
 ; InstallSendNoOps must be called AFTER #Include text_sender.ahk in run_all.ahk
-; to win the last-assignment race and lock both globals to no-ops.
+; to win the last-assignment race and lock every primitive to a no-op.
 InstallSendNoOps() {
-    global _AHK_SendText, _AHK_SendInput
+    global _AHK_SendText, _AHK_SendInput, _AHK_SendEvent, _AHK_InputHookFactory
     _AHK_SendText  := (Text) => 0
     _AHK_SendInput := (Keys) => 0
+    _AHK_SendEvent := (Keys) => 0
+    _AHK_InputHookFactory := (Options) => _NoOpInputHook()
 }
 
 
@@ -637,8 +652,8 @@ InstallSendNoOps() {
 ; ====================================================================
 ; =====================================================================
 
-; These functions are called by modules/llm/prediction_engine.ahk at
-; runtime. In production they live in ui/tooltip/tooltip_llm.ahk and
+; These functions are called by ai/engine/prediction/engine.ahk at
+; runtime. In production they live in core/ui/ui/tooltip/tooltip_llm.ahk and
 ; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
 ; below record calls so individual tests can assert on them.
@@ -861,6 +876,7 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
 global _Stub_AppendLogRows := []      ; recorded KL_AppendLog entries (Map each)
 global _Stub_RoiHotstringCalls := []  ; recorded KL_Roi_OnHotstring calls
 global _Stub_WpmPushCalls := []       ; recorded WPMWidget_Push calls
+global _Stub_WpmRetractCalls := []    ; recorded WPMWidget_Retract calls
 global _Stub_FlushBufferCalls := 0    ; how many times the typing buffer was flushed
 global _Stub_AppendLogAccept := true
 global _Stub_AppendLogRejectSuspend := false
@@ -918,10 +934,17 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
         is_private: is_private ? true : false })
 }
 
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "", NowTick := unset) {
     global _Stub_WpmPushCalls
     _Stub_WpmPushCalls.Push({ is_hs: is_hs, is_ai: is_ai, is_ac: is_ac,
         category: category, section: section })
+}
+
+; Records the count and how many samples preceded it, so a test can read that a
+; producer took back what it erased before its output (MET-17).
+WPMWidget_Retract(Count, NowTick := unset) {
+    global _Stub_WpmPushCalls, _Stub_WpmRetractCalls
+    _Stub_WpmRetractCalls.Push({ count: Count, pushes_before: _Stub_WpmPushCalls.Length })
 }
 
 class Keystats {
@@ -937,6 +960,9 @@ class Keystats {
     ; "text" and "events" — KL_FlushBuffer snapshots them into the entry without
     ; transforming either — so a test that drives the real KL_Hook_OnChar can
     ; read back exactly what would reach today.log.
+	static scalar_fragment := false
+	static scalar_history := false
+	static scalar_epoch := 1
     static buffer_events  := []
     static buffer_text    := ""
     static rich_chunks    := []
@@ -968,9 +994,17 @@ class Keystats {
     ; Mirrors the production terminal lease read by KL_LogHotstring. Tests leave
     ; it false unless they explicitly exercise shutdown-owned publication.
     static _shutting_down := false
+    ; Production declares the resident store too (KL_ResolvePaths writes it);
+    ; KLPF_CaptureForegroundProjection reads it. A test that sets it and then
+    ; deletes the property it believes it created must leave the declared
+    ; field, not a class without one, for every later build.
+    static metrics_dir    := ""
     static by_device_dir  := ""
     static data_sql_path  := ""
 	static today_log_path   := ""
+    ; Production's journal bookmark: KLPF_CaptureForegroundProjection and
+    ; KLPF_ForegroundProjectionCurrent read it once the resident store matches.
+    static today_log_offset := 0
     ; Read by KL_LogHotstring (modules/keystats/keystats_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
@@ -982,6 +1016,8 @@ class Keystats {
 ; can verify the refcounting behaviour.
 KL_MarkSynthetic(source, is_private := false) {
     Owner := Map("source", source, "private", is_private ? true : false)
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.Push(Owner)
     Keystats.synth_active := Keystats.synth_owners.Length
     Keystats.synth_type := source
@@ -1005,6 +1041,8 @@ KL_ClearSynthetic(Owner, *) {
     }
     if !OwnerIndex
         return false
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.RemoveAt(OwnerIndex)
     Keystats.synth_active := Keystats.synth_owners.Length
     if Keystats.synth_active {
@@ -1030,4 +1068,46 @@ _Stub_CurlResolveProxyDirect(State, Url, Callback) {
 	State["proxy_resolutions"] := State.Get("proxy_resolutions", 0) + 1
 	Callback.Call(Map("ok", true, "inherit", false, "proxy", ""))
 	return true
+}
+
+
+; Private RAM verdict for pure bridge fixtures. No focus hook or native probe is installed.
+_LLM_TestPrivacyEnter(Focus) {
+ global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS, _LLM_Bridge_ReadLiveFocus
+ global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_BufferAgentSafe
+ global _LLM_Bridge_AgentContentGeneration, _LLM_Bridge_PrivacyAppCache
+ global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+ AssertEqual(0, SFD_FIELD_CACHE["focus_hook"], "A pure privacy fixture cannot borrow a native WinEvent hook")
+ AssertEqual(0, SFD_FIELD_CACHE["focus_callback"], "A pure privacy fixture cannot borrow a native callback")
+ AssertEqual(0, SFD_FIELD_CACHE["pending_hwnd"], "A pure privacy fixture cannot borrow a pending UIA owner")
+ Saved := {Buffer: _LLM_Bridge_Buffer, Content: _LLM_Bridge_ContentGeneration,
+  AgentBuffer: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding, Cache: SFD_FIELD_CACHE, Ttl: SFD_FIELD_CACHE_TTL_MS, Focus: _LLM_Bridge_ReadLiveFocus,
+  BufferSource: _LLM_Bridge_BufferSource, AgentSource: _LLM_Bridge_AgentBufferSource,
+  AgentSafe: _LLM_Bridge_BufferAgentSafe, AgentGeneration: _LLM_Bridge_AgentContentGeneration,
+  AppCache: _LLM_Bridge_PrivacyAppCache}
+ SFD_FIELD_CACHE := SFD_FIELD_CACHE.Clone()
+ SFD_FIELD_CACHE["hwnd"] := Focus["control"], SFD_FIELD_CACHE["secure"] := false
+ SFD_FIELD_CACHE["focus_generation"] := 47, SFD_FIELD_CACHE["verdict_generation"] := 47
+ SFD_FIELD_CACHE["current_element_id"] := "fixture:bridge-field", SFD_FIELD_CACHE["element_id"] := "fixture:bridge-field"
+ SFD_FIELD_CACHE["focus_tracking_active"] := true, SFD_FIELD_CACHE["at"] := A_TickCount
+ SFD_FIELD_CACHE["focus_hook"] := 0, SFD_FIELD_CACHE["focus_callback"] := 0
+ SFD_FIELD_CACHE_TTL_MS := 600000
+ _LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
+ _LLM_Bridge_BufferSource := 0, _LLM_Bridge_AgentBufferSource := 0
+ _LLM_Bridge_BufferAgentSafe := true
+ _LLM_Bridge_PrivacyAppCache := Map("hwnd", Focus["hwnd"], "control", Focus["control"],
+  "focus_generation", 47, "at", A_TickCount, "app", "fixture-typing.exe")
+ return Saved
+}
+_LLM_TestPrivacyExit(Saved) {
+ global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS, _LLM_Bridge_ReadLiveFocus
+ global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_BufferAgentSafe
+ global _LLM_Bridge_AgentContentGeneration, _LLM_Bridge_PrivacyAppCache
+ global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
+ SFD_FIELD_CACHE := Saved.Cache, SFD_FIELD_CACHE_TTL_MS := Saved.Ttl, _LLM_Bridge_ReadLiveFocus := Saved.Focus
+ _LLM_Bridge_BufferSource := Saved.BufferSource, _LLM_Bridge_AgentBufferSource := Saved.AgentSource
+ _LLM_Bridge_BufferAgentSafe := Saved.AgentSafe, _LLM_Bridge_AgentContentGeneration := Saved.AgentGeneration
+ _LLM_Bridge_PrivacyAppCache := Saved.AppCache
+ _LLM_Bridge_Buffer := Saved.Buffer, _LLM_Bridge_ContentGeneration := Saved.Content
+ _LLM_Bridge_AgentBuffer := Saved.AgentBuffer, _LLM_Bridge_AgentFeeding := Saved.Feeding
 }

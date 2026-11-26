@@ -14,7 +14,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. One file format: the reader takes the line-oriented TOML subset every
- *    loader reads (_shared/keymap/layer_actions.toml, "File format") and
+ *    loader reads (_shared/layouts/data/layer_actions.toml, "File format") and
  *    refuses what they refuse as toml_invalid; the writer writes only that
  *    subset.
  * 2. An edit made on one OS never changes what another OS does: a binding is
@@ -68,13 +68,14 @@ var LayerModel = (function () {
 		'# Each [layers.<layer>.<section>] table binds physical keys, named by their',
 		'# W3C KeyboardEvent.code, while the layer is held. `all` applies on every',
 		'# system; a `windows`, `macos` or `linux` entry replaces it on that system.',
-		'# The values are the actions of _shared/keymap/layer_actions.toml.'
+		'# The values are the actions of _shared/layouts/data/layer_actions.toml.'
 	];
 
 	// The keys that type no character, by the locale key of their short name
 	// (layer_editor.key.<name>). A key the registry marks `character` is not
 	// here: it types what the active layout puts on it, and its legend comes
-	// from the host (script.js init), never from this file.
+	// from the host (script.js init), never from this file; the JIS input-method
+	// keys are the exception, named when the layout types nothing on them.
 	const NAMED_KEYS = {
 		Escape: 'escape',
 		Backspace: 'backspace',
@@ -96,7 +97,12 @@ var LayerModel = (function () {
 		PageUp: 'page_up',
 		PageDown: 'page_down',
 		NumLock: 'num_lock',
-		NumpadEnter: 'enter'
+		NumpadEnter: 'enter',
+		// The JIS input-method keys: sent by scan code, so registry character keys,
+		// but named on their keycap when the layout types nothing on them.
+		NonConvert: 'non_convert',
+		Convert: 'convert',
+		KanaMode: 'kana_mode'
 	};
 
 	// Named keys every keyboard prints the same symbol on, in any language.
@@ -609,7 +615,8 @@ var LayerModel = (function () {
 		const entry = keyEntry(code, view.data);
 		if (entry && entry.character === true) {
 			const legend = view.legends && view.legends[code];
-			return typeof legend === 'string' && legend !== '' ? legend : code;
+			if (typeof legend === 'string' && legend !== '') return legend;
+			if (!hasOwn(NAMED_KEYS, code)) return code;
 		}
 		const own = OS_KEY_GLYPHS[view.os] || {};
 		if (hasOwn(own, code)) return own[code];

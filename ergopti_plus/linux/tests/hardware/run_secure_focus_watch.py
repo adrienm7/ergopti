@@ -3,7 +3,8 @@
 
 """Exercise the real resident privacy owner against owned GTK/AT-SPI controls.
 
-Requires Xvfb, a session bus, openbox, LuaJIT/luv and Python GTK3 bindings.
+Requires Xvfb, a session bus, openbox, xdotool, xprop, LuaJIT/luv and Python GTK3
+bindings.
 No /dev/uinput or physical keyboard is needed. DUMMY enters the original logical
 input callback seam; no claim of native text injection is made. Exit 2 means an
 explicit missing prerequisite, and every regression or cleanup failure exits 1.
@@ -22,6 +23,8 @@ import subprocess
 import sys
 import tempfile
 import time
+
+import x11_window_manager as WindowManager
 
 
 DRIVER = Path(__file__).resolve().parents[2]
@@ -149,7 +152,16 @@ def session(root):
             return process
 
         try:
+            # The window is mapped only once openbox announces it can activate
+            # windows, and activated only once openbox manages it: started
+            # together, the window could map first and openbox then refused
+            # _NET_ACTIVE_WINDOW (desktop-webview job 133797159970).
+            display = stack.enter_context(contextlib.closing(WindowManager.Display()))
+            assert not WindowManager.ready(display), (
+                "a window manager owned the private X server early"
+            )
             launch(["openbox"], "openbox")
+            WindowManager.wait_until_ready(display)
             app = launch(
                 [os.environ["ERGOPTI_ATSPI_GTK_PYTHON"], __file__, "--gtk", str(root)], "gtk"
             )
@@ -166,8 +178,10 @@ def session(root):
                 assert app.poll() is None, "owned GTK fixture exited before mapping"
                 assert time.monotonic() < deadline, "owned GTK fixture did not map"
                 time.sleep(0.02)
+            window = mapped.stdout.splitlines()[0]
+            WindowManager.wait_until_managed(display, int(window))
             subprocess.run(
-                ["xdotool", "windowactivate", "--sync", mapped.stdout.splitlines()[0]],
+                ["xdotool", "windowactivate", "--sync", window],
                 check=True,
                 timeout=5,
             )
@@ -203,7 +217,7 @@ def session(root):
                     if (
                         len(parts) == 3
                         and parts[1] == str(worker.pid)
-                        and "/adapters/atspi_focus_watch_worker.lua " in parts[2]
+                        and "/platform/focus/atspi_focus_watch_worker.lua " in parts[2]
                     ):
                         endpoints = [
                             Path(argument)
@@ -303,10 +317,10 @@ def session(root):
                         "source_sha256": {
                             name: hashlib.sha256((DRIVER / name).read_bytes()).hexdigest()
                             for name in (
-                                "adapters/atspi_focus.lua",
-                                "adapters/atspi_focus_watch.lua",
-                                "adapters/atspi_focus_watch_worker.lua",
-                                "adapters/secure_field_detector.lua",
+                                "platform/focus/atspi_focus.lua",
+                                "platform/focus/atspi_focus_watch.lua",
+                                "platform/focus/atspi_focus_watch_worker.lua",
+                                "platform/focus/secure_field_detector.lua",
                                 "modules/keystats/focus_guard.lua",
                             )
                         },
@@ -419,7 +433,7 @@ def main():
         if os.getenv(name):
             print("ENVIRONMENT: unset " + name + " to load the original modules", file=sys.stderr)
             return 2
-    for name in ("Xvfb", "dbus-run-session", "openbox", "xdotool", "luajit", "ps"):
+    for name in ("Xvfb", "dbus-run-session", "openbox", "xdotool", "xprop", "luajit", "ps"):
         if shutil.which(name) is None:
             print("ENVIRONMENT: required executable missing: " + name, file=sys.stderr)
             return 2

@@ -10,10 +10,28 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["hotstrings.engine.expander.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 
+
+helpers.describe("text transform destination boundary", function()
+	helpers.it("revokes an issued destination receipt instead of always allowing", function()
+		local boundary = Destination.install()
+		local continuation = require("modules.shortcuts.actions.text_continuation")
+		local receipt = continuation.capture_destination()
+		helpers.assert_not_nil(receipt)
+		helpers.assert_eq(receipt.cached(), true)
+		helpers.assert_eq(receipt.current(), true)
+		boundary.revoke()
+		helpers.assert_eq(receipt.cached(), false)
+		helpers.assert_eq(receipt.current(), false)
+		helpers.assert_nil(continuation.capture_destination())
+	end)
+end)
 
 helpers.describe("text transform: reselection is one synthetic transaction", function()
 	helpers.it("batches every cursor key behind one broker handoff", function()
+		Destination.install()
 		package.loaded["tests.stubs.hs"] = nil
 		local hs_stub = require("tests.stubs.hs")
 		hs_stub.__reset()
@@ -24,6 +42,7 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			getContents = function() return selected end,
 			setContents = function() change_count = change_count + 1; return true end,
 			clearContents = function() change_count = change_count + 1 end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function()
 				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
 			end,
@@ -87,11 +106,11 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			return true
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = nil
-		package.loaded["infra.timings"] = nil
-		package.loaded["adapters.synthetic_input"] = synthetic
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
+		package.loaded["platform.input.synthetic_input"] = synthetic
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"] = nil
 		local actions = require("modules.shortcuts.actions.text")
 
@@ -125,3 +144,5 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		end
 	end)
 end)
+
+package.loaded["hotstrings.engine.expander.utils"] = previous_destination

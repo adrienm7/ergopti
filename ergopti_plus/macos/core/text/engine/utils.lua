@@ -1,0 +1,10 @@
+--- core/text/engine/utils.lua
+
+--- ==============================================================================
+--- MODULE: Text Utilities (Hammerspoon re-export)
+--- DESCRIPTION:
+--- Hammerspoon-local re-export of the shared text utilities. Delegates entirely
+--- to _shared/core/text/engine and adds no HS-specific extensions currently.
+--- ==============================================================================
+
+return require("core.text.engine.utils_core")

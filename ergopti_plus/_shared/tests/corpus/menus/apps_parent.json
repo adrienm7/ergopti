@@ -6,14 +6,13 @@
 		"id": "apps",
 		"i18n": "menu.apps.title",
 		"rows": [],
-		"greyed_when_paused": true,
-		"platforms": ["hs"],
-		"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
+		"boot_deferred": true,
+		"platforms": ["ahk", "hs", "linux"]
 	},
 	"platform_presence": {
 		"hs": true,
-		"ahk": false,
-		"linux": false
+		"ahk": true,
+		"linux": true
 	},
 	"captions": {
 		"ar": "🛠️ التطبيقات",

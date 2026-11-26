@@ -9,6 +9,9 @@
 
 local M = {}
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local uv = require("luv")
 
 --- Opens one isolated original configuration stack.
@@ -20,8 +23,8 @@ function M.with_configuration(body)
 	local xdg_keys = { "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "XDG_STATE_HOME" }
 	local environment = {}
 	for _, key in ipairs(xdg_keys) do environment[key] = { value = uv.os_getenv(key) } end
-	local parent_paths = helpers.load_module("infra.config_paths")
-	local parent_bootstrap = parent_paths.config_home() .. "/ergopti_plus/storage.json"
+	local parent_paths = helpers.load_module("settings.engine.paths")
+	local parent_bootstrap = parent_paths.config_home() .. "/" .. FOLDER .. "/storage.json"
 	local function bootstrap_snapshot()
 		local info, detail, code = uv.fs_lstat(parent_bootstrap)
 		if not info then assert(code == "ENOENT", detail); return { present = false } end
@@ -43,11 +46,11 @@ function M.with_configuration(body)
 			assert(uv.fs_mkdir(directory, 448)); assert(uv.os_setenv(key, directory))
 		end
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
-				or name == "adapters.storage" or name == "ui.menu.builder" or name == "ui.numeric_prompt.bridge"
-				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
+			if helpers.in_module_family(name, "modules.llm", true) or helpers.in_module_family(name, "infra.llm_") or name == "settings.engine.paths"
+				or name == "core.fs.adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "menu.ui.builder.builder" or name == "core.ui.ui.numeric_prompt"
+				or name == "settings.ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
-		local Json, Codec = require("json"), require("toml_codec")
+		local Json, Codec = require("core.text.engine.json"), require("core.text.engine.toml_codec")
 		local dirs = { a = root .. "/a", b = root .. "/b" }
 		local initial = {}
 		for id, dir in pairs(dirs) do
@@ -57,7 +60,7 @@ function M.with_configuration(body)
 				.. "[llm.trigger]\ndebounce_ms = 300\n[independent]\nkeep = \"" .. id .. "\"\n"
 			write(dir .. "/config.toml", initial[id])
 		end
-		local Paths = require("infra.config_paths"); assert(Paths.set_config_dir(dirs.a))
+		local Paths = require("settings.engine.paths"); assert(Paths.set_config_dir(dirs.a))
 		local windows, received, notifications, serial = {}, {}, {}, 0
 		local host = {}
 		function host.show(name)
@@ -77,11 +80,11 @@ function M.with_configuration(body)
 			if encoded then received[#received + 1] = assert(Json.decode(encoded)) end
 			return true
 		end
-		package.loaded["ui.webview_manager"] = host
-		package.loaded["adapters.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
-		local i18n = require("infra.i18n"); i18n.init()
-		local prompt = require("ui.numeric_prompt.bridge")
-		local builder = require("ui.menu.builder")
+		package.loaded["core.ui.ui.webview_manager"] = host
+		package.loaded["platform.system.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
+		local i18n = require("core.i18n.engine.i18n"); i18n.init()
+		local prompt = require("core.ui.ui.numeric_prompt")
+		local builder = require("menu.ui.builder.builder")
 		local function find(rows, predicate)
 			for _, row in ipairs(rows or {}) do
 				if predicate(row) then return row end
@@ -92,13 +95,13 @@ function M.with_configuration(body)
 			llm = { is_enabled = function() return Codec.decode(read(Paths.config("config.toml"))).llm.enabled end },
 			webview = host, on_quit = function() error("quit is outside this fixture") end }
 		local f = { paths = Paths, dirs = dirs, initial = initial, prompt = prompt, host = host,
-			preferences = require("infra.llm_preferences"), settings = require("modules.llm.settings"),
-			trigger = require("modules.llm.trigger_settings"), notifications = notifications, received = received, writer = require("toml_codec.writer") }
+			preferences = require("ai.engine.preferences"), settings = require("ai.engine.settings.settings"),
+			trigger = require("ai.engine.settings.trigger_settings"), notifications = notifications, received = received, writer = require("core.text.engine.toml_codec.writer") }
 		function f.bytes(id) return read(dirs[id] .. "/config.toml") end
 		function f.document(id) return Codec.decode(f.bytes(id)) end
 		function f.switch(id)
 			host.show("paths_editor")
-			local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = dirs[id] },
+			local result = require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = dirs[id] },
 				{ config_paths = Paths, webview_manager = host, on_reload = function() end })
 			assert(result.saved and Paths.get_config_dir() == dirs[id])
 		end
@@ -120,7 +123,8 @@ function M.with_configuration(body)
 		end
 		function f.save(value)
 			local request = assert(received[#received], "a real prompt request was published")
-			return prompt.on_message({ action = "save", value = value, request_epoch = request.request_epoch }, {})
+			-- The page sends the text as typed
+			return prompt.on_message({ action = "save", text = tostring(value), request_epoch = request.request_epoch }, {})
 		end
 		body(f)
 	end, debug.traceback)

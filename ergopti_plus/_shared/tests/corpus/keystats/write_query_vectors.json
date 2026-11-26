@@ -2,6 +2,22 @@
 	"_description": "Rendered SQL of the typed-slot and keyed catalogue statements. The JS reference renderer (tools/codegen/codegen-keystats-queries.cjs) and the Lua renderer of both drivers must produce exactly these texts; the values hold what the slot encoder must protect: quotes, a carriage return, a NUL, a line feed. A missing or null value is a missing slot.",
 	"vectors": [
 		{
+			"name": "export.vacuum_into",
+			"dialect": "native",
+			"values": {
+				"path": "/home/it's/Downloads/ergopti-metrics-2026-11-06_10-00-00.sqlite"
+			},
+			"sql": "VACUUM INTO '/home/it''s/Downloads/ergopti-metrics-2026-11-06_10-00-00.sqlite';"
+		},
+		{
+			"name": "export.vacuum_into",
+			"dialect": "cli_json",
+			"values": {
+				"path": "C:\\Users\\Me\\Downloads\\ergopti-metrics-2026-11-06_10-00-00.sqlite"
+			},
+			"sql": "VACUUM INTO 'C:\\Users\\Me\\Downloads\\ergopti-metrics-2026-11-06_10-00-00.sqlite';"
+		},
+		{
 			"name": "meta.get",
 			"dialect": "native",
 			"values": {
@@ -110,6 +126,28 @@
 				"updated_at": "2026-10-02T00:00:00Z"
 			},
 			"sql": "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('dev''1', 'Mac'||char(13)||'', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z') ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at;"
+		},
+		{
+			"name": "devices.import_watermark",
+			"dialect": "native",
+			"values": {
+				"size": 1048576,
+				"digest": "ab'cd",
+				"updated_at": "2026-11-07T00:00:00Z",
+				"device_id": "dev'2"
+			},
+			"sql": "UPDATE devices SET imported_data_sql_size=1048576, imported_data_sql_sha256='ab''cd', updated_at='2026-11-07T00:00:00Z' WHERE device_id='dev''2';"
+		},
+		{
+			"name": "devices.import_watermark",
+			"dialect": "cli_json",
+			"values": {
+				"size": 1048576,
+				"digest": "ab'cd",
+				"updated_at": "2026-11-07T00:00:00Z",
+				"device_id": "dev'2"
+			},
+			"sql": "UPDATE devices SET imported_data_sql_size=1048576, imported_data_sql_sha256='ab''cd', updated_at='2026-11-07T00:00:00Z' WHERE device_id='dev''2';"
 		},
 		{
 			"name": "agg.app_day",
@@ -701,7 +739,7 @@
 				"date": "v_date",
 				"app": "Code's",
 				"count_total": 7,
-				"max_cpm": 0.000025,
+				"max_cpm": 2.5e-5,
 				"max_chars": 7,
 				"length_buckets_json": "v_length_buckets_json",
 				"inter_delay_count": 7,
@@ -737,9 +775,10 @@
 				"date": "v_date",
 				"prev_app": "v_prev_app",
 				"next_app": "v_next_app",
-				"duration_ms": 7
+				"duration_ms": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_prev_app', 'v_next_app', 7);"
+			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_prev_app', 'v_next_app', 7, 60);"
 		},
 		{
 			"name": "events.app_switch",
@@ -749,9 +788,10 @@
 				"id": 7,
 				"ts": "v_ts",
 				"date": "v_date",
-				"duration_ms": 7
+				"duration_ms": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', NULL, NULL, 7);"
+			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', NULL, NULL, 7, 60);"
 		},
 		{
 			"name": "events.window_switch",
@@ -764,9 +804,10 @@
 				"app": "Code's",
 				"prev_title": "v_prev_title",
 				"next_title": "v_next_title",
-				"duration_ms": 7
+				"duration_ms": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_prev_title', 'v_next_title', 7);"
+			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_prev_title', 'v_next_title', 7, 60);"
 		},
 		{
 			"name": "events.window_switch",
@@ -777,9 +818,10 @@
 				"ts": "v_ts",
 				"date": "v_date",
 				"app": "Code's",
-				"duration_ms": 7
+				"duration_ms": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', NULL, NULL, 7);"
+			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', NULL, NULL, 7, 60);"
 		},
 		{
 			"name": "events.shortcut",
@@ -790,9 +832,10 @@
 				"ts": "v_ts",
 				"date": "v_date",
 				"app": "Code's",
-				"key": "v_key"
+				"key": "v_key",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key');"
+			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key', 60);"
 		},
 		{
 			"name": "events.shortcut",
@@ -803,9 +846,10 @@
 				"ts": "v_ts",
 				"date": "v_date",
 				"app": "Code's",
-				"key": "v_key"
+				"key": "v_key",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key');"
+			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key', 60);"
 		},
 		{
 			"name": "events.system",
@@ -816,9 +860,10 @@
 				"ts": "v_ts",
 				"date": "v_date",
 				"action": "v_action",
-				"metadata_json": "v_metadata_json"
+				"metadata_json": "v_metadata_json",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', 'v_metadata_json');"
+			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', 'v_metadata_json', 60);"
 		},
 		{
 			"name": "events.system",
@@ -828,9 +873,97 @@
 				"id": 7,
 				"ts": "v_ts",
 				"date": "v_date",
-				"action": "v_action"
+				"action": "v_action",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', NULL);"
+			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', NULL, 60);"
+		},
+		{
+			"name": "events.network",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"meta_json": "v_meta_json",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', 'v_meta_json', 60);"
+		},
+		{
+			"name": "events.network",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_network (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', NULL, 60);"
+		},
+		{
+			"name": "events.window_topo",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"meta_json": "v_meta_json",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', 'v_meta_json', 60);"
+		},
+		{
+			"name": "events.window_topo",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', NULL, 60);"
+		},
+		{
+			"name": "events.av",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"meta_json": "v_meta_json",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', 'v_meta_json', 60);"
+		},
+		{
+			"name": "events.av",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"app": "v_app",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_av (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 'v_app', NULL, 60);"
 		},
 		{
 			"name": "events.hotstring",
@@ -845,9 +978,10 @@
 				"trigger": "v_trigger",
 				"replacement": "v_replacement",
 				"h_type": "v_h_type",
-				"net_saved_chars": 7
+				"net_saved_chars": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', 'v_h_type', 7);"
+			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', 'v_h_type', 7, 60);"
 		},
 		{
 			"name": "events.hotstring",
@@ -860,9 +994,10 @@
 				"app": "Code's",
 				"kind": "v_kind",
 				"trigger": "v_trigger",
-				"replacement": "v_replacement"
+				"replacement": "v_replacement",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', NULL, NULL);"
+			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', NULL, NULL, 60);"
 		},
 		{
 			"name": "events.session",
@@ -873,9 +1008,10 @@
 				"ts": "v_ts",
 				"date": "v_date",
 				"kind": "v_kind",
-				"duration_ms": 7
+				"duration_ms": 7,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 7);"
+			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 7, 60);"
 		},
 		{
 			"name": "events.session",
@@ -885,9 +1021,10 @@
 				"id": 7,
 				"ts": "v_ts",
 				"date": "v_date",
-				"kind": "v_kind"
+				"kind": "v_kind",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', NULL);"
+			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms, utc_offset_min) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', NULL, 60);"
 		},
 		{
 			"name": "agg.ngram_keycode",
@@ -1017,9 +1154,10 @@
 				"audio_volume": 0.5,
 				"wpm": 61.25,
 				"text": "it's\r\nb\u0000c",
-				"events_json": "[]"
+				"events_json": "[]",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]');"
+			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]', 60);"
 		},
 		{
 			"name": "events.typing",
@@ -1041,9 +1179,10 @@
 				"audio_volume": 0.5,
 				"wpm": 61.25,
 				"text": "it's\r\nb\u0000c",
-				"events_json": "[]"
+				"events_json": "[]",
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]');"
+			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json, utc_offset_min) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]', 60);"
 		},
 		{
 			"name": "events.llm",
@@ -1064,9 +1203,10 @@
 				"prompt_tokens": 10,
 				"completion_tokens": 5,
 				"total_tokens": 15,
-				"est_cost_usd": 0.00125
+				"est_cost_usd": 0.00125,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125);"
+			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd, utc_offset_min) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125, 60);"
 		},
 		{
 			"name": "events.llm",
@@ -1087,9 +1227,40 @@
 				"prompt_tokens": 10,
 				"completion_tokens": 5,
 				"total_tokens": 15,
-				"est_cost_usd": 0.00125
+				"est_cost_usd": 0.00125,
+				"utc_offset_min": 60
 			},
-			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125);"
+			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd, utc_offset_min) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125, 60);"
+		},
+		{
+			"name": "events.roi",
+			"dialect": "native",
+			"values": {
+				"device_id": "device-a",
+				"id": 71,
+				"ts": "2026-11-07 10:00:00.000",
+				"date": "2026-11-07",
+				"kind": "new_trigger_candidate",
+				"app": "Editor's app",
+				"meta_json": "{\"word\":\"d'apostrophe\\r\\n\\u0000é\",\"occurrences\":5}",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('device-a', 71, '2026-11-07 10:00:00.000', '2026-11-07', 'new_trigger_candidate', 'Editor''s app', '{\"word\":\"d''apostrophe\\r\\n\\u0000é\",\"occurrences\":5}', 60);"
+		},
+		{
+			"name": "events.roi",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "device-a",
+				"id": 71,
+				"ts": "2026-11-07 10:00:00.000",
+				"date": "2026-11-07",
+				"kind": "new_trigger_candidate",
+				"app": "Editor's app",
+				"meta_json": "{\"word\":\"d'apostrophe\\r\\n\\u0000é\",\"occurrences\":5}",
+				"utc_offset_min": 60
+			},
+			"sql": "INSERT OR IGNORE INTO events_roi (device_id, id, ts, date, kind, app, meta_json, utc_offset_min) VALUES ('device-a', 71, '2026-11-07 10:00:00.000', '2026-11-07', 'new_trigger_candidate', 'Editor''s app', '{\"word\":\"d''apostrophe\\r\\n\\u0000é\",\"occurrences\":5}', 60);"
 		}
 	]
 }

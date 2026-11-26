@@ -35,10 +35,10 @@ helpers.describe("remap scope transaction", function()
 			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-1")
 			helpers.assert_true(accepted)
 			helpers.assert_eq(disk.files["/remap/backup-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save may only replace the backed-up bytes")
 			local saved = calls.saved_payloads[1]
-			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))
+			helpers.assert_eq(saved.tap_holds_enabled, require("menu.engine.manifest_reader").recommended_for("tap_holds.enabled"))
 			helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "copy", hold = "shift" })
 			helpers.assert_eq(saved.mod_combos_config[COMBO].tap, "escape", "the chords belong to the shortcuts scope")
 			helpers.assert_eq(#settled, 0, "no success before the Karabiner terminal")
@@ -145,8 +145,8 @@ helpers.describe("remap layer fixture: conditional removal", function()
 			local callback_count = 0
 			local on_error = function() callback_count = callback_count + 1 end
 			local expected = { status = "ok", content = disk.files[LAYERS] }
-			helpers.assert_true(require("toml_codec.writer").remove_if_unchanged(LAYERS,
-				require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
+			helpers.assert_true(require("core.text.engine.toml_codec.writer").remove_if_unchanged(LAYERS,
+				require("core.fs.adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
 			helpers.assert_nil(disk.files[LAYERS])
 			helpers.assert_eq(#disk.removal_calls, 1)
 			helpers.assert_eq(disk.removal_calls[1].path, LAYERS)
@@ -170,8 +170,8 @@ helpers.describe("remap layer fixture: conditional removal", function()
 					helpers.assert_eq(category, "removal")
 					callback_count = callback_count + 1
 				end
-				helpers.assert_eq(require("toml_codec.writer").remove_if_unchanged(path,
-					require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").remove_if_unchanged(path,
+					require("core.fs.adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
 				helpers.assert_eq(disk.files[LAYERS], original)
 				helpers.assert_eq(disk.files[foreign], original)
 				helpers.assert_eq(#disk.removal_calls, 1)
@@ -324,7 +324,7 @@ helpers.describe("the combination menu has its own native scope", function()
 		helpers.it("applies " .. mode .. " to pairs and recovers a negative terminal", function()
 			with_fixture(function(fixture)
 				local remap, calls, disk = scoped_remap(fixture)
-				helpers.assert_true(remap.set_mod_combos_enabled(false))
+				helpers.assert_true(remap.set_key_combinations_enabled(false))
 				calls.save, calls.saved_payloads = 0, {}
 				local accepted, settled = request(remap, "key_combinations", mode, "/remap/combination-backup")
 				helpers.assert_true(accepted)
@@ -333,14 +333,14 @@ helpers.describe("the combination menu has its own native scope", function()
 				helpers.assert_eq(saved.tap_hold_config[KEY].tap, "escape", "other keys remain intact")
 				helpers.assert_eq(saved.mod_combos_config[COMBO].tap, mode == "recommended" and "paste" or "none")
 				if mode == "clear" then
-					helpers.assert_eq(saved.mod_combos_enabled, false, "clear preserves the switch")
+					helpers.assert_eq(saved.key_combinations_enabled, false, "clear preserves the switch")
 				end
 				helpers.assert_eq(#settled, 0, "acceptance is not success")
 				disk.terminal(false, "activation-failed")
 				disk.terminal(true, "ready")
 				helpers.assert_eq(settled[1].ok, false)
 				helpers.assert_eq(remap.get_combo_tap_action(COMBO), "escape")
-				helpers.assert_eq(remap.get_mod_combos_enabled(), false)
+				helpers.assert_eq(remap.get_key_combinations_enabled(), false)
 			end)
 		end)
 	end

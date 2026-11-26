@@ -22,12 +22,15 @@
 ---    in System Settings while refusing the new binary, and the user sees a
 ---    permission that looks granted but is not. Resetting this app's own entry
 ---    lets the next prompt add a switch that matches the running binary.
---- 5. Bounded waits: every Accessibility call runs on the main thread, where
+--- 5. Other copies: a second copy signed differently shares the bundle
+---    identifier and can hold the one switch; the wait asks for them before
+---    any reset (clipboard/adapters/accessibility_copies.lua).
+--- 6. Bounded waits: every Accessibility call runs on the main thread, where
 ---    the keyboard event taps also run. macOS lets a call to an application
 ---    that does not answer wait six seconds; the taps then time out, macOS
 ---    disables them and every key typed meanwhile comes out late, held or lost
 ---    (issues #99 and #100). One process-wide messaging timeout bounds them all.
---- 6. Unanswering applications: the bound still holds the main thread for the
+--- 7. Unanswering applications: the bound still holds the main thread for the
 ---    whole timeout on each unanswered read, and a caller that asks several
 ---    reads in a row multiplies it (2515 ms for the tooltip caret, 1512 ms for
 ---    the post-wake context capture of loginwindow, field run 2026-10-31). The
@@ -68,7 +71,7 @@ end
 --- requiring the timings at load would parse them for every reader of trust.
 --- @return number seconds
 function M.unanswered_cooldown_sec()
-	return require("infra.timings").sec("adapters", "unresponsive_ax_backoff_ms")
+	return require("core.timing.engine.timings").sec("adapters", "unresponsive_ax_backoff_ms")
 end
 
 -- A read that took this share of the messaging timeout waited it out: the
@@ -188,8 +191,9 @@ function M.bundle_id()
 	return require("adapters.tcc_grant").bundle_id()
 end
 
---- Returns the path of the running app, the one the Accessibility list shows
---- (as "Hammerspoon") and the one to add with + when the entry is missing.
+--- Returns the path of the running runtime bundle. Packaged, it is the
+--- Hammerspoon.app nested in ErgoptiPlus.app, which macOS lists as
+--- "Hammerspoon".
 --- @return string|nil path Nil when the running process reports none.
 --- @return string|nil detail Exact reason when path is nil.
 function M.bundle_path()
@@ -199,6 +203,44 @@ function M.bundle_path()
 		return nil, "hs.processInfo.bundlePath is unavailable"
 	end
 	return path
+end
+
+--- Returns the app the user turns on in the Accessibility list, and adds with
+--- + when it is missing. Packaged, it is ErgoptiPlus.app, the launcher that
+--- starts the runtime from inside its own bundle: a first install's grant to
+--- the "Hammerspoon" entry alone left the driver untrusted, and it started
+--- once ErgoptiPlus.app was added and turned on (field report 2026-11-23).
+--- @return string|nil path Nil when the running process reports none.
+--- @return string|nil detail Exact reason when path is nil.
+function M.grant_app_path()
+	local path, err = M.bundle_path()
+	if path == nil then return nil, err end
+	return require("clipboard.adapters.accessibility_copies").app_path(path)
+end
+
+--- Returns the Finder icon of an app, for the steps that name it: the icon
+--- shown is the one of the app the user adds with +.
+--- @param path string Absolute .app path.
+--- @return userdata|nil image Nil when macOS has no icon for it.
+function M.app_icon(path)
+	assert(type(path) == "string" and path ~= "", "accessibility_permission: app_icon needs a path")
+	return hs.image.iconForFile(path)
+end
+
+--- Finds the other registered copies of this app whose signature differs: the
+--- Accessibility switch the user turns on can be theirs.
+--- @param on_done function fn(paths|nil, detail) once the probe has exited.
+--- @return boolean started True when the probe was started.
+--- @return string|nil detail Exact reason when started is false.
+function M.other_copies(on_done)
+	local bundle_id, id_err = M.bundle_id()
+	if bundle_id == nil then return false, id_err end
+	local path, path_err = M.bundle_path()
+	if path == nil then return false, path_err end
+	if require("clipboard.adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
+		return false, "the copy probe could not be started"
+	end
+	return true
 end
 
 --- Removes this app's Accessibility entry so a stale grant cannot mask a refusal.
@@ -212,7 +254,7 @@ end
 --- Opens System Settings on the Accessibility list, without blocking.
 --- @return boolean started True when the pane opener was started.
 function M.open_settings()
-	return require("adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
+	return require("core.process.adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
 end
 
 return M

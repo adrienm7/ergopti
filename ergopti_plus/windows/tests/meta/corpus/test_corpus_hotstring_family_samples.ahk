@@ -23,7 +23,7 @@
 ; ======================================
 ; ======================================
 
-; Samples each family needs, as _shared/lua/test/hotstring_family_samples.lua
+; Samples each family needs, as _shared/tests/lua/hotstrings/family_samples.lua
 ; requires, so a new family cannot ship without the data pin.
 global _CHFS_MIN_SAMPLES_PER_FAMILY := 2
 
@@ -119,7 +119,7 @@ _CHFS_ReplaySample(Sample) {
 
 _CHFS_EveryFamilyIsSampled() {
 	global _CHFS_MIN_SAMPLES_PER_FAMILY
-	Manifest := JsonParse(FileRead(_CHFS_SharedPath("modules\menu\menu_manifest.json"), "UTF-8"))
+	Manifest := JsonParse(FileRead(_CHFS_SharedPath("menu\data\menu_manifest.json"), "UTF-8"))
 	Families := Manifest["hotstring_category_keys"]
 	Corpus := _CHFS_Corpus()
 	Excluded := Corpus["excluded_families"]

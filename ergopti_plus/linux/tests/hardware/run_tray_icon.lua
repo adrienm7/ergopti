@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: The Tray Icon Reaches a Real Panel Protocol
 --- DESCRIPTION:
---- Shows the tray through the production adapter (adapters/tray_menu.lua →
---- platform/tray/appindicator.lua → libayatana-appindicator) and keeps its GTK
+--- Shows the tray through the production adapter (tray/adapters/menu.lua →
+--- tray/adapters/appindicator.lua → libayatana-appindicator) and keeps its GTK
 --- loop pumping, so tests/hardware/sni_host.py — a StatusNotifierWatcher, the
 --- protocol every modern Linux panel speaks — can register the item and read
 --- its icon and menu over D-Bus.
@@ -22,8 +22,8 @@
 --- it, 2 = the machine cannot host a tray at all (no library, no display).
 --- ==============================================================================
 
-local TrayMenu = require("adapters.tray_menu")
-local Indicator = require("platform.tray.appindicator")
+local TrayMenu = require("tray.adapters.menu")
+local Indicator = require("tray.adapters.appindicator")
 
 local seconds = tonumber(arg and arg[1]) or 20
 
@@ -123,7 +123,7 @@ pump()
 assert(called == 1, "GTK must enter Lua after the pump becomes hot")
 callback:free()
 
-TrayMenu.setIcon({ title = "Ergopti" })
+assert(TrayMenu.start(), "the tray icon must come up")
 -- The clickable row proves the whole click path: the panel's dbusmenu Event,
 -- libdbusmenu's "activate", the shared dispatcher, and this row's function.
 local click_file = os.getenv("ERGOPTI_TRAY_CLICK_FILE")
@@ -148,6 +148,14 @@ local rows = {
 	} },
 	{ title = "Quit probe", fn = function() os.exit(0) end },
 }
+-- A toggle republishes a tree of the same shape with one check flipped: the
+-- tray updates that row in place, so the host sees every row keep its id.
+local toggle = { title = "Toggle probe", checked = false }
+toggle.fn = function()
+	toggle.checked = not toggle.checked
+	TrayMenu.setMenu(rows)
+end
+table.insert(rows, #rows, toggle)
 rows[#rows + 1] = { title = "Rebuild probe", fn = function()
 	rebuilds = rebuilds + 1
 	rows[#rows + 1] = { title = "Rebuilt marker" }
@@ -157,7 +165,7 @@ end }
 -- still reach the function of the CURRENT menu.
 for _ = 1, 3 do TrayMenu.setMenu(rows) end
 if TrayMenu.getBackend() ~= "appindicator" then
-	print("FAIL the adapter reports no live backend after setIcon")
+	print("FAIL the adapter reports no live backend after start()")
 	os.exit(1)
 end
 print("ok   tray icon created through the production adapter")

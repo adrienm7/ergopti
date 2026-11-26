@@ -96,7 +96,7 @@ local LAUNCHER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 --- @return table timer
 --- @return table shell Recorded shell spawns.
 local function load_port(tweak)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.installed_physical_source"] = nil
 	local Source = require("adapters.installed_physical_source")
 	local world, timer, shell = new_world(), new_timer(), { spawns = {} }
@@ -144,7 +144,7 @@ end
 
 helpers.describe("installed source port: the closed task set", function()
 	helpers.it("derives the module path from the bundle-bound launcher only", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.installed_physical_source"] = nil
 		local Source = require("adapters.installed_physical_source")
 		helpers.assert_eq(Source.module_path(LAUNCHER),

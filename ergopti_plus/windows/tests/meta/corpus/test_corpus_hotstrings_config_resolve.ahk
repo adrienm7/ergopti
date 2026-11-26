@@ -6,14 +6,14 @@
 ; Loads the shared cross-driver corpus from
 ; _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
 ; the AHK resolution cascade (HotstringsResolve,
-; infra/hotstrings/hotstrings_catalogue.ahk) against it — proving
+; hotstrings/engine/catalogue/catalogue.ahk) against it — proving
 ; delay/color/show_tooltip/priority precedence (user_section > user_category >
 ; toml_section > toml_category) matches the macOS driver bit for bit.
 ; The base expansion delay and the offsets of it are covered by the second
 ; corpus, base_delay_vectors.json (section 4 below).
 ;
 ; Reuses the _HCfgTestReset / _HCfgTestSeedToml fixture helpers from
-; unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
+; unit/hotstrings/engine/catalogue/test_config.ahk (must load before this file — see run_all.ahk).
 ;
 ; The macOS half lives in
 ; macos/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua.

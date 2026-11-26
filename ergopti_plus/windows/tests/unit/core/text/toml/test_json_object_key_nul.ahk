@@ -1,0 +1,334 @@
+﻿; tests/unit/core/text/toml/test_json_object_key_nul.ahk
+
+; ==============================================================================
+; MODULE: JSON Object Key Representation Tests
+; DESCRIPTION: Unsupported NUL keys must not alias native Map keys silently.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_JOKN_Reject(Source) {
+	AssertThrows(() => JsonParse(Source),
+		"a NUL key cannot be returned faithfully in the native Map representation")
+}
+for Source in ['{"\u0000":1}', '{"prefix\u0000suffix":1}',
+	'{"type":"safe","type\u0000hidden":"different"}',
+	'{"prefix\u0000one":1,"prefix\u0000two":2}',
+	'{"outer":{"\u0000nested":1}}', '[{"safe":1},{"\u0000":2}]']
+	Test("JSON: reject unrepresentable object key case " . A_Index . " (json-object-key-nul)",
+		_JOKN_Reject.Bind(Source))
+
+_JOKN_Controls() {
+	Decoded := JsonParse('{"":1,"\\u0000":2,"\u0001":3,"value":"before\u0000after"}')
+	AssertEqual(4, Decoded.Count)
+	AssertEqual(1, Decoded[""])
+	AssertEqual(2, Decoded["\u0000"])
+	AssertEqual(3, Decoded[Chr(1)])
+	_KLJR_EqualString("before" . Chr(0) . "after", Decoded["value"], "NUL string value")
+}
+Test("JSON: preserve representable keys and NUL string values (json-object-key-nul)", _JOKN_Controls)
+
+_JOKN_MemberSourceSpans() {
+	Source := ' { "layouts" : { "valid" : {"id":"valid"}, "\u0072etired" : [false, null, 1.25e+2, {"comma":"},:"}] }, "tail":true } '
+	Spans := JsonObjectMemberSpans(Source, ["layouts"])
+	AssertEqual(2, Spans.Count, "decoded object membership")
+	AssertEqual('{"id":"valid"}', Spans["valid"]["text"])
+	Expected := '[false, null, 1.25e+2, {"comma":"},:"}]'
+	AssertEqual(Expected, Spans["retired"]["text"], "primitive identities and nested delimiters remain raw")
+	AssertEqual(Expected, SubStr(Source, Spans["retired"]["start"], Spans["retired"]["length"]))
+	AssertEqual('"\u0072etired" : ' . Expected, Spans["retired"]["member_text"], "escaped key and spacing remain raw")
+	AssertEqual(Spans["retired"]["member_text"],
+		SubStr(Source, Spans["retired"]["member_start"], Spans["retired"]["member_length"]))
+	AssertEqual('true', JsonObjectMemberSpans(Source)["tail"]["text"])
+	AssertEqual('1', JsonObjectMemberSpans('{"": {"a.b": {"x":1}}}', ["", "a.b"])["x"]["text"],
+		"parts name decoded keys rather than dotted paths")
+	AssertEqual('2', JsonObjectMemberSpans('{"x":1,"\u0078":2}')["x"]["text"],
+		"the span API preserves the generic parser's last-member-wins identity")
+	AssertEqual(0, JsonObjectMemberSpans('{"empty":{}}', ["empty"]).Count)
+	Quoted := '{"a\"b": {"value":"é\uD83D\uDE00"},"Case":1,"case":2}'
+	AssertEqual('"é\uD83D\uDE00"', JsonObjectMemberSpans(Quoted, ['a"b'])["value"]["text"],
+		"decoded quoted keys and Unicode source spelling remain exact")
+	AssertEqual(3, JsonObjectMemberSpans(Quoted).Count, "native JSON member names retain case identity")
+	Parsed := JsonParse(Quoted), Cased := JsonObjectMemberSpans(Quoted)
+	AssertEqual(3, Parsed.Count, "full parser retains simultaneous cased keys")
+	AssertEqual(1, Parsed["Case"]), AssertEqual(2, Parsed["case"])
+	AssertEqual("1", Cased["Case"]["text"]), AssertEqual("2", Cased["case"]["text"])
+	AssertEqual(Parsed.CaseSense, Cased.CaseSense, "descriptor map uses the same identity as the parser")
+	Paths := '{"Node":{"value":1},"node":{"value":2}}'
+	AssertEqual("1", JsonObjectMemberSpans(Paths, ["Node"])["value"]["text"])
+	AssertEqual("2", JsonObjectMemberSpans(Paths, ["node"])["value"]["text"],
+		"decoded path parts distinguish simultaneous cased parent members")
+}
+Test("JSON: public member spans preserve exact source and decoded object identity (json-member-spans)",
+	_JOKN_MemberSourceSpans)
+
+_JOKN_MemberSpanRefusals() {
+	for Source in ['{"layouts":{}} trailing', '{"layouts":{}} {"second":1}',
+		'{"layouts":{"safe":1},"later":[1,]}', '{"layouts":{"safe":1},"\u0000":2}',
+		'{"layouts":{"prefix\u0000suffix":1}}', '{"layouts":{"safe":1},"later":1e999}']
+		AssertThrows(JsonObjectMemberSpans.Bind(Source, ["layouts"]),
+			"the entire source must satisfy the unchanged generic JSON parser")
+	for Source in ['[]', 'null', 'false', '1', '"object"']
+		AssertThrows(JsonObjectMemberSpans.Bind(Source), "a selected non-object cannot supply member spans")
+	AssertThrows(() => JsonObjectMemberSpans('{"array":[]}', ["array"]))
+	AssertThrows(() => JsonObjectMemberSpans('{"x":1}', ["missing"]))
+	AssertThrows(() => JsonObjectMemberSpans('{"x":1}', "x"))
+	AssertThrows(() => JsonObjectMemberSpans('{"x":1}', [1]))
+}
+Test("JSON: public member spans retain whole-document and path refusals (json-member-spans)",
+	_JOKN_MemberSpanRefusals)
+
+
+_JOKN_MemberPathNulRefusals() {
+	AssertThrows(() => JsonObjectMemberSpans('{"layouts":{"safe":1}}', ["layouts" . Chr(0) . "hidden"]),
+		"a decoded path part cannot alias its representable prefix at NUL")
+	AssertThrows(() => JsonObjectMemberSpans('{"":{"safe":1}}', [Chr(0) . "hidden"]),
+		"a decoded path part cannot alias the empty member name at NUL")
+	AssertThrows(() => JsonObjectMemberSpans('{"outer":{"layouts":{"safe":1}}}',
+		["outer", "layouts" . Chr(0) . "hidden"]), "every decoded path component is validated")
+	AssertEqual("1", JsonObjectMemberSpans('{"\\u0000":{"safe":1}}', ["\u0000"])["safe"]["text"],
+		"literal backslash-u text is a representable decoded path key")
+}
+Test("JSON: public member paths refuse native NUL aliases before lookup (json-member-spans)",
+	_JOKN_MemberPathNulRefusals)
+
+; perf-json-member-spans-2026-11-17: the span owner decoded the whole document
+; to validate it, then decoded every member value of each walked object again
+; to find its end; three decodes of the AI catalogue made its boot load 440 ms.
+; Validation and the walks now build nothing: only the returned descriptors.
+_JOKN_MemberSpansBuildNoTree() {
+	Source := '{"providers":{"a":{"models":[{"id":"x","tags":["t"]}],"auth":{"k":{"v":1}}},'
+		. '"b":{"models":[[1,2],{"deep":{"deeper":{"deepest":[null]}}}]}},"order":["a","b"]}'
+	Before := JsonDecodeTally()["containers"]
+	Providers := JsonObjectMemberSpans(Source, ["providers"])
+	Root := JsonObjectMemberSpans(Source)
+	AssertEqual(Before, JsonDecodeTally()["containers"],
+		"member spans must validate and walk without building a decoded container")
+	AssertEqual(2, Providers.Count)
+	AssertEqual("object", Providers["b"]["kind"])
+	AssertEqual("array", Root["order"]["kind"])
+	AssertEqual('["a","b"]', Root["order"]["text"])
+	AssertEqual(JsonParse(Providers["b"]["text"])["models"][2]["deep"]["deeper"]["deepest"].Length, 1,
+		"a skipped value's span is still its exact decodable source")
+}
+Test("JSON: member spans validate and walk without decoding the document (json-member-spans)",
+	_JOKN_MemberSpansBuildNoTree)
+
+; Checks every object of a member span tree against JsonObjectMemberSpans of
+; that object's own text: same members, kinds and exact source, offsets in Source.
+_JOKN_AssertTreeMatchesSpans(Source, Tree, ObjectText, Where) {
+	Expected := JsonObjectMemberSpans(ObjectText)
+	AssertEqual(Expected.Count, Tree.Count, Where . ": the tree holds every decoded member")
+	for Key, Span in Expected {
+		AssertTrue(Tree.Has(Key), Where . ": the tree holds " . Key)
+		Node := Tree[Key]
+		AssertEqual(Span["text"], Node["text"], Where . "." . Key . " keeps its exact source")
+		AssertEqual(Span["kind"], Node["kind"], Where . "." . Key . " keeps its source kind")
+		AssertEqual(Node["text"], SubStr(Source, Node["start"], Node["length"]),
+			Where . "." . Key . " has its offsets in the whole text")
+		AssertEqual(Span["kind"] == "object", Node.Has("members"), Where . "." . Key . " nests only an object")
+		if Node.Has("members")
+			_JOKN_AssertTreeMatchesSpans(Source, Node["members"], Node["text"], Where . "." . Key)
+	}
+}
+
+; Two decoded values are the same, the JSON null sentinel included.
+_JOKN_SameDecoded(A, B) {
+	if (A is Map) {
+		if !(B is Map) || A.Count != B.Count
+			return false
+		for Key, Value in A
+			if !B.Has(Key) || !_JOKN_SameDecoded(Value, B[Key])
+				return false
+		return true
+	}
+	if (A is Array) {
+		if !(B is Array) || A.Length != B.Length
+			return false
+		for Index, Value in A
+			if !_JOKN_SameDecoded(Value, B[Index])
+				return false
+		return true
+	}
+	if IsObject(A) || IsObject(B)
+		return ObjPtr(A) == ObjPtr(B)
+	return Type(A) == Type(B) && A == B
+}
+
+; perf-ai-catalogue-walks-2026-11-18: the AI catalogue was decoded, walked whole
+; again for its provider spans, and each provider's slice walked once more. One
+; decode and one span walk now give the same spans, at every depth.
+_JOKN_MemberSpanTreeMatchesSpans() {
+	global _SharedDir
+	Sources := [
+		' { "layouts" : { "valid" : {"id":"valid"}, "retired" : [false, null, 1.25e+2, {"comma":"},:"}] }, "tail":true } ',
+		'{"x":1,"x":{"a":2},"x":{"b":{"c":false}}}',
+		'{"a\"b": {"value":"é😀"},"Case":{"k":1},"case":{"k":2},"":{}}',
+		'{"n":-0,"big":1234567890123456789,"f":1.5e-3,"s":"\\\"\/\b\f\n\r\té","t":true,"z":null}',
+		'{"deep":{"a":{"b":{"c":{"d":[{"e":{"f":1}}]}}}}}',
+		'{}'
+	]
+	for Name in ["api_providers.json", "local_servers.json", "thinking_off.json"]
+		Sources.Push(FileRead(_SharedDir . "\ai\data\" . Name, "UTF-8"))
+	for Index, Source in Sources {
+		Where := "source " . Index
+		_JOKN_AssertTreeMatchesSpans(Source, JsonObjectMemberSpanTree(Source), Source, Where)
+		Document := JsonParseWithMemberSpans(Source, [])
+		AssertTrue(_JOKN_SameDecoded(JsonParse(Source), Document["root"]), Where . ": the root is JsonParse's")
+		_JOKN_AssertTreeMatchesSpans(Source, Document["members"], Source, Where . " (decoded)")
+	}
+	Catalogue := Sources[Sources.Length - 2]
+	Providers := JsonParseWithMemberSpans(Catalogue, ["providers"])["members"]
+	_JOKN_AssertTreeMatchesSpans(Catalogue, Providers, JsonObjectMemberSpans(Catalogue)["providers"]["text"], "providers")
+	Paths := '{"Node":{"value":1},"node":{"value":2},"twice":{"v":1},"twice":{"v":2}}'
+	AssertEqual("2", JsonParseWithMemberSpans(Paths, ["node"])["members"]["value"]["text"],
+		"decoded path parts keep their case")
+	AssertEqual("2", JsonParseWithMemberSpans(Paths, ["twice"])["members"]["v"]["text"],
+		"the path follows the member the decoder kept, the last one")
+	AssertEqual(0, JsonParseWithMemberSpans('{"empty":{}}', ["empty"])["members"].Count)
+}
+Test("JSON: a member span tree holds the member spans of every nested object (json-member-span-tree)",
+	_JOKN_MemberSpanTreeMatchesSpans)
+
+_JOKN_MemberSpanTreeRefusals() {
+	for Source in ['{"layouts":{}} trailing', '{"layouts":{"safe":1},"later":[1,]}',
+		'{"layouts":{"safe":1},"\u0000":2}', '{"layouts":{"safe":1},"later":1e999}', '{"a":"\q"}'] {
+		AssertThrows(JsonObjectMemberSpanTree.Bind(Source), "the span tree validates the whole document")
+		AssertThrows(JsonParseWithMemberSpans.Bind(Source, ["layouts"]), "the decode refuses the whole document")
+	}
+	for Source in ['[]', 'null', 'false', '1', '"object"'] {
+		Message := ""
+		try JsonObjectMemberSpanTree(Source)
+		catch as Err
+			Message := Err.Message
+		AssertEqual("Selected JSON member is not an object.", Message, "a non-object root has no span tree")
+		Document := JsonParseWithMemberSpans(Source, [])
+		AssertFalse(Document["members"], "a decoded non-object root selects no members")
+		AssertTrue(_JOKN_SameDecoded(JsonParse(Source), Document["root"]), "and is still returned decoded")
+	}
+	for Path in [["missing"], ["array"], ["scalar"], ["nested", "array"], ["twice"]]
+		AssertFalse(JsonParseWithMemberSpans('{"array":[],"scalar":1,"nested":{"array":[]},"twice":{},"twice":2}',
+			Path)["members"], "a path that selects no object selects no members")
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', "x"))
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', [1]))
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', ["x" . Chr(0) . "hidden"]))
+	Tree := JsonObjectMemberSpanTree('{"o":{"k":1},"s":"x"}')
+	AssertEqual(1, JsonSpanObjectMembers(Tree["o"]).Count, "an object span gives its members")
+	Message := ""
+	try JsonSpanObjectMembers(Tree["s"])
+	catch as Err
+		Message := Err.Message
+	AssertEqual("Selected JSON member is not an object.", Message,
+		"a scalar span is refused as JsonObjectMemberSpans refuses its text")
+}
+Test("JSON: a member span tree keeps the whole-document and non-object refusals (json-member-span-tree)",
+	_JOKN_MemberSpanTreeRefusals)
+
+; The decode is the one complete-document pass: the span walk that follows it,
+; at any depth, walks no text again.
+_JOKN_DecodeWithSpansWalksOnce() {
+	global _SharedDir
+	Source := FileRead(_SharedDir . "\ai\data\api_providers.json", "UTF-8")
+	Before := JsonDecodeTally()
+	JsonParseWithMemberSpans(Source, ["providers"])
+	After := JsonDecodeTally()
+	AssertEqual(1, After["document_passes"] - Before["document_passes"], "the decode is the only document pass")
+	AssertEqual(StrLen(Source), After["document_units"] - Before["document_units"], "over the text, once")
+	Before := JsonDecodeTally()
+	JsonObjectMemberSpanTree(Source)
+	After := JsonDecodeTally()
+	AssertEqual(1, After["document_passes"] - Before["document_passes"], "the span tree validates once")
+	AssertEqual(Before["containers"], After["containers"], "and decodes nothing")
+}
+Test("JSON: a decode with member spans walks its text once (json-member-span-tree)",
+	_JOKN_DecodeWithSpansWalksOnce)
+
+; perf-shared-json-roots-2026-11-17: four boot owners each decoded the 130 KB
+; physical-key registry (about 170 ms apiece). One decode is shared while the
+; text read is unchanged, and an edited text is decoded again.
+_JOKN_SharedRootFollowsItsText() {
+	Key := "shared-root-test-" . A_TickCount
+	First := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	Before := JsonDecodeTally()["containers"]
+	Again := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	AssertTrue(ObjPtr(First) == ObjPtr(Again), "an unchanged text must reuse the decoded root")
+	AssertEqual(Before, JsonDecodeTally()["containers"], "a reused root decodes nothing")
+	Edited := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertEqual("SC010", Edited["keys"]["KeyA"]["ahk"], "an edited text must be decoded again")
+	AssertEqual("SC01E", First["keys"]["KeyA"]["ahk"], "an earlier root is never rewritten")
+	Other := JsonParseShared(Key . "-other", '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertFalse(ObjPtr(Other) == ObjPtr(Edited), "documents of different paths never share a root")
+	; Every owner of the registry decodes it through the shared root, the composed
+	; layout's source emulation too: it only reads the registry to name its scan
+	; codes, and its session is built from the layout's own model.
+	for Owner in ["WPMWidget_TypingBurstIndex", "StarSlotPhysicalCatalogue", "LayoutEmulationRows",
+			"KeymapLayers_LoadContext", "_KLE_SourceBoot"]
+		AssertTrue(InStr(_DriverFuncBody(Owner), "JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))"),
+			Owner . " must read the physical-key registry through its shared root")
+}
+Test("JSON: a shared root is reused for an unchanged text and decoded again for an edited one (json-shared-root)",
+	_JOKN_SharedRootFollowsItsText)
+
+
+_JsonArraySpans_PreserveExactOrderedTokenKinds() {
+	Source := ' [ true , 1, false, 0, "true", null, {"size":true,"\u0073ize":1}, ["é", {"x":"nested"}] ] '
+	Spans := JsonArrayElementSpans(Source)
+	AssertEqual(8, Spans.Length, "independent array element census")
+	Expected := ['true', '1', 'false', '0', '"true"', 'null',
+		'{"size":true,"\u0073ize":1}', '["é", {"x":"nested"}]']
+	for Index, Token in Expected {
+		AssertEqual(Token, Spans[Index]["text"], "ordered original token kind is preserved")
+		AssertEqual(Token, SubStr(Source, Spans[Index]["start"], Spans[Index]["length"]),
+			"original UTF-16 offsets reproduce exact token source")
+	}
+	AssertEqual('1', JsonObjectMemberSpans(Spans[7]["text"])["size"]["text"],
+		"decoded duplicate key preserves last-member-wins kind")
+	AssertEqual(0, JsonArrayElementSpans(" [] ").Length)
+	AssertEqual('"é\uD83D\uDE00"', JsonArrayElementSpans('["é\uD83D\uDE00"]')[1]["text"],
+		"Unicode source spelling is retained, rather than reconstructed from values")
+}
+Test("JSON: array source spans preserve exact ordered token kinds (json-array-spans)",
+	_JsonArraySpans_PreserveExactOrderedTokenKinds)
+
+_JsonArraySpans_RefuseWholeDocumentAndNonArrays() {
+	for Source in ['{}', '"[]"', 'null', 'true', '1', '[1,]', '[1] trailing',
+		'[1, {"x":2} invalid]', '[{"key\u0000hidden":1}]']
+		AssertThrows(JsonArrayElementSpans.Bind(Source), "array source spans retain full canonical validation")
+}
+Test("JSON: array source spans retain whole-document and root refusals (json-array-spans)",
+	_JsonArraySpans_RefuseWholeDocumentAndNonArrays)
+
+
+_R7JK_ExactSourceKinds() {
+	global JSON_NULL
+	Source := '{"object":{"leaf":false},"array":[false,1,"x"],"string":"1","number":1.0,"true":true,"false":false,"null":null}'
+	Members := JsonObjectMemberSpans(Source)
+	Expected := Map("object", "object", "array", "array", "string", "string", "number", "number",
+		"true", "boolean", "false", "boolean", "null", "null")
+	AssertEqual(Expected.Count, Members.Count, "every independent JSON kind fixture must be present")
+	for Name, Kind in Expected
+		AssertEqual(Kind, Members[Name]["kind"], "the parser owns the original kind of " . Name)
+	AssertTrue(JsonParse(Members["string"]["text"]) is String, "ordinary decoding preserves numeric strings")
+	AssertTrue(JsonParse(Members["true"]["text"]) is Integer, "ordinary decoding keeps the existing native Boolean representation")
+	AssertEqual(true, JsonParse(Members["true"]["text"]))
+	AssertEqual(false, JsonParse(Members["false"]["text"]))
+	AssertTrue(JsonParse(Members["null"]["text"]) == JSON_NULL, "the null sentinel remains unchanged")
+}
+Test("JSON source kinds: canonical spans distinguish scalar aliases and nested containers (json-member-source-kind)",
+	_R7JK_ExactSourceKinds)
+
+_R7JK_DecodedMemberKinds() {
+	for KindCase in [
+		['{"schema_version":1,"\u0073chema_version":true}', "boolean", "true"],
+		['{"schema_version":true,"\u0073chema_version":1e0}', "number", "1e0"],
+		['{"schema_version":0,"\u0073chema_version":"1"}', "string", '"1"']
+	] {
+		Member := JsonObjectMemberSpans(KindCase[1])["schema_version"]
+		AssertEqual(KindCase[2], Member["kind"], "the last decoded member owns its actual JSON kind")
+		AssertEqual(KindCase[3], Member["text"], "kind and source span must name the same decoded member")
+	}
+	Nested := JsonObjectMemberSpans('{"outer":{"schema_version":"1"}}', ["outer"])["schema_version"]
+	AssertEqual("string", Nested["kind"], "selected nested objects use the same canonical dispatch kind")
+}
+Test("JSON source kinds: escaped duplicates retain exact decoded ownership (json-member-source-kind)",
+	_R7JK_DecodedMemberKinds)

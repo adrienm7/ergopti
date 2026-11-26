@@ -36,19 +36,21 @@ local helpers, Sandbox, load_over_config, drop_config, chord =
 
 helpers.describe("keyboard shortcuts: late contextual delivery custody", function()
 	local function with_editor(initial, body, writes_fail)
-		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
-		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-		local saved_builder = package.loaded["ui.menu.builder"]
-		local gestures = require("modules.gestures.manager")
+		local saved_source = package.loaded["modules.shortcuts.star_key_source"]
+		local saved_magic = package.loaded["hotstrings.engine.magic_key"]
+		local saved_builder = package.loaded["menu.ui.builder.builder"]
+		local gestures = require("gestures.engine.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
 			queue = {}, fired = {} }
-		package.loaded["modules.hotstrings.magic_key_source"] = {
-			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
+		package.loaded["modules.shortcuts.star_key_source"] = {
+			source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
 			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
 		}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end,
+			default = function() return "★" end, marker = function() return "★" end,
+			display = function(char) return char or "★" end, display_text = function(text) return text end }
 		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
 		local ok, err = pcall(function()
 			local shortcuts, config = load_over_config(initial, writes_fail)
@@ -60,23 +62,23 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 			body(shortcuts, config, state)
 		end)
 		gestures.execute_action = saved_execute
-		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
-		package.loaded["modules.hotstrings.magic_key"] = saved_magic
-		package.loaded["ui.menu.builder"] = saved_builder
+		package.loaded["modules.shortcuts.star_key_source"] = saved_source
+		package.loaded["hotstrings.engine.magic_key"] = saved_magic
+		package.loaded["menu.ui.builder.builder"] = saved_builder
 		drop_config()
 		if not ok then error(err, 0) end
 	end
 
 	local function with_actual_logger(body)
-		local saved_core, saved_shim = package.loaded["logger"], package.loaded["logger.shim"]
-		package.loaded["logger"], package.loaded["logger.shim"] = nil, nil
-		local logger = require("logger.shim")
+		local saved_core, saved_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+		local logger = require("core.logger.engine.shim")
 		local ok, err = pcall(function()
 			logger.set_level("debug")
 			body(logger)
 		end)
 		logger.set_sink(nil)
-		package.loaded["logger"], package.loaded["logger.shim"] = saved_core, saved_shim
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = saved_core, saved_shim
 		if not ok then error(err, 0) end
 	end
 
@@ -90,7 +92,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 				helpers.assert_true(shortcuts.consume(state.detail, state.options))
 				state.queue[1]()
 				helpers.assert_eq(observed, 1, "The real configured logger sink must run before the executor")
-				helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__magic_editor" } })
+				helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__meta_star" } })
 			end)
 		end)
 	end)
@@ -107,7 +109,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 						elseif gate == "paused" then state.paused = true
 						elseif gate == "inhibited" then state.inhibited = true
 						elseif gate == "source" then state.generation = state.generation + 1
-						elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+						elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("meta_star", "enter"))
 						else
 							local token = {}
 							helpers.assert_true(shortcuts.acquire_configuration(token))
@@ -128,13 +130,13 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		helpers.it("(contextual-late-custody) rereads live " .. gate .. " after source callback reentry", function()
 			with_actual_logger(function(logger)
 				with_editor(nil, function(shortcuts, _, state)
-					local source = require("modules.hotstrings.magic_key_source")
-					local original = source.editor_source
+					local source = require("modules.shortcuts.star_key_source")
+					local original = source.source
 					local armed, observed = false, 0
 					logger.set_sink(function(line)
 						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
 					end)
-					source.editor_source = function()
+					source.source = function()
 						local facts = original()
 						if armed then
 							armed, observed = false, observed + 1
@@ -158,8 +160,8 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		helpers.it("(contextual-late-custody) closes configuration owner reentry in late " .. boundary, function()
 			with_actual_logger(function(logger)
 				with_editor(nil, function(shortcuts, _, state)
-					local source = require("modules.hotstrings.magic_key_source")
-					local original_admission, original_source = state.options.admission, source.editor_source
+					local source = require("modules.shortcuts.star_key_source")
+					local original_admission, original_source = state.options.admission, source.source
 					local armed, observed, reads = false, 0, 0
 					logger.set_sink(function(line)
 						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -178,7 +180,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 						end
 						return facts
 					end
-					source.editor_source = function()
+					source.source = function()
 						local facts = original_source()
 						if armed and boundary == "source" then retire() end
 						return facts
@@ -195,13 +197,13 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 	helpers.it("(contextual-late-custody) refuses failed source callback after logging without invoking executor", function()
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
-				local source = require("modules.hotstrings.magic_key_source")
-				local original = source.editor_source
+				local source = require("modules.shortcuts.star_key_source")
+				local original = source.source
 				local armed, observed = false, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
 				end)
-				source.editor_source = function()
+				source.source = function()
 					if armed then observed = observed + 1; error("original selected-source callback unavailable") end
 					return original()
 				end
@@ -222,8 +224,8 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 	helpers.it("(contextual-late-custody) refuses source read after original admission retires configuration owner", function()
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
-				local source = require("modules.hotstrings.magic_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local source = require("modules.shortcuts.star_key_source")
+				local admission, original = state.options.admission, source.source
 				local armed, retired, observed, source_after_loss = false, false, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -238,7 +240,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					end
 					return facts
 				end
-				source.editor_source = function()
+				source.source = function()
 					if retired then source_after_loss = source_after_loss + 1 end
 					return original()
 				end
@@ -255,7 +257,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 		helpers.it("(contextual-late-custody) refuses a replacement " .. owner .. " owner after logger without invoking it", function()
 			with_actual_logger(function(logger)
 				with_editor(nil, function(shortcuts, _, state)
-					local original = shortcuts.magic_editor_decision
+					local original = shortcuts.star_slot_decision
 					local captured = original(state.options.admission())
 					local foreign_calls, observed = 0, 0
 					logger.set_sink(function(line)
@@ -267,7 +269,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 								return { master = true, paused = false, inhibited = false }
 							end
 						else
-							shortcuts.magic_editor_decision = function()
+							shortcuts.star_slot_decision = function()
 								foreign_calls = foreign_calls + 1
 								return captured
 							end
@@ -280,7 +282,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 						helpers.assert_eq(foreign_calls, 0, "Replacement functions cannot issue the original queued decision")
 						helpers.assert_eq(state.fired, {})
 					end)
-					shortcuts.magic_editor_decision = original
+					shortcuts.star_slot_decision = original
 					if not ok then error(err, 0) end
 				end)
 			end)
@@ -290,8 +292,8 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 	helpers.it("(contextual-late-custody) refuses admission issuer replacement during original getter before source callback", function()
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
-				local source = require("modules.hotstrings.magic_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local source = require("modules.shortcuts.star_key_source")
+				local admission, original = state.options.admission, source.source
 				local armed, replaced, observed, source_after_loss, foreign_calls = false, false, 0, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -307,7 +309,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					end
 					return facts
 				end
-				source.editor_source = function()
+				source.source = function()
 					if replaced then source_after_loss = source_after_loss + 1 end
 					return original()
 				end
@@ -324,8 +326,8 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 	helpers.it("(contextual-late-custody) refuses final admission read after source retires dispatch owner", function()
 		with_actual_logger(function(logger)
 			with_editor(nil, function(shortcuts, _, state)
-				local source = require("modules.hotstrings.magic_key_source")
-				local admission, original = state.options.admission, source.editor_source
+				local source = require("modules.shortcuts.star_key_source")
+				local admission, original = state.options.admission, source.source
 				local armed, retired, observed, admission_after_loss = false, false, 0, 0
 				logger.set_sink(function(line)
 					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
@@ -334,7 +336,7 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 					if retired then admission_after_loss = admission_after_loss + 1 end
 					return admission()
 				end
-				source.editor_source = function()
+				source.source = function()
 					local facts = original()
 					if armed then
 						armed, retired, observed = false, true, observed + 1
@@ -393,7 +395,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 		"retained false", "retained nil", "retained unknown", "retained throw" }) do
 		helpers.it("(consume-queue-ack) refuses " .. scenario .. " before any action", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired, before_ack = gestures.execute_action, nil, {}, nil
 			gestures.execute_action = function(action) fired[#fired + 1] = action end
 			local checked, failure = pcall(function()
@@ -428,7 +430,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 	for _, scenario in ipairs({ "duplicate delivery", "reentrant delivery" }) do
 		helpers.it("(consume-queue-ack) acknowledges one action under " .. scenario, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired, reentered = gestures.execute_action, nil, {}, false
 			gestures.execute_action = function(action)
 				fired[#fired + 1] = action
@@ -461,7 +463,7 @@ end)
 
 helpers.describe("keyboard collision claim source", function()
 	helpers.it("retains explicit native reservations and refuses source divergence", function()
-		local keyboard, storage = load_over_config({ primary_j = "none", magic_editor = "none" })
+		local keyboard, storage = load_over_config({ primary_j = "none", meta_star = "none" })
 		local ok, why = pcall(function()
 			local frame = assert(keyboard.capture_collision_inventory())
 			helpers.assert_true(frame.current())
@@ -470,14 +472,14 @@ helpers.describe("keyboard collision claim source", function()
 				if claim.binding == "keyboard__primary_j" then found = claim.key == "j" and claim.mods.ctrl == true end
 			end
 			helpers.assert_true(found, "None is a retained ordinary native-behavior reservation")
-			Sandbox.write_bytes(storage.path, '[shortcuts.keyboard]\nprimary_j = "copy"\nmagic_editor = "none"\n')
+			Sandbox.write_bytes(storage.path, '[shortcuts.keyboard]\nprimary_j = "copy"\nmeta_star = "none"\n')
 			helpers.assert_eq(frame.current(), false)
 			helpers.assert_nil(keyboard.capture_collision_inventory())
 		end)
 		drop_config(); if not ok then error(why, 0) end
 	end)
 	helpers.it("configuration acquisition and its release cannot revive an old collision frame", function()
-		local keyboard = load_over_config({ primary_j = "none", magic_editor = "none" })
+		local keyboard = load_over_config({ primary_j = "none", meta_star = "none" })
 		local ok, why = pcall(function()
 			local frame = assert(keyboard.capture_collision_inventory()); local token = {}
 			helpers.assert_true(keyboard.acquire_configuration(token))
@@ -496,7 +498,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	for _, gate in ipairs({ "master", "paused", "inhibited", "reader failure", "reader replacement" }) do
 		helpers.it("(ordinary-live-admission) cancels an ordinary action after " .. gate, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute = gestures.execute_action
 			local pending, fired, refuse = nil, 0, false
 			local admission = { master = true, paused = false, inhibited = false }
@@ -530,9 +532,9 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	end
 
 	for _, gate in ipairs({ "master", "paused" }) do
-		helpers.it("(ordinary-live-admission) keeps script control available through " .. gate, function()
+		helpers.it("(ordinary-live-admission) retires a script-action slot through " .. gate .. " (scd1-slot-paused)", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "script_pause_toggle" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute, pending, fired = gestures.execute_action, nil, 0
 			local admission = { master = true, paused = false, inhibited = false }
 			gestures.execute_action = function() fired = fired + 1 end
@@ -543,7 +545,9 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 				}))
 				admission[gate] = gate == "paused"
 				pending()
-				helpers.assert_eq(fired, 1, "script control remains the user's way back from pause")
+				-- SCD-1: a slot is suspended like on Windows and macOS; the AltGr
+				-- script chords are the way back from a pause.
+				helpers.assert_eq(fired, 0, "a keyboard slot must not run a script action through " .. gate)
 			end)
 			gestures.execute_action = execute
 			drop_config()
@@ -559,7 +563,7 @@ helpers.describe("keyboard shortcuts: admission callback boundaries", function()
 	for _, phase in ipairs({ "capture", "queue acknowledgement", "execution log" }) do
 		helpers.it("(ordinary-live-admission) rechecks pause at " .. phase, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures, logger = require("modules.gestures.manager"), require("logger.shim")
+			local gestures, logger = require("gestures.engine.manager"), require("core.logger.engine.shim")
 			local execute, debug_log = gestures.execute_action, logger.debug
 			local pending, fired, queued = nil, 0, 0
 			local admission = { master = true, paused = phase == "capture", inhibited = false }

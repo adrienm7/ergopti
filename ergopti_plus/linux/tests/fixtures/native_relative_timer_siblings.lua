@@ -4,14 +4,14 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_relative_timer_siblings%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
-local Scheduler = require("adapters.timer_scheduler")
-local Digest = require("adapters.file_digest")
-local Http = require("adapters.http_client")
-local Shell = require("adapters.shell_runner")
-local Loop = require("adapters.event_loop")
+local Scheduler = require("core.events.timer_scheduler")
+local Digest = require("core.fs.adapters.file_digest")
+local Http = require("core.network.adapters.http_client")
+local Shell = require("core.process.adapters.shell_runner")
+local Loop = require("core.events.loop")
 local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-relative-siblings-XXXXXX"))
 local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}
 -- Cold external curl startup belongs to this existing one-second completion
@@ -73,7 +73,7 @@ local function flush_http_trace()
 		end
 	end)
 end
-local NativeTimer = require("infra.native_timer")
+local NativeTimer = require("core.timing.engine.native_timer")
 local original_native_start, original_spawn = NativeTimer.start, uv.spawn
 local original_write, original_close, original_kill = uv.write, uv.close, uv.kill
 NativeTimer.start = function(...)
@@ -259,7 +259,7 @@ for _, in_callback in ipairs({ false, true }) do
 		local function arm()
 			uv.sleep(HTTP_STALE_WORK_MS); start = uv.hrtime()
 			pcall(function()
-				local clock = require("infra.monotonic").backend()
+				local clock = require("core.logger.engine.monotonic").backend()
 				active_http_trace = { start = start / 1000000, cached = uv.now(), events = {},
 					mode = in_callback and "inside-callback" or "after-blocking",
 					clock = clock == "luv.hrtime" and "luv.hrtime" or "Other" }
@@ -284,9 +284,13 @@ for _, in_callback in ipairs({ false, true }) do
 	check("actual ShellRunner child survives its new deadline " .. location, function()
 		local results, start = {}, nil
 		local function arm()
-			uv.sleep(160); start = uv.hrtime()
+			-- The blocking work outlasts the deadline, so a deadline taken from
+			-- the stale loop clock has already passed; the 400 ms deadline
+			-- leaves a loaded runner room for a 40 ms child (one took 102 ms
+			-- against the former 100 ms deadline).
+			uv.sleep(600); start = uv.hrtime()
 			local token = assert(Shell.run_async("/bin/sh", { "-c", "sleep .04; printf done; printf warning >&2" },
-				{ timeout_ms = 100 }, function(result) results[#results + 1] = result end))
+				{ timeout_ms = 400 }, function(result) results[#results + 1] = result end))
 			tokens[#tokens + 1] = token
 			remember_processes()
 		end

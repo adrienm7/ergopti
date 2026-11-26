@@ -8,9 +8,9 @@ assert(base:match("^https://127%.0%.0%.1:%d+$") and tag:match("^v%d+%.%d+%.%d+")
 local root = prefix .. "/lib/ergopti"
 local driver = root .. "/linux"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
- .. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path
+ .. root .. "/_shared/?.lua;" .. root .. "/_shared/?/init.lua;" .. package.path
 assert(type(jit) == "table" and jit.os == "Linux", "Actual Linux LuaJIT required")
-local compat = require("compat.utf8"); compat.install()
+local compat = require("core.lifecycle.engine.compat.utf8"); compat.install()
 local uv = require("luv")
 local Manager = require("modules.updater.manager")
 local Installer = require("modules.updater.installer")

@@ -35,7 +35,7 @@
 ; ==================================
 ; ==================================
 
-; The vector count, pinned as _shared/lua/test/tap_hold_decision_contract.lua
+; The vector count, pinned as _shared/tests/lua/keyboard/tap_hold_decision_contract.lua
 ; pins it, so a truncated corpus fails instead of shrinking the contract.
 global _CTHD_VECTOR_COUNT := 30
 
@@ -169,7 +169,7 @@ class _CTHD_World {
 				AssertEqual("", TapHoldOneShotResult(Key, ScriptInformation["MagicKey"]),
 					"a corpus letter has no special one-shot result")
 				; OneShotShift title-cases a character with no special result.
-				this.Strokes.Push(Format("{:T}", Key) == StrUpper(Key) ? "shift+" . Key : Key)
+				this.Strokes.Push(TextCaseTitle(Key) == StrUpper(Key) ? "shift+" . Key : Key)
 				return
 			}
 		}
@@ -266,12 +266,16 @@ class _CTHD_World {
 			if TapHoldKeyRolls(Key) {
 				if TapHoldRollUndecided()
 					throw Error("a vector with two undecided typing keys would replay outside the seam")
+				; One owner spans the press, the hold and the roll, as in TapHoldOwnHoldModifier.
+				Owner := TapHoldNewOwner()
+				Owner.KeyId := Key
 				TapFn := () => _CTHD_FireTap(World, Key)
-				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey)
+				PressFn := _TapHoldRollPressModifier.Bind(Key, ModKey, Owner)
 				OwnFn := (Pressed) => TapHoldOwnImmediateModifier(Key, Info.Wait, ModKey, Seconds,
-					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0)
+					Wait, (Name) => World.Physical.Has(Key), Tick, Pressed ? (*) => true : 0,
+					0, 0, false, 0, Owner)
 				TapHoldOwnRoll(Key, Info.Wait, Seconds, TapFn, PressFn, OwnFn,
-					Map("wait_release", Wait, "tick", Tick))
+					Map("wait_release", Wait, "tick", Tick), Owner)
 				return
 			}
 			; A native modifier held as itself passes through: its own edge holds it.
@@ -325,7 +329,7 @@ _CTHD_HoldPickerOrder() {
 	global _SharedDir
 	static Order := 0
 	if !IsObject(Order)
-		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
+		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\data\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
 	return Order
 }
 
@@ -425,9 +429,10 @@ Test("tap_hold decision corpus: holds the pinned number of vectors", _CTHD_Count
 _CTHD_OneShotSourcePinned() {
 	Body := _DriverFuncBody("OneShotShift")
 	AssertTrue(Body != "", "OneShotShift must exist")
-	AssertTrue(InStr(Body, 'Format("{:T}", Scalar)') > 0, "the replay reads a capitalised letter through this title-casing")
+	AssertTrue(InStr(Body, "TextCaseTitle(Scalar)") > 0, "the replay reads a capitalised letter through this title-casing")
 	AssertTrue(InStr(Body, "TapHoldOneShotResult(Scalar, MagicKey)") > 0, "the replay reads special results through this table")
-	AssertTrue(InStr(Body, 'InputHook("L2 T" . TimeoutSec') > 0, "the native capture must time out at the shared timeout the replay reads")
+	AssertTrue(InStr(Body, "TimeoutOption := TapHoldOneShotHookTimeoutOption()") > 0
+		&& InStr(Body, 'InputHook("L2" . TimeoutOption') > 0, "the native capture must time out at the shared timeout the replay reads")
 }
 Test("tap_hold decision corpus: the one-shot replay matches OneShotShift's own steps", _CTHD_OneShotSourcePinned)
 

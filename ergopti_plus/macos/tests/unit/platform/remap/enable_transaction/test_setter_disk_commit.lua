@@ -66,6 +66,57 @@ helpers.describe("karabiner synchronous setters commit disk before live state", 
 		end)
 	end)
 
+	helpers.it("refuses invalid timing values before persisting (remap-timing-invalid)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			local setters = {
+				{ remap.set_sticky_timeout, remap.get_sticky_timeout },
+				{ remap.set_tap_hold_timeout, remap.get_tap_hold_timeout },
+				{ remap.set_simultaneous_threshold, remap.get_simultaneous_threshold },
+			}
+			for _, pair in ipairs(setters) do
+				local original, before = pair[2](), calls.save
+				for _, value in ipairs({ 0.5, 1.5, math.huge, -math.huge, 0/0, 2^54 }) do
+					helpers.assert_eq(pair[1](value), false, "timeout must be a finite positive integer")
+					helpers.assert_eq(pair[2](), original)
+					helpers.assert_eq(calls.save, before, "invalid input must not reach persistence")
+				end
+			end
+		end)
+	end)
+
+	helpers.it("does not clear a per-key override for malformed values (remap-timing-invalid)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			helpers.assert_true(remap.set_tap_timeout("left_shift", 321))
+			local before = calls.save
+			for _, value in ipairs({ "invalid", "321", 0.5, 1.5, 10001, math.huge, -math.huge, 0/0, 2^54 }) do
+				helpers.assert_eq(remap.set_tap_timeout("left_shift", value), false)
+				helpers.assert_eq(remap.get_tap_timeout("left_shift"), 321)
+				helpers.assert_eq(calls.save, before)
+			end
+			helpers.assert_true(remap.set_tap_timeout("left_shift", 0), "zero intentionally clears the override")
+			helpers.assert_nil(remap.get_tap_timeout("left_shift"))
+		end)
+	end)
+
+	helpers.it("refuses a global delay or chord threshold outside the shared schema (value-validation)", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			helpers.assert_true(remap.set_tap_hold_timeout(10000), "the declared maximum is accepted")
+			helpers.assert_true(remap.set_simultaneous_threshold(1000), "the declared maximum is accepted")
+			local before = calls.save
+			for _, value in ipairs({ "300", 0, 10001, 2.5, 0/0, math.huge }) do
+				helpers.assert_eq(remap.set_tap_hold_timeout(value), false)
+				helpers.assert_eq(remap.get_tap_hold_timeout(), 10000)
+			end
+			for _, value in ipairs({ "80", 0, 1001, 2.5, 0/0 }) do
+				helpers.assert_eq(remap.set_simultaneous_threshold(value), false)
+			end
+			helpers.assert_eq(calls.save, before, "a refused value is never saved")
+		end)
+	end)
+
 	helpers.it("reset publishes all defaults together or preserves every prior value", function()
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()
@@ -78,6 +129,18 @@ helpers.describe("karabiner synchronous setters commit disk before live state", 
 			helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
 			helpers.assert_eq(remap.get_combo_symmetric(), true)
 			helpers.assert_eq(remap.get_tap_hold_timeout(), 321)
+		end)
+	end)
+
+	-- The chord setter took the one-shot Shift, which no chord runs on any OS
+	-- (maintainer decision of 2026-11-06); Windows and Linux refuse it.
+	helpers.it("(kcl-chord-refuses-one-shot-shift) the chord setter refuses the one-shot Shift", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap({ initially_enabled = false })
+			local saves = calls.save
+			helpers.assert_eq(remap.set_combo_combo_action("left_shift+right_shift", "sticky_shift"), false)
+			helpers.assert_eq(remap.get_combo_combo_action("left_shift+right_shift"), "none")
+			helpers.assert_eq(calls.save, saves, "a refused chord action saves nothing")
 		end)
 	end)
 end)

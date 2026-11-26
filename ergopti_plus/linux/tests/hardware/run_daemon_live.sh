@@ -8,12 +8,25 @@
 # real daemon, a real trigger, a real prediction, and the tray it shows.
 #
 # Needs root (uinput and the grab), Xvfb, dbus-launch, at-spi2-core, openbox,
-# xkbcomp, xclip, python3-gi with Gtk 3. Run from anywhere.
+# xkbcomp, xclip, python3-gi with Gtk 3, lua-lgi. Run from anywhere.
 # Exit 0 = expansion and tray both verified; 1 = a failure; 2 = no environment.
 
 set -u
 cd "$(dirname "$0")/../.." || exit 2
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
+# lua-lgi installs for the distro's Lua, not for LuaJIT. Without it the daemon
+# has no tooltip renderer, retires every prediction offer it cannot draw, and
+# the AI phase sees its accepting digit typed instead.
+export LUA_PATH="${LUA_PATH};/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+# Run as root under sudo, the runner user's XDG_RUNTIME_DIR is inherited, and a
+# dconf client there creates its dconf folder owned by root: every later
+# gsettings of that user is then refused (desktop-webview, 2026-11-25). Root
+# keeps its session files in a runtime folder of its own.
+if [ "$(id -u)" = 0 ]; then
+	XDG_RUNTIME_DIR="$(mktemp -d)" || exit 2
+	export XDG_RUNTIME_DIR
+fi
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break
@@ -22,7 +35,9 @@ for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp xclip; do
 	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
+luajit -e 'require("lgi")' >/dev/null 2>&1 || { echo "ENVIRONMENT: lgi is unreachable from LuaJIT (lua-lgi)" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
+python3 tests/hardware/test_llm_selection_focus_state.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
 for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do
 	python3 "tests/hardware/${probe}" || exit 1
@@ -33,6 +48,16 @@ PIDS="$!"
 export DISPLAY=:58
 eval "$(dbus-launch --sh-syntax)"
 PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
+# The daemon moves the fixture's plaintext API key to the secret service in
+# the background. A locked keyring once held the boot before its output
+# keyboard opened: secret-tool store waited on a prompt nobody here can
+# dismiss (5bf79358). The daemon below runs with a secret-tool that blocks the
+# same way (decided by the maintainer on 2026-11-11: that must never delay
+# input readiness); run_daemon_live.lua checks the daemon is ready meanwhile.
+SECRET_TOOL_SHIM="$(mktemp -d)"
+export ERGOPTI_LIVE_SECRET_TOOL_MARKER="${SECRET_TOOL_SHIM}/blocked"
+printf '#!/bin/sh\n: > "%s"\nexec sleep 600\n' "${ERGOPTI_LIVE_SECRET_TOOL_MARKER}" > "${SECRET_TOOL_SHIM}/secret-tool"
+chmod 700 "${SECRET_TOOL_SHIM}/secret-tool"
 "${BUS_LAUNCHER}" --launch-immediately >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
@@ -125,7 +150,10 @@ for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
-python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
+# The host stays the session's watcher until the daemon has exited, as a panel
+# does: the daemon checks 15 s after its icon that something hosts it (TRAY-03),
+# and a host gone by then makes it open a « no tray » window over the editor.
+python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 --hold \
 	--expect-icon-file --min-labels 5 --forbid-raw-keys --expect-label "Tap-Holds" > "${REPORT}" &
 HOST=$!
 for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done
@@ -138,8 +166,9 @@ if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
 	kill ${PIDS} "${HOST}" 2>/dev/null
 	exit 2
 fi
-luajit tests/hardware/run_daemon_live.lua
+PATH="${SECRET_TOOL_SHIM}:${PATH}" luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
+kill -TERM "${HOST}" 2>/dev/null
 wait "${HOST}"
 TRAY=$?
 echo "--- the tray the daemon showed ---"

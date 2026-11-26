@@ -9,7 +9,7 @@
 ---
 --- THE ROOT CAUSE ENCODED:
 --- The three drivers are supposed to read one privacy posture from
---- _shared/modules/features/manifest.toml. Linux could not: [sections.metrics]
+--- _shared/settings/data/features/manifest.toml. Linux could not: [sections.metrics]
 --- listed only ["ahk", "hs"], and the codegen emitted features_manifest.lua for
 --- Windows and macOS only. The driver had nowhere to read the flags FROM, so it
 --- had none of them. This suite fails if either half regresses — the manifest
@@ -39,12 +39,12 @@ local DRIVER_ROOT = helpers.driver_root()
 -- real adapter would therefore modify the developer's own configuration and
 -- make the next suite run depend on the previous one. Keep every case on a
 -- fresh in-memory store, then restore the exact modules this file displaced.
-local _previous_storage = package.loaded["adapters.storage"]
+local _previous_storage = package.loaded["core.fs.adapters.storage"]
 local _previous_keystats = package.loaded["modules.keystats.keystats"]
 
 --- Reloads the keystats with fresh module state.
 local function fresh_keystats(neutral)
-	package.loaded["adapters.storage"] = Fakes.storage()
+	package.loaded["core.fs.adapters.storage"] = Fakes.storage()
 	package.loaded["modules.keystats.keystats"] = nil
 	local kl = require("modules.keystats.keystats")
 	kl.init({})
@@ -97,7 +97,7 @@ end
 
 helpers.describe("keystats privacy — the posture is read, not re-typed", function()
 	it("exposes every flag the shared manifest declares", function()
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		local kl = fresh_keystats(true)
 		local state = kl.get_privacy_state()
 
@@ -115,7 +115,7 @@ helpers.describe("keystats privacy — the posture is read, not re-typed", funct
 
 	it("does not hardcode the four defaults in the driver", function()
 		local code = unit_code("local function new_live_tracker(")
-		local KEY = require("config_keys").KEY
+		local KEY = require("settings.engine.keys").KEY
 		for _, entry in ipairs({
 			{ "METRICS_ENABLED",                    "metrics.enabled" },
 			{ "METRICS_PRIVATE_FILTER_ENABLED",     "metrics.private_filter_enabled" },
@@ -179,6 +179,44 @@ helpers.describe("keystats privacy — private browsing", function()
 			helpers.assert_true(kl.is_private_window(title),
 				"must flag a private window: " .. title)
 		end
+	end)
+
+	it("protects localized Firefox private windows before recording keys", function()
+		local kl = fresh_keystats()
+		for _, title in ipairs({
+			"Exemple — Navigation privée de Mozilla Firefox",
+			"Beispiel — Mozilla Firefox Privater Modus",
+			"Ejemplo — Mozilla Firefox Navegación privada",
+			"Mozilla Firefox — Navigazione anonima", "Mozilla Firefox — navegação privativa",
+			"Mozilla Firefox-privénavigatie", "Mozilla Firefox — tryb prywatny",
+			"Приватный просмотр Mozilla Firefox", "Приватний перегляд Mozilla Firefox",
+			"Mozilla Firefox Gizli Gezinti", "Mozilla Firefox プライベートブラウジング",
+			"Mozilla Firefox 사생활 보호 모드", "Mozilla Firefox 隐私浏览",
+			"Mozilla Firefox التصفح الخاص", "Anonymní prohlížení — Mozilla Firefox",
+			"Mozilla Firefox Privat browsing", "Mozilla Firefox Privat surfning",
+			"Mozilla Firefox Privat nettlesing", "גלישה פרטית של Mozilla Firefox",
+			"Exemple — NAVIGATION PRIVÉE de Mozilla Firefox",
+		}) do
+			kl.set_private_window(kl.is_private_window(title))
+			helpers.assert_true(kl.is_private_window(title), "private window must be detected")
+			helpers.assert_eq(keystrokes_after_typing(kl, "firefox"), 0, "private input must not be recorded")
+		end
+	end)
+
+	it("refreshes changed private markers and honors extra Unicode keywords", function()
+		local matcher = require("metrics.engine.view.private_window")
+		local original = matcher.KEYWORDS
+		local ok, err = pcall(function()
+			matcher.KEYWORDS = { "Old marker" }
+			helpers.assert_true(matcher.matches("OLD MARKER"))
+			matcher.KEYWORDS[1] = "Nouveau marqueur"
+			helpers.assert_eq(matcher.matches("OLD MARKER"), false)
+			helpers.assert_true(matcher.matches("NOUVEAU MARQUEUR"))
+			helpers.assert_true(matcher.matches("Fenêtre ÉPHÉMÈRE", { "éphémère" }))
+			helpers.assert_eq(matcher.matches("Fenêtre ÉPHÉMÈRE", { "autre" }), false)
+		end)
+		matcher.KEYWORDS = original
+		if not ok then error(err, 0) end
 	end)
 
 	it("does not flag an ordinary window", function()
@@ -354,6 +392,34 @@ helpers.describe("keystats privacy — coverage never narrows", function()
 		kl.set_system_auth_filter_enabled(true)
 	end)
 
+	-- ADD-1 (decided by the maintainer on 2026-11-11): a password manager of the
+	-- shared list is a secure field as a whole, as on macOS, whatever the
+	-- metrics switches say: the published verdict also gates hotstrings, AI
+	-- and clipboard borrowers. Its Wayland app_id is matched, not only comm.
+	it("protects a shared-list password manager whatever the metrics filters (add1-secure-app)", function()
+		local kl = fresh_keystats()
+		kl.set_secure_filter_enabled(false)
+		local ok, failure = pcall(function()
+			for _, app in ipairs({ "org.keepassxc.KeePassXC", "com.bitwarden.desktop", "RoboForm", "Dashlane" }) do
+				helpers.assert_true(kl.is_context_protected(app, "Vault"),
+					"the whole application must stay protected with the secure filter off: " .. app)
+			end
+			helpers.assert_eq(kl.is_context_protected("firefox", "Mail"), false)
+		end)
+		kl.set_secure_filter_enabled(true)
+		if not ok then error(failure, 0) end
+	end)
+
+	it("reads the shared list in the detector and the metrics (add1-secure-app)", function()
+		local Detector = helpers.load_module("platform.focus.secure_field_detector")
+		for _, app in ipairs({ "org.keepassxc.KeePassXC", "1password", "Seahorse", "org.gnome.seahorse.Application" }) do
+			helpers.assert_true(Detector.isSecureApp(app), "the detector must match " .. app)
+		end
+		local kl = fresh_keystats()
+		helpers.assert_true(kl.is_password_app("roboform"), "the metrics list is the shared one")
+		helpers.assert_eq(Detector.isSecureApp("gedit"), false)
+	end)
+
 	it("still ignores ordinary applications", function()
 		local kl = fresh_keystats()
 		helpers.assert_eq(kl.is_password_app("firefox"), false)
@@ -385,7 +451,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 
 	it("asks AT-SPI whether the focused element is a password field", function()
 		-- The sibling of the defect above, and worse, because this one had a whole
-		-- adapter behind it. adapters/secure_field_detector.lua was written and
+		-- adapter behind it. platform/focus/secure_field_detector.lua was written and
 		-- tested, keystats.set_secure_field was written, and `refresh()` had no
 		-- caller anywhere in the driver — so isSecureField() answered false forever
 		-- and the setter was never called. metrics.secure_filter_enabled ships
@@ -398,7 +464,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 		-- call deleted, because the filter simply never fires.
 		local code = code_of("ergopti_hotstrings.lua")
 		local guard_code = unit_code('error("focus_guard requires keystats.set_secure_field")')
-		helpers.assert_contains(code, "adapters.secure_field_detector",
+		helpers.assert_contains(code, "platform.focus.secure_field_detector",
 			"the daemon must reach the detector at all")
 		helpers.assert_contains(code, "keystats  = keystats",
 			"the daemon must give the focus guard the real keystats")
@@ -425,12 +491,12 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 
 	it("uses the shared keyword list rather than a driver-local copy", function()
 		local code = unit_code("local function new_live_tracker(")
-		helpers.assert_contains(code, 'require("keystats.private_window")',
+		helpers.assert_contains(code, 'require("metrics.engine.view.private_window")',
 			"the markers are a cross-driver privacy guarantee and live in _shared")
 		helpers.assert_true(code:find("Incognito", 1, true) == nil,
 			"the keyword list must not be duplicated into this driver")
 	end)
 end)
 
-package.loaded["adapters.storage"] = _previous_storage
+package.loaded["core.fs.adapters.storage"] = _previous_storage
 package.loaded["modules.keystats.keystats"] = _previous_keystats

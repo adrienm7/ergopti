@@ -63,7 +63,7 @@ _USBP_SelectionIsPolledInBackground() {
 		"GetUIASelection must NOT call UIA directly on the keyboard path (uia-selection-blocks-keyboard-thread)")
 
 	; 3. Verify timer is armed.
-	Assert(InStr(Src, "SetTimer(_UIA_SelectionPollTimer, 500)") > 0,
+	Assert(InStr(Src, 'SetTimer(_UIA_SelectionPollTimer, TimingsGet("adapters", "uia_selection_poll_ms"))') > 0,
 		"UIA selection poll timer must be armed with a periodic interval")
 
 	Root := _USBP_ReadSource("ErgoptiPlus.ahk")
@@ -74,9 +74,9 @@ _USBP_SelectionIsPolledInBackground() {
 	StartBody := _DriverFuncBody("UIASW_Start")
 	Assert(InStr(StartBody, "UIASW_WorkerEntryPath()") > 0,
 		"source mode must launch the minimal UIA worker entry instead of reparsing the full driver on first use")
-	Entry := _USBP_ReadSource("modules/keymap/uia_selection_worker_entry.ahk")
+	Entry := _USBP_ReadSource("hotstrings/engine/expander/uia_selection_worker_entry.ahk")
 	Assert(InStr(Entry, "vendor\UIA.ahk") > 0
-		&& InStr(Entry, "adapters\uia_worker.ahk") > 0
+		&& InStr(Entry, "core\process\adapters\uia_worker.ahk") > 0
 		&& InStr(Entry, "#Include %A_ScriptDir%\uia_selection_worker.ahk") = 0
 		&& InStr(Entry, "ErgoptiPlus.ahk") = 0,
 		"the source worker entry must contain only its UIA/protocol dependencies, never the resident controller or normal driver boot")

@@ -43,8 +43,8 @@ local function read_corpus()
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local ok, result = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(result) end
 	return result, nil
@@ -52,8 +52,8 @@ end
 
 local corpus, corpus_err = read_corpus()
 
--- Load the shared TOML codec (lives in _shared/lua/toml_codec/).
-local codec_ok, codec = pcall(require, "toml_codec.codec")
+-- Load the shared TOML codec (lives in _shared/core/text/engine/toml_codec/).
+local codec_ok, codec = pcall(require, "core.text.engine.toml_codec.codec")
 
 
 
@@ -87,7 +87,7 @@ helpers.describe("toml_fuzz corpus — integrity", function()
 
 	helpers.it("toml_codec is available on the Lua path", function()
 		helpers.assert_true(codec_ok,
-			"toml_codec.codec not found — check package.path in tests/run.lua")
+			"core.text.engine.toml_codec.codec not found — check package.path in tests/run.lua")
 	end)
 end)
 

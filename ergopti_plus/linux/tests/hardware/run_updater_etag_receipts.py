@@ -14,18 +14,27 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import tomllib
 import urllib.parse
+
+# The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
+# boot creates it and the updater only sends conditional requests when it exists.
+FOLDER = tomllib.loads(
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
+)["app"]["linux_folder_name"]
 
 
 WORKER = r"""
 local uv = require("luv")
 local root = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_ROOT"))
 local mode = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_MODE"))
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local owned_paths = {}
 for key, value in pairs(Paths) do owned_paths[key] = value end
 owned_paths.home = function() return root end
-package.loaded["infra.config_paths"] = owned_paths
+package.loaded["settings.engine.paths"] = owned_paths
 local Manager = require("modules.updater.manager")
 local original_url = Manager.release_api_url()
 local count = assert(original_url:match("per_page=(%d+)"))
@@ -237,7 +246,7 @@ def main():
             ):
                 checks += 1
                 case_root = root / mode
-                (case_root / ".cache").mkdir(parents=True)
+                (case_root / "cache" / FOLDER).mkdir(parents=True)
                 (case_root / "config").mkdir()
                 env = dict(os.environ)
                 env.update(
@@ -247,7 +256,8 @@ def main():
                         "ERGOPTI_NATIVE_UPDATER_MODE": mode,
                         "ERGOPTI_NATIVE_UPDATER_URL": f"https://127.0.0.1:{server.server_port}/{mode}",
                         "XDG_CONFIG_HOME": str(case_root / "config"),
-                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                        "XDG_CACHE_HOME": str(case_root / "cache"),
+                        "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                     }
                 )
                 try:

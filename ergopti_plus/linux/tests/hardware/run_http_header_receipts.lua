@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native header checks require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-http-header-XXXXXX"))
 local path = root .. "/etag"

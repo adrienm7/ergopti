@@ -24,7 +24,7 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--accent: var(--theme-hue-4a9eff);
+		--accent: var(--theme-hue-9ccaff);
 		--accent-text: var(--theme-grey-0b0b0b);
 	}
 }
@@ -110,6 +110,11 @@ p {
 	margin: 2px 0;
 }
 
+/* The line names the other channel's release beside its switch button. */
+.others li p {
+	margin: 0;
+}
+
 .status {
 	font-size: 12px;
 	margin-top: 8px;
@@ -128,14 +133,27 @@ p {
 	color: var(--muted);
 }
 
+/* An indeterminate progress element drawn as a spinning ring: the native
+   bar is turned off so only the ring shows. */
 .spinner {
 	animation: spin 0.9s linear infinite;
+	appearance: none;
+	background: transparent;
 	border: 3px solid var(--border);
 	border-radius: 50%;
 	border-top-color: var(--accent);
 	height: 22px;
 	margin-bottom: 12px;
 	width: 22px;
+}
+
+.spinner::-webkit-progress-bar,
+.spinner::-webkit-progress-value {
+	background: transparent;
+}
+
+.spinner::-moz-progress-bar {
+	background: transparent;
 }
 
 @keyframes spin {
@@ -195,7 +213,7 @@ button.link {
 	max-height: 170px;
 	overflow-y: auto;
 	padding: 8px 4px 0;
-	text-align: left;
+	text-align: start;
 	width: 100%;
 }
 
@@ -264,24 +282,22 @@ button.link {
 }
 
 #release-notes blockquote {
-	border-left: 3px solid var(--border);
+	border-inline-start: 3px solid var(--border);
 	color: var(--muted);
 	margin: 0.4em 0;
 	padding: 0.1em 0.8em;
 }
 
+/* Underlined at rest: a link inside a sentence must not differ from the text
+   by its colour alone (WCAG 1.4.1); the dark blue sits too close to the text. */
 #release-notes a {
 	color: var(--accent);
 	cursor: pointer;
-	text-decoration: none;
-}
-
-#release-notes a:hover {
 	text-decoration: underline;
 }
 
-#release-notes .md-link-refused {
-	color: inherit;
+#release-notes a:hover {
+	text-decoration-thickness: 2px;
 }
 
 #release-notes table {
@@ -293,7 +309,7 @@ button.link {
 #release-notes td {
 	border: 1px solid var(--border);
 	padding: 0.2em 0.5em;
-	text-align: left;
+	text-align: start;
 }
 
 #release-notes summary {

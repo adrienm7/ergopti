@@ -141,8 +141,9 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 			AssertEqual(Trigger, BufTail,
 				"vector '" . Vec["id"] . "': strict vector's buffer must end with the trigger exactly")
 		} else {
-			; "=" is AHK's case-insensitive comparison.
-			AssertTrue(BufTail = Trigger,
+			; "=" folds A-Z only, so « ÉÊ » would not fold to « éê »; StrLower
+			; folds every Unicode letter, as the engine's own case variants do.
+			AssertTrue(StrLower(BufTail) == StrLower(Trigger),
 				"vector '" . Vec["id"] . "': buffer must end with trigger (case-folded) for matched=true")
 		}
 	}

@@ -8,7 +8,7 @@
 
 -- Native metadata controls keep existing scalar admission and malformed fallback.
 local uv=require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local W=require("modules.keystats.sqlite_writer")
 local R=require("modules.keystats.sqlite_reader")
 local root=assert(uv.fs_mkdtemp("/tmp/ergopti-source-types-XXXXXX"))

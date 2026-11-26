@@ -32,7 +32,7 @@
 --- the test, which is a property of the machine and not of the code.
 --- ==============================================================================
 
-local Finder = require("modules.gestures.touchpad_finder")
+local Finder = require("gestures.adapters.touchpad_finder")
 
 local UINPUT_PATH = "/dev/uinput"
 local DEVICES_PATH = "/proc/bus/input/devices"

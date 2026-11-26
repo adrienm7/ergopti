@@ -10,24 +10,24 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
-	"infra.notifications",
-	"infra.keycodes",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
-	"adapters.key_state",
-	"adapters.synthetic_input",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"platform.input.keycodes",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.event_provenance",
-	"adapters.timer_scheduler",
+	"diagnostics.adapters.event_provenance",
+	"core.events.timer_scheduler",
 }
 
 --- Loads a fresh script-control module over observable subsystem doubles.
@@ -130,8 +130,8 @@ local function load_context(options)
 	logger.warn = function(_module, format_string, ...)
 		ctx.warnings[#ctx.warnings + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			ctx.notifications[#ctx.notifications + 1] = {
 				title = title,
@@ -140,7 +140,7 @@ local function load_context(options)
 			}
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 0x6A,
 		F14_KARABINER_BACKSPACE = 0x6B,
 		F15_KARABINER_ESCAPE = 0x6C,
@@ -148,32 +148,32 @@ local function load_context(options)
 		RETURN = 0x24,
 		ESCAPE = 0x35,
 	}
-	package.loaded["modules.gestures.engine"] = {}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = {}
+	package.loaded["gestures.engine.actions"] = {
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 		SG_NAMES = { "none", "script_pause_toggle" },
 		AX_NAMES = {},
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
-	package.loaded["modules.llm.warmup_controller"] = {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = {
 		pause_warmup = record("warmup_stop"),
 		resume_warmup = inverse("warmup_resume"),
 	}
-	package.loaded["modules.llm.api_mlx"] = {
+	package.loaded["ai.engine.api.mlx"] = {
 		stop_warmup = record("mlx_stop"),
 		resume_warmup = inverse("mlx_resume"),
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		stop_warmup = record("ollama_stop"),
 	}
 	-- HS-012 added these fixed pause owners. Keep this older transaction harness
 	-- independent from whichever real/cache-backed instance a prior test loaded;
 	-- the class-wide owner matrix exercises their refusal paths separately.
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.remote"] = {
 		stop_warmup = function() return true end,
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = {
@@ -189,12 +189,12 @@ local function load_context(options)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 	package.loaded["modules.keystats"] = {
 		resync_context = record("keystats_resync"),
 		log_shortcut = function() end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback)
 			ctx.calls.input_drain = (ctx.calls.input_drain or 0) + 1
 			ctx.input_idle_callbacks[#ctx.input_idle_callbacks + 1] = callback

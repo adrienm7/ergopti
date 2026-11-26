@@ -9,13 +9,13 @@
 
 local helpers = require("tests.helpers")
 local OWNED = {
-	"infra.logger", "logger", "diagnostics.redact", "json", "app_dirs",
-	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
-	"infra.launcher_environment", "infra.notifications", "infra.i18n",
-	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
-	"adapters.task_lifecycle", "adapters.shell_runner", "adapters.timer_scheduler",
-	"adapters.json_codec", "modules.llm.api_mlx",
-	"ui.menu.menu_llm.models_manager_mlx_server",
+	"core.logger.engine.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
+	"core.logger.engine.log_folders", "core.logger.adapters.log_transport",
+	"core.lifecycle.engine.launcher_environment", "core.ui.engine.notifications", "core.i18n.engine.i18n",
+	"settings.engine.paths", "core.text.engine.utils", "ai.engine.api.common",
+	"core.process.adapters.task_lifecycle", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
+	"core.fs.adapters.json_codec", "ai.engine.api.mlx",
+	"ai.ui.menu.models.manager_mlx_server",
 }
 
 --- Runs the actual Logger sink and server lifecycle with recording native ports.
@@ -27,9 +27,9 @@ local function with_adoption(scenario)
 			local noop = function() end
 			local state = { tasks = {}, cleanup = {}, logs = {}, callback_errors = {}, current_a = true,
 				a_success = 0, a_cancel = 0, b_success = 0, b_cancel = 0 }
-			package.loaded["adapters.log_transport"] = {}
+			package.loaded["core.logger.adapters.log_transport"] = {}
 			_G.hs = {}
-			local Logger = require("infra.logger")
+			local Logger = require("core.logger.engine.logger")
 			helpers.admit_logger_privacy(Logger)
 			Logger.set_level("INFO")
 			Logger.set_sink(function(line)
@@ -51,29 +51,29 @@ local function with_adoption(scenario)
 				state.cleanup[#state.cleanup + 1] = command
 				return true, "exit", 0
 			end
-			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
-			package.loaded["infra.text_utils"] = { shell_quote = function(value) return "'" .. value .. "'" end }
-			package.loaded["modules.llm.api_common"] = {
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["settings.engine.paths"] = { get = function() return "/fixture/model.txt" end }
+			package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return "'" .. value .. "'" end }
+			package.loaded["ai.engine.api.common"] = {
 				protected_call = function(fn, _, ...)
 					if type(fn) ~= "function" then return false end
 					return pcall(fn, ...)
 				end,
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				get_port = function() return 3460 end, reset_endpoints = function() return true end,
 				set_model_hf_path = noop, set_active_server_pgid = noop, mark_load_failed = noop,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,
 			}
-			package.loaded["adapters.json_codec"] = {
+			package.loaded["core.fs.adapters.json_codec"] = {
 				decode = function() return { data = { { id = "org/Model-A" } } } end,
 			}
-			package.loaded["adapters.shell_runner"] = { spawn = function() error("unexpected process dispatch") end }
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function() error("unexpected process dispatch") end }
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, complete, stream, args)
 					local task = { label = label, terminate_calls = 0, args = args, stream = stream }
 					function task:start() self.running = true; return self end
@@ -88,7 +88,7 @@ local function with_adoption(scenario)
 			_G.hs = { execute = function() return '{"data":[{"id":"org/Model-A"}]}' end }
 			local deps = { active_tasks = {} }
 			local obj = { get_mlx_repo = function(model) return "org/" .. model end }
-			require("ui.menu.menu_llm.models_manager_mlx_server").install({
+			require("ai.ui.menu.models.manager_mlx_server").install({
 				obj = obj, deps = deps, active_tasks_gc_root = {}, project_venv_python_escaped = "/fixture/python",
 			})
 			function state.start_a(guarded)

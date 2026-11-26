@@ -106,25 +106,24 @@ Test("keystats: KL_AppendLog re-checks the OUTGOING app/title for app_switch/win
 ; relabel window_switch's "app" field with the NEW app, defeating the F9
 ; check in section 3 above (it would check the wrong app's exclusion status).
 _KLSPF_OutgoingAppSnapshottedBeforeMutation() {
-	Body := _DriverFuncBody("KL_Hook_RefreshContext")
-	Assert(Body != "", "KL_Hook_RefreshContext must exist in keystats_hook.ahk")
-
-	SnapshotPos := InStr(Body, "outgoing_app := KLHook.prev_app")
-	MutatePos    := InStr(Body, "KLHook.prev_app := NewApp")
-	UsagePos     := InStr(Body, "KL_LogWindowSwitch(outgoing_app,")
-
-	Assert(SnapshotPos > 0,
-		"KL_Hook_RefreshContext must snapshot 'outgoing_app := KLHook.prev_app' before "
-		. "the app-switch block can mutate KLHook.prev_app (F9)")
-	Assert(MutatePos > 0,
-		"KL_Hook_RefreshContext must still mutate KLHook.prev_app in the app-switch block")
-	Assert(UsagePos > 0,
-		"KL_Hook_RefreshContext must call KL_LogWindowSwitch(outgoing_app, ...) rather than "
-		. "KL_LogWindowSwitch(KLHook.prev_app, ...), which may already read the NEW app on a "
-		. "combined app+title transition (F9)")
-	Assert(SnapshotPos < MutatePos,
-		"outgoing_app must be captured BEFORE KLHook.prev_app is mutated by the app-switch "
-		. "block, otherwise the snapshot itself would already read the NEW app (F9)")
+	Project := _DriverFuncBody("_KL_ContextProject")
+	Frame := _DriverFuncBody("_KL_ContextNewFrame")
+	Drain := _DriverFuncBody("_KL_ContextDrain")
+	Publish := _DriverFuncBody("_KL_ContextPublishClock")
+	Advance := _DriverFuncBody("_KL_ContextAdvanceClock")
+	FramePos := InStr(Project, "_KL_ContextNewFrame(")
+	DrainPos := InStr(Project, "_KL_ContextDrain(")
+	Assert(FramePos > 0 && DrainPos > FramePos,
+		"The actual projector must freeze its source before draining the resulting exact frame")
+	Assert(InStr(Frame, "OldApp: KLHook.prev_app") > 0 && InStr(Frame, "OldTitle: KLHook.prev_title") > 0,
+		"Both outgoing identities must be captured together before either independent clock advances")
+	Assert(InStr(Publish, "KL_LogWindowSwitch(Frame.OldApp, Frame.OldTitle,") > 0,
+		"Window publication must retain the immutable old app/title, never the independently advanced static app")
+	Assert(InStr(Advance, "KLHook.prev_app := Frame.NewApp") > 0
+		&& InStr(Advance, "Clock.Done := true") > 0,
+		"The app clock changes only in its exact acknowledgement owner")
+	Assert(InStr(Drain, "_KL_ContextPublishClock(") > 0,
+		"The actual frame owner must use these independent clock publications")
 }
 Test("keystats_hook: outgoing_app is snapshotted before KLHook.prev_app mutates (F9)",
 	_KLSPF_OutgoingAppSnapshottedBeforeMutation)

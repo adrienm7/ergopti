@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/en.msg
-# AUTO-GENERATED from _shared/data/locales/en.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/en.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT networking module built from source.
 build_luv.recipe_required=The native luv build needs its source recipe.
 install.already_installed={1} — already installed
 install.archive_digest_unavailable=retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.
+install.bytecode_skipped=Precompiled modules could not be built — Ergopti starts from source, a little slower.
 install.capability_verified={1} — capability verified
 install.command_still_missing={1} was installed, but '{2}' is still not found.
 install.daemon_manual=To start the daemon manually:
 install.daemon_running=The daemon runs in the background. To check its status:
+install.focus_integration_enabled={1} focus integration enabled
+install.focus_integration_failed=Could not enable the {1} focus integration — per-application rules stay inactive on this desktop.
+install.focus_integration_next_login={1} focus integration installed (effective at the next login)
+install.focus_integration_updated={1} focus integration updated
 install.gnome_extension_active=GNOME AppIndicator extension — already active
 install.gnome_extension_enabled=GNOME AppIndicator extension enabled
 install.gnome_extension_failed=Could not enable the AppIndicator extension — without it, GNOME does not show the icon.
 install.gnome_extension_missing=GNOME AppIndicator extension missing — installing {1}…
 install.gnome_extension_next_login=GNOME AppIndicator extension enabled (effective at the next login)
+install.gnome_extension_not_installed=No package of this distribution carries the GNOME AppIndicator extension: install AppIndicator and KStatusNotifierItem Support from {1}, then log out and back in — without it, GNOME does not show the icon.
 install.gnome_without_extensions=GNOME without gnome-extensions — enable an AppIndicator extension to see the icon.
 install.help_help=Show this help message
 install.help_no_deps=Install no dependency (you provide them)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — dependency check
 install.section_deps_skipped=Dependencies skipped (--no-deps)
 install.section_done=Installation complete
 install.section_files=Installing files
+install.section_focus=Focused application under Wayland (GNOME, KDE)
 install.section_lua_deps=Optional Lua dependencies (event loop, timers, webviews, signals)
 install.section_permissions=Input permissions (requires sudo)
 install.section_services=Creating the systemd user services
@@ -63,6 +70,7 @@ install.section_tray=System tray icon and windows
 install.security_warning_body=Being in the 'input' group lets a program read EVERY keystroke of the session, including passwords typed in any application. A hotstring engine needs exactly that, and so do keyd and xremap.
 install.security_warning_title=SECURITY WARNING
 install.service_started=ergopti-hotstrings service enabled and started
+install.session_without_graphical_target=This session never starts systemd's graphical-session.target (i3, Openbox, Xfce, sway without a session manager), so the user unit would never run: Ergopti+ starts from the XDG autostart entry at the next login instead. A window manager that ignores XDG autostart (i3, sway) needs the line exec {1} in its configuration.
 install.source_toolchain_unavailable=the installed compiler cannot build the native archive backend.
 install.startup_choice_unreadable=The startup choice could not be read.
 install.summary_config=Configuration: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG autostart: {1}
 launch.already_running=Ergopti+ is already running in this session ({1} is held); this launch was refused.
 launch.authorization_failed=Input permission authorization was cancelled or failed.
 launch.groups_unavailable=The session could not acquire its configured input groups.
+launch.restarting=Ergopti+ is already running in this session; asking it to quit, then restarting.
+launch.session_lock_invalid=The session lock root must be an absolute path.
 launcher.dependencies_installed=Dependencies installed.
 launcher.driver_missing=Error: Linux driver directory not found: {1}
 launcher.install_deps_hint=Run: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Installation path crosses a symbolic link.
 uninstall.system_prefix=Refusing a system installation prefix.
 uninstall.unsafe_path=Unsafe ownership path.
 uninstall.unsupported_argument=Unsupported uninstall argument: {1}
+xkb_helpers.not_found=The keyboard layout installation files were not found beside {1} nor at {2}: without them no keyboard layout can be installed.

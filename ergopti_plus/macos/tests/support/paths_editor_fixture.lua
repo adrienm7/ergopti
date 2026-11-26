@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Loads a pristine paths editor behind an already-initialized resolver and
 --- records native bridge/webview creation.
@@ -28,8 +29,8 @@ local function load_fixture(show_result)
 	logger.error = function(_, fmt, ...)
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.config_paths"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["settings.engine.paths"] = {
 		is_initialized = function() return true end,
 		init = function()
 			calls.config_init = calls.config_init + 1
@@ -37,9 +38,9 @@ local function load_fixture(show_result)
 		end,
 		get = function(key) return "/tmp/ergopti/" .. tostring(key) end,
 		get_config_dir = function() return "/tmp/ergopti/" end,
-		get_default_config_dir = function() return "/Users/test/.config/ergopti_plus/" end,
-		get_logs_dir = function() return "/tmp/ergopti-logs/ergopti_plus/" end,
-		get_default_logs_dir = function() return "/Users/test/Library/Logs/ergopti_plus/" end,
+		get_default_config_dir = function() return "/Users/test/" .. AppDirs.config.macos_relative .. "/" end,
+		get_logs_dir = function() return "/tmp/ergopti-logs/" .. AppDirs.macos.folder_name .. "/" end,
+		get_default_logs_dir = function() return "/Users/test/" .. AppDirs.macos.relative .. "/" end,
 		set_config_dir = function(dir)
 			calls.saved = { config = dir }
 			return true
@@ -56,7 +57,7 @@ local function load_fixture(show_result)
 			if calls.delete_throws then error("synthetic paths editor delete refusal") end
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
 		show_webview = function(opts)
@@ -77,7 +78,7 @@ local function load_fixture(show_result)
 	}
 
 	_G._base_dir = nil
-	local module = helpers.load_with_stubs("ui.menu.menu_paths", {
+	local module = helpers.load_with_stubs("settings.ui.menu.paths", {
 		webview = {
 			usercontent = {
 				new = function()

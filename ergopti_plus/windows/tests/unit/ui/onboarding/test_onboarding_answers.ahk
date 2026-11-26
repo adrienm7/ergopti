@@ -179,23 +179,26 @@ Test("onboarding answers: any invalid answer refuses the whole batch (onboarding
 ; sparse row like any answer, a neutral value a deletion (neutral-layout-wizard).
 _TOAN_LayoutControlsBecomeRows() {
 	Index := OnboardingCatalogue()
-	for Path in ["layout.ergopti_base", "layout.ergopti_variant", "layout.emulated_layout",
+	for Path in ["layout.ergopti_variant", "layout.emulated_layout",
 			"layout.ergopti_alt_gr", "layout.emulate_number_row", "layout.direct_access_digits"]
 		AssertEqual("control", Index["entries"][Path]["kind"], Path . " is answered by a layout control")
+	; The selection is the gate (2026-11-23): no layout choice writes a layer switch.
+	AssertFalse(Index["entries"].Has("layout.ergopti_base")
+		&& Index["entries"]["layout.ergopti_base"]["kind"] == "control", "no layout control writes the base layer switch")
 	Rows := OnboardingAnswerRows(Index, [
-		_TOAN_Op("layout.ergopti_base", true),
 		_TOAN_Op("layout.ergopti_variant", "ergopti_plus"),
+		_TOAN_Op("layout.ergopti_alt_gr", false),
 		_TOAN_Op("layout.emulate_number_row", false),
 		_TOAN_Op("layout.direct_access_digits", "native")
 	])
 	AssertTrue(Rows is Array, "control answers produce rows: " . (Rows is String ? Rows : ""))
-	AssertEqual(1, _TOAN_RowFor(Rows, "layout", "ergopti_base").Value)
 	AssertEqual("ergopti_plus", _TOAN_RowFor(Rows, "layout", "ergopti_variant").Value)
+	AssertEqual(0, _TOAN_RowFor(Rows, "layout", "ergopti_alt_gr").Value)
 	AssertEqual(0, _TOAN_RowFor(Rows, "layout", "emulate_number_row").Value)
 	Native := _TOAN_RowFor(Rows, "layout", "direct_access_digits")
 	AssertTrue(Native.HasOwnProp("Delete") && Native.Delete == 1, "the native order is the neutral value: a deletion")
 	for Probe in [["layout.direct_access_digits", "sideways"], ["layout.ergopti_variant", "bepo"],
-			["layout.emulated_layout", "ergol"], ["layout.ergopti_base", "true"]] {
+			["layout.emulated_layout", "ergol"], ["layout.ergopti_alt_gr", "true"]] {
 		Why := OnboardingAnswerRows(Index, [_TOAN_Op(Probe[1], Probe[2])])
 		AssertTrue(Why is String, Probe[1] . " refuses a value no choice writes")
 		AssertContains(Why, "one of the values its choices write")
@@ -254,7 +257,7 @@ _TOAN_TapHoldKeysGoToTheWriterNeverToConfig() {
 		AssertEqual(1, Entry["value"], "a key imports its recommendation")
 		AssertEqual(0, Entry["default"], "an unchecked key is its neutral value")
 	}
-	AssertEqual(LoadTapHoldToml(_SharedDir . "\tap_hold\defaults.toml")["keys"].Count, Listed,
+	AssertEqual(LoadTapHoldToml(_SharedDir . "\tap_hold\data\defaults.toml")["keys"].Count, Listed,
 		"the page lists every key the shipped preset recommends")
 	Operations := [
 		_TOAN_Op("tap_holds.keys.caps_lock", true),
@@ -348,7 +351,7 @@ Test("onboarding answers: the commit renders one stamped candidate (onboarding-a
 ; The commit publishes this image beside config.toml in its own transition.
 _TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Path := _TOAN_NewPath()
 	Rendered := _TOAN_NewPath()
 	Source := '[tap_hold]`ninherit_defaults = false`n'
@@ -386,7 +389,7 @@ Test("onboarding answers: the tap-hold import renders only the checked keys' pre
 ; A re-run answered Yes imported over the keys the user had set.
 _TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\tap_hold.toml"
 	Source := '[tap_hold.keys.left_alt]`ntap_action = "escape"`n'
@@ -445,7 +448,7 @@ _TOAN_NavLayerComesWithItsKey() {
 	LayersPath := Folder . "\layers.toml"
 	try {
 		Preset := TapHoldRecommendedLayer(_SharedDir)
-		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), Preset["text"])
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\layouts\data\layers.recommended.toml"), Preset["text"])
 		AssertEqual("nav", Preset["layer_id"], "the layer the recommended left_alt holds")
 		AssertEqual(LayersPath, _Onboarding_NavLayerPath(Folder, ["caps_lock", "left_alt"]),
 			"the key holding the layer brings the folder's layers.toml into the commit")
@@ -468,6 +471,22 @@ _TOAN_NavLayerComesWithItsKey() {
 		_TOAN_DeleteFolder(Folder)
 	}
 }
+
+_TOAN_RefuseUnreadableNavLayer() {
+	global _SharedDir
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\layers.toml"
+	try {
+		DirCreate(Path)
+		Preset := TapHoldRecommendedLayer(_SharedDir)
+		Result := TapHoldHoldLayerImport(Map("kind", "layer", "id", Preset["layer_id"]), Folder)
+		AssertFalse(Result, "a directory at the layer path is not a readable layer")
+		AssertTrue(DirExist(Path), "the foreign directory must remain untouched")
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("tap-hold import: refuses an unreadable existing navigation layer", _TOAN_RefuseUnreadableNavLayer)
 Test("onboarding answers: the key holding the navigation layer brings the recommended layer (nav-layer-fresh-install-default)",
 	_TOAN_NavLayerComesWithItsKey)
 
@@ -510,7 +529,7 @@ Test("onboarding answers: a re-run reads the values in force (onboarding-answers
 ; the page now shows each key the tap_hold.toml beside config.toml configures.
 _TOAN_TapHoldReportTellsImportedFromCustomised() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Index := OnboardingCatalogue()
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\tap_hold.toml"
@@ -707,7 +726,7 @@ _TOAN_PrebootChosenTargetUsesActualWizardWal(Current := false) {
 		Acquired := ConfigTransitionAcquireLifecycleBundle(PathsFile, [Chosen, PathsFile])
 		AssertTrue(ConfigTransitionResultIs(Acquired, "bundle_acquired"))
 		Bundle := Acquired["bundle"]
-		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([_TOAN_Op("layout.ergopti_base", true)], "fr", Folder . "\chosen"))
+		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([_TOAN_Op("layout.ergopti_variant", "ergopti_plus")], "fr", Folder . "\chosen"))
 		AssertTrue(Plan is Map)
 		Target := _TOAN_PrepareNativeWizardTarget(Chosen,
 			_Onboarding_CommitUpdates(Plan["locale"], Plan["rows"]), Bundle)
@@ -723,7 +742,8 @@ _TOAN_PrebootChosenTargetUsesActualWizardWal(Current := false) {
 		AssertTrue(ConfigTransitionResultIs(Committed, "committed_new"), "the actual guarded native WAL publishes the wizard target and locator before later Boot")
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Chosen))
 		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
-		AssertTrue(Document["layout"]["ergopti_base"].Value)
+		; The parsed document wraps only booleans (TOML_Bool); a string is native.
+		AssertEqual("ergopti_plus", Document["layout"]["ergopti_variant"])
 		if Current
 			AssertEqual("independent", Document["private"]["keep"])
 		AssertEqual(Locator, FSReadUtf8Exact(PathsFile), "the stable locator is the final actual native target")

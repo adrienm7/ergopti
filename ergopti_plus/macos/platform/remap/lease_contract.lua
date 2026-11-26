@@ -50,6 +50,8 @@ local UUID_HYPHEN_POSITIONS = { 9, 14, 19, 24 }
 local RUNTIME_LOGICAL_NAMES = {
 	layer_active = true,
 	capsword = true,
+	-- The navigation layer's repeat count (platform/remap/nav_layer.lua).
+	nav_repeat_count = true,
 }
 
 

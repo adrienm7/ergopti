@@ -1,0 +1,32 @@
+{
+	"_comment": "The pair rows of « Combinaisons de touches », the Windows layout every OS follows (maintainer decision KCD-8 of 2026-11-21): one submenu per first key, each pair's slots in slot_order, and a summary after the pair's label that names every assigned slot in that order, chord included, joined by separator, or the empty word when none is. Replayed by every driver's menu.",
+	"slot_order": ["tap", "hold", "chord"],
+	"separator": " / ",
+	"empty": "dialog.action_picker.disabled",
+	"summaries": [
+		{ "name": "empty pair", "labels": {}, "expected": "dialog.action_picker.disabled" },
+		{ "name": "tap only", "labels": { "tap": "Copy" }, "expected": "Copy" },
+		{ "name": "hold only", "labels": { "hold": "Ctrl" }, "expected": "Ctrl" },
+		{ "name": "chord only", "labels": { "chord": "Paste" }, "expected": "Paste" },
+		{
+			"name": "tap and hold",
+			"labels": { "tap": "Copy", "hold": "Ctrl" },
+			"expected": "Copy / Ctrl"
+		},
+		{
+			"name": "tap and chord",
+			"labels": { "tap": "Copy", "chord": "Paste" },
+			"expected": "Copy / Paste"
+		},
+		{
+			"name": "hold and chord",
+			"labels": { "hold": "Ctrl", "chord": "Paste" },
+			"expected": "Ctrl / Paste"
+		},
+		{
+			"name": "every slot",
+			"labels": { "tap": "Copy", "hold": "Ctrl", "chord": "Paste" },
+			"expected": "Copy / Ctrl / Paste"
+		}
+	]
+}

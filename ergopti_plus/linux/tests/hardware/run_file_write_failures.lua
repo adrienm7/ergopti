@@ -8,7 +8,7 @@
 --- Regular-file controls retain successful write/append behavior.
 --- ==============================================================================
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local failures, checks = 0, 0
 local temporary = assert(os.tmpname())
 

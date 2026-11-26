@@ -3341,7 +3341,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			runtimeDirectory + "bin/../bin/ergoptiplus_remap_cli",
 			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
 			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
-			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			// A per-user look-alike of the root-owned runtime folder.
+			"~/Library/Application Support/" + kMacOSOwnedRuntimeFolderName + "/Runtime/bin/ergoptiplus_remap_cli",
 			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 		]
 		for forbiddenPath in forbiddenPaths {
@@ -3547,9 +3548,6 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let headless = try XCTUnwrap(
 			source.range(of: "KarabinerLeaseWorker.handles")?.lowerBound
 		)
-		let preferences = try XCTUnwrap(
-			source.range(of: "let _earlyInitLua")?.lowerBound
-		)
 		let application = try XCTUnwrap(
 			source.range(of: "NSApplication.shared")?.lowerBound
 		)
@@ -3566,8 +3564,10 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			source.range(of: "applicationLauncher(applicationURL, configuration)")?.lowerBound
 		)
 
-		XCTAssertLessThan(headless, preferences)
 		XCTAssertLessThan(headless, application)
+		// MJConfigFile is seeded by the sole launcher only, never by the
+		// top-level code a headless worker or a second launcher runs (MLC-001).
+		XCTAssertNil(source[headless..<application].range(of: "kHammerspoonConfigKey"))
 		XCTAssertLessThan(helperExport, childStart)
 		XCTAssertLessThan(deviceExport, childStart)
 		XCTAssertLessThan(inodeExport, childStart)
@@ -5143,6 +5143,99 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			"the report must name the command in flight: \(result.diagnostics)")
 		XCTAssertFalse(result.diagnostics.contains { $0.hasPrefix("lease lost") },
 			"an EOF is not a lease loss: \(result.diagnostics)")
+	}
+
+	/// Proves a FENCED still queued behind a hang-up seen after a READY read is
+	/// kept. The inner can answer STOP and exit between the outer's read of its
+	/// stale READY and the post-read boundary poll; discarding the queued FENCED
+	/// sent the closed-input test into replacement recovery and exit 73.
+	func testParentEOFKeepsFencedQueuedBehindHangupAfterStaleReadyRead() throws {
+		// The inner holds FENCED until the release FIFO yields a line, so the read
+		// that reaches the boundary returns READY alone; it then closes its socket
+		// before reporting on the closed FIFO.
+		let fixture = try makeExecutableFixture(
+			body: "IFS= read -r command <&3 || exit 40\n"
+				+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
+				+ "printf 'READY 1\\n' >&3\n"
+				+ "IFS= read -r command <&3 || exit 42\n"
+				+ "[ \"$command\" = STOP ] || exit 43\n"
+				+ "IFS= read -r release < \"$3\" || exit 44\n"
+				+ "printf 'FENCED\\n' >&3\n"
+				+ "exec 3>&-\n"
+				+ "printf 'closed\\n' > \"$4\"\n"
+		)
+		let directory = fixture.deletingLastPathComponent()
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let releaseFIFO = directory.appendingPathComponent("release-fenced")
+		let closedFIFO = directory.appendingPathComponent("socket-closed")
+		XCTAssertEqual(mkfifo(releaseFIFO.path, 0o600), 0)
+		XCTAssertEqual(mkfifo(closedFIFO.path, 0o600), 0)
+		// O_RDWR opens a FIFO without waiting for its peer, so neither the inner's
+		// opens nor this test can block on the other side of a FIFO.
+		let releaseDescriptor = Darwin.open(releaseFIFO.path, O_RDWR)
+		let closedDescriptor = Darwin.open(closedFIFO.path, O_RDWR)
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		let pipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
+			Darwin.pipe(buffer.baseAddress!)
+		}
+		let nullDescriptor = Darwin.open("/dev/null", O_WRONLY)
+		defer {
+			for descriptor in parentPipe + [releaseDescriptor, closedDescriptor, nullDescriptor]
+				where descriptor >= 0 { _ = Darwin.close(descriptor) }
+		}
+		XCTAssertGreaterThanOrEqual(releaseDescriptor, 0)
+		XCTAssertGreaterThanOrEqual(closedDescriptor, 0)
+		XCTAssertEqual(pipeStatus, 0)
+		XCTAssertGreaterThanOrEqual(nullDescriptor, 0)
+		guard releaseDescriptor >= 0, closedDescriptor >= 0, pipeStatus == 0, nullDescriptor >= 0
+		else { return }
+		_ = Darwin.close(parentPipe[1])
+		parentPipe[1] = -1
+		let identity = LeaseIdentity(
+			cliPath: "/unused/karabiner_cli",
+			token: token,
+			modeName: releaseFIFO.path,
+			revokedName: closedFIFO.path,
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		var boundaryPolls = 0
+		var hangupObservedAfterReadyRead = false
+		var diagnostics: [String] = []
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: identity,
+			detached: false,
+			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: nullDescriptor,
+			boundaryPoller: { descriptor, timeoutMilliseconds in
+				boundaryPolls += 1
+				guard boundaryPolls == 1 else {
+					return pollLeaseDescriptor(&descriptor, timeoutMilliseconds)
+				}
+				// Release FENCED, then sample the boundary only after the inner
+				// reported its socket closed: FENCED is queued behind a hang-up.
+				XCTAssertTrue(writeLeaseLine("release", to: releaseDescriptor))
+				var closed = pollfd(fd: closedDescriptor, events: Int16(POLLIN), revents: 0)
+				XCTAssertEqual(Darwin.poll(&closed, 1, 5_000), 1,
+					"the inner must queue FENCED and close its socket")
+				let result = pollLeaseDescriptor(&descriptor, timeoutMilliseconds)
+				hangupObservedAfterReadyRead = result > 0
+					&& leasePollReportsTerminal(descriptor.revents)
+				return result
+			},
+			diagnostic: { diagnostics.append($0) }
+		)
+
+		let exitCode = runtime.run()
+
+		XCTAssertTrue(hangupObservedAfterReadyRead,
+			"the boundary poll must see the hang-up with FENCED still queued")
+		XCTAssertEqual(exitCode, LeaseWorkerExit.success.rawValue,
+			"a queued FENCED is terminal proof, not an inner crash: \(diagnostics)")
+		XCTAssertFalse(diagnostics.contains { $0.contains("exhausted its budget") },
+			"a fenced inner must not trigger replacement recovery: \(diagnostics)")
 	}
 
 	/// Proves an explicit STOP stays silent, and that a slow preparation is reported.

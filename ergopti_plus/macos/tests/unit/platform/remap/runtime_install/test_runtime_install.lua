@@ -1,0 +1,250 @@
+--- tests/unit/platform/remap/runtime_install/test_runtime_install.lua
+
+--- ==============================================================================
+--- MODULE: Owned Runtime First Install
+--- DESCRIPTION:
+--- Pins platform/remap/runtime_install.lua with fake ports: the confirmed
+--- install runs the signed launcher's install role once, reads its one answer
+--- line, and only after the helper's full success asks pqrs' manager to
+--- activate the driver.
+---
+--- ROOT CAUSE ENCODED: nothing could install the owned runtime, so a Mac
+--- without a hand-installed runtime stayed at `runtime_not_installed` with its
+--- tap-holds off (ADR 011, WP8). A half-finished helper reported as installed,
+--- a cancelled prompt reported as a failure, or an activation before the
+--- install would each mislead the user.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local LAUNCHER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+
+--- Builds an installer over a fake Mac.
+--- @param answer function fn() -> code, stdout of the launcher role.
+--- @param overrides table|nil { launcher, manager_present, manager_code }.
+--- @return table installer
+--- @return table world { commands }
+--- @return table Install The module.
+local function fake(answer, overrides)
+	overrides = overrides or {}
+	package.loaded["platform.remap.runtime_install"] = nil
+	local Install = require("platform.remap.runtime_install")
+	local world = { commands = {} }
+	local installer = Install.new({
+		launcher = overrides.launcher or function() return LAUNCHER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = LAUNCHER } end,
+		exists = function(path)
+			if path == Install.DAEMON then return overrides.daemon_present ~= false end
+			return overrides.manager_present ~= false
+		end,
+		fetch_driver = function(callback)
+			world.fetches = (world.fetches or 0) + 1
+			callback(overrides.fetch_ok ~= false, overrides.fetch_ok == false and "vhid_update_download_failed" or nil, "offline")
+		end,
+		exec = function(executable, args, timeout, callback, environment)
+			world.commands[#world.commands + 1] = { executable = executable, args = args, timeout = timeout,
+				environment = environment }
+			if executable == LAUNCHER then return callback(answer()) end
+			callback(overrides.manager_code or 0, "", "")
+		end,
+	})
+	return installer, world, Install
+end
+
+--- Runs one install and returns its settlement.
+local function install(installer)
+	local result
+	installer.install(function(ok, reason, detail) result = { ok = ok, reason = reason, detail = detail } end)
+	return assert(result, "the install must settle")
+end
+
+helpers.describe("owned runtime first install", function()
+	helpers.it("runs the launcher role, then asks pqrs' manager to activate the driver", function()
+		local installer, world, Install = fake(function()
+			return 0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n"
+		end)
+		local result = install(installer)
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#world.commands, 2)
+		helpers.assert_eq(world.commands[1].executable, LAUNCHER)
+		helpers.assert_eq(world.commands[1].args[1], "--request-owned-runtime-install")
+		helpers.assert_eq(#world.commands[1].args, 1)
+		helpers.assert_eq(world.commands[1].environment.ERGOPTI_LAUNCHER_EXECUTABLE, LAUNCHER)
+		helpers.assert_eq(world.commands[1].timeout, Install.INSTALL_TIMEOUT_SEC)
+		helpers.assert_eq(world.commands[2].executable, require("platform.remap.runtime_vhid_update").MANAGER)
+		helpers.assert_eq(world.commands[2].args[1], "activate")
+	end)
+
+	helpers.it("names each refusal and never activates after one", function()
+		local cases = {
+			{ 0, "OWNED_RUNTIME_INSTALL|1|files-published-service-cleanup-pending\n", "install_cleanup_pending" },
+			{ 1, "OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled\n", "install_cancelled" },
+			{ 77, "OWNED_RUNTIME_INSTALL_REQUEST|1|refused|launcher_unsigned\n", "install_refused", "launcher_unsigned" },
+			{ 77, "OWNED_RUNTIME_INSTALL_REQUEST|1|refused|artifact_download_absent\n", "install_refused" },
+			{ 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77\n", "install_refused" },
+			{ 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75\n", "install_cleanup_pending" },
+			{ 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1\n", "install_failed" },
+			{ 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1|stage_signature\n", "install_failed",
+				"administrator shell status 1 at step stage_signature" },
+			{ 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1|Stage\n", "install_unanswered" },
+			{ 0, "", "install_unanswered" },
+			{ 0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\nextra\n", "install_unanswered" },
+			{ 1, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n", "install_unanswered" },
+			{ 0, "OWNED_RUNTIME_INSTALL|1|files-published-staging-retired\n", "install_unanswered" },
+		}
+		for _, case in ipairs(cases) do
+			local installer, world = fake(function() return case[1], case[2] end)
+			local result = install(installer)
+			helpers.assert_eq(result.ok, false, case[2])
+			helpers.assert_eq(result.reason, case[3], case[2])
+			if case[4] then helpers.assert_eq(result.detail, case[4]) end
+			helpers.assert_eq(#world.commands, 1, "no activation after " .. case[2])
+		end
+	end)
+
+	-- Field report 2026-11-15: every attempt read « the helper left cleanup pending » while the launcher's own log
+	-- line named the helper trail's errno 24 (owned-install-trail-cause).
+	helpers.it("names the helper trail's cause of a cleanup left pending", function()
+		local trail = "fd-limit-256-to-10240,refused-source-root-dup-errno-24-fds-250-of-256:OwnedRuntimeInstallWorker.swift:239,"
+			.. "publish-failed-source,refused-cleanupPending:OwnedRuntimeInstallJournal.swift:388"
+		local installer, world = fake(function()
+			return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|" .. trail .. "\n"
+		end)
+		local result
+		installer.install(function(ok, reason, detail, cause)
+			result = { ok = ok, reason = reason, detail = detail, cause = cause }
+		end)
+		helpers.assert_eq(result.reason, "install_cleanup_pending")
+		helpers.assert_eq(result.cause, "source-root-dup-errno-24-fds-250-of-256")
+		helpers.assert_eq(result.detail, "the helper left cleanup pending at step helper, trail " .. trail)
+		helpers.assert_eq(#world.commands, 1, "no activation after a cleanup left pending")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause("publish-failed-source"), "publish-failed-source")
+		helpers.assert_nil(Install.trail_cause(nil))
+		helpers.assert_eq(#Install.trail_cause("refused-" .. string.rep("x", 90)), Install.CAUSE_MAX_LENGTH)
+		-- A line whose trail breaks the closed grammar is not read as a trail.
+		local odd = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|a b\n" end)))
+		helpers.assert_eq(odd.reason, "install_unanswered")
+	end)
+
+	-- Field report 2026-11-23: the redaction read `refused-destination@OwnedRuntimeFirstInstallOwner.swift:62` as an
+	-- e-mail address, so the log, the error dialog and the report all said `<email>:62` instead of the cause.
+	helpers.it("keeps the helper trail's refusal through the diagnostics redaction", function()
+		local trail = "refused-destination:OwnedRuntimeFirstInstallOwner.swift:62,publish-failed-destination"
+		local result = install((fake(function()
+			return 77, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|helper|" .. trail .. "\n"
+		end)))
+		helpers.assert_eq(result.reason, "install_refused")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause(trail), "destination")
+		-- The pinned 16.3.0-ergopti.6 helper still writes `@` before the file.
+		helpers.assert_eq(Install.trail_cause("refused-destination@OwnedRuntimeFirstInstallOwner.swift:62"), "destination")
+		local file = assert(io.open(helpers.shared("diagnostics/data/redaction.json"), "rb"))
+		local rules = require("core.text.engine.json").decode(file:read("*a"))
+		file:close()
+		local redacted = require("diagnostics.engine.reports.redact").apply(result.detail, rules, {})
+		helpers.assert_eq(redacted, result.detail)
+		helpers.assert_true(redacted:find("refused-destination:OwnedRuntimeFirstInstallOwner.swift:62", 1, true) ~= nil, redacted)
+	end)
+
+	helpers.it("refuses without a launcher and when the manager is absent or fails", function()
+		local installer, world = fake(function() error("unreachable") end,
+			{ launcher = function() return nil, "no bundle" end })
+		local result = install(installer)
+		helpers.assert_eq(result.reason, "install_launcher_unavailable")
+		helpers.assert_eq(#world.commands, 0)
+		local success = function() return 0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n" end
+		helpers.assert_eq(install((fake(success, { manager_present = false }))).reason, "install_activation_failed")
+		helpers.assert_eq(install((fake(success, { manager_code = 1 }))).reason, "install_activation_failed")
+	end)
+
+	helpers.it("downloads pqrs' driver first when none is installed, and stops when it cannot", function()
+		-- The live helper carries no driver payload: the role installs the verified download.
+		local success = function() return 0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n" end
+		local installer, world = fake(success, { daemon_present = false })
+		helpers.assert_eq(install(installer).ok, true)
+		helpers.assert_eq(world.fetches, 1)
+		helpers.assert_eq(world.commands[1].executable, LAUNCHER, "the role runs after the download")
+		local refused, refused_world = fake(function() error("unreachable") end, { daemon_present = false, fetch_ok = false })
+		local result = install(refused)
+		helpers.assert_eq(result.reason, "install_driver_failed")
+		helpers.assert_eq(#refused_world.commands, 0, "no administrator prompt without the verified package")
+		local present, present_world = fake(success)
+		install(present)
+		helpers.assert_nil(present_world.fetches, "an installed driver is not downloaded again")
+		local digest = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|78\n" end)))
+		helpers.assert_eq(digest.reason, "install_driver_failed")
+	end)
+
+	helpers.it("lets a second caller wait for the running install", function()
+		local pending
+		package.loaded["platform.remap.runtime_install"] = nil
+		local installer = require("platform.remap.runtime_install").new({
+			launcher = function() return LAUNCHER end,
+			exists = function() return true end,
+			fetch_driver = function() error("the driver is installed: nothing to fetch") end,
+			exec = function(executable, _, _, callback)
+				if executable == LAUNCHER then pending = callback else callback(0, "", "") end
+			end,
+		})
+		local results = {}
+		installer.install(function(ok) results[#results + 1] = ok end)
+		installer.install(function(ok) results[#results + 1] = ok end)
+		pending(0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n")
+		helpers.assert_eq(#results, 2)
+		helpers.assert_eq(results[1], true)
+		helpers.assert_eq(results[2], true)
+	end)
+
+	-- Field report 2026-11-24: an earlier install's journal made every helper refuse at its exclusive create, and the
+	-- dialog showed only the helper's trail. The administrator shell now retires that journal, and stops before
+	-- touching anything when a live helper still holds it (stale-install-journal).
+	helpers.it("names another install still running apart from a cleanup left pending (stale-install-journal)", function()
+		local busy = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|install_busy\n" end)))
+		helpers.assert_eq(busy.reason, "install_busy")
+		helpers.assert_true(busy.detail:find("nothing was stopped or removed", 1, true) ~= nil, busy.detail)
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.REASON.BUSY, "install_busy")
+		-- The same step under another status is not the busy refusal.
+		local other = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1|install_busy\n" end)))
+		helpers.assert_eq(other.reason, "install_failed")
+		-- The step the shell names is the launcher's own constant.
+		local source = assert(require("tests.support.source_file").read(helpers.driver_root()
+			.. "/launcher/Sources/ErgoptiPlus/UninstallWorker.swift"))
+		helpers.assert_true(source:find('static let busyStep = "' .. Install.BUSY_STEP .. '"', 1, true) ~= nil,
+			"BUSY_STEP must match OwnedRuntimeUninstall.busyStep")
+	end)
+
+	helpers.it("tells the user what to do after a cleanup left pending or another install (stale-install-journal)", function()
+		local Install = require("platform.remap.runtime_install")
+		local cases = {
+			{ Install.REASON.CLEANUP_PENDING, "karabiner.owned_install.failed_cleanup_pending" },
+			{ Install.REASON.BUSY, "karabiner.owned_install.failed_busy" },
+			{ Install.REASON.FAILED, "karabiner.owned_install.failed" },
+		}
+		for _, case in ipairs(cases) do
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+			local alerts, scheduled = {}, {}
+			local dialog_util = { block_alert = function(title, body, first)
+				alerts[#alerts + 1] = { title = title, body = body }
+				return first
+			end }
+			local deferred = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end }
+			local Dialog = helpers.load_with_stubs("ai.ui.owned_runtime_install", {
+				["core.ui.engine.dialog_util"] = dialog_util,
+				["core.timing.engine.deferred_work"] = deferred,
+			})
+			package.loaded["core.ui.engine.dialog_util"] = dialog_util
+			package.loaded["core.timing.engine.deferred_work"] = deferred
+			local started = Dialog.open({
+				install_owned_runtime = function(on_done) on_done(false, case[1], "detail"); return true end,
+			}, function() error("a failed install never reloads") end)
+			helpers.assert_eq(started, true)
+			helpers.assert_eq(#scheduled, 1, case[1])
+			scheduled[1]()
+			helpers.assert_eq(alerts[2].body, case[2], case[1])
+			package.loaded["core.ui.engine.dialog_util"] = nil
+			package.loaded["core.timing.engine.deferred_work"] = nil
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+		end
+	end)
+end)

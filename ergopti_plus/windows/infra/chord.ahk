@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; Canonical parser and formatter for keyboard chords ("Ctrl+Shift+S"), and the
 ; AutoHotkey half of the notation the macOS and Linux drivers read from
-; _shared/lua/chord/init.lua. The two implementations exist because there is no
+; _shared/keyboard/engine/chord/init.lua. The two implementations exist because there is no
 ; shared AutoHotkey layer; they are kept honest by a single corpus,
-; _shared/lua/chord/vectors.json, which both suites run.
+; _shared/keyboard/engine/chord/vectors.json, which both suites run.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One canonical spelling: modifiers always appear in CHORD_MOD_ORDER, so the

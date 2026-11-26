@@ -13,7 +13,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "capsword"
 
 -- The watcher of the running Karabiner lease; nil while none runs.

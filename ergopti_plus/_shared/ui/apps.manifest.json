@@ -1,8 +1,9 @@
 {
-	"$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts.",
+	"$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/core/i18n/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts. An app with \"maximized\": true opens maximized on every host (its size is then the size it restores to), and every host keeps a window inside the screen's work area, so its title bar and buttons stay reachable at any display scale.",
 	"window_title": {
 		"prefix": "ErgoptiPlus",
-		"separator": " — "
+		"separator": " — ",
+		"product_names": ["Ergopti Studio"]
 	},
 	"native_windows": {
 		"console": {
@@ -15,11 +16,6 @@
 			"kind": "dialog",
 			"title_key": "menu.profiles.shortcut_title",
 			"platforms": ["hs"]
-		},
-		"magic_key_source_notice": {
-			"kind": "notification",
-			"title_key": "dialog.magic_key_source.title",
-			"platforms": ["linux"]
 		}
 	},
 	"apps": {
@@ -79,7 +75,7 @@
 		"changelog": {
 			"title_key": "changelog_window.window_title",
 			"width": 860,
-			"height": 580,
+			"height": 620,
 			"min_width": 860,
 			"min_height": 540,
 			"vhost": "ergopti.changelog"
@@ -87,10 +83,18 @@
 		"download_window": {
 			"title_key": "download_window.window_title",
 			"width": 460,
-			"height": 380,
+			"height": 420,
 			"min_width": 460,
-			"min_height": 380,
+			"min_height": 420,
 			"vhost": "ergopti.download"
+		},
+		"emulation_picker": {
+			"title_key": "menu.layout.emulated_layout",
+			"width": 440,
+			"height": 520,
+			"min_width": 360,
+			"min_height": 360,
+			"vhost": "ergopti.emulationpicker"
 		},
 		"permission_dialog": {
 			"title_key": "permission_dialog.window_title",
@@ -99,6 +103,14 @@
 			"min_width": 560,
 			"min_height": 520,
 			"vhost": "ergopti.permissiondialog"
+		},
+		"field_report": {
+			"title_key": "field_report.title",
+			"width": 560,
+			"height": 520,
+			"min_width": 440,
+			"min_height": 360,
+			"vhost": "ergopti.fieldreport"
 		},
 		"error_dialog": {
 			"title_key": "common.error_title",
@@ -127,18 +139,19 @@
 		"hotstring_editor": {
 			"title_key": "editor.hotstrings.window_title",
 			"width": 960,
-			"height": 640,
+			"height": 660,
 			"min_width": 720,
 			"min_height": 520,
 			"vhost": "ergopti.hotstrings"
 		},
-		"layer_editor": {
-			"title_key": "layer_editor.window_title",
-			"width": 1120,
-			"height": 800,
+		"layout_editor_window": {
+			"title_key": "layout_editor.title",
+			"width": 1180,
+			"height": 820,
 			"min_width": 900,
 			"min_height": 620,
-			"vhost": "ergopti.layereditor"
+			"maximized": true,
+			"vhost": "ergopti.layouteditor"
 		},
 		"layout_manager": {
 			"title_key": "layout_manager.window_title",
@@ -195,6 +208,22 @@
 			"min_width": 560,
 			"min_height": 200,
 			"vhost": "ergopti.paths"
+		},
+		"user_workflows": {
+			"title_key": "workflows.editor.window_title",
+			"width": 980,
+			"height": 720,
+			"min_width": 640,
+			"min_height": 420,
+			"vhost": "ergopti.userworkflows"
+		},
+		"keep_awake_library": {
+			"title_key": "keepawake.library.window_title",
+			"width": 920,
+			"height": 700,
+			"min_width": 620,
+			"min_height": 420,
+			"vhost": "ergopti.keepawakelibrary"
 		},
 		"personal_info_editor": {
 			"title_key": "editor.personal_info.window_title",

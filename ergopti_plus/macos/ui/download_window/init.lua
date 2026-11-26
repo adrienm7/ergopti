@@ -27,18 +27,18 @@
 
 local M = {}
 
-local Logger     = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Paths      = require("infra.paths")
-local ShellRunner = require("adapters.shell_runner")
-local OwnWindow  = require("adapters.own_window")
-local ui_builder = require("ui.ui_builder")
-local i18n       = require("infra.i18n")
-local text_utils = require("infra.text_utils")
+local Logger     = require("core.logger.engine.logger")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Paths      = require("core.fs.engine.paths")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local OwnWindow  = require("core.ui.adapters.own_window")
+local ui_builder = require("core.ui.ui.builder")
+local i18n       = require("core.i18n.engine.i18n")
+local text_utils = require("core.text.engine.utils")
 local JavaScript = require("ui.download_window.javascript")
 local PendingQueue = require("ui.download_window.pending_queue")
-local NativeTheme = require("native_theme_data")
+local NativeTheme = require("core.ui.engine.native_theme_data")
 
 local LOG = "download_window"
 
@@ -153,7 +153,7 @@ local PRESETS = {
 -- from the shared registry when an error is shown, so loading this window
 -- (which every download path does) does not depend on the registry.
 local function error_auto_dismiss_sec()
-	return require("infra.timings").sec("tooltip", "error_dialog_autodismiss_ms")
+	return require("core.timing.engine.timings").sec("tooltip", "error_dialog_autodismiss_ms")
 end
 
 --- Invokes one external window controller through the central visible boundary.
@@ -436,7 +436,7 @@ local function ensure_webview(title)
 		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		DeferredWork.after(require("infra.timings").sec("ui", "download_window_flush_safety_ms"), function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "download_window_flush_safety_ms"), function()
 				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
@@ -680,7 +680,15 @@ end
 function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
 		if not require_active_operation() then return false end
 
+		if pct_str ~= nil and type(pct_str) ~= "number" and type(pct_str) ~= "string" then
+			Logger.warn(LOG, "Invalid download progress was refused.")
+			return false
+		end
 		local pct = tonumber(pct_str) or 0
+		if pct ~= pct or pct == math.huge or pct == -math.huge then
+			Logger.warn(LOG, "Invalid download progress was refused.")
+			return false
+		end
 		local elapsed = TimerScheduler.awake_time() - (_start_ts or TimerScheduler.awake_time())
 
 		local dl_str, speed_str, eta_str, file_count_str
@@ -829,7 +837,7 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        DeferredWork.after(require("infra.timings").sec("ui", "download_window_hide_delay_ms"), function()
+        DeferredWork.after(require("core.timing.engine.timings").sec("ui", "download_window_hide_delay_ms"), function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return
@@ -880,7 +888,10 @@ end
 --- @param pct number|nil Percentage in [0, 100], or nil for indeterminate.
 function M.set_progress(pct)
     if not require_active_operation() then return false end
-    if pct ~= nil and type(pct) ~= "number" then return end
+    if pct ~= nil and (type(pct) ~= "number" or pct ~= pct or pct < 0 or pct > 100) then
+        Logger.warn(LOG, "Invalid bootstrap progress was refused.")
+        return false
+    end
     note_progress("p|" .. tostring(pct))
     -- The model selector page shows a runtime install's progress in its group.
     if pct ~= nil and pct < 100 then tell_percent(math.floor(pct)) end

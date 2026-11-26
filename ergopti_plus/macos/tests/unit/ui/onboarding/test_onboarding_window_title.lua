@@ -15,7 +15,7 @@ local with_delivery = fixture.with_delivery
 --- Makes the fixture's i18n locale-aware: get() returns "<locale>:<key>".
 --- @return table i18n The patched stub.
 local function locale_aware_i18n()
-	local i18n = package.loaded["infra.i18n"]
+	local i18n = package.loaded["core.i18n.engine.i18n"]
 	local current = "en"
 	i18n.get_locale = function() return current end
 	i18n.set_locale_no_reload = function(code) current = code; return true end
@@ -27,8 +27,8 @@ end
 -- fixture scripts the file streams.
 local TITLES = {}
 for _, code in ipairs({ "en", "fr", "de" }) do
-	local fh = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
-	TITLES[code] = require("json").decode(fh:read("*a"))["onboarding.window_title"]
+	local fh = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
+	TITLES[code] = require("core.text.engine.json").decode(fh:read("*a"))["onboarding.window_title"]
 	fh:close()
 end
 
@@ -67,6 +67,33 @@ helpers.describe("onboarding window title", function()
 		end)
 	end)
 
+	-- OBM-001: the running script kept the chosen language when the wizard was
+	-- closed before Finish, and a refused Finish restored that same language.
+	helpers.it("(onboarding-locale-choice) choosing a language waits for Finish", function()
+		with_delivery(function(_, state, pending)
+			local i18n = locale_aware_i18n()
+			state.receiver({ body = { action = "localeSelected", locale = "fr" } })
+			helpers.assert_eq(i18n.get_locale(), "en", "the running script keeps its language")
+			state.receiver({ body = { action = "ready" } })
+			pending[#pending]()
+			helpers.assert_eq(state.titles[#state.titles].title, window_title("fr"),
+				"the page reopens in the chosen language")
+		end)
+	end)
+
+	helpers.it("(onboarding-locale-choice) a language the build does not ship is refused", function()
+		with_delivery(function(_, state, pending)
+			local i18n = locale_aware_i18n()
+			state.receiver({ body = { action = "previewLocale" } })
+			state.receiver({ body = { action = "localeSelected", locale = 42 } })
+			helpers.assert_eq(#state.titles, 0, "no preview in a substituted language")
+			helpers.assert_eq(i18n.get_locale(), "en")
+			state.receiver({ body = { action = "ready" } })
+			pending[#pending]()
+			helpers.assert_eq(state.titles[#state.titles].title, window_title("en"))
+		end)
+	end)
+
 	helpers.it("(onboarding-window-title) initData retitles in the current locale", function()
 		with_delivery(function(_, state, pending)
 			locale_aware_i18n()
@@ -87,7 +114,7 @@ helpers.describe("onboarding window title", function()
 
 	helpers.it("(onboarding-window-title) every locale's window title is brand-less", function()
 		local Json = require("tests.stubs.hs").json
-		local dir = "../_shared/data/locales/"
+		local dir = "../_shared/core/i18n/data/locales/"
 		local codes = { "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 			"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }
 		for _, code in ipairs(codes) do
@@ -104,14 +131,14 @@ end)
 
 helpers.describe("ui_builder window title", function()
 	helpers.it("(shared-window-titles) layout and navigation captions use every shipped translation", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
-		local Json = require("json")
-		local file = assert(io.open(helpers.shared("data/locale_order.json"), "r"))
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
+		local Json = require("core.text.engine.json")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "r"))
 		local locales = Json.decode(file:read("*a")).order
 		file:close()
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "r"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "r"))
 			local strings = Json.decode(file:read("*a"))
 			file:close()
 			for _, key in ipairs({ "layout_manager.window_title", "layer_editor.window_title" }) do
@@ -124,7 +151,7 @@ helpers.describe("ui_builder window title", function()
 	end)
 
 	helpers.it("(onboarding-window-title) the product name is prefixed exactly once", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
 		local title = ui_builder.window_title("Setup")
 		helpers.assert_eq(title, "ErgoptiPlus — Setup")
 		local _, count = title:gsub("ErgoptiPlus", "")
@@ -134,7 +161,7 @@ helpers.describe("ui_builder window title", function()
 	end)
 
 	helpers.it("(onboarding-window-title) set_window_title applies the composed title", function()
-		local ui_builder = helpers.load_with_stubs("ui.ui_builder", {})
+		local ui_builder = helpers.load_with_stubs("core.ui.ui.builder", {})
 		local applied
 		local view = { windowTitle = function(_, value) applied = value end }
 		helpers.assert_true(ui_builder.set_window_title(view, "Configuration"))

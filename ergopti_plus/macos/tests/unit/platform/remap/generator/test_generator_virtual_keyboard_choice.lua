@@ -23,10 +23,11 @@ local helpers = require("tests.helpers")
 package.loaded["tests.support.platform.remap.generator.generator_fixture"] = nil
 local Fixture = require("tests.support.platform.remap.generator.generator_fixture")
 local Generator = Fixture.Generator
+local Sequence = require("tests.support.script_chord_sequence")
 local NONE_ACTION = Fixture.NONE_ACTION
 local make_state = Fixture.make_state
 local Layout = require("modules.keymap.layout")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 -- What each virtual product makes of a HID usage (IOHIDFamily; Karabiner's
 -- event_tap_utility: the ISO product sends 0x35 as 10 and 0x64 as 50).
@@ -45,8 +46,8 @@ local CHOICES = { "auto", "iso", "ansi" }
 --- @return string usage The HID usage name the keyboard reports.
 --- @return integer native The keycode macOS natively gives that keyboard for it.
 local function physical(code, form)
-	local source = assert(io.open(helpers.shared("data/keycodes/physical_keys.json"), "rb"))
-	local registry = require("json").decode(source:read("*a")); source:close()
+	local source = assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json"), "rb"))
+	local registry = require("core.text.engine.json").decode(source:read("*a")); source:close()
 	local entry = assert(registry.keys[code], code)
 	local record = form == "iso" and entry.macos_iso or entry
 	return record.karabiner.key_code, record.hs
@@ -164,9 +165,10 @@ helpers.describe("the choice reaches the outputs and the arrival convention", fu
 		local config, err = Generator.build_karabiner_json(state, { NONE_ACTION }, {}, {}, nil, "/fake/data_dir/")
 		helpers.assert_nil(err)
 		for _, rule in ipairs(config.profiles[1].complex_modifications.rules) do
-			for _, manipulator in ipairs(rule.manipulators or {}) do
+			-- The rule ending the script chord sequence types every key as is.
+			for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
 				if manipulator.from and manipulator.from.key_code == "h" and manipulator.to then
-					return manipulator.to[1].key_code
+					return Sequence.without_sequence(manipulator.to)[1].key_code
 				end
 			end
 		end

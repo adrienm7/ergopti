@@ -3,11 +3,11 @@
 local helpers = require("tests.helpers")
 local Gesture = require("tests.support.gesture_actions_fixture")
 local Native = require("tests.support.synthetic_input_fixture")
-require("infra.logger")
+require("core.logger.engine.logger")
 local M = {}
 function M.with_world(options, callback)
-	return helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner",
-		"adapters.storage", "adapters.event_provenance", "tests.stubs.hs", "hs", "logger.shim" }, function()
+	return helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner",
+		"core.fs.adapters.storage", "diagnostics.adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
 		return Gesture.with_fixture(function(fresh)
 			fresh()
 			local f = Native.make({ absolute_time = 0, epoch = 1900000000 })
@@ -25,6 +25,7 @@ function M.with_world(options, callback)
 			end
 			f.key_observer = copy
 			hs.pasteboard = {
+				allContentTypes = function() return { {} } end,
 				readAllData = function() return board end,
 				changeCount = function() if w.count_unavailable then return nil end; return generation end,
 				clearContents = function() board = {}; generation = generation + 1 end,
@@ -43,9 +44,9 @@ function M.with_world(options, callback)
 				native.stop = function(self) stop(self); return self end
 				return native
 			end
-			package.loaded["adapters.clipboard"] = nil
-			package.loaded["modules.gestures.actions"] = nil
-			local actions = require("modules.gestures.actions")
+			package.loaded["clipboard.adapters.clipboard"] = nil
+			package.loaded["gestures.engine.actions"] = nil
+			local actions = require("gestures.engine.actions")
 			actions.init({ action_params = {} })
 			assert(actions.set_action_parameter("keyboard__primary_1", "search_web", "https://example.test/?q=%s"))
 			if options.backlog then

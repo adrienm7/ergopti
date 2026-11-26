@@ -8,10 +8,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "ui.physical_shortcuts", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.i18n", "webview.i18n_seed", "window_titles",
-	"adapters.file_system", "adapters.json_codec", "shortcuts.physical_slots", "shortcuts.physical_editor_window",
-	"shortcuts.physical_availability", "infra.locale", "locale.core", "webview.presentation", "hs.webview", "json" }
+local OWNED = { "ui.physical_shortcuts", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
+	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
+	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
+	"shortcuts.engine.physical_availability", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
 
 --- Executes the actual diagnostic with individual retirement facts held back.
 --- @param blocked string|nil Boundary whose observed acknowledgement is withheld.
@@ -23,14 +23,14 @@ local function run(blocked, scenario)
 		local root = assert(driver:match("^(.*)/static/ergopti_plus/macos/$"))
 		local logger = helpers.make_logger_stub()
 		logger.initialize_privacy = function() return true end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = function(path) return path end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["webview.i18n_seed"] = {}
-		package.loaded["window_titles"] = { compose = function(key) return key end }
-		package.loaded["adapters.file_system"] = { read = function() return "{}" end }
-		package.loaded["shortcuts.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
-		package.loaded["shortcuts.physical_editor_window"] = { new = function() return {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return path end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
+		package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
+		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
+		package.loaded["shortcuts.engine.physical_editor_window"] = { new = function() return {
 			retire = function() return true end, receive = function() return true end,
 		} end }
 		local function timer(delay, callback, diagnostic)
@@ -127,7 +127,7 @@ local function run(blocked, scenario)
 				doAfter = function(delay, fn) return timer(delay, fn, true):start() end },
 		})
 		assert(host)
-		local builder = package.loaded["ui.ui_builder"]
+		local builder = package.loaded["core.ui.ui.builder"]
 		builder.get_app_geometry = function() return { width = 700, height = 600 } end
 		builder.get_centered_frame = function() return {} end
 		builder.build_injected_html = function() return "<html></html>" end

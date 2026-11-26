@@ -1,0 +1,9 @@
+# _shared/tests/corpus/config_migrations/shipped_section_order_language_key_copied_on_windows/input.toml
+
+[_meta]
+schema_version = 20
+
+[hotstrings.order_overrides]
+autocorrection = ["accents", "names", "-", "abbreviations"]
+magickey = ["text_expansion", "replace"]
+rolls = ["hc"]

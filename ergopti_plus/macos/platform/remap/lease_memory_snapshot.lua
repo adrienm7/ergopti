@@ -19,9 +19,9 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
-local ShellRunner    = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger         = require("core.logger.engine.logger")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "lease_memory"
 

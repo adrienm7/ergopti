@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
-	"infra.perf_counters", "toml_codec.reader",
+	"infra.phase_stats", "core.process.adapters.shell_runner", "menu.ui.builder.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
+	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
 local MS = 1e6
@@ -20,9 +20,9 @@ local MS = 1e6
 --- @param level number Logger minimum level.
 --- @return table stats, table lines
 local function fixture(level)
-	package.loaded["logger"] = nil
-	package.loaded["logger.shim"] = nil
-	local logger = require("logger")
+	package.loaded["core.logger.engine"] = nil
+	package.loaded["core.logger.engine.shim"] = nil
+	local logger = require("core.logger.engine")
 	local lines = {}
 	logger.set_sink(function(line) lines[#lines + 1] = line end)
 	logger.set_level(level)
@@ -89,7 +89,7 @@ end)
 helpers.describe("phase stats: child processes", function()
 	helpers.it("times a synchronous child as process.<program> through the shell runner", function()
 		local stats = fixture(20)
-		local runner = helpers.load_module("adapters.shell_runner")
+		local runner = helpers.load_module("core.process.adapters.shell_runner")
 		helpers.assert_true(runner.run("true"))
 		local figures = stats.figures("process.true")
 		helpers.assert_not_nil(figures, "the runner must record the child's duration")
@@ -98,10 +98,12 @@ helpers.describe("phase stats: child processes", function()
 
 	helpers.it("names the program, never the command line", function()
 		local stats, lines = fixture(20)
-		local runner = helpers.load_module("adapters.shell_runner")
-		runner.run("true --secret-argument-4711")
+		local runner = helpers.load_module("core.process.adapters.shell_runner")
+		-- A marker without digits: the flushed lines carry durations and
+		-- timestamps, and "4711" once matched one of them on a CI runner.
+		runner.run("true --secret-argument-qzxwv")
 		stats.flush(300)
-		helpers.assert_true(not table.concat(lines, "\n"):find("4711", 1, true),
+		helpers.assert_true(not table.concat(lines, "\n"):find("qzxwv", 1, true),
 			"an argument must not reach a phase name")
 	end)
 end)
@@ -110,14 +112,14 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 	helpers.it("times a tray menu rebuild as menu.rebuild, and the daemon's rebuild owner uses it", function()
 		local stats = fixture(20)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
-		local items = require("ui.menu.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
+		package.loaded["menu.ui.builder.timed_build"] = nil
+		local items = require("menu.ui.builder.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
 		helpers.assert_eq(items, { "Ergopti" })
 		helpers.assert_eq(stats.figures("menu.rebuild").n, 1)
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = file:read("*a")
 		file:close()
-		helpers.assert_not_nil(source:find('require("ui.menu.timed_build").run(build, ctx)', 1, true),
+		helpers.assert_not_nil(source:find('require("menu.ui.builder.timed_build").run(build, ctx)', 1, true),
 			"the daemon's tray rebuild goes through the timed build")
 	end)
 
@@ -126,15 +128,15 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local clock = 0
 		stats.use_clock(function() return clock end)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
-		local Timings = require("infra.timings")
+		package.loaded["menu.ui.builder.timed_build"] = nil
+		local Timings = require("core.timing.engine.timings")
 		local held_ms = Timings.ms
 		Timings.ms = function(section, key)
 			if section == "budgets" and key == "menu_rebuild_ms" then return 250 end
 			return held_ms(section, key)
 		end
 		local ok, failure = pcall(function()
-			local TimedBuild = require("ui.menu.timed_build")
+			local TimedBuild = require("menu.ui.builder.timed_build")
 			TimedBuild.run(function() clock = clock + 120 * MS; return { 1, 2, 3 } end, {})
 			TimedBuild.run(function() clock = clock + 300 * MS; return { 1 } end, {})
 		end)
@@ -156,16 +158,16 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local source = file:read("*a")
 		file:close()
 		local completed = source:find("local boot_ms = BootProfiler.complete()", 1, true)
-		local reported = source:find('require("infra.reload_timing").complete()', 1, true)
+		local reported = source:find('require("core.timing.engine.reload_timing").complete()', 1, true)
 		helpers.assert_true(completed ~= nil and reported ~= nil and reported > completed,
 			"the reload is reported once the boot it ends is complete")
 	end)
 
 	helpers.it("times each TOML parse as toml.parse and leaves the shared reader's other functions alone", function()
 		local stats = fixture(20)
-		package.loaded["infra.toml.reader"] = nil
-		local Reader = require("infra.toml.reader")
-		local shared = require("toml_codec.reader")
+		package.loaded["core.text.engine.toml.reader"] = nil
+		local Reader = require("core.text.engine.toml.reader")
+		local shared = require("core.text.engine.toml_codec.reader")
 		helpers.assert_eq(Reader.parse_text, shared.parse_text)
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb"))
@@ -179,10 +181,33 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		helpers.assert_eq(stats.figures("toml.parse").n, 1)
 	end)
 
+	-- The tooltip constants, the timing registry and the two hotstring windows
+	-- parsed through the shared reader itself, so the phase summary missed
+	-- them; macOS reads each through its timed reader (parity TXT-01).
+	helpers.it("every production module parses TOML through the timed reader (txt-01)", function()
+		local root = (helpers.driver_root():gsub("[/\\]$", ""))
+		local paths = assert(require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true }))
+		local shim, bypassing = 0, {}
+		for _, path in ipairs(paths) do
+			local handle = assert(io.open(path, "rb"))
+			local body = assert(handle:read("*a"))
+			handle:close()
+			if body:find("MODULE: Timed TOML Reader (Linux)", 1, true) then
+				shim = shim + 1
+			elseif body:find("core.text.engine.toml_codec.reader", 1, true) then
+				bypassing[#bypassing + 1] = path:sub(#root + 2)
+			end
+		end
+		helpers.assert_eq(shim, 1, "the timed reader is found by its banner")
+		helpers.assert_eq(table.concat(bypassing, ", "), "", "modules reading the shared reader untimed")
+	end)
+
 	helpers.it("records every closed boot stage as boot.stage with its CPU time as boot.stage_cpu", function()
 		local stats = fixture(20)
-		package.loaded["infra.boot_profiler"] = nil
-		local Boot = require("infra.boot_profiler")
+		package.loaded["core.logger.engine.boot_profiler"] = nil
+		local Boot = require("core.logger.engine.boot_profiler")
 		Boot.begin()
 		Boot.stage("config")
 		Boot.stage_done("config")

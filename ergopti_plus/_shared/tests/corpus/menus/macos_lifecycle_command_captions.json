@@ -1,5 +1,5 @@
 {
-	"source": "Prior physical macos/ui/menu/builder.lua Reload/Quit prefix plus Lua C-locale ASCII whitespace token stripping; frozen before candidate preparation",
+	"source": "Prior physical macos/menu/ui/builder/builder.lua Reload/Quit prefix plus Lua C-locale ASCII whitespace token stripping; frozen before candidate preparation",
 	"captions": {
 		"ar": {
 			"reload": {

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Chord Notation Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
---- Runs the shared chord corpus (_shared/lua/chord/vectors.json) against the
+--- Runs the shared chord corpus (_shared/keyboard/engine/chord/vectors.json) against the
 --- shared notation core. The AutoHotkey driver runs the SAME file against its own
 --- twin (windows/tests/meta/test_chord_notation.ahk), which is the only thing that
 --- makes "one notation, two implementations" a fact rather than an intention: a
@@ -22,8 +22,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json    = require("json")
-local Chord   = require("chord")
+local json    = require("core.text.engine.json")
+local Chord   = require("keyboard.engine.chord")
 
 
 
@@ -35,7 +35,7 @@ local Chord   = require("chord")
 -- ======================================
 -- ======================================
 
-local CORPUS_PATH = helpers.shared("lua/chord/vectors.json")
+local CORPUS_PATH = helpers.shared("keyboard/engine/chord/vectors.json")
 
 --- Reads and decodes the shared chord corpus.
 --- Fails loudly rather than skipping: a corpus that cannot be read must not let

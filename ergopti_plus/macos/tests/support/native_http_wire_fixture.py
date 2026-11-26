@@ -30,6 +30,8 @@ import uuid
 
 # An explicit private media type: CFNetwork does not sniff a declared body type.
 WIRE_BODY_TYPE = "application/x-ergopti-native-wire"
+# The redirects' own body, distinct from the origin payload a successor returns.
+REDIRECT_BODY = b"redirect\x00body"
 
 
 class FixtureFailure(RuntimeError):
@@ -567,14 +569,19 @@ class WireFixture:
                         else f"http://{owner.host}:{owner.origin_port}/blocked"
                     )
                     self.send_header("Location", location)
-                    # Untyped, this held redirect would also wait for sniffing.
+                    # Untyped, this redirect would also wait for sniffing.
                     self.send_header("Content-Type", WIRE_BODY_TYPE)
-                    self.send_header("Content-Length", "1048576")
+                    # A complete body: HTTPX reads a followed redirect's body
+                    # before its successor, and the managed transport keeps
+                    # that stream, so a declared body that never arrives is a
+                    # truncated response for stock HTTPX and for the native
+                    # client alike, never a redirect.
+                    self.send_header("Content-Length", str(len(REDIRECT_BODY)))
                     self.send_header("Connection", "close")
                     self.end_headers()
+                    self.wfile.write(REDIRECT_BODY)
                     self.wfile.flush()
-                    # The receiver must close on redirect headers. No full body
-                    # or successful origin EOF is offered to a late successor.
+                    # The receiver retires this connection before its successor.
                     self.connection.settimeout(3)
                     try:
                         eof = self.connection.recv(1) == b""

@@ -9,10 +9,10 @@
 --- 1. _shared/tests/corpus/healthcheck/errors_tail_vectors.json through
 ---    healthcheck.snapshot.parse_errors_tail (the window's recent issues).
 --- 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
----    diagnostics.issue_link (the prefilled GitHub issue URL).
+---    diagnostics.issue_link (the prefilled GitHub issue URL and the pasted report).
 --- 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ---    diagnostics.redact with the rules of
----    _shared/modules/diagnostics/redaction.json (what leaves the machine).
+---    _shared/diagnostics/data/redaction.json (what leaves the machine).
 --- 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
 ---    diagnostics.issue_report (the bug report text).
 --- 5. _shared/tests/corpus/healthcheck/action_vectors.json through
@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared/"
 
@@ -53,7 +53,7 @@ end
 
 helpers.describe("diagnostics corpus (linux): errors-file tail", function()
 	local corpus = read_corpus("tests/corpus/healthcheck/errors_tail_vectors.json")
-	local Snapshot = require("healthcheck.snapshot")
+	local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
 
 	helpers.it("has vectors (errors-tail-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 10,
@@ -72,7 +72,7 @@ end)
 
 helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/issue_link_vectors.json")
-	local IssueLink = require("diagnostics.issue_link")
+	local IssueLink = require("diagnostics.engine.reports.issue_link")
 
 	helpers.it("has vectors (issue-link-corpus)", function()
 		helpers.assert_true(type(corpus.encode_vectors) == "table" and #corpus.encode_vectors >= 5,
@@ -92,6 +92,7 @@ helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 			local templates = {}
 			for key, value in pairs(corpus.templates) do templates[key] = value end
 			templates.max_url_bytes = vector.max_url_bytes
+			templates.max_redirect_bytes = vector.max_redirect_bytes
 			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values, vector.notes)
 			if vector.expect_error then
 				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))
@@ -101,12 +102,30 @@ helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 			end
 		end)
 	end
+
+	helpers.it("has fit vectors (issue-link-corpus)", function()
+		helpers.assert_true(type(corpus.fit_vectors) == "table" and #corpus.fit_vectors >= 5,
+			"the issue-link corpus must hold its pasted-report vectors")
+	end)
+
+	for _, vector in ipairs(corpus.fit_vectors or {}) do
+		helpers.it("fit_lines: " .. vector.id .. " (issue-link-corpus)", function()
+			local ok, text = pcall(IssueLink.fit_lines, vector.text, vector.max_bytes, vector.marker, vector.note)
+			if vector.expect_error then
+				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(text))
+			else
+				helpers.assert_true(ok, vector.id .. ": " .. tostring(text))
+				helpers.assert_eq(text, vector.expected, vector.id)
+				helpers.assert_true(#text <= vector.max_bytes, vector.id .. ": over its budget")
+			end
+		end)
+	end
 end)
 
 helpers.describe("diagnostics corpus (linux): redaction", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/redaction_vectors.json")
-	local rules = read_corpus("modules/diagnostics/redaction.json")
-	local Redact = require("diagnostics.redact")
+	local rules = read_corpus("diagnostics/data/redaction.json")
+	local Redact = require("diagnostics.engine.reports.redact")
 
 	helpers.it("has vectors (redaction-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 10,
@@ -122,7 +141,7 @@ end)
 
 helpers.describe("diagnostics corpus (linux): bug report text", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/issue_report_vectors.json")
-	local IssueReport = require("diagnostics.issue_report")
+	local IssueReport = require("diagnostics.engine.reports.issue_report")
 
 	helpers.it("has vectors (issue-report-corpus)", function()
 		for _, list in ipairs({ "dump_vectors", "markdown_vectors" }) do
@@ -164,7 +183,7 @@ end)
 
 helpers.describe("diagnostics corpus (linux): page actions (page-actions-corpus)", function()
 	local corpus = read_corpus("tests/corpus/healthcheck/action_vectors.json")
-	local Actions = require("healthcheck.actions")
+	local Actions = require("diagnostics.engine.healthcheck.actions")
 
 	helpers.it("has vectors (page-actions-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 30,
@@ -188,8 +207,8 @@ end)
 
 helpers.describe("diagnostics corpus (linux): issue form identity (form-identity-corpus)", function()
 	local corpus = read_corpus("tests/corpus/healthcheck/form_identity_vectors.json")
-	local Share = require("healthcheck.share")
-	local config = require("healthcheck.snapshot").load_config(function(rel) return SHARED_ROOT .. rel end)
+	local Share = require("diagnostics.engine.healthcheck.share")
+	local config = require("diagnostics.engine.healthcheck.snapshot").load_config(function(rel) return SHARED_ROOT .. rel end)
 
 	helpers.it("has vectors (form-identity-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
@@ -203,6 +222,7 @@ helpers.describe("diagnostics corpus (linux): issue form identity (form-identity
 			local document = Share.document(snapshot, config.schema, "")
 			helpers.assert_eq(document.fields.version, vector.version, vector.id .. ": version")
 			helpers.assert_eq(document.fields.os, vector.os, vector.id .. ": os")
+			helpers.assert_eq(document.fields.driver, corpus.driver_options[vector.snapshot.driver], vector.id .. ": driver option")
 			helpers.assert_true(not document.fields.diagnostics:find("```json", 1, true),
 				vector.id .. ": the form report has no JSON block")
 		end)
@@ -211,7 +231,7 @@ end)
 
 helpers.describe("diagnostics corpus (linux): error window policy (error-policy-corpus)", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/error_policy_vectors.json")
-	local Policy = require("diagnostics.error_policy")
+	local Policy = require("diagnostics.engine.reports.error_policy")
 
 	helpers.it("has vectors (error-policy-corpus)", function()
 		helpers.assert_true(type(corpus.signature_vectors) == "table" and #corpus.signature_vectors >= 5,
@@ -223,7 +243,7 @@ helpers.describe("diagnostics corpus (linux): error window policy (error-policy-
 	end)
 
 	helpers.it("the shipped policy is valid (error-policy-corpus)", function()
-		local ok, err = pcall(Policy.validate, read_corpus("modules/diagnostics/error_policy.json"))
+		local ok, err = pcall(Policy.validate, read_corpus("diagnostics/data/error_policy.json"))
 		helpers.assert_true(ok, "error_policy.json must validate: " .. tostring(err))
 	end)
 
@@ -255,7 +275,7 @@ end)
 
 helpers.describe("diagnostics corpus (linux): error report (error-report-corpus)", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/error_report_vectors.json")
-	local ErrorReport = require("diagnostics.error_report")
+	local ErrorReport = require("diagnostics.engine.reports.error_report")
 
 	helpers.it("has vectors (error-report-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 3,
@@ -280,8 +300,8 @@ end)
 
 helpers.describe("diagnostics corpus: day log attachment (day-log-corpus)", function()
 	local corpus = read_corpus("tests/corpus/diagnostics/day_log_vectors.json")
-	local rules = read_corpus("modules/diagnostics/redaction.json")
-	local DayLog = require("diagnostics.day_log")
+	local rules = read_corpus("diagnostics/data/redaction.json")
+	local DayLog = require("diagnostics.engine.day_log")
 
 	helpers.it("has vectors (day-log-corpus)", function()
 		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
@@ -292,7 +312,7 @@ helpers.describe("diagnostics corpus: day log attachment (day-log-corpus)", func
 		helpers.it("collect: " .. vector.id .. " (day-log-corpus)", function()
 			local got = DayLog.collect(vector.raw, vector.file_size, rules, corpus.context, vector.limits or corpus.limits)
 			-- An empty list decodes as an empty table in both directions
-			helpers.assert_eq(require("json").encode(got), require("json").encode(vector.expected), vector.id)
+			helpers.assert_eq(require("core.text.engine.json").encode(got), require("core.text.engine.json").encode(vector.expected), vector.id)
 		end)
 	end
 end)

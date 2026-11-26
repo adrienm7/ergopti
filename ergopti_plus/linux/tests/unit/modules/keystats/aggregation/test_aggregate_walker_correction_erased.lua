@@ -10,12 +10,12 @@
 package.loaded["tests.support.modules.keystats.aggregation.aggregate_walker_fixture"] = nil
 local Fixture = require("tests.support.modules.keystats.aggregation.aggregate_walker_fixture")
 
-local file = assert(io.open(assert(require("infra.paths").shared(
+local file = assert(io.open(assert(require("core.fs.engine.paths").shared(
 	"tests/corpus/keystats/correction_erased_vectors.json")), "rb"))
-local data = require("json").decode(assert(file:read("*a")))
+local data = require("core.text.engine.json").decode(assert(file:read("*a")))
 assert(file:close())
 
-require("test.keystats_correction_erased_contract")(Fixture.helpers, data, function(vec)
+require("tests.lua.metrics.correction_erased_contract")(Fixture.helpers, data, function(vec)
 	local batch, ctx = nil, {}
 	for _, flush in ipairs(vec.flushes) do
 		local events = {}
@@ -24,5 +24,6 @@ require("test.keystats_correction_erased_contract")(Fixture.helpers, data, funct
 		end
 		batch = Fixture.Walker.walk(events, data.date, data.app, batch, Fixture.qwerty_clock(nil), ctx)
 	end
-	return batch.ngram
-end, 6)
+	local error_row = batch.errors[data.date .. "\1" .. data.app]
+	return batch.ngram, { bs_total = error_row.bs_total, cur_word = ctx.cur_word, word_err = ctx.word_err, hs_input_chars = (batch.app_day[data.date .. "\1" .. data.app] or {}).hs_input_chars or 0 }
+end, 11)

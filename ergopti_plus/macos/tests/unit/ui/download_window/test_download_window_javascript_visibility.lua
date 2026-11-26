@@ -13,30 +13,30 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real window and observable fixture.
 local function with_window(scenario)
 	local names = {
-		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
-		"infra.logger", "infra.deferred_work", "infra.paths", "infra.timings", "infra.i18n",
-		"infra.text_utils",
-		"adapters.timer_scheduler", "error_description", "number_policy",
+		"ui.download_window", "ui.download_window.javascript", "core.ui.ui.builder",
+		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.timing.engine.timings", "core.i18n.engine.i18n",
+		"core.text.engine.utils",
+		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
 	local saved, saved_hs = {}, _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { errors = {}, timers = {}, callbacks = {}, failure = nil }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop,
 		error = function(_, message, ...)
 			fixture.errors[#fixture.errors + 1] = string.format(message, ...)
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback) fixture.timers[#fixture.timers + 1] = callback; return true end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return "/assets" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/assets" end }
 	helpers.provide_timings()
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = {}
-	package.loaded["adapters.shell_runner"] = {}
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = {}
+	package.loaded["core.process.adapters.shell_runner"] = {}
 	local view = {
 		evaluateJavaScript = function(self, _, callback)
 			if fixture.failure == "throw" then error("PRIVATE_NATIVE_SENTINEL") end
@@ -46,7 +46,7 @@ local function with_window(scenario)
 		end,
 		delete = noop,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 460, height = 380 } end,
 		show_webview = function(opts)
 			fixture.navigation = opts.on_navigation
@@ -69,7 +69,7 @@ local function with_window(scenario)
 		scenario(window, fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	_G.hs = saved_hs
 	if not ok then error(err, 0) end
 end

@@ -41,6 +41,32 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
 }
 
+// Reads a typed field through the shared value check (_shared/ui/value_check.js,
+// generated from the one schema the three drivers read). A refusal is shown on
+// the field itself with the localized text naming the accepted range, and
+// nothing is sent; an admitted value is returned in the typed unit. Every
+// field of this page is an override: with `override`, a blank answers
+// INHERITED, and its caller removes the override.
+const INHERITED = Object.freeze({ inherited: true });
+function checkedField(input, key, override) {
+	const V = window.ErgoptiValueCheck;
+	const entry = V.entryFor(V.SCHEMA, key);
+	// A number field hands text it cannot read over as an empty value: that is
+	// an unreadable answer, refused as such, never a blank that inherits.
+	const typed = input.validity?.badInput
+		? V.parseEntry(entry, 'NaN')
+		: V.parseEntry(entry, input.value, override ? V.INHERIT : undefined);
+	if (!typed.ok) {
+		input.setCustomValidity(V.renderMessage(V.messageParts(entry, typed), _t));
+		input.reportValidity();
+		return null;
+	}
+	input.setCustomValidity('');
+	if (typed.inherit) return INHERITED;
+	// The host takes the typed unit (ms for a delay): the text, already admitted.
+	return Number(input.value.trim().replace(',', '.'));
+}
+
 // Apply data-i18n-key / data-i18n-title-key inside a freshly cloned template
 // fragment (i18n.js cannot reach inside <template> nodes before cloning).
 function applyTemplateI18n(node) {
@@ -49,6 +75,29 @@ function applyTemplateI18n(node) {
 	});
 	node.querySelectorAll('[data-i18n-title-key]').forEach(function (el) {
 		el.title = _t(el.getAttribute('data-i18n-title-key'));
+	});
+}
+
+// Numbers the controls of the rendered fields; a template cannot hold ids.
+let fieldCount = 0;
+
+/**
+ * Ties each field's label to its control, and names the control after the
+ * category or section it sets: every card repeats the same four labels, so a
+ * screen reader hears which one it is in (WCAG 1.3.1, 2.4.6, 4.1.2).
+ * @param {ParentNode} node - A rendered category head or section.
+ * @param {Element} heading - The category's or section's heading.
+ */
+function labelFields(node, heading) {
+	heading.id = 'hs-heading-' + ++fieldCount;
+	node.querySelectorAll('.field').forEach(function (field) {
+		const label = field.querySelector('label');
+		const control = field.querySelector('.ctrl input, .ctrl select');
+		if (!label || !control) return;
+		control.id = 'hs-field-' + ++fieldCount;
+		label.htmlFor = control.id;
+		label.id = control.id + '-label';
+		control.setAttribute('aria-labelledby', label.id + ' ' + heading.id);
 	});
 }
 
@@ -75,6 +124,14 @@ function setData(next) {
 	renderGroupSelector();
 	render();
 }
+
+// The cards are built from the host's data, and on Windows the locale strings
+// are fetched: data that lands first drew every field label as its locale key
+// (hs_config.label_delay). Draw again once i18n.js has applied the strings.
+document.addEventListener('i18n:applied', function () {
+	renderGroupSelector();
+	render();
+});
 
 function closeWindow() {
 	send({ action: 'close' });
@@ -132,11 +189,11 @@ function render() {
 		applyTemplateI18n(node);
 		const card = node.querySelector('.cat');
 
-		card.querySelector('.cat-title').textContent = cat.title;
-
-		// The caret and the title both fold the category's sections.
+		// The heading's one button, caret and title, folds the category's
+		// sections: a disclosure the keyboard reaches (WCAG 2.1.1, 4.1.2).
 		const toggle = card.querySelector('[data-role=toggle]');
-		const title = card.querySelector('.cat-title');
+		toggle.textContent = cat.title;
+		labelFields(card.querySelector('.cat-head'), card.querySelector('.cat-title'));
 		const sectionsBox = card.querySelector('.sections');
 		const key = categoryKey(cat);
 		const fold = () => {
@@ -146,7 +203,6 @@ function render() {
 		};
 		applyFold(toggle, sectionsBox, foldedCategories.has(key));
 		toggle.addEventListener('click', fold);
-		title.addEventListener('click', fold);
 
 		// File-level (category) controls
 		bindDelay(card.querySelector('.field-delay'), cat, null);
@@ -159,7 +215,9 @@ function render() {
 		for (const sec of cat.sections) {
 			const secNode = document.importNode(tplSec, true);
 			applyTemplateI18n(secNode);
-			secNode.querySelector('.sec-title').textContent = sec.title || sec.name;
+			const secTitle = secNode.querySelector('.sec-title');
+			secTitle.textContent = sec.title || sec.name;
+			labelFields(secNode, secTitle);
 			bindDelay(secNode.querySelector('.field-delay'), cat, sec);
 			bindColor(secNode.querySelector('.field-color'), cat, sec);
 			bindPriority(secNode.querySelector('.field-priority'), cat, sec);
@@ -201,17 +259,41 @@ function bindDelay(field, cat, sec) {
 	// When the TOML default is 0, fall back to the global default as the hint
 	// so the user understands what value will actually be applied.
 	const defaultMs =
-		(sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms || 750;
+		((sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms) ?? 750;
 	const input = field.querySelector('input');
 	const reset = field.querySelector('.reset');
 
-	input.value = ms || defaultMs;
+	// Zero is the effective unlimited delay, not a missing value.
+	input.value = ms ?? defaultMs;
 	input.placeholder = defaultMs;
 	field.classList.toggle('overridden', !!overridden);
 
+	function clearDelay() {
+		send({
+			action: 'clear_delay',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
+		});
+	}
+
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0) {
+		const v = checkedField(
+			input,
+			sec
+				? window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_ANY_DELAY
+				: window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY,
+			true
+		);
+		// A blank delay removes the override, so the inherited delay applies
+		// again (maintainer decision of 2026-11-22, PCK-13 for overrides).
+		if (v === INHERITED) {
+			clearDelay();
+			return;
+		}
+		if (v !== null) {
 			send({
 				action: 'set_delay',
 				category: cat.name,
@@ -224,16 +306,7 @@ function bindDelay(field, cat, sec) {
 		}
 	});
 
-	reset.addEventListener('click', () => {
-		send({
-			action: 'clear_delay',
-			category: cat.name,
-			group: cat.group,
-			section: sec ? sec.name : '',
-			personal_path: cat.personal_path || '',
-			ext_id: cat.ext_id || ''
-		});
-	});
+	reset.addEventListener('click', clearDelay);
 }
 
 // Collision priority (0-100, higher wins a same-trigger collision). The input
@@ -251,9 +324,30 @@ function bindPriority(field, cat, sec) {
 	if (typeof def === 'number') input.placeholder = def;
 	field.classList.toggle('overridden', !!overridden);
 
+	function clearPriority() {
+		send({
+			action: 'clear_priority',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
+		});
+	}
+
 	input.addEventListener('change', () => {
-		const v = parseInt(input.value, 10);
-		if (Number.isFinite(v) && v >= 0 && v <= 100) {
+		const v = checkedField(
+			input,
+			sec
+				? window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_ANY_PRIORITY
+				: window.ErgoptiValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY,
+			true
+		);
+		if (v === INHERITED) {
+			clearPriority();
+			return;
+		}
+		if (v !== null) {
 			send({
 				action: 'set_priority',
 				category: cat.name,
@@ -266,16 +360,7 @@ function bindPriority(field, cat, sec) {
 		}
 	});
 
-	reset.addEventListener('click', () => {
-		send({
-			action: 'clear_priority',
-			category: cat.name,
-			group: cat.group,
-			section: sec ? sec.name : '',
-			personal_path: cat.personal_path || '',
-			ext_id: cat.ext_id || ''
-		});
-	});
+	reset.addEventListener('click', clearPriority);
 }
 
 function bindColor(field, cat, sec) {
@@ -380,3 +465,14 @@ function bindTooltip(field, cat, sec) {
 // The Linux hardware harness found this window unreachable that way while the
 // editor — which has always assigned `window.initData` explicitly — worked.
 window.setData = setData;
+
+// Ask for the state once setData is published. Windows and macOS also push it
+// when the navigation completes and drop this string message; the Linux bridge
+// pushes only on it, so without it the window opened empty (WVH-001).
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', function () {
+		send('ready');
+	});
+} else {
+	send('ready');
+}

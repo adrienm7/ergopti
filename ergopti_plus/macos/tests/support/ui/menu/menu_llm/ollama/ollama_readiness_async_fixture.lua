@@ -53,26 +53,26 @@ local function retire_daemon(daemon, status, before_completion)
 end
 
 local MODULES = {
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.text_utils",
-	"modules.llm.api_ollama",
-	"modules.llm.ollama_binary",
-	"modules.llm.ollama_endpoint",
-	"modules.llm.ollama_server_command",
-	"modules.llm.network_env",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.text.engine.utils",
+	"ai.engine.api.ollama",
+	"ai.engine.ollama.binary",
+	"ai.engine.ollama.endpoint",
+	"ai.engine.ollama.server_command",
+	"ai.engine.api.network_env",
 	-- The prelude reads the proxy override through storage: none is stored.
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	-- FileSystem captures hs when it loads; each fixture binds its own copy.
-	"adapters.file_system",
-	"adapters.task_lifecycle",
-	"adapters.shell_runner",
-	"adapters.timer_scheduler",
-	"adapters.http_client",
+	"core.fs.adapters.file_system",
+	"core.process.adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
 	"ui.download_window",
-	"ui.menu.menu_llm.requirement_operation_registry",
-	"ui.menu.menu_llm.models_manager_ollama",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_ollama",
 }
 
 --- Receives argv from the actual emitted wrapper through the canonical Bash owner.
@@ -129,7 +129,7 @@ local function receive_pull_argv(executable, argv)
 		helpers.assert_eq(closed, true, output)
 		helpers.assert_eq(reason, "exit")
 		helpers.assert_eq(code, 0)
-		local packet = assert(require("json").decode(output))
+		local packet = assert(require("core.text.engine.json").decode(output))
 		helpers.assert_eq(packet.executable, "/opt/homebrew/bin/ollama")
 		helpers.assert_type(packet.args, "table")
 		return packet.args
@@ -189,21 +189,21 @@ local function with_fixture(spec, body)
 		local native_task_results = spec.native_task_results or {}
 		local menu_updates = 0
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(...)
 				notifications[#notifications + 1] = table.pack(...)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+		package.loaded["core.text.engine.utils"] = {
 			shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 		}
-		package.loaded["modules.llm.ollama_binary"] = {
+		package.loaded["ai.engine.ollama.binary"] = {
 			resolve = function() return "/opt/homebrew/bin/ollama" end,
 		}
-		package.loaded["modules.llm.ollama_server_command"] = {
+		package.loaded["ai.engine.ollama.server_command"] = {
 			build = function() return "exec /opt/homebrew/bin/ollama serve" end,
 		}
 		local window_session = 0
@@ -219,7 +219,7 @@ local function with_fixture(spec, body)
 			complete = function() return true end,
 		}
 
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local index = #spawns + 1
 				local record = {
@@ -273,7 +273,7 @@ local function with_fixture(spec, body)
 			end,
 		}
 
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local index = #timers + 1
 				local handle = {
@@ -309,7 +309,7 @@ local function with_fixture(spec, body)
 			end,
 		}
 
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				local client = { settled = false, observers = {} }
 				function client.post(url, headers, body, callback)
@@ -352,7 +352,7 @@ local function with_fixture(spec, body)
 		}
 
 		local manager
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, on_chunk_or_args, args)
 				local index = #native_tasks + 1
 				if native_task_results[index] == false then return nil end
@@ -410,7 +410,7 @@ local function with_fixture(spec, body)
 		-- not readiness work; once the body runs every execute is forbidden.
 		local setup_probe = helpers.existence_probe_execute()
 		local in_setup = true
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 		_G.hs = {
 			execute = function(...)
 				if in_setup then return setup_probe(...) end
@@ -445,9 +445,9 @@ local function with_fixture(spec, body)
 				return true
 			end,
 		})
-		package.loaded["modules.llm.api_ollama"] = daemon.api
+		package.loaded["ai.engine.api.ollama"] = daemon.api
 		local endpoint_port = spec.ollama_port or 11435
-		package.loaded["modules.llm.ollama_endpoint"] = {
+		package.loaded["ai.engine.ollama.endpoint"] = {
 			get_port = function() return endpoint_port end,
 			get_base_url = function() return "http://127.0.0.1:" .. tostring(endpoint_port) end,
 		}
@@ -455,16 +455,16 @@ local function with_fixture(spec, body)
 		-- Own the genuine methods with an independently read native policy path.
 		-- The fixture's other cached adapter doubles cannot select a fake policy.
 		local native_root = helpers.driver_root():gsub("\\", "/")
-		package.loaded["adapters.storage"] = { get = function(_, default) return default end }
-		package.loaded["modules.llm.network_env"] = nil
-		local network = require("modules.llm.network_env")
-		local native_policy_path = native_root .. "modules/llm/network-retry.sh"
+		package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
+		package.loaded["ai.engine.api.network_env"] = nil
+		local network = require("ai.engine.api.network_env")
+		local native_policy_path = native_root .. "ai/engine/network-retry.sh"
 		local native_policy = assert(io.open(native_policy_path, "r"))
 		assert(native_policy:close())
 		network.policy_path = function() return native_policy_path end
-		package.loaded["modules.llm.network_env"] = network
-		package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
-		manager = require("ui.menu.menu_llm.models_manager_ollama").new({
+		package.loaded["ai.engine.api.network_env"] = network
+		package.loaded["ai.ui.menu.models.manager_ollama"] = nil
+		manager = require("ai.ui.menu.models.manager_ollama").new({
 			active_tasks = {},
 			save_prefs = function() return true end,
 			update_menu = function()
@@ -485,7 +485,7 @@ local function with_fixture(spec, body)
 		helpers.assert_eq(#timers, 1)
 		helpers.assert_eq(timers[1].delay, 0)
 		helpers.assert_eq(
-			package.loaded["adapters.timer_scheduler"].cancel(timers[1].handle), true)
+			package.loaded["core.events.timer_scheduler"].cancel(timers[1].handle), true)
 		helpers.assert_eq(timers[1].handle.timer, nil)
 		table.remove(timers, 1)
 

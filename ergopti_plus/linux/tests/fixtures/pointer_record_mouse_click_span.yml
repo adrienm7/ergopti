@@ -1,0 +1,98 @@
+version: 1
+ndevices: 1
+libinput:
+  version: 'ergopti'
+  git: 'unknown'
+# A wheel mouse's evdev stream in the `libinput record` format, written by hand
+# from the kernel's input-event-codes.h: the repository holds no capture of a
+# mouse. The rows are what a USB wheel mouse sends, a MSC_SCAN before each
+# button edge and a high-resolution report beside each wheel notch.
+# A: travel of the still pointer, before any click.
+# B: a click, then two wheel notches and travel within the guard's settle delay.
+# C: a double-click 1.3 s later, then a vertical and a horizontal notch.
+devices:
+  - node: /dev/input/event3
+    evdev:
+      # Name: Logitech USB Optical Mouse
+      # ID: bus 0x3 vendor 0x46d product 0xc077 version 0x111
+      # Supported Events:
+      # Event type 0 (EV_SYN)
+      # Event type 1 (EV_KEY)
+      #   Event code 272 (BTN_LEFT)
+      #   Event code 273 (BTN_RIGHT)
+      #   Event code 274 (BTN_MIDDLE)
+      # Event type 2 (EV_REL)
+      #   Event code 0 (REL_X)
+      #   Event code 1 (REL_Y)
+      #   Event code 6 (REL_HWHEEL)
+      #   Event code 8 (REL_WHEEL)
+      #   Event code 11 (REL_WHEEL_HI_RES)
+      #   Event code 12 (REL_HWHEEL_HI_RES)
+      # Event type 4 (EV_MSC)
+      #   Event code 4 (MSC_SCAN)
+      name: 'Logitech USB Optical Mouse'
+      id: [3, 1133, 49271, 273]
+      codes:
+        0: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] # EV_SYN
+        1: [272, 273, 274] # EV_KEY
+        2: [0, 1, 6, 8, 11, 12] # EV_REL
+        4: [4] # EV_MSC
+      properties: []
+    events:
+      # A: travel of the still pointer, before any click
+      - evdev:
+          - [0, 0, 2, 0, 3] # EV_REL / REL_X                   3
+          - [0, 0, 2, 1, 1] # EV_REL / REL_Y                   1
+          - [0, 0, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +0ms
+      - evdev:
+          - [0, 8000, 2, 0, 2] # EV_REL / REL_X                   2
+          - [0, 8000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +8ms
+      # B: a click, then two wheel notches and travel within the settle delay
+      - evdev:
+          - [0, 500000, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [0, 500000, 1, 272, 1] # EV_KEY / BTN_LEFT               1
+          - [0, 500000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +492ms
+      - evdev:
+          - [0, 560000, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [0, 560000, 1, 272, 0] # EV_KEY / BTN_LEFT               0
+          - [0, 560000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +60ms
+      - evdev:
+          - [0, 600000, 2, 8, -1] # EV_REL / REL_WHEEL               -1
+          - [0, 600000, 2, 11, -120] # EV_REL / REL_WHEEL_HI_RES     -120
+          - [0, 600000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +40ms
+      - evdev:
+          - [0, 640000, 2, 8, -1] # EV_REL / REL_WHEEL               -1
+          - [0, 640000, 2, 11, -120] # EV_REL / REL_WHEEL_HI_RES     -120
+          - [0, 640000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +40ms
+      - evdev:
+          - [0, 680000, 2, 0, 5] # EV_REL / REL_X                   5
+          - [0, 680000, 2, 1, -2] # EV_REL / REL_Y                  -2
+          - [0, 680000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +40ms
+      - evdev:
+          - [0, 720000, 2, 0, 4] # EV_REL / REL_X                   4
+          - [0, 720000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +40ms
+      # C: a double-click, then a vertical and a horizontal notch
+      - evdev:
+          - [2, 0, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [2, 0, 1, 272, 1] # EV_KEY / BTN_LEFT               1
+          - [2, 0, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +1280ms
+      - evdev:
+          - [2, 80000, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [2, 80000, 1, 272, 0] # EV_KEY / BTN_LEFT               0
+          - [2, 80000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +80ms
+      - evdev:
+          - [2, 180000, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [2, 180000, 1, 272, 1] # EV_KEY / BTN_LEFT               1
+          - [2, 180000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +100ms
+      - evdev:
+          - [2, 250000, 4, 4, 589825] # EV_MSC / MSC_SCAN             589825
+          - [2, 250000, 1, 272, 0] # EV_KEY / BTN_LEFT               0
+          - [2, 250000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +70ms
+      - evdev:
+          - [2, 400000, 2, 8, 1] # EV_REL / REL_WHEEL                1
+          - [2, 400000, 2, 11, 120] # EV_REL / REL_WHEEL_HI_RES      120
+          - [2, 400000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +150ms
+      - evdev:
+          - [2, 450000, 2, 6, 1] # EV_REL / REL_HWHEEL               1
+          - [2, 450000, 2, 12, 120] # EV_REL / REL_HWHEEL_HI_RES     120
+          - [2, 450000, 0, 0, 0] # ------------ SYN_REPORT (0) ---------- +50ms

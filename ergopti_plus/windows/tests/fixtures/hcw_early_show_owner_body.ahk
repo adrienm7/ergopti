@@ -46,11 +46,11 @@ Gui_Create(Options := "", Title := "") {
 	Record := {Window: Window, Hwnd: Window.Hwnd, Index: _HESW.Windows.Length + 1,
 		Epoch: _HESW_State().Epoch, ShowCount: 0, CloseCount: 0, NativeClose: 0, Controller: 0, ExistsAfterClose: true}
 	_HESW.Windows.Push(Record)
-	; A stale web opening must not enter unrelated native fallback controls.
+	; A stale web opening must never build another window.
 	; Track the real new GUI first so even this refusal retains cleanup custody.
 	if _HESW.Windows.Length > (_HESW.Mode == "reopen" ? 2 : 1) {
 		_HESW.FallbackAttempts += 1
-		throw Error("Business oracle: a retired web opening attempted native fallback.")
+		throw Error("Business oracle: a retired web opening built another window.")
 	}
 	; Capture the native method before installing an own registration observer.
 	; Only the actual Close callback supplied by production gets a relay.
@@ -182,6 +182,8 @@ _HESW_Open() {
 	OpenHotstringsConfigWindow()
 }
 
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) {
 	global _HESW
 	_HESW.Environments += 1
@@ -232,6 +234,8 @@ class _HESW_Controller {
 	Close() {
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}
@@ -276,7 +280,7 @@ _HESW_Check() {
 	} else
 		_HESW_Require(_HESW.Windows.Length == 1 && !IsObject(State.Window) && State.Reset
 			&& !IsObject(State.Controller) && !IsObject(State.View) && !State.Message && !State.Navigation,
-			"A consumed early Close must leave no stale GUI/browser/subscriptions or native fallback.")
+			"A consumed early Close must leave no stale GUI/browser/subscriptions or other window.")
 }
 
 _HESW_OnError(Failure, Mode) {
@@ -302,7 +306,7 @@ _HESW_Main() {
 	_VendorDir := A_Args[3], _SharedDir := A_Args[3] . "\shared", _ConfigDir := A_Args[3] . "\"
 	_ExtensionsDir := A_Args[3] . "\extensions", _I18nLocale := "en"
 	ScriptInformation := Map("PersonalHotstringsDir", A_Args[3] . "\personal\")
-	Index := _SharedDir . "\modules\hotstrings\_index.toml"
+	Index := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 	_HESW_Require(CryptoSha256Bytes(FSReadBytesStrict(Index)) == _HESW_SourceIndexHash,
 		"The genuine category builder must receive exact delivered index bytes.")
 	Primary := 0

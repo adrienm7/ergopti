@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard: asserts that the runtime values of the AHK
 ; updater constants agree with the canonical values committed in
-; _shared/modules/updater/defaults.json. Tests check actual global values at
+; _shared/updater/data/defaults.json. Tests check actual global values at
 ; run-time — NOT source text — so they catch both edit-without-update and
 ; silent-fallback-override bugs.
 ; ==============================================================================

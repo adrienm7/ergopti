@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function install_temp_file_stub()
 	local next_id = 0
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			next_id = next_id + 1
 			return string.format("/private/tmp/pixel-refusal-%d", next_id)
@@ -39,16 +39,16 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			end,
 			start = function(task) return task:start() and true or false end,
 		}
-		package.loaded["adapters.task_lifecycle"] = task_lifecycle
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = task_lifecycle
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, _, level)
 				notifications[#notifications + 1] = { message = message, level = level }
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = setmetatable({
+		package.loaded["core.logger.engine.logger"] = setmetatable({
 			error = function(_log, message, ...)
 				logs[#logs + 1] = string.format(message, ...)
 			end,
@@ -78,7 +78,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 		local clipboard = "original"
 		local nested_pause = nil
 		local actions
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(_label, _path, callback, _args)
 				callbacks[#callbacks + 1] = callback
 				return {
@@ -89,9 +89,9 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 			end,
 			start = function(task) return task.start() == true end,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		install_temp_file_stub()
 
 		actions = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {

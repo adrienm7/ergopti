@@ -1,13 +1,14 @@
 --- ui/user_action_editor.lua
 
 --- ==============================================================================
---- MODULE: Command and Path Parameter Editors (Linux)
+--- MODULE: Command, Path and Workflow Parameter Editors (Linux)
 --- DESCRIPTION:
 --- Asks the tray's native dialogs for the parameter of run_command (the
---- command typed, then how it runs and what its output does) and of open_path
---- (a file or folder chosen in Ergopti's own picker). Every binding
---- editor of the driver (the shortcuts menu, the menu dialogs and the physical
---- shortcuts window) calls ask() for these kinds.
+--- command typed, then how it runs and what its output does), of open_path
+--- (a file or folder chosen in Ergopti's own picker) and of run_workflow (one
+--- of the user's workflows, by name). Every binding editor of the driver (the
+--- shortcuts menu, the menu dialogs and the physical shortcuts window) calls
+--- ask() for these kinds.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One editor per kind, so the three menus cannot disagree.
@@ -21,19 +22,19 @@
 
 local M = {}
 
-local ChoicePrompt = require("ui.choice_prompt")
-local TextPrompt = require("ui.text_prompt")
-local I18n = require("infra.i18n")
-local Parameter = require("user_action_parameter")
-local Logger = require("logger.shim")
+local ChoicePrompt = require("core.ui.ui.choice_prompt")
+local TextPrompt = require("core.ui.ui.text_prompt")
+local I18n = require("core.i18n.engine.i18n")
+local Parameter = require("shortcuts.engine.actions.user_action_parameter")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.user_action_editor"
 
 --- The kinds this module edits.
-M.KINDS = { command = true, path = true }
+M.KINDS = { command = true, path = true, workflow = true }
 
 -- Escapes text for a dialog's --text, which is Pango markup.
-local markup_plain = require("ui.native_dialog").plain_markup
+local markup_plain = require("core.ui.ui.native_dialog").plain_markup
 
 --- The choices of a closed option set, labelled through the locale.
 --- @param options table Array of { value, key }.
@@ -86,21 +87,44 @@ end
 function M.ask_path(title, prompt, prior, deps)
 	deps = deps or {}
 	local pick = deps.pick or ChoicePrompt.pick
-	local shell = deps.shell or require("adapters.shell_runner")
+	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local stored = Parameter.parse("path", prior)
 	local kind = pick(title, prompt, labelled({
 		{ value = "file", key = "dialog.gestures.param_path_kind_file" },
 		{ value = "folder", key = "dialog.gestures.param_path_kind_folder" },
 	}), nil)
 	if kind == nil then return nil end
-	local start = stored and stored.path or (require("infra.config_paths").home() .. "/")
-	local chosen, why = require("ui.app_chooser").pick_path(shell, title, kind == "folder", start, deps.modal)
+	local start = stored and stored.path or (require("settings.engine.paths").home() .. "/")
+	local chosen, why = require("apps.ui.chooser").pick_path(shell, title, kind == "folder", start, deps.modal)
 	if not chosen then Logger.info(LOG, "No path chosen: %s.", tostring(why)) end
 	return chosen
 end
 
+--- Asks for a run_workflow value: one of the user's workflows, by name.
+--- @param title string Window title.
+--- @param prompt string The kind's prompt (plain text).
+--- @param prior string|nil The stored value.
+--- @param deps table|nil { pick, workflows, notify } (tests).
+--- @return string|nil value The workflow id.
+function M.ask_workflow(title, prompt, prior, deps)
+	deps = deps or {}
+	local pick = deps.pick or ChoicePrompt.pick
+	local workflows = deps.workflows or require("modules.shortcuts.workflows")
+	local choices = workflows.choices()
+	if choices == nil then return nil end
+	if #choices == 0 then
+		Logger.info(LOG, "No workflow to assign: the user has none yet.")
+		local notify = deps.notify or function(text)
+			require("platform.focus.application_notifier").send(text, { level = "info" })
+		end
+		notify(I18n.get("workflows.none_defined"))
+		return nil
+	end
+	return pick(title, prompt, choices, prior)
+end
+
 --- Asks for a value of one of KINDS.
---- @param spec string command or path.
+--- @param spec string command, path or workflow.
 --- @param title string Window title.
 --- @param prompt string The kind's prompt (plain text).
 --- @param prior string|nil The stored value.
@@ -108,6 +132,7 @@ end
 function M.ask(spec, title, prompt, prior)
 	if spec == "command" then return M.ask_command(title, prompt, prior) end
 	if spec == "path" then return M.ask_path(title, prompt, prior) end
+	if spec == "workflow" then return M.ask_workflow(title, prompt, prior) end
 	error("user_action_editor: no editor for parameter kind '" .. tostring(spec) .. "'", 2)
 end
 

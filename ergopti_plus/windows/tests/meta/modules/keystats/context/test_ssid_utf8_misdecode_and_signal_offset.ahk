@@ -13,7 +13,7 @@
 ; encoding. The fix also bounds-checks cbData against the minimum size that can
 ; hold the signal-quality field at +576 before reading it.
 ;
-; This is a meta-static test (scans source text) because adapters/network_info.ahk
+; This is a meta-static test (scans source text) because core/network/adapters/info.ahk
 ; is NOT part of the headless runner include graph (run_all.ahk does not include
 ; it - its DllCall paths target live wlanapi/iphlpapi hardware). Calling its
 ; functions from a test would be a load-time error that hangs the suite, so the
@@ -47,7 +47,7 @@ _SsidHash_ReadSource(FileName) {
 ; ==================================================
 
 _SsidHash_HashesRawOctetsNotUtf8() {
-	Src := _SsidHash_ReadSource("network_info.ahk")
+	Src := _SsidHash_ReadSource("info.ahk")
 	Seg := _DriverFuncBody("_NI_QueryWlan")
 	Assert(Seg != "", "_NI_QueryWlan() declaration must exist in network_info.ahk")
 	Assert(InStr(Seg, "_NI_SsidOctetsToHashInput(") > 0,
@@ -58,7 +58,7 @@ _SsidHash_HashesRawOctetsNotUtf8() {
 Test("NetworkInfo: SSID hashed from raw octets, not UTF-8 decode (ssid-utf8-misdecode-and-signal-offset-fragility)", _SsidHash_HashesRawOctetsNotUtf8)
 
 _SsidHash_HasSignalSizeBoundsGuard() {
-	Src := _SsidHash_ReadSource("network_info.ahk")
+	Src := _SsidHash_ReadSource("info.ahk")
 	Seg := _DriverFuncBody("_NI_QueryWlan")
 	Assert(InStr(Seg, "NI_WLAN_MIN_CONN_ATTR_SIZE") > 0,
 		"_NI_QueryWlan must bound-check cbData against NI_WLAN_MIN_CONN_ATTR_SIZE before reading the signal-quality field at +576 (a truncated buffer would NumGet past the allocation)")
@@ -66,7 +66,7 @@ _SsidHash_HasSignalSizeBoundsGuard() {
 Test("NetworkInfo: _NI_QueryWlan bounds-checks cbData before signal read (ssid-utf8-misdecode-and-signal-offset-fragility)", _SsidHash_HasSignalSizeBoundsGuard)
 
 _SsidHash_OctetHelperSerialisesBytes() {
-	Src := _SsidHash_ReadSource("network_info.ahk")
+	Src := _SsidHash_ReadSource("info.ahk")
 	Seg := _DriverFuncBody("_NI_SsidOctetsToHashInput")
 	Assert(Seg != "", "_NI_SsidOctetsToHashInput(pBytes, len) helper must exist in network_info.ahk")
 	Assert(InStr(Seg, "UChar") > 0,

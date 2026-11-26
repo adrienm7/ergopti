@@ -7,91 +7,110 @@
 		<!-- Bump the ?v= on style.css/script.js whenever either changes: the host
 		     loads index.html fresh each launch (cache-busted) but WebView2 caches
 		     these sub-resources by URL, so the version query forces a refresh. -->
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
-		<link rel="stylesheet" href="style.css?v=6" />
+		<link rel="stylesheet" href="style.css?v=8" />
 		<script src="../host_bridge.js"></script>
 		<!-- The pages, their questions and checklists, generated from the
 		     manifest's [onboarding] declaration. -->
 		<script src="../_generated/onboarding_catalogue.js"></script>
 	</head>
 	<body>
-		<div id="wizard">
-			<!-- One dot per step: language, folder, then one per configuration page. -->
-			<div class="step-bar" id="step-bar"></div>
+		<!-- One dot per step: language, folder, then one per configuration page. -->
+		<ol class="step-bar" id="step-bar"></ol>
 
-			<!-- The only scrollable region: the header dots and the footer buttons
+		<!-- The only scrollable region: the header dots and the footer buttons
 			     stay visible whatever the page's length. -->
-			<main class="step-scroll" id="step-scroll">
-				<!-- Language -->
-				<section class="step" id="step-language">
-					<h1 id="language-title"></h1>
-					<div class="lang-list" id="lang-list"></div>
-				</section>
+		<main class="step-scroll" id="step-scroll">
+			<!-- Language -->
+			<section class="step" id="step-language">
+				<h1 id="language-title"></h1>
+				<!-- The reader's font and spacing, applied to this window as soon as
+				     chosen: a dyslexic reader gets them from the first screen. -->
+				<p class="reading-prefs">
+					<label class="reading-choice" for="reading-font" id="reading-font-label"></label>
+					<select id="reading-font"></select>
+					<label class="reading-choice" for="reading-spacing" id="reading-spacing-label"></label>
+					<select id="reading-spacing"></select>
+				</p>
+				<!-- A group of toggle buttons named by the heading: no legend of its own. -->
+				<div class="lang-list" id="lang-list" role="group" aria-labelledby="language-title"></div>
+			</section>
 
-				<!-- Personal configuration folder -->
-				<section class="step hidden" id="step-config">
-					<h1 id="config-title"></h1>
-					<p class="desc" id="config-desc"></p>
-					<div class="field-group">
-						<input type="text" id="config-input" placeholder="" />
-						<button type="button" id="config-browse" class="secondary"></button>
-					</div>
-					<p class="hint" id="config-hint"></p>
-				</section>
+			<!-- Personal configuration folder -->
+			<section class="step hidden" id="step-config">
+				<h1 id="config-title"></h1>
+				<p class="desc" id="config-desc"></p>
+				<p class="field-group">
+					<input type="text" id="config-input" placeholder="" aria-labelledby="config-desc" />
+					<button type="button" id="config-browse" class="secondary"></button>
+				</p>
+				<p class="hint" id="config-hint"></p>
+			</section>
 
-				<!-- One configuration page, redrawn for each scope from the catalogue. -->
-				<section class="step hidden" id="step-page">
-					<h1 id="page-title"></h1>
-					<p class="desc" id="page-desc"></p>
-					<p class="warning hidden" id="page-consent"></p>
-					<p class="warning hidden" id="page-hint"></p>
-					<p class="note hidden" id="page-note"></p>
-					<div class="question hidden" id="page-question">
-						<p class="question-label" id="page-question-label"></p>
-						<div class="radio-row">
-							<label class="radio-card">
-								<input type="radio" name="master" value="yes" id="page-yes" />
-								<span class="radio-label" id="page-yes-label"></span>
-							</label>
-							<label class="radio-card">
-								<input type="radio" name="master" value="no" id="page-no" checked />
-								<span class="radio-label" id="page-no-label"></span>
-							</label>
-						</div>
+			<!-- One configuration page, redrawn for each scope from the catalogue. -->
+			<section class="step hidden" id="step-page">
+				<h1 id="page-title"></h1>
+				<p class="desc" id="page-desc"></p>
+				<p class="warning hidden" id="page-consent"></p>
+				<p class="warning hidden" id="page-hint"></p>
+				<p class="note hidden" id="page-note"></p>
+				<fieldset class="question hidden" id="page-question">
+					<legend class="question-label" id="page-question-label"></legend>
+					<div class="radio-row">
+						<label class="radio-card">
+							<input type="radio" name="master" value="yes" id="page-yes" />
+							<span class="radio-label" id="page-yes-label"></span>
+						</label>
+						<label class="radio-card">
+							<input type="radio" name="master" value="no" id="page-no" checked />
+							<span class="radio-label" id="page-no-label"></span>
+						</label>
 					</div>
-					<!-- Persistent controls a page declares (the keyboard layout's emulated
+				</fieldset>
+				<!-- Persistent controls a page declares (the keyboard layout's emulated
 					     layout, number-row emulation and ordering), redrawn on their own. -->
-					<div class="controls hidden" id="page-controls"></div>
-					<!-- Windows touchpad gestures must also be registered in Windows
+				<div class="controls hidden" id="page-controls"></div>
+				<!-- Windows touchpad gestures must also be registered in Windows
 					     Settings: "Auto" writes the precision-touchpad values, "Manual"
 					     opens the tutorial. Shown on the gestures page when enabled. -->
-					<div class="gesture-register hidden" id="page-register">
-						<p class="register-section" id="register-section"></p>
-						<button type="button" class="secondary register-btn" id="register-auto"></button>
-						<p class="hint" id="register-auto-hint"></p>
-						<button type="button" class="secondary register-btn" id="register-manual"></button>
-						<p class="hint" id="register-manual-hint"></p>
-						<p class="register-status hidden" id="register-status"></p>
-					</div>
-					<div class="magic-key hidden" id="page-magic">
-						<p class="question-label" id="page-magic-label"></p>
-						<div class="magic-options" id="page-magic-options"></div>
-						<p class="hint" id="page-magic-hint"></p>
-					</div>
-					<details class="checklist hidden" id="page-checklist" open>
-						<summary id="page-checklist-summary"></summary>
-						<p class="hint hidden" id="page-checklist-inactive"></p>
-						<div class="checklist-body" id="page-checklist-body"></div>
-					</details>
+				<section
+					class="gesture-register hidden"
+					id="page-register"
+					aria-labelledby="register-section"
+				>
+					<h2 class="register-section" id="register-section"></h2>
+					<button type="button" class="secondary register-btn" id="register-auto"></button>
+					<p class="hint" id="register-auto-hint"></p>
+					<button type="button" class="secondary register-btn" id="register-manual"></button>
+					<p class="hint" id="register-manual-hint"></p>
+					<p
+						class="register-status hidden"
+						id="register-status"
+						role="status"
+						aria-live="polite"
+					></p>
 				</section>
-			</main>
+				<fieldset class="magic-key hidden" id="page-magic">
+					<legend class="question-label" id="page-magic-label"></legend>
+					<div class="magic-options" id="page-magic-options"></div>
+					<p class="field-error hidden" id="page-magic-error" role="alert"></p>
+					<p class="hint" id="page-magic-hint"></p>
+				</fieldset>
+				<details class="checklist hidden" id="page-checklist" open>
+					<summary id="page-checklist-summary"></summary>
+					<p class="hint hidden" id="page-checklist-inactive"></p>
+					<div class="checklist-body" id="page-checklist-body"></div>
+				</details>
+			</section>
+		</main>
 
-			<footer class="btns">
-				<button type="button" class="secondary hidden" id="btn-back"></button>
-				<button type="button" class="primary" id="btn-next"></button>
-			</footer>
-		</div>
+		<footer class="btns">
+			<button type="button" class="secondary hidden" id="btn-back"></button>
+			<button type="button" class="primary" id="btn-next"></button>
+		</footer>
 
-		<script src="script.js?v=10"></script>
+		<script src="script.js?v=14"></script>
 	</body>
 </html>

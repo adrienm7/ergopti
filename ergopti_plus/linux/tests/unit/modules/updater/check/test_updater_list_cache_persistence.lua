@@ -31,18 +31,18 @@ end
 --- @param etag_content string|nil What the saved ETag file reads as.
 --- @return table manager
 local function boot(storage, etag_content)
-	local names = { "adapters.file_system", "adapters.storage", "modules.updater.manager" }
+	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "modules.updater.manager" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local real_fs = require("adapters.file_system")
-	package.loaded["adapters.file_system"] = setmetatable({
+	local real_fs = require("core.fs.adapters.file_system")
+	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		exists = function() return true end,
 		read = function(path)
-			if tostring(path):find("ergopti_updater_etag_", 1, true) then return etag_content end
+			if tostring(path):find("/updater_etag_", 1, true) then return etag_content end
 			return real_fs.read(path)
 		end,
 	}, { __index = real_fs })
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	package.loaded["modules.updater.manager"] = nil
 	local ok, fresh = pcall(require, "modules.updater.manager")
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -113,6 +113,17 @@ helpers.describe("updater (linux): the release-list copy survives a restart", fu
 		local restarted = boot(storage, VALIDATOR .. "\n")
 		local _, _, options = restarted._build_fetch_request("main", 1)
 		helpers.assert_nil(options.etag_compare, "an object is not a release list")
+	end)
+
+	helpers.it("list-copy: truncated JSON sends a full request after restart", function()
+		local storage = Fakes.storage({ initial = {} })
+		local probe = boot(storage, VALIDATOR .. "\n")
+		storage.set(probe.LIST_CACHE_KEY, {
+			["main-page-1-size-20"] = { url = PAGE_ONE, etag = VALIDATOR, body = '[{"tag_name":"v1"' },
+		})
+		local restarted = boot(storage, VALIDATOR .. "\n")
+		local _, _, options = restarted._build_fetch_request("main", 1)
+		helpers.assert_nil(options.etag_compare, "a truncated copy cannot answer a 304")
 	end)
 
 	helpers.it("list-copy: a failed page removes its stored copy", function()

@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local TARGETS = {
-	"infra.text_utils", "infra.toml.reader", "infra.logger",
-	"infra.keycodes", "modules.keymap.layout", "infra.perf",
-	"modules.keymap.terminators", "modules.keymap.utils",
+	"core.text.engine.utils", "core.text.engine.toml.reader", "core.logger.engine.logger",
+	"platform.input.keycodes", "modules.keymap.layout", "core.logger.engine.perf",
+	"hotstrings.engine.expander.terminators", "hotstrings.engine.expander.utils",
 	"platform.remap.defaults", "platform.remap.config",
-	"modules.llm.backend_detector", "modules.llm.parser",
+	"ai.engine.api.backend_detector", "ai.engine.api.parser",
 }
 
 local pass, fail = 0, 0

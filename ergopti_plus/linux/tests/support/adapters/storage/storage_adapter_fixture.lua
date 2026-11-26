@@ -10,8 +10,11 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+
 --- Creates a throwaway XDG config root under the system temp directory and
---- ensures its ergopti_plus/ subdirectory exists so the storage adapter can
+--- ensures its application subdirectory exists so the storage adapter can
 --- write there instead of the developer's real config.
 --- @return string Absolute path to inject as XDG_CONFIG_HOME.
 local function make_temp_config_root()
@@ -19,9 +22,9 @@ local function make_temp_config_root()
 	os.remove(base)
 	base = base:gsub("\\", "/"):gsub("/+$", "")
 	if package.config:sub(1, 1) == "\\" then
-		os.execute(string.format('mkdir "%s" 2>nul', (base .. "/ergopti_plus"):gsub("/", "\\")))
+		os.execute(string.format('mkdir "%s" 2>nul', (base .. "/" .. FOLDER):gsub("/", "\\")))
 	else
-		os.execute(string.format('mkdir -p "%s"', base .. "/ergopti_plus"))
+		os.execute(string.format('mkdir -p "%s"', base .. "/" .. FOLDER))
 	end
 	return base
 end
@@ -31,20 +34,20 @@ end
 --- @param callback function
 local function storage_cohort_fixture(source, callback)
 	local root = make_temp_config_root()
-	local path = root .. "/ergopti_plus/storage.json"
+	local path = root .. "/" .. FOLDER .. "/storage.json"
 	local function write(name, bytes) local file = assert(io.open(name, "wb")); assert(file:write(bytes)); assert(file:close()) end
 	local function read(name)
 		local file = io.open(name, "rb"); if not file then return nil end
 		local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 	end
 	if source ~= nil then write(path, source) end
-	local getenv, previous = os.getenv, package.loaded["adapters.storage"]
+	local getenv, previous = os.getenv, package.loaded["core.fs.adapters.storage"]
 	os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return getenv(name) end
 	local okay, detail = xpcall(function()
-		callback(helpers.load_module("adapters.storage"), require("adapters.file_system"), path, root .. "/snapshot", write, read)
+		callback(helpers.load_module("core.fs.adapters.storage"), require("core.fs.adapters.file_system"), path, root .. "/snapshot", write, read)
 	end, debug.traceback)
-	os.getenv, package.loaded["adapters.storage"] = getenv, previous
-	local Shell = require("adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+	os.getenv, package.loaded["core.fs.adapters.storage"] = getenv, previous
+	local Shell = require("core.process.adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
 	if not okay then error(detail, 0) end
 end
 

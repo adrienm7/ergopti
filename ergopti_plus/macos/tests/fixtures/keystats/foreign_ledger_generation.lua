@@ -12,11 +12,11 @@ local driver = root .. "/static/ergopti_plus/macos"
 -- Interpreter wrappers can inject host Lua modules before this fixture starts.
 -- Physical replay must remain runnable with only the repository's Lua sources.
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua"
+	.. root .. "/static/ergopti_plus/_shared/?.lua;"
+	.. root .. "/static/ergopti_plus/_shared/?/init.lua"
 package.cpath = ""
 
-local Json, Helpers = require("json"), require("tests.helpers")
+local Json, Helpers = require("core.text.engine.json"), require("tests.helpers")
 local RunloopTimers = require("tests.support.runloop_timers")
 
 local function rpc(message)
@@ -98,10 +98,10 @@ end
 function db:errmsg() return self.last_error end
 
 local receipt
-Helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+Helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 	local runloop = RunloopTimers.create()
-	package.loaded["infra.logger"] = Helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.logger.engine.logger"] = Helpers.make_logger_stub()
+	package.loaded["core.fs.engine.dir"] = nil
 	local export = Helpers.load_with_stubs("modules.keystats.export", {
 		fs = { attributes = physical_attributes, dir = physical_directory }, hash = { new = new_hash }, timer = runloop.api,
 	})

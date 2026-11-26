@@ -6,13 +6,13 @@
 --- A hotstring group's colour comes from a TOML file the user edits freely, so
 --- "#fff", a colour name or garbage used to reach hex arithmetic and raise
 --- inside the widget's timer. The darkening now lives once, in the shared model
---- (_shared/lua/wpm_widget/model.lua), which both Lua drivers draw with; the
+--- (_shared/metrics/engine/wpm_widget_model.lua), which both Lua drivers draw with; the
 --- colour it darkens is always one the model validated, and its own guard
 --- refuses anything that is not six hex digits.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local WPMModel = require("wpm_widget.model")
+local WPMModel = require("metrics.engine.wpm_widget_model")
 
 helpers.describe("wpm readouts: darkening a malformed colour (F-MED-25)", function()
 
@@ -45,7 +45,7 @@ helpers.describe("wpm readouts: darkening a malformed colour (F-MED-25)", functi
 		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 		helpers.assert_nil(src:find("local function _wpm_darken_hex", 1, true),
 			"a second darkening is a second place for the strips to drift apart")
-		helpers.assert_true(src:find('require("wpm_widget.model")', 1, true) ~= nil,
+		helpers.assert_true(src:find('require("metrics.engine.wpm_widget_model")', 1, true) ~= nil,
 			"the widget draws the shared model's frames")
 	end)
 

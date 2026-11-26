@@ -41,7 +41,7 @@ _MetaDuplicateDefaultsResult() {
 		'""', true, "300", true, "100", true, "50", true
 	)
 	Seen := Map()
-	for Sub in ["infra", "modules", "platform"] {
+	for Sub in ["infra", "modules", "platform", "core", "settings", "menu", "tray", "ai", "apps", "diagnostics", "gestures", "hotstrings"] {
 		for AbsPath in _MetaListAhkFilesDups(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -51,7 +51,10 @@ _MetaDuplicateDefaultsResult() {
 			NormRoot := StrReplace(DriverRoot, "\", "/")
 			Rel := SubStr(StrReplace(AbsPath, "\", "/"), StrLen(NormRoot) + 1)
 			Pos := 1
-			while RegExMatch(Body, "global\s+(\w+)\s*:=\s*([^\r\n;]+)", &M, Pos) {
+			; A default is declared at the top level, at the start of its line; an
+			; indented `global X := v` is a function resetting runtime state, and
+			; counting those booked the two former duplicates.
+			while RegExMatch(Body, "m)^global\s+(\w+)\s*:=\s*([^\r\n;]+)", &M, Pos) {
 				VarName := Trim(M[1])
 				VarVal  := Trim(M[2])
 				if (!Whitelist.Has(VarVal)) {
@@ -76,13 +79,15 @@ _MetaDuplicateDefaultsResult() {
 	}
 	DupCount := 0
 	Report := ""
+	Duplicates := Map()
 	for Key, Files in Seen {
 		if (Files.Length > 1) {
 			DupCount++
 			FileList := ""
 			for F in Files
 				FileList .= F . ", "
-			Report .= "`n    " . Key . " declared in: " . SubStr(FileList, 1, -2)
+			Duplicates[Key] := SubStr(FileList, 1, -2)
+			Report .= "`n    " . Key . " declared in: " . Duplicates[Key]
 		}
 	}
 
@@ -91,10 +96,12 @@ _MetaDuplicateDefaultsResult() {
 	; visible in the run and asserted by nothing. It could not fail whatever it
 	; found, and OutputDebug is not read by CI.
 	;
-	; Two duplicates exist today. They are frozen here rather than declared clean:
-	; the point of the scan is that the number goes DOWN, and a ratchet is the only
-	; version of this test that can ever notice.
-	DUPLICATE_BASELINE := 2
+	; Admitted duplicates, each named with its reason; the list only shrinks. A
+	; count of 2 until 2026-11-22, when both turned out to be function-scope
+	; resets (CapsWordEnabled, OneShotShiftEnabled) the scan no longer reads as
+	; declarations. A named ledger fails on a new duplicate and on a fixed one
+	; alike, where the count let one pay for the other.
+	DuplicateLedger := Map()
 
 	; The scan must have looked at something. A dir listing that returns nothing
 	; — a moved tree, a failed RunWait — would otherwise report zero duplicates
@@ -103,9 +110,13 @@ _MetaDuplicateDefaultsResult() {
 		"the constant scan found only " . Seen.Count . " global declaration(s) across infra/ and "
 		. "modules/ — the file listing is broken, so a duplicate count of " . DupCount
 		. " means nothing")
-	Assert(DupCount <= DUPLICATE_BASELINE,
-		"duplicated constant defaults rose to " . DupCount . " (baseline " . DUPLICATE_BASELINE
-		. "). Each is the same value declared under the same name in two files, which is "
-		. "exactly how two copies drift apart:" . Report)
+	for Key, Files in Duplicates
+		Assert(DuplicateLedger.Has(Key),
+			"new duplicated constant default " . Key . " declared in: " . Files
+			. ". The same value under the same name in two files is exactly how two copies "
+			. "drift apart; keep one declaration. All duplicates:" . Report)
+	for Key, Reason in DuplicateLedger
+		Assert(Duplicates.Has(Key),
+			Key . " is no longer duplicated; remove it from DuplicateLedger (" . Reason . ").")
 }
 Test("meta duplicate defaults: no new duplicated constant", _MetaDuplicateDefaultsResult)

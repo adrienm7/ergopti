@@ -166,9 +166,19 @@ _MAD_PageAssets() {
 _MAD_CopyShared() {
 	global _MAD, _MAD_Root, _MAD_SourceShared, _SharedDir
 	Files := _MAD_PageAssets()
-	for Relative in ["data\locales\fr.json", "data\locales\en.json", "data\db\schema.sql", "data\db\media_schema.sql",
-		"modules\diagnostics\redaction.json", "modules\timings\constants.toml"]
+	for Relative in ["core\i18n\data\locales\fr.json", "core\i18n\data\locales\en.json",
+		"diagnostics\data\redaction.json", "core\timing\data\constants.toml",
+		"hotstrings\data\magic_key.json"]
 		Files.Push(Relative)
+	; Every schema the reader chains (schema, media, purge) comes from the
+	; shared folder itself: a hand-kept list missed purge_schema.sql, so the
+	; detached worker's KLR_LoadSchema failed and no projection was ever built.
+	SchemaCount := 0
+	Loop Files, _MAD_SourceShared . "\metrics\data\db\*.sql" {
+		Files.Push("metrics\data\db\" . A_LoopFileName)
+		SchemaCount += 1
+	}
+	_MVSP_Require(SchemaCount >= 3, "The reader's schema, media and purge schemas must all reach the private store")
 	for Relative in Files {
 		Source := _MAD_SourceShared . "\" . Relative, Destination := _SharedDir . "\" . Relative
 		SplitPath(Destination, , &Directory)
@@ -285,7 +295,7 @@ _MAD_Eval(Script) {
 
 _MAD_Row() {
 	global _MAD
-	return _MAD_Eval('(function(){const r=[...document.querySelectorAll("#apps-tbody tr")].find(x=>x.querySelector(".app-name-cell strong")?.textContent==='
+	return _MAD_Eval('(function(){const r=[...document.querySelectorAll("#apps-tbody tr")].find(x=>x.querySelector(".app-name-cell .app-name-btn")?.textContent==='
 		. JsonStringLiteral(_MAD.App) . ');return r?{name:r.querySelector(".app-name-cell").textContent,category:r.querySelector(".app-cat-cell").textContent}:null})()')
 }
 
@@ -379,8 +389,8 @@ _MAD_RunDom(Action) {
 		_MVSP_Require(_MAD_Eval('(function(){const b=document.getElementById("btn-add-app");if(!b||!b.getClientRects().length)return false;b.click();return true})()'),
 			"The actual visible Apps button must be clicked through the DOM.")
 	} else {
-		_MVSP_Require(_MAD_Eval('(function(){document.querySelector("[data-tab-target=apps]").click();const r=[...document.querySelectorAll("#apps-tbody tr")].find(x=>x.querySelector(".app-name-cell strong")?.textContent==='
-			. JsonStringLiteral(_MAD.App) . ');const c=r?.querySelector(".app-cat-cell");if(!c)return false;c.scrollIntoView({block:"center",inline:"center"});const b=c.getBoundingClientRect();if(b.width<=0||b.height<=0||b.top<0||b.bottom>innerHeight)return false;c.click();return true})()'),
+		_MVSP_Require(_MAD_Eval('(function(){document.querySelector("[data-tab-target=apps]").click();const r=[...document.querySelectorAll("#apps-tbody tr")].find(x=>x.querySelector(".app-name-cell .app-name-btn")?.textContent==='
+			. JsonStringLiteral(_MAD.App) . ');const c=r?.querySelector(".app-cat-cell .app-cat-btn");if(!c)return false;c.scrollIntoView({block:"center",inline:"center"});const b=c.getBoundingClientRect();if(b.width<=0||b.height<=0||b.top<0||b.bottom>innerHeight)return false;c.click();return true})()'),
 			"The actual visible category cell must emit its own edit action.")
 	}
 	Started := A_TickCount

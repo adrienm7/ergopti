@@ -54,9 +54,10 @@ _MNWE_AbruptExit(Which) {
 		KLPF_LAST_JSON := Map(Path, OldJson)
 		loop 2 {
 			Expected := A_Index
-			AssertTrue(KLPF_RequestBuild(Which, Root, "full", 91, (Status, *) => Terminals.Push(Status)))
+			AssertTrue(KLPF_RequestBuild(Which, Root, "full", 91, (Status, *) => Terminals.Push(Status)),
+				"the native build must start: " . KLPF_LastBuildRefusal())
 			Started := A_TickCount
-			while Terminals.Length < Expected && TickElapsed(Started) < 5000 {
+			while Terminals.Length < Expected && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 				_SR_TreePoll()
 				Sleep(10)
 			}

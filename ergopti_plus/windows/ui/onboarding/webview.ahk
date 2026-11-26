@@ -24,10 +24,8 @@
 ; Functions/globals are hoisted; #Include'd from ui/onboarding/init.ahk.
 ; ==============================================================================
 
-; French keyboard LANGID (low word of the HKL). When the active OS layout is
-; French we hint the frontend (system_layout = "french") so the hotstrings page
-; proposes the "u-grave" trigger character when no configuration names one.
-global ONBOARDING_LANGID_FRENCH := 0x040C
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 
 ; The wizard's id in _shared/ui/apps.manifest.json, which sizes it.
 global ONBOARDING_APP_ID := "onboarding"
@@ -83,17 +81,6 @@ global _OnbWeb_SessionEpoch := 0
 ; =========================================
 ; ==============================================================
 
-; Returns true when the WebView2 runtime binding + loader DLL are present.
-; Unlike the model_browser gate, onboarding intentionally does NOT apply the
-; low-RAM native fallback (WebView_ShouldUseNativeFallback): the first-run wizard
-; is a one-off and the shared webview UX is wanted even on a RAM-starved machine.
-; Chromium may cold-boot slowly under pressure, but that cost is paid once.
-_OnbWeb_Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
 ; The wizard's size from _shared/ui/apps.manifest.json, as every driver reads
 ; it, bounded by the primary monitor's work area so the footer buttons stay on
 ; screen: the page scrolls its content instead.
@@ -118,10 +105,10 @@ _Onboarding_TryWeb() {
 	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
 	global _ob_gui, _ob_locale, _VendorDir, _SharedDir
 
-	if !_OnbWeb_Available() {
-		try LoggerError("Onboarding", "The wizard cannot be shown: WebView2 is unavailable ({1}).", _OnbWeb_UnavailableReason())
+	; The wizard has no native form: without WebView2 the user is told how to
+	; recover instead of seeing nothing (maintainer decision 2026-11-21).
+	if !WebView_RequireAvailable("onboarding wizard")
 		return false
-	}
 	; Singleton — bring the existing wizard window to the front instead of
 	; opening a second one. Every sibling WebView2 host (paths_editor,
 	; personal_info_editor, prompt_editor, hotstrings_config_window) has this
@@ -136,14 +123,19 @@ _Onboarding_TryWeb() {
 	}
 	; A duplicate request must leave the live session's callbacks and teardown
 	; owner untouched. Allocate a fresh epoch only when constructing a new host.
-	_OnbWeb_SessionEpoch += 1
-	SessionEpoch := _OnbWeb_SessionEpoch
-	_OnbWeb_ResetDone := false
+	PreviousCritical := Critical("On")
+	try {
+		if _ob_gui != 0
+			return true
+		_OnbWeb_SessionEpoch += 1
+		SessionEpoch := _OnbWeb_SessionEpoch
+		_OnbWeb_ResetDone := false
+		_OnbWeb_Ready := false
+		SavedQueue := _OnbWeb_Queue
+		_OnbWeb_Queue := []
+	} finally Critical(PreviousCritical)
 
 	try LoggerStart("Onboarding", "Launching wizard via WebView2 (shared frontend)…")
-
-	_OnbWeb_Ready := false
-	_OnbWeb_Queue := []
 
 	try Geo := _OnbWeb_Geometry()
 	catch as Err {
@@ -164,19 +156,43 @@ _Onboarding_TryWeb() {
 	; zero/placeholder client rect, so it paints the empty gray default and never
 	; lays out the navigated page — the model_browser host shows first for exactly
 	; this reason.
-	g.Show("w" . Geo.w . " h" . Geo.h . " Center")
-	_ob_gui := g
+	; Native Show can deliver Close before returning. Its real host must already
+	; be owned, and an old constructor must never publish over a replacement.
+	Published := false
+	PreviousCritical := Critical("On")
+	try {
+		if _OnbWeb_SessionCurrent(SessionEpoch) && _ob_gui == 0 {
+			_ob_gui := g
+			Published := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		try g.Destroy()
+		return false
+	}
+	try g.Show("w" . Geo.w . " h" . Geo.h . " Center")
+	catch as Err {
+		if !_OnbWeb_SessionCurrent(SessionEpoch) || _ob_gui != g
+			return false
+		SavedGui := _OnbWeb_Reset(g, SessionEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		throw Err
+	}
+	if !_OnbWeb_SessionCurrent(SessionEpoch) || _ob_gui != g
+		return false
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	try {
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
 		try LoggerError("Onboarding", "WebView2 create failed: {1} — the wizard cannot be shown.", Err.Message)
-		if _OnbWeb_SessionCurrent(SessionEpoch) && _ob_gui == g {
-			try g.Destroy()
-			_OnbWeb_Reset()
-			; Clear only this opening's sentinel; a replacement owns its own state.
-			_ob_gui := 0
+		SavedGui := _OnbWeb_Reset(g, SessionEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
 		}
 		return false
 	}
@@ -217,8 +233,11 @@ _Onboarding_TryWeb() {
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST, _SharedDir . "\ui", WEBVIEW_HOST_ACCESS_ALLOW)
 	try _OnbWeb_WebView.SetVirtualHostNameToFolderMapping(ONBOARDING_VHOST_ASSETS, _StaticDir, WEBVIEW_HOST_ACCESS_ALLOW)
 
+	ReadingPrefs_Track(_OnbWeb_WebView)
+	_OnbWeb_WebView.AddScriptToExecuteOnDocumentCreated(_OnbWeb_SeedScript(_ob_locale))
 	try _OnbWeb_WebView.Navigate(_OnbWeb_HtmlUrl())
 	try _OnbWeb_Controller.Fill()
+	WebView_TakeFocus(_OnbWeb_Controller)
 
 	try LoggerSuccess("Onboarding", "Wizard shown via WebView2 — rendering shared frontend at {1}.", _OnbWeb_HtmlUrl())
 
@@ -228,17 +247,6 @@ _Onboarding_TryWeb() {
 	return true
 }
 
-; Returns a short human-readable reason why the WebView2 path is unavailable,
-; used purely for the log line so the cause is visible at a glance.
-_OnbWeb_UnavailableReason() {
-	global _VendorDir
-	if !IsSet(WebView2)
-		return "WebView2 binding not loaded"
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	if !FileExist(loader)
-		return "WebView2Loader.dll missing"
-	return "unknown"
-}
 
 
 
@@ -252,9 +260,9 @@ _OnbWeb_UnavailableReason() {
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
-; "action" field. Handled actions: ready, previewLocale, localeSelected,
-; pickConfigDir, resolveMetricsPath, loadExistingConfig, registerGesturesAuto,
-; registerGesturesManual, finish.
+; "action" field. Handled actions: ready, previewLocale, setReadingPreference,
+; localeSelected, pickConfigDir, resolveMetricsPath, loadExistingConfig,
+; registerGesturesAuto, registerGesturesManual, finish.
 _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if !_OnbWeb_SessionCurrent(SessionEpoch)
 		return
@@ -271,8 +279,10 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("An onboarding page action")
 		return
+	}
 	if (Action == "ready") {
 		_OnbWeb_FlushQueue(SessionEpoch)
 		; Reading the configuration and the catalogue, and closing the window when
@@ -280,6 +290,8 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_InjectInitData, SessionEpoch), -1)
 	} else if (Action == "previewLocale") {
 		_OnbWeb_PreviewLocale(Payload.Has("locale") ? Payload["locale"] : "", SessionEpoch)
+	} else if (Action == "setReadingPreference") {
+		_OnbWeb_SetReadingPreference(Payload.Get("name", ""), Payload.Get("value", ""))
 	} else if (Action == "localeSelected") {
 		global _ob_locale
 		Locale := Payload.Get("locale", "")
@@ -443,7 +455,9 @@ _OnbWeb_InjectInitData(SessionEpoch := unset, ReadFn := OnboardingReadCurrentVal
 		. ",empty_config_dir:" . _OnbWeb_JsStr(_Onboarding_ConfigDirFor(""))
 		. ",config_dir:" . _OnbWeb_JsStr(ConfigDir)
 		. ",current:" . OnboardingValuesJson(Values)
-		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())
+		; The magic key the page proposes when no configuration names one: the
+		; layout default the driver applies to an absent trigger_char.
+		. ",magic_key_default:" . _OnbWeb_JsStr(_OnbWeb_MagicKeyDefault(Values))
 		; The page fills the metrics consent warning with this path; later folder
 		; changes arrive through resolveMetricsPath -> window.setMetricsPath.
 		. ",metrics_path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(ConfigDir))
@@ -466,6 +480,20 @@ _OnbWeb_OpenFailed(Detail, SessionEpoch, ShowErrorFn := _Onboarding_ShowError) {
 		return false
 	_OnbWeb_OnClose()
 	return true
+}
+
+; The reader's font or spacing, picked beside the languages: saved as the
+; Configuration menu saves it, which pushes it to every open window, this one
+; included (ReadingPrefs_Set).
+; @param Name {Any} The page's name of the choice (`font`, `spacing`).
+; @param Value {Any} The chosen value.
+; @returns {Boolean} Whether the choice was saved.
+_OnbWeb_SetReadingPreference(Name, Value, SetFn := ReadingPrefs_Set) {
+	for Key, PageName in ReadingPrefs_Names()
+		if (PageName == Name)
+			return SetFn.Call(Key, Value)
+	LoggerWarn("Onboarding", "setReadingPreference refused: '{1}' is not a reading choice.", Name)
+	return false
 }
 
 ; Loads the strings for a previewed locale and pushes them as an envelope so
@@ -717,7 +745,7 @@ _OnbWeb_FlagUrl(Code) {
 ; the file or key is absent so the language list still renders (sans flag).
 _OnbWeb_LocaleFlag(Code) {
 	global _SharedDir
-	path := _SharedDir . "\data\locales\" . Code . ".json"
+	path := _SharedDir . "\core\i18n\data\locales\" . Code . ".json"
 	if !FileExist(path)
 		return ""
 	try {
@@ -733,25 +761,23 @@ _OnbWeb_LocaleFlag(Code) {
 ; frontend renders keys verbatim rather than crashing on a missing file.
 _OnbWeb_LocaleStringsJson(Code) {
 	global _SharedDir
-	path := _SharedDir . "\data\locales\" . Code . ".json"
+	path := _SharedDir . "\core\i18n\data\locales\" . Code . ".json"
 	if FileExist(path) {
 		try return FileRead(path, "UTF-8")
 	}
 	return "{}"
 }
 
-; Maps the active OS keyboard layout to the substring the page's
-; _contextMagicKey matches: "french" for the French LANGID, "" otherwise (so
-; QWERTY-family layouts fall through to ";").
-_OnbWeb_SystemLayoutHint() {
-	global ONBOARDING_LANGID_FRENCH
-	try {
-		hkl  := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-		lang := hkl & 0xFFFF
-		if (lang == ONBOARDING_LANGID_FRENCH)
-			return "french"
-	}
-	return ""
+; The layout default of the magic key for the configuration being read
+; (MagicKeyLayoutDefaultFor): ù on AZERTY, ; on QWERTY, the manifest default
+; elsewhere and while an emulated layout types.
+; @param Values {Map} The configuration values the page starts from, by path.
+; @returns {String}
+_OnbWeb_MagicKeyDefault(Values) {
+	Base := Values.Get(ConfigKey.LAYOUT_ERGOPTI_BASE, false)
+	Selected := Values.Get(ConfigKey.LAYOUT_EMULATED_LAYOUT, "")
+	Emulated := ((Base is TOML_Bool) ? Base.Value : (Base == true)) || ((Selected is String) && Selected != "")
+	return MagicKeyLayoutDefaultFor(Emulated, KS_ResolveKeyboardLayout())
 }
 
 ; Whether a locale code is one this driver ships.
@@ -800,6 +826,18 @@ _Onboarding_MetricsPathFor(Chosen) {
 	return StrReplace(KL_MetricsDirFor(_Onboarding_ConfigDirFor(Chosen)), "\", "/")
 }
 
+/**
+ * The statement the page runs before its own scripts: the language the wizard
+ * opens in and the reader's font and spacing, as WebViewHost and the macOS and
+ * Linux page builders seed them. A first run has read no choice yet, so the
+ * reading seed is empty and a11y_prefs.js keeps its defaults (LTP-09).
+ * @param {String} Locale The wizard's current language (_ob_locale).
+ * @returns {String}
+ */
+_OnbWeb_SeedScript(Locale) {
+	return "window._i18n_locale=" . JsonStringLiteral(Locale) . ";" . ReadingPrefs_SeedScript()
+}
+
 ; Returns the virtual-host URL for _shared/ui/onboarding/index.html. Served from
 ; a mapped origin (not file://) so the chrome.webview JS->AHK channel works.
 ; A per-launch cache-buster forces a fresh index.html each open (WebView2 caches
@@ -835,54 +873,63 @@ _OnbWeb_OnResize(GuiObj, MinMax, Width, Height) {
 ; Window-close (X / Alt+F4) without committing: restore AltGr, drop the WebView2
 ; controller, clear the _ob_gui sentinel so Onboarding_Run's park-loop ends and
 ; the caller exits (first launch) or returns (menu re-run).
-_OnbWeb_OnClose(*) {
-	global _ob_gui, _OB_ALTGR_PASSTHROUGH
-	_OB_ALTGR_PASSTHROUGH := false
-	saved := (_ob_gui != 0) ? _ob_gui : 0
-	_OnbWeb_Reset()
+_OnbWeb_OnClose(GuiObj := unset, *) {
+	global _ob_gui
+	ExpectedGui := IsSet(GuiObj) ? GuiObj : _ob_gui
+	SavedGui := _OnbWeb_Reset(ExpectedGui)
 	try {
-		if saved
-			saved.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_ob_gui := 0
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
 ; whether to destroy the window). Idempotent: a second call (e.g. _OnbWeb_Finish
 ; and _OnbWeb_OnClose both firing for the same teardown) is a true no-op instead
 ; of touching the globals again.
-_OnbWeb_Reset() {
+_OnbWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset) {
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_MsgSub
-	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch
-
-	; A prior Reset() already released remove_WebMessageReceived against this
-	; controller. Re-running the unset line below would call __Delete's bound
-	; ComCall a SECOND time against a COM pointer WebView2 has already torn down
-	; (Controller.Close() releases CoreWebView2's underlying interfaces) — a
-	; genuine SEH access violation that no try/catch can intercept.
-	if _OnbWeb_ResetDone
-		return
-	_OnbWeb_ResetDone := true
-	_OnbWeb_SessionEpoch += 1
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence (e.g. if the controller was invalidated by the host Gui
-	; already being destroyed), and a bare per-line `try` only catches ordinary
-	; AHK exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	global _OnbWeb_ResetDone, _OnbWeb_SessionEpoch, _ob_gui, _OB_ALTGR_PASSTHROUGH
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscription handle FIRST, while the controller is still alive.
-		; Its __Delete unsubscribes via remove_WebMessageReceived on the live controller;
-		; doing it AFTER Controller.Close() raises a COM error that — uncaught in the
-		; window's Close-event thread — terminates the entire AHK script.
+		if IsSet(ExpectedGui) && _ob_gui != ExpectedGui
+			return 0
+		if IsSet(ExpectedEpoch) && !_OnbWeb_SessionCurrent(ExpectedEpoch)
+			return 0
+		if _OnbWeb_ResetDone {
+			; BeforeReload may already have retired the plumbing while retaining
+			; this exact native host. Closing that host must remain possible.
+			if IsSet(ExpectedGui) {
+				SavedGui := _ob_gui
+				_ob_gui := 0
+				_OB_ALTGR_PASSTHROUGH := false
+				return SavedGui
+			}
+			return 0
+		}
+		SavedGui := _ob_gui
+		SavedController := IsSet(_OnbWeb_Controller) ? _OnbWeb_Controller : 0
+		SavedWebView := IsSet(_OnbWeb_WebView) ? _OnbWeb_WebView : 0
+		SavedSubscription := IsSet(_OnbWeb_MsgSub) ? _OnbWeb_MsgSub : 0
+		SavedQueue := _OnbWeb_Queue
+		_OnbWeb_ResetDone := true
+		_OnbWeb_SessionEpoch += 1
+		_OnbWeb_Controller := unset
+		_OnbWeb_WebView := unset
 		_OnbWeb_MsgSub := unset
-		if IsSet(_OnbWeb_Controller)
-			_OnbWeb_Controller.Close()
-	}
-	_OnbWeb_Controller := unset
-	_OnbWeb_WebView    := unset
-	_OnbWeb_Ready      := false
-	_OnbWeb_Queue      := []
+		_OnbWeb_Ready := false
+		_OnbWeb_Queue := []
+		; Finish's BeforeReload callback only retires WebView plumbing. Exact host
+		; close paths additionally detach their sentinel before native callouts.
+		if IsSet(ExpectedGui) {
+			_ob_gui := 0
+			_OB_ALTGR_PASSTHROUGH := false
+		}
+	} finally Critical(PreviousCritical)
+	; Keep old strong references through detach; unsubscribe only outside Critical
+	; and before closing the exact controller whose subscription was captured.
+	try SavedSubscription := unset
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }

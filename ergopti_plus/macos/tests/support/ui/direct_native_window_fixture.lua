@@ -9,18 +9,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 --- Composes one direct controller with observable native ownership roots.
 --- @param domain string healthcheck or error.
 --- @param scenario function Receives native observations and public actions.
 local function with_window(domain, scenario)
 	return helpers.with_stub_scope({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot", "healthcheck.cleanup", "healthcheck.actions",
-		"ui.error_dialog", "diagnostics.error_policy", "diagnostics.error_report", "diagnostics.issue_report", "diagnostics.redact",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
-		"adapters.timer_scheduler", "adapters.storage", "ui.healthcheck.report", "hs", "tests.stubs.hs",
-		"tests.support.webview_recursive_close_fixture", "json", "adapters.json_codec",
+		"diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot", "diagnostics.engine.healthcheck.cleanup", "diagnostics.engine.healthcheck.actions",
+		"diagnostics.ui.error_dialog", "diagnostics.engine.reports.error_policy", "diagnostics.engine.reports.error_report", "diagnostics.engine.reports.issue_report", "diagnostics.engine.reports.redact",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
+		"core.events.timer_scheduler", "core.fs.adapters.storage", "diagnostics.ui.healthcheck.report", "hs", "tests.stubs.hs",
+		"tests.support.webview_recursive_close_fixture", "core.text.engine.json", "core.fs.adapters.json_codec",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
 			timers = {}, script_refs = {}, controllers = {}, serial = 0 }
@@ -32,11 +32,11 @@ local function with_window(domain, scenario)
 		logger.debug = function(_, format)
 			if h.on_debug then h.on_debug(format) end
 		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = helpers.shared }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["adapters.storage"] = { get = function() return true end, set = function() return true end }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.fs.adapters.storage"] = { get = function() return true end, set = function() return true end }
+		package.loaded["core.ui.ui.builder"] = {
 			window_title = function(value) return "ErgoptiPlus — " .. tostring(value) end,
 			get_app_geometry = function() return { width = 700, height = 600 } end,
 			build_injected_html = function() return "<html></html>" end,
@@ -99,18 +99,18 @@ local function with_window(domain, scenario)
 		end
 		local product
 		if domain == "healthcheck" then
-			package.loaded["ui.healthcheck.helpers"], package.loaded["healthcheck.snapshot"] = {}, {}
-			product = require("ui.healthcheck.core")
+			package.loaded["diagnostics.ui.healthcheck.helpers"], package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}, {}
+			product = require("diagnostics.ui.healthcheck.core")
 			product.run = function() return {} end
 			product.config = function() return { schema = {}, templates = {} } end
 		else
-			package.loaded["ui.healthcheck.core"] = {
+			package.loaded["diagnostics.ui.healthcheck.core"] = {
 				DRIVER = "macos", config = function() return { redaction = {} } end,
 				run = function() return { generated_at = "2026-10-18", sections = {
 					paths = { errors_today = "/virtual/errors.log" } } } end,
 			}
-			package.loaded["ui.healthcheck.report"] = { redaction_context = function() return {} end }
-			product = require("ui.error_dialog")
+			package.loaded["diagnostics.ui.healthcheck.report"] = { redaction_context = function() return {} end }
+			product = require("diagnostics.ui.error_dialog")
 			assert(product.init(), "real error policy must initialise")
 		end
 		function h.drain()

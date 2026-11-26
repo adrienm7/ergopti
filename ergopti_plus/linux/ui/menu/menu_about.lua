@@ -10,24 +10,24 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ParentSource = require("menu.frames.parent_source")
+local Logger = require("core.logger.engine.shim")
+local ParentSource = require("menu.engine.frames.parent_source")
 local Version = require("infra.version")
-local Installation = require("infra.installation")
-local VersionLabel = require("updater.version_label")
-local Schedule = require("updater.schedule")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local Installation = require("core.lifecycle.engine.installation")
+local VersionLabel = require("updater.engine.version_label")
+local Schedule = require("updater.engine.schedule")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local separator_modules = package.loaded
 local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
-local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
+local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")
 local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local shell_quote = require("ui.menu.menu_dialogs").shell_quote
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
+local _fill = require("menu.ui.builder.dialogs")._fill
+local shell_quote = require("menu.ui.builder.dialogs").shell_quote
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_about"
 
@@ -36,10 +36,10 @@ local LOG = "ui.menu.menu_about"
 local function uninstall_caption_facade_current()
 	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
 		and rawget(package, "loaded") == separator_modules
-		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu
 		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
 		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
-		and rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n
+		and rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n
 		and type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get
 end
 
@@ -51,7 +51,7 @@ end
 --- @param up table The updater module.
 --- @return table row A provider row with its items.
 local function _channel_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("settings.engine.keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			local ok, committed = pcall(up.set_channel, id)
 			if not ok or committed ~= true then return false end
@@ -66,7 +66,7 @@ local function _channel_picker(ctx, up)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end,
+		[require("settings.engine.keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end,
 		installed_build = function() return not Installation.is_source_run() end,
 	})
 end
@@ -76,7 +76,7 @@ end
 --- @param up table Native updater owner.
 --- @return table row Shared choice provider data.
 local function _frequency_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("settings.engine.keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if up.set_check_interval(seconds) ~= true then return false end
 			if up.start_background_checks() ~= true then return false end
@@ -84,7 +84,7 @@ local function _frequency_picker(ctx, up)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
+		[require("settings.engine.keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 		end,
 		installed_build = function() return not Installation.is_source_run() end,
@@ -126,18 +126,33 @@ local function _about_update_rows(ctx)
 	-- could tell whether the automatic update exists. The manifest's
 	-- `disabled_when = ["installed_build"]` greys the two choices.
 	local source_run = Installation.is_source_run()
-	-- A system package never self-updates either, so it gets the same greyed rows
-	-- with its own reason (the key the Versions window already shows).
+	-- A system package, an AppImage or a Flatpak never self-updates either, so it
+	-- gets the same greyed rows with its own origin's reason (the key the Versions
+	-- window already shows).
 	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil
-	if not source_run and type(up.installation_kind) == "function" and up.installation_kind() == "package" then
-		update_blocked_reason = "changelog_window.install_blocked_package"
+	if not source_run and type(up.installation_kind) == "function" then
+		update_blocked_reason = require("modules.updater.install_origin").update_blocked_key(up.installation_kind())
 	end
 	local frequency_row = _frequency_picker(ctx, up)
 
+	-- An installed release whose daemon restart was refused waits for one: the
+	-- row completes it rather than checking for another release.
+	local Versions = require("ui.changelog.bridge")
+	if type(ctx.on_menu_changed) == "function" then Versions.set_pending_install_observer(ctx.on_menu_changed) end
+	local pending = not source_run and Versions.pending_install() or nil
+
 	-- A check discovers releases; installation needs the separately named row.
-	if source_run then
-		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
+	if pending then
+		out[#out + 1] = {
+			label = _fill(i18n_safe("menu.about.restart_to_finish_install"), "{tag}", pending.tag),
+			action = function()
+				Logger.info(LOG, "User asked to restart on installed release %s.", pending.tag)
+				Versions.complete_pending_install()
+			end,
+		}
+	elseif source_run then
+		local source_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not source_run end })
 		if source_row then out[#out + 1] = source_row end
 	else
@@ -158,16 +173,14 @@ local function _about_update_rows(ctx)
 			-- Without a window (no WebKitGTK, no display) the answer is announced
 			-- by a notification instead
 			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
-			up.check_for_updates(nil, function(available, release, err)
-				if available and release then
-					Logger.info(LOG, "Update available: %s.", release.tag)
-				elseif err then
-					Logger.warn(LOG, "Update check failed: %s.", tostring(err))
-				else
-					Logger.info(LOG, "No update available (current: %s).", up.current_version())
-				end
+			up.check_for_updates(nil, function(_, _, err, result)
+				if err then Logger.warn(LOG, "Update check failed: %s.", tostring(err)) end
+				Logger.info(LOG, "Update check answered: %s (current: %s).",
+					tostring(type(result) == "table" and result.state), up.current_version())
+				-- The structured answer the window would show: each outcome keeps its
+				-- own sentence (_shared/updater/engine/check_notice.lua).
 				if type(ctx.on_update_checked) == "function" then
-					ctx.on_update_checked(available, release, err)
+					ctx.on_update_checked(result)
 				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end)
@@ -210,8 +223,10 @@ local function _about_update_rows(ctx)
 	end
 
 
-	-- A system package is an installed build, so only its own reason is applied here.
-	if update_blocked_reason and not source_run then
+	-- A system package is an installed build, so only its own reason is applied
+	-- here. An AppImage keeps its frequency: its checks still announce releases.
+	if update_blocked_reason and not source_run
+		and not require("modules.updater.install_origin").checks_for_releases(up.installation_kind()) then
 		frequency_row.items = nil
 		frequency_row.disabled = true
 		frequency_row.disabled_reason_key = update_blocked_reason
@@ -223,7 +238,7 @@ end
 
 
 --- The action of the Uninstall row: the confirmed removal transaction of
---- ui/menu/uninstall.lua, which quits the daemon through ctx.on_quit once the
+--- menu/ui/transactions/uninstall.lua, which quits the daemon through ctx.on_quit once the
 --- removal worker owns the files.
 --- @param ctx table Menu context.
 --- @return function
@@ -232,7 +247,7 @@ local function _uninstall_command(ctx)
 	if uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end
 	return function()
 		if not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end
-		local run = require("ui.menu.uninstall").run
+		local run = require("menu.ui.transactions.uninstall").run
 		local title = receive()
 		if title == nil or not uninstall_caption_facade_current() or not current() then return false end
 		local confirmation = i18n_safe("dialog.uninstall.confirm")
@@ -297,7 +312,7 @@ local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.START_AT_LOGIN] = function()
+		[require("settings.engine.keys").COMMAND.START_AT_LOGIN] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
 			end
@@ -308,14 +323,14 @@ local function _build_about(ctx)
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,
 		-- with no caller anywhere. The page existed and nothing could reach it.
-		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_CHANGELOG] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the release notes cannot open.")
 				return
 			end
 			ctx.webview.show("changelog")
 		end,
-		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_RELEASES_PAGE] = function()
 			if type(ctx.updater) ~= "table" then
 				Logger.error(LOG, "No updater module — the releases page URL is unknown.")
 				return
@@ -333,11 +348,17 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	-- One helper run per build answers both getters (start_at_login.snapshot).
+	local startup = nil
+	local function startup_state()
+		startup = startup or require("ui.menu.start_at_login").snapshot()
+		return startup
+	end
 	getters["startup_command_available"] = function()
-		return require("ui.menu.start_at_login").command_available() ~= false
+		return startup_state().command_available ~= false
 	end
 	getters["start_at_login_enabled"] = function()
-		return require("ui.menu.start_at_login").enabled() == true
+		return startup_state().enabled == true
 	end
 	render_ctx.state_getters = getters
 

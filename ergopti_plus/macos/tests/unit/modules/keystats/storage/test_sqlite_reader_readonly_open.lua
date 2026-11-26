@@ -40,7 +40,7 @@ end
 
 local function load_reader(existing)
 	local sqlite3, state = native_sqlite(existing)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite3 }), state
 end
 

@@ -10,88 +10,93 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	-- The real logger and timer scheduler describe failures through this pure owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	-- The real logger's shared core and the phase counters it records into.
-	"logger",
+	"core.logger.engine",
 	"infra.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
-	"phase_stats_core",
+	"metrics.engine.perf.phase_stats_core",
 	-- The real paths, logger and configuration owners split paths through this pure owner,
 	-- and the timer scheduler admits delays through the number policy.
-	"native_path",
-	"number_policy",
+	"core.fs.engine.native_path",
+	"core.text.engine.number_policy",
 	-- The real notifications owner focuses the clicked application through this adapter.
-	"adapters.running_application",
-	"program_parameter", "user_action_parameter",
-	"actions.assignable",
+	"platform.focus.running_application",
+	"settings.engine.program_parameter", "shortcuts.engine.actions.user_action_parameter",
+	"shortcuts.engine.actions.assignable",
 	-- The chord and sticky labels name their keys through the key name table,
 	-- which loads with its data.
-	"actions.sticky_label", "keycodes.key_names", "keycodes.key_names_data",
+	"shortcuts.engine.actions.sticky_label", "platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data",
 	"_generated.action_catalogue",
 	-- The generated catalogue filters the shared data through this owner.
-	"actions.catalogue",
-	"actions.catalogue_data",
+	"shortcuts.engine.actions.catalogue",
+	"shortcuts.engine.actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
 	"infra.script_chord_catalogue",
-	"script_chords",
-	"app_parameter",
-	"brightness_actions",
-	"brightness_actions_data",
-	"config_binding_identity",
+	"keyboard.engine.layers.script_chords",
+	"apps.engine.parameter",
+	"shortcuts.engine.brightness_actions",
+	"shortcuts.engine.brightness_actions_data",
+	"settings.engine.publication.binding_identity",
 	-- Shared binding admission captures this real ordered-pair dependency.
-	"tap_hold.key_combinations",
-	"config_binding_publication",
-	"config_keyboard_publication",
+	"tap_hold.engine.key_combinations",
+	"settings.engine.publication.binding_publication",
+	"settings.engine.publication.keyboard_publication",
 	-- infra.notifications names the launcher bundle id through this shared table.
-	"identifiers",
+	"core.text.engine.identifiers",
 	"_generated.gesture_emit_actions",
-	"adapters.file_system",
-	"adapters.clipboard",
-	"adapters.hotkey_registrar",
-	"adapters.json_codec",
-	"adapters.key_state",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"desktop_navigation",
-	"infra.config_paths",
-	"infra.i18n",
-	"infra.logger",
-	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.paths",
-	"infra.startup_transaction",
-	"infra.termination_coordinator",
-	"infra.text_utils",
-	"infra.timings",
+	"core.fs.adapters.file_system",
+	"clipboard.adapters.clipboard",
+	"platform.input.hotkey_registrar",
+	"core.fs.adapters.json_codec",
+	"platform.input.key_state",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"keyboard.engine.desktop_navigation",
+	"settings.engine.paths",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_reader",
+	"core.ui.engine.notifications",
+	"core.fs.engine.paths",
+	"core.lifecycle.engine.startup_transaction",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
+	"core.text.engine.utils",
+	"core.timing.engine.timings",
 	-- The driver bindings of the manifest reader and the timings registry build on these.
-	"manifest_reader",
-	"timings",
-	"infra.toml.reader",
-	"json",
-	"llm.profile_selector",
-	"llm.prompt_action",
-	"llm.tone",
-	"llm.translate",
-	"llm.vision",
+	"menu.engine.manifest_reader_core",
+	"core.timing.engine.timings_core",
+	"core.text.engine.toml.reader",
+	"core.text.engine.json",
+	"ai.engine.settings.profile_selector",
+	"ai.engine.prediction.prompt_action",
+	"ai.engine.prediction.tone",
+	"ai.engine.prediction.translate",
+	"ai.engine.prediction.vision",
 	-- The shared vision request reads the API dialects from this pure owner.
-	"llm.remote_formats",
-	"modules.gestures",
-	"modules.gestures.actions",
-	"modules.gestures.native_app_switcher_action",
-	"modules.gestures.native_app_switcher",
+	"ai.engine.api.remote_formats",
+	"gestures.engine",
+	"gestures.engine.actions",
+	"gestures.adapters.native_app_switcher_action",
+	"gestures.adapters.native_app_switcher",
 	"adapters.system_switcher_input",
 	"adapters.system_switcher_sampler",
 	"adapters.system_switcher_runtime",
 
-	"modules.gestures.actions_aux_owner",
-	"modules.gestures.actions_click",
-	"modules.gestures.conflicts",
-	"modules.gestures.engine",
-	"infra.gesture_frame_evidence",
-	"modules.gestures.sticky_modifiers",
+	"gestures.engine.actions_aux_owner",
+	"gestures.engine.actions_click",
+	"gestures.engine.conflicts",
+	"gestures.engine.engine",
+	"gestures.engine.frame_evidence",
+	"gestures.engine.sticky_modifiers",
+	-- The engine bounds incremental tab steps through the sensitivity owner.
+	"gestures.engine.sensitivity",
+	-- The sensitivity owner checks a step against the shared value schema.
+	"settings.engine.value_check",
+	"settings.engine.value_schema_data",
 	"modules.shortcuts",
 	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
@@ -100,53 +105,57 @@ local OWNERS = {
 	"modules.shortcuts.actions.text",
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
+	-- The Shortcuts entry loads the layer wheel's own lifecycle owner at require time.
+	"modules.shortcuts.layer_wheel",
 	"modules.shortcuts.script_control",
-	"send_input",
-	"text_utils",
-	"toml_codec.basic_string",
-	"toml_codec.bom",
-	"toml_codec.key_path",
-	"toml_codec.reader",
-	"toml_codec.record_scanner",
+	"platform.input.send_input",
+	"core.text.engine.utils_core",
+	-- text_utils builds its case tables from this generated data at require time.
+	"core.text.engine.unicode_case.data",
+	"core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.reader",
+	"core.text.engine.toml_codec.record_scanner",
 	-- The record scanner memoizes one text's scans through this owner.
-	"toml_codec.source_memo",
+	"core.text.engine.toml_codec.source_memo",
 	-- The real TOML reader opens its source through this shared owner.
-	"toml_codec.source_open",
+	"core.text.engine.toml_codec.source_open",
 	-- The shared ordered-pair policy copies tables through this owner.
-	"table_util",
-	"wrap_pair",
+	"core.text.engine.table_util",
+	"keyboard.engine.wrap_pair",
 }
 
 local function fresh_actions(options)
 	local controls = options or {}
 	for _, name in ipairs({
-		"modules.gestures.actions",
-	"modules.gestures.native_app_switcher_action",
-	"modules.gestures.native_app_switcher",
+		"gestures.engine.actions",
+	"gestures.adapters.native_app_switcher_action",
+	"gestures.adapters.native_app_switcher",
 	"adapters.system_switcher_input",
 	"adapters.system_switcher_sampler",
 	"adapters.system_switcher_runtime",
 
-		"infra.notifications",
-		"adapters.timer_scheduler",
-		"modules.gestures.actions_aux_owner",
-		"modules.gestures.actions_click",
-		"modules.gestures.sticky_modifiers",
+		"core.ui.engine.notifications",
+		"core.events.timer_scheduler",
+		"gestures.engine.actions_aux_owner",
+		"gestures.engine.actions_click",
+		"gestures.engine.sticky_modifiers",
 		"modules.shortcuts.actions.screenshot_save",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.system_mouse",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system_pixel",
-		"adapters.file_system",
-		"adapters.clipboard",
-		"adapters.key_state",
-		"adapters.synthetic_input",
-		"infra.termination_coordinator",
-		"infra.logger",
-		"infra.paths",
-		"infra.config_paths",
-		"infra.timings",
-		"infra.i18n",
+		"core.fs.adapters.file_system",
+		"clipboard.adapters.clipboard",
+		"platform.input.key_state",
+		"platform.input.synthetic_input",
+		"core.lifecycle.engine.shutdown.termination_coordinator",
+		"core.logger.engine.logger",
+		"core.fs.engine.paths",
+		"settings.engine.paths",
+		"core.timing.engine.timings",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local calls = {
@@ -251,7 +260,7 @@ local function fresh_actions(options)
 		}
 		return true, token
 	end
-	package.loaded["modules.gestures.actions_aux_owner"] = {
+	package.loaded["gestures.engine.actions_aux_owner"] = {
 		after = function(delay, label, callback, parent)
 			local prepared, token = prepare_after(delay, label, callback, parent)
 			if prepared ~= true then return prepared end
@@ -569,7 +578,7 @@ local function fresh_actions(options)
 		{ "open_downloads", "open_finder", "open_settings", "copy_or_open_path" })
 	package.loaded["modules.shortcuts.actions.system_pixel"] = scoped_owner("pixel",
 		{ "copy_pixel_color" })
-	package.loaded["modules.gestures.actions_click"] = setmetatable({
+	package.loaded["gestures.engine.actions_click"] = setmetatable({
 		force_cleanup = function(parent)
 			calls.click_force_parents[#calls.click_force_parents + 1] = parent
 			return true
@@ -586,27 +595,27 @@ local function fresh_actions(options)
 			return accepted
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.sticky_modifiers"] = setmetatable({
+	package.loaded["gestures.engine.sticky_modifiers"] = setmetatable({
 		clear = function(parent)
 			calls.sticky_clear_parents[#calls.sticky_clear_parents + 1] = parent
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- Only the send-input vocabulary is real: the send_* actions cannot parse
 		-- a value without it, and every other shared file stays missing.
 		read = function(path)
-			if type(path) ~= "string" or not path:find("modules/actions/send_keys.json", 1, true) then
+			if type(path) ~= "string" or not path:find("shortcuts/data/actions/send_keys.json", 1, true) then
 				return nil
 			end
-			local handle = assert(io.open(helpers.shared("modules/actions/send_keys.json"), "r"))
+			local handle = assert(io.open(helpers.shared("shortcuts/data/actions/send_keys.json"), "r"))
 			local body = handle:read("*a")
 			handle:close()
 			return body
 		end,
 		read_file = function() return nil end,
 	}
-	package.loaded["adapters.key_state"] = setmetatable({}, {
+	package.loaded["platform.input.key_state"] = setmetatable({}, {
 		__index = function() return function() return false end end,
 	})
 	local function finish_transaction(tx, status)
@@ -618,7 +627,7 @@ local function fresh_actions(options)
 		tx.completed, tx.status = true, tx.cancelled and "cancelled" or status
 		for _, callback in ipairs(tx.complete) do callback(tx, tx.status) end
 	end
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		begin = function(owner, effect, publication)
 			return { owner = owner, effect = effect, publication = publication, complete = {}, dispatched = {} }
 		end,
@@ -714,8 +723,8 @@ local function fresh_actions(options)
 			return result
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
-	package.loaded["infra.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
+	package.loaded["core.fs.engine.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
 	-- The user's files the open_* actions name live in the configuration folder,
 	-- never in hs.configdir (the script folder, the bundle once installed).
 	local config_files = {
@@ -724,10 +733,10 @@ local function fresh_actions(options)
 		PersonalShortcutsLuaPath = "personal_shortcuts.lua",
 		PersonalTomlPath = "hotstrings/personal_hotstrings.toml",
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key) return config_files[key] and ("/fixture/config/" .. config_files[key]) or nil end,
 	}
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
 	local logger = helpers.make_logger_stub()
 	logger.error = function(module_name, message, ...)
 		local ok, rendered = pcall(string.format, message, ...)
@@ -736,8 +745,8 @@ local function fresh_actions(options)
 			message = ok and rendered or tostring(message),
 		}
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }
 	local focused_window = {
@@ -750,7 +759,7 @@ local function fresh_actions(options)
 			return controlled_result(controls.window_action_mode, "window maximize exploded")
 		end,
 	}
-	actions = helpers.load_with_stubs("modules.gestures.actions", {
+	actions = helpers.load_with_stubs("gestures.engine.actions", {
 		configdir = "/tmp/ergopti",
 		reload = function() calls.reload = calls.reload + 1; return true end,
 		mouse = {
@@ -815,6 +824,7 @@ local function fresh_actions(options)
 		},
 		pasteboard = {
 			changeCount = function() return clipboard_count end,
+			allContentTypes = function() return { {} } end,
 			readAllData = function()
 				return clone_clipboard(clipboard_data)
 			end,
@@ -915,12 +925,12 @@ local function with_feature_lifecycles(actions, calls, body)
 		"modules.shortcuts.bindings",
 		"modules.shortcuts.script_control",
 		"modules.shortcuts.keyboard_shortcuts",
-		"adapters.hotkey_registrar",
-		"infra.startup_transaction",
-		"modules.gestures",
-		"modules.gestures.engine",
-		"modules.gestures.conflicts",
-		"infra.manifest_reader",
+		"platform.input.hotkey_registrar",
+		"core.lifecycle.engine.startup_transaction",
+		"gestures.engine",
+		"gestures.engine.engine",
+		"gestures.engine.conflicts",
+		"menu.engine.manifest_reader",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -953,10 +963,10 @@ local function with_feature_lifecycles(actions, calls, body)
 		start = function() feature.keyboard_started = true; return true end,
 		stop = function() feature.keyboard_started = false; return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		set_delivery_guard = function() return true end,
 	}
-	package.loaded["infra.startup_transaction"] = {
+	package.loaded["core.lifecycle.engine.startup_transaction"] = {
 		run = function(steps)
 			local applied = {}
 			for _, step in ipairs(steps) do
@@ -972,23 +982,23 @@ local function with_feature_lifecycles(actions, calls, body)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = setmetatable({
+	package.loaded["gestures.engine.engine"] = setmetatable({
 		init = function() return true end,
 		cancel_current_gesture = function()
 			feature.cancel_calls = feature.cancel_calls + 1
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
+	package.loaded["gestures.engine.conflicts"] = setmetatable({}, {
 		__index = function() return function() return true end end,
 	})
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return true end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["modules.gestures.actions"] = actions
+	package.loaded["gestures.engine.actions"] = actions
 	package.loaded["modules.shortcuts"] = nil
-	package.loaded["modules.gestures"] = nil
+	package.loaded["gestures.engine"] = nil
 
 	feature.keyboard_execute = function(action)
 		if feature.keyboard_started ~= true then return false end
@@ -1000,10 +1010,10 @@ local function with_feature_lifecycles(actions, calls, body)
 	end
 
 	local ok, err = xpcall(function()
-		body(require("modules.shortcuts"), require("modules.gestures"), feature)
+		body(require("modules.shortcuts"), require("gestures.engine"), feature)
 	end, debug.traceback)
 	for _, name in ipairs(module_names) do package.loaded[name] = saved[name] end
-	package.loaded["modules.gestures.actions"] = actions
+	package.loaded["gestures.engine.actions"] = actions
 	if not ok then error(err, 0) end
 end
 

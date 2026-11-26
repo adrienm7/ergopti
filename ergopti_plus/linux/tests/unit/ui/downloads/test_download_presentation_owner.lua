@@ -11,15 +11,15 @@
 local helpers = require("tests.helpers")
 
 local function with_session(run)
-	local names = { "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
-		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
-		"ui.download_window.bridge", "infra.manifest_reader", "logger.shim", "infra.i18n" }
+	local names = { "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
+		"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
+		"ui.download_window.bridge", "menu.engine.manifest_reader", "core.logger.engine.shim", "core.i18n.engine.i18n" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local document
 	local ok, primary = xpcall(function()
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["ui.download_window.bridge"] = nil
 		local bridge = require("ui.download_window.bridge")
 		document = require("tests.support.document_fixture").new("download_window", bridge, {})
@@ -64,6 +64,79 @@ local function certificate()
 end
 
 helpers.describe("download fresh presentation preserves original operation consent", function()
+	for _, opened in ipairs({ false, true }) do
+		helpers.it("an old opening cannot erase its reentrant successor: " .. tostring(opened), function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original, successor = document.manager, document.manager.show, nil
+			manager.show = function(app)
+				manager.show = original
+				helpers.assert_true(bridge.complete(world.id + 1, true, "done"))
+				successor = assert(world.show("successor"))
+				return opened
+			end
+			helpers.assert_nil(world.show("superseded"))
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+		end)
+	end
+
+	helpers.it("terminal close cannot replace a session opened by its callback", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original, successor = document.manager, document.manager.hide, nil
+			manager.hide = function(app, epoch)
+				manager.hide = original
+				helpers.assert_true(original(app, epoch))
+				successor = assert(world.show("successor"))
+				return true
+			end
+			helpers.assert_nil(world.show("superseded"))
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+	end)
+
+	helpers.it("focus reports refusal when the existing native window cannot be presented", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			local manager, original = document.manager, document.manager.bring_to_front
+			manager.bring_to_front = function() return false end
+			local focused = bridge.focus(world.id)
+			manager.bring_to_front = original
+			helpers.assert_eq(focused, false)
+		end)
+	end)
+
+	helpers.it("focus refuses an old session replaced while presenting", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			local manager, original, successor = document.manager, document.manager.bring_to_front, nil
+			manager.bring_to_front = function()
+				manager.bring_to_front = original
+				helpers.assert_true(bridge.complete(world.id, true, "done"))
+				successor = assert(world.show("successor"))
+				return true
+			end
+			helpers.assert_eq(bridge.focus(world.id), false)
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+	end)
+
+	helpers.it("refused terminal close retains the old session and refuses replacement", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			helpers.assert_true(bridge.complete(world.id, true, "done"))
+			local manager, original = document.manager, document.manager.hide
+			manager.hide = function() return false end
+			local replacement = world.show("replacement")
+			manager.hide = original
+			helpers.assert_nil(replacement)
+			helpers.assert_true(bridge.focus(world.id), "the original terminal session remains owned")
+		end)
+	end)
+
 	helpers.it("reopened real document displays retained terminal data under its own lease", function()
 		with_session(function(bridge, document, world)
 			helpers.assert_true(world.ready().pushed)

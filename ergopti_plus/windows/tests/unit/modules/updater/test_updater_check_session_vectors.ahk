@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/updater/check_session_vectors.json on the Windows
 ; host of the update-check window and on its rate-limit sentence, as the Lua
-; session of macOS and Linux does (_shared/lua/test/check_session_contract.lua).
+; session of macOS and Linux does (_shared/tests/lua/check_session_contract.lua).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -100,3 +100,45 @@ _TUSV_RateLimit() {
 	}
 }
 Test("update check session vectors: the exhausted rate limit reads the shared sentence (PAR-76)", _TUSV_RateLimit)
+
+; UPD-06: a failed check named no rate limit, and an unknown network cause
+; replaced « Could not reach GitHub » with a sentence that proves nothing.
+_TUSV_FailureReasons() {
+	global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts, _ManagedNetworkWindowsInitializing
+	Corpus := _TUSV_Corpus()
+	Assert(Corpus["failure_reasons"].Length >= 10, "the corpus holds its failure reasons")
+	; The genuine canonical contract validates each report, as at boot
+	Saved := {Contract: _ManagedNetworkWindowsContract, Ports: _ManagedNetworkWindowsPorts,
+		Initializing: _ManagedNetworkWindowsInitializing}
+	_ManagedNetworkWindowsContract := 0, _ManagedNetworkWindowsPorts := 0, _ManagedNetworkWindowsInitializing := false
+	try {
+		AssertTrue(ManagedNetworkFailureWindows_Init(), "the canonical managed-network policy loads")
+		for Vector in Corpus["failure_reasons"] {
+			Report := Vector.Has("report") ? Vector["report"] : 0
+			AssertEqual(Vector["expect"], UpdateCheck_FailureKey(Vector["reason"], Vector.Get("rate_limited", false) == true,
+				Report), Vector["id"])
+		}
+	} finally {
+		_ManagedNetworkWindowsContract := Saved.Contract
+		_ManagedNetworkWindowsPorts := Saved.Ports
+		_ManagedNetworkWindowsInitializing := Saved.Initializing
+	}
+}
+Test("update check session vectors: a failed check names the cause its evidence proves (upd-06)", _TUSV_FailureReasons)
+
+; UPD-06: the API's exhausted limit reaches the window once the feed failed too.
+_TUSV_RateLimitedWindow() {
+	Corpus := _TUSV_Corpus()
+	_TUSV_InPhase(Corpus, "checking", _TUSV_RateLimitedCase)
+}
+_TUSV_RateLimitedCase(Request, Shown) {
+	_Updater_InterpretResponse(403, "", "", "dev", "https://api.github.com/repos/o/r/releases", Request,
+		Map("remaining", "0", "reset", "86400"))
+	Assert(Request.HasOwnProp("RateLimited") && Request.RateLimited, "the exhausted limit is recorded on its check")
+	_Updater_OneClickUpdateCallback("", "v0.0.0-dev.144", Request, 0, true)
+	Message := JsonParse(_UpdateCheck_StateJson(Shown[Shown.Length]))
+	AssertEqual("error", Message["state"])
+	AssertEqual("update_check.error_rate_limited", Message["reason_key"], "upd-06: the window names the rate limit")
+	Assert(t("update_check.error_rate_limited") != "update_check.error_rate_limited", "the rate limit is localized")
+}
+Test("update check session vectors: an exhausted rate limit is named in the window (upd-06)", _TUSV_RateLimitedWindow)

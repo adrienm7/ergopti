@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Toml = require("toml_codec")
+local Toml = require("core.text.engine.toml_codec")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Base64 = require("compat.base64")
+local Base64 = require("core.lifecycle.engine.compat.base64")
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
 --- Every native owner is fresh; all module identities/absence are journalled.
@@ -25,11 +25,11 @@ local function with_idle_live_owner(settings, body)
 	for name, value in pairs(package.loaded) do journal[name] = value end
 	local owner
 	local ok, err = xpcall(function()
-		for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.settings" }) do
+		for _, name in ipairs({ "ai.engine.prediction.engine", "ai.engine.settings.profiles", "ai.engine.settings.settings" }) do
 			package.loaded[name] = nil
 		end
-		owner = require("modules.llm.prediction_engine")
-		helpers.assert_true(rawequal(require("modules.llm.profile_settings"), settings),
+		owner = require("ai.engine.prediction.engine")
+		helpers.assert_true(rawequal(require("ai.engine.settings.profile_settings"), settings),
 			"the native engine captures the actual fixture profile owner")
 		helpers.assert_nil(owner.init(), "fresh native initialization retains its original nil receipt")
 		helpers.assert_type(owner.get_live, "function")
@@ -55,15 +55,15 @@ end
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings", "adapters.storage" }
+		local names = { "settings.engine.paths", "ai.engine.preferences", "ai.engine.settings.profile_settings", "core.fs.adapters.storage" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
-			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["llm.profiles.active"] = "raw", ["llm.profiles.num_predictions"] = 9,
 			} })
-			body(require("modules.llm.profile_settings"), path)
+			body(require("ai.engine.settings.profile_settings"), path)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end

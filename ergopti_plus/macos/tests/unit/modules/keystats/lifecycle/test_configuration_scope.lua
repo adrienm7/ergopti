@@ -5,7 +5,9 @@ local helpers = require("tests.helpers")
 local function fixture()
 	local enabled, available, migrating, conversions = false, true, false, 0
 	package.loaded["modules.keystats.text_cipher"] = {
-		set_enabled = function(value) enabled = value end,
+		set_enabled = function(value) enabled = value; return true end,
+			prepare_roi_encryption = function() return true end,
+			abandon_roi_encryption = function() return true end,
 		is_enabled = function() return enabled end,
 		is_available = function() return available end,
 	}

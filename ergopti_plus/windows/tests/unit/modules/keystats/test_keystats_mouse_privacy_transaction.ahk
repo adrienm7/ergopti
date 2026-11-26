@@ -515,3 +515,129 @@ _KLMS_ParkPrivacyFailure() {
 	}
 }
 Test("mouse-privacy-query-failure: park polling fails closed", _KLMS_ParkPrivacyFailure)
+
+; The park poll is a timer, which native Suspend does not stop. A paused tick
+; must ask no privacy question and accumulate no distance, only re-anchor the
+; cursor; the same tick running is the positive control
+; (mouse-park-distance-no-gate).
+_KLMS_CountedFilter(Recorder) {
+	Recorder.Calls.Push("filter")
+	return false
+}
+
+_KLMS_ParkFrom(Recorder) {
+	Recorder.Calls.Push("position")
+	return {x: 300, y: 400}
+}
+
+_KLMS_ParkTickUnderPause() {
+	Fields := ["prev_x", "prev_y", "prev_initialized", "park_initialized", "park_last_x", "park_last_y",
+		"park_still_since"]
+	Saved := Map()
+	for Field in Fields
+		Saved[Field] := KLMouse.%Field%
+	SavedInitialized := Keystats.initialized
+	SavedCollection := KLCollection.suspended
+	WasSuspended := A_IsSuspended
+	try {
+		Keystats.initialized := true
+		KLCollection.suspended := false
+		for Paused in [true, false] {
+			Recorder := {Calls: [], Distances: []}
+			KLMouse.prev_x := 0, KLMouse.prev_y := 0, KLMouse.prev_initialized := true
+			KLMouse.park_initialized := false
+			Suspend(Paused ? 1 : 0)
+			try KL_Mouse_ParkTick(_KLMS_CountedFilter.Bind(Recorder),
+				_KLMS_ParkFrom.Bind(Recorder), _KLMS_RecordDistance.Bind(Recorder))
+			finally Suspend(WasSuspended ? 1 : 0)
+			AssertEqual(300, KLMouse.prev_x, "every tick re-anchors the cursor")
+			AssertEqual(400, KLMouse.prev_y)
+			if Paused {
+				AssertEqual("position", _JoinParts(Recorder.Calls), "a paused park tick must ask no privacy question")
+				AssertEqual(0, Recorder.Distances.Length, "a paused park tick must accumulate no mouse distance")
+				AssertFalse(KLMouse.park_initialized, "a paused park tick must not start park detection")
+			} else {
+				AssertEqual("position filter", _JoinParts(Recorder.Calls), "positive control: a running tick asks privacy")
+				AssertEqual(1, Recorder.Distances.Length, "positive control: a running tick accumulates the move")
+				AssertEqual(500, Recorder.Distances[1], "the accumulated distance is the cursor move")
+			}
+		}
+	} finally {
+		for Field, Value in Saved
+			KLMouse.%Field% := Value
+		Keystats.initialized := SavedInitialized
+		KLCollection.suspended := SavedCollection
+	}
+}
+Test("keystats_mouse: a paused park tick accumulates no distance (mouse-park-distance-no-gate)", _KLMS_ParkTickUnderPause)
+
+
+_KLMS_CompensatedBurst(Recorder) {
+	_KLMS_Flush(1500, Recorder)
+	AssertEqual(0, KLMouse.scroll_start, "zero-net scroll must retire its start timestamp")
+	AssertEqual(0, KLMouse.scroll_last, "zero-net scroll must retire its last timestamp")
+	AssertEqual(0, Recorder.Calls.Length, "zero-net scroll must not query context or append an event")
+	_KLMS_Accumulate("vertical", 2000, Recorder)
+	_KLMS_Flush(2100, Recorder)
+	AssertEqual(1, Recorder.Events.Length)
+	AssertEqual(100, Recorder.Events[1]["duration_ms"], "the next burst measures only its own interval")
+}
+Test("scroll: compensated burst retires timing (scroll-zero-net-lifecycle)",
+	_KLMS_WithState.Bind(0, 0, 1000, 1100, _KLMS_CompensatedBurst))
+
+
+; Scroll hooks and the burst flush timer bypass native Suspend. While capture is
+; held (driver suspended or metrics paused) the accumulator must count nothing
+; and arm no timer, and a flush must publish nothing and retire the burst so a
+; post-resume flush does not measure the pause (mouse-handlers-bypass-suspend,
+; keystats-mouse-scroll-suspend-reset).
+_KLMS_SuspendedAccumulateAction(Recorder) {
+	WasSuspended := A_IsSuspended
+	try {
+		Suspend(true)
+		_KLMS_Accumulate("vertical", 1300, Recorder)
+		AssertEqual(2, KLMouse.scroll_ticks, "a wheel tick while suspended must not be accumulated")
+		AssertEqual(1000, KLMouse.scroll_last, "a wheel tick while suspended must not move the burst clock")
+		AssertEqual(0, Recorder.Calls.Length, "a wheel tick while suspended must not query, bump or arm anything")
+		Suspend(false)
+		_KLMS_Accumulate("vertical", 1300, Recorder)
+		AssertEqual(3, KLMouse.scroll_ticks, "positive control: the same tick accumulates once resumed")
+		AssertEqual(1, Recorder.Bumps, "positive control: the resumed tick bumps the counter")
+	} finally Suspend(WasSuspended)
+}
+Test("mouse: a wheel tick while suspended is not accumulated (mouse-handlers-bypass-suspend)",
+	_KLMS_WithState.Bind(2, 0, 1000, 1000, _KLMS_SuspendedAccumulateAction))
+
+_KLMS_SuspendedFlushAction(Recorder) {
+	WasSuspended := A_IsSuspended
+	try {
+		Suspend(true)
+		_KLMS_Flush(1500, Recorder)
+	} finally Suspend(WasSuspended)
+	AssertEqual(0, Recorder.Events.Length, "a flush while suspended must not publish a scroll event")
+	AssertEqual(0, Recorder.Calls.Length, "a flush while suspended must not query, refresh or sample the cursor")
+	for Field in ["scroll_ticks", "scroll_h_ticks", "scroll_start", "scroll_last"]
+		AssertEqual(0, KLMouse.%Field%, "a flush while suspended must retire KLMouse." . Field)
+}
+Test("mouse: a flush while suspended publishes nothing and retires the burst (keystats-mouse-scroll-suspend-reset)",
+	_KLMS_WithState.Bind(5, 0, 1000, 1000, _KLMS_SuspendedFlushAction))
+
+; Every mouse guard names KL_CaptureHeld, so it must hold for both pauses.
+_KLMS_CaptureHoldCoversBothPauses() {
+	WasSuspended := A_IsSuspended
+	WasPaused := KLCollection.suspended
+	try {
+		Suspend(false)
+		KLCollection.suspended := false
+		AssertFalse(KL_CaptureHeld(), "capture is open while neither pause is active")
+		Suspend(true)
+		AssertTrue(KL_CaptureHeld(), "capture is held while the driver is suspended")
+		Suspend(false)
+		KLCollection.suspended := true
+		AssertTrue(KL_CaptureHeld(), "capture is held while the user pauses metrics")
+	} finally {
+		KLCollection.suspended := WasPaused
+		Suspend(WasSuspended)
+	}
+}
+Test("mouse: the capture-hold gate covers native Suspend and the metrics pause", _KLMS_CaptureHoldCoversBothPauses)

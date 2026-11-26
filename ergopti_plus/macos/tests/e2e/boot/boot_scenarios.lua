@@ -54,6 +54,11 @@
 
 local M = {}
 
+local AppDirs = require("core.fs.engine.app_dirs")
+
+-- The configuration folder, relative to HOME, the boots read their files from.
+local CONFIG_REL = AppDirs.config.macos_relative
+
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 
 -- The line each boot must reach: the wizard of a fresh install, or the end of
@@ -113,7 +118,7 @@ local function stage_app(repo, root)
 	run("cp -R " .. q(repo .. "/static/ergopti_plus/macos") .. " " .. q(repo .. "/static/ergopti_plus/_shared")
 		.. " " .. q(static .. "/ergopti_plus/"))
 	run("rm -rf " .. q(static .. "/ergopti_plus/macos/tests") .. " " .. q(static .. "/ergopti_plus/macos/launcher")
-		.. " " .. q(static .. "/ergopti_plus/_shared/tests") .. " " .. q(static .. "/ergopti_plus/_shared/lua/test"))
+		.. " " .. q(static .. "/ergopti_plus/_shared/tests") .. " " .. q(static .. "/ergopti_plus/_shared/tests/lua"))
 	run("find " .. q(static .. "/ergopti_plus") .. " -name '*.md' -type f -exec rm -f {} +")
 	for _, logo in ipairs({ "logo_black.png", "logo_simple.png", "logo_simple_disabled.png", "logo_white.png" }) do
 		run("cp " .. q(repo .. "/static/img/logo/" .. logo) .. " " .. q(static .. "/img/logo/"))
@@ -174,13 +179,24 @@ end
 --- @param ctx table Scenario context.
 local function neutral_defaults(ctx)
 	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
-	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml"),
+	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml"),
 		"migration registry missing")
 	local version = assert(registry:match("\noldest_version = (%d+)"), "registry has no oldest version")
-	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml",
+	write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config.toml",
 		"[_meta]\nschema_version = " .. version .. "\n\n"
 		.. assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
+end
+
+--- The neutral defaults on a Mac that keeps Karabiner-Elements by hand
+--- (`[karabiner] runtime = "shared"`): the scenarios about the shared lease and
+--- the rules merged into the user's own karabiner.json. Ergopti's own runtime is
+--- the default, and the E2E Mac has none installed.
+--- @param ctx table Scenario context.
+local function kept_shared_runtime(ctx)
+	neutral_defaults(ctx)
+	write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config_karabiner.toml",
+		'[karabiner]\nruntime = "shared"\n')
 end
 
 --- The neutral defaults with the AI turned on in config.toml only: no value in
@@ -188,11 +204,11 @@ end
 --- @param ctx table Scenario context.
 local function ai_on_in_config(ctx)
 	neutral_defaults(ctx)
-	local path = ctx.home .. "/.config/ergopti_plus/hammerspoon/config.toml"
+	local path = ctx.home .. "/" .. CONFIG_REL .. "/hammerspoon/config.toml"
 	local toml, replaced = assert(read(path), "config.toml missing"):gsub("\n%[llm%]\nenabled = false\n",
 		"\n[llm]\nenabled = true\n", 1)
 	assert(replaced == 1, "the config template no longer opens [llm] with enabled = false")
-	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml", toml)
+	write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config.toml", toml)
 end
 
 --- The AI turned on in config.toml and in this Mac's preferences.
@@ -207,7 +223,7 @@ end
 --- @param ctx table Scenario context.
 local function partial_wpm_position(ctx)
 	neutral_defaults(ctx)
-	local relative = ".config/ergopti_plus/hammerspoon/config.toml"
+	local relative = CONFIG_REL .. "/hammerspoon/config.toml"
 	local config = assert(read(ctx.home .. "/" .. relative))
 	local enabled, enabled_count = config:gsub("%[metrics%]\nenabled = false", "[metrics]\nenabled = true")
 	assert(enabled_count == 1, "the metrics configuration section must be present exactly once")
@@ -222,11 +238,11 @@ local function partial_wpm_position(ctx)
 	-- An existing Metrics user already owns its device identity and folders.
 	-- The world has no hardware UUID probe, so the saved identity uses its
 	-- documented host-name fallback, without replacing the production resolver.
-	write_home(ctx.home, ".config/ergopti_plus/metrics/by_device/e2e-wpm/device.json",
+	write_home(ctx.home, CONFIG_REL .. "/metrics/by_device/e2e-wpm/device.json",
 		'{"device_id":"e2e-wpm","name":"E2E Mac","os":"darwin",'
 		.. '"host_signature":"fallback:unknown","created_at":"2024-01-01"}\n')
 	-- The SQLite mirror lives in the persistent cache folder since L64.
-	run("mkdir -p " .. q(ctx.home .. "/Library/Caches/ergopti_plus/metrics/e2e-wpm"))
+	run("mkdir -p " .. q(ctx.home .. "/" .. AppDirs.macos.cache_relative .. "/metrics/e2e-wpm"))
 end
 
 --- A configuration folder an older release left, with its config.toml from the
@@ -237,8 +253,8 @@ end
 local function older_release(case, extra)
 	return function(ctx)
 		local input = ctx.repo .. "/static/ergopti_plus/_shared/tests/corpus/config_migrations/" .. case .. "/input.toml"
-		write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml", assert(read(input), "missing " .. input))
-		write_home(ctx.home, ".config/ergopti_plus/wrap_symbols.toml", "")
+		write_home(ctx.home, CONFIG_REL .. "/hammerspoon/config.toml", assert(read(input), "missing " .. input))
+		write_home(ctx.home, CONFIG_REL .. "/wrap_symbols.toml", "")
 		ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
 		if extra then extra(ctx) end
 	end
@@ -278,8 +294,8 @@ local function legacy_settings_and_tilde_paths(ctx)
 		magickey_repeat_enabled = true,
 		ergopti_menubar_logo_variant = "default",
 	}
-	write_home(ctx.home, "Library/Application Support/ErgoptiPlus/paths.toml",
-		"# Custom paths — auto-generated by ErgoptiPlus.\n\nConfigDirPath = \"~/.config/ergopti_plus/\"\n")
+	write_home(ctx.home, AppDirs.config.macos_paths_file,
+		"# Custom paths — auto-generated by ErgoptiPlus.\n\nConfigDirPath = \"~/" .. CONFIG_REL .. "/\"\n")
 end
 
 -- The config.toml files older macOS releases wrote: every shipped case of the
@@ -385,18 +401,28 @@ local function scenarios(repo)
 			facts = { wpm_input_counted = "true", wpm_canvas_visible = "1", wpm_position_recovered = "true" } },
 		-- Booted over the recommended preset, it then opens every window and file the
 		-- action catalogue can open, which the recommended shortcuts admit.
+		-- The navigation layer it deploys is read back from the user's karabiner.json.
 		{ name = "the recommended preset imported from the menu boots and opens its windows",
-			setup = neutral_defaults, steps = { "restore_recommended", "open_windows" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "restore_recommended", "open_windows" }, marker = BOOTED_MARKER,
 			recommended = true },
+		-- The default: Ergopti's own runtime, absent from this Mac. The edit is saved for the
+		-- runtime's admission, with no error, dialog or reverted setting.
+		{ name = "the recommended preset imported without Ergopti's own runtime installed boots and saves",
+			setup = neutral_defaults, steps = { "restore_recommended" }, marker = BOOTED_MARKER },
+		-- macOS keeps a three-finger tap it runs itself: the slot is held and
+		-- greyed, and the boot shows no dialog, since only macOS would react.
+		{ name = "a native three-finger conflict is held without a boot dialog (gesture-conflict-boot)",
+			setup = neutral_defaults, steps = { "restore_recommended", "gesture_conflict" }, marker = BOOTED_MARKER,
+			machine = "gesture_conflict", held_gesture_conflict = true },
 		-- world.MACHINES: the machine each boot runs on, and the lease facts it ends with.
 		{ name = "an Ergopti layout boots while the lease worker answers late, on one lease worker",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "ergopti_layout_slow_worker", facts = { lease_workers = "1", lease_phase = "active" } },
 		{ name = "a layout switch while the boot's RESUME is in flight activates a fresh lease",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "layout_switch_during_resume", facts = { lease_workers = "2", lease_phase = "active" } },
 		{ name = "a reload while the boot's RESUME is in flight fences the lease before reloading",
-			setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			setup = kept_shared_runtime, steps = { "boot" }, marker = BOOTED_MARKER,
 			machine = "reload_during_resume", facts = { native_reloads = "1", lease_phase = "idle" } },
 		-- hardening-h-no-rosetta: the recommended shortcuts, then a Python helper
 		-- (the display-mirror shortcut), which must pick the arm64 Homebrew.
@@ -560,12 +586,12 @@ local function navigation_layer(home, json)
 end
 
 --- The keys the shipped recommended layer binds on one OS: its `all` table
---- and that OS's table (_shared/keymap/layers.recommended.toml).
+--- and that OS's table (_shared/layouts/data/layers.recommended.toml).
 --- @param shared string The _shared folder.
 --- @param os_name string "macos" or "linux".
 --- @return integer keys
 local function recommended_layer_keys(shared, os_name)
-	local fh = assert(io.open(shared .. "/keymap/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
+	local fh = assert(io.open(shared .. "/layouts/data/layers.recommended.toml", "rb"), "the shipped layer preset is missing")
 	local keys, count, scope = {}, 0, nil
 	for line in fh:lines() do
 		local header = line:match("^%[layers%.[%w_]+%.([%w_]+)%]")
@@ -614,7 +640,7 @@ end
 
 --- How many MLX port cleanup shells a child started during its boot: the
 --- world records each task start, and the cleanup is the one that lists the
---- port's listeners (modules/llm/boot_cleanup.lua).
+--- port's listeners (ai/engine/bootstrap/boot_cleanup.lua).
 --- @param output string Child output.
 --- @return integer count E2E_TASK lines before E2E_PHASE that run lsof on a port.
 local function boot_port_cleanups(output)
@@ -648,7 +674,7 @@ function M.run(check, options)
 	end
 	local world = dofile(options.driver .. "/tests/e2e/boot/world.lua")
 	-- Loaded by path: the scenarios make no assumption on the caller's package.path.
-	local json = dofile(options.driver .. "/../_shared/lua/json.lua")
+	local json = dofile(options.driver .. "/../_shared/core/text/engine/json.lua")
 	-- A source checkout may differ from the harness for a safe red/green replay.
 	-- Normal E2E stages the same checkout that supplies its test support.
 	local repo = options.source_repo or options.driver:gsub("/static/ergopti_plus/macos/?$", "")
@@ -682,11 +708,17 @@ function M.run(check, options)
 			local marker = action ~= "restore_recommended" and scenario.marker or nil
 			for context_index, ctx in ipairs(contexts) do
 				local output = outputs[context_index]
+				local held_conflict = scenario.held_gesture_conflict and action == "gesture_conflict"
 				for _, problem in ipairs(judge(output, action, marker)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
 				end
 				for _, problem in ipairs(judge_facts(output, scenario.facts)) do
 					ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+				end
+				if held_conflict then
+					for _, problem in ipairs(judge_facts(output, { system_tap_3_state = "taken" })) do
+						ctx.problems[#ctx.problems + 1] = action .. ": " .. problem
+					end
 				end
 				-- hardening-h: the boot starts no Python at all; the helper starts one,
 				-- which the ROSETTA judgement above then covers.

@@ -27,7 +27,7 @@ local LOOPBACK = { host = "127.0.0.1", port = 49321 }
 --- @return table context Transport plus observable test-double state.
 local function new_context(config)
 	config = config or {}
-	package.loaded["adapters.log_transport"] = nil
+	package.loaded["core.logger.adapters.log_transport"] = nil
 	package.loaded["tests.stubs.hs"] = nil
 	package.loaded["hs"] = nil
 
@@ -53,7 +53,6 @@ local function new_context(config)
 		failures = {},
 		rejected = {},
 		recoveries = {},
-		route_calls = 0,
 		activation_order = {},
 	}
 
@@ -167,7 +166,7 @@ local function new_context(config)
 		return state.clock * 1000000000
 	end
 
-	local transport = require("adapters.log_transport")
+	local transport = require("core.logger.adapters.log_transport")
 	local bootstrap = {}
 	function bootstrap:settimeout(timeout_sec)
 		state.preflight_timeouts[#state.preflight_timeouts + 1] = timeout_sec
@@ -233,7 +232,6 @@ local function new_context(config)
 		log_dir = "/tmp/ergopti/logs",
 		retention_days = 21,
 		max_batch_records = config.batch_records or 1,
-		route_overlap_bytes = config.route_overlap_bytes or 16,
 		scheduler = scheduler,
 		clock = function() return state.clock end,
 		bootstrap_socket_factory = function()
@@ -243,12 +241,6 @@ local function new_context(config)
 			end
 			if state.bootstrap_construct_mode == "nil" then return nil end
 			return bootstrap
-		end,
-		route_line = function(line)
-			state.route_calls = state.route_calls + 1
-			if state.route_mode == "throw" then error("synthetic routing failure") end
-			if state.route_mode == "invalid" then return false end
-			return line:find("LLM", 1, true) and { "ErgoptiPlus_llm.log" } or {}
 		end,
 		on_delivered = function(record)
 			state.delivered[#state.delivered + 1] = record
@@ -331,8 +323,8 @@ end
 --- @param callback function Test assertions.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"adapters.log_transport", "tests.stubs.hs", "hs",
-		"adapters.timer_scheduler", "infra.logger",
+		"core.logger.adapters.log_transport", "tests.stubs.hs", "hs",
+		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}, callback)
 end
 

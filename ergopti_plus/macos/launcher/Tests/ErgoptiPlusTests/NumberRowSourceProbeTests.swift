@@ -16,114 +16,18 @@ import XCTest
 
 final class NumberRowSourceProbeTests: XCTestCase {
 	private let codes: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25, 29]
-	private let selectionTimeoutSeconds: TimeInterval = 5
-
-	private enum SelectionFailure: Error { case unavailable, deadline }
-
-	/// A native selection return does not acknowledge this process's notification cache.
-	private func receiveSelection(timeout: TimeInterval, selected: () -> Bool,
-		now: () -> TimeInterval, pump: () -> Void) throws {
-		let started = now()
-		guard timeout.isFinite, timeout > 0, started.isFinite else { throw SelectionFailure.unavailable }
-		while true {
-			let elapsed = now() - started
-			guard elapsed.isFinite, elapsed >= 0, elapsed < timeout else { throw SelectionFailure.deadline }
-			if selected() {
-				let acknowledged = now() - started
-				guard acknowledged.isFinite, acknowledged >= 0, acknowledged < timeout else {
-					throw SelectionFailure.deadline
-				}
-				return
-			}
-			pump()
-		}
-	}
-
-	private func sourceIsSelected(_ expected: TISInputSource) -> Bool {
-		guard let current = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-			CFEqual(current, expected) else { return false }
-		let retainedState = KeyboardSourceTestState.read(expected)
-		let currentState = KeyboardSourceTestState.read(current)
-		return retainedState.selected.value == true && retainedState.enabled.value == true
-			&& currentState.selected.value == true && currentState.enabled.value == true
-	}
-
-	/// Select exactly once, retain its raw status, then receive genuine selected state.
-	private func selectAndObserve(_ source: TISInputSource) -> (status: OSStatus, observed: Bool) {
-		let status = TISSelectInputSource(source)
-		var observed = false
-		if status == noErr {
-			do {
-				try receiveSelection(timeout: selectionTimeoutSeconds,
-					selected: { self.sourceIsSelected(source) },
-					now: { ProcessInfo.processInfo.systemUptime },
-					pump: { _ = CFRunLoopRunInMode(.defaultMode, 0.01, true) })
-				observed = true
-			} catch { XCTFail("Native selection was not observed before the fixture deadline: \(error)") }
-		}
-		return (status, observed)
-	}
-
-	/// A failed restoration must retain the temporary source instead of disabling an unresolved selection.
-	private func retireTemporarySource(restorationObserved: Bool, originalSelected: () -> Bool,
-		targetUnselected: () -> Bool, disable: () -> Void) throws {
-		guard restorationObserved, originalSelected(), targetUnselected() else { throw SelectionFailure.unavailable }
-		disable()
-	}
-
 	private func withSelectedSource(_ identifier: String, _ body: (KeyboardSourceTestDiagnostics) throws -> Void) throws {
 		try XCTSkipUnless(ProcessInfo.processInfo.environment["CI"] == "true",
 			"Input-source switching is restricted to disposable CI hosts")
 		let diagnostics = KeyboardSourceTestDiagnostics(name + ":" + identifier)
 		defer { diagnostics.emit() }
-		let original = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-		diagnostics.record("original.capture", original: original)
-		// Refuse stale or unselected initial state before changing this disposable host.
-		guard Thread.isMainThread, sourceIsSelected(original) else { throw SelectionFailure.unavailable }
-		defer {
-			let status = diagnostics.nativeCall("restore.outer", original: original) { selectAndObserve(original).status }
-			XCTAssertEqual(status, noErr)
+		// The shared fixture selects through the launcher's headless role, never in
+		// this application process, and acknowledges each change once observed here.
+		try KeyboardSourceSelectionFixture.withSelectedSource(identifier, diagnostics: diagnostics) { source in
+			diagnostics.record("body.before", target: source)
+			defer { diagnostics.record("body.after", target: source) }
+			try body(diagnostics)
 		}
-		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-		let sources = TISCreateInputSourceList(filter, true).takeRetainedValue() as! [TISInputSource]
-		let source = try XCTUnwrap(sources.first, "Missing native fixture: \(identifier)")
-		let pointer = try XCTUnwrap(TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled))
-		let wasEnabled = CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
-		diagnostics.record("target.inventory", original: original, target: source)
-		if !wasEnabled {
-			let status = diagnostics.nativeCall("enable", original: original, target: source) { TISEnableInputSource(source) }
-			XCTAssertEqual(status, noErr)
-		}
-		defer {
-			var restorationObserved = false
-			let status = diagnostics.nativeCall("restore.inner", original: original, target: source) {
-				let receipt = selectAndObserve(original)
-				restorationObserved = receipt.observed
-				return receipt.status
-			}
-			XCTAssertEqual(status, noErr)
-			if !wasEnabled {
-				do {
-					try retireTemporarySource(restorationObserved: restorationObserved,
-						originalSelected: { self.sourceIsSelected(original) },
-						targetUnselected: { KeyboardSourceTestState.read(source).selected.value == false }, disable: {
-							let disabled = diagnostics.nativeCall("disable", original: original, target: source) { TISDisableInputSource(source) }
-							XCTAssertEqual(disabled, noErr)
-						})
-				} catch { XCTFail("Temporary source cleanup remains unresolved: \(error)") }
-			}
-		}
-		var selectionObserved = false
-		let status = diagnostics.nativeCall("select", original: original, target: source) {
-			let receipt = selectAndObserve(source)
-			selectionObserved = receipt.observed
-			return receipt.status
-		}
-		XCTAssertEqual(status, noErr)
-		guard status == noErr, selectionObserved, sourceIsSelected(source) else { throw SelectionFailure.unavailable }
-		diagnostics.record("body.before", original: original, target: source)
-		defer { diagnostics.record("body.after", original: original, target: source) }
-		try body(diagnostics)
 	}
 
 	private func snapshot(_ diagnostics: KeyboardSourceTestDiagnostics) throws -> KeyboardSourceSnapshot {
@@ -318,23 +222,23 @@ final class NumberRowSourceProbeTests: XCTestCase {
 
 	func testInvalidInvocationRefusesBeforeAnyNativeRead() {
 		var disabled = 0
-		XCTAssertThrowsError(try retireTemporarySource(restorationObserved: false,
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.retireTemporarySource(restorationObserved: false,
 			originalSelected: { XCTFail("Failed restoration cannot grant a later observation"); return true },
 			targetUnselected: { XCTFail("Failed restoration cannot inspect a successor"); return true },
 			disable: { disabled += 1 }))
 		XCTAssertEqual(disabled, 0)
-		XCTAssertThrowsError(try retireTemporarySource(restorationObserved: true,
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.retireTemporarySource(restorationObserved: true,
 			originalSelected: { false }, targetUnselected: { XCTFail("Unrestored original cannot inspect a successor"); return true },
 			disable: { disabled += 1 }))
-		XCTAssertThrowsError(try retireTemporarySource(restorationObserved: true,
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.retireTemporarySource(restorationObserved: true,
 			originalSelected: { true }, targetUnselected: { false }, disable: { disabled += 1 }))
 		XCTAssertEqual(disabled, 0, "A selected or unknown target remains owned after refused restoration")
-		XCTAssertNoThrow(try retireTemporarySource(restorationObserved: true,
+		XCTAssertNoThrow(try KeyboardSourceSelectionFixture.retireTemporarySource(restorationObserved: true,
 			originalSelected: { true }, targetUnselected: { true }, disable: { disabled += 1 }))
 		XCTAssertEqual(disabled, 1, "Only acknowledged restoration admits exact temporary-source cleanup")
 		var time: TimeInterval = 0
 		var reads = 0
-		XCTAssertNoThrow(try receiveSelection(timeout: 1, selected: {
+		XCTAssertNoThrow(try KeyboardSourceSelectionFixture.receiveSelection(timeout: 1, selected: {
 			reads += 1
 			return reads == 3
 		}, now: { time }, pump: { time += 0.25 }))
@@ -342,19 +246,19 @@ final class NumberRowSourceProbeTests: XCTestCase {
 		XCTAssertEqual(time, 0.5, "The fixture pumps notifications before acknowledging selection")
 		time = 0
 		reads = 0
-		XCTAssertThrowsError(try receiveSelection(timeout: 1, selected: {
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.receiveSelection(timeout: 1, selected: {
 			reads += 1
 			return false
 		}, now: { time }, pump: { time += 0.5 })) { error in
-			guard case SelectionFailure.deadline = error else { return XCTFail("Expected a selection deadline") }
+			guard case KeyboardSourceSelectionFixture.Failure.deadline = error else { return XCTFail("Expected a selection deadline") }
 		}
 		XCTAssertEqual(reads, 2, "Equality at the deadline refuses before another source read")
 		time = 0
-		XCTAssertThrowsError(try receiveSelection(timeout: 1, selected: {
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.receiveSelection(timeout: 1, selected: {
 			time = 1
 			return true
 		}, now: { time }, pump: { XCTFail("A late acknowledgement cannot retry selection") }))
-		XCTAssertThrowsError(try receiveSelection(timeout: 0, selected: {
+		XCTAssertThrowsError(try KeyboardSourceSelectionFixture.receiveSelection(timeout: 0, selected: {
 			XCTFail("Invalid selection admission cannot read a native source")
 			return true
 		}, now: { 0 }, pump: { XCTFail("Invalid selection admission cannot pump callbacks") }))

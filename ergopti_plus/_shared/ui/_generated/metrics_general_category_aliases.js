@@ -2,7 +2,7 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Source: static/ergopti_plus/_shared/data/metrics_general_category_aliases.json
+// Source: static/ergopti_plus/_shared/metrics/data/metrics_general_category_aliases.json
 // Run: node tools/build/gen-metrics-category-aliases.cjs
 // ==========================================
 

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("tap_hold.one_shot_shift")
+local Policy = require("tap_hold.engine.one_shot_shift_core")
 local Owner = {}
 Owner.__index = Owner
 
@@ -32,23 +32,23 @@ end
 
 --- Arms or refreshes the deadline without inventing a timeout default.
 --- @param now number Monotonic seconds.
---- @param timeout number User-configured seconds.
+--- @param timeout number User-configured seconds; 0 is no time limit.
 function Owner:arm(now, timeout)
-	assert(type(now) == "number" and type(timeout) == "number" and timeout > 0,
+	assert(type(now) == "number" and type(timeout) == "number" and timeout >= 0 and timeout < math.huge,
 		"one-shot Shift requires a valid configured timeout")
-	self.deadline = now + timeout
+	self.deadline = require("tap_hold.engine.one_shot_timeout").deadline(now, timeout)
 end
 
---- Cancels activation while retaining release debt for already consumed keys.
+--- Cancels activation while retaining release debt for transformed keys.
 function Owner:disarm()
 	self.deadline = nil
-	self.shifted = {}
 end
 
 --- Drops identities after observation stops; a later press is a new owner.
 function Owner:reset()
 	self:disarm()
 	self.absorbed = {}
+	self.shifted = {}
 end
 
 --- Whether the owner can change the next event.

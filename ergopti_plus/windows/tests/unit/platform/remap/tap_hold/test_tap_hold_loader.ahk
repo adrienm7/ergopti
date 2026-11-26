@@ -635,7 +635,7 @@ Test("tap_hold: TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the registry's tap_hold.de
 ; No key ships a delay: the shared catalogue loaded as a user file declares none.
 _TH_ShippedCatalogueDeclaresNoKeyDelay() {
 	global _SharedDir
-	Shipped := LoadTapHoldToml(_SharedDir . "\tap_hold\defaults.toml")
+	Shipped := LoadTapHoldToml(_SharedDir . "\tap_hold\data\defaults.toml")
 	Assert(Shipped["keys"].Count > 0, "the shipped catalogue has keys")
 	for KeyId, Entry in Shipped["keys"]
 		Assert(!Entry.Has("time_activation_seconds"), KeyId . " must not ship a delay of its own")
@@ -682,7 +682,7 @@ Test("LoadTapHoldToml: reads [tap_hold] time_activation_seconds as the global de
 ; (any other number) stays, and a flagged file's every value is the user's.
 _TH_RetiredShippedDelaysAreMigrated() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Source := '[tap_hold.keys.caps_lock]`r`ntap_action = "enter"`r`ntime_activation_seconds = 0.35`r`n'
 		. '[tap_hold.keys.tab]`r`ntap_action = "tab"`r`ntime_activation_seconds = 0.2`r`n'
 		. '[tap_hold.keys.left_ctrl]`r`ntap_action = "paste"`r`ntime_activation_seconds = 0.45`r`n'

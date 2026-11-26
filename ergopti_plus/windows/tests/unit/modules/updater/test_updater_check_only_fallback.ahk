@@ -81,6 +81,15 @@ _TUCO_ListCacheVectors() {
 }
 Test("updater check-only: the stored list copy follows the shared vectors (PAR-14)", _TUCO_ListCacheVectors)
 
+_TUCO_RejectMalformedCachedList() {
+	global UPDATER_LIST_CACHE_MAGIC
+	Url := "https://api.github.com/example"
+	; A damaged list can retain both brackets and an ETag.
+	Text := UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . '"etag"' . "`n" . '[{"tag_name":}]'
+	AssertEqual(0, _Updater_ParseListCache(Text, Url), "malformed JSON must not authorize a conditional request")
+}
+Test("updater check-only: reject malformed stored list before revalidation", _TUCO_RejectMalformedCachedList)
+
 ; Drives the manual check's completion with the window captured.
 _TUCO_ManualCase(Scenario) {
 	global _UC_PresentFn, _UC_RequestId, _UC_State, _UC_Release, UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
@@ -146,6 +155,23 @@ _TUCO_FeedFailureIsTheFailure(Request, Shown) {
 }
 Test("updater check-only: a failed feed answers the connection failure once (PAR-14)",
 	() => _TUCO_ManualCase(_TUCO_FeedFailureIsTheFailure))
+
+; UPD-1: a captive portal's HTML 200 answers no list, so the feed is read and its
+; failure is the connection failure, never « parse failed ».
+_TUCO_HtmlOkAsksTheFeed(Request, Shown) {
+	Feed := []
+	Json := _Updater_InterpretResponse(200, "<html><body>Sign in to the network</body></html>", "", "main",
+		"test://portal")
+	_Updater_OneClickUpdateCallback(Json, "1.0.0", Request, 0, false,
+		(Channel, FeedRequest, OnJson) => Feed.Push(OnJson))
+	AssertEqual(1, Feed.Length, "an HTML 200 reads the feed")
+	Feed[1].Call("", Request)
+	Answer := Shown[Shown.Length]
+	AssertEqual("error", Answer["state"])
+	AssertEqual("updater.no_connection", Answer["reason_key"], "the portal page is a connection failure")
+}
+Test("updater check-only: an HTML 200 requests the feed and answers no connection (UPD-1)",
+	() => _TUCO_ManualCase(_TUCO_HtmlOkAsksTheFeed))
 
 _TUCO_ApiListNeverAsksTheFeed(Request, Shown) {
 	Feed := []

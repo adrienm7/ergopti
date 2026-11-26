@@ -188,3 +188,37 @@ _TK_Rows() {
 	}
 }
 Test("tap keys: the menu rows name each key by its live character (tap-keys)", _TK_Rows)
+
+; Kana AltGr is an ordinary VK to AHK, so its synthetic logical hold needs
+; the same explicit admission gate as its physical hold. Standard modifiers
+; remain the native static hotkey's responsibility, witnessed by the native
+; standard-held control; no generic OEM8 key is excluded on that family.
+_TK_KanaAltGrGatesEveryTapKey() {
+	global TapKeyAssignments, CategoryEnabled, _TapHoldModifierIsHeld, TAP_KEY_ORDER
+	SavedAssignments := TapKeyAssignments
+	SavedCategory := CategoryEnabled["Shortcuts"]
+	SavedModifier := _TapHoldModifierIsHeld
+	SavedFamily := _TestSetAltGrFamily(false)
+	try {
+		TapKeyAssignments := Map()
+		for Id in TAP_KEY_ORDER
+			TapKeyAssignments[Id] := "screen_capture"
+		CategoryEnabled["Shortcuts"] := true
+		for Vector in [[true, true], [true, false], [false, true]]
+			_TK_KanaGateCase(Vector[1], Vector[2])
+	} finally {
+		_TestRestoreAltGrFamily(SavedFamily)
+		_TapHoldModifierIsHeld := SavedModifier
+		CategoryEnabled["Shortcuts"] := SavedCategory
+		TapKeyAssignments := SavedAssignments
+	}
+}
+_TK_KanaGateCase(Kana, Held) {
+	global _TapHoldModifierIsHeld, TAP_KEY_ORDER
+	_TestSetAltGrFamily(Kana)
+	_TapHoldModifierIsHeld := (Name) => Held && Name == KS_AltGrKeyName()
+	for Id in TAP_KEY_ORDER
+		AssertEqual(!(Kana && Held), TapKeyShouldFire(Id),
+			Id . " must preserve logical Kana AltGr without disabling ordinary native taps")
+}
+Test("tap keys: logical Kana AltGr preserves every assigned suffix (tap-keys-kana-admission)", _TK_KanaAltGrGatesEveryTapKey)

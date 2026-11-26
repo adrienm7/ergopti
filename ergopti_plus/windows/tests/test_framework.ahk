@@ -59,6 +59,14 @@ global TEST_NOT_EXECUTED_COUNT := 0
 ; report.cjs parse the same spelling.
 global TEST_NOT_EXECUTED_MARKER := " # SKIP NOT EXECUTED: "
 
+; How long a test waits for a real child process or a local peer to settle by
+; itself. Each such wait polls its explicit condition, so a healthy run returns
+; as soon as the child does; this bound only decides when a stalled one fails.
+; A hosted Windows runner ran 10 to 50 times slower than usual for minutes
+; (CI run 45247903986): 330 ms PowerShell children took over 5 s and a 2.7 s
+; managed request over 30 s, so short per-test literals failed healthy code.
+global TEST_NATIVE_SETTLE_TIMEOUT_MS := 60000
+
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
@@ -680,7 +688,7 @@ _DriverExtractDefinedBody(&Src, Definition) {
 
 ; Reads every .ahk under a windows/-relative directory (recursive), concatenated
 ; into one string. Use for source-introspection tests that scan a specific
-; module's files (e.g. "ui/tooltip") regardless of how that module is internally
+; module's files (e.g. "core/ui/ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
 ;
 ; THROWS when any selected file is unreadable or the directory holds no .ahk
@@ -697,6 +705,22 @@ _DriverDirConcat(RelDir) {
 		Combined .= "`n" . _DriverResolveConstants(FileRead(A_LoopFileFullPath, "UTF-8"))
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
+	return Combined
+}
+
+; Reads several windows/-relative directories with _DriverDirConcat, in order.
+; The structure plan writes it when a step scatters a directory a test scans:
+; the directory (while it keeps files) and the new homes of the files that left
+; it, so the scan still reads every file it read before the move. Each one must
+; hold a readable .ahk file, as for _DriverDirConcat.
+; @param RelDirs {String*} One or more directories, forward slashes.
+; @returns {String} Their sources, concatenated.
+_DriverDirsConcat(RelDirs*) {
+	if RelDirs.Length == 0
+		throw ValueError("_DriverDirsConcat needs at least one directory.")
+	Combined := ""
+	for RelDir in RelDirs
+		Combined .= _DriverDirConcat(RelDir)
 	return Combined
 }
 
@@ -768,31 +792,31 @@ global TEST_MODULE_GROUPS := [
 	; Source-scanning meta tests of the whole driver.
 	["meta", "^meta/"],
 	; Local LLM server panel (view preparation, discovery, panel actions).
-	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	["llm-server-panel", "^unit/ai/servers/test_local_server_panel"],
 	; Every other local and managed LLM server test: sharing, publication, Ollama.
-	["llm-servers", "^unit/modules/llm/servers/"],
+	["llm-servers", "^unit/ai/servers/"],
 	; LLM terminal navigation owner.
-	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	["llm-terminal", "^unit/ai/nav_event_owner/"],
 	; The rest of the LLM module: prediction, menus, API clients.
-	["llm", "^unit/modules/llm/"],
+	["llm", "^unit/ai/"],
 	; Configuration version transitions.
-	["config-transition", "^unit/infra/config/transition/"],
+	["config-transition", "^unit/settings/engine/transition/"],
 	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
-	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	["config-scope-global", "^unit/settings/engine/scope/test_(global_config_scope|restore_recommended_no_confirm|menus|shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
 	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
-	["config-scope-features", "^unit/infra/config/scope/"],
+	["config-scope-features", "^unit/settings/engine/scope/"],
 	; Configuration storage, TOML and the updater.
-	["config-updater", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
-	; Hotstrings, dynamic hotstrings and shortcuts.
-	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	; Keyboard remapping, layouts and gestures.
-	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	["config-updater", "^unit/settings/engine/|^unit/core/text/toml/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	; Hotstrings (with their keyboard layout expander), dynamic hotstrings and shortcuts.
+	["hotstrings-shortcuts", "^unit/(hotstrings|modules/shortcuts)/"],
+	; Keyboard remapping, layouts, gestures and the Take note action a gesture runs.
+	["keymap-gestures", "^unit/(platform/remap|modules/keymap|modules/take_note|gestures)/"],
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
-	["ui", "^unit/ui/"],
+	["ui", "^unit/(ui|menu|ai|apps|diagnostics/ui)/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard|diagnostics)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.
@@ -1280,22 +1304,33 @@ _TestClockMs() {
 ; flight keeps its native process and poll timer alive, and its completion
 ; runs inside whichever later test next yields: a rebuild launched from there
 ; reached a proof that forbids every launch, in a whole-group CI run only.
-; @returns {Integer} The owner counter before the test, or -1 without the module.
+; The mark is the set of owners current before the test, not the owner counter:
+; twenty isolation helpers rewind that counter to 0, and an owner the test then
+; opened carried a token below the old counter, so a leak passed in suite order
+; and failed only under --reverse.
+; @returns {Map|Integer} Owner object pointer -> owner (held, so no address is
+;   reused during the test), or 0 without the module.
 _TestLlmAuxMark() {
-	global _LLM_AuxOwnerCounter
-	return IsSet(_LLM_AuxOwnerCounter) ? _LLM_AuxOwnerCounter : -1
+	global _LLM_AuxOwners
+	if !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+		return 0
+	Mark := Map()
+	for Kind, Owner in _LLM_AuxOwners
+		if IsObject(Owner)
+			Mark[ObjPtr(Owner)] := Owner
+	return Mark
 }
 
-; @param {Integer} Mark The counter _TestLlmAuxMark returned before the test.
+; @param {Map|Integer} Mark What _TestLlmAuxMark returned before the test.
 ; @returns {String} The kinds of the owners the test opened and left current,
 ;   comma-separated; "" when it retired every one.
 _TestLlmAuxLeaked(Mark) {
 	global _LLM_AuxOwners
-	if Mark < 0 || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
+	if !(Mark is Map) || !IsSet(_LLM_AuxOwners) || !(_LLM_AuxOwners is Map)
 		return ""
 	Kinds := ""
 	for Kind, Owner in _LLM_AuxOwners {
-		if Owner is Map && Owner.Get("token", 0) > Mark
+		if Owner is Map && !Mark.Has(ObjPtr(Owner))
 			Kinds .= (Kinds == "" ? "" : ", ") . Kind
 	}
 	return Kinds
@@ -1355,6 +1390,37 @@ MsgBox(Text := "", Title := "", Options := "") {
 	TestMsgBoxCount(true)
 	Responder := TestMsgBoxResponder()
 	return IsObject(Responder) ? Responder(Text, Title, Options) : ""
+}
+
+; A real InputBox is a native window: a test path that reached one showed it on
+; the desktop and waited for a person. The stub answers Cancel, like the user
+; closing it, unless a test answers in the user's place.
+InputBox(Prompt := "", Title := "", Options := "", Default := "") {
+	TestInputBoxCount(true)
+	Responder := TestInputBoxResponder()
+	return IsObject(Responder) ? Responder(Prompt, Title, Options, Default) : {Result: "Cancel", Value: ""}
+}
+
+; Lets one test answer the stubbed InputBox. Always clear it (pass "") in the
+; test's finally block.
+; @param {Func|String} Responder Called with (Prompt, Title, Options, Default),
+;     returning {Result, Value}; "" clears.
+; @returns {Func|String} The responder in force.
+TestInputBoxResponder(Responder?) {
+	static Current := ""
+	if IsSet(Responder)
+		Current := Responder
+	return Current
+}
+
+; Counts the input dialogs the stub above absorbed.
+; @param {Boolean} Record True to count one more dialog.
+; @returns {Integer} Dialogs absorbed so far.
+TestInputBoxCount(Record := false) {
+	static Count := 0
+	if Record
+		Count += 1
+	return Count
 }
 
 ; Lets one test answer the stubbed MsgBox in place of the user, for code that

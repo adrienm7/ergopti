@@ -11,8 +11,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/install/desktop_entry.sh"
 # Load the complete catalogue before uninstallation retires its owned files.
 source "$SCRIPT_DIR/install/messages.sh"
-PREFIX="${HOME}/.local"
+PREFIX="${HOME:+${HOME}/.local}"
 source "$SCRIPT_DIR/install/config_home.sh"
+# shellcheck source=install/ownership_schema.sh
+source "$SCRIPT_DIR/install/ownership_schema.sh"
 ergopti_resolve_config_home CONFIG_ROOT
 PACKAGE_NAME=ergopti
 CONFIRMED=false
@@ -37,19 +39,24 @@ while [ "$#" -gt 0 ]; do
 		--yes) CONFIRMED=true; shift ;;
 		--check) CHECK_ONLY=true; shift ;;
 		--wait-owner)
-			[ "$#" -ge 2 ] || exit 64
+			[ "$#" -ge 2 ] && [[ "$2" =~ ^[0-9]+:[0-9]+$ ]] || exit 64
 			WAIT_OWNER="$2"; shift 2 ;;
 		--gui)
 			[ "$#" -ge 4 ] || exit 64
+			for gui_value in "$2" "$3" "$4"; do
+				case "$gui_value" in ''|--yes|--check|--wait-owner|--gui|--prefix) exit 64 ;; esac
+			done
 			GUI_TITLE="$2"; GUI_ERROR="$3"; GUI_MISSING="$4"; shift 4 ;;
 		--prefix)
 			[ "$#" -ge 2 ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
+			# Use ./-name or an absolute path for a prefix beginning with '-'.
+			case "$2" in ''|-*) ergopti_msg uninstall.missing_prefix_value >&2; exit 64 ;; esac
 			PREFIX="$2"; shift 2 ;;
 		*) ergopti_msg uninstall.unsupported_argument "$1" >&2; exit 64 ;;
 	esac
 done
 
-# The failure is shown in Ergopti's own dialog (ui/dialog_host.lua), run by the
+# The failure is shown in Ergopti's own dialog (core/ui/ui/dialog_host.lua), run by the
 # private runtime's LuaJIT when the package carries one, else the source
 # install's. The report runs after recovery, so the driver tree is back. When
 # the dialog cannot open the failure must still reach the user, so the last
@@ -57,8 +64,8 @@ done
 show_failure_dialog() {
 	local interpreter="$SCRIPT_DIR/runtime/bin/luajit"
 	[ -x "$interpreter" ] || interpreter="$(command -v luajit || true)"
-	if [ -n "$interpreter" ] && [ -f "$SCRIPT_DIR/ui/dialog_host.lua" ]; then
-		if "$interpreter" "$SCRIPT_DIR/ui/dialog_host.lua" --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
+	if [ -n "$interpreter" ] && [ -f "$SCRIPT_DIR/core/ui/ui/dialog_host.lua" ]; then
+		if "$interpreter" "$SCRIPT_DIR/core/ui/ui/dialog_host.lua" --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
 			return 0
 		fi
 	fi
@@ -84,6 +91,22 @@ uninstall_invalid_source() {
 	printf '%s path=%q\n' "$record" "$1" >&2
 }
 
+# The XDG root is an explicit user selection and may itself be a symlink (as
+# /home can be). Resolve that root once, then retain the existing direct-path
+# checks for every component and file below it. Missing suffixes stay missing.
+resolve_selected_config_root() {
+	local probe="$CONFIG_ROOT" suffix= component physical
+	while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+		component="${probe##*/}"
+		suffix="/$component$suffix"
+		probe="${probe%/*}"
+		[ -n "$probe" ] || probe=/
+	done
+	[ -d "$probe" ] || return 1
+	IFS= read -r -d '' physical < <(CDPATH= cd -Pe -- "$probe" && printf '%s\0' "$PWD") || return 1
+	CONFIG_ROOT="${physical%/}$suffix"
+	[ -n "$CONFIG_ROOT" ] || CONFIG_ROOT=/
+}
 # Cache only complete native directory catalogs during pre-mutation admission.
 # A failed stat cannot authorize absence, including below an external XDG root.
 catalog_directory() {
@@ -265,6 +288,11 @@ report_exit() {
 }
 trap report_exit EXIT
 
+if ! resolve_selected_config_root; then
+	uninstall_invalid_source "$CONFIG_ROOT"
+	exit 1
+fi
+
 if ! "$CONFIRMED" && ! "$CHECK_ONLY"; then
 	ergopti_msg uninstall.confirmation_required >&2
 	exit 64
@@ -278,7 +306,12 @@ if [ -n "$WAIT_OWNER" ]; then
 	owner_start="${BASH_REMATCH[2]}"
 	for ((attempt = 0; attempt < 300; attempt++)); do
 		if [ ! -e "/proc/$owner_pid/stat" ]; then break; fi
-		if ! stat="$(cat "/proc/$owner_pid/stat")"; then continue; fi
+		if ! stat="$(cat "/proc/$owner_pid/stat")"; then
+			# A transient read error is still one timed wait, not an instant
+			# retry that can exhaust the entire shutdown deadline immediately.
+			sleep 0.1
+			continue
+		fi
 		read -ra fields <<< "${stat##*) }"
 		if [ "${fields[19]:-}" != "$owner_start" ]; then break; fi
 		# A zombie has finished cleanup; only its parent can reap the proc entry.
@@ -289,11 +322,18 @@ if [ -n "$WAIT_OWNER" ]; then
 fi
 
 remove_native_startup() {
-	local entry="${CONFIG_ROOT}/autostart/ergopti.desktop"
-	if [ -f "$entry" ] && [ ! -L "$entry" ] \
-		&& grep -Fxq "$(ergopti_desktop_exec /usr/bin/ergopti)" "$entry"; then
-		rm -- "$entry"
-	fi
+	local entry="${CONFIG_ROOT}/autostart/ergopti.desktop" command actual expected hidden
+	[ -f "$entry" ] && [ ! -L "$entry" ] || return 0
+	command="$(ergopti_desktop_exec /usr/bin/ergopti)" || return 1
+	actual="$(sha256sum < "$entry")" || return 1
+	for hidden in true false; do
+		expected="$(printf '[Desktop Entry]\nType=Application\nName=Ergopti\n%s\nTerminal=false\nHidden=%s\nX-Ergopti-Startup=true\n' "$command" "$hidden" | sha256sum)" || return 1
+		if [ "${actual%% *}" = "${expected%% *}" ]; then
+			rm -- "$entry"
+			return
+		fi
+	done
+	return 0
 }
 
 if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
@@ -335,7 +375,7 @@ esac
 LIBRARY="$PREFIX/lib/ergopti"
 WRAPPER="$PREFIX/bin/ergopti-hotstrings"
 if [ -L "$LIBRARY" ] || [ -L "$WRAPPER" ] || [ ! -f "$LIBRARY/linux/ergopti_hotstrings.lua" ] \
-	|| [ ! -f "$LIBRARY/_shared/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
+	|| [ ! -f "$LIBRARY/_shared/core/i18n/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
 	ergopti_msg uninstall.incomplete_installation >&2
 	exit 1
 fi
@@ -362,11 +402,12 @@ if [ -n "$checkout_marker" ]; then
 fi
 ancestor="$LIBRARY"
 while [ "$ancestor" != / ]; do
-	if [ -e "$ancestor/.git" ]; then
+	if [ -e "$ancestor/.git" ] || [ -L "$ancestor/.git" ]; then
 		ergopti_msg uninstall.inside_source_checkout >&2
 		exit 1
 	fi
-	ancestor="$(dirname -- "$ancestor")"
+	ancestor="${ancestor%/*}"
+	[ -n "$ancestor" ] || ancestor=/
 done
 MANIFEST="$LIBRARY/.ergopti-owned-files"
 UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
@@ -442,11 +483,49 @@ SNAPSHOT_SOURCES=("${OWNED[@]}" "$MANIFEST")
 manifest_digest="$(sha256sum < "$MANIFEST")"
 SNAPSHOT_DIGESTS=("${OWNED_DIGESTS[@]}" "${manifest_digest%% *}")
 prepare_uninstall_snapshots
+stopped_unit=false
 if [ -f "$UNIT" ] && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
-	systemctl --user disable --now ergopti-hotstrings.service
+	# The service may own the singleton lock itself. Stop it first, but do not
+	# change its enabled preference until removal can acquire that lock.
+	systemctl --user stop ergopti-hotstrings.service
+	stopped_unit=true
 fi
+# A terminal-launched daemon is not owned by systemd. Hold the same singleton
+# lock as every Linux entry point until removal finishes, so its live files are
+# never unlinked and a new session cannot start midway through removal.
+lock_root="${XDG_RUNTIME_DIR:-${HOME:+$HOME/.cache}}"
+case "$lock_root" in /*) ;; *) uninstall_record invalid-source lock "$lock_root"; exit 1 ;; esac
+lock_root="$lock_root/ergopti"
+install -d -m 700 "$lock_root"
+exec 9<>"$lock_root/ergopti.lock"
+if [ ! -f /proc/self/fd/9 ]; then
+	uninstall_record invalid-source lock "$lock_root/ergopti.lock"
+	exit 1
+fi
+if lock_diagnostic="$(flock -n 9 2>&1)"; then
+	if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+else
+	lock_status=$?
+	if [ "$lock_status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
+		uninstall_record busy lock "$lock_root/ergopti.lock"
+		exit 75
+	fi
+	if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+	exit "$lock_status"
+fi
+if "$stopped_unit"; then
+	systemctl --user disable ergopti-hotstrings.service
+fi
+# The desktop focus integration lives in the XDG data folder, outside the
+# manifest; its helper removes only the folders it wrote. Run it while the
+# helper is still installed.
+bash "$LIBRARY/linux/install/compositor_focus.sh" remove || true
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
+# The bytecode package is derived from the payload, never listed in the
+# receipt: removed whole, and only as the real directory the schema names.
+bytecode_tree="$LIBRARY/${OWNERSHIP_DERIVED_TREE:?}"
+if [ -d "$bytecode_tree" ] && [ ! -L "$bytecode_tree" ]; then rm -rf -- "$bytecode_tree"; fi
 rm -- "$MANIFEST"
 UNINSTALL_REMOVAL_COMMITTED=true
 finish_uninstall

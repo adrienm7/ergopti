@@ -18,12 +18,12 @@ local SETTINGS_URL =
 	"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 local SUBJECT_MODULES = {
-	"adapters.task_lifecycle",
-	"adapters.file_system",
-	"adapters.screen_capture",
-	"adapters.shell_runner",
-	"infra.notifications",
-	"infra.logger",
+	"core.process.adapters.task_lifecycle",
+	"core.fs.adapters.file_system",
+	"platform.system.screen_capture",
+	"core.process.adapters.shell_runner",
+	"core.ui.engine.notifications",
+	"core.logger.engine.logger",
 	"modules.shortcuts.actions.system_pixel",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -56,13 +56,13 @@ local function with_pixel(options, scenario)
 			pasteboard = { count = 10, image = nil, writes = {} },
 		}
 
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target)
 				f.opened[#f.opened + 1] = target
 				return true
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, path, callback, args)
 				local task = { label = label, path = path, args = args, callback = callback }
 				f.tasks[#f.tasks + 1] = task
@@ -74,7 +74,7 @@ local function with_pixel(options, scenario)
 			end,
 			start = function() return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function()
 				local path = "/private/tmp/ergopti-shot-" .. (#f.temp_paths + 1)
 				f.temp_paths[#f.temp_paths + 1] = path
@@ -91,7 +91,7 @@ local function with_pixel(options, scenario)
 				return { mode = "file", size = f.files[path] }, "ok"
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind,
 					on_click = on_click }
@@ -104,7 +104,7 @@ local function with_pixel(options, scenario)
 				f.logs[level][#f.logs[level] + 1] = string.format(tostring(message), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {
 			screenRecordingState = function(prompt)
@@ -358,6 +358,16 @@ helpers.describe("Ctrl+H interactive screenshot: verified clipboard result", fun
 		with_pixel(nil, function(subject, f)
 			f.capture_to_clipboard()
 			subject.interactive_screenshot()
+			f.tasks[1].callback(0, "", "")
+			assert_clipboard_failure(f)
+		end)
+	end)
+
+	helpers.it("does not treat a regressing pasteboard count as a capture (capture-count-regression)", function()
+		with_pixel(nil, function(subject, f)
+			f.pasteboard.image = { source = "older image" }
+			subject.interactive_screenshot()
+			f.pasteboard.count = f.pasteboard.count - 1
 			f.tasks[1].callback(0, "", "")
 			assert_clipboard_failure(f)
 		end)

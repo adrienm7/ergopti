@@ -13,15 +13,26 @@ ProgramActions_Available() {
 }
 
 ProgramActions_BindingSupported(Binding) {
-	return (Binding is String) && RegExMatch(Binding, "^(gesture|keyboard|script|tap_key)__.+$")
+	return (Binding is String) && RegExMatch(Binding, "^(gesture|keyboard|script|tap_key|combination)__.+$")
 }
 
+; A key combination's binding serves its tap and the chord of the pair that
+; owns it (KeyCombinationBindingId): either one may run the program (maintainer
+; decision KCD-2 of 2026-11-22). Section is the TOML table that holds it.
 _ProgramActions_BindingAction(Binding, &Section := "", &Slot := "") {
 	global GestureAssignments, KeyboardShortcutAssignments, ScriptShortcutAssignments, TapKeyAssignments
-	if !RegExMatch(Binding, "^(gesture|keyboard|script|tap_key)__(.+)$", &Parts)
+	global KeyCombinationChords
+	if !RegExMatch(Binding, "^(gesture|keyboard|script|tap_key|combination)__(.+)$", &Parts)
 		return ""
 	Slot := Parts[2]
 	switch Parts[1] {
+		case "combination":
+			if IsSet(KeyCombinationTapOf) && KeyCombinationTapOf(Slot) == "run_program" {
+				Section := "key_combination_taps"
+				return "run_program"
+			}
+			Section := "chord"
+			return IsSet(KeyCombinationChords) && (KeyCombinationChords is Map) ? KeyCombinationChords.Get(Slot, "") : ""
 		case "gesture":
 			Section := "gestures"
 			return IsSet(GestureAssignments) && (GestureAssignments is Map) ? GestureAssignments.Get(Slot, "") : ""
@@ -50,13 +61,25 @@ _ProgramActions_Snapshot(Binding) {
 	Content := FSReadUtf8Exact(ConfigurationFile)
 	Document := TOML_ParseDocument(Content)
 	Parameters := Document.Get(ConfigLeaf.ACTION_PARAMETERS, 0)
-	Actions := Section == "gestures" ? Document.Get("gestures", 0) : Document.Get("shortcuts", Map()).Get(Section, 0)
-	if !(Parameters is Map) || !(Actions is Map)
+	if !(Parameters is Map)
 		|| !(Parameters.Get(GestureActionParameterKey(Binding, "run_program"), "") == Scalar)
-		|| !(Actions.Get(Slot, "") == "run_program")
+		|| !(_ProgramActions_StoredAction(Document, Section, Slot) == "run_program")
 		return false
 	return Map("binding", Binding, "scalar", Scalar, "source", Content,
 		"path", ConfigurationFile, "generation", _UserProgramGeneration, "program", Program)
+}
+
+; The action the canonical document stores for a binding's slot: a section of
+; [shortcuts], [gestures], or (Section "chord") a chord's [mod_combos.config.<pair>] combo.
+_ProgramActions_StoredAction(Document, Section, Slot) {
+	if (Section == "chord") {
+		Combos := Document.Get(ConfigLeaf.MOD_COMBOS, 0)
+		Config := (Combos is Map) ? Combos.Get(ConfigLeaf.CONFIG, 0) : 0
+		Row := (Config is Map) ? Config.Get(Slot, 0) : 0
+		return (Row is Map) ? Row.Get("combo", "") : ""
+	}
+	Actions := Section == "gestures" ? Document.Get("gestures", 0) : Document.Get("shortcuts", Map()).Get(Section, 0)
+	return (Actions is Map) ? Actions.Get(Slot, "") : ""
 }
 
 _ProgramActions_Admitted(Snapshot) {

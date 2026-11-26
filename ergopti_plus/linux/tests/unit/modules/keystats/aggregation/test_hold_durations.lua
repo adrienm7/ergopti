@@ -199,8 +199,10 @@ helpers.describe("hold durations: tap or hold", function()
 			execute_action = function() end,
 			on_text_injected = function() end,
 			action_names = function() return {} end,
-			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+			defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
 			user_path = user_path,
+			-- No switch row: the config.toml beside the file is absent.
+			config_path = user_path .. ".config.toml",
 		})
 		local ok, err = pcall(body, TapHold.threshold_ms())
 		TapHold._reset_for_test()
@@ -268,7 +270,7 @@ local function run_hold(transition, expected, options)
 	options = options or {}
 	local writer_name, logger_name = "modules.keystats.sqlite_writer", "modules.keystats.keystats"
 	local previous_writer, previous_logger = package.loaded[writer_name], package.loaded[logger_name]
-	local clock = require("infra.monotonic")
+	local clock = require("core.logger.engine.monotonic")
 	local previous_clock, now = clock.now_ms, 100
 	local writer = Fakes.sqlite_writer()
 	package.loaded[writer_name], package.loaded[logger_name] = writer, nil
@@ -285,14 +287,14 @@ local function run_hold(transition, expected, options)
 			privacy_owners = {},
 			keystats = logger,
 			script_actions = { is_paused = function() return state.paused end },
-			MagicKeySource = { cancel_capture = noop },
-			TapHold = { set_paused = noop },
+			TapHold = { set_paused = noop, observe_copy_activity = noop },
 			Logger = helpers.make_logger_stub(),
 			engine = { reset = noop },
-			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end },
+			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end,
+				text_automation = function() return true, "field", "field_admitted" end },
 		}
 		local block = assert(main:match("input_capture_gate = InputCaptureGate.new%({%s*on_block = function(.-)\n\t\tend,"))
-		local gate = require("infra.input_capture_gate").new({ on_block = source_callback(block, environment) })
+		local gate = require("platform.input.capture_gate").new({ on_block = source_callback(block, environment) })
 		environment.input_capture_gate = gate
 		local pause_body = assert(main:match("on_pause_change = function(.-)\n\t\tend,"))
 		local on_pause = source_callback(pause_body, environment)
@@ -320,10 +322,10 @@ local function run_hold(transition, expected, options)
 		-- existing captured-press bookkeeping is shared exactly as in production.
 		local physical = assert(main:match("(local capture_owned_scancodes = {}.-\n\tlocal on_physical = input_capture_gate.guard%(.-\n\t\tend%))"))
 		local hold = assert(main:match("(local hold_token = keystats.hold_accounting_token.-\n\tlocal on_hold = input_capture_gate.guard%(.-\n\tend%))"))
-		environment.InputEvent = require("infra.input_event")
+		environment.InputEvent = require("platform.input.event")
 		environment.Monotonic = clock
 		environment._cached_app_id = "code"
-		local startup = assert(main:match("keyboard_hook.start%(%{(.-)\n\t%}%)"))
+		local startup = assert(main:match("local hook_start_options = %{(.-)\n\t%}\n\tkeyboard_hook%.start%(hook_start_options%)"))
 		local physical_binding = assert(startup:match("onPhysical%s*=%s*([%w_]+),"))
 		local hold_binding = assert(startup:match("onHold%s*=%s*([%w_]+),"))
 		local admission_binding = assert(startup:match("onHoldAdmission%s*=%s*([%w_]+),"))
@@ -336,17 +338,20 @@ local function run_hold(transition, expected, options)
 		local callbacks = chunk()
 
 		if options.before then options.before(logger, state) end
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
+		-- The genuine physical callback asks the hook which modifiers are held (TWD-2).
+		environment.keyboard_hook = hook
 		local forwarded = {}
 		local changed = false
+		local code = options.code or 30
 		local stream = {
-			{ type = 1, code = 30, value = 1 },
-			{ type = 1, code = 30, value = 2 },
-			{ type = 1, code = 30, value = 0 },
+			{ type = 1, code = code, value = 1 },
+			{ type = 1, code = code, value = 2 },
+			{ type = 1, code = code, value = 0 },
 		}
 		if options.second then
-			stream[#stream + 1] = { type = 1, code = 30, value = 1 }
-			stream[#stream + 1] = { type = 1, code = 30, value = 0 }
+			stream[#stream + 1] = { type = 1, code = code, value = 1 }
+			stream[#stream + 1] = { type = 1, code = code, value = 0 }
 		end
 		local physical_index = 0
 		hook._test_drive(stream, {
@@ -368,8 +373,9 @@ local function run_hold(transition, expected, options)
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(table.concat(forwarded, " "), options.second and "30:1 30:2 30:0 30:1 30:0"
-			or "30:1 30:2 30:0", "physical delivery is unchanged")
+		local sequence = code .. ":1 " .. code .. ":2 " .. code .. ":0"
+		if options.second then sequence = sequence .. " " .. code .. ":1 " .. code .. ":0" end
+		helpers.assert_eq(table.concat(forwarded, " "), sequence, "physical delivery is unchanged")
 		logger.flush()
 		local total = 0
 		for _, entry in ipairs(writer.kc_hold) do total = total + entry.row.sum_ms end
@@ -381,6 +387,15 @@ local function run_hold(transition, expected, options)
 end
 
 helpers.describe("physical hold exclusion epochs", function()
+	Preferences.it("records an allowed modifier hold through the main metrics callback", function()
+		run_hold(function() end, 300, { code = 42 })
+	end)
+	Preferences.it("drops a modifier hold interrupted by private focus", function()
+		run_hold(function(logger) logger.set_private_window(true); logger.set_private_window(false) end, 0, { code = 42 })
+	end)
+	Preferences.it("records an allowed CapsLock hold through the main metrics callback", function()
+		run_hold(function() end, 300, { code = 58 })
+	end)
 	Preferences.it("retires the whole hold across a private interval without another key", function()
 		run_hold(function(logger) logger.set_private_window(true); logger.set_private_window(false) end, 0)
 	end)
@@ -468,7 +483,7 @@ helpers.describe("physical hold exclusion epochs", function()
 			on_capture_reset = function()
 				-- The real startup XKB reset is reentrant foreign work. Its
 				-- observations must precede admission of the tentative owner.
-				local hook = require("adapters.keyboard_hook")
+				local hook = require("platform.input.keyboard_hook")
 				helpers.assert_nil(admission_of(hook))
 				checked = true
 				return true

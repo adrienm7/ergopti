@@ -352,16 +352,19 @@ _KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
 
 		Failed := KLR_BuildColdCandidate(root . "\", "")
 		AssertFalse(Failed.Get("ok", true),
-			"a throwing walker row must reject the unpublished cold candidate")
+			"a throwing poison row must reject the unpublished cold candidate")
 		AssertEqual(0, Failed.Get("db", 0),
 			"the partially replayed database handle must be closed, never published")
+		; The typing projection reads every row before the walker and is the
+		; first layer to reject the invalid delay, so it owns the diagnostic.
 		AssertEqual(1, Diagnostics.Length,
-			"one poison row must emit exactly one owned replay diagnostic")
+			"one poison row must emit exactly one owned replay diagnostic; cold receipt has failure="
+			. (Failed.Has("failure") ? KL_JsonEncode(Failed["failure"]) : "<none>"))
 		Failure := Failed.Get("failure", 0)
 		AssertTrue(Failure is Map,
 			"the cold-builder receipt must retain the replay failure context")
-		AssertEqual("logical", Failure.Get("sweep", ""),
-			"the diagnostic must name the failing replay statement family")
+		AssertEqual("typing-projection", Failure.Get("sweep", ""),
+			"the diagnostic must name the first replay layer that rejected the row")
 		AssertEqual("poison-device", Failure.Get("device_id", ""),
 			"the diagnostic must retain the exact durable device owner")
 		AssertEqual(2, Failure.Get("row_index", 0),

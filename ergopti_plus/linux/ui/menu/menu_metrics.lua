@@ -10,13 +10,14 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ParentSource = require("menu.frames.parent_source")
-local TextPrompt = require("ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local Logger = require("core.logger.engine.shim")
+local ParentSource = require("menu.engine.frames.parent_source")
+local TextPrompt = require("core.ui.ui.text_prompt")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_metrics"
 
@@ -47,6 +48,41 @@ local function _migration_row(k)
 			if type(k.cancel_migration) == "function" then k.cancel_migration() end
 		end,
 	}
+end
+
+--- The metrics this session cannot measure, one inert row each with its reason.
+--- PROVIDER data for the `metrics_availability` list: a label naming the metric
+--- and why, so an empty dashboard column reads as unmeasured, not as zero.
+--- @param k table The keystats module.
+--- @return table rows Possibly empty.
+local function _availability_rows(k)
+	local rows = {}
+	local function add(name_key, availability)
+		if type(availability) == "table" and availability.measured == false then
+			-- The reason is the row's tooltip, which the Linux tray draws below the
+			-- row: inline it made rows of 120 columns and more, cut by the panel.
+			rows[#rows + 1] = {
+				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key)),
+				tooltip = i18n_safe(assert(availability.reason, "an unmeasured metric names its reason")),
+				disabled = true,
+			}
+		end
+	end
+	if type(k.pointer_distance_availability) == "function" then
+		add("menu.metrics.pointer_distance", k.pointer_distance_availability())
+	end
+	if type(k.tap_click_availability) == "function" then
+		add("menu.metrics.touchpad_taps", k.tap_click_availability())
+	end
+	local ok, SystemMetrics = pcall(require, "modules.keystats.system.system_metrics")
+	if ok and type(SystemMetrics.space_change_availability) == "function" then
+		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
+	end
+	local loaded, TopologyMetrics = pcall(require, "modules.keystats.system.topology_metrics")
+	if loaded and type(TopologyMetrics.window_topology_availability) == "function" then
+		add("menu.metrics.window_topology", TopologyMetrics.window_topology_availability())
+	end
+	return rows
 end
 
 --- Renders the rows of the metrics submenu that the manifest describes.
@@ -89,9 +125,9 @@ local function _manifest_metrics_rows(ctx, k)
 	-- declaratively instead of re-deriving the condition at each call site.
 	local getters = {
 		keystats_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
-		metrics_filter_private = privacy(require("config_keys").LEAF.PRIVATE_FILTER_ENABLED),
-		metrics_filter_secure  = privacy(require("config_keys").LEAF.SECURE_FILTER_ENABLED),
-		metrics_filter_sysauth = privacy(require("config_keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED),
+		metrics_filter_private = privacy(require("settings.engine.keys").LEAF.PRIVATE_FILTER_ENABLED),
+		metrics_filter_secure  = privacy(require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED),
+		metrics_filter_sysauth = privacy(require("settings.engine.keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED),
 		-- The manifest gates the colour row on the widget being visible: choosing
 		-- how to colour something that is not on screen is a control with no
 		-- subject. Without this getter the resolver logs an error and falls back to
@@ -209,8 +245,8 @@ local function _manifest_metrics_rows(ctx, k)
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
 	local function restore_metrics_scope()
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local committed = require("infra.metrics_scope").apply("recommended", ctx.is_paused)
+		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+		local committed = require("infra.metrics_scope").apply("recommended")
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
@@ -220,19 +256,27 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
-		[require("config_keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
-		[require("config_keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
+		[require("settings.engine.keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
+		[require("settings.engine.keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
+		[require("settings.engine.keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
 		-- The category switch, the submenu's first row: appindicator binds
 		-- item.fn only on a row with no submenu, so the parent cannot carry it.
-		[require("config_keys").COMMAND.SCOPE_RESTORE] = restore_metrics_scope,
-		[require("config_keys").COMMAND.METRICS_TOGGLE] = function()
-			if type(k.set_enabled) ~= "function" then
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = restore_metrics_scope,
+		[require("settings.engine.keys").COMMAND.METRICS_TOGGLE] = function()
+			if type(k.set_enabled) ~= "function" or type(k.is_enabled) ~= "function" then
 				Logger.error(LOG, "The keystats exposes no set_enabled — the gate does nothing.")
-				return
+				return false
 			end
-			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
+			local read, enabled = pcall(k.is_enabled)
+			if not read or type(enabled) ~= "boolean" then return false end
+			local saved = k.set_enabled(not enabled)
+			if saved ~= true then
+				Logger.error(LOG, "Metrics collection setting could not be saved.")
+				show_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title"))
+				return false
+			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
 		end,
 		-- `command` rows since 2026-08-07: the label and the greying are the
 		-- manifest's, so this driver supplies only the window each one opens.
@@ -240,18 +284,18 @@ local function _manifest_metrics_rows(ctx, k)
 		-- this supplies only the toggle. The row used to carry a DIFFERENT label
 		-- here than on the other two drivers — one switch, two names.
 		["encryption"]     = toggle("encrypt", k.set_encrypt_enabled),
-		[require("config_keys").COMMAND.SHOW_TYPING]    = open_window("metrics_typing"),
-		[require("config_keys").COMMAND.SHOW_APPS]      = open_window("metrics_apps"),
+		[require("settings.engine.keys").COMMAND.SHOW_TYPING]    = open_window("metrics_typing"),
+		[require("settings.engine.keys").COMMAND.SHOW_APPS]      = open_window("metrics_apps"),
 
-		[require("config_keys").COMMAND.FILTER_PRIVATE] = toggle(require("config_keys").LEAF.PRIVATE_FILTER_ENABLED, k.set_private_filter_enabled),
-		[require("config_keys").COMMAND.FILTER_SECURE]  = toggle(require("config_keys").LEAF.SECURE_FILTER_ENABLED, k.set_secure_filter_enabled),
-		[require("config_keys").COMMAND.FILTER_SYSAUTH] = toggle(require("config_keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED, k.set_system_auth_filter_enabled),
+		[require("settings.engine.keys").COMMAND.FILTER_PRIVATE] = toggle(require("settings.engine.keys").LEAF.PRIVATE_FILTER_ENABLED, k.set_private_filter_enabled),
+		[require("settings.engine.keys").COMMAND.FILTER_SECURE]  = toggle(require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED, k.set_secure_filter_enabled),
+		[require("settings.engine.keys").COMMAND.FILTER_SYSAUTH] = toggle(require("settings.engine.keys").LEAF.SYSTEM_AUTH_FILTER_ENABLED, k.set_system_auth_filter_enabled),
 
 		-- This driver answers these five in its log rather than in a window; the
 		-- other two open a metrics WINDOW for the same figures. Declared rows
 		-- since 2026-08-06, so the manifest can describe a driver-specific row
 		-- rather than the driver keeping it to itself.
-		[require("config_keys").COMMAND.METRICS_SUSPEND] = function()
+		[require("settings.engine.keys").COMMAND.METRICS_SUSPEND] = function()
 			if type(k.is_collection_suspended) ~= "function" then
 				Logger.error(LOG, "Keystats exposes no is_collection_suspended — the row cannot toggle anything.")
 				return
@@ -259,7 +303,7 @@ local function _manifest_metrics_rows(ctx, k)
 			if k.is_collection_suspended() then k.resume_collection() else k.suspend_collection() end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		[require("config_keys").COMMAND.RESET_WPM_POSITION] = function()
+		[require("settings.engine.keys").COMMAND.RESET_WPM_POSITION] = function()
 			local widget = wpm_widget()
 			if not widget then
 				Logger.error(LOG, "No WPM widget module — its place cannot be reset.")
@@ -267,7 +311,7 @@ local function _manifest_metrics_rows(ctx, k)
 			end
 			widget.reset_position()
 		end,
-		[require("config_keys").COMMAND.WPM_MENUBAR] = function()
+		[require("settings.engine.keys").COMMAND.WPM_MENUBAR] = function()
 			local ok, readout = pcall(require, "ui.wpm.tray_readout")
 			if not ok then
 				Logger.error(LOG, "No WPM tray readout module — the row cannot toggle anything.")
@@ -276,13 +320,13 @@ local function _manifest_metrics_rows(ctx, k)
 			local changed = readout.is_running() and readout.stop() or readout.start()
 			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		[require("config_keys").COMMAND.MENUBAR_COLORS] = function()
+		[require("settings.engine.keys").COMMAND.MENUBAR_COLORS] = function()
 			local ok, readout = pcall(require, "ui.wpm.tray_readout")
 			if not ok then return end
 			local changed = readout.set_use_source_colors(not readout.uses_source_colors())
 			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
-		[require("config_keys").COMMAND.METRICS_RESET_SESSION] = function()
+		[require("settings.engine.keys").COMMAND.METRICS_RESET_SESSION] = function()
 			if type(k.request_session_reset) ~= "function" then
 				Logger.error(LOG, "Keystats exposes no request_session_reset — the row does nothing.")
 				return false
@@ -308,10 +352,11 @@ local function _manifest_metrics_rows(ctx, k)
 	-- is the progress itself.
 	local providers = {
 		["metrics_migration"] = function() return { _migration_row(k) } end,
+		["metrics_availability"] = function() return _availability_rows(k) end,
 		-- The applications whose typing is never recorded: the same submenu the
 		-- other two drivers draw, over this driver's own keystats list.
 		["exclude_apps"] = function()
-			local AppRows = require("ui.menu.app_exclusion_rows")
+			local AppRows = require("apps.ui.menu.exclusion_rows")
 			local count = #k.get_disabled_apps()
 			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
 			-- The add-application prompt's caption, not a row label.

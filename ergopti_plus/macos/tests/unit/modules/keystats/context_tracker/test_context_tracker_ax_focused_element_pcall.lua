@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 --- while the script is paused. These scenarios exercise the RUNNING state.
 local function NOT_PAUSED() return false end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Builds an hs override that stubs hs.axuielement with an application element
 --- whose AXFocusedUIElement attributeValue() read throws.
@@ -167,11 +167,11 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 			"keystats must register application activation through ProcessLifecycle"
 		)
 
-		-- Selected by a declaration unique to adapters/process_lifecycle.lua rather than by
+		-- Selected by a declaration unique to core/process/adapters/lifecycle.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local adapter_src = helpers.read_driver_source("function M.getForegroundApp")
-		helpers.assert_true(adapter_src ~= nil, "adapters/process_lifecycle.lua source must be locatable")
+		helpers.assert_true(adapter_src ~= nil, "core/process/adapters/lifecycle.lua source must be locatable")
 		helpers.assert_true(
 			adapter_src:find(
 				"xpcall%(function%(%)%s*return%s+hs%.application%.watcher%.new", 1, false) ~= nil,

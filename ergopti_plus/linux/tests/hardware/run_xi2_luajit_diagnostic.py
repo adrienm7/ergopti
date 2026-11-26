@@ -13,7 +13,7 @@ import time
 import uuid
 
 
-CANDIDATE_SHA = "ef40b9fdea5b5e5ee609e5fa810fcdb9a79eef373252c64a7d7e8954256871bc"
+CANDIDATE_SHA = "ce158acea690e558c0c40423108d7db61ee5d4044a1562df0f800495597ca9e9"
 FAMILY_SHA = "7545c2d6aa8d48e5d48557b2b218e6d8a864eeb42ae761e055d4f917cdf06334"
 HERE = Path(__file__).resolve().parent
 
@@ -198,11 +198,11 @@ def execute(directory, root, candidate):
         HERE / "xi2_luajit_receiver.lua",
         Path(__file__),
         candidate,
-        root / "static/ergopti_plus/_shared/lua/logger/shim.lua",
+        root / "static/ergopti_plus/_shared/core/logger/engine/shim.lua",
         root / "static/ergopti_plus/linux/_generated/native_runtime.lua",
         original.FAMILY,
-        root / "static/ergopti_plus/linux/infra/display_server.lua",
-        root / "static/ergopti_plus/_shared/lua/logger/init.lua",
+        root / "static/ergopti_plus/linux/core/ui/engine/display_server.lua",
+        root / "static/ergopti_plus/_shared/core/logger/engine/init.lua",
     ]
     for path in inputs:
         relative = str(path.resolve(strict=True).relative_to(root))
@@ -221,7 +221,7 @@ def execute(directory, root, candidate):
     config = {
         "candidate": str(candidate),
         "lua": str(HERE / "xi2_luajit_receiver.lua"),
-        "logger": str(root / "static/ergopti_plus/_shared/lua/logger/shim.lua"),
+        "logger": str(root / "static/ergopti_plus/_shared/core/logger/engine/shim.lua"),
         "runtime": str(root / "static/ergopti_plus/linux/_generated/native_runtime.lua"),
         "driver": str(root / "static/ergopti_plus/linux"),
         "nonce": uuid.uuid4().hex,

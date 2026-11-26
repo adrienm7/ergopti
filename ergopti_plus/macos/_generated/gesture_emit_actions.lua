@@ -1,12 +1,12 @@
 --- _generated/gesture_emit_actions.lua
---- AUTO-GENERATED from _shared/modules/actions/actions.toml.
+--- AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.
 --- DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions:hs` to refresh.
 
 --- ==============================================================================
 --- MODULE: Gesture Emit Actions (macOS)
 --- DESCRIPTION:
 --- Every action macOS performs as a plain keystroke, as { key, mods } for
---- hs.eventtap.keyStroke. modules/gestures/actions.lua registers these instead
+--- hs.eventtap.keyStroke. gestures/engine/actions.lua registers these instead
 --- of spelling each one out as its own closure.
 ---
 --- These are macOS values, NOT shared ones. Of the 24 actions both drivers

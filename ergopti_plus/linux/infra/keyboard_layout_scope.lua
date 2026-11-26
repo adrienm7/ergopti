@@ -25,13 +25,14 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Logger = require("logger.shim")
+local Manifest = require("menu.engine.manifest_reader")
+local Transaction = require("settings.engine.scope.transaction")
+local Logger = require("core.logger.engine.shim")
+local EmulationReload = require("settings.engine.scope.layout_emulation_reload")
 local LOG = "infra.keyboard_layout_scope"
 local SCOPE = "keyboard_layout"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction over config.toml's layout rows.
 --- @param options table path, backup_path and an optional files port.
@@ -40,7 +41,7 @@ function M.new(options)
 	assert(type(options) == "table", "keyboard layout scope requires its options")
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"), manifest = Manifest,
+		files = options.files or require("core.fs.adapters.file_system"), manifest = Manifest,
 		-- The live layout is acknowledged by the participant, after the rows are
 		-- published: the receipt is empty but present, so the transaction records
 		-- that the capture happened.
@@ -56,18 +57,18 @@ function M.new(options)
 end
 
 --- Executes a menu request, retaining any failed inverse for the next retry.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
 --- @param mode string "recommended" or "clear".
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
+function M.apply(mode)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid keyboard layout scope mode" end
-	if type(is_paused) ~= "function" or is_paused() then return false, "keyboard layout configuration is paused" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then
 		return false, "keyboard layout rollback is pending"
 	end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path,
 		backup_path = path .. ".layout-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
 	Logger.start(LOG, "Keyboard layout scope '%s' started.", mode)
@@ -104,11 +105,12 @@ end
 
 --- The layout participant of a composed scope, bound to the retained owner. It
 --- settles each request only once the session holds the layout the stored rows
---- describe.
---- @param is_paused function Live pause getter.
---- @param ports table|nil { live } The number-row live owner (tests replace it).
+--- describe, and has the layout emulation reload whatever the scope committed or
+--- reverted: a global restore or clear used to leave it typing its old session.
+--- @param ports table|nil { live, emulation } The number-row live owner and the
+---   layout emulation owner (tests replace them).
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused, ports)
+function M.participant(ports)
 	ports = ports or {}
 	local live = ports.live or require("modules.keymap.number_row_live")
 	-- cohort: the owner of this participant's request; changed: its rows moved;
@@ -126,12 +128,13 @@ function M.participant(is_paused, ports)
 		if participant.pending() then return done(false, "the layout scope retains an unsettled request") end
 		applying = true
 		local before = live.stored()
-		local called, committed, detail = pcall(M.apply, mode, is_paused)
+		local called, committed, detail = pcall(M.apply, mode)
 		cohort = _owner
 		if not called or committed ~= true then
 			applying = false
 			return done(false, called and detail or tostring(committed))
 		end
+		EmulationReload.reload(ports.emulation, Logger, LOG)
 		changed = not same_rows(before, live.stored())
 		if not changed then
 			applying = false
@@ -145,6 +148,7 @@ function M.participant(is_paused, ports)
 			-- The session kept its layout: the file must not claim the new rows.
 			local reverted, revert_detail = cohort.revert()
 			applying = false
+			if reverted == true then EmulationReload.reload(ports.emulation, Logger, LOG) end
 			Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
 				tostring(reverted == true or revert_detail))
 			return done(false, "the session did not load the layout: " .. tostring(code))
@@ -155,6 +159,7 @@ function M.participant(is_paused, ports)
 		if applying then return done(false, "the layout scope request is still settling") end
 		if cohort == nil then return done(false, "no committed scope to revert") end
 		local reverted, detail = cohort.revert()
+		if reverted == true then EmulationReload.reload(ports.emulation, Logger, LOG) end
 		if reverted ~= true then
 			-- The session reload follows the rows once their rollback settles.
 			owed, changed = changed, false
@@ -195,6 +200,23 @@ function M.participant(is_paused, ports)
 	end
 
 	return participant
+end
+
+--- Runs the layout scope alone, from its own menu rows: the same participant
+--- a global restore composes, so the session loads the stored rows before the
+--- request settles and a refused load reverts config.toml.
+--- @param mode string "recommended" or "clear".
+--- @param on_settled function on_settled(ok, detail), called once.
+--- @param ports table|nil { live } The number-row live owner (tests replace it).
+function M.request(mode, on_settled, ports)
+	assert(type(on_settled) == "function", "a keyboard layout scope request needs its settlement callback")
+	local participant = M.participant(ports)
+	participant.apply(mode, function(ok, detail)
+		-- A settled success has nothing left to revert; a failure was reverted
+		-- (or keeps its debt) by the participant itself.
+		if ok then participant.release() end
+		on_settled(ok == true, detail)
+	end)
 end
 
 --- Test seam: forgets the retained owner and its debt.

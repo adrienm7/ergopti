@@ -15,7 +15,7 @@
 
 global _THD_Phase := ""
 global _THD_Result := 0
-global _THD_Answer := { Result: "OK", Value: "375.4" }
+global _THD_Answer := { Result: "OK", Value: "375" }
 global _THD_Prompts := []
 global _THD_Setters := []
 global _THD_Reloads := []
@@ -25,7 +25,7 @@ _THD_Reset() {
 	global _THD_Phase, _THD_Result, _THD_Answer, _THD_Prompts, _THD_Setters, _THD_Reloads, _THD_Mode
 	_THD_Phase := ""
 	_THD_Result := 0
-	_THD_Answer := { Result: "OK", Value: "375.4" }
+	_THD_Answer := { Result: "OK", Value: "375" }
 	_THD_Prompts := []
 	_THD_Setters := []
 	_THD_Reloads := []
@@ -267,7 +267,10 @@ _THD_PromptAndBoundKey(TargetPath) {
 	AssertEqual(1, _THD_Prompts.Length)
 	AssertEqual(350, _THD_Prompts[1]["current"], "effective per-key350ms is not guessed global200ms")
 	Assert(!InStr(_THD_Prompts[1]["prompt"], "%d"), "the native prompt substitutes its printf placeholder")
-	Assert(InStr(_THD_Prompts[1]["prompt"], "350"), "the translated prompt displays the effective value")
+	; The box holds the effective value; the hint names the global delay a
+	; blank answer goes back to (maintainer decision of 2026-11-22).
+	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	Assert(InStr(_THD_Prompts[1]["prompt"], String(GlobalMs)), "the translated prompt names the global delay")
 	AssertEqual(0, _THD_Prompts[1]["critical"])
 	AssertEqual(1, _THD_Setters.Length)
 	AssertEqual("caps_lock", _THD_Setters[1]["key"])
@@ -287,9 +290,16 @@ _THD_PromptRefusesMalformed(TargetPath) {
 		{ Result: "OK", Value: "nan" }, { Result: "OK", Value: "1e309" }, { Result: "OK", Value: "invalid" }] {
 		_THD_Reset()
 		_THD_Answer := Answer
+		Shown := _ValueCheckTest_Refusals.Length
 		AssertEqual(false, _THD_Ask())
 		AssertEqual(0, _THD_Setters.Length, "invalid/cancelled answers invoke no owner")
 		AssertEqual(0, _THD_Reloads.Length)
+		; Typed text that is refused is shown with the accepted range, never dropped silently.
+		Typed := (Answer is Object) && !(Answer is Map) && Answer.HasOwnProp("Value") && (Answer.Value is String)
+			&& Answer.Result == "OK"
+		AssertEqual(Shown + (Typed ? 1 : 0), _ValueCheckTest_Refusals.Length, "refusal shown for a typed answer")
+		if Typed
+			AssertEqual("tap_hold.keys.*.time_activation_seconds", _ValueCheckTest_Refusals[-1]["key"])
 	}
 	_THD_Reset()
 	_THD_Mode := "prompt_throw"
@@ -298,6 +308,30 @@ _THD_PromptRefusesMalformed(TargetPath) {
 }
 Test("tap-hold duration: cancellation and malformed prompt shapes have no effects (tap-hold-key-delay)",
 	() => _THHS_WithNativeFixture(_THD_PromptRefusesMalformed))
+
+; The maintainer's decision of 2026-11-22 (PCK-13 for overrides): a blank
+; per-key delay removes the key's own delay, so the global delay applies again.
+; Before, the blank was refused as empty and nothing changed.
+_THD_PromptBlankRemovesKeyDelay(TargetPath) {
+	global _THD_Answer, _THD_Setters, _THD_Reloads
+	Resets := []
+	ResetFn := (KeyId) => (Resets.Push(KeyId), 1)
+	for Blank in ["", "   "] {
+		_THD_Reset()
+		_THD_Answer := { Result: "OK", Value: Blank }
+		Shown := _ValueCheckTest_Refusals.Length
+		AssertEqual(1, _TH_PromptKeyDelay("caps_lock", _THD_Prompt, _THD_Setter, _THD_Reload, ResetFn),
+			"a blank answer is accepted")
+		AssertEqual(0, _THD_Setters.Length, "no delay of its own is written")
+		AssertEqual("caps_lock", Resets[-1], "the key's own delay is removed")
+		AssertEqual(1, _THD_Reloads.Length)
+		AssertEqual("delay_reset", _THD_Reloads[1]["reason"])
+		AssertEqual(Shown, _ValueCheckTest_Refusals.Length, "a blank answer is no refusal")
+	}
+	AssertEqual(2, Resets.Length)
+}
+Test("tap-hold duration: a blank per-key delay removes the override (pck-13-overrides-2026-11-22)",
+	() => _THHS_WithNativeFixture(_THD_PromptBlankRemovesKeyDelay))
 
 _THD_PromptRefusesNonStrictOwners(TargetPath) {
 	global _THD_Mode, _THD_Result, _THD_Setters, _THD_Reloads
@@ -690,7 +724,9 @@ _THD_PersistedEmptyDurationReset(TargetPath) {
 	AssertEqual(0.42, Before["tap_hold"]["keys"]["left_ctrl"][ConfigLeaf.TIME_ACTIVATION_SECONDS],
 		"the independent file read proves the key existed before reset")
 	AssertEqual(1, WriteTapHoldDurationReset("left_ctrl"), "the actual reset persists the empty-key removal")
-	AssertFalse(TapHold["keys"].Has("left_ctrl"), "a reset removes a truly empty modeled key")
+	; The live model projects the file through the shipped defaults, so the key
+	; stays modeled with its default mapping but no longer owns a delay.
+	AssertFalse(TapHoldHasOwnDuration(TapHold, "left_ctrl"), "a reset removes the key's own delay from the model")
 	After := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
 	AssertFalse(After["tap_hold"]["keys"].Has("left_ctrl"), "the formerly persisted empty key is removed")
 	AssertEqual("copy", After["tap_hold"]["keys"]["tab"]["tap_action"], "the mapped neighbor remains persisted")
@@ -754,3 +790,45 @@ _THD_NewerFileRefusesBody(TargetPath) {
 }
 Test("tap-hold delay: a file saved by a newer build refuses every writer (tap-hold-versioned-file)",
 	() => _THHS_WithNativeFixture(_THD_NewerFileRefusesEveryWriter))
+
+
+_THD_NumericPromptBody(GlobalDelay, Raw, ExpectedMs, TargetPath) {
+ global TapHold, _THD_Answer, _THD_Setters, _THD_Reloads, _THGT_Writes
+ _THD_Reset()
+ _THD_Answer := {Result: "OK", Value: Raw}
+ Before := TapHold, SourceBefore := FileExist(TargetPath) ? FSReadUtf8Exact(TargetPath) : "absent"
+ SetterCalls := []
+ GlobalSetter := (Seconds) => (SetterCalls.Push(Seconds), _THD_GlobalWrite(Seconds))
+ Result := GlobalDelay ? _TH_PromptGlobalDelay(_THD_Prompt, GlobalSetter, _THD_Reload) : _THD_Ask()
+ if ExpectedMs == 0 {
+  AssertFalse(Result, "The original user magnitude must not alias an ordinary accepted delay")
+  AssertEqual(0, _THD_Setters.Length + SetterCalls.Length, "Rejected input must not reach either duration owner")
+  AssertEqual(0, _THGT_Writes.Length)
+  AssertEqual(0, _THD_Reloads.Length)
+  AssertEqual(ObjPtr(Before), ObjPtr(TapHold), "Rejected input cannot replace the actual live model")
+  AssertEqual(SourceBefore, FileExist(TargetPath) ? FSReadUtf8Exact(TargetPath) : "absent", "Rejected input cannot change private source bytes")
+ } else {
+  AssertEqual(1, Result)
+  Seconds := GlobalDelay ? SetterCalls[1] : _THD_Setters[1]["seconds"]
+  AssertEqual(ExpectedMs / 1000, Seconds, "Signed, hexadecimal, padded and fractional inputs retain their native meaning")
+  AssertEqual(1, _THD_Reloads.Length)
+  AssertEqual(1, _THGT_Writes.Length)
+ }
+}
+_THD_NumericPromptDomain(GlobalDelay) {
+ ; Whole milliseconds only (the shared value schema): a hexadecimal, fractional or
+ ; exponent spelling is refused with the accepted range, never reinterpreted.
+ for Raw in ["18446744073709551619", "00018446744073709551619", "0x10000000000000003", "-18446744073709551613", "0",
+   "0x3", "3.4", "3e0", "10001"]
+  _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 0))
+ ; A blank global delay resets it to its default (PCK-13, 2026-11-21); a key's
+ ; own delay resets through its own row, so a blank one stays refused.
+ _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, "",
+  GlobalDelay ? Round(TAPHOLD_DEFAULT_ACTIVATION_SECONDS * 1000) : 0))
+ for Raw in ["3", "0003", "+3", " 3 "]
+  _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, Raw, 3))
+ ; The declared maximum itself is admitted.
+ _THHS_WithNativeFixture(_THD_NumericPromptBody.Bind(GlobalDelay, "10000", 10000))
+}
+Test("Tap-hold global delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(true))
+Test("Tap-hold key delay refuses overflowing prompt aliases (tap-hold-prompt-numeric-domain)", _THD_NumericPromptDomain.Bind(false))

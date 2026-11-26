@@ -15,17 +15,17 @@ local M = {}
 --- @param retire function Public close or native closing callback.
 --- @param factory_lifecycle table|nil Exact options passed to the native factory.
 function M.check(view, activate, retire, factory_lifecycle)
-	local builder = package.loaded["ui.ui_builder"]
-	local previous_deferred = package.loaded["infra.deferred_work"]
+	local builder = package.loaded["core.ui.ui.builder"]
+	local previous_deferred = package.loaded["core.timing.engine.deferred_work"]
 	local previous_focus, previous_hs_focus = builder.force_focus, hs.focus
 	local previous_window, previous_show = view.hswindow, view.show
 	local pending, invalid, reads, focuses = {}, false, 0, 0
 	local ok, err = xpcall(function()
-		package.loaded["infra.deferred_work"] = { after = function(_, callback, label)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback, label)
 			if label == "webview focus retry" then pending[#pending + 1] = callback end
 			return true
 		end }
-		builder.force_focus = assert(loadfile(helpers.driver_root() .. "ui/ui_builder.lua"))().force_focus
+		builder.force_focus = assert(loadfile(helpers.driver_root() .. "core/ui/ui/builder.lua"))().force_focus
 		view.hswindow = function()
 			if invalid then reads = reads + 1; error("native window deleted") end
 			return nil
@@ -53,7 +53,7 @@ function M.check(view, activate, retire, factory_lifecycle)
 		helpers.assert_eq(focuses, 0, "retired focus must not foreground Hammerspoon")
 		helpers.assert_eq(#pending, 0)
 	end, debug.traceback)
-	package.loaded["infra.deferred_work"] = previous_deferred
+	package.loaded["core.timing.engine.deferred_work"] = previous_deferred
 	builder.force_focus, hs.focus = previous_focus, previous_hs_focus
 	view.hswindow, view.show = previous_window, previous_show
 	if not ok then error(err, 0) end

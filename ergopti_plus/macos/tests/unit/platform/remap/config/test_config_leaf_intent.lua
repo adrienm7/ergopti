@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Remap Configuration Explicit Leaf Intent
 --- DESCRIPTION:
---- An obsolete leaf of config_karabiner.toml (a timing spelled as text, a
+--- An obsolete leaf of tap_hold.toml (a timing spelled as text, a
 --- switch that is not a Boolean, a binding that is not a table) survives every
 --- ordinary full-state save, and a non-neutral candidate value at that leaf is
 --- refused, because a carried value never proves that the user repaired it.
@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim",
-	"toml_codec", "infra.toml.codec" }
+local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
+	"core.text.engine.toml_codec", "core.text.engine.toml.codec" }
 
 --- Runs body against one real source file; publication is captured in place.
 --- @param original string Source bytes.
@@ -26,23 +26,32 @@ local function with_file(original, body)
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
+		local Text = require("tests.support.tap_hold_file_text")
+		local original_config
+		original, original_config = Text.file(original)
 		write(original)
-		local files = require("adapters.file_system")
+		Text.write_config(path, original_config)
+		local files = require("core.fs.adapters.file_system")
 		local native_write = files.write_if_unchanged
 		local controls = { writes = 0 }
 		-- The source fence is the writer's; this fixture records the exact
 		-- candidate it would publish over the unchanged source.
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				Text.write_config(path, content); return true
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = original })
@@ -53,9 +62,9 @@ local function with_file(original, body)
 			return config.load_user_config({ { id = "escape" } }, { { id = "esc_tab" } }, path)
 		end
 		local ok, err = pcall(body, { config = config, path = path, warnings = warnings, errors = errors,
-			controls = controls, load = load, read = read, decode = require("infra.toml.codec").decode })
+			controls = controls, load = load, read = read, decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original })
 		files.write_if_unchanged = native_write
-		os.remove(path); os.remove(path .. ".tmp")
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end
@@ -105,7 +114,7 @@ helpers.describe("Remap explicit leaf intent (remap-leaf-intent)", function()
 					or "mod_combos.simultaneous_threshold_ms"
 				helpers.assert_eq(f.config.save_user_config(state, f.path, nil, nil, { leaves = { [other] = true } }),
 					false)
-				helpers.assert_eq(f.read(), original)
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(f.controls.writes, 0)
 			end)
 		end)

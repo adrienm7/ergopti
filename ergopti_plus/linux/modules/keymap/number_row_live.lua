@@ -21,6 +21,10 @@
 
 local M = {}
 
+local Logger = require("core.logger.engine.shim")
+
+local LOG = "keymap.number_row_live"
+
 --- The collaborators of the module, resolved lazily so the tests may replace them.
 --- @param deps table|nil { preferences, registry, registry_deps }
 --- @return table
@@ -52,7 +56,7 @@ function M.available(deps)
 	if not live then return false, "session_unsupported" end
 	local resolved = resolve(deps)
 	local snapshot = resolved.registry.snapshot(resolved.registry_deps)
-	if require("table_util").count(snapshot.installed or {}) == 0 then return false, "no_source_layout" end
+	if require("core.text.engine.table_util").count(snapshot.installed or {}) == 0 then return false, "no_source_layout" end
 	return true, nil
 end
 
@@ -72,6 +76,9 @@ function M.apply_stored(on_done, deps)
 	local rows = resolved.preferences.settings()
 	return resolved.registry.apply_rows(nil, rows, function(ok, detail, extra, _, live_code)
 		if ok then
+			-- One line per live apply, which a field report counts
+			Logger.info(LOG, "Number-row options applied live (order %s, edges %s).", tostring(rows and rows.order),
+				tostring(rows and rows.edges))
 			on_done(true, nil, nil, nil, detail.rows)
 		else
 			on_done(false, detail, extra, live_code, nil)

@@ -86,15 +86,18 @@ Test("keystats: the outgoing-context privacy re-check covers every entry type (k
 ; above would still hold but would no longer be guarding anything -- so pin the
 ; divergence that makes it load-bearing.
 _KPPF_PayloadStillCarriesTheLaggingContext() {
-	Flush := _DriverFuncBody("KL_FlushBuffer")
-	Assert(Flush != "", "KL_FlushBuffer must exist")
+	Caller := _DriverFuncBody("KL_FlushBuffer")
+	Flush := _DriverFuncBody("_KL_DetachBufferSnapshot")
+	Assert(Flush != "" && InStr(Caller, "_KL_DetachBufferSnapshot()") > 0, "The actual public flush must reach the real shared snapshot")
 	Assert(InStr(Flush, "Keystats.session_app") > 0 && InStr(Flush, "Keystats.session_title") > 0,
 		"prerequisite: the typing entry still stamps app/title from the session context")
 
 	Hook := _DriverFuncBody("KL_Hook_RefreshContext")
 	Assert(Hook != "", "KL_Hook_RefreshContext must exist")
-	Assert(InStr(Hook, "Keystats.session_app") > 0 && InStr(Hook, "Keystats.session_title") > 0,
-		"prerequisite: KL_Hook_RefreshContext is still the sole writer of that pair")
+	Prepare := _DriverFuncBody("_KL_ContextPrepare")
+	Assert(InStr(Hook, "_KL_ContextProject(") > 0 && InStr(Prepare, "Keystats.session_app") > 0
+		&& InStr(Prepare, "Keystats.session_title") > 0,
+		"prerequisite: the real hook projector still publishes the lagging session pair through its frame owner")
 	Assert(InStr(Hook, "CONTEXT_TTL_MS") > 0,
 		"prerequisite: it still self-gates on its own TTL, which is what makes the payload "
 		. "lag the focus cache MF_ShouldFilter reads")

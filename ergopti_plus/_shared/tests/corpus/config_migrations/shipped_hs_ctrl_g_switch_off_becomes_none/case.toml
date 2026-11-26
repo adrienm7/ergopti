@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_switch_off_becomes_none/case.toml
-
-[case]
-description = "The macOS Ctrl+G switch turned off becomes an empty slot, and the emptied section disappears."
-drivers = ["hs"]
-outcome = "migrated"
-from_version = 19
-to_version = 20

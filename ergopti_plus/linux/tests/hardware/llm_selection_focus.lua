@@ -10,13 +10,13 @@
 --- This does not claim evdev/uinput or physical keyboard input.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 -- A refused AI action reports its reason only in the log. The receipts go to
 -- stdout, so the log goes to stderr (worker.log), which the harness prints
 -- when an assertion fails.
-require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
-local Json = require("json")
-local Shell = require("adapters.shell_runner")
+require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
+local Json = require("core.text.engine.json")
+local Shell = require("core.process.adapters.shell_runner")
 local source_path = os.getenv("ERGOPTI_AI_DAEMON_SOURCE") or "ergopti_hotstrings.lua"
 local file = assert(io.open(source_path, "r"))
 local source = file:read("*a")
@@ -24,12 +24,12 @@ file:close()
 local seam = assert(source:match("focus_id = (.-),\n%s*%-%-"), "the daemon focus callback must be present")
 local compile = loadstring or load
 local focus_factory = assert(compile("return function(window_info, secure_focus_guard) return " .. seam .. " end"))()
-local Window = require("adapters.window_info")
-local Detector = require("adapters.secure_field_detector")
-local Atspi = require("adapters.atspi_focus")
+local Window = require("platform.focus.window_info")
+local Detector = require("platform.focus.secure_field_detector")
+local Atspi = require("platform.focus.atspi_focus")
 local uv = require("luv")
-local Clock = require("infra.monotonic")
-local Timings = require("infra.timings")
+local Clock = require("core.logger.engine.monotonic")
+local Timings = require("core.timing.engine.timings")
 local ffi = require("ffi")
 ffi.cdef([[typedef struct _XDisplay Display;
 	Display *XOpenDisplay(const char *name); int XCloseDisplay(Display *display);
@@ -37,43 +37,43 @@ ffi.cdef([[typedef struct _XDisplay Display;
 	int XTestFakeKeyEvent(Display *display, unsigned int code, int pressed, unsigned long delay);]])
 local X11, XTest = ffi.load("libX11.so.6"), ffi.load("libXtst.so.6")
 local display = assert(X11.XOpenDisplay(nil), "native X11 output connection required")
-local Injector = require("modules.hotstrings.injector")
+local Injector = require("hotstrings.engine.injector")
 require("adapters.keyboard_layout")._set_table_for_test({ v = { keycode = 47, mods = {} } })
 Injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 	assert(XTest.XTestFakeKeyEvent(display, code + 8, value == 1 and 1 or 0, 0) ~= 0)
 	X11.XSync(display, 0)
 	return true
 end })
-local Clipboard = require("adapters.clipboard")
+local Clipboard = require("clipboard.adapters.clipboard")
 local CLIPBOARD_SEED = "ERGOPTI-NATIVE-SELECTION-CLIPBOARD"
 -- A new Xvfb session has no clipboard owner. The strict stage must snapshot a
 -- known existing owner, rather than guessing that an unavailable read is empty.
 assert(Clipboard.write(CLIPBOARD_SEED), "native clipboard control must be seeded")
 local clipboard_read_ok, clipboard_content = Clipboard.read_checked()
 assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native clipboard control must be readable")
-local Watch = require("adapters.atspi_focus_watch").new()
-package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
+local Watch = require("platform.focus.atspi_focus_watch").new()
+package.loaded["ai.engine.preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
 } })
 -- Every case re-initializes the engine, which first retires the previous
 -- Profiles inventory: without these ports each re-initialization was refused
 -- and the next case ran on the first case's scheduler and pacing clock.
-package.loaded["modules.llm.profiles"] = require("tests.support.llm_profiles_fixture").without_inventory({
+package.loaded["ai.engine.settings.profiles"] = require("tests.support.llm_profiles_fixture").without_inventory({
 	init = function() end, is_enabled = function() return true end,
 })
-package.loaded["modules.llm.api_entries"] = { active = function()
+package.loaded["ai.engine.settings.api_entries"] = { active = function()
 	return { id = "owned", provider = "openai_compat", model = "fixture-model" }
 end }
 local callback, applied, request, reads, mode, scheduler
-package.loaded["modules.llm.api_remote"] = {
+package.loaded["ai.engine.api.api_remote"] = {
 	provider = function() return { default_model = "fixture-model" } end,
 	serves = function() return true end,
 	chat = function(_, _, _, _, _, done) callback = done; request = request + 1; return true end,
 	cancel = function() return true end,
 }
-local Engine = require("modules.llm.prediction_engine")
-local Tone = require("llm.tone")
+local Engine = require("ai.engine.prediction.engine")
+local Tone = require("ai.engine.prediction.tone")
 local Keystats = require("modules.keystats.keystats")
 local Guard = require("modules.keystats.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, prediction = Engine,
@@ -97,7 +97,7 @@ local function await_join()
 	error("native AI privacy context did not join within five seconds")
 end
 
-local Selection = require("adapters.selection_transaction")
+local Selection = require("clipboard.adapters.selection_transaction")
 local selection_owner
 
 local function initialize()
@@ -141,8 +141,8 @@ local function snapshot(fields)
 	fields.conclusive = conclusive
 	fields.target = focus_id()
 	fields.cached_verdict = Detector.getVerdict()
-	fields.url_filter = require("modules.llm.trigger_settings").get("url_bar_filter_enabled")
-	fields.foreground_type = type(require("adapters.process_lifecycle").getForegroundApp())
+	fields.url_filter = require("ai.engine.settings.trigger_settings").get("url_bar_filter_enabled")
+	fields.foreground_type = type(require("core.process.adapters.lifecycle").getForegroundApp())
 	fields.window = Window.focused_identity()
 	fields.applied, fields.requests, fields.reads = applied, request, reads
 	fields.offered = Engine.has_suggestions()
@@ -228,7 +228,7 @@ for command in io.lines() do
 		assert(called, detail)
 	elseif command == "benchmark" or command == "deadline" then
 		if command == "benchmark" then await_join() end
-		local clock = require("infra.monotonic")
+		local clock = require("core.logger.engine.monotonic")
 		result.probe_ms = {}
 		for _ = 1, command == "benchmark" and 20 or 1 do
 			local started = clock.now_ms()

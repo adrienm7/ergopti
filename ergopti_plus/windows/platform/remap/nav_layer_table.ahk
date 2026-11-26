@@ -1,5 +1,5 @@
 ﻿; platform/remap/nav_layer_table.ahk
-; Requires: platform/remap/layers_loader.ahk, adapters/hotkey_registrar.ahk (modifier symbols),
+; Requires: platform/remap/layers_loader.ahk, platform/input/hotkey_registrar.ahk (modifier symbols),
 ;           infra/nav_layer_helpers.ahk (ActionLayer, repeat count)
 
 ; ==============================================================================
@@ -30,7 +30,7 @@
 #Requires AutoHotkey v2.0
 
 ; The layer LayerEnabled carries: the id a tap-hold key's hold_layer names
-; (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
+; (_shared/tap_hold/data/defaults.toml [tap_hold.hold_picker].layers).
 global NAV_LAYER_ID := "nav"
 ; Stands for the repeat count in a Send template ("{Up N}").
 global NAV_LAYER_COUNT_PLACEHOLDER := "N"
@@ -44,10 +44,10 @@ global NAV_LAYER_CRITERION_LAYER := "layer"
 global NAV_LAYER_ALTGR_CODE := "AltRight"
 global NAV_LAYER_ALTGR_LABELS := ["~SC01D & ~SC138", "*SC138"]
 ; Layer-vocabulary modifier -> the chord notation's name, whose AutoHotkey
-; symbol adapters/hotkey_registrar.ahk owns (HOTKEY_MOD_PREFIXES).
+; symbol platform/input/hotkey_registrar.ahk owns (HOTKEY_MOD_PREFIXES).
 global NAV_LAYER_MODIFIER_CHORD_NAMES := Map("ctrl", "ctrl", "alt", "alt", "shift", "shift", "meta", "cmd")
 ; The driver-native handlers a call:<handler> resolution may name on Windows;
-; must cover [call_handlers].windows in _shared/keymap/layer_actions.toml.
+; must cover [call_handlers].windows in _shared/layouts/data/layer_actions.toml.
 global NAV_LAYER_CALL_HANDLERS := Map("maximize_window", _NavLayer_MaximizeWindow,
 	"brightness_up", (*) => ScreenBrightnessRequest("brightness_up"),
 	"brightness_down", (*) => ScreenBrightnessRequest("brightness_down"))

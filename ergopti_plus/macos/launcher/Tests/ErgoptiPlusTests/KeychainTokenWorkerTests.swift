@@ -78,6 +78,26 @@ final class KeychainTokenWorkerTests: XCTestCase {
 		XCTAssertEqual(String(data: output, encoding: .utf8), "resolved-secret")
 	}
 
+	func testReadReportsAnAbsentItemApartFromOtherFailures() {
+		let store = TestKeychainTokenStore()
+		store.readStatus = errSecItemNotFound
+		let absent = KeychainTokenWorker.run(
+			arguments: ["ErgoptiPlus", kKeychainTokenReadFlag, "entry-a"],
+			input: nil,
+			store: store,
+			writeOutput: { _ in XCTFail("an absent item has no secret to emit"); return false }
+		)
+		XCTAssertEqual(absent, KeychainTokenWorkerExit.itemNotFound.rawValue)
+		store.readStatus = errSecInteractionNotAllowed
+		let locked = KeychainTokenWorker.run(
+			arguments: ["ErgoptiPlus", kKeychainTokenReadFlag, "entry-a"],
+			input: nil,
+			store: store,
+			writeOutput: { _ in XCTFail("a refused read has no secret to emit"); return false }
+		)
+		XCTAssertEqual(locked, KeychainTokenWorkerExit.keychainFailure.rawValue)
+	}
+
 	func testDeleteTreatsMissingItemAsIdempotentSuccess() {
 		let store = TestKeychainTokenStore()
 		store.deleteStatus = errSecItemNotFound

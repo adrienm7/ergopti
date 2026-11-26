@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: ShellRunner GC Protection Meta Test
 --- DESCRIPTION:
---- Static source guard ensuring adapters/shell_runner.lua pins every live
+--- Static source guard ensuring core/process/adapters/shell_runner.lua pins every live
 --- hs.task in M._active_tasks so the GC cannot collect subprocess objects
 --- before they exit.
 ---
@@ -41,10 +41,10 @@ end
 -- ============================================================
 -- ============================================================
 
-helpers.describe("adapters/shell_runner.lua: GC protection", function()
+helpers.describe("core/process/adapters/shell_runner.lua: GC protection", function()
 
 	helpers.it("M._active_tasks module-level table is declared", function()
-		local src = read_source("local function invoke_guarded") -- adapters/shell_runner.lua
+		local src = read_source("local function invoke_guarded") -- core/process/adapters/shell_runner.lua
 		helpers.assert_true(
 			src:find("M%._active_tasks%s*=") ~= nil,
 			"shell_runner.lua must declare M._active_tasks to pin live hs.task objects")

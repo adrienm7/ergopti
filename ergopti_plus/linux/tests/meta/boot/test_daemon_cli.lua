@@ -4,9 +4,12 @@
 --- Tests all CLI flags (--help, --dry-run, --verbose, --tray, --config,
 --- --device, --layout) and edge cases via subprocess (lua ergopti_hotstrings.lua).
 --- The daemon calls os.exit(), so we test via io.popen to capture exit codes
---- and stdout/stderr.
+--- and stdout/stderr. Each daemon child resolves its notifier to the recording
+--- one (tests/support/notice_recorder.lua), so no launch reaches notify-send.
 
 local helpers = require("tests.helpers")
+local NoticeRecorder = require("tests.support.notice_recorder")
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("ergopti_hotstrings CLI", function()
 
@@ -31,8 +34,15 @@ helpers.describe("ergopti_hotstrings CLI", function()
     return root .. "/ergopti_hotstrings.lua"
   end
 
+  --- The daemon launch, its notifier bound to the recording seam.
+  --- @return string command Interpreter, prelude and daemon script.
+  local function daemon_command()
+    return string.format("%s -e %s %s", lua_bin(),
+      shell_quote(NoticeRecorder.child_prelude(helpers.driver_root())), daemon_path())
+  end
+
   local function run_daemon(args)
-    local cmd = string.format("%s %s %s 2>&1", lua_bin(), daemon_path(), args or "")
+    local cmd = string.format("%s %s 2>&1", daemon_command(), args or "")
     local pipe = io.popen(cmd, "r")
     if not pipe then return "", -1 end
     local output = pipe:read("*a")
@@ -69,7 +79,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
       local fh = io.open(daemon_path(), "r")
       local content = fh:read("*a")
       fh:close()
-      helpers.assert_true(content:find('require%("adapters%.keyboard_hook"%)'), "imports keyboard_hook")
+      helpers.assert_true(content:find('require%("platform%.input%.keyboard_hook"%)'), "imports keyboard_hook")
     end)
 
     helpers.it("daemon file has pump event loop", function()
@@ -203,7 +213,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
     helpers.it("--help needs no session: no USER, no HOME, no XDG_RUNTIME_DIR", function()
       -- It used to run after the logger's privacy admission, which refused a start
       -- without $USER and $LOGNAME, so even the usage could not be printed.
-      local cmd = string.format("env -i PATH=%q %s %s --help 2>&1", os.getenv("PATH") or "/usr/bin:/bin", lua_bin(), daemon_path())
+      local cmd = string.format("env -i PATH=%q %s %s --help 2>&1", os.getenv("PATH") or "/usr/bin:/bin", daemon_command(), "")
       local pipe = assert(io.popen(cmd, "r"))
       local out = pipe:read("*a")
       pipe:close()
@@ -267,6 +277,65 @@ helpers.describe("ergopti_hotstrings CLI", function()
   -- ==========================================================================
 
   helpers.describe("edge cases", function()
+    helpers.it("inspects default catalogue paths without opening special files (cli-config-path)", function()
+      local file = assert(io.open(daemon_path(), "rb"))
+      local source = file:read("*a"); assert(file:close())
+      local first = assert(source:find("local function resolve_config_path(", 1, true))
+      local last = assert(source:find("local function reload_hotstrings(", first, true))
+      local status = {}
+      local env = setmetatable({ DEFAULT_CONFIG_DIR = "/default", require = function(name)
+        if name == "luv" then return { fs_stat = function(path)
+          local item = assert(status[path], "unexpected path")
+          if type(item) == "table" then return item end
+          return nil, "fixture error", item
+        end } end
+        if name == "core.fs.engine.paths" then return { shared = function() return "/shared" end } end
+        error("unexpected dependency " .. name)
+      end }, { __index = _G })
+      local code = source:sub(first, last - 1) .. "\nreturn resolve_config_path"
+      local chunk
+      if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+      else chunk = assert(load(code, "daemon config resolution", "t", env)) end
+      local resolve = chunk()
+      status["/default"], status["/shared"] = "ENOENT", { type = "directory" }
+      helpers.assert_eq(resolve(nil), "/default")
+      status["/default"] = { type = "directory" }
+      helpers.assert_eq(resolve(nil), "/default")
+      for _, invalid in ipairs({ "EACCES", "ENOTDIR", { type = "fifo" } }) do
+        status["/default"] = invalid
+        helpers.assert_eq(pcall(resolve, nil), false, "an inaccessible or special default must refuse startup")
+      end
+      helpers.assert_eq(resolve("/explicit"), "/explicit")
+    end)
+
+    helpers.it("rejects missing option values without swallowing the next flag (cli-missing-value)", function()
+      local file = assert(io.open(daemon_path(), "rb"))
+      local source = file:read("*a"); assert(file:close())
+      local first = assert(source:find("local function parse_args()", 1, true))
+      local last = assert(source:find("======= 6/ Config Resolution", first, true))
+      for _, option in ipairs({ "--config", "--device", "--layout", "--keymap" }) do
+        for _, arguments in ipairs({ { option }, { option, "--no-grab" } }) do
+          local env = setmetatable({ arg = arguments, Logger = helpers.make_logger_stub() }, { __index = _G })
+          local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+          local chunk
+          if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+          else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+          local ok, reason = pcall(chunk)
+          helpers.assert_eq(ok, false, option .. " must reject a missing value")
+          helpers.assert_true(tostring(reason):find(option, 1, true) ~= nil, "the refusal names the option")
+        end
+      end
+      local env = setmetatable({ arg = { "--config", "./--definitions", "--no-grab" },
+        Logger = helpers.make_logger_stub() }, { __index = _G })
+      local code = source:sub(first, last - 1) .. "\nreturn parse_args()"
+      local chunk
+      if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+      else chunk = assert(load(code, "daemon argument parser", "t", env)) end
+      local opts = chunk()
+      helpers.assert_eq(opts.config, "./--definitions")
+      helpers.assert_eq(opts.grab, false)
+    end)
+
     helpers.it("bogus flag does not crash", function()
       local out, _ = run_daemon("--bogus-flag-xyz 2>&1")
       -- Accept: Unknown/ignored warning, Erreur/device (crash, not flag-crash), or any output.
@@ -277,7 +346,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
     helpers.it("no arguments does not corrupt output", function()
       -- Without a device, the daemon will fail — but it should not crash.
       local ok, launch_err = pcall(function()
-        local pipe = io.popen(lua_bin() .. " " .. daemon_path() .. " 2>&1", "r")
+        local pipe = io.popen(daemon_command() .. " 2>&1", "r")
         if pipe then
           local _ = pipe:read("*a")
           pipe:close()
@@ -296,7 +365,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
     helpers.it("rapid launch/exit cycles do not leak processes", function()
       local ok = pcall(function()
         for _ = 1, 5 do
-          local pipe = io.popen(lua_bin() .. " " .. daemon_path() .. " --help 2>&1", "r")
+          local pipe = io.popen(daemon_command() .. " --help 2>&1", "r")
           if pipe then
             pipe:read("*a")
             pipe:close()

@@ -18,9 +18,9 @@ local function load_preferences(file_system)
 		function(path, content, _expected_source)
 			return file_system.write(path, content)
 		end
-	package.loaded["adapters.file_system"] = file_system
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences")
+	package.loaded["core.fs.adapters.file_system"] = file_system
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences")
 end
 
 local function minimal_save(preferences)
@@ -94,7 +94,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		helpers.assert_eq(load_status, "ok")
 		helpers.assert_type(loaded, "table")
 
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { preview_star_enabled = false }
 		local restores = 0
 		local save = transaction.bind(preferences, {
@@ -150,7 +150,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		local loaded, load_status = preferences.load(path)
 		helpers.assert_eq(load_status, "ok")
 		helpers.assert_type(loaded, "table")
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { preview_star_enabled = false }
 		local restores = 0
 		local save = transaction.bind(preferences, {
@@ -219,7 +219,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 end)
 
 helpers.describe("menu preference side effects are success-gated", function()
-	local transaction = require("ui.menu.preferences_transaction")
+	local transaction = require("settings.ui.menu.preferences_transaction")
 
 	helpers.it("leaves every cache untouched on false, nil, or raise", function()
 		for _, save in ipairs({
@@ -268,8 +268,8 @@ helpers.describe("menu preferences: first-click rollback", function()
 		logger.error = function(_, fmt, ...)
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
-		package.loaded["infra.logger"] = logger
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		package.loaded["core.logger.engine.logger"] = logger
+		local MenuState = helpers.load_with_stubs("menu.ui.builder.state")
 
 		local function sync_with(setter)
 			return MenuState.sync_state_to_modules({
@@ -292,8 +292,8 @@ helpers.describe("menu preferences: first-click rollback", function()
 
 		local nil_result = sync_with(function() end)
 		local throw_result = sync_with(function() error("runtime setter failure", 0) end)
-		package.loaded["infra.logger"] = nil
-		package.loaded["ui.menu.menu_state"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
+		package.loaded["menu.ui.builder.state"] = nil
 
 		helpers.assert_eq(nil_result, true,
 			"a successful setter's nil return must not be confused with failure")
@@ -311,9 +311,9 @@ helpers.describe("menu preferences: first-click rollback", function()
 		logger.error = function(_, fmt, ...)
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
-		package.loaded["infra.logger"] = logger
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
-		local transaction = require("ui.menu.preferences_transaction")
+		package.loaded["core.logger.engine.logger"] = logger
+		local MenuState = helpers.load_with_stubs("menu.ui.builder.state")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = {
 			hotstrings = {},
 			keymap = false,
@@ -348,9 +348,9 @@ helpers.describe("menu preferences: first-click rollback", function()
 
 		state.preview_star_enabled = true
 		local committed = save()
-		package.loaded["infra.logger"] = nil
-		package.loaded["ui.menu.menu_state"] = nil
-		package.loaded["ui.menu.preferences_transaction"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
+		package.loaded["menu.ui.builder.state"] = nil
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
 
 		helpers.assert_eq(committed, false)
 		helpers.assert_eq(state.preview_star_enabled, false)
@@ -363,7 +363,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("preserves retained nested table identities during rollback", function()
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { nested = { enabled = true, values = { 1, 2 } } }
 		local nested_ref = state.nested
 		local values_ref = state.nested.values
@@ -379,13 +379,13 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("restores the keystats cipher posture without starting migration", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local cipher_values = {}
 		package.loaded["modules.keystats.text_cipher"] = {
 			set_enabled = function(value) cipher_values[#cipher_values + 1] = value end,
 		}
-		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = require("ui.menu.menu_state")
+		package.loaded["menu.ui.builder.state"] = nil
+		local MenuState = require("menu.ui.builder.state")
 		local result = MenuState.sync_state_to_modules({
 			hotstrings = {},
 			keystats_encrypt = false,
@@ -404,9 +404,9 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("restores gesture registries owned outside the flat state", function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = require("ui.menu.menu_state")
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["menu.ui.builder.state"] = nil
+		local MenuState = require("menu.ui.builder.state")
 		local observed = {}
 		local result = MenuState.sync_state_to_modules({ hotstrings = {}, gestures = true }, {
 			gesture_modes = { swipe_left = "continuous" },
@@ -608,7 +608,7 @@ helpers.describe("Number-row native-only preferences", function()
 		local saved, status = preferences.load(path)
 		helpers.assert_eq(status, "absent")
 		helpers.assert_eq(preferences.flat_key_for("layout.direct_access_digits"), "layout_number_row_mode")
-		helpers.assert_eq(require("infra.manifest_reader").default_for("layout.direct_access_digits"), "native")
+		helpers.assert_eq(require("menu.engine.manifest_reader").default_for("layout.direct_access_digits"), "native")
 		helpers.assert_eq(saved.layout_number_row_mode, nil)
 		helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
 		helpers.assert_eq(written, 1)
@@ -638,7 +638,7 @@ end)
 
 -- Do not leak the final FileSystem double into later test modules in the same
 -- Lua process; those modules intentionally exercise the real atomic adapter.
-package.loaded["adapters.file_system"] = nil
-package.loaded["infra.preferences"] = nil
+package.loaded["core.fs.adapters.file_system"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 return true

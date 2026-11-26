@@ -21,16 +21,16 @@
 ---    so background checks that return 304 Not Modified do not count against
 ---    the API rate limit. A 304 has no body: it reuses the list held for that
 ---    ETag, and a request is conditional only while that list is held. The
----    lists are kept in the Storage port (_shared/lua/updater/list_cache.lua
+---    lists are kept in the Storage port (_shared/updater/engine/list_cache.lua
 ---    validates them), so the first request after a start is conditional too,
 ---    provided the ETag file still names the stored list.
---- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
+--- 3. Shared parser: delegates JSON parsing to _shared/updater/engine/release_parser.lua
 ---    which requires no full JSON decoder.
 --- 4. Shared channels: every channel reads the same release list and keeps its
----    latest release through _shared/lua/updater/channels.lua (the registry in
----    _shared/modules/updater/channels.json); version order comes from
----    _shared/lua/updater/version.lua.
---- 5. Background schedule: _shared/lua/updater/schedule.lua decides from the
+---    latest release through _shared/updater/engine/channels.lua (the registry in
+---    _shared/updater/data/channels.json); version order comes from
+---    _shared/updater/engine/version_core.lua.
+--- 5. Background schedule: _shared/updater/engine/schedule.lua decides from the
 ---    wall clock and the persisted record, so a restart mid-interval does not
 ---    check at boot and a machine off past its due time catches up after the
 ---    boot delay. luv timers are monotonic and stop during a suspend, so every
@@ -42,34 +42,37 @@
 --- 7. A chosen release: the Versions window installs any release of the list it
 ---    shows through the same download, checksum and install path
 ---    (release_record, download_release, install_release_archive); only a
----    click there reaches them, never the schedule.
+---    click there reaches them, never the schedule. When the window could only
+---    read the public feed, feed_release_record names the channel's newest
+---    release under its conventional asset names and the transfer installs it
+---    only once its detached signature verifies (signature_required).
 --- ==============================================================================
 
 local M = {}
 
-local Identifiers = require("identifiers")
-local Logger    = require("logger.shim")
-local Paths     = require("infra.paths")
-local Timings   = require("infra.timings")
-local NoReplaceMove = require("infra.no_replace_move")
-local Version   = require("updater.version")
-local Parser    = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local Channels  = require("updater.channels")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local ReleaseSources = require("updater.release_sources")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger    = require("core.logger.engine.shim")
+local Paths     = require("core.fs.engine.paths")
+local Timings   = require("core.timing.engine.timings")
+local NoReplaceMove = require("core.fs.engine.no_replace_move")
+local Version   = require("updater.engine.version_core")
+local Parser    = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local Channels  = require("updater.engine.channels")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local ReleaseSources = require("updater.engine.release_sources")
 local Installer = require("modules.updater.installer")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local Fs        = require("adapters.file_system")
-local HttpClient = require("adapters.http_client")
-local FileDigest = require("adapters.file_digest")
-local ok_storage, Storage = pcall(require, "adapters.storage")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local Fs        = require("core.fs.adapters.file_system")
+local HttpClient = require("core.network.adapters.http_client")
+local FileDigest = require("core.fs.adapters.file_digest")
+local ok_storage, Storage = pcall(require, "core.fs.adapters.storage")
 if not ok_storage then Storage = nil end
-local ok_timer, Timer = pcall(require, "adapters.timer_scheduler")
+local ok_timer, Timer = pcall(require, "core.events.timer_scheduler")
 if not ok_timer then Timer = nil end
 
 local LOG = "modules.updater.manager"
@@ -79,8 +82,8 @@ M._file_digest = FileDigest
 
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 -- =========================================
 -- =========================================
@@ -88,14 +91,14 @@ local ConfigKeys = require("config_keys")
 -- =========================================
 -- =========================================
 
--- Hardcoded fallback mirroring _shared/modules/updater/defaults.json — keeps
+-- Hardcoded fallback mirroring _shared/updater/data/defaults.json — keeps
 -- the engine functional when the shared tree is unreachable (packaged edge-case)
 local _DEFAULTS_FALLBACK = {
 	github = { owner = "adrienm7", repo = "ergopti" },
 	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
 }
 
---- Resolves the absolute path to _shared/modules/updater/defaults.json.
+--- Resolves the absolute path to _shared/updater/data/defaults.json.
 ---
 --- Through infra.paths, which knows both layouts that ship. Stripping four path
 --- components off this file's own location described the checkout only: an
@@ -103,7 +106,7 @@ local _DEFAULTS_FALLBACK = {
 --- leaves the install and the updater falls back to its hardcoded scalars.
 --- @return string|nil Absolute path, or nil if it cannot be resolved.
 local function resolve_defaults_path()
-	return Paths.shared("modules/updater/defaults.json")
+	return Paths.shared("updater/data/defaults.json")
 end
 
 --- Loads the shared updater scalars from defaults.json. Falls back to
@@ -127,7 +130,7 @@ end
 
 local _defs = load_updater_defaults()
 
--- GitHub repo coordinates (single source: _shared/modules/updater/defaults.json)
+-- GitHub repo coordinates (single source: _shared/updater/data/defaults.json)
 local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
 local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
@@ -153,7 +156,7 @@ local CHECK_RELEASES_URL = require_check_releases_url(_defs)
 --- no fallback: a guessed channel list could offer another channel's artifacts.
 --- @return table registry updater.channels interpreter.
 local function load_channel_registry()
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = path and Fs.read(path) or nil
 	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
 	local registry, err = Channels.load(Json.decode(raw))
@@ -179,8 +182,7 @@ local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes"
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20
 local _release_fetch_cancel = nil
-local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
-local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+local MAX_DOWNLOAD_BYTES = Timings.count("limits", "update_asset_download_bytes")
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
 --- Resolves the automatic-check timing (presets, backoff, jitter). No fallback:
@@ -270,10 +272,10 @@ M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 M.LINUX_ASSET_NAME     = LINUX_ASSET_NAME
 M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 
--- Path for the ETag cache (one per channel).
+-- Path for the ETag cache (one per channel), in the driver's cache folder
+-- that the legacy folder migration creates at boot.
 local function etag_cache_path(channel)
-	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti_updater_etag_" .. channel .. ".txt"
+	return require("settings.engine.paths").cache("updater_etag_" .. channel .. ".txt")
 end
 
 -- =========================================
@@ -299,6 +301,7 @@ local _channel         = nil       -- registry channel id; resolved at the end o
 local _config_path     = nil       -- config.toml holding [updater] channel; set by init()
 local _channel_persisted = false   -- whether config.toml names the channel (else it is the default)
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
+local _installed_root = nil      -- root of that installation, whose .old the restart watcher restores
 local _download_part   = nil
 local _download_dest   = nil
 local native_transfer, native_verified, native_install, native_channel_intent
@@ -392,9 +395,12 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
-			tostring(raw), DEFAULT_INTERVAL_SEC)
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s); using %ds.",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC
 	end
 	local seconds, code, snapped = Schedule.snap_interval(raw, TIMING)
@@ -421,7 +427,16 @@ end
 --- @return table state
 local function _load_check_state()
 	if _check_state then return _check_state end
-	local state, dropped = Schedule.sanitize_state(_storage_get(CHECK_STATE_KEY, nil))
+	if not Storage or type(Storage.read_exact) ~= "function" then
+		Logger.error(LOG, "The update-check storage cannot perform an exact read.")
+		return nil
+	end
+	local called, read_ok, stored = pcall(Storage.read_exact, CHECK_STATE_KEY)
+	if not called or read_ok ~= true then
+		Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+		return nil
+	end
+	local state, dropped = Schedule.sanitize_state(stored)
 	for _, field in ipairs(dropped) do
 		Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 	end
@@ -470,6 +485,13 @@ local function _load_list_cache()
 	end
 	for key, raw in pairs(stored) do
 		local copy, reason = ListCache.validate(raw)
+		if copy then
+			local valid, decoded = pcall(Json.decode_lossless, copy.body)
+			local entries = valid and type(decoded) == "table" and Parser.split_releases_array(copy.body) or nil
+			if not entries or #entries ~= #decoded or #entries > RELEASE_PAGE_SIZE then
+				copy, reason = nil, "invalid release page JSON"
+			end
+		end
 		if copy and type(key) == "string" and _list_cache[key] == nil then
 			_list_cache[key] = { body = copy.body, validator = copy.etag, effective_url = copy.url, restored = true }
 		else
@@ -614,8 +636,10 @@ local function _fetch_releases(channel, callback)
 	local active_key, active_page
 	local cancelled = false
 	local cancel, publish_page
-	-- reason: the updater.check_result reason a failure is shown with
-	local function finish(body, status, err, reason)
+	-- reason: the updater.check_result reason a failure is shown with;
+	-- evidence: what the failed page proved (an exhausted rate limit, its
+	-- native receipt), which the check names (UPD-06)
+	local function finish(body, status, err, reason, evidence)
 		if terminal or _release_fetch_cancel ~= cancel then return end
 		terminal = true
 		-- Native etag_save can advance its file before transport/JSON acceptance.
@@ -624,7 +648,7 @@ local function _fetch_releases(channel, callback)
 		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		_persist_list_cache()
-		callback(body, status, err, reason)
+		callback(body, status, err, reason, evidence)
 	end
 	local function page_current(work)
 		return not terminal and _release_fetch_cancel == cancel and rawequal(active_page, work)
@@ -719,18 +743,22 @@ local function _fetch_releases(channel, callback)
 					finish(nil, status, "incomplete conditional response", "no_connection")
 					return
 				end
+				-- A 304 this check cannot answer from its cached page (none, or one
+				-- the response does not belong to) is no list, as on macOS and
+				-- Windows: the public feed still tells whether a release is newer
+				-- (UPD-1, decided by the maintainer on 2026-11-11). The cached
+				-- page goes, so the next check asks without a validator.
 				local cached, association = _list_cache[key], result.etag_receipt
 				if type(cached) ~= "table" or type(association) ~= "table"
 					or association.format ~= "curl-etag-final-v1" or association.conditional_sent ~= true
-					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator then
-					finish(nil, status, "conditional response endpoint association refused", "unexpected"); return
-				end
-				body = cached.body
-				if not body then
-					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
-					finish(nil, status, "not modified, and no release page is cached", "unexpected")
+					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator
+					or not cached.body then
+					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a usable cached release page.", channel, page)
+					_list_cache[key] = nil
+					finish(nil, status, "not modified, and no usable release page is cached", "no_connection")
 					return
 				end
+				body = cached.body
 				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
 			elseif not result or result.ok ~= true then
 				local limit = result and type(result.rate_limit) == "table" and result.rate_limit or {}
@@ -740,14 +768,26 @@ local function _fetch_releases(channel, callback)
 				elseif status == 403 then
 					Logger.warn(LOG, "GitHub refused the releases request (HTTP 403) for channel %s page %d.", channel, page)
 				end
-				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection")
+				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection",
+					{ rate_limited = limited ~= nil,
+						receipt = result and type(result.failure_receipt) == "table" and result.failure_receipt or nil })
 				return
 			else
 				all_unchanged = false
 			end
+			-- A 200 that does not even open a JSON array is a proxy or captive
+			-- portal answering in GitHub's place, not a release list: no
+			-- connection, so the public feed is read, as on macOS (UPD-1, the
+			-- shared release_sources.opens_release_array); a malformed or cut
+			-- array stays a parse failure.
+			if not ReleaseSources.opens_release_array(body) then
+				Logger.warn(LOG, "GitHub releases for channel %s page %d: HTTP %d without a JSON release array.",
+					channel, page, status)
+				finish(nil, status, "HTTP 200 without a JSON release array", "no_connection")
+				return
+			end
 			local valid, decoded = pcall(Json.decode_lossless, body)
-			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
-				or type(decoded) ~= "table" then
+			if not valid or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
@@ -904,13 +944,31 @@ end
 
 M._select_channel_release = _select_channel_release
 
+--- The URL of one named asset, bound to this repository's download path for
+--- the release's own tag, as Windows (_Updater_FindAsset) and the macOS archive
+--- selection bind it: an asset of the right name served from anywhere else is
+--- refused, since its checksum would come from the same answer (UPX-002).
+--- @param body string Raw release JSON.
+--- @param name string Exact asset name.
+--- @return string url The bound URL, or an empty string.
+local function _repository_asset_url(body, name)
+	local url = Parser.parse_asset_url(body, name)
+	if url == "" then return "" end
+	local expected = M.releases_page_url() .. "/download/" .. Parser.parse_tag(body) .. "/" .. name
+	if url ~= expected then
+		Logger.warn(LOG, "Release asset '%s' refused: it is not served from this repository's release path.", name)
+		return ""
+	end
+	return url
+end
+
 --- Selects only the canonical Linux self-update archive from one release.
 --- The shared parser binds name and URL from the same asset object and returns
 --- an empty string when the exact attachment is absent.
 --- @param body string Raw release JSON.
 --- @return string url Exact asset URL, or an empty string.
 local function _select_update_asset(body)
-	return Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_ASSET_NAME)
 end
 
 M._select_update_asset = _select_update_asset
@@ -919,12 +977,12 @@ M._select_update_asset = _select_update_asset
 --- @param body string Raw release JSON.
 --- @return string url Exact checksum asset URL, or an empty string.
 local function _select_checksum_asset(body)
-	return Parser.parse_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
 end
 
 M._select_checksum_asset = _select_checksum_asset
 
---- The detached-signature gate (policy: _shared/modules/updater/asset_signing.json).
+--- The detached-signature gate (policy: _shared/updater/data/asset_signing.json).
 --- Built on first use; M._signature_gate is a test seam.
 --- @return table gate
 local function get_signature_gate()
@@ -932,7 +990,7 @@ local function get_signature_gate()
 	M._signature_gate = require("modules.updater.signature_gate").new({
 		verifier = require("infra.asset_signature"),
 		read_policy = function()
-			local text = Fs.read(Paths.shared("modules/updater/asset_signing.json"))
+			local text = Fs.read(Paths.shared("updater/data/asset_signing.json"))
 			if type(text) ~= "string" then return nil, "bad_policy" end
 			local decoded_ok, decoded = pcall(Json.decode, text)
 			if not decoded_ok or type(decoded) ~= "table" then return nil, "bad_policy" end
@@ -951,10 +1009,43 @@ end
 --- @return string url
 local function _select_signature_asset(body)
 	local name = get_signature_gate().signature_name()
-	return name and Parser.parse_asset_url(body, name) or ""
+	return name and _repository_asset_url(body, name) or ""
 end
 
 M._select_signature_asset = _select_signature_asset
+
+--- Whether a release read from the public feed can be authenticated: the
+--- signing policy names a verification key (docs/tooling/update-signing.md).
+--- @return boolean
+function M.feed_install_available()
+	return get_signature_gate().has_key() == true
+end
+
+--- The installable record of a release the public feed names, which lists no
+--- assets and no digests: the canonical bundle, its checksum and its signature
+--- under their conventional names in this repository's release path, with the
+--- signature required whatever the policy's enforcement. The checksum binds the
+--- downloaded bytes to a digest and the signature binds that digest and the size
+--- to the pinned key, so nothing the feed or the checksum asset says is trusted
+--- on its own.
+--- @param tag string Release tag the feed names.
+--- @return table|nil record nil when the tag is unusable or no key is provisioned.
+function M.feed_release_record(tag)
+	if type(tag) ~= "string" or not tag:match("^[A-Za-z0-9._+-]+$") then return nil end
+	local signature_name = get_signature_gate().signature_name()
+	if not signature_name or not M.feed_install_available() then return nil end
+	local base = M.releases_page_url() .. "/download/" .. tag .. "/"
+	return {
+		tag                = tag,
+		notes              = "",
+		download_url       = base .. LINUX_ASSET_NAME,
+		checksum_url       = base .. LINUX_CHECKSUM_ASSET_NAME,
+		signature_url      = base .. signature_name,
+		signature_required = true,
+		published_at       = "",
+		prerelease         = false,
+	}
+end
 
 --- The installable record of one release object of the release list: its tag
 --- and the canonical Linux bundle with its checksum, or nil when the release
@@ -1030,27 +1121,11 @@ local function _process_release_response(body, channel, check_only)
 
 	local signature_url = _select_signature_asset(body)
 
-	if current == "local" then
-		-- Running from source — always show the latest as available for dev.
-		Logger.info(LOG, "Local source — latest release: %s.", latest_tag)
-		_cached_release = {
-			tag          = latest_tag,
-			notes        = Parser.parse_notes(body),
-			download_url = _select_update_asset(body),
-			checksum_url = _select_checksum_asset(body),
-			signature_url = signature_url ~= "" and signature_url or nil,
-			published_at = Parser.parse_published_at(body),
-			prerelease   = Parser.parse_prerelease_flag(body),
-			check_only   = check_only == true or nil,
-		}
-		_state = "available"
-		return true
-	end
-
 	-- A deliberate switch to another channel offers that channel's latest release
 	-- even when semver orders it below the installed build (the same rule as the
-	-- other drivers, pinned by channel_vectors.json).
-	if not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
+	-- other drivers, pinned by channel_vectors.json). A source checkout offers the
+	-- latest too, but still needs the same installable asset admission below.
+	if current ~= "local" and not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
@@ -1092,6 +1167,8 @@ local function _process_release_response(body, channel, check_only)
 		signature_url = signature_url ~= "" and signature_url or nil,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
+		-- Declared by GitHub, for the download's progress only (UPD-07)
+		size         = Parser.parse_asset_size(body, LINUX_ASSET_NAME),
 	}
 
 	_state = "available"
@@ -1112,6 +1189,30 @@ local function publish_check(callback, available, release, err, result)
 	if type(callback) ~= "function" then return end
 	local ok, callback_error = pcall(callback, available, release, err, result)
 	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
+end
+
+local _network_contract = nil
+
+--- The evidence a failed check names (updater.check_result failure_key): the
+--- API's exhausted rate limit, and the managed-network cause the shared
+--- contract classifies from the fetch's native receipt. No receipt, no cause.
+--- @param evidence table|nil { rate_limited = boolean, receipt = table|nil }
+--- @return table|nil { rate_limited, report }
+function M._check_evidence(evidence)
+	if type(evidence) ~= "table" then return nil end
+	local report = nil
+	if type(evidence.receipt) == "table" and next(evidence.receipt) ~= nil then
+		if not _network_contract then
+			local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
+			local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+			assert(status == "ok", "managed network policy read or close refused")
+			_network_contract = require("core.network.engine.failure").new(Json.decode(source))
+		end
+		local classified, value = pcall(_network_contract.classify, evidence.receipt, {})
+		if classified then report = value
+		else Logger.error(LOG, "The check's failure receipt could not be classified: %s.", tostring(value)) end
+	end
+	return { rate_limited = evidence.rate_limited == true, report = report }
 end
 
 --- Checks the GitHub API for a newer release without blocking the event loop.
@@ -1138,7 +1239,8 @@ function M.check_for_updates(channel, callback)
 	_state = "checking"
 	local published = false
 	--- Publishes a check that gave no list.
-	local function publish_failure(status, fetch_error, reason)
+	--- @param evidence table|nil The API attempt's { rate_limited, receipt }.
+	local function publish_failure(status, fetch_error, reason, evidence)
 		_cached_release = known
 		_state = known and "available" or "idle"
 		Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
@@ -1148,7 +1250,7 @@ function M.check_for_updates(channel, callback)
 			Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
 		end
 		publish_check(callback, known ~= nil, known, fetch_error or "empty body",
-			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
+			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body", M._check_evidence(evidence)))
 	end
 	--- Publishes a list: the API's, or the public feed's when check_only.
 	local function publish_list(body, check_only)
@@ -1169,14 +1271,14 @@ function M.check_for_updates(channel, callback)
 		publish_check(callback, available, _cached_release, nil, result)
 	end
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
-		function(body, status, fetch_error, reason)
+		function(body, status, fetch_error, reason, evidence)
 			published = true
 			if body then
 				publish_list(body, false)
 				return
 			end
 			if reason ~= "no_connection" then
-				publish_failure(status, fetch_error, reason)
+				publish_failure(status, fetch_error, reason, evidence)
 				return
 			end
 			-- api.github.com gave no list (blocked, throttled, rate-limited): the
@@ -1191,12 +1293,12 @@ function M.check_for_updates(channel, callback)
 				if list then
 					publish_list(list, true)
 				else
-					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason)
+					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason, evidence)
 				end
 			end)
 			if not started and not feed_published then
 				feed_published = true
-				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason)
+				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason, evidence)
 			end
 		end)
 	if not ok then
@@ -1244,11 +1346,15 @@ end
 --- @param generation number Captured logical schedule owner.
 local function _complete_background_check(ok, available, release, generation)
 	if not _schedule_current(generation) then return end
-	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
+	local previous = _load_check_state()
+	if not previous then return end
+	local state = Schedule.record_check(previous, M._now(), ok)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
-	if not available or not release then return end
+	-- A failed check still hands back the release already known; as on
+	-- Windows, only a successful check announces one (UPL-001).
+	if not ok or not available or not release then return end
 	if Version.normalize_tag(release.tag) == Version.normalize_tag(state.last_notified_tag or "") then
 		Logger.info(LOG, "Background check result: %s available, already notified.", release.tag)
 		return
@@ -1283,6 +1389,10 @@ local function _evaluate_schedule()
 	if _schedule_active ~= true then return end
 	_bg_timer_handle = nil
 	local now = M._now()
+	if _started_at and now < _started_at then
+		Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+		_started_at = now
+	end
 	-- A luv timer does not advance during a suspend: a wall-clock gap longer
 	-- than the delay it was armed for is a wake, after which the network needs
 	-- the boot delay before a catch-up check.
@@ -1291,9 +1401,11 @@ local function _evaluate_schedule()
 			now - _armed_at, _armed_for)
 		_started_at = now
 	end
+	local state = _load_check_state()
+	if not state then _arm_schedule(TIMING.reevaluate_sec); return end
 	local due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at or now, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
+		state = state, timing = TIMING,
 	})
 	if due_at == nil then
 		Logger.debug(LOG, "Automatic update checks are off (%s).", reason)
@@ -1382,20 +1494,31 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		Logger.debug(LOG, "Local source — background checks disabled.")
 		return true
 	end
-	-- A system package owns its own update path: install_archive() refuses to
-	-- replace it, so a background check would only offer what cannot be installed.
-	if M.installation_kind() == "package" then
-		Logger.info(LOG, "Package installation: no automatic update check, the package manager updates it.")
+	-- A system package or a Flatpak owns its own update path, which also
+	-- announces a new release: install_archive() refuses to replace it, so a
+	-- background check would only offer what cannot be installed. An AppImage
+	-- has no such announcer: its checks run and only announce (install_origin).
+	local kind = M.installation_kind()
+	local InstallOrigin = require("modules.updater.install_origin")
+	if not InstallOrigin.checks_for_releases(kind) then
+		Logger.info(LOG, "No automatic update check for this %s installation: its own updater replaces it.", kind)
 		return true
+	end
+	if InstallOrigin.update_blocked_key(kind) then
+		Logger.info(LOG, "This %s installation never replaces itself; its background checks only announce "
+			.. "a new release.", kind)
 	end
 
 	_schedule_active = true
 	_started_at = _started_at or M._now()
 	local now = M._now()
-	local due_at, reason = Schedule.next_due({
+	if now < _started_at then _started_at = now end
+	local state = _load_check_state()
+	local due_at, reason
+	if state then due_at, reason = Schedule.next_due({
 		now = now, started_at = _started_at, interval = _check_interval,
-		state = _load_check_state(), timing = TIMING,
-	})
+		state = state, timing = TIMING,
+	}) else reason = "record_unavailable" end
 	local first_delay = due_at and Schedule.delay_until(due_at, now, TIMING) or TIMING.reevaluate_sec
 	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
 		_check_interval, _channel, first_delay, reason)
@@ -1447,11 +1570,13 @@ end
 --- @param callback function|nil
 --- @param path string|nil
 --- @param err string|nil
---- @param stage string|nil "download" or "verify": where a failure happened.
+--- @param stage string|nil "download", "verify" or "signature": where a failure happened.
 --- @param release table|nil The release the archive belongs to.
 --- @param failure_state string The updater state a failure returns to.
 --- @param failure_receipt table|nil Structured native evidence, never inferred from err.
 local function publish_download(callback, path, err, stage, release, failure_state, failure_receipt)
+	-- An offer survives its failed download only while it is still the cached one
+	if not path and failure_state == "available" and _cached_release == nil then failure_state = "idle" end
 	_state = path and "available" or failure_state
 	_verified_archive = path
 	_verified_release = path and release or nil
@@ -1488,6 +1613,7 @@ local function release_snapshot(release)
  if type(signature_url) == "string" and signature_url ~= "" and not signature_url:find("\0", 1, true) then
   copy.signature_url = signature_url
  end
+ if rawget(release, "signature_required") == true then copy.signature_required = true end
  return copy
 end
 local function retire_verified_artifact()
@@ -1527,7 +1653,7 @@ local function capture_operation(operation)
  if type(methods.is_settled) ~= "function" or type(methods.on_settled) ~= "function" or type(methods.cancel) ~= "function" then return nil end
  return methods
 end
-local function start_native_download(release, download_url, callback, failure_state, execution)
+local function start_native_download(release, download_url, callback, failure_state, execution, on_progress)
  if native_transfer or native_install or native_channel_intent then return false end
  local selected = release_snapshot(release)
  if not selected or selected.download_url ~= download_url or (execution ~= nil and type(execution) ~= "function") then return false end
@@ -1623,7 +1749,7 @@ local function start_native_download(release, download_url, callback, failure_st
  local initialized, flow = pcall(function()
   local Output = require("infra.archive_output")
   local Transfer = require("modules.updater.archive_transfer")
-  local Clock = require("infra.monotonic")
+  local Clock = require("core.logger.engine.monotonic")
   local native_artifact = rawget(Output, "native_artifact")
   local make_transfer = rawget(Transfer, "new")
   if type(native_artifact) ~= "function" or type(make_transfer) ~= "function"
@@ -1646,7 +1772,7 @@ local function start_native_download(release, download_url, callback, failure_st
    end,
    parse_checksum = parse_checksum, owner = REQUEST_OWNER, headers = { ["User-Agent"] = USER_AGENT },
    max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES,
-   signature = get_signature_gate() })
+   signature = get_signature_gate(), on_progress = on_progress })
  end)
  local started, operation
  if initialized and type(flow) == "table" and type(rawget(flow, "start")) == "function" then
@@ -1678,15 +1804,17 @@ local function start_native_download(release, download_url, callback, failure_st
  return record.operation ~= nil and not record.unknown -- Exact owned transaction admission, not HTTP success.
 end
 
-local function start_download(release, download_url, callback, failure_state, execution)
- return start_native_download(release, download_url, callback, failure_state, execution)
+local function start_download(release, download_url, callback, failure_state, execution, on_progress)
+ if on_progress ~= nil and type(on_progress) ~= "function" then return false end
+ return start_native_download(release, download_url, callback, failure_state, execution, on_progress)
 end
 
 --- Downloads and verifies the canonical update archive asynchronously.
 --- @param url string|nil Must match the cached release URL when provided.
 --- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
+--- @param on_progress function|nil Told the archive bytes received so far (UPD-07).
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_update(url, callback)
+function M.download_update(url, callback, on_progress)
  if native_channel_intent then return false end
 	local release = _cached_release
 	local download_url = url or (release and release.download_url)
@@ -1701,7 +1829,9 @@ function M.download_update(url, callback)
 		if type(callback) == "function" then callback(nil, "updater is not ready to download", "download") end
 		return false
 	end
-	return start_download(release, download_url, callback, "idle")
+	-- A failed or cancelled download keeps the offer, so the menu still says
+	-- « Update now », as a Versions download does (UPD-08)
+	return start_download(release, download_url, callback, "available", nil, on_progress)
 end
 
 --- Downloads and verifies the archive of a release the user chose in the
@@ -1710,7 +1840,7 @@ end
 --- @param release table M.release_record() result.
 --- @param callback function|nil Receives verified path, error, failing stage.
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_release(release, callback, native_execution)
+function M.download_release(release, callback, native_execution, on_progress)
  if native_channel_intent then return false end
 	if type(release) ~= "table" or type(release.tag) ~= "string" or release.tag == ""
 		or type(release.download_url) ~= "string" or release.download_url == ""
@@ -1725,7 +1855,7 @@ function M.download_release(release, callback, native_execution)
 		return false
 	end
 	Logger.info(LOG, "Downloading the chosen release %s.", release.tag)
-	return start_download(release, release.download_url, callback, _state, native_execution)
+	return start_download(release, release.download_url, callback, _state, native_execution, on_progress)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.
@@ -1819,6 +1949,7 @@ local function install_archive(archive_path, expected_version)
 	_verified_archive = nil
 	_verified_release = nil
 	_installed_launcher = context.wrapper
+	_installed_root = context.install_root
 	_state = "idle"
 	return true
 end
@@ -1886,7 +2017,7 @@ local function install_native_archive(path, tag, callback, admission)
   local completed = work.result.installed == true
   if completed then
    native_verified, _verified_archive, _verified_release = nil, nil, nil
-   _installed_launcher, _state = captured_context.wrapper, "idle"
+   _installed_launcher, _installed_root, _state = captured_context.wrapper, captured_context.install_root, "idle"
   else _state = "available" end
   pcall(callback, completed, work.result.detail, work.result.receipt)
  end
@@ -1917,7 +2048,7 @@ end
 
 --- Whether this installation can replace itself (a standalone install), and
 --- why not otherwise.
---- @return string kind "standalone", "package" or "unmanaged"
+--- @return string kind "standalone", "package", "appimage", "flatpak" or "unmanaged"
 --- @return string|nil reason
 function M.installation_kind()
 	local ok, context = pcall(M._resolve_installation)
@@ -1930,6 +2061,13 @@ end
 --- @return string|nil
 function M.installed_launcher()
 	return _installed_launcher
+end
+
+--- The root of the installation the last update replaced; its `.old` sibling
+--- holds the previous installation the restart watcher puts back.
+--- @return string|nil
+function M.installed_root()
+	return _installed_root
 end
 
 -- =========================================
@@ -1988,9 +2126,15 @@ end
 --- @param seconds number
 --- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
-	local s = tonumber(seconds)
-	if not s or s < 0 then return false end
-	local wanted = math.floor(s)
+	-- The consuming boundary: a string, a fraction, NaN, an infinity or a value
+	-- out of the declared range never reaches config.toml or the timer.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), seconds)
+	if not checked.ok then
+		Logger.error(LOG, "Check interval '%s' refused (%s).", tostring(seconds), checked.reason)
+		return false
+	end
+	local wanted = checked.value
 	if wanted == _check_interval then return true end
 	if type(_config_path) ~= "string" or _config_path == "" then
 		Logger.error(LOG, "Check interval %ds cannot be saved: the updater has no config path (init not run).", wanted)
@@ -2070,7 +2214,7 @@ end
 --- separate "Download and install <tag>" row names and installs that release.
 --- @return string
 function M.get_menu_label()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	if _state == "checking" then
 		return i18n.get("menu.about.update_checking")
 	end
@@ -2102,7 +2246,7 @@ function M.init(opts)
 	_is_paused = opts.is_paused
 	_on_available = opts.on_available
 
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_load_persisted()
 
 	if opts.channel then
@@ -2118,7 +2262,7 @@ function M.init(opts)
 	-- A local version run from source has no installation to update: it
 	-- checks for nothing on its own, as on the other two drivers, and the
 	-- tray greys its check and frequency rows.
-	if require("infra.installation").is_source_run() then
+	if require("core.lifecycle.engine.installation").is_source_run() then
 		Logger.info(LOG, "Local version run from source: no automatic update check.")
 		return
 	end

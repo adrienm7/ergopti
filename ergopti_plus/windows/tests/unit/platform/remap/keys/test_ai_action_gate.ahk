@@ -200,7 +200,7 @@ _AAG_KeyboardHandles() {
 	SavedAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	Handles := _KeyboardShortcutAiHandles()
 	SavedHandles := Handles.Clone()
-	State := MagicEditorState()
+	State := StarSlotState()
 	SavedClaim := State["ordinary_claim"], SavedInitialized := State["initialized"]
 	_AAG_WithAi(_Body)
 	_Body(SetAi) {
@@ -279,7 +279,7 @@ _AAG_Broker() {
 	global KeyboardShortcutAssignments, CategoryEnabled
 	SavedAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	SavedCategory := CategoryEnabled.Get("Shortcuts", true)
-	State := MagicEditorState()
+	State := StarSlotState()
 	Saved := State.Clone()
 	_AAG_WithAi(_Body)
 	_Body(SetAi) {
@@ -292,7 +292,7 @@ _AAG_Broker() {
 			State["legacy"] := Map()
 			State["layouts"] := Map()
 			State["ordinary_physical"] := Map("SC029", Map("slot", "meta_sc029", "action", AAG_ACTION))
-			_AAG_WithFn(_MagicEditorAdmission, (*) => Map("master", true, "paused", false, "inhibited", false), _Press)
+			_AAG_WithFn(_StarSlotAdmission, (*) => Map("master", true, "paused", false, "inhibited", false), _Press)
 		} finally {
 			KeyboardShortcutAssignments := IsSet(SavedAssignments) ? SavedAssignments : unset
 			CategoryEnabled["Shortcuts"] := SavedCategory
@@ -300,11 +300,11 @@ _AAG_Broker() {
 				State[Key] := Value
 		}
 		_Press() {
-			AssertFalse(_MagicEditorBrokerWinner("SC029") is Map, "the broker leaves the chord to the system")
+			AssertFalse(_StarSlotBrokerWinner("SC029") is Map, "the broker leaves the chord to the system")
 			SetAi(true)
-			AssertEqual("ordinary", _MagicEditorBrokerWinner("SC029")["kind"], "armed by the switch-on")
+			AssertEqual("ordinary", _StarSlotBrokerWinner("SC029")["kind"], "armed by the switch-on")
 			SetAi(false)
-			AssertEqual("none", _MagicEditorArmedAction("meta_sc029"), "no contextual delivery of an AI action")
+			AssertEqual("none", _StarSlotArmedAction("meta_sc029"), "no contextual delivery of an AI action")
 		}
 	}
 }

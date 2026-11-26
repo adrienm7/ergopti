@@ -48,7 +48,7 @@ local function load_fixture(options)
 		path = function() return "/Applications/Fixture.app" end,
 		pid = function() return 42 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = {
 			frontmostApplication = function() return front_app end,
 		},
@@ -74,15 +74,19 @@ local function load_fixture(options)
 			if options.on_log then options.on_log(fixture, record) end
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local defaults = make_defaults()
 	-- The engine reads its enable switch from these defaults when it loads.
 	if options.llm_enabled == false then defaults.llm_enabled = false end
+	-- Token-by-token rows of every prediction slot, as the streaming menu sets.
+	if options.streaming_multi == true then defaults.llm_streaming_multi = true end
 	local core = {
 		DEFAULT_STATE = defaults,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		-- The settings a request is sent with (AID-3): unchanged unless a test edits them
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		-- The global profile, and the registry prompt actions look profiles up in
 		get_active_profile = function() return options.active_profile end,
 		find_profile = function(id) return (options.profiles or {})[id] end,
@@ -109,12 +113,13 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["modules.llm"] = core
+	package.loaded["ai.engine"] = core
 	-- The pipeline test controls the focused-window classification boundary. A
 	-- newly loaded real keymap cache is deliberately unknown until its async AX
 	-- prewarm commits, which would make this fixture stop before backend dispatch.
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
+		window_mode_admits = function() return false end,
 	}
 
 	local tooltip = {
@@ -136,6 +141,7 @@ local function load_fixture(options)
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function()
 			fixture.hides = fixture.hides + 1
 			return true
@@ -145,7 +151,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
@@ -159,19 +165,19 @@ local function load_fixture(options)
 	-- These internal modules must be real: the regression guards their transitive
 	-- callback contract, not a test-local reproduction of either half.
 	for _, module_name in ipairs({
-		"modules.llm.parser",
-		"modules.llm.prompt_builder",
-		"modules.llm.streaming_handler",
-		"modules.llm.warmup_controller",
-		"modules.llm.app_filter",
-		"modules.llm.api_common",
-		"modules.llm.prediction_engine",
+		"ai.engine.api.parser",
+		"ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler",
+		"ai.engine.local_servers.warmup_controller",
+		"ai.engine.prediction.app_filter",
+		"ai.engine.api.common",
+		"ai.engine.prediction.engine",
 	}) do
 		package.loaded[module_name] = nil
 	end
 
-	local StreamingHandler = require("modules.llm.streaming_handler")
-	local Engine = require("modules.llm.prediction_engine")
+	local StreamingHandler = require("ai.engine.api.streaming_handler")
+	local Engine = require("ai.engine.prediction.engine")
 	fixture.handler = StreamingHandler
 	fixture.engine = Engine
 	-- The typed buffer the engine reads at every check: a test changes it to

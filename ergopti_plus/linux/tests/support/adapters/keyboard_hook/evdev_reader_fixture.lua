@@ -57,7 +57,7 @@ end
 --- @param value integer
 --- @return string
 local function encoded(ev_type, code, value)
-	local ie = require("infra.input_event")
+	local ie = require("platform.input.event")
 	return ie.encode(ev_type, code, value)
 end
 
@@ -68,7 +68,7 @@ end
 local function controlled_native_reader(rows, options, body)
 	options = options or {}
 	local old_ffi, old_preload = package.loaded.ffi, package.preload.ffi
-	local codec = require("infra.input_event")
+	local codec = require("platform.input.event")
 	local log = { reads = 0, closes = 0, opens = 0, grabs = 0 }
 	local reader
 	local symbols = {
@@ -101,7 +101,7 @@ local function controlled_native_reader(rows, options, body)
 			buffer.bytes = bytes
 			return #bytes
 		end,
-		poll = function() return 1 end,
+		poll = function() return options.poll_result ~= nil and options.poll_result or 1 end,
 		close = function(fd)
 			log.closes = log.closes + 1
 			if options.before_close then options.before_close(reader, fd) end
@@ -114,7 +114,13 @@ local function controlled_native_reader(rows, options, body)
 		return {
 			cdef = function() if options.before_cdef then options.before_cdef(reader) end end,
 			sizeof = function() return 24 end,
-			new = function(kind) return kind == "struct pollfd[1]" and { [0] = {} } or { bytes = "" } end,
+			new = function(kind, count)
+				if kind == "struct pollfd[1]" then return { [0] = {} } end
+				if kind == "struct pollfd[?]" then
+					local result = {}; for index = 0, count - 1 do result[index] = {} end; return result
+				end
+				return { bytes = "" }
+			end,
 			cast = function(_, value) return value end,
 			string = function(buffer, count)
 				if options.before_string then options.before_string(reader) end
@@ -126,7 +132,7 @@ local function controlled_native_reader(rows, options, body)
 	end
 	codec._reset_measurement()
 	local called, err = pcall(function()
-		reader = helpers.load_module("adapters.evdev_reader")
+		reader = helpers.load_module("platform.input.evdev_reader")
 		body(reader, log, symbols)
 	end)
 	package.loaded.ffi, package.preload.ffi = old_ffi, old_preload
@@ -163,7 +169,7 @@ end
 local function controlled_held_reader(options, body)
 	options = options or {}
 	local saved_ffi, saved_preload = package.loaded.ffi, package.preload.ffi
-	local codec = require("infra.input_event")
+	local codec = require("platform.input.event")
 	local reader
 	local log = { queries = 0, led_queries = 0, opens = 0, closes = 0 }
 	local function bitmap(count, codes)
@@ -219,7 +225,7 @@ local function controlled_held_reader(options, body)
 	end
 	codec._reset_measurement()
 	local called, reason = pcall(function()
-		reader = helpers.load_module("adapters.evdev_reader")
+		reader = helpers.load_module("platform.input.evdev_reader")
 		body(reader, options, log, symbols)
 	end)
 	package.loaded.ffi, package.preload.ffi = saved_ffi, saved_preload

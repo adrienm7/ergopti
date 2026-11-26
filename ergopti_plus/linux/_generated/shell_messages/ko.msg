@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/ko.msg
-# AUTO-GENERATED from _shared/data/locales/ko.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ko.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT 네트워킹 모듈을 소스에서 빌드했습니다.
 build_luv.recipe_required=luv 네이티브 빌드에는 소스 레시피가 필요합니다.
 install.already_installed={1} — 이미 설치됨
 install.archive_digest_unavailable=유지된 디스크립터 업데이트에는 실제 OpenSSL3 런타임이 필요합니다. 이 기능은 계속 사용할 수 없습니다.
+install.bytecode_skipped=미리 컴파일된 모듈을 만들 수 없습니다 — Ergopti가 소스에서 시작하므로 조금 느려집니다.
 install.capability_verified={1} — 기능 확인됨
 install.command_still_missing={1}을(를) 설치했지만 '{2}'을(를) 여전히 찾을 수 없습니다.
 install.daemon_manual=데몬을 직접 시작하려면:
 install.daemon_running=데몬이 백그라운드에서 실행 중입니다. 상태를 확인하려면:
+install.focus_integration_enabled={1} 포커스 연동을 활성화했습니다
+install.focus_integration_failed={1} 포커스 연동을 활성화할 수 없습니다 — 이 데스크톱에서는 애플리케이션별 규칙이 비활성 상태로 유지됩니다.
+install.focus_integration_next_login={1} 포커스 연동을 설치했습니다 (다음 로그인부터 적용)
+install.focus_integration_updated={1} 포커스 연동을 업데이트했습니다
 install.gnome_extension_active=GNOME AppIndicator 확장 — 이미 활성화됨
 install.gnome_extension_enabled=GNOME AppIndicator 확장을 켰습니다
 install.gnome_extension_failed=AppIndicator 확장을 켤 수 없습니다. 이 확장이 없으면 GNOME에 아이콘이 표시되지 않습니다.
 install.gnome_extension_missing=GNOME AppIndicator 확장 없음 — {1} 설치 중…
 install.gnome_extension_next_login=GNOME AppIndicator 확장을 켰습니다(다음 로그인부터 적용)
+install.gnome_extension_not_installed=이 배포판에는 GNOME AppIndicator 확장을 제공하는 패키지가 없습니다. {1}에서 AppIndicator and KStatusNotifierItem Support를 설치한 뒤 로그아웃했다가 다시 로그인하세요 — 이 확장이 없으면 GNOME은 아이콘을 표시하지 않습니다.
 install.gnome_without_extensions=gnome-extensions가 없는 GNOME — 아이콘을 보려면 AppIndicator 확장을 켜세요.
 install.help_help=이 도움말을 표시합니다
 install.help_no_deps=종속성을 설치하지 않습니다(직접 준비하세요)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — 종속성 확인
 install.section_deps_skipped=종속성 건너뜀(--no-deps)
 install.section_done=설치 완료
 install.section_files=파일 설치
+install.section_focus=Wayland의 활성 애플리케이션 (GNOME, KDE)
 install.section_lua_deps=선택적 Lua 종속성(이벤트 루프, 타이머, 웹뷰, 신호)
 install.section_permissions=입력 권한(sudo 필요)
 install.section_services=systemd 사용자 서비스 만들기
@@ -63,6 +70,7 @@ install.section_tray=시스템 트레이 아이콘과 창
 install.security_warning_body='input' 그룹에 속하면 어떤 애플리케이션에서 입력한 암호를 포함해 세션의 모든 키 입력을 읽을 수 있습니다. 핫스트링 엔진에는 바로 이것이 필요하며, keyd와 xremap도 마찬가지입니다.
 install.security_warning_title=보안 경고
 install.service_started=ergopti-hotstrings 서비스를 켜고 시작했습니다
+install.session_without_graphical_target=이 세션은 systemd의 graphical-session.target을 시작하지 않습니다 (i3, Openbox, Xfce, 세션 관리자 없는 sway). 따라서 사용자 유닛은 실행되지 않으므로 Ergopti+는 다음 로그인 때 XDG 자동 시작 항목으로 시작됩니다. XDG 자동 시작을 무시하는 창 관리자(i3, sway)는 설정에 exec {1} 줄이 필요합니다.
 install.source_toolchain_unavailable=설치된 컴파일러로는 네이티브 아카이브 백엔드를 빌드할 수 없습니다.
 install.startup_choice_unreadable=시작 선택을 읽을 수 없습니다.
 install.summary_config=설정: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG 자동 시작: {1}
 launch.already_running=Ergopti+가 이 세션에서 이미 실행 중입니다({1} 사용 중). 이번 실행은 거부되었습니다.
 launch.authorization_failed=입력 접근 권한 승인이 취소되었거나 실패했습니다.
 launch.groups_unavailable=세션이 설정된 입력 그룹을 얻지 못했습니다.
+launch.restarting=Ergopti+가 이 세션에서 이미 실행 중입니다. 종료를 요청한 다음 다시 시작합니다.
+launch.session_lock_invalid=세션 잠금 폴더는 절대 경로여야 합니다.
 launcher.dependencies_installed=종속성을 설치했습니다.
 launcher.driver_missing=오류: Linux 드라이버 디렉터리를 찾을 수 없습니다: {1}
 launcher.install_deps_hint=실행: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=설치 경로가 심볼릭 링크를 거칩니다.
 uninstall.system_prefix=시스템 설치 접두사를 거부했습니다.
 uninstall.unsafe_path=소유권 경로가 안전하지 않습니다.
 uninstall.unsupported_argument=지원되지 않는 제거 인수: {1}
+xkb_helpers.not_found=키보드 배열 설치 파일을 {1} 옆에서도 {2}에서도 찾을 수 없습니다. 이 파일이 없으면 배열을 설치할 수 없습니다.

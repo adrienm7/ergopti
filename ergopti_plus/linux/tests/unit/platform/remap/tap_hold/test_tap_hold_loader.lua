@@ -14,26 +14,62 @@ local helpers = require("tests.helpers")
 -- an earlier suite loaded under a substitute logger would report elsewhere.
 local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
---- Loads the defaults with a user file holding `text`.
+--- Loads the defaults with a user file holding `text`, its switch and timings
+--- in the config.toml beside it (tests/support/tap_hold_fixture.lua).
 local function load(text)
 	local path = os.tmpname()
-	local fh = assert(io.open(path, "w"))
-	fh:write(require("tests.support.tap_hold_fixture").with_preset(text))
-	fh:close()
-	local loaded = Config.load(DEFAULTS, path)
+	local config_path = require("tests.support.tap_hold_fixture").write(path, text)
+	local loaded = Config.load(DEFAULTS, path, config_path)
 	os.remove(path)
+	os.remove(config_path)
 	return loaded
 end
 
 helpers.describe("tap-hold config: the user file over the shared defaults", function()
+	helpers.it("refuses a FIFO tap-hold source without blocking or calling it absent", function()
+		local uv = require("luv")
+		local Shell = require("core.process.adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local code = string.format([[package.path = %q
+local loader = require("platform.remap.tap_hold_loader")
+local result = loader.load(%q, %q)
+assert(type(result.user_error) == "string", "a FIFO is not an absent source")
+assert(result.enabled == false and next(result.keys) == nil)
+]], package.path, DEFAULTS, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "tap-hold initialization must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
 
 	helpers.it("keeps every key neutral when the user file is absent", function()
 		local loaded = Config.load(DEFAULTS, "/nonexistent/tap_hold.toml")
 		helpers.assert_eq(loaded.enabled, false)
 		helpers.assert_nil(next(loaded.keys))
 		helpers.assert_nil(loaded.user_error)
+	end)
+
+	helpers.it("reports an inaccessible user path rather than treating it as absent", function()
+		local loaded = Config.load(DEFAULTS, DEFAULTS .. "/child")
+		helpers.assert_eq(loaded.user_error, "unreadable")
+		helpers.assert_eq(loaded.enabled, false)
+		helpers.assert_nil(next(loaded.keys))
 	end)
 
 	helpers.it("changes one field and keeps the others", function()
@@ -61,13 +97,36 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_nil(next(loaded.keys), "Disable all leaves no tap-hold")
 	end)
 
-	helpers.it("reads the feature switch", function()
+	helpers.it("reads the feature switch from config.toml", function()
 		helpers.assert_true(not load('[tap_hold]\nenabled = false\n').enabled)
+		helpers.assert_true(load('[tap_hold]\nenabled = true\n').enabled)
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n")
+		fh:close()
+		helpers.assert_eq(Config.load(DEFAULTS, path).enabled, false, "a switch left in tap_hold.toml is never read")
+		os.remove(path)
 	end)
 
 	helpers.it("falls back to the global delay for a threshold out of range", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntime_activation_seconds = 30\n')
 		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.GLOBAL_DEFAULT_SECONDS)
+	end)
+
+	helpers.it("falls back to the global delay for a NaN key threshold", function()
+		local loaded = load('[tap_hold]\ntime_activation_seconds = 0.4\n[tap_hold.keys.left_shift]\ntime_activation_seconds = nan\n')
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.4)
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
+			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end })
+		engine:process(Engine.KEY_CODES.left_shift, 1, 0)
+		local _, tap = engine:process(Engine.KEY_CODES.left_shift, 0, 100)
+		helpers.assert_eq(tap, "copy", "the fallback threshold must admit a short tap")
+	end)
+
+	helpers.it("rejects a quoted key threshold as the wrong TOML type", function()
+		local loaded = load('[tap_hold]\ntime_activation_seconds = 0.4\n[tap_hold.keys.left_shift]\ntime_activation_seconds = "0.1"\n')
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.4)
 	end)
 
 	helpers.it("disables a key with a field of the wrong type", function()
@@ -76,7 +135,7 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 	end)
 
 	helpers.it("warns once about a key or field it does not have, and applies the rest (config-outdated-tap-hold)", function()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -112,7 +171,7 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		local broken, replaced = text:gsub('(%[tap_hold%.keys%.caps_lock%][^%[]-hold_modifier%s*=%s*)"ctrl"', '%1"hyper"', 1)
 		helpers.assert_eq(replaced, 1, "the fixture edits the shipped caps_lock hold")
 		local defaults_path, user_path = os.tmpname(), os.tmpname()
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -141,7 +200,9 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 	helpers.it("reports a malformed user file and keeps every key neutral", function()
 		local loaded = load('[tap_hold.keys.left_shift\ntap_action = "paste"\n')
 		helpers.assert_eq(loaded.user_error, "malformed")
-		helpers.assert_eq(loaded.enabled, false)
+		-- The switch is the config.toml row (on in this fixture), which reads
+		-- fine; the malformed tap_hold.toml leaves every key neutral.
+		helpers.assert_eq(loaded.enabled, true)
 		helpers.assert_nil(next(loaded.keys))
 	end)
 
@@ -154,7 +215,7 @@ end)
 helpers.describe("tap-hold config: the spellings of a hold", function()
 
 	local Engine = require("platform.remap.tap_hold_engine")
-	local HoldOptions = require("tap_hold.hold_options")
+	local HoldOptions = require("tap_hold.engine.hold_options")
 
 	--- The modifier codes the engine presses when `key_id` goes down.
 	local function held_codes(keys, key_id)
@@ -170,7 +231,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 	--- Loads `hold_modifier = value` on AltGr and captures the errors and
 	--- warnings logged.
 	local function load_hold(field, value)
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error, real_warn, errors = Logger.error, Logger.warn, {}
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		Logger.warn = Logger.error
@@ -241,7 +302,7 @@ helpers.describe("tap-hold config: the spellings of a hold", function()
 			{ "hold_modifier", "hyper" }, { "hold_modifier", "ctrl+alt gr" }, { "hold_modifier", "none" },
 			{ "hold_layer", "sym" },
 		}) do
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local real_error, real_warn, errors, warnings = Logger.error, Logger.warn, {}, {}
 			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -279,8 +340,18 @@ helpers.describe("tap-hold config: the wizard's report of a folder", function()
 		local fh = assert(io.open(path, "w"))
 		fh:write(text)
 		fh:close()
-		local result, err = Config.key_report(DEFAULTS, path)
+		local tap_text = text:gsub("%[tap_hold%]\nenabled = %a+\n", "[tap_hold]\n")
+		fh = assert(io.open(path, "w"))
+		fh:write(tap_text)
+		fh:close()
+		local config_path = path .. ".config.toml"
+		local switch = text:match("%[tap_hold%]\nenabled = (%a+)\n")
+		fh = assert(io.open(config_path, "w"))
+		fh:write(switch and ("[tap_holds]\nenabled = " .. switch .. "\n") or "")
+		fh:close()
+		local result, err = Config.key_report(DEFAULTS, path, config_path)
 		os.remove(path)
+		os.remove(config_path)
 		return result, err
 	end
 

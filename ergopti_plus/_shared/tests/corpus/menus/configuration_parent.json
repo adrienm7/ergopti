@@ -3,30 +3,48 @@
 		"parent": "Configuration",
 		"quit": "⏹ Quit",
 		"children": [
+			"— Reset —",
 			"↺ Restore recommended values",
 			"✕ Clear all (system behaviour)",
 			"-",
+			"— Files and wizard —",
 			"Clean config.toml",
-			"-",
 			"Paths (configuration & logs)…",
 			"Setup wizard…",
 			"-",
-			"Proxy for downloads…"
-		]
+			"— Network —",
+			"Proxy for downloads…",
+			"-",
+			"— Accessibility —",
+			"Font of the windows and menus: Default",
+			"Text spacing of the windows: Default"
+		],
+		"linux_children": {
+			"Font of the windows and menus: Default": "Font of the windows (menus follow the desktop theme): Default"
+		}
 	},
 	"fr": {
 		"parent": "Configuration",
 		"quit": "⏹ Quitter",
 		"children": [
+			"— Réinitialisation —",
 			"↺ Restaurer les valeurs conseillées",
 			"✕ Tout effacer (comportement du système)",
 			"-",
+			"— Fichiers et assistant —",
 			"Nettoyer config.toml",
-			"-",
 			"Chemins (configuration & logs)…",
 			"Assistant de configuration…",
 			"-",
-			"Proxy des téléchargements…"
-		]
+			"— Réseau —",
+			"Proxy des téléchargements…",
+			"-",
+			"— Accessibilité —",
+			"Police des fenêtres et menus : Par défaut",
+			"Espacement du texte des fenêtres : Par défaut"
+		],
+		"linux_children": {
+			"Police des fenêtres et menus : Par défaut": "Police des fenêtres (les menus suivent le thème du bureau) : Par défaut"
+		}
 	}
 }

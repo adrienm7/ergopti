@@ -384,7 +384,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
 				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
 		end
-		local Keycodes = require("infra.keycodes")
+		local Keycodes = require("platform.input.keycodes")
 		helpers.assert_true(type(manipulator.to_if_alone) == "table"
 			and type(manipulator.to_if_alone[1]) == "table"
 			and manipulator.to_if_alone[1].key_code == Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED),
@@ -506,6 +506,29 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 		local m = rcmd_manipulator(result)
 		helpers.assert_eq(m.parameters["basic.to_if_alone_timeout_milliseconds"], 200,
 			"timeout_ms <= 0 must resolve to the managed default at manipulator scope")
+	end)
+
+	-- TCL-005: a key's delay in seconds can fall between whole milliseconds; it
+	-- refused the whole Karabiner build, every other key included.
+	helpers.it("(tcl-005-per-key-delay) deploys a delay between whole milliseconds to the nearest one", function()
+		local state = make_state({
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 250.5 } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		helpers.assert_true(type(result) == "table", "the build is not refused")
+		helpers.assert_eq(rcmd_manipulator(result).parameters["basic.to_if_alone_timeout_milliseconds"], 251)
+	end)
+
+	helpers.it("(tcl-005-per-key-delay) a key's delay above the bound follows the global", function()
+		local state = make_state({
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 10001 } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		helpers.assert_eq(rcmd_manipulator(result).parameters["basic.to_if_alone_timeout_milliseconds"], 200)
 	end)
 
 	-- PAR-15: no key ships a delay of its own. A key without an override follows the

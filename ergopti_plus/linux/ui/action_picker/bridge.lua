@@ -26,10 +26,10 @@
 --- ==============================================================================
 
 local M = {}
-local ProgramProviderPicker = require("program_provider_picker")
+local ProgramProviderPicker = require("apps.engine.program_provider_picker")
 M.bridge_name = "action_picker_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.action_picker"
 
 local _session_serial = 0
@@ -41,7 +41,7 @@ local _handle_json, _handle_table
 --- Handles a JSON string payload (shared — no duplicated JSON parsing).
 local function _handle_json(payload_str, state, context)
 	local ok, data = pcall(function()
-		local json_mod = require("json")
+		local json_mod = require("core.text.engine.json")
 		return json_mod.decode(payload_str)
 	end)
 	if not ok or type(data) ~= "table" then
@@ -70,12 +70,12 @@ end
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
 	local o = type(opts) == "table" and opts or {}
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 
 	local items = type(o.items) == "table" and o.items or nil
 	if not items then
 		items = {}
-		local ok_actions, Actions = pcall(require, "modules.gestures.manager")
+		local ok_actions, Actions = pcall(require, "gestures.engine.manager")
 		if not ok_actions or type(Actions.get_picker_items) ~= "function" then
 			Logger.error(LOG, "Cannot build the action catalogue: the gestures action registry is unavailable.")
 		else
@@ -132,13 +132,16 @@ M.pending_opts = nil
 local function close_session(session, context)
 	if _active_session ~= session then return false end
 	local closed = false
+	-- The close notice this hide may raise belongs to this call, not to a title-bar close
+	session.closing = true
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		closed = context.close_owned_window() == true
 	else
-		local ok_manager, Manager = pcall(require, "ui.webview_manager")
+		local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 		closed = ok_manager and type(Manager.hide) == "function"
 			and Manager.hide("action_picker") == true
 	end
+	session.closing = false
 	if not closed then
 		Logger.error(LOG, "Action picker close refused; exact session %s retained.",
 			tostring(session.epoch))
@@ -164,7 +167,7 @@ function M.open(opts, on_confirm, on_cancel)
 		Logger.error(LOG, "Action picker requires a confirmation callback.")
 		return false
 	end
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_manager or type(Manager.show) ~= "function"
 		or type(Manager.hide) ~= "function" then
 		Logger.error(LOG, "Action picker cannot open: webview manager is unavailable.")
@@ -183,7 +186,7 @@ function M.open(opts, on_confirm, on_cancel)
 		local show, eval_js = rawget(Manager, "show"), rawget(Manager, "eval_js")
 		local function owners_live()
 			return getmetatable(source_opts) == nil and getmetatable(Manager) == nil
-				and rawget(package.loaded, "ui.webview_manager") == Manager
+				and rawget(package.loaded, "core.ui.ui.webview_manager") == Manager
 				and rawget(source_opts, "presentation_id") == presentation_id
 				and rawget(source_opts, "presentation_suffix") == suffix
 				and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
@@ -213,7 +216,11 @@ function M.open(opts, on_confirm, on_cancel)
 		local visible = type(Manager.is_visible) == "function"
 			and Manager.is_visible("action_picker") == true
 		if _active_session ~= previous_session then return false end
-		if visible and Manager.hide("action_picker") ~= true then
+		-- Its close notice belongs to this replacement, not to a title-bar close
+		previous_session.closing = true
+		local hidden = not visible or Manager.hide("action_picker") == true
+		previous_session.closing = false
+		if not hidden then
 			Logger.error(LOG, "Action picker replacement refused; prior session retained.")
 			return false
 		end
@@ -240,7 +247,7 @@ function M.open(opts, on_confirm, on_cancel)
 		end or nil,
 	}
 	_active_session = session
-	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	local adapter_ok, adapter = pcall(require, "core.process.adapters.program_providers")
 	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
 	if _active_session ~= session then
 		ProgramProviderPicker.close(session.providers)
@@ -270,8 +277,34 @@ function M.open(opts, on_confirm, on_cancel)
 		if _active_session == session then close_session(session) end
 		return false
 	end
+	-- The native page this session owns, so a title-bar close retires exactly it
+	if type(Manager.current_epoch) == "function" then
+		local epoch_ok, native_epoch = pcall(Manager.current_epoch, "action_picker")
+		if epoch_ok and type(native_epoch) == "number" then session.native_epoch = native_epoch end
+	end
 	Logger.info(LOG, "Action picker session %d opened.", session.epoch)
 	return true
+end
+
+--- Retires the session whose window the user closed from its title bar or
+--- with the window manager's close key, as a cancel: the page sent nothing, so
+--- without this the session, its pending options and its program discovery
+--- outlived the window, as they do not on Windows (Close) or macOS (on_close).
+--- @param epoch number Native page epoch the webview manager closed.
+function M.on_window_closed(epoch)
+	local session = _active_session
+	if not session or session.closing or session.native_epoch == nil or session.native_epoch ~= epoch then return end
+	session.cancelled = true
+	if not session.confirmed and type(session.on_cancel) == "function" then
+		local ok_cancel = pcall(session.on_cancel, nil)
+		if not ok_cancel then Logger.error(LOG, "Action picker cancel callback failed; details withheld.") end
+	end
+	ProgramProviderPicker.close(session.providers)
+	if _active_session == session then
+		_active_session = nil
+		M.pending_opts = nil
+	end
+	Logger.info(LOG, "Action picker session %d closed by its window.", session.epoch)
 end
 
 function M.is_open()
@@ -285,16 +318,22 @@ end
 --- whole handler was written to stop having.
 --- @return boolean True when the push was handed to WebKit.
 local function _push_init()
+	-- The one START of the push: every return below closes it.
+	Logger.start(LOG, "Action picker UI ready — pushing init()…")
 	local session = _active_session
 	local function title_current()
 		return session == nil or session.presentation_current == nil
 			or (session == _active_session and session.presentation_current() == true)
 	end
-	if not title_current() then return false end
+	local function superseded()
+		Logger.warn(LOG, "Action picker init() not pushed: its window was replaced or closed.")
+		return false
+	end
+	if not title_current() then return superseded() end
 	-- The same JSON module _handle_json decodes with. dkjson is the webview
 	-- manager's optional dependency and is absent on a plain Lua host, so
 	-- encoding through it made the push fail everywhere the decode half worked.
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push init(): the shared json module is unavailable — the page stays empty.")
 		return false
@@ -302,19 +341,19 @@ local function _push_init()
 	local ok_payload, encoded = pcall(function()
 		return json_mod.encode(M.build_init_payload(M.pending_opts))
 	end)
-	if not title_current() then return false end
+	if not title_current() then return superseded() end
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push init(): payload encoding failed (%s).", tostring(encoded))
 		return false
 	end
 
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push init(): webview_manager.eval_js is unavailable.")
 		return false
 	end
 
-	if not title_current() then return false end
+	if not title_current() then return superseded() end
 	local pushed = Manager.eval_js("action_picker", "init(" .. encoded .. ")")
 	if pushed then
 		Logger.success(LOG, "Action picker initialised (%d byte(s) of payload).", #encoded)
@@ -339,8 +378,18 @@ local function _handle_table(data, state, context)
 		local session = _active_session
 		if session then
 			if session.settling then return nil end
+			if session.confirmed or session.cancelled then
+				close_session(session, context)
+				return nil
+			end
+			-- A confirmation that names no action is a page defect, refused on the
+			-- three drivers with the picker left open: it never means "none"
+			if type(data.id) ~= "string" or data.id == "" then
+				Logger.warn(LOG, "Refused a confirmation that names no action; the picker stays open.")
+				return nil
+			end
 			session.settling = true
-			local id = type(data.id) == "string" and data.id or "none"
+			local id = data.id
 			-- A value the page's editor collected travels with the pick.
 			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, data)
 			if _active_session ~= session then
@@ -349,7 +398,7 @@ local function _handle_table(data, state, context)
 			end
 			if not admitted then
 				session.settling = false
-				local ok_manager, manager = pcall(require, "ui.webview_manager")
+				local ok_manager, manager = pcall(require, "core.ui.ui.webview_manager")
 				if ok_manager and type(manager.eval_js) == "function" and _active_session == session then
 					manager.eval_js("action_picker", "programProviderRefused()")
 				end
@@ -358,13 +407,15 @@ local function _handle_table(data, state, context)
 			local ok_callback, accepted = pcall(session.on_confirm, id, state, parameter)
 			session.settling = false
 			if not ok_callback then
-				Logger.error(LOG, "Action picker confirmation callback failed: %s", tostring(accepted))
+				Logger.error(LOG, "Action picker confirmation callback failed; details withheld.")
 				return nil
 			end
 			if accepted == false then
 				Logger.warn(LOG, "Action picker confirmation was refused; keeping the session open.")
 				return nil
 			end
+			if _active_session ~= session then return nil end
+			session.confirmed = true
 			close_session(session, context)
 		elseif type(M.on_confirm) == "function" then
 			pcall(M.on_confirm, data.id, state)
@@ -376,9 +427,16 @@ local function _handle_table(data, state, context)
 		Logger.info(LOG, "Action picker cancelled.")
 		local session = _active_session
 		if session then
+			if session.settling then return nil end
+			if session.confirmed or session.cancelled then
+				close_session(session, context)
+				return nil
+			end
+			session.cancelled, session.settling = true, true
 			if type(session.on_cancel) == "function" then
 				pcall(session.on_cancel, state)
 			end
+			session.settling = false
 			close_session(session, context)
 		elseif type(M.on_cancel) == "function" then
 			pcall(M.on_cancel, state)
@@ -387,7 +445,6 @@ local function _handle_table(data, state, context)
 	end
 
 	if action == "ready" then
-		Logger.start(LOG, "Action picker UI ready — pushing init()…")
 		_push_init()
 		return nil
 	end
@@ -405,7 +462,6 @@ function M.on_message(payload, state, context)
 		-- "ready" arrives as a bare string from the page's own post({action:…})
 		-- only after JSON encoding, so the bare form is the host_bridge fallback.
 		if payload == "ready" then
-			Logger.start(LOG, "Action picker UI ready — pushing init()…")
 			_push_init()
 			return nil
 		end

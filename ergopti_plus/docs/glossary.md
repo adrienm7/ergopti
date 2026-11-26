@@ -24,14 +24,14 @@ within each group. Cross-references appear as **→ Term**.
 A **→ Hotstring** expansion mode where the expansion fires the instant the
 full trigger is typed, without waiting for a **→ Terminator** keystroke. Enabled
 by the `auto` flag on a hotstring entry. Implemented in
-`static/ergopti_plus/macos/modules/keymap/expander.lua` and
+`static/ergopti_plus/macos/hotstrings/engine/expander/expander.lua` and
 `static/ergopti_plus/windows/lib/hotstrings/hotstring_engine.ahk`.
 
 **Buffer (Typing Buffer)**
 The rolling in-memory string that records the characters the user has typed
 since the last word boundary or reset event. The **→ HotstringMatcher** reads
 the buffer on every keypress to detect matching triggers. The buffer is
-maintained in `CoreState` and is managed by `modules/keymap/init.lua`.
+maintained in `CoreState` and is managed by `hotstrings/engine/expander/init.lua`.
 
 **Caret Positioning**
 After a hotstring expansion, the caret (text cursor) is placed at the correct
@@ -43,20 +43,20 @@ up where the user expects. See `expander.lua` → `perform_text_replacement`.
 The shared runtime state table that is passed by reference to every keymap
 sub-module (Registry, Expander, LLMBridge). It stores the typing buffer,
 active delays, the magic key character, and feature flags. Defined and
-instantiated in `modules/keymap/state.lua`. See also **→ Registry**, **→ Expander**.
+instantiated in `hotstrings/engine/expander/state.lua`. See also **→ Registry**, **→ Expander**.
 
 **Eventtap**
 The Hammerspoon mechanism (wrapping macOS `CGEventTap`) through which
 Ergopti+ intercepts every keydown and keyup event system-wide. The eventtap
-loop in `modules/keymap/init.lua` is the entry point for all keymap and
+loop in `hotstrings/engine/expander/init.lua` is the entry point for all keymap and
 hotstring processing.
 
 **Expander**
 The module responsible for executing a hotstring expansion once the
 **→ HotstringMatcher** has identified a match. It calculates the number of
 backspaces to issue, emits the replacement text, and updates the
-**→ CoreState** buffer. Domain spec: `_shared/core/domain/Expander.spec.js`.
-Implementations: `modules/keymap/expander.lua` (Hammerspoon),
+**→ CoreState** buffer. Domain spec: `_shared/core/text/data/domain/Expander.spec.js`.
+Implementations: `hotstrings/engine/expander/expander.lua` (Hammerspoon),
 `modules/hotstrings.ahk` (AHK).
 
 **HotstringMatcher**
@@ -64,8 +64,8 @@ The pure matching algorithm that, given the current **→ Buffer** and the last
 typed character, queries the **→ Registry** for candidates in the
 **→ Tail-Char Bucket** and applies **→ Word Boundary** and case-sensitivity
 rules to select the longest matching trigger. Domain spec:
-`_shared/core/domain/HotstringMatcher.spec.js`. Shared Lua implementation:
-`_shared/lua/hotstring_engine/init.lua`.
+`_shared/core/text/data/domain/HotstringMatcher.spec.js`. Shared Lua implementation:
+`_shared/hotstrings/engine/matcher/init.lua`.
 
 **Interceptor**
 A callback registered via `M.register_interceptor()` in `keymap/init.lua`
@@ -90,8 +90,8 @@ last character correction. Stored in `CoreState.magic_key` and updated by
 The in-memory data store for all hotstring mappings, groups, sections, and
 terminators. Provides O(1) lookup via **→ Tail-Char Bucket** indexing and
 manages the enable/disable lifecycle of hotstring groups. Domain spec:
-`_shared/core/domain/Registry.spec.js`. Implementations:
-`modules/keymap/registry.lua` (Hammerspoon),
+`_shared/core/text/data/domain/Registry.spec.js`. Implementations:
+`hotstrings/engine/expander/registry.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_engine.ahk` (AHK).
 
 **Repeat Feature**
@@ -109,15 +109,15 @@ An O(1) lookup index inside the **→ Registry** that groups hotstring mappings
 by the last Unicode codepoint of their trigger. On every keypress, only the
 bucket for the typed character is examined, keeping the hot-path cost
 proportional to the bucket size rather than the total number of mappings.
-See `_shared/lua/hotstring_engine/init.lua` and
-`_shared/core/domain/HotstringMatcher.spec.js`.
+See `_shared/hotstrings/engine/matcher/init.lua` and
+`_shared/core/text/data/domain/HotstringMatcher.spec.js`.
 
 **Terminator**
 A keypress (space, punctuation, Enter, etc.) that signals the end of a
 potential hotstring trigger and triggers expansion if the buffer matches.
 The full catalogue of enabled terminators is managed by the Terminators
-module. Domain spec: `_shared/core/domain/Terminators.spec.js`. Implementations:
-`modules/keymap/terminators.lua` (Hammerspoon),
+module. Domain spec: `_shared/core/text/data/domain/Terminators.spec.js`. Implementations:
+`hotstrings/engine/expander/terminators.lua` (Hammerspoon),
 `lib/hotstrings/hotstring_prefix_watcher.ahk` (AHK).
 
 **Word Boundary**
@@ -157,7 +157,7 @@ key, or combining vowel + modifier into a single typed sequence. Stored in
 **Dynamic Hotstrings**
 Hotstrings whose replacement is computed at expansion time rather than being
 a static string. Implemented in
-`static/ergopti_plus/macos/modules/dynamic_hotstrings/`. Examples include
+`static/ergopti_plus/macos/hotstrings/engine/dynamic/`. Examples include
 the `{date}` and `{time}` template tokens.
 
 **`final` Flag**
@@ -190,9 +190,9 @@ per-section enabled state in `hs.settings`.
 **TOML Hotstring File**
 The canonical source format for hotstring data. Each file contains an array of
 `[[entry]]` tables with `trigger`, `replacement`, and optional `flags`. Files
-live under `_shared/modules/hotstrings/`. The AHK driver consumes them at runtime via a
+live under `_shared/hotstrings/data/catalogue/`. The AHK driver consumes them at runtime via a
 self-healing `.tsv` cache (`lib/hotstrings/hotstrings_cache.ahk`) — no build step
-or committed generated code. Schema: `_shared/modules/hotstrings/schema.md`.
+or committed generated code. Schema: `_shared/hotstrings/data/catalogue/schema.md`.
 
 ---
 
@@ -212,7 +212,7 @@ action dictionary. See `macos/platform/remap/data/mod_combos.json`.
 **Hold Action**
 The action emitted when a **→ Tap-Hold** key is held past the activation
 threshold. Can be a modifier key (`hold_modifier`) or a layer switch
-(`hold_layer`). See `_shared/tap_hold/defaults.toml`.
+(`hold_layer`). See `_shared/tap_hold/data/defaults.toml`.
 
 **Karabiner-Elements**
 The macOS kernel-extension tool used by Ergopti+ to implement **→ Tap-Hold**
@@ -224,13 +224,13 @@ via `platform/remap/generator.lua`.
 A virtual keyboard mode activated by holding a designated key. While the layer
 is active, other keys emit different characters or actions. A tap-hold key
 names the layer it activates (`hold_layer`, one of
-`[tap_hold.hold_picker].layers` in `_shared/tap_hold/defaults.toml`); what the
+`[tap_hold.hold_picker].layers` in `_shared/tap_hold/data/defaults.toml`); what the
 layer does is data keyed by physical key: Ergopti's preset in
-`_shared/keymap/layers.recommended.toml` and the user's `layers.toml` in the
+`_shared/layouts/data/layers.recommended.toml` and the user's `layers.toml` in the
 configuration folder, written in the vocabulary of
-`_shared/keymap/layer_actions.toml` against the physical-key registry
-`_shared/data/keycodes/physical_keys.json`. They are read by
-`_shared/lua/keymap/layers.lua` (macOS, Linux) and
+`_shared/layouts/data/layer_actions.toml` against the physical-key registry
+`_shared/layouts/data/keycodes/physical_keys.json`. They are read by
+`_shared/layouts/engine/layers/layers.lua` (macOS, Linux) and
 `windows/platform/remap/layers_loader.ahk`. Windows and macOS build their
 navigation layer from the user's `layers.toml` (no file = no binding): Windows
 registers hotkeys (`windows/platform/remap/nav_layer_table.ahk`) and macOS
@@ -243,13 +243,13 @@ Windows layer key for key.
 **Nav-Layer Sentinel**
 A synthetic keycode (F20, keycode 90) injected by Karabiner-Elements when a
 navigation layer becomes active or inactive. The eventtap in
-`modules/keymap/init.lua` detects this sentinel to suppress hotstring
+`hotstrings/engine/expander/init.lua` detects this sentinel to suppress hotstring
 processing while a layer is engaged.
 
 **Tap Action**
 The action emitted when a **→ Tap-Hold** key is pressed and released quickly,
 below the activation threshold. Declared as `tap_action` in
-`_shared/tap_hold/defaults.toml`.
+`_shared/tap_hold/data/defaults.toml`.
 
 **Tap-Hold**
 A key-behaviour mode where a short press (tap) and a long press (hold) on the
@@ -267,7 +267,7 @@ the user changes it or gives a key its own `time_activation_seconds`. Test vecto
 When multiple predictions are requested (`num_predictions > 1`), the
 **→ PromptBuilder** optionally raises the temperature for each successive
 prediction to encourage diversity. The formula and cap (`TEMP_DIVERSITY_CAP
-= 1.0`) are defined in `_shared/core/domain/PromptBuilder.js`.
+= 1.0`) are defined in `_shared/core/text/data/domain/PromptBuilder.js`.
 
 **Backend**
 The local inference server that processes LLM requests. Supported backends
@@ -285,7 +285,7 @@ queue drains, creating a seamless chained prediction flow. Implemented in
 The **→ PromptBuilder** limits the forwarded typing context to a length
 proportional to the predicted output, cutting LLM prefill tokens and reducing
 time-to-first-token (TTFT). Canonical constant: `CONTEXT_TAIL_WORDS = 5`.
-See `_shared/core/domain/PromptBuilder.js`.
+See `_shared/core/text/data/domain/PromptBuilder.js`.
 
 **Debounce**
 A configurable delay (default: `llm_debounce` seconds) after the last keypress
@@ -293,7 +293,7 @@ before an LLM prediction request is fired. Prevents sending a request on every
 single keystroke. Implemented as a timer in `modules/llm/prediction_engine.lua`.
 
 **LLM Bridge**
-The thin orchestrator in `modules/keymap/llm_bridge.lua` that connects the
+The thin orchestrator in `ai/engine/bridge.lua` that connects the
 keymap core to the **→ Prediction Engine**. Handles keymap-specific concerns:
 hotstring preview, keystroke routing (arrow keys, Enter, modifier+digit) for
 navigating predictions, and buffer management on navigation or escape events.
@@ -307,17 +307,17 @@ LLM-specific logic here.
 **Profile**
 A named LLM system-prompt template that determines how the LLM is instructed
 to behave. Built-in profiles (`raw`, `basic`, `advanced`, `batch_advanced`)
-are defined in `_shared/modules/llm/profiles.json`. The active profile is selected via
+are defined in `_shared/ai/data/profiles.json`. The active profile is selected via
 `modules/llm/profiles.lua`. See also **→ ProfileSelector**.
 
 **ProfileSelector**
-The domain module (`_shared/core/domain/ProfileSelector.js`) that loads the profile
+The domain module (`_shared/core/text/data/domain/ProfileSelector.js`) that loads the profile
 catalogue from `profiles.json`, merges user-defined overrides, resolves the
 active profile by ID, and injects template variables (`{context}`, `{tail}`,
 `{min_words}`, etc.) into the system prompt.
 
 **PromptBuilder**
-The domain module (`_shared/core/domain/PromptBuilder.js`) that constructs the
+The domain module (`_shared/core/text/data/domain/PromptBuilder.js`) that constructs the
 complete LLM request parameters from the user's buffer and configuration:
 context string, tail excerpt, token budget, and temperature. See also
 **→ Context Truncation**, **→ Adaptive Temperature**.
@@ -332,8 +332,8 @@ Managed by `modules/llm/streaming_handler.lua`. Controlled by the
 The pass that colours the LLM prediction for display in the tooltip: green for
 corrected tail words, orange for new continuation words, and no colour (gray)
 for unchanged text. Implemented by `process_prediction` in the shared Lua canon
-`_shared/lua/llm/parser.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
-`windows/modules/llm/parser.ahk`), pinned cross-driver by
+`_shared/ai/engine/api/parser_core.lua` (Hammerspoon shim `modules/llm/parser.lua`, AHK port
+`windows/ai/engine/api/parser.ahk`), pinned cross-driver by
 `_shared/tests/corpus/llm/process_prediction_vectors.json`. (Superseded the
 removed `TokenParser.js` word-level reference, 2026-06-13.)
 
@@ -345,7 +345,7 @@ removed `TokenParser.js` word-level reference, 2026-06-13.)
 Once the **→ GestureRecognizer** commits a gesture to a horizontal or vertical
 axis, cross-axis noise is ignored for the remainder of that gesture. This
 prevents diagonal drift from mis-classifying a clean swipe. Documented in
-`_shared/core/domain/GestureRecognizer.spec.js`.
+`_shared/core/text/data/domain/GestureRecognizer.spec.js`.
 
 **Centroid**
 The average position of all active touch points in a touch frame. The
@@ -357,7 +357,7 @@ to determine gesture direction and magnitude. Computed in
 The domain module that processes raw touch frame data, computes the centroid
 and movement vector, applies threshold constants, and emits a normalised
 gesture event (e.g. `swipe_3_left`, `tap_3`). Domain spec:
-`_shared/core/domain/GestureRecognizer.spec.js`. Implementation:
+`_shared/core/text/data/domain/GestureRecognizer.spec.js`. Implementation:
 `modules/gestures/engine.lua`.
 
 **Gesture Slot**
@@ -431,7 +431,7 @@ ADR-001.
 
 **Codegen (Code Generation)**
 The build-time process that reads the authoritative TOML manifest
-(`_shared/modules/features/manifest.toml`) and emits driver-specific feature
+(`_shared/settings/data/features/manifest.toml`) and emits driver-specific feature
 registries and config templates. Run via `npm run build:manifest`. Generated
 files live under `_generated/` directories and are committed to the repository.
 See ADR-002.
@@ -449,13 +449,13 @@ Each driver implements the **→ Port** adapters it needs and consumes the
 shared domain modules. All live under `static/ergopti_plus/<driver>/`.
 
 **Domain Module**
-A pure, platform-agnostic module in `_shared/core/domain/` that contains only
+A pure, platform-agnostic module in `_shared/core/text/data/domain/` that contains only
 business logic — no OS API calls, no file I/O, no driver imports. Domain
 modules are specified as JavaScript spec files and ported faithfully to each
 driver's runtime language. See ADR-005.
 
 **Features Manifest**
-The single authoritative TOML file (`_shared/modules/features/manifest.toml`) that
+The single authoritative TOML file (`_shared/settings/data/features/manifest.toml`) that
 declares all user-configurable features with their default values. All
 driver-specific feature registries are generated from this file. See ADR-002.
 
@@ -473,7 +473,7 @@ active language. Ergopti+ supports 21 languages. All UI text must go through
 See the repository-wide language contract in `AGENTS.md`, the `i18n` skill, and ADR-007.
 
 **Manifest Schema**
-A JSON Schema file (`_shared/modules/features/manifest.schema.json`) that validates
+A JSON Schema file (`_shared/settings/data/features/manifest.schema.json`) that validates
 the structure of the features manifest. Prevents malformed entries from
 reaching the codegen step.
 

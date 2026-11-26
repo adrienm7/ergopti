@@ -1,5 +1,5 @@
 {
-	"_comment": "Replayed by the three drivers' configuration reducers (_shared/lua/healthcheck/configuration.lua on macOS and Linux, windows/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. Every canary is a private value that must reach neither a row nor a shared document. An enum row is only a declared string member, compared exactly: a manifest enum may also declare booleans (script.alt_gr_is_kana_remap), which the AHK JSON reader holds as 1 and 0, so a typed \"1\" or \"0\" stays text.",
+	"_comment": "Replayed by the three drivers' configuration reducers (_shared/diagnostics/engine/healthcheck/configuration.lua on macOS and Linux, windows/diagnostics/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. A setting whose value equals its manifest default is no row (a config.toml that spells out every default would bury the changed settings a bug report needs). Every canary is a private value that must reach neither a row nor a shared document. An enum row is only a declared string member, compared exactly: a manifest enum may also declare booleans (script.alt_gr_is_kana_remap), which the AHK JSON reader holds as 1 and 0, so a typed \"1\" or \"0\" stays text. A number that is not a whole value under 1e15 is written with 14 significant digits and an exponent of at least two digits, as C's %g writes it (1e-05).",
 	"features": [
 		{
 			"path": "script.log_level",
@@ -13,11 +13,12 @@
 			"platforms": ["ahk", "hs", "linux"],
 			"enum_values": ["auto", true, false]
 		},
-		{ "path": "script.locale", "default": "fr", "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "script.locale", "default": "", "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "script.show_error_dialog", "default": true, "platforms": ["ahk"] },
 		{ "path": "metrics.keep_days", "default": 30, "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "llm.display.opacity", "default": 0.5, "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "llm.models.user_models", "default": [], "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "hotstrings.packs", "default": ["base"], "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "shortcuts.keyboard.undo", "default": "none", "platforms": ["ahk", "linux"] },
 		{ "path": "layout.mac_only", "default": false, "platforms": ["hs"] },
 		{
@@ -89,7 +90,7 @@
 		{
 			"id": "windows-path-keeps-only-its-length",
 			"driver": "windows",
-			"toml": "[script]\nlocale = 'C:\\Users\\PRIVATE_USER_ZEBRA\\notes'\n\n[shortcuts.keyboard]\nundo = \"none\"\n",
+			"toml": "[script]\nlocale = 'C:\\Users\\PRIVATE_USER_ZEBRA\\notes'\n\n[shortcuts.keyboard]\nundo = \"ctrl\"\n",
 			"expected": [
 				{ "setting": "script.locale", "type": "text", "value": "33" },
 				{ "setting": "shortcuts.keyboard.undo", "type": "text", "value": "4" }
@@ -98,10 +99,31 @@
 		{
 			"id": "empty-list-and-empty-text",
 			"driver": "linux",
-			"toml": "[script]\nlocale = \"\"\n\n[llm.models]\nuser_models = []\n",
+			"toml": "[hotstrings]\npacks = []\n\n[shortcuts.keyboard]\nundo = \"\"\n",
 			"expected": [
-				{ "setting": "llm.models.user_models", "type": "list", "value": "0" },
-				{ "setting": "script.locale", "type": "text", "value": "0" }
+				{ "setting": "hotstrings.packs", "type": "list", "value": "0" },
+				{ "setting": "shortcuts.keyboard.undo", "type": "text", "value": "0" }
+			]
+		},
+		{
+			"id": "values-equal-to-their-default-are-no-rows",
+			"driver": "windows",
+			"toml": "[script]\nlog_level = \"INFO\"\nalt_gr_is_kana_remap = \"auto\"\nlocale = \"\"\nshow_error_dialog = true\n\n[metrics]\nkeep_days = 30\n\n[llm.display]\nopacity = 0.5\n\n[llm.models]\nuser_models = []\n\n[hotstrings]\npacks = [\"base\"]\n\n[shortcuts.keyboard]\nundo = \"none\"\n\n[hotstrings.autocorrection.names]\nenabled = false\ntime_activation_seconds = 0.5\n",
+			"expected": []
+		},
+		{
+			"id": "a-changed-value-is-a-row-beside-defaults",
+			"driver": "linux",
+			"toml": "[script]\nlog_level = \"INFO\"\nlocale = \"fr\"\n\n[metrics]\nkeep_days = 31\n\n[hotstrings]\npacks = [\"base\", \"extra\"]\n\n[hotstrings.autocorrection.names]\nenabled = true\ntime_activation_seconds = 0.5\n",
+			"expected": [
+				{
+					"setting": "hotstrings.autocorrection.names.enabled",
+					"type": "boolean",
+					"value": "true"
+				},
+				{ "setting": "hotstrings.packs", "type": "list", "value": "2" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "31" },
+				{ "setting": "script.locale", "type": "text", "value": "2" }
 			]
 		},
 		{
@@ -144,6 +166,12 @@
 			"driver": "macos",
 			"toml": "[layout]\nmac_only = true\n",
 			"expected": [{ "setting": "layout.mac_only", "type": "boolean", "value": "true" }]
+		},
+		{
+			"id": "exponent-keeps-two-digits",
+			"driver": "windows",
+			"toml": "[llm.display]\nopacity = 0.00001\n",
+			"expected": [{ "setting": "llm.display.opacity", "type": "number", "value": "1e-05" }]
 		},
 		{
 			"id": "empty-document",

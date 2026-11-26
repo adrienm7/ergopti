@@ -37,7 +37,8 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset, Now
 				First := true
 				for App, Cell in Apps {
 						Index[Day][App] := true
-						TitleJson := Titles.Has(Day) ? Titles[Day].Get(App, "{}") : "{}"
+						RawApp := KLR_ManifestAppLabel(App)
+						TitleJson := Titles.Has(Day) ? Titles[Day].Get(RawApp, "{}") : "{}"
 						if App == "_system" {
 								Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":" . KLR_EncodeManifestCell(Cell, TitleJson)
 								First := false
@@ -47,8 +48,8 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset, Now
 						Cell.Delete("hourly")
 						Cell.Delete("hourly_min5")
 						Raw := KLR_EncodeManifestCell(Cell, TitleJson)
-						HourJson := Hourly.Has(Day) ? Hourly[Day].Get(App, "{}") : "{}"
-						MinJson := Min5.Has(Day) ? Min5[Day].Get(App, "{}") : "{}"
+						HourJson := Hourly.Has(Day) ? Hourly[Day].Get(RawApp, "{}") : "{}"
+						MinJson := Min5.Has(Day) ? Min5[Day].Get(RawApp, "{}") : "{}"
 						Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":"
 								. SubStr(Raw, 1, StrLen(Raw) - 1) . ',"hourly":' . HourJson
 								. ',"hourly_min5":' . MinJson . "}"

@@ -70,17 +70,20 @@ _CTLR_Rows(Operations, Typed) {
 _CTLR_Difference(Vector, Typed) {
 	Expect := Vector["expect"]
 	Source := Vector["source"] is String ? Vector["source"] : ""
-	Refused := "", Content := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; refusal, and a message sentinel read it as an accepted chain.
+	Refused := false, Refusal := "", Content := ""
 	try {
 		Rows := _CTLR_Rows(Vector["operations"], Typed["operations"])
 		Content := TOML_BuildConfigDocumentCandidate(Source, Rows, [])["content"]
 	} catch Error as Err {
-		Refused := Err.Message
+		Refused := true
+		Refusal := Type(Err) . ": " . Err.Message
 	}
 	if !Expect["ok"]
-		return Refused != "" ? "" : "the chain must be refused, it accepted"
-	if Refused != ""
-		return "the chain must be accepted, it refused: " . Refused
+		return Refused ? "" : "the chain must be refused, it accepted"
+	if Refused
+		return "the chain must be accepted, it refused: " . Refusal
 	return _TCV_CandidateDifference(Content, Source, Expect, Typed["expect"])
 }
 

@@ -14,7 +14,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. One projection: the rows come from the shared model catalogue and the
- *    driver's install scan (_shared/lua/llm/model_catalogue.lua on macOS and
+ *    driver's install scan (_shared/ai/engine/local_servers/model_catalogue.lua on macOS and
  *    Linux, its pinned AHK twin on Windows); the page never reads files.
  * 2. Only what works now is selectable: a backend the driver reports
  *    unavailable greys its rows with the reason, and a model that is not
@@ -85,6 +85,7 @@ var NUMERIC_SORT = { disk_gb: true, ram_gb: true, params_b: true };
 var postBridgeMessage = makeHostBridge('model_browser_bridge');
 var _session = null;
 var _catalogueOwner = {};
+var _modelDrafts = new Map();
 
 /** Posts an action with the optional native operation identity. */
 function postModelAction(action) {
@@ -105,6 +106,7 @@ function injectModels(payload) {
 		}
 		session = payload.session;
 	}
+	if (session === null || _session !== session) _modelDrafts = new Map();
 	_session = session;
 	_catalogueOwner = {};
 	_models = payload.models;
@@ -189,6 +191,10 @@ function _fmt(key, values) {
 var _orig_i18n_apply = window.i18n_apply;
 window.i18n_apply = function (strings) {
 	if (typeof _orig_i18n_apply === 'function') _orig_i18n_apply(strings);
+	// The search landmark is named as its field is: what it searches.
+	document
+		.getElementById('toolbar')
+		.setAttribute('aria-label', _t('model_browser.search_placeholder'));
 	buildFilter();
 	render();
 };
@@ -293,7 +299,7 @@ function findRow(key) {
  * Whether an identifier typed to add a model is well formed for its backend:
  * an Ollama name ("qwen3:4b", "hf.co/owner/repo:Q4_K_M") or an MLX Hugging Face
  * repository id ("mlx-community/Qwen3-4B-4bit"). The native side checks again
- * with _shared/lua/llm/model_identifier.lua or its AHK twin; all three pass
+ * with _shared/ai/engine/local_servers/model_identifier.lua or its AHK twin; all three pass
  * _shared/tests/corpus/llm/model_identifiers.json.
  */
 // The add-model texts of each backend that can add a model, named literally so
@@ -387,26 +393,25 @@ function buildHead() {
 	head.innerHTML = COLUMNS.map(function (c) {
 		var sorted =
 			c.sort && c.sort === _sortKey ? (_sortDir === 1 ? 'ascending' : 'descending') : 'none';
+		// A sortable header holds a button: the keyboard reaches and presses
+		// it like any control, and the cell keeps aria-sort for readers.
+		var label = _escHtml(_t(c.header));
 		return (
 			'<th scope="col" class="' +
 			c.cls +
 			'"' +
-			(c.sort ? ' data-sort="' + c.sort + '" tabindex="0" aria-sort="' + sorted + '"' : '') +
+			(c.sort ? ' aria-sort="' + sorted + '"' : '') +
 			'>' +
-			_escHtml(_t(c.header)) +
+			(c.sort
+				? '<button type="button" class="sort-btn" data-sort="' + c.sort + '">' + label + '</button>'
+				: label) +
 			'</th>'
 		);
 	}).join('');
 	if (typeof head.querySelectorAll !== 'function') return;
-	head.querySelectorAll('th[data-sort]').forEach(function (th) {
-		th.onclick = function () {
-			setSort(th.getAttribute('data-sort'));
-		};
-		th.onkeydown = function (ev) {
-			if (ev.key === 'Enter' || ev.key === ' ') {
-				ev.preventDefault();
-				setSort(th.getAttribute('data-sort'));
-			}
+	head.querySelectorAll('button[data-sort]').forEach(function (button) {
+		button.onclick = function () {
+			setSort(button.getAttribute('data-sort'));
 		};
 	});
 }
@@ -537,6 +542,16 @@ function hasTools(b) {
 
 /** Applies the filters and the active sort, then rebuilds every group. */
 function render() {
+	var active = document.activeElement;
+	var editing =
+		active && active._modelDraftOwner === _catalogueOwner
+			? {
+					backend: active._modelDraftBackend,
+					start: active.selectionStart,
+					end: active.selectionEnd,
+					direction: active.selectionDirection
+				}
+			: null;
 	var table = document.getElementById('models');
 	var empty = document.getElementById('empty');
 	if (!table) return;
@@ -578,6 +593,18 @@ function render() {
 		table.appendChild(tbody);
 	});
 
+	if (editing && typeof table.querySelectorAll === 'function') {
+		table.querySelectorAll('input.add-input').forEach(function (input) {
+			if (input._modelDraftBackend !== editing.backend) return;
+			input.focus();
+			if (
+				typeof input.setSelectionRange === 'function' &&
+				editing.start !== null &&
+				editing.end !== null
+			)
+				input.setSelectionRange(editing.start, editing.end, editing.direction);
+		});
+	}
 	if (empty) empty.style.display = rows.length === 0 ? 'block' : 'none';
 	updateCount(rows.length, _models.length);
 	updateCurrent();
@@ -690,25 +717,25 @@ function buildSectionHead(b, section, open, searching) {
 		return m.backend === b.id && m.provider === section.provider;
 	}).length;
 	var current = open ? null : section.rows.filter(isCurrent)[0];
-	var toggle = document.createElement('span');
+	// A native button: the keyboard reaches it and a reader hears its state.
+	var toggle = document.createElement('button');
+	toggle.type = 'button';
 	toggle.className = 'group-toggle';
-	toggle.setAttribute('role', 'button');
-	toggle.setAttribute('tabindex', '0');
 	toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 	toggle.setAttribute('data-section', section.key);
 	toggle.setAttribute('data-nav', 'true');
 	toggle.innerHTML =
-		'<span class="chevron" aria-hidden="true">▸</span> ' +
-		'<span class="group-title">' +
+		'<b class="chevron" aria-hidden="true">▸</b> ' +
+		'<b class="group-title">' +
 		_escHtml(section.provider) +
-		'</span>' +
-		' <span class="group-count">' +
+		'</b>' +
+		' <small class="group-count">' +
 		_escHtml(_fmt('model_browser.count_label', { n: section.rows.length, total: total })) +
-		'</span>' +
+		'</small>' +
 		(current
-			? ' <span class="group-active">' +
+			? ' <small class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: current.name })) +
-				'</span>'
+				'</small>'
 			: '');
 	bindHeaderToggle(th, toggle, function () {
 		if (_catalogueOwner === catalogueOwner) toggleGroup(section.key, searching, open);
@@ -808,7 +835,8 @@ function buildInstallButton(b, catalogueOwner) {
 
 /** The words next to an install button: why it refuses or why it did not start. */
 function installNote(text) {
-	var note = document.createElement('span');
+	// A message the install answered: an output, read at once as an alert.
+	var note = document.createElement('output');
 	note.className = 'install-note';
 	note.setAttribute('role', 'alert');
 	note.textContent = text;
@@ -840,24 +868,24 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		return m.backend === b.id;
 	}).length;
 	var active = expanded ? null : activeIn(b);
-	var toggle = document.createElement('span');
+	// A native button: the keyboard reaches it and a reader hears its state.
+	var toggle = document.createElement('button');
+	toggle.type = 'button';
 	toggle.className = 'group-toggle';
-	toggle.setAttribute('role', 'button');
-	toggle.setAttribute('tabindex', '0');
 	toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
 	toggle.setAttribute('data-group', b.id);
 	toggle.innerHTML =
-		'<span class="chevron" aria-hidden="true">▸</span> ' +
-		'<span class="group-title">' +
+		'<b class="chevron" aria-hidden="true">▸</b> ' +
+		'<b class="group-title">' +
 		_escHtml(backendHeading(b)) +
-		'</span>' +
-		' <span class="group-count">' +
+		'</b>' +
+		' <small class="group-count">' +
 		_escHtml(_fmt('model_browser.count_label', { n: rows.length, total: total })) +
-		'</span>' +
+		'</small>' +
 		(active
-			? ' <span class="group-active">' +
+			? ' <small class="group-active">' +
 				_escHtml(_fmt('model_browser.current_label', { model: active.name })) +
-				'</span>'
+				'</small>'
 			: '');
 	var narrowedWithRows = narrowed && rows.length > 0;
 	var toggleHere = function () {
@@ -866,9 +894,11 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 	bindHeaderToggle(th, toggle, toggleHere);
 	_toggles[b.id] = toggle;
 	th.appendChild(toggle);
-	var tools = document.createElement('div');
+	// The header's two lines of controls: the install and the backend's own
+	// actions, then the fields that add a model or a provider.
+	var tools = document.createElement('p');
 	tools.className = 'group-tools';
-	var adders = document.createElement('div');
+	var adders = document.createElement('p');
 	adders.className = 'group-add';
 
 	if (b.install) {
@@ -895,7 +925,7 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 	});
 
 	if (reason) {
-		var status = document.createElement('span');
+		var status = document.createElement('small');
 		status.className = 'reason';
 		status.textContent = reason;
 		tools.appendChild(status);
@@ -907,6 +937,12 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		var input = document.createElement('input');
 		input.type = 'text';
 		input.className = 'add-input';
+		input._modelDraftOwner = catalogueOwner;
+		input._modelDraftBackend = b.id;
+		input.value = _modelDrafts.get(b.id) || '';
+		input.addEventListener('input', function () {
+			if (_catalogueOwner === catalogueOwner) _modelDrafts.set(b.id, input.value);
+		});
 		input.setAttribute('spellcheck', 'false');
 		input.setAttribute('autocomplete', 'off');
 		var hint = _t(texts.placeholder);
@@ -916,7 +952,7 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		addBtn.type = 'button';
 		addBtn.className = 'act';
 		addBtn.textContent = _t('model_browser.add_model_button');
-		var error = document.createElement('span');
+		var error = document.createElement('output');
 		error.className = 'add-error';
 		error.setAttribute('role', 'alert');
 		var submit = function () {
@@ -1005,53 +1041,55 @@ function bindHeaderToggle(cell, toggle, run) {
 function rowCells(m) {
 	var current = isCurrent(m);
 	var cells = {
-		current:
-			'<span class="mark' +
-			(current ? ' on' : '') +
-			'" aria-label="' +
-			_escHtml(current ? _t('model_browser.status_current') : '') +
-			'">' +
-			(current ? '✓' : '') +
-			'</span>',
+		// The check is drawn; the row says it is the current one (aria-current).
+		current: current ? '<b class="mark on" aria-hidden="true">✓</b>' : '',
 		name:
-			'<span class="name-cell">' +
+			'<b class="name-cell">' +
 			_escHtml(m.name || '') +
-			'</span>' +
+			'</b>' +
 			(m.family || m.provider
-				? '<span class="sub">' + _escHtml(m.family || m.provider) + '</span>'
+				? '<small class="sub">' + _escHtml(m.family || m.provider) + '</small>'
 				: '') +
 			(m.custom
-				? ' <span class="chip">' + _escHtml(_t('model_browser.chip_custom')) + '</span>'
+				? ' <small class="chip">' + _escHtml(_t('model_browser.chip_custom')) + '</small>'
 				: '') +
 			(m.is_default
-				? ' <span class="chip default">' + _escHtml(_t('model_browser.chip_default')) + '</span>'
+				? ' <small class="chip default">' + _escHtml(_t('model_browser.chip_default')) + '</small>'
 				: '') +
 			(m.type === 'completion'
-				? ' <span class="chip completion">' +
+				? ' <small class="chip completion">' +
 					_escHtml(_t('model_browser.type_completion')) +
-					'</span>'
+					'</small>'
 				: '') +
-			(m.hint_key ? '<span class="sub hint">' + _escHtml(_t(m.hint_key)) + '</span>' : ''),
+			(m.hint_key ? '<small class="sub hint">' + _escHtml(_t(m.hint_key)) + '</small>' : ''),
 		disk: _escHtml(fmtGb(m.disk_gb)),
 		ram: _escHtml(fmtGb(m.ram_gb)),
 		params: _escHtml(fmtParams(m)),
 		status:
 			m.pending === 'download'
-				? '<span class="status pending">' +
+				? '<data class="status pending" value="downloading">' +
 					_escHtml(
 						typeof m.progress === 'number'
 							? _fmt('model_browser.status_downloading_percent', { n: m.progress })
 							: _t('model_browser.status_downloading')
 					) +
-					'</span>'
-				: isRemote(m)
-					? '<span class="status remote">' + _escHtml(_t('model_browser.status_remote')) + '</span>'
-					: '<span class="dot' +
-						(m.installed ? ' on' : '') +
-						'" aria-hidden="true"></span> ' +
-						_escHtml(
-							_t(m.installed ? 'model_browser.status_installed' : 'model_browser.status_available')
-						),
+					'</data>'
+				: m.inventory_unknown === true
+					? '<data class="status" value="unknown">' +
+						_escHtml(_t('model_browser.inventory_unavailable')) +
+						'</data>'
+					: isRemote(m)
+						? '<data class="status remote" value="remote">' +
+							_escHtml(_t('model_browser.status_remote')) +
+							'</data>'
+						: '<svg class="dot' +
+							(m.installed ? ' on' : '') +
+							'" aria-hidden="true" focusable="false"></svg> ' +
+							_escHtml(
+								_t(
+									m.installed ? 'model_browser.status_installed' : 'model_browser.status_available'
+								)
+							),
 		actions: rowActions(m, current)
 	};
 	return COLUMNS.map(function (c) {
@@ -1131,6 +1169,7 @@ function buildRow(m) {
 		tr.setAttribute('data-nav', 'true');
 		tr.setAttribute('aria-disabled', isSelectable(m) ? 'false' : 'true');
 		tr.setAttribute('aria-selected', key === _selected ? 'true' : 'false');
+		if (isCurrent(m)) tr.setAttribute('aria-current', 'true');
 	}
 	tr.innerHTML = rowCells(m);
 
@@ -1302,6 +1341,15 @@ function setSort(key) {
 		disableBtn.addEventListener('click', function () {
 			if (_capabilities.disable === true) postModelAction({ action: 'disable_model' });
 		});
+
+	// Escape closes the window: the page holds the keyboard, so no host window
+	// sees the key (PCK-19). An IME composition keeps its own Escape.
+	document.addEventListener('keydown', function (ev) {
+		if (ev.key !== 'Escape' || ev.isComposing || ev.keyCode === 229) return;
+		if (ev.defaultPrevented) return;
+		ev.preventDefault();
+		postModelAction({ action: 'close' });
+	});
 
 	updateFooter();
 	if (window._i18n_strings) render();

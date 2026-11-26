@@ -1,12 +1,13 @@
 // Sources/ErgoptiPlus/LauncherTimings.generated.swift
-// AUTO-GENERATED from _shared/modules/timings/constants.toml.
+// AUTO-GENERATED from _shared/core/timing/data/constants.toml.
 // DO NOT EDIT BY HAND — run `npm run codegen:registry-constants` to refresh.
 
 // ==============================================================================
 // MODULE: Launcher Timings
 // DESCRIPTION:
 // The [launcher] section of the timing registry: every sleep and poll interval
-// of the launcher, its fixtures and its tests, in the units the sleep APIs take.
+// of the launcher, its fixtures and its tests, plus the shared LLM route-probe
+// budget and the Lua quit deadline, in the units the sleep APIs take.
 // ==============================================================================
 
 import Foundation
@@ -28,6 +29,7 @@ struct RegistryDuration: Sendable {
 enum LauncherTimings {
 	static let fileLockRetry = RegistryDuration(section: "launcher", key: "file_lock_retry_ms", milliseconds: 1)
 	static let instanceLockRetry = RegistryDuration(section: "launcher", key: "instance_lock_retry_ms", milliseconds: 100)
+	static let staleRuntimePoll = RegistryDuration(section: "launcher", key: "stale_runtime_poll_ms", milliseconds: 100)
 	static let guardianArmPoll = RegistryDuration(section: "launcher", key: "guardian_arm_poll_ms", milliseconds: 10)
 	static let guardianSingletonRetry = RegistryDuration(section: "launcher", key: "guardian_singleton_retry_ms", milliseconds: 10)
 	static let leaseChildPoll = RegistryDuration(section: "launcher", key: "lease_child_poll_ms", milliseconds: 50)
@@ -45,6 +47,7 @@ enum LauncherTimings {
 	static let vhidReportQueryPoll = RegistryDuration(section: "launcher", key: "vhid_report_query_poll_ms", milliseconds: 10)
 	static let vhidReportMainPoll = RegistryDuration(section: "launcher", key: "vhid_report_main_poll_ms", milliseconds: 20)
 	static let vhidReportRequestPoll = RegistryDuration(section: "launcher", key: "vhid_report_request_poll_ms", milliseconds: 20)
+	static let proxyRelayStopGrace = RegistryDuration(section: "launcher", key: "proxy_relay_stop_grace_ms", milliseconds: 5000)
 	static let automationFixtureWait = RegistryDuration(section: "launcher", key: "automation_fixture_wait_ms", milliseconds: 30000)
 	static let programFixturePoll = RegistryDuration(section: "launcher", key: "program_fixture_poll_ms", milliseconds: 1)
 	static let ollamaFixtureReapPoll = RegistryDuration(section: "launcher", key: "ollama_fixture_reap_poll_ms", milliseconds: 10)
@@ -59,4 +62,7 @@ enum LauncherTimings {
 	static let testLeaseLineInterval = RegistryDuration(section: "launcher", key: "test_lease_line_interval_ms", milliseconds: 50)
 	static let testLateRelaunchSettle = RegistryDuration(section: "launcher", key: "test_late_relaunch_settle_ms", milliseconds: 250)
 	static let testSlowSettingsRead = RegistryDuration(section: "launcher", key: "test_slow_settings_read_ms", milliseconds: 20)
+	static let managedProxyProbeTimeout = RegistryDuration(section: "llm", key: "managed_proxy_probe_timeout_ms", milliseconds: 1000)
+	static let userQuitDeadline = RegistryDuration(section: "ui", key: "user_quit_deadline_ms", milliseconds: 12000)
+	static let quitHandshakeMargin = RegistryDuration(section: "ui", key: "quit_handshake_margin_ms", milliseconds: 2000)
 }

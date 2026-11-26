@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
-local Codec = require("toml_codec")
-local Outdated = require("config_outdated")
-local Logger = require("logger.shim")
-local LayerPreset = require("keymap.layer_preset")
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local Codec = require("core.text.engine.toml_codec")
+local Outdated = require("settings.engine.migration.outdated")
+local Logger = require("core.logger.engine.shim")
+local LayerPreset = require("layouts.engine.layers.preset")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local FUTURE = '\n[future]\nnote = "kept"\n'
 local CASES = {
 	{ name = "scalar root", text = 'tap_hold = "opaque"\n', path = "tap_hold" },
@@ -63,9 +63,9 @@ local function with_writer(text, body)
 		end,
 		is_tap_action = function(id) return id == "copy" or id == "paste" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
-		layers = { shared_root = require("infra.paths").shared_root(), config_dir = dir },
+		layers = { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir },
 	})
 	local ok, detail = pcall(body, writer, path, state, dir)
 	-- Backups are private fixture state and never include a user's path.
@@ -245,11 +245,15 @@ helpers.describe("tap-hold exact-source publication", function()
 			local original = '[tap_hold.keys.caps_lock]\nfuture = "old"\n'
 			with_writer(original, function(writer, path, state)
 				local real_open, real_rename = io.open, os.rename
+				local FileWriter = require("core.fs.engine.regular_file_writer")
+				local real_writer_open = FileWriter.open
 				local staged, publications = 0, 0
 				local external = '# newer editor bytes\n[tap_hold.keys.caps_lock]\nfuture = "new"\n'
-				io.open = function(candidate, mode, ...)
-					local file = real_open(candidate, mode, ...)
-					if candidate ~= path .. ".tmp" or mode ~= "w" or not file then return file end
+				FileWriter.open = function(candidate, mode, ...)
+					local file, detail, code, remove_owned, current_image = real_writer_open(candidate, mode, ...)
+					if candidate ~= path .. ".tmp" or mode ~= "wx" or not file then
+						return file, detail, code, remove_owned, current_image
+					end
 					staged = staged + 1
 					return {
 						write = function(self, content) assert(file:write(content)); return self end,
@@ -259,7 +263,7 @@ helpers.describe("tap-hold exact-source publication", function()
 							assert(editor:write(external)); assert(editor:close())
 							return true
 						end,
-					}
+					}, detail, code, remove_owned, current_image
 				end
 				os.rename = function(...)
 					publications = publications + 1
@@ -271,7 +275,7 @@ helpers.describe("tap-hold exact-source publication", function()
 					end
 					return writer.set_tap("caps_lock", "copy")
 				end)
-				io.open, os.rename = real_open, real_rename
+				FileWriter.open, os.rename = real_writer_open, real_rename
 				helpers.assert_eq(called, true)
 				helpers.assert_eq(accepted, false)
 				helpers.assert_eq(staged, 1, "the race follows an actual staged candidate")
@@ -293,10 +297,10 @@ helpers.describe("tap-hold exact-source publication", function()
 			helpers.assert_eq(read(backup), source)
 			helpers.assert_eq(state.reloads, 0, "the wizard import still relies on its later daemon restart")
 			helpers.assert_true(read(path):find("caps_lock = []", 1, true) ~= nil)
-			local loaded = Loader.load(DEFAULTS, path)
+			local loaded = Loader.load(DEFAULTS, path, writer.config_path_for(path))
 			helpers.assert_nil(loaded.keys.caps_lock)
 			helpers.assert_eq(loaded.keys.left_shift.tap_action, "copy")
-			helpers.assert_eq(loaded.enabled, true)
+			helpers.assert_eq(loaded.enabled, true, "the import switches config.toml on")
 		end)
 	end)
 end)
@@ -310,7 +314,8 @@ helpers.describe("tap-hold untouched numeric source values", function()
 			with_writer(source, function(writer, path, state)
 				local original = Codec.decode(source)
 				if operation == "ordinary" then
-					helpers.assert_eq(writer.set_enabled(true), true)
+					-- A tray change that rewrites tap_hold.toml (the switch is a config.toml row).
+					helpers.assert_eq(writer.set_global_threshold(0.25), true)
 				else
 					local accepted, reason, backup = writer.import_recommended(path, { "left_shift" }, Loader.preset_keys(DEFAULTS))
 					helpers.assert_eq(accepted, true, reason)

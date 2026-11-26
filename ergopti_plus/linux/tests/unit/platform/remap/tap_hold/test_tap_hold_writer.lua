@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- A writer bound to a throwaway file.
 --- @param reload_ok boolean|nil What the reload reports (true by default).
@@ -27,11 +27,13 @@ local function fresh_writer(reload_ok)
 	local writer = helpers.load_module("platform.remap.tap_hold_writer")
 	writer.init({
 		path = path,
+		-- The switch and the timings land beside the throwaway file, never in a shared folder.
+		config_path = path .. ".config.toml",
 		reload = function() state.reloads = state.reloads + 1; return reload_ok ~= false end,
 		is_tap_action = function(id) return id == "copy" or id == "paste" or id == "enter" end,
 		-- The shipped catalogue, through the same canonicaliser the manager uses.
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 	})
 	return writer, path, state
@@ -67,16 +69,19 @@ local function with_folder_writer(opts, body)
 	local writer = helpers.load_module("platform.remap.tap_hold_writer")
 	writer.init({
 		path = dir .. "/tap_hold.toml",
+		config_path = dir .. "/tap_hold.toml.config.toml",
 		reload = function() state.reloads = state.reloads + 1; return opts.reload_ok ~= false end,
 		is_tap_action = function(id) return id == "copy" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 		layers = opts.layers ~= false
-			and { shared_root = require("infra.paths").shared_root(), config_dir = dir } or nil,
+			and { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir } or nil,
 	})
 	local ok, err = pcall(body, writer, dir, state)
-	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp", "layers.toml" }) do os.remove(dir .. "/" .. name) end
+	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp", "tap_hold.toml.config.toml", "layers.toml" }) do
+		os.remove(dir .. "/" .. name)
+	end
 	os.execute('rmdir "' .. dir .. '"')
 	if not ok then error(err, 0) end
 end
@@ -87,12 +92,81 @@ local function write_file(path, text)
 	fh:close()
 end
 
---- What the engine will run after the change.
+--- What the engine will run after the change: the keys of `path`, the switch
+--- and the timings of the config.toml the writer publishes beside it.
 local function effective(path)
-	return Loader.load(DEFAULTS, path)
+	return Loader.load(DEFAULTS, path, path .. ".config.toml")
 end
 
 helpers.describe("tap-hold writer: a tray change reaches the engine", function()
+	helpers.it("refuses a recommended layer when its source stream fails to close", function()
+		local original_open, closes = io.open, 0
+		io.open = function(path, mode)
+			local file, err = original_open(path, mode)
+			if not file or not path:match("layer_actions%.toml$") then return file, err end
+			return {
+				read = function(_, ...) return file:read(...) end,
+				close = function() closes = closes + 1; file:close(); return nil, "close refused" end,
+			}
+		end
+		local ok = pcall(require("layouts.engine.layers.preset").read, require("core.fs.engine.paths").shared_root(),
+			require("core.text.engine.toml_codec").decode)
+		io.open = original_open
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(closes, 1)
+	end)
+	helpers.it("refuses an unreadable recommended layer without writing", function()
+		local writes = 0
+		local result, err = require("layouts.engine.layers.preset").import_if_absent({
+			shared_root = require("core.fs.engine.paths").shared_root(), config_dir = "/unreadable",
+			toml_decode = require("core.text.engine.toml_codec").decode,
+			file_adapter = {
+				read_with_status = function() return nil, "error", "permission denied" end,
+				write_if_unchanged = function() writes = writes + 1; return true end,
+			},
+		})
+		helpers.assert_nil(result)
+		helpers.assert_true(type(err) == "string" and err ~= "")
+		helpers.assert_eq(writes, 0)
+	end)
+	helpers.it("does not follow a foreign staging symlink while saving a tap-hold", function()
+		local writer, path, state = fresh_writer()
+		local victim = os.tmpname()
+		write_file(victim, "original bytes")
+		assert(require("luv").fs_symlink(victim, path .. ".tmp"))
+		local ok, err = pcall(function()
+			helpers.assert_eq(writer.set_tap("left_shift", "paste"), false)
+			helpers.assert_eq(read_file(victim), "original bytes")
+			helpers.assert_eq(state.reloads, 0)
+		end)
+		os.remove(path .. ".tmp"); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses a staging file replaced before tap-hold publication", function()
+		local writer, path, state = fresh_writer()
+		local victim = os.tmpname()
+		write_file(path, '[tap_hold]\nenabled = true\n')
+		write_file(victim, "foreign bytes")
+		local uv, replaced = require("luv"), false
+		local ok, err = pcall(function()
+			local accepted = writer.set_tap("left_shift", "paste", function()
+				if not replaced and uv.fs_lstat(path .. ".tmp") then
+					assert(uv.fs_unlink(path .. ".tmp"))
+					assert(uv.fs_symlink(victim, path .. ".tmp"))
+					replaced = true
+				end
+				return true
+			end)
+			helpers.assert_true(replaced, "the editor guard must run after staging")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(read_file(path), '[tap_hold]\nenabled = true\n')
+			helpers.assert_eq(read_file(victim), "foreign bytes")
+			helpers.assert_eq(state.reloads, 0)
+		end)
+		os.remove(path .. ".tmp"); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("sets a tap in the shared schema and reloads the engine", function()
 		local writer, path, state = fresh_writer()
@@ -132,7 +206,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 	-- else: in a folder with no layers.toml the key entered a layer that binds
 	-- no key. The pick brings the recommended layer along, as the restore does.
 	helpers.it("(hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer", function()
-		local preset = read_or_nil(require("infra.paths").shared("keymap/layers.recommended.toml"))
+		local preset = read_or_nil(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 		helpers.assert_type(preset, "string", "the shipped layer must be readable")
 		with_folder_writer(nil, function(writer, dir, state)
 			helpers.assert_true(writer.set_hold("caps_lock", "modifier", "ctrl"))
@@ -229,12 +303,10 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 	helpers.it("renders a clear that the defaults never come back through", function()
 		local writer, path = fresh_writer()
 		writer.set_tap("left_shift", "paste")
-		local rows = { { section = "tap_holds", key = "enabled", delete = true } }
-		local candidate = writer.render_scope("clear", require("toml_codec").decode(read_file(path)), rows,
+		local candidate = writer.render_scope("clear", require("core.text.engine.toml_codec").decode(read_file(path)), {},
 			Loader.preset_keys(DEFAULTS))
 		write_file(path, candidate)
 		helpers.assert_nil(next(effective(path).keys), "no key at all")
-		helpers.assert_eq(effective(path).enabled, false)
 		os.remove(path)
 	end)
 
@@ -244,15 +316,14 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nenabled = false\n'
 			.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
 			.. '[other]\nvalue = 17\n')
-		local rows = { { section = "tap_holds", key = "enabled", value = true } }
-		local candidate = writer.render_scope("recommended", require("toml_codec").decode(read_file(path)), rows,
+		local candidate = writer.render_scope("recommended", require("core.text.engine.toml_codec").decode(read_file(path)), {},
 			Loader.preset_keys(DEFAULTS))
 		write_file(path, candidate)
-		local stored = require("toml_codec").decode(read_file(path))
+		local stored = require("core.text.engine.toml_codec").decode(read_file(path))
 		helpers.assert_nil(stored.tap_hold.inherit_defaults, "the preset is written, never inherited")
+		helpers.assert_nil(stored.tap_hold.enabled, "the switch is a config.toml row, dropped from tap_hold.toml")
 		helpers.assert_eq(stored.tap_hold.keys.left_shift.custom.note, "keep")
 		helpers.assert_eq(stored.other.value, 17)
-		helpers.assert_eq(effective(path).enabled, true)
 		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "copy")
 		helpers.assert_eq(state.reloads, 0, "rendering publishes and reloads nothing")
 		os.remove(path)
@@ -260,15 +331,14 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 
 	helpers.it("renders a clear of only owned tap-hold fields", function()
 		local writer = fresh_writer()
-		local document = require("toml_codec").decode('[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
+		local document = require("core.text.engine.toml_codec").decode('[tap_hold]\nenabled = true\ninherit_defaults = true\nfuture = "keep"\n'
 			.. '[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n'
 			.. 'enabled = true\ntime_activation_seconds = 0.3\n'
 			.. '[tap_hold.keys.left_shift.custom]\nnote = "keep"\n'
 			.. '[tap_hold.keys.left_ctrl]\ntap_action = "copy"\n'
 			.. '[tap_hold.keys.future_key]\ntap_action = "future"\nenabled = true\n'
 			.. '[other]\nvalue = 17\n')
-		local rows = { { section = "tap_holds", key = "enabled", delete = true } }
-		local stored = require("toml_codec").decode(writer.render_scope("clear", document, rows, Loader.preset_keys(DEFAULTS)))
+		local stored = require("core.text.engine.toml_codec").decode(writer.render_scope("clear", document, {}, Loader.preset_keys(DEFAULTS)))
 		helpers.assert_eq(stored.tap_hold.keys.left_shift, { custom = { note = "keep" } })
 		helpers.assert_nil(stored.tap_hold.keys.left_ctrl)
 		helpers.assert_eq(stored.tap_hold.keys.future_key, { tap_action = "future", enabled = true })
@@ -284,16 +354,22 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_throws(function()
 			writer.render_scope("clear", {}, { { section = "tap_holds", key = "future", delete = true } }, preset)
 		end)
+		helpers.assert_throws(function()
+			writer.render_scope("clear", {}, { { section = "tap_holds", key = "enabled", value = true } }, preset)
+		end, "the switch is a config.toml row")
 		helpers.assert_throws(function() writer.render_scope("clear", { tap_hold = "opaque" }, {}, preset) end)
 		helpers.assert_throws(function() writer.render_scope("factory", {}, {}, preset) end)
 	end)
 
-	helpers.it("switches the feature off in the file", function()
+	helpers.it("switches the feature off and on in config.toml", function()
 		local writer, path = fresh_writer()
-		writer.set_enabled(false)
+		helpers.assert_true(writer.set_enabled(false))
 		helpers.assert_true(not effective(path).enabled)
-		writer.set_enabled(true)
+		helpers.assert_true(writer.set_enabled(true))
 		helpers.assert_true(effective(path).enabled)
+		helpers.assert_eq(read_or_nil(path), nil, "tap_hold.toml is not written")
+		helpers.assert_eq(require("core.text.engine.toml_codec").decode(read_file(path .. ".config.toml")).tap_holds.enabled, true)
+		os.remove(path .. ".config.toml")
 		os.remove(path)
 	end)
 
@@ -304,6 +380,14 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_true(not writer.set_threshold("caps_lock", 30))
 		helpers.assert_true(not writer.set_threshold("caps_lock", 0))
 		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.3)
+		os.remove(path)
+	end)
+
+	helpers.it("refuses a NaN key delay before writing or reloading", function()
+		local writer, path, state = fresh_writer()
+		helpers.assert_eq(writer.set_threshold("caps_lock", 0 / 0), false)
+		helpers.assert_nil(read_or_nil(path))
+		helpers.assert_eq(state.reloads, 0)
 		os.remove(path)
 	end)
 
@@ -330,7 +414,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		local writer, path = fresh_writer()
 		write_file(path, '[other]\nnote = "say \\"hi\\""\n[tap_hold.keys.left_shift]\ncustom = 3\n')
 		writer.set_tap("left_shift", "paste")
-		local parsed = require("toml_codec").decode(read_file(path))
+		local parsed = require("core.text.engine.toml_codec").decode(read_file(path))
 		helpers.assert_eq(parsed.other.note, 'say "hi"', "a quote survives the round trip")
 		helpers.assert_eq(parsed.tap_hold.keys.left_shift.custom, 3)
 		os.remove(path)
@@ -347,6 +431,58 @@ end)
 -- The first-run wizard's Tap-Holds answer: it names a file of the folder it
 -- sets up, which may not be the running one, and restarts the daemon after.
 helpers.describe("tap-hold writer: the wizard imports only the checked keys", function()
+	helpers.it("refuses a dangling link at the proposed backup name", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path, victim = os.tmpname(), os.tmpname()
+		os.remove(victim)
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		assert(require("luv").fs_symlink(victim, backup))
+		local date = os.date
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS), path .. ".config.toml")
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(victim), "an unrelated target must never be created")
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date = date
+		os.remove(backup); os.remove(path); os.remove(victim)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes its own incomplete backup when its write is refused", function()
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		local path = os.tmpname()
+		local original = '[tap_hold]\ninherit_defaults = false\n'
+		write_file(path, original)
+		local backup = path .. ".tap_holds-20260101-000000-1.bak"
+		local date, Native = os.date, require("core.fs.engine.regular_file_writer")
+		local native_open = Native.open
+		local ok, err = pcall(function()
+			os.date = function(format, ...)
+				if format == "%Y%m%d-%H%M%S" then return "20260101-000000" end
+				return date(format, ...)
+			end
+			Native.open = function(target, mode)
+				local fh, detail, code, remove_owned, current = native_open(target, mode)
+				if target ~= backup or not fh then return fh, detail, code, remove_owned, current end
+				return { write = function() return nil, "injected refusal" end,
+					close = function() return fh:close() end }, detail, code, remove_owned, current
+			end
+			local imported = writer.import_recommended(path, { "caps_lock" }, Loader.preset_keys(DEFAULTS), path .. ".config.toml")
+			helpers.assert_eq(imported, false)
+			helpers.assert_nil(read_or_nil(backup))
+			helpers.assert_eq(read_file(path), original)
+		end)
+		os.date, Native.open = date, native_open
+		os.remove(backup); os.remove(path)
+		if not ok then error(err, 0) end
+	end)
 
 	--- A throwaway path with no file behind it.
 	local function absent_path()
@@ -364,7 +500,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 			.. '[other]\nvalue = 17\n'
 		write_file(path, original)
 		local preset = Loader.preset_keys(DEFAULTS)
-		local imported, err, backup = writer.import_recommended(path, { "caps_lock", "left_alt" }, preset)
+		local imported, err, backup = writer.import_recommended(path, { "caps_lock", "left_alt" }, preset, path .. ".config.toml")
 		helpers.assert_true(imported, tostring(err))
 		helpers.assert_type(backup, "string", "the replaced file is backed up")
 		helpers.assert_true(backup:find(path, 1, true) == 1, "beside itself: " .. backup)
@@ -377,7 +513,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 		helpers.assert_eq(loaded.keys.left_alt.hold_layer, preset.left_alt.hold_layer)
 		helpers.assert_eq(loaded.keys.left_shift.tap_action, "paste", "an unchecked key keeps what it had")
 		helpers.assert_nil(loaded.keys.right_ctrl, "a key nobody checked is not written")
-		local stored = require("toml_codec").decode(read_file(path))
+		local stored = require("core.text.engine.toml_codec").decode(read_file(path))
 		helpers.assert_eq(stored.tap_hold.keys.caps_lock.custom, 3, "a field the writer does not own survives")
 		helpers.assert_eq(stored.tap_hold.inherit_defaults, false)
 		helpers.assert_eq(stored.other.value, 17)
@@ -396,7 +532,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 			["another delay"] = '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.5\n',
 		}) do
 			write_file(path, text)
-			local imported, err, backup = writer.import_recommended(path, { "left_alt", "caps_lock" }, preset)
+			local imported, err, backup = writer.import_recommended(path, { "left_alt", "caps_lock" }, preset, path .. ".config.toml")
 			helpers.assert_eq(imported, false, label)
 			helpers.assert_true(tostring(err):find("caps_lock", 1, true) ~= nil, label .. ": " .. tostring(err))
 			helpers.assert_nil(backup, label)
@@ -405,7 +541,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 		local recommended = '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\ntap_action = "enter"\n'
 			.. 'hold_modifier = "ctrl"\nenabled = true\n'
 		write_file(path, recommended)
-		local imported, err, backup = writer.import_recommended(path, { "caps_lock" }, preset)
+		local imported, err, backup = writer.import_recommended(path, { "caps_lock" }, preset, path .. ".config.toml")
 		helpers.assert_true(imported, "a key already at its recommendation is not the user's: " .. tostring(err))
 		os.remove(backup)
 		os.remove(path)
@@ -414,7 +550,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 	helpers.it("creates the file of a folder that has none", function()
 		local writer = helpers.load_module("platform.remap.tap_hold_writer")
 		local path = absent_path()
-		local imported, _, backup = writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS))
+		local imported, _, backup = writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS), path .. ".config.toml")
 		helpers.assert_true(imported)
 		helpers.assert_nil(backup, "nothing to back up")
 		local loaded = effective(path)
@@ -434,17 +570,17 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 			["key twice"] = { "tab", "tab" },
 			["no key"] = {},
 		}) do
-			local imported, err = writer.import_recommended(path, keys, preset)
+			local imported, err = writer.import_recommended(path, keys, preset, path .. ".config.toml")
 			helpers.assert_eq(imported, false, label)
 			helpers.assert_type(err, "string", label)
 			helpers.assert_eq(read_file(path), "", label .. ": nothing is written")
 		end
 		local broken = "[tap_hold.keys.left_shift\ntap_action = \"paste\"\n"
 		write_file(path, broken)
-		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset), false)
+		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset, path .. ".config.toml"), false)
 		helpers.assert_eq(read_file(path), broken, "the user's text is left as it was")
 		write_file(path, 'tap_hold = "opaque"\n')
-		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset), false)
+		helpers.assert_eq(writer.import_recommended(path, { "tab" }, preset, path .. ".config.toml"), false)
 		helpers.assert_eq(read_file(path), 'tap_hold = "opaque"\n')
 		os.remove(path)
 	end)
@@ -528,7 +664,7 @@ helpers.describe("tap-hold writer: classified source refusal", function()
 
 	helpers.it("refuses an unreadable source before the recommended import creates a backup", function()
 		observe_refusal("permission", function(writer, path)
-			return writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS))
+			return writer.import_recommended(path, { "tab" }, Loader.preset_keys(DEFAULTS), path .. ".config.toml")
 		end)
 	end)
 
@@ -551,7 +687,7 @@ helpers.describe("tap-hold writer: classified source refusal", function()
 		local writer, path, state = fresh_writer()
 		write_file(path, original)
 		local accepted = writer.set_tap("left_shift", "paste")
-		local document = require("toml_codec").decode(read_file(path))
+		local document = require("core.text.engine.toml_codec").decode(read_file(path))
 		os.remove(path)
 		helpers.assert_eq(accepted, true)
 		helpers.assert_eq(state.reloads, 1)
@@ -571,13 +707,14 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 	local function observe_staging(fault)
 		local writer, path, state = fresh_writer()
 		write_file(path, original)
-		local real_open, real_rename, real_remove = io.open, os.rename, os.remove
+		local NativeWriter = require("core.fs.engine.regular_file_writer")
+		local real_open, real_rename = NativeWriter.open, os.rename
 		local observed = { opens = 0, writes = 0, closes = 0, renames = 0, removals = 0 }
 		local handle, proxy
-		io.open = function(target, mode)
-			if target ~= path .. ".tmp" or mode ~= "w" then return real_open(target, mode) end
+		NativeWriter.open = function(target, mode)
+			if target ~= path .. ".tmp" or mode ~= "wx" then return real_open(target, mode) end
 			observed.opens = observed.opens + 1
-			local opened, err, code = real_open(target, mode)
+			local opened, err, code, remove_owned, current_image = real_open(target, mode)
 			handle = opened
 			if not opened then return nil, err, code end
 			proxy = {
@@ -609,21 +746,18 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 					return closed, close_err, close_code
 				end,
 			}
-			return proxy
+			return proxy, nil, nil, function()
+				observed.removals = observed.removals + 1
+				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
+				return remove_owned()
+			end, current_image
 		end
 		os.rename = function(from, to)
 			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
 			return real_rename(from, to)
 		end
-		os.remove = function(target)
-			if target == path .. ".tmp" then
-				observed.removals = observed.removals + 1
-				if fault == "cleanup_refused" then return nil, "owned stage removal refused" end
-			end
-			return real_remove(target)
-		end
 		local call_ok, accepted = pcall(writer.set_tap, "left_shift", "paste")
-		io.open, os.rename, os.remove = real_open, real_rename, real_remove
+		NativeWriter.open, os.rename = real_open, real_rename
 		if handle then pcall(handle.close, handle) end
 		local source, staged = read_or_nil(path), read_or_nil(path .. ".tmp")
 		os.remove(path)
@@ -656,7 +790,7 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 		local writer, path, state = fresh_writer()
 		write_file(path, original)
 		local accepted = writer.set_tap("left_shift", "paste")
-		local document = require("toml_codec").decode(read_file(path))
+		local document = require("core.text.engine.toml_codec").decode(read_file(path))
 		local staged = read_or_nil(path .. ".tmp")
 		os.remove(path)
 		helpers.assert_eq(accepted, true)
@@ -735,7 +869,7 @@ helpers.describe("tap-hold delay model: global default, sticky per-key delays, r
 	helpers.it("a scope restore drops the user's global delay with the keys' delays", function()
 		local writer, path = fresh_writer()
 		helpers.assert_true(writer.set_global_threshold(0.3))
-		local document = require("toml_codec").decode(read_file(path))
+		local document = require("core.text.engine.toml_codec").decode(read_file(path))
 		local text = writer.render_scope("recommended", document, {}, Loader.preset_keys(DEFAULTS))
 		helpers.assert_true(text:find("time_activation_seconds", 1, true) == nil)
 		os.remove(path)

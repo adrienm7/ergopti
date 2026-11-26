@@ -1,7 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_step_skips_others/input.toml
-
-[_meta]
-schema_version = 19
-
-[shortcuts.keys]
-ctrl_g = true

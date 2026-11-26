@@ -29,16 +29,16 @@ helpers.describe("boot privacy admission", function()
 				end,
 				os = { exit = function(code) observed.exits[#observed.exits + 1] = code end },
 				require = function(name)
-					if name == "adapters.boot_journal" then
+					if name == "core.logger.adapters.boot_journal" then
 						return assert(load(adapter, "actual boot journal", "t", {
 							assert = assert, type = type, pcall = pcall, io = env.io,
 							require = function(module)
-								helpers.assert_eq(module, "infra.logger")
+								helpers.assert_eq(module, "core.logger.engine.logger")
 								return logger
 							end,
 						}))()
 					end
-					helpers.assert_eq(name, "adapters.boot_fatal")
+					helpers.assert_eq(name, "diagnostics.adapters.boot_fatal")
 					if mode == "require_throw" then error("PRIVATE_REPORT_IMPORT_REFUSAL") end
 					return { report = function(...)
 						observed.reports[#observed.reports + 1] = table.pack(...)
@@ -47,7 +47,7 @@ helpers.describe("boot privacy admission", function()
 					end }
 				end,
 				io = { open = function(path, access)
-					helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
+					helpers.assert_eq(path, "/owned-shared/diagnostics/data/redaction.json")
 					helpers.assert_eq(access, "rb")
 					if mode == "open" then error("PrivateUser /Users/PrivateUser/private") end
 					return { read = function()

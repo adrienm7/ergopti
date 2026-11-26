@@ -1,0 +1,26 @@
+Applications > Encryptor, container proof (2026-11-10)
+Command: bash tests/hardware/desktop/run_encryptor.sh   (exit 0, 13 check(s), 0 failure(s))
+Host: Ubuntu 24.04 container, Xvfb + openbox 3.6.1, GTK 3.24.41, LuaJIT 2.1, OpenSSL 3.0.
+Started as install/launch.sh starts the daemon: absolute script, no LUA_PATH in the
+environment. Path: ui/bundled_apps.lua rows() Encryptor row -> launch() -> luv spawn of
+apps/encryptor.lua -> apps/dialogs.lua -> ui/dialog_host.lua (Ergopti's GTK host);
+the dialogs are answered on the session keyboard (xdotool), locale fr.
+
+ok  Applications lists Encryptor; the row starts the child
+ok  ergopti-encryptor.desktop (MimeType application/octet-stream) runs ergopti-encryptor.sh
+ok  file chooser « ErgoptiPlus — Fichier : » opens; path typed
+ok  password asked, then confirmed (« Chiffrer le fichier »); success question closed
+ok  the child exits and the launcher retires its handle
+ok  proof.txt.enc written, no plain text in it; openssl decrypts it to the exact bytes
+ok  the launcher given proof.txt.enc (a drop) asks the password once (« Déchiffrer le
+    fichier ») and writes proof.txt back byte for byte
+
+Bugs found first (each fixed, regression in tests/unit/ui/bundled_apps/test_bundled_apps_launcher.lua):
+1. The tray's child got no module path: the daemon sets package.path itself and exports
+   no LUA_PATH, so apps/encryptor.lua (and App Cloner) died on « module 'native_path' not
+   found » and no window opened (the proof's four dialog checks failed). Fix:
+   bundled_apps.app_environment() hands the child the same LUA_PATH, LUA_CPATH and runtime
+   variables as the desktop entry's launcher.
+2. Under a relative package.path every native dialog refused to open (« the native dialog
+   needs the driver root »): ui/native_dialog.lua read the root from its own source path.
+   Fix: it reads infra.paths.driver_root(), which is absolute.

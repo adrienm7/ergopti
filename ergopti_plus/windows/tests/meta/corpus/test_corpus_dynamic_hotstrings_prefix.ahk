@@ -5,10 +5,10 @@
 ; DESCRIPTION:
 ; Loads the shared cross-driver corpus from
 ; _shared/tests/corpus/dynamic_hotstrings/prefix_vectors.json and validates
-; the AHK personal-info prefix counter (CountDynamicSection, infra/menu_helpers.ahk)
+; the AHK personal-info prefix counter (CountDynamicSection, menu/engine/helpers.ahk)
 ; against it — proving the AHK reimplementation of the phone/SSN/IBAN threshold
 ; arithmetic still matches the shared Lua reference it was hand-copied from
-; (_shared/lua/dynamic_hotstrings/init.lua:compute_prefix_counts).
+; (_shared/hotstrings/engine/dynamic/core.lua:compute_prefix_counts).
 ;
 ; The macOS half lives in macos/tests/unit/meta/test_corpus_dynamic_hotstrings_prefix.lua
 ; and calls the shared Lua function directly — this file exists because AHK has
@@ -90,8 +90,8 @@ _CorpusDynHS_CountDynamicSectionMatchesCorpus() {
 		PersonalInformation := Map(
 			"phone_number", Vector["phone"],
 			"phone_number_clean", Vector["fphone"],
-			"social_security_number", Vector["ssn_raw"],
-			"iban", Vector["iban_raw"]
+			"social_security_number", Vector["ssn"],
+			"iban", Vector["iban"]
 		)
 		_TomlCountCache := Map()
 

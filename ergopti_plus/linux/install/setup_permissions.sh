@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # Accounts and groups resolve through NSS (LDAP, sssd), so through getent;
 # without it nothing is changed (EX_UNAVAILABLE). The stderr line is a
 # machine-readable token, not a sentence: the Lua caller localizes it
-# (infra/input_access.lua) and a terminal reader sees the program's name.
+# (platform/input/access.lua) and a terminal reader sees the program's name.
 command -v getent >/dev/null 2>&1 || { printf '%s %s\n' missing-program getent >&2; exit 69; }
 MODE="${1:-}"
 case "$MODE" in
@@ -26,7 +26,8 @@ resolve_user() {
 	local uid="$1" entry name password resolved_uid rest
 	[[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ] \
 		|| { ergopti_msg permissions.non_desktop_account >&2; return 1; }
-	entry="$(getent passwd "$uid")"
+	entry="$(getent passwd "$uid")" || return 1
+	case "$entry" in *$'\n'*) ergopti_msg permissions.identity_mismatch >&2; return 1 ;; esac
 	IFS=: read -r name password resolved_uid rest <<< "$entry"
 	[ "$resolved_uid" = "$uid" ] && [ -n "$name" ] || { ergopti_msg permissions.identity_mismatch >&2; return 1; }
 	printf '%s\n' "$name"
@@ -34,31 +35,60 @@ resolve_user() {
 
 enroll_user() {
 	local name
-	name="$(resolve_user "$1")"
+	name="$(resolve_user "$1")" || return 1
 	if command -v usermod >/dev/null 2>&1; then
 		usermod -aG input,uinput "$name"
 	else
-		addgroup "$name" input
+		addgroup "$name" input || return 1
 		addgroup "$name" uinput
 	fi
 }
 
 if [ "$MODE" = --user ]; then resolve_user "$2" >/dev/null; fi
 
-for group in input uinput; do
-	if ! getent group "$group" >/dev/null; then
-		if command -v groupadd >/dev/null 2>&1; then groupadd --system "$group"
-		else addgroup -S "$group"; fi
+# A dangling administrator-owned link is not usable configuration. Preserve it
+# and report the conflict before creating groups or changing system files.
+for config in /etc/udev/rules.d/99-ergopti-uinput.rules /etc/modules-load.d/ergopti-uinput.conf; do
+	if [ -L "$config" ] && [ ! -e "$config" ]; then
+		printf '[permissions] code=dangling-configuration path=%q\n' "$config" >&2
+		exit 78
+	fi
+	# Existing administrator files, including links to /dev/null used to mask
+	# rules, remain theirs. A directory or FIFO cannot serve as configuration.
+	if [ -e "$config" ] && [ ! -f "$config" ] && [ ! "$config" -ef /dev/null ]; then
+		printf '[permissions] code=invalid-configuration path=%q\n' "$config" >&2
+		exit 78
 	fi
 done
+
+missing_groups=()
+for group in input uinput; do
+	if getent group "$group" >/dev/null; then
+		:
+	else
+		lookup_status=$?
+		# getent reports an absent key as 2. Other errors cannot authorize
+		# creating a local group, which could shadow an unavailable NSS entry.
+		if [ "$lookup_status" -ne 2 ]; then
+			printf '[permissions] code=group-lookup-failed group=%s status=%s\n' "$group" "$lookup_status" >&2
+			exit "$lookup_status"
+		fi
+		missing_groups+=("$group")
+	fi
+done
+for group in "${missing_groups[@]}"; do
+	if command -v groupadd >/dev/null 2>&1; then groupadd --system "$group"
+	else addgroup -S "$group"; fi
+done
 install -d /etc/udev/rules.d /etc/modules-load.d
-if [ ! -e /etc/udev/rules.d/99-ergopti-uinput.rules ]; then
+if [ ! -e /etc/udev/rules.d/99-ergopti-uinput.rules ] && [ ! -L /etc/udev/rules.d/99-ergopti-uinput.rules ]; then
 	install -m 644 "$SCRIPT_DIR/99-ergopti-uinput.rules" /etc/udev/rules.d/99-ergopti-uinput.rules
 fi
-if [ ! -e /etc/modules-load.d/ergopti-uinput.conf ]; then
+if [ ! -e /etc/modules-load.d/ergopti-uinput.conf ] && [ ! -L /etc/modules-load.d/ergopti-uinput.conf ]; then
 	install -m 644 "$SCRIPT_DIR/ergopti-uinput.conf" /etc/modules-load.d/ergopti-uinput.conf
 fi
 
+enrollment_failed=false
 if [ "$MODE" = --user ]; then
 	enroll_user "$2"
 elif command -v loginctl >/dev/null 2>&1; then
@@ -81,7 +111,21 @@ elif command -v loginctl >/dev/null 2>&1; then
 				esac
 			done <<< "$properties"
 			case "$type:$remote:$class:$active" in
-				x11:no:user:yes|wayland:no:user:yes) enroll_user "$uid" ;;
+				x11:no:user:yes|wayland:no:user:yes)
+					# Incomplete sessions and system accounts are not candidates for
+					# keyboard access and must not abort setup for other users.
+					if [[ "$uid" =~ ^[0-9]+$ ]]; then
+						if [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ]; then
+							if ! enroll_user "$uid"; then
+								printf '[permissions] code=session-enrollment-failed session=%q uid=%s\n' "$session" "$uid" >&2
+								enrollment_failed=true
+							fi
+						else
+							ergopti_msg permissions.non_desktop_account >&2
+						fi
+					else
+						ergopti_msg permissions.session_uninspectable "$session" >&2
+					fi ;;
 			esac
 		done <<< "$sessions"
 	else
@@ -98,3 +142,12 @@ if [ -S /run/udev/control ]; then
 else
 	ergopti_msg permissions.udev_not_running >&2
 fi
+
+# One session disappearing or failing enrollment must not skip later sessions,
+# but callers still need to know that setup did not complete for every user.
+# 75 (EX_TEMPFAIL) says only that: the groups, the rule and the module are in
+# place, and the launcher asks again for that account at its first start. A
+# package hook can then finish configuring (an sssd or LDAP account that
+# usermod refuses left dpkg with a half-configured package) while every other
+# refusal keeps its own status.
+if [ "$enrollment_failed" = true ]; then exit 75; fi

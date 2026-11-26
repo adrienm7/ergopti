@@ -4,8 +4,8 @@
 --- Capture ownership must be established by the producer's consumer before logging.
 local M = {}
 local Wire = require("modules.keystats.physical_wire")
-local Release = require("keystats.physical_release")
-local Walker = require("keystats.walker")
+local Release = require("metrics.engine.capture.physical_release")
+local Walker = require("metrics.engine.walker.walker")
 
 --- Validates original physical attribution before changing aggregate state.
 ---@param entry table Original capture, exact device, keycode, app and timestamp.

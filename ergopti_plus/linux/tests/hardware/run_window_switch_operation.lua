@@ -1,13 +1,13 @@
 --- tests/hardware/run_window_switch_operation.lua
 
 --- Actual X11 workers with explicit controlled kernel-source receipts.
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Switch = require("adapters.window_switch")
 local pulses, result, elapsed = 0, nil, uv.hrtime()
 local pump = uv.new_timer()
 uv.timer_start(pump, 1, 5, function() pulses = pulses + 1 end)
-local Runner = require("adapters.program_runner")
+local Runner = require("core.process.adapters.program_runner")
 local groups, leaders, allowed = {}, {}, true
 local mode = arg[3] or "normal"
 local foreign, replace_transport = nil, nil
@@ -74,12 +74,12 @@ if mode == "binding" or mode == "canonical" or mode == "physical" or mode == "di
 	-- still belong to the real manager and the actual canonical file.
 	local original_new = Switch.new
 	Switch.new = function(capture) return original_new(capture, ports) end
-	package.loaded["adapters.keyboard_hook"] = { physical_source_receipt = function()
+	package.loaded["platform.input.keyboard_hook"] = { physical_source_receipt = function()
 		return { generation = physical_generation, ready = true }
 	end }
 	local global_combos = 0
-	package.loaded["modules.gestures.combo_emitter"] = { press = function() global_combos = global_combos + 1; return true end }
-	Gestures = require("modules.gestures.manager")
+	package.loaded["gestures.engine.combo_emitter"] = { press = function() global_combos = global_combos + 1; return true end }
+	Gestures = require("gestures.engine.manager")
 	assert(Gestures.init({ persist = true, config_path = arg[4], is_paused = function() return paused end }) ~= false)
 	owner = {
 		run = function(_, done)
@@ -163,8 +163,8 @@ elseif preactivation then
 			debt = owner.stop() == false and owner.has_pending()
 			assert(debt, "pause acknowledged physical retirement before owned worker exit")
 		elseif mode == "preactivation_program_binding" then
-			local scalar = require("json").encode({ version = 1, executable = "/bin/true", arguments = { "owned-program-binding" } })
-			configuration = require("infra.program_binding_transaction").new({
+			local scalar = require("core.text.engine.json").encode({ version = 1, executable = "/bin/true", arguments = { "owned-program-binding" } })
+			configuration = require("settings.engine.preferences.program_binding_transaction").new({
 				binding = "tap_3", scalar = scalar, path = arg[4], backup_path = arg[4] .. ".owned-program-binding",
 				is_paused = function() return paused end,
 			})

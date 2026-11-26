@@ -15,6 +15,9 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\layout_row_host_character.ahk
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 
 
 
@@ -27,7 +30,7 @@ _LRP_Corpus() {
 _LRP_SharedCorpus() {
 	global _SharedDir, LAYOUT_ROWS_POLICY_IDS
 	Corpus := _LRP_Corpus()
-	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\data\keycodes\physical_keys.json"))
+	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\layouts\data\keycodes\physical_keys.json"))
 	Rows := LayoutRowsPolicyKeys(Registry)
 	AssertEqual(4, LAYOUT_ROWS_POLICY_IDS.Length, "four row switches")
 	for Row in LAYOUT_ROWS_POLICY_IDS {
@@ -122,18 +125,26 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	; Other entry points in the included module name services this narrow child
 	; never calls. Runtime unset reads still throw; only load-time warnings stop.
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	Code .= "#Include " . _DriverDir . "\infra\json.ahk`n"
-	Code .= "#Include " . _DriverDir . "\adapters\file_system.ahk`n"
-	Code .= "#Include " . _SharedDir . "\modules\features\layout_rows_policy.ahk`n"
+	Code .= "#Include " . _DriverDir . "\core\text\engine\json.ahk`n"
+	Code .= "#Include " . _DriverDir . "\core\fs\adapters\file_system.ahk`n"
+	Code .= "#Include " . _SharedDir . "\settings\data\features\layout_rows_policy.ahk`n"
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
 	Code .= "#Include " . Owner . "`n"
+	; LayoutRowIsEmulated asks the game keys first and LayerDispatch holds its
+	; letters through them: the genuine module, whose unregistered release
+	; hotkeys leave every row to the emulation and every letter to its text.
+	GameKeysOwner := _DriverProductionFileForSymbol("GameKeys_PassThrough")
+	AssertTrue(GameKeysOwner != "", "the genuine game keys must have one production owner")
+	Code .= "#Include " . GameKeysOwner . "`n"
 	for Name in ["LayoutEmulationRows", "LayoutRowOf", "LayoutRowSwitches",
 		"LayoutRowsAllEmulated", "LayoutRowIsEmulated"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the real row policy helper must exist: " . Name)
 		Code .= Definition . "`n"
 	}
+	if BodyName == "layout_row_native_flags_body.ahk" || BodyName == "layout_row_external_flags_body.ahk"
+		Code .= "#Include " . _DriverDir . "\tests\fixtures\layout_row_host_character.ahk`n"
 	Code .= ExtraSource . "`n"
 	Code .= FileRead(_DriverDir . "\tests\fixtures\" . BodyName, "UTF-8")
 	return Code
@@ -174,7 +185,15 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 		AssertEqual(1, State.Calls, "the row sender child must settle once")
 		AssertEqual(0, State.Code, "the row sender refused: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "no native child error may be hidden")
-		AssertEqual(Receipt, State.Output)
+		if Receipt == "PASS layout-row-native-flags" {
+			AssertTrue(IsSet(ExtraArgs) && ExtraArgs.Length >= 1)
+			Observation := "OBSERVATION row-native-feed mode=" . ExtraArgs[1]
+				. " observer_level=1 keydowns=1 char_units=1 expected_units=1"
+			AssertEqual(Observation . "`n" . Receipt, State.Output,
+				"the exact I1 observation and terminal native receipt must both be received")
+			_TestPrint("# " . Observation)
+		} else
+			AssertEqual(Receipt, State.Output)
 	} catch as Err {
 		Primary := Err
 	}
@@ -198,8 +217,8 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 
 for _LRPS_CallerLevel in [0, 2, 3]
 	for _LRPS_Throws in [false, true]
-		Test("layout row sender: caller level " . _LRPS_CallerLevel . " survives " . (_LRPS_Throws ? "refusal" : "success")
-			. " without rehooking (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
+		Test("layout row native callback: caller level " . _LRPS_CallerLevel . " ignores a " . (_LRPS_Throws ? "refusing" : "recording") . " sender trap"
+			. " without synthetic replay (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
 
 
 _LRPW_ChildSource() {
@@ -207,12 +226,14 @@ _LRPW_ChildSource() {
 	Definition := _DriverFuncBody("RemapKey")
 	AssertTrue(Definition != "", "the real built-in registrar must be exercised")
 	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
-		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition . "`n"
+		"#Include " . _DriverDir . "\infra\star_slot.ahk`n" . Definition . "`n"
+		. _DriverFuncBody("_RemapWinCriterion") . "`n"
+		. _DriverFuncBody("_RemapHeldEmit") . "`n"
 		. _DriverFuncBody("_RemapChordEmit") . "`nKeyboardShortcutRunLayoutChord(*) => false`n")
 }
 
 for _LRPW_Row in ["number", "top", "home", "bottom"]
-	for _LRPW_Mode in ["off", "on", "magic-source", "magic-other", "ordinary", "legacy"]
+	for _LRPW_Mode in ["off", "on", "ordinary", "legacy"]
 		Test("layout Win fallback: " . _LRPW_Row . " row " . _LRPW_Mode . " (layout-row-win-fallback)",
 			_LRPS_LevelCustody.Bind(0, false, _LRPW_ChildSource, [_LRPW_Row, _LRPW_Mode], "PASS row-win-fallback"))
 
@@ -271,8 +292,8 @@ _LRPE_ChildSource() {
 	At := RegExMatch(Source, Pattern, &Criterion)
 	AssertTrue(At > 0, "the actual static edge criterion must be found")
 	AssertEqual(0, RegExMatch(Source, Pattern, , At + Criterion.Len), "the edge cohort must have one real static criterion")
-	Extra := "#Include " . _DriverDir . "\adapters\key_state.ahk`n"
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra := "#Include " . _DriverDir . "\platform\input\key_state.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	for Name in ["KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
 		"KeylayoutEmulation_NumberRowLevels", "TapHoldKanaAltGrHeld"] {
 		Definition := _DriverFuncBody(Name)
@@ -291,27 +312,18 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
 
 
-_LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSource := "") {
+; The remap registrar and the Win broker the built-in row producers share.
+_LRPN_RemapSource(BodyName, AdditionalSource := "") {
 	global _DriverDir
-	Source := _NRP_LayoutSource()
-	Start := InStr(Source, "_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(")
-	Finish := InStr(Source, "`nRegisterShiftLayer()", , Start)
-	AssertTrue(Start > 0 && Finish > Start, "the genuine magic producer must be bounded before Shift registration")
-	Extra := "#Include " . _DriverDir . "\infra\magic_editor.ahk`n"
-	for Name in ["RemapKey", "_RemapChordEmit", "LayoutRegistry_MagicKeyHotkeys"] {
+	Extra := "#Include " . _DriverDir . "\infra\star_slot.ahk`n"
+	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapHeldEmit", "_RemapChordEmit"] {
 		Definition := _DriverFuncBody(Name)
-		AssertTrue(Definition != "", "the genuine magic dependency must exist: " . Name)
+		AssertTrue(Definition != "", "the genuine remap dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
 	Extra .= "KeyboardShortcutRunLayoutChord(*) => false`n"
-	Extra .= "_LRPCM_RegisterMagic() {`n global ScriptInformation, Features`n"
-		. SubStr(Source, Start, Finish - Start) . "`n}`n"
 	return _LRPS_ChildSource(BodyName, Extra . AdditionalSource)
 }
-
-for _LRPCM_Row in ["number", "top", "home", "bottom"]
-	Test("layout rows: chosen magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-chosen-magic-scope)",
-		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-chosen-magic"))
 
 
 _LRPN_ChildSource() {
@@ -333,27 +345,27 @@ _LRPN_ChildSource() {
 		Includes := Resolved
 	}
 	Extra := Includes
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	; The extracted digit emitters share their real native/recorder selector.
 	; Only its final SendEvent boundary is the child's passive output port.
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
-		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition",
+		"KeylayoutEmulation_NumberRowLevels", "GetCapsLockCondition",
 		"NumberRowSendEvent", "_DigitShiftSend"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the actual built-in row dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
-	return _LRPCM_ChildSource("builtin_number_row_magic_body.ahk", Extra)
+	return _LRPN_RemapSource("builtin_number_row_owner_body.ahk", Extra)
 }
 
 for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
 	for _LRPN_Emulated in [false, true]
 		for _LRPN_Caps in [false, true]
 			Test("built-in number row: " . _LRPN_Scan . " " . (_LRPN_Emulated ? "emulated" : "native")
-				. " row caps " . (_LRPN_Caps ? "on" : "off") . " retains chosen magic and releases (builtin-number-row-magic-owner)",
+				. " row caps " . (_LRPN_Caps ? "on" : "off") . " types its own row, never the magic key (builtin-number-row-owner)",
 				_LRPS_LevelCustody.Bind(0, false, _LRPN_ChildSource,
 					[_LRPN_Scan, _LRPN_Emulated ? "on" : "off", _LRPN_Caps ? "on" : "off", _StaticDir, _DriverDir],
-					"PASS builtin-number-row-magic-owner"))
+					"PASS builtin-number-row-owner"))
 
 
 _LRCC_ChildSource(BodyName := "layout_row_control_body.ahk", AdditionalSource := "") {
@@ -412,3 +424,130 @@ for _LRCZ_Sc in ["SC00C", "SC00D"]
 		Test("layout zoom: " . _LRCZ_Sc . " chooses its actual " . _LRCZ_Host . " host owner (layout-zoom-host-precedence)",
 			_LRPS_LevelCustody.Bind(0, false, _LRCZ_ChildSource,
 				[_LRCZ_Sc, _LRCZ_Host], "PASS layout-zoom-host-precedence"))
+
+_LRNF_ChildSource() {
+	return _LRPS_ChildSource("layout_row_native_flags_body.ahk")
+}
+
+; The virtual key this thread's active layout gives SC010, the physical key
+; both native row probes inject and expect to type a letter.
+_LRN_TopRowVk() => DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+
+; Probed before the child opens its window, so a layout without a top-row
+; letter neither activates a window nor injects a key.
+_LRNF_Case(Mode) {
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(_LRN_TopRowVk()))
+	_LRPS_LevelCustody(0, false, _LRNF_ChildSource,
+		[Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags")
+}
+for _LRNF_Mode in ["plain", "held", "released"]
+	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)", _LRNF_Case.Bind(_LRNF_Mode))
+
+_LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
+	if Hwnd != Record["edit"].Hwnd || WParam != Record["vk"]
+		return
+	Record["received"] += 1
+	if Record["received"] == 1 {
+		Shift := !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000)
+		; What this keydown types under the Shift state it arrived with. The
+		; receiver's own TranslateMessage was seen to run under the later state
+		; (receipt Shift=1, Edit "q"), which proves nothing about the sender.
+		Record["typed"] := _LRN_HostCharacter(WParam, Shift, DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
+		Extra := DllCall("GetMessageExtraInfo", "UPtr")
+		Payload := Shift . "|" . Extra . "|" . WParam . "|" . Hwnd . "|" . DllCall("GetCurrentProcessId", "UInt")
+		try {
+			if !FSWriteCreateDurable(Record["receipt"], Payload)
+				throw Error("the owned external receiver receipt could not be created")
+		} catch as Err
+			Record["failure"] := Err
+	}
+	return
+}
+
+_LRNX_Case(Mode) {
+	global _DriverDir, _SharedDir
+	static RetirementDebt := 0
+	if IsObject(RetirementDebt)
+		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
+	TopRowVk := _LRN_TopRowVk()
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(TopRowVk))
+	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "typed", "", "failure", 0)
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	Created := false, Handle := 0, Primary := 0, Receiver := _LRNX_Receiver.Bind(Record)
+	PreviousCritical := Critical("Off")
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Script := Root . "\sender.ahk"
+		Code := _LRPS_ChildSource("layout_row_external_flags_body.ahk")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . Code) != 0)
+		Record["window"] := Gui(, "Ergopti external native row receiver")
+		Record["edit"] := Record["window"].AddEdit("w320 r3")
+		Record["window"].Show()
+		WinActivate("ahk_id " . Record["window"].Hwnd)
+		AssertTrue(WinWaitActive("ahk_id " . Record["window"].Hwnd, , 2), "the parent-owned external receiver must acquire focus")
+		Record["edit"].Focus()
+		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
+			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
+		Record["vk"] := TopRowVk
+		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
+		ExpectedHost := _LRN_HostCharacter(Record["vk"], Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
+		OnMessage(0x100, Receiver)
+		Args := ["/ErrorStdOut=UTF-8", Script, "--allow-explicit-family-edit-row-flags", Mode,
+			String(Record["window"].Hwnd), String(Record["edit"].Hwnd), String(DllCall("GetCurrentProcessId", "UInt")),
+			String(Record["vk"]), Record["receipt"], _SharedDir]
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args, _LRPS_Completion.Bind(State))
+		AssertTrue(Handle.start(), "the exact owned sender process must start separately from its receiving parent")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		; Through the results file: the runner does not forward a test's raw stdout,
+		; and this line is what tells a test-side translation race from a lost flag.
+		ReceiverReceipt := ""
+		try ReceiverReceipt := FileRead(Record["receipt"], "UTF-8")
+		_TestPrint("# external-row-flags " . Mode . " code=" . State.Code . " received=" . Record["received"]
+			. " receipt=" . ReceiverReceipt . " typed=" . Record["typed"] . " edit=" . Record["edit"].Value
+			. " stdout=" . StrReplace(State.Output, "`n", " | ") . " stderr=" . StrReplace(State.ErrorText, "`n", " | "))
+		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
+		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
+		AssertEqual(ExpectedHost, Record["typed"], "the keydown the separate process receives must carry the host character's modifiers")
+		AssertEqual(1, StrLen(Record["edit"].Value), "the separate receiving process must obtain one character")
+		AssertTrue(Record["edit"].Value = ExpectedHost, "the separate receiving process must obtain the host letter")
+		if IsObject(Record["failure"])
+			throw Record["failure"]
+		AssertEqual(0, State.Code, "the native external row sender refused: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertTrue(InStr(State.Output, "PASS layout-row-external-native-flags") > 0)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try {
+			OnMessage(0x100, Receiver, 0)
+			if IsObject(Record["window"])
+				Record["window"].Destroy()
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	} else
+		RetirementDebt := {Handle: Handle, Record: Record, Receiver: Receiver, Root: Root}
+	Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "the owned sender must retire before its external receiver is destroyed")
+}
+
+for _LRNX_Mode in ["plain", "held", "released"]
+	Test("layout row external native modifier flags: " . _LRNX_Mode . " (layout-row-external-native-flags)", _LRNX_Case.Bind(_LRNX_Mode))

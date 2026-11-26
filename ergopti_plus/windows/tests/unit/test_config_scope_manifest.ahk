@@ -454,20 +454,39 @@ Test("scope-hash-precondition: extra file hash refusal never publishes a stale i
 
 ; Actual private source, real lifecycle lease/WAL/backup; only reload launch is
 ; injected, exactly as the existing scope fixture. No boot warning is authority.
-_ScopeObsoleteSource(Literal, Parent := false) {
-	Assert(ManifestBuildFeaturesMap()["layout"].Has("ergopti_alt_gr"), "the fixture sibling must be a real declared layout setting")
+_ScopeObsoleteSource(Literal, Parent := false, Leaf := "ergopti_base") {
+	Assert(ManifestBuildFeaturesMap()["layout"].Has(Leaf), "the obsolete fixture leaf must be a real declared layout setting")
+	Sibling := _ScopeObsoleteSiblingRow()
 	return Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . (Parent
-		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
-		: '[layout]`nergopti_base = ' . Literal . ' # retain until explicit cleanup`nergopti_alt_gr = true`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
+		? '[hotstrings]`nautocorrection = ' . Literal . ' # retain until explicit cleanup`n[layout]`n' . Sibling . '[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		: '[layout]`n' . Leaf . ' = ' . Literal . ' # retain until explicit cleanup`n' . Sibling . '[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n')
 }
 
-; The four preview switches are active by default, so a hotstrings clear writes
-; their off value (the manifest's cleared value) instead of deleting them. A new
-; key opens its section, as the shared batch-write corpus pins (the vector
-; header-scalar-new-key-gets-the-precise-numeric-literal); keys follow the manifest order.
+; The sibling stores the value its manifest default is not, so the row a clear
+; removes is a genuine effect: the AltGr layer switch defaults on since the
+; maintainer decision of 2026-11-23, and a stored true would be neutral. Key
+; names the row, so a misspelled neighbor can carry the same value.
+_ScopeObsoleteSiblingRow(Key := "ergopti_alt_gr") {
+	Layout := ManifestBuildFeaturesMap()["layout"]
+	Assert(Layout.Has("ergopti_alt_gr") && Layout["ergopti_alt_gr"] is Integer, "the fixture sibling must be a real declared Boolean layout setting")
+	return Key . " = " . (Layout["ergopti_alt_gr"] ? "false" : "true") . "`n"
+}
+
+; The preview switches (HSE_PreviewSwitchKeys, their one home) are active by
+; default, so a hotstrings clear writes their off value (the manifest's cleared
+; value) instead of deleting them. A new key opens its section, as the shared
+; batch-write corpus pins (the vector
+; header-scalar-new-key-gets-the-precise-numeric-literal); new keys are written
+; in key order.
 _ScopePreviewOffRows() {
-	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
-		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
+	Keys := ""
+	for Key in HSE_PreviewSwitchKeys()
+		Keys .= (Keys = "" ? "" : "`n") . Key
+	Assert(InStr(Keys, "preview_star_enabled"), "the preview switch list must name its switches")
+	Rows := ""
+	Loop Parse, Sort(Keys), "`n"
+		Rows .= A_LoopField . " = false`n"
+	return Rows
 }
 
 _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
@@ -484,10 +503,12 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 		ApplyConfigToml(Seed, Fixture.path, &Rejected, , &Outdated)
 		AssertEqual(0, Rejected)
 		Assert(Outdated.Has("layout`nergopti_base"), "the actual native reader must classify the old value")
-		AssertEqual(false, Seed["layout"]["ergopti_base"], "outdated source leaves the runtime neutral")
+		Neutral := ManifestBuildFeaturesMap()["layout"]["ergopti_base"]
+		AssertEqual(Neutral, Seed["layout"]["ergopti_base"], "outdated source leaves the runtime neutral")
 		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		Expected := StrReplace(Source, "ergopti_alt_gr = true`n", "")
+		Expected := StrReplace(Source, _ScopeObsoleteSiblingRow(), "")
+		Assert(Expected != Source, "the fixture must store its nonneutral sibling")
 		AssertEqual(Expected, FSReadUtf8Exact(Fixture.path), "clear preserves the complete obsolete/future image while applying a legitimate sibling effect")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the actual exclusive backup is exact")
 		Document := TOML_ParseDocument(Expected)
@@ -509,7 +530,7 @@ _ScopeObsoleteLeafClear(Literal, Outcome := "complete") {
 			ApplyConfigToml(RestartSeed, Restart, &RestartRejected, , &RestartOutdated)
 			AssertEqual(0, RestartRejected)
 			Assert(RestartOutdated.Has("layout`nergopti_base"))
-			AssertEqual(false, RestartSeed["layout"]["ergopti_base"])
+			AssertEqual(Neutral, RestartSeed["layout"]["ergopti_base"])
 			AssertEqual(Expected, FSReadUtf8Exact(Restart))
 		}
 	} finally {
@@ -524,8 +545,15 @@ Test("scope-obsolete-source: map leaf clear retains full source", _ScopeObsolete
 Test("scope-obsolete-source: float Boolean leaf clear retains full source", _ScopeObsoleteLeafClear.Bind('1.0'))
 Test("scope-obsolete-source: actual late refusal restores full obsolete source", _ScopeObsoleteLeafClear.Bind('"old-shape"', "refused"))
 
+; The leaf carries a Windows recommendation that differs from its default: a
+; neutral recommendation never collides with the obsolete value, and the layer
+; switches stopped qualifying when they began defaulting on (2026-11-23).
 _ScopeObsoleteConflict(Literal, Parent := false) {
-	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal, Parent)
+	Leaf := "direct_access_digits"
+	Entry := ManifestFindEntryByPath("layout." . Leaf)
+	Assert(Entry is Map && !ManifestValuesEqual(Entry["recommended"], Entry["default"]),
+		"the conflicting fixture leaf must have a nonneutral recommendation")
+	Fixture := _ScopeOwnerFixture(), Source := _ScopeObsoleteSource(Literal, Parent, Leaf)
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Backups := 0, Launches := 0
 	Backup(*) {
@@ -685,14 +713,15 @@ _ScopeObsoleteGlobal(Mode) {
 	OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
 	Fixture := _HotstringsScopeFixture()
-	Source := _ScopeObsoleteSource('"old-shape"')
+	; The obsolete leaf has a nonneutral recommendation, as in _ScopeObsoleteConflict.
+	Source := _ScopeObsoleteSource('"old-shape"', false, "direct_access_digits")
 	Source := StrReplace(Source, "[layout]`n", '[hotstrings]`nautocorrection = [1, "x"] # obsolete namespace`n[layout]`n')
 	Assert(FSWriteDurable(Fixture.path, Source))
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	TapSource := '[tap_hold.keys.space]`ntap_action = "open_url"`n'
 	Assert(FSWriteDurable(TapPath, TapSource))
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Bundle := 0, Refusal := 0, Backups := 0, Launches := 0
 	Backup(Path, Content) {
 		Backups += 1
@@ -718,8 +747,8 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
-				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
+			Expected := StrReplace(StrReplace(Source, _ScopeObsoleteSiblingRow(), ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
+				. '[shortcuts.keyboard]`nmeta_star = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'
 			Actual := FSReadUtf8Exact(Fixture.path)
@@ -820,7 +849,11 @@ Test("scope-obsolete-source: inventory schema refusal is rechecked before backup
 ; The historical misspelling has no manifest owner and must remain user data.
 _ScopeObsoleteUnownedNeighbor() {
 	Fixture := _ScopeOwnerFixture()
-	Source := StrReplace(_ScopeObsoleteSource('"old-shape"'), "ergopti_alt_gr = true`n", "ergopti_altgr = true`n")
+	Source := StrReplace(_ScopeObsoleteSource('"old-shape"'), _ScopeObsoleteSiblingRow(), _ScopeObsoleteSiblingRow("ergopti_altgr"))
+	; The neighbor stores the value the actual sibling does not default to, so a
+	; reader that took the misspelling for the sibling would change it.
+	Neutral := ManifestBuildFeaturesMap()["layout"]["ergopti_alt_gr"]
+	Assert(InStr(Source, "ergopti_altgr = " . (Neutral ? "false" : "true") . "`n"), "the unknown neighbor must hold the nonneutral value")
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed, Refusal := Refused
@@ -834,7 +867,7 @@ _ScopeObsoleteUnownedNeighbor() {
 		AssertEqual(0, Rejected)
 		Assert(Outdated.Has("layout`nergopti_base"))
 		AssertFalse(Seed["layout"].Has("ergopti_altgr"), "an unknown spelling never becomes a manifest-owned runtime setting")
-		AssertFalse(Seed["layout"]["ergopti_alt_gr"], "the actual sibling remains neutral when only its unknown neighbor is stored")
+		AssertEqual(Neutral, Seed["layout"]["ergopti_alt_gr"], "the actual sibling remains neutral when only its unknown neighbor is stored")
 		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
 		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "clear retains the complete obsolete leaf and unknown-neighbor source")

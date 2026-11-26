@@ -19,10 +19,10 @@ local UUIDS = {
 local function load_controller(options)
 	options = options or {}
 	package.loaded["platform.remap.lease_controller"] = nil
-	package.loaded["adapters.task_output_turn"] = nil
-	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.storage"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.task_output_turn"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
 	local log_events = { debug = {}, info = {}, warn = {}, error = {}, evidence = {} }
@@ -32,7 +32,7 @@ local function load_controller(options)
 			log_events[level][#log_events[level] + 1] = { ... }
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local ctx = {
 		clock = 0,
@@ -65,7 +65,7 @@ local function load_controller(options)
 		ctx.helper_error = "test helper unavailable"
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		_active_tasks = {},
 		spawn = function(executable, args, on_done, on_chunk, environment)
 			local start_result = ctx.next_start_result
@@ -108,6 +108,13 @@ local function load_controller(options)
 					if result == nil then result = true end
 					ctx.next_input_result = nil
 					if result then task.inputs[#task.inputs + 1] = data end
+					if result and task.executable == "/bin/cat" and ctx.output_probe_on_input then
+						ctx.output_probe_on_input()
+					end
+					if task.executable == "/bin/cat" and ctx.output_probe_input_refused then return false end
+					if result and task.executable == "/bin/cat" and ctx.output_probe_immediate_echo then
+						task.on_chunk(task, data, "")
+					end
 					local immediate_chunk = ctx.next_input_chunk
 					ctx.next_input_chunk = nil
 					if result and immediate_chunk and task.on_chunk then
@@ -137,7 +144,7 @@ local function load_controller(options)
 		end,
 	}
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		-- Seconds on the fixture's clock; tests advance ctx.clock to model a
 		-- run loop parked past a deadline.
 		awake_time = function() return ctx.clock end,
@@ -339,9 +346,9 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "adapters.storage",
-		"adapters.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
-		"infra.logger",
+		"platform.remap.lease_controller", "core.process.adapters.task_output_turn", "core.process.adapters.shell_runner", "core.fs.adapters.storage",
+		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
+		"core.logger.engine.logger",
 	}, function()
 		return callback(load_controller)
 	end)

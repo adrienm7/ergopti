@@ -15,34 +15,36 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
-		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
-		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
-		"ui.text_prompt", "llm.trigger_policy", "infra.version", "infra.installation",
-		"updater.version_label", "updater.schedule", "ui.model_browser.bridge" }
+	local names = { "menu.ui.builder.builder", "ai.ui.menu.backend_rows", "menu.engine.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+		"core.ui.engine.window_titles", "shortcuts.engine.actions.parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
+		"_generated.locale_table", "hotstrings.engine.magic_key",
+		"hotstrings.engine.preview_settings", "hotstrings.engine.repeat_key", "core.ui.ui.modal",
+		"core.ui.ui.text_prompt", "ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation",
+		"updater.engine.version_label", "updater.engine.schedule", "ai.ui.model_browser.bridge" }
 	local saved = {}
 	for _, name in ipairs(names) do
 		saved[name] = package.loaded[name]
-		if name == "ui.menu.llm_backend_rows" then package.loaded[name] = nil
+		if name == "ai.ui.menu.backend_rows" then package.loaded[name] = nil
 		else package.loaded[name] = {} end
 	end
 	local ok, err = xpcall(function()
 		local controls = { shows = 0, result = true }
-		package.loaded["ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
+		package.loaded["ai.ui.model_browser.bridge"] = { bind = function(options) controls.bound = options end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
-		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
-		package.loaded["infra.paths"] = { shared = function(relative)
-			return driver .. "/../_shared/" .. relative
-		end }
+		local driver = assert(source:match("^(.*)/tests/unit/"))
+		-- The Delete question's dialog command reads the driver root from here.
+		package.loaded["core.fs.engine.paths"] = {
+			shared = function(relative) return driver .. "/../_shared/" .. relative end,
+			driver_root = function() return driver end,
+		}
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
-		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_file = assert(io.open(driver .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")
 		assert(header_file:close())
-		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_labels = assert(require("core.text.engine.json").decode(assert(header_raw)))
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key)
 				if key == "menu.builder.active_brand" then return header_brand end
 				-- The button's caption is its getter alone ("%s" in every locale).
@@ -51,8 +53,8 @@ local function with_browser(callback)
 			end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.manifest_menu"] = nil
-		local native = require("infra.manifest_menu")
+		package.loaded["menu.engine.manifest_menu"] = nil
+		local native = require("menu.engine.manifest_menu")
 		local root, selected = native.get_root(), {}
 		for _, row in ipairs(native.get_array("top_level")) do
 			if row.id == "llm" then selected[#selected + 1] = row end
@@ -63,9 +65,9 @@ local function with_browser(callback)
 			-- The model row is list DATA: the shared renderer materialises it.
 			return native.render_rows(providers.llm_model(), "llm_model")
 		end
-		package.loaded["infra.manifest_menu"] = facade
-		package.loaded["ui.menu.builder"] = nil
-		local Builder = require("ui.menu.builder")
+		package.loaded["menu.engine.manifest_menu"] = facade
+		package.loaded["menu.ui.builder.builder"] = nil
+		local Builder = require("menu.ui.builder.builder")
 		local ctx = {
 			llm = {
 				is_enabled = function() return false end,
@@ -91,7 +93,7 @@ end
 --- @param rows table Native rows.
 --- @return table|nil row, table|nil siblings The rows that hold it.
 local function selector_row(rows)
-	local emoji = require("modules.llm.backend_brands").emoji("ollama")
+	local emoji = require("ai.engine.api.backend_brands").emoji("ollama")
 	for _, row in ipairs(rows or {}) do
 		if type(row.title) == "string" and row.title:sub(1, #emoji) == emoji then return row, rows end
 		local nested, siblings = selector_row(row.menu)
@@ -106,7 +108,7 @@ helpers.describe("the model selector button (model-selector-page)", function()
 			local row, siblings = selector_row(fixture.builder.build(fixture.ctx))
 			helpers.assert_type(row, "table")
 			helpers.assert_eq(#siblings, 1, "the AI menu draws one button, no model list")
-			helpers.assert_eq(row.title, require("modules.llm.backend_brands").emoji("ollama") .. " qwen3:4b")
+			helpers.assert_eq(row.title, require("ai.engine.api.backend_brands").emoji("ollama") .. " qwen3:4b")
 			helpers.assert_eq(row.menu, nil, "the button opens the page, never a submenu")
 			helpers.assert_true(row.disabled ~= true)
 			helpers.assert_eq(row.fn(), true)
@@ -155,13 +157,13 @@ end)
 --- Captures the notices the removal sends instead of showing desktop notifications.
 --- @return table notices, function restore
 local function scripted_notices()
-	local previous = package.loaded["adapters.application_notifier"]
+	local previous = package.loaded["platform.focus.application_notifier"]
 	local notices = {}
-	package.loaded["adapters.application_notifier"] = { send = function(body, opts)
+	package.loaded["platform.focus.application_notifier"] = { send = function(body, opts)
 		notices[#notices + 1] = { body = body, title = opts.title, level = opts.level }
 		return true
 	end }
-	return notices, function() package.loaded["adapters.application_notifier"] = previous end
+	return notices, function() package.loaded["platform.focus.application_notifier"] = previous end
 end
 
 --- Answers the native question with the given exit, recording the commands it ran.
@@ -184,8 +186,8 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 	--- @return table deletes
 	local function installed(f)
 		-- The fixture's blank dialog owners: the question runs inline, titled as given.
-		package.loaded["ui.modal"].run = function(fn) return fn() end
-		package.loaded["window_titles"].compose = function(title) return title end
+		package.loaded["core.ui.ui.modal"].run = function(fn) return fn() end
+		package.loaded["core.ui.engine.window_titles"].compose = function(title) return title end
 		local deletes = {}
 		f.ctx.llm.is_enabled = function() return true end
 		f.ctx.llm.get_models = function() return { "qwen:2b", "gemma:1b" } end
@@ -223,7 +225,7 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 		end)
 	end)
 
-	helpers.it("linux-model-delete: a declined question or a paused script removes nothing", function()
+	helpers.it("linux-model-delete: a declined question removes nothing; a paused script still asks (edd1-paused-writes)", function()
 		with_browser(function(f)
 			local deletes = installed(f)
 			local commands, restore_question = scripted_question(false)
@@ -232,11 +234,12 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 				local delete_model = f.controls.bound.delete_model
 				helpers.assert_eq(delete_model("qwen:2b"), false)
 				helpers.assert_eq(#deletes, 0)
-				-- A page still open when the script is paused asks nothing.
+				-- A pause stops typing, not configuration (EDD-1): a page still open
+				-- when the script is paused asks again; the declined answer still wins.
 				local asked = #commands
 				f.ctx.paused = true
 				helpers.assert_eq(delete_model("qwen:2b"), false)
-				helpers.assert_eq(#commands, asked)
+				helpers.assert_eq(#commands, asked + 1)
 				helpers.assert_eq(#deletes, 0)
 			end)
 			restore_question()

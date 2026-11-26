@@ -59,7 +59,7 @@ _NLT_GoldenRows() {
 	return Doc["rows"]
 }
 
-_NLT_RecommendedText() => FileRead(_NLT_SharedDir() . "\keymap\layers.recommended.toml", "UTF-8")
+_NLT_RecommendedText() => FileRead(_NLT_SharedDir() . "\layouts\data\layers.recommended.toml", "UTF-8")
 
 ; The Windows rows of a layer file's navigation layer; the file must load cleanly.
 _NLT_Rows(Ctx, Text) {
@@ -440,8 +440,8 @@ Test("nav layer boot: a layers.toml rejected as a whole logs an error, never a s
 ; registry, so any read of the registry fails.
 _NLT_SharedWithoutRegistry() {
 	Dir := A_Temp . "\ergopti_nav_layer_shared_" . A_TickCount . "_" . Random(1000, 9999)
-	DirCreate(Dir . "\keymap")
-	FileCopy(_NLT_SharedDir() . "\keymap\layer_actions.toml", Dir . "\keymap\layer_actions.toml")
+	DirCreate(Dir . "\layouts\data")
+	FileCopy(_NLT_SharedDir() . "\layouts\data\layer_actions.toml", Dir . "\layouts\data\layer_actions.toml")
 	return Dir
 }
 

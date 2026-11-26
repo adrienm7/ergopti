@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/zh.msg
-# AUTO-GENERATED from _shared/data/locales/zh.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/zh.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=已从源代码构建 LuaJIT 网络模块。
 build_luv.recipe_required=luv 原生构建需要其源代码配方。
 install.already_installed={1} — 已安装
 install.archive_digest_unavailable=保留描述符的更新需要真实的 OpenSSL3 运行时；该功能仍不可用。
+install.bytecode_skipped=无法生成预编译模块 — Ergopti 将从源代码启动，速度稍慢。
 install.capability_verified={1} — 功能已验证
 install.command_still_missing=已安装 {1}，但仍找不到 '{2}'。
 install.daemon_manual=要手动启动守护进程：
 install.daemon_running=守护进程在后台运行。要查看其状态：
+install.focus_integration_enabled=已启用 {1} 焦点集成
+install.focus_integration_failed=无法启用 {1} 焦点集成——此桌面上的按应用规则保持停用。
+install.focus_integration_next_login=已安装 {1} 焦点集成（下次登录时生效）
+install.focus_integration_updated=已更新 {1} 焦点集成
 install.gnome_extension_active=GNOME AppIndicator 扩展 — 已启用
 install.gnome_extension_enabled=已启用 GNOME AppIndicator 扩展
 install.gnome_extension_failed=无法启用 AppIndicator 扩展 — 没有它，GNOME 不会显示图标。
 install.gnome_extension_missing=缺少 GNOME AppIndicator 扩展 — 正在安装 {1}…
 install.gnome_extension_next_login=已启用 GNOME AppIndicator 扩展（下次登录时生效）
+install.gnome_extension_not_installed=此发行版没有提供 GNOME AppIndicator 扩展的软件包：请从 {1} 安装 AppIndicator and KStatusNotifierItem Support，然后注销并重新登录 — 没有它，GNOME 不会显示图标。
 install.gnome_without_extensions=GNOME 缺少 gnome-extensions — 请启用 AppIndicator 扩展以显示图标。
 install.help_help=显示此帮助信息
 install.help_no_deps=不安装任何依赖项（由您自行提供）
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — 依赖项检查
 install.section_deps_skipped=已跳过依赖项（--no-deps）
 install.section_done=安装完成
 install.section_files=正在安装文件
+install.section_focus=Wayland 下的活动应用（GNOME、KDE）
 install.section_lua_deps=可选的 Lua 依赖项（事件循环、定时器、Web 视图、信号）
 install.section_permissions=输入权限（需要 sudo）
 install.section_services=正在创建 systemd 用户服务
@@ -63,6 +70,7 @@ install.section_tray=系统托盘图标和窗口
 install.security_warning_body=加入 'input' 组后可以读取会话中的所有按键，包括在任何应用中输入的密码。这正是热字符串引擎所需要的，keyd 和 xremap 也是如此。
 install.security_warning_title=安全警告
 install.service_started=已启用并启动 ergopti-hotstrings 服务
+install.session_without_graphical_target=此会话从不启动 systemd 的 graphical-session.target（i3、Openbox、Xfce、没有会话管理器的 sway），因此用户单元永远不会运行：Ergopti+ 改为在下次登录时通过 XDG 自动启动项启动。忽略 XDG 自动启动的窗口管理器（i3、sway）需要在其配置中加入 exec {1} 这一行。
 install.source_toolchain_unavailable=已安装的编译器无法构建原生归档后端。
 install.startup_choice_unreadable=无法读取启动选项。
 install.summary_config=配置：{1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG 自动启动：{1}
 launch.already_running=Ergopti+ 已在此会话中运行（{1} 已被占用）；本次启动被拒绝。
 launch.authorization_failed=输入访问授权已取消或失败。
 launch.groups_unavailable=会话无法获得已配置的输入组。
+launch.restarting=Ergopti+ 已在此会话中运行；正在请求其退出，然后重新启动。
+launch.session_lock_invalid=会话锁定文件夹必须使用绝对路径。
 launcher.dependencies_installed=依赖项已安装。
 launcher.driver_missing=错误：找不到 Linux 驱动目录：{1}
 launcher.install_deps_hint=运行：ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=安装路径经过了符号链接。
 uninstall.system_prefix=已拒绝系统安装前缀。
 uninstall.unsafe_path=所有权路径不安全。
 uninstall.unsupported_argument=不支持的卸载参数：{1}
+xkb_helpers.not_found=在 {1} 旁和 {2} 中均未找到键盘布局安装文件：没有它们就无法安装任何布局。

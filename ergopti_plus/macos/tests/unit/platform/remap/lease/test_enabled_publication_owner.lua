@@ -69,14 +69,16 @@ helpers.describe("enabled preference conditional publication ownership", functio
 			require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, calls = fixture.load_enabled_remap({ initially_enabled = initially_enabled })
 				local configured = package.loaded["platform.remap.config"]
-				package.loaded["infra.config_paths"].get = function() return path end
-				local captured = require("adapters.file_system")
+				package.loaded["settings.engine.paths"].get = function() return path end
+				local captured = require("core.fs.adapters.file_system")
 				for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 					captured[method] = fs[method]
 				end
-				package.loaded["adapters.file_system"] = fs
+				package.loaded["core.fs.adapters.file_system"] = fs
 				package.loaded["platform.remap.config"] = nil
 				local actual = helpers.load_with_stubs("platform.remap.config")
+				-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
+				actual.RUNTIME_DEFAULT = "shared"
 				local receipts = {}
 				configured.save_user_config = function(...)
 					local saved, detail, receipt = actual.save_user_config(...)
@@ -318,7 +320,7 @@ helpers.describe("enabled preference conditional publication ownership", functio
 				remap.set_enabled(true)
 				helpers.assert_eq(remap.has_pending_settings_save(), false)
 				helpers.assert_eq(result, false)
-				local codec = require("toml_codec")
+				local codec = require("core.text.engine.toml_codec")
 				local document = assert(codec.decode(assert(fs.read_with_status(path))))
 				helpers.assert_eq(document.karabiner.integration_enabled, false,
 					"the compensating receipt's ON source is never restored")

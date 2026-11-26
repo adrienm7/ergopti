@@ -57,22 +57,23 @@ _KATO_Bind(&Source, Name, Needle, Replacement, Expected) {
 }
 
 _KATO_Source(Receipt) {
-	global _DriverDir
+	global _DriverDir, _SharedDir
 	Owner := _KATO_Owner(), Original := FSReadStrict(Owner)
 	for Name in ["StartActivitySimulation", "StopActivitySimulation", "AwakeStopCancellationHook",
 		"AwakeCreateCancellationHook", "AwakeCheckMouseMoved", "SimulateActivity"]
 		AssertTrue(_DriverExtractFunctionBody(&Original, Name) != "", "the authentic subject must be nonempty: " . Name)
 	Start := _DriverFindFunctionDefinition(&Original, "StartActivitySimulation")
-	DeclarationsStart := InStr(Original, "global AWAKE_TICK_MIN_MS", true)
+	DeclarationsStart := InStr(Original, "global AwakeOriginX", true)
 	AssertTrue(DeclarationsStart > 0 && DeclarationsStart < Start.Idx)
 	Declarations := SubStr(Original, DeclarationsStart, Start.Idx - DeclarationsStart)
 	DeclarationsCode := _DriverMaskNonCode(&Declarations)
 	AssertFalse(InStr(DeclarationsCode, "(", true), "only the real inactive state declarations may be replayed")
 	RegExReplace(DeclarationsCode, "m)^\s*global\b", "", &DeclarationCount)
-	AssertTrue(DeclarationCount >= 6, "all original session defaults must be present")
+	AssertTrue(DeclarationCount >= 3, "all original session defaults must be present")
 	Bound := Original
-	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
-	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MouseGetPos(", "_KATO_MouseGetPos(", 1)
+	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MCGetPos(", "_KATO_GetPos(", 1)
+	MouseBindings += _KATO_Bind(&Bound, "SimulateActivity", "MCGetPos(", "_KATO_GetPos(", 1)
 	; Every SetTimer call in this whole subject owner uses one identity-preserving
 	; arm/cancel proxy. A future cancel-only repair must cancel the same wrapper.
 	BoundCode := _DriverMaskNonCode(&Bound)
@@ -111,7 +112,7 @@ _KATO_Source(Receipt) {
 		Source .= 'Features["shortcuts"]["' . Nested . '"] := Map("enabled", false)' . "`n"
 	Seen := Map()
 	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "KS_AltGrKeyName", "CryptoSha256Bytes",
-		"KL_JsonEncode", "JsonStringLiteral", "t"] {
+		"KL_JsonEncode", "JsonStringLiteral", "t", "NotifierSend", "ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the real child dependency must resolve: " . Symbol)
 		if !Seen.Has(Path) {
@@ -119,6 +120,11 @@ _KATO_Source(Receipt) {
 			Seen[Path] := true
 		}
 	}
+	; After the notifier's include, whose top level resets the seam: the
+	; keep-awake notices reach a recorder, never the desktop.
+	Source .= "NotifierSetDisplaySink((*) => 1)`n"
+	; The movement poll reads its period from the real shared timing registry.
+	Source .= "TimingsLoadShared(" . _KATO_Quote(_SharedDir) . ")`n"
 	BodyPath := _DriverDir . "\tests\fixtures\keepawake_timer_owner_body.ahk"
 	Body := FSReadStrict(BodyPath)
 	AssertTrue(Body != "")
@@ -168,7 +174,8 @@ _KATO_Case(Mode) {
 		AssertEqual("", State.ErrorText)
 		AssertTrue(Receipt is Map)
 		for Pair in [["pid", Pid], ["mode", Mode], ["source_sha256", Hash], ["runtime_sha256", RuntimeHash],
-			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", 1],
+			["owner_sha256", Owners["owner_sha256"]], ["subject_arms", Mode == "retired-keyboard" ? 0 : 1],
+			["controlled_keyboard_deliveries", Mode == "retired-keyboard" ? 2 : 0],
 			["hooks_retired", 1], ["mouse_injected", 0], ["suspended", 0]]
 			AssertEqual(Pair[2], Receipt[Pair[1]], "the terminal receipt must bind actual native cleanup: " . Pair[1])
 	} catch Any as Failure {
@@ -217,6 +224,6 @@ _KATO_Case(Mode) {
 
 }
 
-for _KATO_Mode in ["retired-session", "current-session"]
+for _KATO_Mode in ["retired-session", "current-session", "retired-keyboard"]
 	Test("Keep-awake timer ownership: " . _KATO_Mode . " preserves exact session cancellation (keepawake-timer-owner)",
 		_KATO_Case.Bind(_KATO_Mode))

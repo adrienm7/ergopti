@@ -1,0 +1,1 @@
+import{n as e}from"../chunks/XKyaHtl9.js";import{n as t}from"../chunks/BD-ys6aq.js";import"../chunks/CFrlKVBo.js";import{t as n}from"../chunks/VskvGoPF.js";var r=e({load:()=>i,prerender:()=>!0});function i(){n(308,t(`/studio`))}export{r as universal};

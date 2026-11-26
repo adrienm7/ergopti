@@ -19,10 +19,11 @@
 /**
  * Creates a non-editable visual chip element for a specific token.
  * @param {string} name - The token name (e.g., "context").
- * @returns {HTMLElement} The constructed span element representing the chip.
+ * @returns {HTMLElement} The constructed var element representing the chip: a
+ *   placeholder the model fills in, which is what var marks.
  */
 function makeChip(name) {
-	var s = document.createElement('span');
+	var s = document.createElement('var');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.token = name;
@@ -40,18 +41,17 @@ function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 
 	var nodes = [];
-	var normalized = text.replace(/\n/g, '{Enter}');
-	var re = /\{([^}]+)\}/gi;
+	var re = /\n|\{([^}\n]+)\}/gi;
 	var last = 0;
 	var match;
 
-	while ((match = re.exec(normalized)) !== null) {
+	while ((match = re.exec(text)) !== null) {
 		if (match.index > last) {
-			nodes.push(document.createTextNode(normalized.slice(last, match.index)));
+			nodes.push(document.createTextNode(text.slice(last, match.index)));
 		}
 
-		var tokenName = match[1].toLowerCase();
-		if (tokenName === 'enter') {
+		var tokenName = match[1] && match[1].toLowerCase();
+		if (match[0] === '\n') {
 			nodes.push(document.createElement('br'));
 		} else if (
 			tokenName === 'context' ||
@@ -60,15 +60,15 @@ function parseToNodes(text) {
 			tokenName === 'max_words' || // config-key-literal-ok: prompt template token, not a configuration key
 			tokenName === 'language'
 		) {
-			nodes.push(makeChip(tokenName));
+			nodes.push(makeChip(match[1]));
 		} else {
 			nodes.push(document.createTextNode(match[0]));
 		}
 		last = re.lastIndex;
 	}
 
-	if (last < normalized.length) {
-		nodes.push(document.createTextNode(normalized.slice(last)));
+	if (last < text.length) {
+		nodes.push(document.createTextNode(text.slice(last)));
 	}
 
 	return nodes;
@@ -81,16 +81,6 @@ function parseToNodes(text) {
  */
 function serializeEditor(element) {
 	var nodes = Array.from(element.childNodes);
-
-	// Strip trailing breaks that aren't chips
-	while (nodes.length > 0) {
-		var last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
-			nodes.pop();
-		} else {
-			break;
-		}
-	}
 
 	var serializedString = '';
 	nodes.forEach(function (node) {
@@ -116,7 +106,7 @@ function checkPlaceholder() {
 	var placeholderElement = document.getElementById('e-out-ph');
 
 	var isEmpty =
-		editorElement.textContent.length === 0 && editorElement.innerHTML.indexOf('<span') === -1;
+		editorElement.textContent.length === 0 && editorElement.innerHTML.indexOf('<var') === -1;
 	placeholderElement.style.display = isEmpty ? 'block' : 'none';
 }
 
@@ -221,8 +211,7 @@ function tryConvertToken(editorElement) {
 	replaceRange.setEnd(node, offset);
 	replaceRange.deleteContents();
 
-	var tokenName = match[1].toLowerCase();
-	var chip = makeChip(tokenName);
+	var chip = makeChip(match[1]);
 	var anchorRange = selection.getRangeAt(0);
 	anchorRange.insertNode(chip);
 
@@ -278,19 +267,26 @@ function showAc(matches) {
 		return;
 	}
 	var rect = sel.getRangeAt(0).getBoundingClientRect();
+	// A list box the editor owns: the editor keeps the focus and names the
+	// highlighted suggestion through aria-activedescendant, so the arrow
+	// keys' choice is announced (WCAG 4.1.2).
 	matches.forEach(function (name, i) {
-		var d = document.createElement('div');
-		d.className = 'ac-item' + (i === 0 ? ' active' : '');
-		d.textContent = name;
-		d.addEventListener('mousedown', function (e) {
+		var option = document.createElement('li');
+		option.className = 'ac-item' + (i === 0 ? ' active' : '');
+		option.id = 'ac-option-' + i;
+		option.setAttribute('role', 'option');
+		option.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+		option.textContent = name;
+		option.addEventListener('mousedown', function (e) {
 			e.preventDefault();
 			applyAc(name);
 		});
-		popup.appendChild(d);
+		popup.appendChild(option);
 	});
 	popup.style.left = rect.left + 'px';
 	popup.style.top = rect.bottom + 4 + 'px';
 	popup.classList.add('on');
+	editorElement.setAttribute('aria-activedescendant', 'ac-option-0');
 }
 
 /**
@@ -300,6 +296,7 @@ function hideAc() {
 	var popup = document.getElementById('ac-popup');
 	if (popup) popup.classList.remove('on');
 	acItems = [];
+	editorElement.removeAttribute('aria-activedescendant');
 }
 
 /**
@@ -308,7 +305,9 @@ function hideAc() {
 function updateAcSel() {
 	document.querySelectorAll('.ac-item').forEach(function (el, i) {
 		el.classList.toggle('active', i === acIdx);
+		el.setAttribute('aria-selected', i === acIdx ? 'true' : 'false');
 	});
+	editorElement.setAttribute('aria-activedescendant', 'ac-option-' + acIdx);
 }
 
 /**
@@ -365,16 +364,27 @@ function checkAc() {
 // ================================
 // ================================
 
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
+
 var editorElement = document.getElementById('e-out');
 
 // Trigger dynamic token evaluation on text input
-editorElement.addEventListener('input', function () {
+editorElement.addEventListener('input', function (e) {
+	if (imeComposing || e.isComposing) return;
 	tryConvertToken(editorElement);
 	checkAc();
 	checkPlaceholder();
 });
 
 editorElement.addEventListener('keyup', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		acItems.length > 0 &&
 		['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(e.key) >=
@@ -390,6 +400,7 @@ editorElement.addEventListener('keyup', function (e) {
 editorElement.addEventListener('blur', hideAc);
 
 editorElement.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	// Handling Autocomplete navigation
 	if (acItems.length > 0) {
 		if (e.key === 'Tab') {
@@ -507,6 +518,7 @@ editorElement.addEventListener('paste', function (e) {
 
 // Cursor Ejector: Prevents the caret from getting stuck inside non-editable chips
 document.addEventListener('selectionchange', function () {
+	if (imeComposing) return;
 	var selection = window.getSelection();
 	if (!selection || !selection.rangeCount || !selection.isCollapsed) return;
 
@@ -536,6 +548,7 @@ document.addEventListener('click', function (e) {
 // ==============================
 
 var activePromptContext = Object.freeze({ edit_id: '', epoch: 0 });
+var promptInitialized = false;
 
 /**
  * Reads an immutable host context while preserving legacy macOS payloads.
@@ -560,15 +573,18 @@ function readPromptContext(data) {
  */
 function init(data) {
 	var nextContext = readPromptContext(data);
+	if (promptInitialized && nextContext.epoch === activePromptContext.epoch) return;
 	if (
 		(activePromptContext.epoch > 0 && nextContext.epoch === 0) ||
-		(nextContext.epoch > 0 && nextContext.epoch < activePromptContext.epoch)
+		(nextContext.epoch > 0 && nextContext.epoch <= activePromptContext.epoch)
 	) {
 		return;
 	}
 	activePromptContext = nextContext;
 
 	document.getElementById('title').textContent = data.title;
+	// The document title says what the window edits, as its heading does (WCAG 2.4.2).
+	document.title = data.title;
 	document.getElementById('p-name').value = data.name;
 	document.getElementById('p-mode').value = data.mode;
 
@@ -580,6 +596,7 @@ function init(data) {
 	});
 
 	checkPlaceholder();
+	promptInitialized = true;
 
 	setTimeout(function () {
 		document.getElementById('p-name').focus();
@@ -605,9 +622,9 @@ function doCancel() {
 function doSave() {
 	var promptName = document.getElementById('p-name').value.trim();
 	var promptMode = document.getElementById('p-mode').value;
-	var promptContent = serializeEditor(editorElement).trim();
+	var promptContent = serializeEditor(editorElement);
 
-	if (!promptName || !promptContent) {
+	if (!promptName || !promptContent.trim()) {
 		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 
@@ -623,6 +640,7 @@ function doSave() {
 
 // Global hotkey for cancellation
 document.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') doCancel();
 });
 

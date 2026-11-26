@@ -1,5 +1,5 @@
 ﻿; _generated/identifiers.ahk
-; AUTO-GENERATED from _shared/data/identifiers.json.
+; AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -7,8 +7,9 @@
 ; MODULE: Application Identifiers and External Hosts
 ; DESCRIPTION:
 ; The application file names, bundle ids, service labels, external hosts and
-; field report names. A misspelt name fails at the first access. Hosts are bare
-; names: build a URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
+; field report names, and the catalogue shown for a system language without
+; one. A misspelt name fails at the first access. Hosts are bare names: build a
+; URL as "https://" . Identifiers.Hosts.GITHUB . "/...".
 ; ==============================================================================
 
 class Identifiers {
@@ -17,6 +18,7 @@ class Identifiers {
 		static AHK := "ErgoptiPlus.ahk"
 		static EXE := "ErgoptiPlus.exe"
 		static BUNDLE := "ErgoptiPlus.app"
+		static DISPLAY_NAME := "Ergopti+"
 	}
 	class BundleIds {
 		static LAUNCHER := "com.ergoptiplus.app"
@@ -49,5 +51,13 @@ class Identifiers {
 		static BRANCH_PREFIX := "field/"
 		static FOLDER := "docs/field-reports"
 		static BASE_CONFIG_KEY := "ergoptiFieldBase"
+		static ENVIRONMENT := "ERGOPTI_FIELD_RUN_ROOT"
+	}
+	class Locales {
+		static SYSTEM_FALLBACK := "en"
+	}
+	class WindowsVendor {
+		static LUA_EXPORT_EXE := "ergopti_lua_export.exe"
+		static LUA_EXPORT_IDENTITY := "ergopti_lua_export.json"
 	}
 }

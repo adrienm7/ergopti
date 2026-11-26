@@ -4,14 +4,14 @@
 ; MODULE: Proxy Override Live Fixture
 ; DESCRIPTION:
 ; The real http_client and its real managed worker under one stored proxy
-; override: publishes the value the way boot does, sends one real request, asks
+; override: publishes a detached route value, sends one real request, asks
 ; each route owner of the adapter what it would do, runs the menu row over the
 ; plan's typed values, and writes what came back. tools/test/
 ; test-windows-proxy-override-e2e.cjs builds the plan and reads the fake network.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The logger is not included: its file sink would write the maintainer's
-;    %LOCALAPPDATA%\ergopti_plus logs, which a test must never touch.
+;    %LOCALAPPDATA%\Ergopti logs, which a test must never touch.
 ; 2. The texts are the shipped English locale, so "refused in words" is asserted
 ;    on what a user would read.
 ; ==============================================================================
@@ -38,6 +38,7 @@ t(Key) => _OwnerTexts[Key]
 
 global ConfigurationFile := ""
 global _OwnerCommitted := []
+global Features := Map()
 ; config_io is not part of this fixture's closure: the commit records what reaches the file.
 ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, PublishFn := 0) {
 	_OwnerCommitted.Push(Updates[1].Value)
@@ -45,14 +46,14 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, Publis
 	return true
 }
 
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\http_client.ahk
-#Include ..\..\ui\proxy_override.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
+#Include ..\..\core\text\engine\json.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
+#Include ..\..\core\network\adapters\http_client.ahk
+#Include ..\..\core\network\proxy_override.ahk
 
 _OwnerMain(A_Args[1])
 
@@ -67,17 +68,27 @@ _OwnerFatal(Err, *) {
  * @param {String} PlanPath The JSON plan.
  */
 _OwnerMain(PlanPath) {
-	global _SharedDir, _VendorDir, _OwnerTexts
+	global _SharedDir, _VendorDir, _OwnerTexts, Features
 	Plan := JsonParse(FileRead(PlanPath, "UTF-8"))
 	_SharedDir := Plan["shared"]
 	_VendorDir := Plan["vendor"]
-	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\en.json", "UTF-8"))
+	Declaration := ProxyOverride_Declaration()
+	Features := Map(Declaration["section"], Map(Declaration["key"], Plan["stored"] is String ? Plan["stored"] : ""))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))
-	; The first start after an edit by hand: the request below then runs on the sealed value.
+	; Direct publication has no authenticated bootstrap source and cannot start
+	; an automatic migration. Positive boot sealing uses the native unit owner.
 	if Plan.Get("seal_at_start", false) {
 		Result["sealed_now"] := ProxyOverride_SealStoredAtStart() ? 1 : 0
 		Result["committed"] := _OwnerCommitted
+		Result["runtime_sealed"] := _ProxyOverrideSealed ? 1 : 0
+		Result["unchanged_unsealed"] := !_ProxyOverrideSealed
+			&& StrCompare(_ProxyOverrideStored, Plan["stored"], true) == 0
 	}
+	; A separate real DPAPI sample qualifies encrypted route transport only;
+	; it neither publishes a bootstrap receipt nor claims a configuration write.
+	if Plan.Get("sample_envelope", false)
+		Result["sample_envelope"] := ProxyOverride_Seal(Plan["stored"])
 	Settings := Map("auto_detect", false, "pac_url", Plan.Get("pac_url", ""), "proxy", Plan.Get("system_proxy", ""), "bypass", "")
 
 	Http := CurlAsyncRequest()

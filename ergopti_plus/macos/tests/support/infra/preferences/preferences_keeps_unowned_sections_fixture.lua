@@ -9,8 +9,8 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local TomlCodec  = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
+local TomlCodec  = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
 
 local PATH = "/virtual/preferences_unowned/config.toml"
 
@@ -19,7 +19,7 @@ local PATH = "/virtual/preferences_unowned/config.toml"
 --- @return table preferences, table writes
 local function load_preferences(disk)
 	local writes = {}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			if disk[path] == nil then return nil, "absent" end
 			return disk[path], "ok"
@@ -39,8 +39,8 @@ local function load_preferences(disk)
 			return true
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences"), writes
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences"), writes
 end
 
 local SOURCE = table.concat({

@@ -12,14 +12,14 @@
 ---     luajit tests/hardware/run_numlock_hotplug.lua remove
 --- ==============================================================================
 
-require('compat.utf8').install()
-local Hook=require('adapters.keyboard_hook')
-local Names=require('infra.device_names')
-local Reader=require('adapters.evdev_reader')
-local Finder=require('modules.hotstrings.device_finder')
+require('core.lifecycle.engine.compat.utf8').install()
+local Hook=require('platform.input.keyboard_hook')
+local Names=require('platform.input.device_names')
+local Reader=require('platform.input.evdev_reader')
+local Finder=require('hotstrings.engine.device_finder')
 local Layout=require('adapters.keyboard_layout')
-local Clock=require('infra.monotonic')
-local Json=require('json')
+local Clock=require('core.logger.engine.monotonic')
+local Json=require('core.text.engine.json')
 local mode=assert(arg[1]);assert(mode=='add' or mode=='remove')
 local names,paths,keyboards,caps,chars,rows={},{},{},{},{},{}
 local ownerA
@@ -87,7 +87,7 @@ local ok,failure=xpcall(function()
 	-- real EV_LED writes before Hook seeds capture, matching the fresh sink.
 	for index, keyboard in ipairs(keyboards) do keyboard.set_led(paths[index],0,0) end
 	selected={paths[1]};if paths[2] then selected[2]=paths[2] end
-	Injector=require('modules.hotstrings.injector');assert(Injector.open_fast_channel())
+	Injector=require('hotstrings.engine.injector');assert(Injector.open_fast_channel())
 	assert(Reader.open(assert(await(function() return node(oldname) end,5000)),'pass2-output'))
 	assert(Layout.refresh())
 	local mapping=assert(io.popen('xkbcomp -xkb "$DISPLAY" - 2>/dev/null','r'))
@@ -95,7 +95,7 @@ local ok,failure=xpcall(function()
 	Sink=assert(loadfile('adapters/xkb_capture.lua'))();assert(Sink.load(text));sink_chars={}
 	Capture=require('adapters.xkb_capture')
 	Finder.find_devices=function() return selected,{} end
-	Hook=require('adapters.keyboard_hook')
+	Hook=require('platform.input.keyboard_hook')
 	Hook.start({intercept=true,requireOutputBroker=true,outputBroker=assert(Injector.output_broker()),
 		onCaptureReacquired=function() return Layout.publish_current_capture() end,onEmitRaw=Injector.emit_key,onChar=function(char) chars[#chars+1]=char end})
 	assert(Hook.isRunning());assert(Layout.publish_current_capture())

@@ -1,0 +1,19 @@
+# _shared/tests/corpus/tap_hold_spellings/mac_thumb.toml
+# A tap_hold.toml holding Mac thumb ids, as a Mac wrote them before the
+# decision « follow the position » (TCL-004): every driver reads each one as
+# the PC key at its place, and right_command loses to the alt_gr entry beside it.
+
+[_meta]
+schema_version = 1
+
+[tap_hold.keys.left_command]
+tap_action = "copy"
+
+[tap_hold.keys.right_option]
+tap_action = "backspace"
+
+[tap_hold.keys.right_command]
+tap_action = "copy"
+
+[tap_hold.keys.alt_gr]
+tap_action = "backspace"

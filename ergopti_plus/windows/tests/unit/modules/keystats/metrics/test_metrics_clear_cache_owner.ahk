@@ -6,7 +6,8 @@
 ; A real purge diagnostic may replace its dashboard or pause the driver. The
 ; resumed message must preserve the successor's actual scheduler job. An
 ; admitted paused reset retains its recovery debt. Only the external worker
-; process is passive; cache reset, files, logger and dispatch run.
+; process is passive; cache reset, files, logger and dispatch run. The page
+; hears its Reset's outcome, refused or done, before any rebuild (MET-19).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -23,7 +24,7 @@ class _MWCP_Args {
 	}
 	TryGetWebMessageAsString() {
 		this.World.PayloadReads += 1
-		return '{"action":"clear_cache"}'
+		return '{"action":"clear_cache","reset_id":7}'
 	}
 }
 
@@ -51,6 +52,16 @@ _MWCP_Spawn(World, Exe, Args, Done) {
 	Handle.terminate := _MWCP_Terminate.Bind(Handle)
 	World.Handles.Push(Handle)
 	return Handle
+}
+
+_MWCP_Post(Posted, Self, Message) {
+	Posted.Push(Message)
+}
+
+_MWCP_View() {
+	View := {Posted: []}
+	View.DefineProp("PostWebMessageAsString", {Call: _MWCP_Post.Bind(View.Posted)})
+	return View
 }
 
 _MWCP_Terminal(World, Status, Stage := "") {
@@ -114,6 +125,15 @@ _MWCP_Check(World) {
 	if IsObject(World.Failure)
 		throw World.Failure
 	Rejected := World.Mode == "wrong-sender" || World.Mode == "wrong-source" || World.Mode == "paused"
+	; The page hears the outcome only while it is still the page that asked.
+	Outcomes := Map("current", '"ok":true', "purge-pause", '"ok":true', "paused", '"ok":false')
+	Posted := World.View.Posted
+	if Outcomes.Has(World.Mode) {
+		AssertEqual(1, Posted.Length, "the page that asked hears its Reset's outcome once")
+		AssertTrue(InStr(Posted[1], '{"host_epoch":82,"type":"cache_reset","reset_id":7,' . Outcomes[World.Mode] . '}', true) == 1,
+			"the outcome names the page's Reset: " . Posted[1])
+	} else
+		AssertEqual(0, Posted.Length, "a retired or foreign page hears nothing")
 	AssertEqual(Rejected ? 0 : 1, World.PurgeLogs, "the test must distinguish admission from actual purge reentry")
 	AssertEqual("foreign-disk", FSReadStrict(World.ForeignPath), "cache clearing cannot remove another store")
 	AssertEqual("foreign-memory", KLPF_LAST_JSON[World.ForeignPath])
@@ -187,7 +207,7 @@ _MWCP_Case(Mode) {
 _MWCP_OwnedCase(Mode) {
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
+	global KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
 	static Serial := 0
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedReader := Map()
 	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN",
@@ -204,7 +224,7 @@ _MWCP_OwnedCase(Mode) {
 		PurgeLogs: 0, SourceReads: 0, PayloadReads: 0, Replaced: false, Failure: 0, Handles: [], Terminals: [], NextJob: 0}
 	World.Path := KLPF_PrefetchPath("typing", World.OldRoot)
 	World.ForeignPath := KLPF_PrefetchPath("typing", World.NextRoot)
-	World.View := {}, World.NextView := {}
+	World.View := _MWCP_View(), World.NextView := _MWCP_View()
 	World.Entry := Map("epoch", 82, "webview", World.View, "navigation_url", World.Url,
 		"metrics_dir", World.OldRoot, "full_build_done", true)
 	World.NextEntry := Map("epoch", 83, "webview", World.NextView, "navigation_url", World.Url . "&next=83",
@@ -222,7 +242,6 @@ _MWCP_OwnedCase(Mode) {
 		AssertTrue(FSWriteCreateDurable(World.ForeignPath, "foreign-disk"))
 		CreatedPaths.Push(World.ForeignPath)
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 		LoggerSetTestSink(_MWCP_PurgeLog.Bind(World))
 		KLRCache.db := 0, KLRCache.readonly := false, KLRCache.disposable := false, KLRCache.saved_at := ""

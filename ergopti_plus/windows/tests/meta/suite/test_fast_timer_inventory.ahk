@@ -67,7 +67,9 @@ global _FTI_MIN_REPEATING_SITES := 30
 _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
-		"_KeyCombinationChordTimerFn",  "5",     ; only armed while a key waits for its chord or a chord holds its keys; one key-state read per key
+		"_RegionSelectTrack",           "15",    ; only armed while the left button drags a Ctrl+O capture region; timings [screen_vision] region_select_track_ms, one pointer read
+		"_ScreenVisionPoll",            "25",    ; only armed while the vision worker starts or a call waits for its answer file, disarmed once the queue is empty; timings [screen_vision] worker_poll_ms
+		"_KeyCombinationChordTimerFn",  "5",    ; only armed while a key waits for its chord or a chord holds its keys; one key-state read per key
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
 		"_UserHotstringsPoll",          "25",    ; only while exact worker/Job/stage debt is owned; stale source/focus/input cancellation
 		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
@@ -83,7 +85,7 @@ _FTI_Inventory() {
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
 		"this.PollTimer",                "?",     ; field run request watch, only while a field report folder is declared; timings [ui] field_run_poll_ms
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
-		'Callbacks["motion"]',          "?",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
+		'Callbacks["motion"]',          "100",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keystats buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch
@@ -97,7 +99,9 @@ _FTI_Inventory() {
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
 		"SimulateActivity",             "?",     ; randomised interval, awake mode only
-		"MagicKeyCapturePoll",          "?")     ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
+		"_RawTouchpadWatchdog",         "300",     ; only armed while a swipe shortcut waits for its touch to end; timings [gestures] incremental_handoff_ms (300), no OS call
+		"Watch",                        "?",       ; Ergopti Studio stage watch, only while a Studio read's worker runs; timings [keystats] studio_stage_poll_ms (250), one file-exists check
+		"Tick",                         "?")     ; keyboard layout registry watch; timings [adapters] layout_registry_watch_poll_ms (100), one zero-timeout event wait per watched key
 }
 
 
@@ -181,7 +185,7 @@ _FTI_ResolvePeriod(Src, Expr) {
 	; This exact native getter exposes one owned field of the shared brightness
 	; policy. Arbitrary local Maps and other shared fields remain unresolved.
 	if Expr == 'ScreenBrightnessData()["worker_poll_ms"]' {
-		Policy := JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+		Policy := JsonParse(FileRead(_SharedDir . "\shortcuts\data\actions\brightness.json", "UTF-8"))
 		if !(Policy is Map)
 			throw ValueError("Invalid shared brightness timer policy.")
 		Period := Policy.Get("worker_poll_ms", 0)
@@ -191,6 +195,10 @@ _FTI_ResolvePeriod(Src, Expr) {
 	}
 	if RegExMatch(Expr, "^\d+$")
 		return Expr
+	; A period read from the shared timings registry at the call resolves to the
+	; registry's value, so moving a poller's literal there keeps it inventoried.
+	if RegExMatch(Expr, '^TimingsGet\(\s*"(\w+)"\s*,\s*"(\w+)"\s*\)$', &Read)
+		return String(TimingsGet(Read[1], Read[2]))
 	if !RegExMatch(Expr, "^(?:[_A-Za-z][_A-Za-z0-9]*\.)?([_A-Za-z][_A-Za-z0-9]*)$", &Name)
 		return ""
 	; A constant loaded from the shared timings registry resolves to the

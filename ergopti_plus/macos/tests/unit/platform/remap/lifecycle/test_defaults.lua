@@ -62,7 +62,7 @@ helpers.describe("karabiner.defaults: combos table", function()
 end)
 
 -- Regression: the defaults are loaded in full from the shared
--- _shared/tap_hold/defaults.toml ([hs_*] sections), not a hardcoded Lua table.
+-- _shared/tap_hold/data/defaults.toml ([hs_*] sections), not a hardcoded Lua table.
 -- A partial parse (e.g. a malformed inline-table line or a dropped section)
 -- would silently shrink these sets — the shape tests above pass vacuously on an
 -- empty table, so pin the exact counts and a few sentinel values here.

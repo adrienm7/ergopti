@@ -94,6 +94,41 @@ Test("accented shortcuts: a chord resolves to the configured letter (accented-sh
 			"after a switch to QWERTY the same key is a digit again")
 	)))
 
+; A layout whose KeyC types the real star at its base level (Ergopti+).
+_ACS_StarScanCode(Char, Hkl) => Char == Chr(0x2605) ? 0x2E : 0
+
+; The key that types the real star joins the accented letters (2026-11-21):
+; with « s », Ctrl+star saves. Before, only é è ê à had a letter picker.
+Test("accented shortcuts: the key typing the real star maps its chords to its letter (star-letter-shortcut)", () => (
+	Config := _ACS_DefaultConfig(),
+	Config["star"] := Map("enabled", true, "letter", "s"),
+	_ACS_WithShortcuts(Config, () => _ACS_StarCase())))
+
+_ACS_StarCase() {
+	global KeyboardShortcutAssignments
+	Keys := AccentedShortcutKeysForLayout(3, _ACS_StarScanCode)
+	AssertEqual("star", Keys.Get(0x2E, ""), "the star key is a direct key of its own")
+	AssertEqual("s", AccentedShortcutResolve("^SC02E", Keys), "Ctrl+star is Ctrl+S")
+	AssertEqual("s", AccentedShortcutResolve("!+SC02E", Keys), "every configured chord follows")
+	Had := IsSet(KeyboardShortcutAssignments), Saved := Had ? KeyboardShortcutAssignments : 0
+	try {
+		KeyboardShortcutAssignments := Map("meta_star", "open_hotstrings_editor")
+		AssertEqual("", AccentedShortcutResolve("#SC02E", Keys), "Win+star stays the star slot's")
+		AssertEqual("s", AccentedShortcutResolve("^SC02E", Keys), "the slot takes only the Win chords")
+		KeyboardShortcutAssignments := Map("meta_star", "none")
+		AssertEqual("s", AccentedShortcutResolve("#SC02E", Keys), "a cleared star slot leaves Win+star to the letter")
+	} finally {
+		; An unset table stays unset: a later full save reads it with its defaults.
+		KeyboardShortcutAssignments := Had ? Saved : unset
+	}
+	AssertEqual(0, AccentedShortcutKeysForLayout(1, _ACS_AzertyScanCode).Get(0x2E, 0),
+		"AZERTY types no star: the configured magic key never becomes the star key")
+}
+
+Test("accented shortcuts: the star letter is off by default (star-letter-shortcut)", () => (
+	AssertFalse(ManifestDefaultFor("shortcuts.star.enabled"), "off in an empty configuration"),
+	AssertEqual("s", ManifestDefaultFor("shortcuts.star.letter"))))
+
 Test("accented shortcuts: registration covers every chord but AltGr (accented-shortcuts-any-layout)", () =>
 	_ACS_WithShortcuts(_ACS_DefaultConfig(), () => _ACS_RegistrationCase()))
 
@@ -108,14 +143,21 @@ _ACS_RegistrationCase() {
 			(Name, *) => Names.Push(Name),
 			(Args*) => HotIfCalls.Push(Args.Length),
 			_ACS_KeysPerLayout)
-		AssertEqual(18, Count, "three keys times six modifier chords")
-		AssertEqual(18, Names.Length)
+		AssertEqual(24, Count, "three keys times eight modifier chords")
+		AssertEqual(24, Names.Length)
 		Joined := ""
 		for Name in Names
 			Joined .= Name . " "
-		for Expected in ["^SC003", "^+SC003", "!SC008", "!+SC008", "#SC00B", "#+SC00B"]
+		for Expected in ["^SC003", "^+SC003", "!SC008", "!+SC008", "#SC00B", "#+SC00B", "<^<!SC003", "<^<!+SC00B"]
 			Assert(InStr(Joined, Expected . " ") > 0, Expected . " must be registered")
 		AssertEqual(0, InStr(Joined, "^!"), "Ctrl+Alt is AltGr and must stay untouched")
+		AssertEqual(0, InStr(Joined, ">!"), "AltGr's right Alt is never a chord (SCD-2)")
+		; SCD-2: the left Ctrl+Alt chord resolves the key like the others, so
+		; Ctrl+Alt+é sends Ctrl+Alt and the logical letter.
+		Plain := AccentedShortcutResolve("^SC003", _ACS_KeysPerLayout(1))
+		AssertTrue(Plain != "", "the AZERTY é key resolves a logical letter")
+		AssertEqual(Plain, AccentedShortcutResolve("<^<!SC003", _ACS_KeysPerLayout(1)),
+			"Ctrl+Alt+é sends the same logical letter as Ctrl+é")
 		AssertEqual(2, HotIfCalls.Length, "the HotIf context must be opened then closed")
 		AssertEqual(0, HotIfCalls[2], "the HotIf context must be reset after registration")
 		AssertThrows(() => AccentedShortcuts_Register([1],
@@ -131,9 +173,10 @@ Test("accented shortcuts: Ergopti emulation honours Disabled (accented-shortcut-
 		AssertEqual("v", _ErgoptiLetterOr("a_grave", _ACS_AGrave()))
 	)))
 
-; The Layout menu separates what needs the Ergopti layout from what works on any
-; layout. The rows are read from the generated manifest the renderer draws, so a
-; row moved back across the headers fails here (layout-menu-sections).
+; The Layout menu reads input sources, emulation, then the tuning of the active
+; layout (maintainer, 2026-11-19). The rows are read from the generated manifest
+; the renderer draws, so a row moved back across the headers fails here
+; (layout-menu-sections).
 _ACS_LayoutMenuTokens() {
 	Tokens := []
 	for Row in _MR_GetMenuDef("layout_menu") {
@@ -155,19 +198,23 @@ _ACS_TokenIndex(Tokens, Token) {
 	throw Error("Layout menu row '" . Token . "' is not declared.")
 }
 
-Test("layout menu: the custom layout rows precede the any-layout section (layout-menu-sections)", () => _ACS_LayoutSectionsCase())
+Test("layout menu: the input sources, then the emulation, precede the layout tuning section (layout-menu-sections)",
+	() => _ACS_LayoutSectionsCase())
 
 _ACS_LayoutSectionsCase() {
 	Tokens := _ACS_LayoutMenuTokens()
-	Custom := _ACS_TokenIndex(Tokens, "menu.layout.header_custom")
-	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_any")
-	Assert(Custom < AnyLayout, "the custom layout section must come first")
-	for Row in ["custom_layouts", "layout_manager", "layout_features_base", "layout_features_altgr"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > Custom && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
-			Row . " belongs to the custom layout section")
-	for Row in ["number_row_policy", "accented_letters",
-			"magic_key_source", "layout.ctrl_magic_save"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
+	Sources := _ACS_TokenIndex(Tokens, "menu.layout.active_layouts")
+	Emulation := _ACS_TokenIndex(Tokens, "menu.layout.header_emulation")
+	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_tuning")
+	Assert(Sources < Emulation && Emulation < AnyLayout, "the input sources, the emulation, then the tuning")
+	for Row in ["active_layouts", "layout_switching", "layout_manager", "layout_system_install"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > Sources && _ACS_TokenIndex(Tokens, Row) < Emulation,
+			Row . " belongs to the input sources section")
+	Assert(_ACS_TokenIndex(Tokens, "layout_emulation") > Emulation
+		&& _ACS_TokenIndex(Tokens, "layout_emulation") < AnyLayout, "the emulated layout has its own section")
+	for Row in ["layout_features_base", "layout_features_altgr", "layout_emulated_rows", "number_row_policy",
+			"accented_letters"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " tunes the active layout")
 	AssertEqual(0, _ACS_CountLayoutToken(Tokens, "hotstrings.magic_key.replace"),
 		"the removed replacement switch must not reappear in the Layout menu")
 	_ACS_LayoutProviderPlacement(Tokens, AnyLayout)
@@ -184,7 +231,7 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 	SavedState := State.Clone()
 	try {
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", true,
-			"ergopti_variant", "ergopti_plus", "ctrl_magic_save", false,
+			"ergopti_variant", "ergopti_plus",
 			"direct_access_digits", "digits", "emulated_layout", "",
 				; Rows of the same section layout_switching owns: a provider listing the
 				; section's remainder drew them here as raw ids.
@@ -206,7 +253,7 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 		for Index, Token in Tokens {
 			if Token == "number_row_policy" {
 				Count += 1
-				Assert(Index > AnyLayout, "the single global policy belongs after the any-layout header")
+				Assert(Index > AnyLayout, "the single global policy belongs after the tuning header")
 			}
 		}
 		AssertEqual(1, Count, "the actual global declaration must contain exactly one number-row policy")
@@ -252,8 +299,8 @@ _ACS_NumberRowPolicyCache() {
 		; The fake native profile is already cached. Keep the production default
 		; KeysFn so this also proves registration selects the native inventory.
 		Count := AccentedShortcuts_Register([Azerty], (Name, *) => Names.Push(Name), (Args*) => 0)
-		AssertEqual(18, Count, "digits mode must still register the three hidden native accent positions")
-		AssertEqual(18, Names.Length)
+		AssertEqual(24, Count, "digits mode must still register the three hidden native accent positions")
+		AssertEqual(24, Names.Length)
 
 		Features["layout"]["direct_access_digits"] := "native"
 		AssertEqual(Native, _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode),

@@ -18,9 +18,9 @@
  *    split on the headings and the changelog fold CI has always written.
  * 3. Pure text in, text out: no DOM, no HTML parsing, so the result goes
  *    through the same DOM-only renderer as any other release text.
- * 4. Cross-driver contract: the Windows native notes view ports the changelog
- *    extraction; both are pinned by _shared/tests/corpus/updater/
- *    release_body_vectors.json.
+ * 4. Single owner: every driver's notes view loads this page, so no driver
+ *    ports the extraction; _shared/tests/corpus/updater/release_body_vectors.json
+ *    pins it.
  * ==============================================================================
  */
 

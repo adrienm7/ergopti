@@ -28,7 +28,7 @@
 --- installed, which is a property of the machine and not of the binding.
 --- ==============================================================================
 
--- Mirrored from platform/tray/appindicator.lua. Written out rather than imported
+-- Mirrored from tray/adapters/appindicator.lua. Written out rather than imported
 -- because importing would make the harness agree with the binding by
 -- construction: if the binding renamed a symbol to something absent, a shared
 -- list would rename it here too and the check would pass.
@@ -52,6 +52,7 @@ local EXPECTED_SYMBOLS = {
 		"gtk_main_iteration_do",
 		"gtk_menu_new",
 		"gtk_menu_shell_append",
+		"gtk_menu_shell_insert",
 		"gtk_menu_item_set_submenu",
 		"gtk_widget_show_all",
 		"gtk_widget_set_sensitive",
@@ -107,6 +108,7 @@ pcall(ffi.cdef, [[
 	int   gtk_main_iteration_do(int);
 	GtkWidget* gtk_menu_new(void);
 	void  gtk_menu_shell_append(GtkWidget*, GtkWidget*);
+	void  gtk_menu_shell_insert(GtkWidget*, GtkWidget*, int);
 	void  gtk_menu_item_set_submenu(GtkWidget*, GtkWidget*);
 	void  gtk_widget_show_all(GtkWidget*);
 	void  gtk_widget_set_sensitive(GtkWidget*, int);

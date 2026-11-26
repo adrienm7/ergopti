@@ -1,0 +1,141 @@
+--- _shared/tests/lua/check_session_contract.lua
+
+--- ==============================================================================
+--- MODULE: Update Check Session Vectors Contract
+--- DESCRIPTION:
+--- Replays _shared/tests/corpus/updater/check_session_vectors.json on the session
+--- behind the update-check window and on the exhausted rate-limit sentence. The
+--- Windows host replays the same vectors: a phase rule or a page field that one
+--- host changes alone fails here or there.
+--- ==============================================================================
+
+return function(helpers, json, shared_root)
+	local CheckSession = require("updater.engine.check_session")
+	local RateLimit = require("updater.engine.rate_limit")
+
+	local file = assert(io.open(shared_root .. "/tests/corpus/updater/check_session_vectors.json", "rb"))
+	local corpus = json.decode(file:read("*a"))
+	file:close()
+
+	--- The answer of a phase as the session receives it: the release's JSON object
+	--- carries the body the session seeds into the notes.
+	local function answer_of(id, check_only)
+		local answer = {}
+		for key, value in pairs(corpus.answers[id]) do answer[key] = value end
+		if answer.body then
+			answer.release = json.encode({ tag_name = answer.latest, body = answer.body })
+			answer.body = nil
+		end
+		if check_only then answer.check_only = true end
+		return answer
+	end
+
+	--- A session over ports that record which effect ran, showing one phase.
+	local function session_in(phase)
+		local effects = {}
+		local function effect(name, result)
+			return function() effects[name] = true; return result end
+		end
+		local on_result
+		local session = CheckSession.new({
+			push = function() return true end,
+			check = function(_, answer) on_result = answer; return true end,
+			channel = function() return "dev" end,
+			current = function() return "v0.0.0-dev.144" end,
+			set_channel = effect("switch_channel", true),
+			install = effect("update", true),
+			open_changelog = effect("whats_new", true),
+			report = function(_, complete) effects.report = true; complete(true) end,
+			open_log = effect("open_log", true),
+			repository = function() return corpus.repository end,
+			open_url = effect("open_url", true),
+			close = effect("close"),
+			log_path = function() return "/logs/today.log" end,
+			log = function() end,
+		})
+		session.start()
+		if phase ~= "checking" then on_result(answer_of(phase)) end
+		return session, effects, on_result
+	end
+
+	helpers.describe("update-check session vectors: the phase of each action", function()
+		for _, rule in ipairs(corpus.actions) do
+			local allowed = {}
+			for _, phase in ipairs(rule.phases) do allowed[phase] = true end
+			for _, phase in ipairs({ "checking", "up_to_date", "available", "no_release", "error" }) do
+				helpers.it(rule.action .. " in " .. phase, function()
+					local session, effects = session_in(phase)
+					session.on_message({ action = rule.action, url = corpus.link, channel = corpus.switch_channel })
+					helpers.assert_eq(effects[rule.action] == true, allowed[phase] == true)
+				end)
+			end
+		end
+	end)
+
+	helpers.describe("update-check session vectors: the page's state message", function()
+		for _, vector in ipairs(corpus.state_messages) do
+			helpers.it(vector.id, function()
+				local session, _, on_result = session_in("checking")
+				on_result(answer_of(vector.answer, vector.check_only))
+				local message = session.message()
+				for name, value in pairs(vector.expect) do helpers.assert_eq(message[name], value, name) end
+				for name, value in pairs(vector.expect_notes or {}) do
+					helpers.assert_eq(message.notes[name], value, "notes." .. name)
+				end
+				for _, name in ipairs(vector.absent) do helpers.assert_eq(message[name], nil, name) end
+			end)
+		end
+	end)
+
+	helpers.describe("update-check session vectors: the failure's reason (upd-06)", function()
+		local CheckResult = require("updater.engine.check_result")
+		for _, vector in ipairs(corpus.failure_reasons) do
+			helpers.it("upd-06: " .. vector.id, function()
+				local evidence = { rate_limited = vector.rate_limited == true, report = vector.report }
+				local result = CheckResult.failure({ channel = "dev", current = "v0.0.0-dev.144" }, vector.reason,
+					"detail", evidence)
+				helpers.assert_eq(result.reason_key, vector.expect)
+				-- The session admits the key the answer carries
+				local session, _, on_result = session_in("checking")
+				on_result(result)
+				helpers.assert_eq(session.message().reason_key, vector.expect)
+			end)
+		end
+		helpers.it("upd-06: the session refuses a key that is no reason and no network cause", function()
+			local session, _, on_result = session_in("checking")
+			on_result({ state = "error", channel = "dev", current = "v0", others = {}, reason_key = "private.arbitrary" })
+			helpers.assert_eq(session.message().reason_key, CheckResult.REASONS.unexpected)
+		end)
+	end)
+
+	helpers.describe("update-check session vectors: a native receipt's cause (upd-13)", function()
+		local CheckResult = require("updater.engine.check_result")
+		local policy = assert(io.open(shared_root .. "/core/network/data/managed_network.json", "rb"))
+		local contract = require("core.network.engine.failure").new(json.decode(policy:read("*a")))
+		policy:close()
+		helpers.it("upd-13: the corpus holds the three named causes and the unnamed ones", function()
+			local expected = {}
+			for _, vector in ipairs(corpus.native_receipts) do expected[vector.expect] = true end
+			for _, key in ipairs({ "network.failure.offline", "network.failure.certificate",
+				"network.failure.proxy", "updater.no_connection" }) do
+				helpers.assert_true(expected[key] == true, key)
+			end
+		end)
+		for _, vector in ipairs(corpus.native_receipts) do
+			helpers.it("upd-13: " .. vector.id, function()
+				local report = contract.classify(vector.receipt, {})
+				helpers.assert_true(report.evidence ~= "invalid_receipt", "a well-formed receipt")
+				helpers.assert_eq(CheckResult.failure_key("no_connection", { report = report }), vector.expect)
+			end)
+		end
+	end)
+
+	helpers.describe("update-check session vectors: the exhausted rate limit", function()
+		for _, vector in ipairs(corpus.rate_limit) do
+			helpers.it(vector.id, function()
+				local detail = RateLimit.exhausted_detail(vector.status, vector.remaining, vector.reset)
+				helpers.assert_eq(detail or "", vector.detail)
+			end)
+		end
+	end)
+end

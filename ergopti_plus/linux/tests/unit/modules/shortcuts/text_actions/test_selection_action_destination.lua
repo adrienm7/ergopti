@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local fixture = require("tests.support.text_owner_fixture")
 
 --- Executes Main's actual initialization call while isolating configuration I/O.
@@ -38,31 +39,39 @@ end
 --- @param body function Receives the observations after dispatch.
 local function with_action(session, action, change, body)
 	local names = {
-		"adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
-		"adapters.event_loop", "modules.hotstrings.injector", "adapters.clipboard",
-		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info",
+		"core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+		"platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.uinput_writer",
+		"core.events.loop", "hotstrings.engine.injector", "clipboard.adapters.clipboard",
+		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter",
+		"platform.focus.window_info", "core.logger.engine.shim",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector
 	local ok, detail = pcall(function()
 		fixture.with(function(guard, state, _, _, watch)
-			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0 }
+			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0, logs = {} }
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) world.logs[#world.logs + 1] = line end)
+			package.loaded["core.logger.engine.shim"] = logger
 			local pending, changed = nil, false
 			local function retire(point)
-				if changed or change ~= point then return end
+				if changed or (change ~= point and not (change == "snapshot-copy" and point == "snapshot")) then return end
 				changed = true
 				if change == "privacy" then state.role = 40 else state.path = "/field/successor" end
 				if point == "key-down" then watch.barrier() end
 			end
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
-					if world.reads == 1 then retire("snapshot") end
+					local snapshot = world.clipboard
+					if world.reads == 1 then
+						retire("snapshot")
+						if change == "snapshot-copy" then world.clipboard = "new user copy"; return true, snapshot end
+					end
 					if action == "paste_plain" and world.reads == 1 then
 						retire("privacy")
 						if change == "read-refused" then return false, "", "controlled clipboard read refusal" end
@@ -77,7 +86,7 @@ local function with_action(session, action, change, body)
 					return true
 				end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return session end,
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,
@@ -85,9 +94,9 @@ local function with_action(session, action, change, body)
 			package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = function(_, fallback)
 				retire("layout"); return fallback
 			end }
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.uinput_writer"] = {
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["platform.input.uinput_writer"] = {
 				is_open = function() return true end,
 				emit = function(code, value)
 					world.events[#world.events + 1] = { code, value }
@@ -100,33 +109,33 @@ local function with_action(session, action, change, body)
 					return true
 				end,
 			}
-			package.loaded["adapters.event_loop"] = { sleep_ms = function(ms)
+			package.loaded["core.events.loop"] = { sleep_ms = function(ms)
 				if ms == 80 then retire("copy-wait") end
 				if ms == 30 then retire("paste-wait"); retire("privacy") end
 				return true
 			end }
-			package.loaded["modules.hotstrings.injector"] = { inject = function()
+			package.loaded["hotstrings.engine.injector"] = { inject = function()
 				error("explicit selection actions must retain the clipboard transaction")
 			end }
 			if action == "paste_plain" then
-				package.loaded["adapters.window_info"] = { focused_app_id = function()
+				package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 					retire("metrics"); return "owned-editor"
 				end }
 				local layout = helpers.load_module("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-				package.loaded["adapters.clipboard"] = nil
-				injector = helpers.load_module("modules.hotstrings.injector")
-				injector._set_uinput(package.loaded["adapters.uinput_writer"])
+				package.loaded["clipboard.adapters.clipboard"] = nil
+				injector = helpers.load_module("hotstrings.engine.injector")
+				injector._set_uinput(package.loaded["platform.input.uinput_writer"])
 				injector._set_nanosleep_for_test(function() end)
 			end
-			for _, name in ipairs({ "adapters.clipboard", "modules.shortcuts.manager",
-				"modules.gestures.manager", "modules.gestures.combo_emitter" }) do
-				if action ~= "paste_plain" or name ~= "adapters.clipboard" then package.loaded[name] = nil end
+			for _, name in ipairs({ "clipboard.adapters.clipboard", "modules.shortcuts.manager",
+				"gestures.engine.manager", "gestures.engine.combo_emitter" }) do
+				if action ~= "paste_plain" or name ~= "clipboard.adapters.clipboard" then package.loaded[name] = nil end
 			end
 			local original = assert(guard.capture_text_owner())
 			local Shortcuts = require("modules.shortcuts.manager")
 			initialize_from_main(Shortcuts, change ~= "absent" and guard.capture_text_owner or nil)
-			local Gestures = require("modules.gestures.manager")
+			local Gestures = require("gestures.engine.manager")
 			local handlers = require("modules.shortcuts.action_handlers").compose({}, Shortcuts)
 			if action == "paste_plain" then
 				local perform = handlers.paste_plain
@@ -140,7 +149,13 @@ local function with_action(session, action, change, body)
 			if action == "wrap_selection" then helpers.assert_true(Gestures.set_action_parameter("tap_3", action, "(")) end
 			helpers.assert_true(Gestures.execute_action(action, "tap_3"))
 			world.original_current = original.current()
-			helpers.assert_eq(world.clipboard, "saved clipboard", "retirement must still restore the saved clipboard")
+			-- A value that replaced the snapshot before the copy chord may be a
+			-- concurrent user copy: it is kept. What the copy's own wait leaves is
+			-- the chord's (the successful path reads it as the selection), so a
+			-- destination retired during that wait puts the snapshot back instead
+			-- of leaving the copied selection (run_shortcut_transforms_live.lua).
+			local expected_clipboard = change == "snapshot-copy" and "new user copy" or "saved clipboard"
+			helpers.assert_eq(world.clipboard, expected_clipboard, "retirement must respect clipboard ownership")
 			helpers.assert_eq(next(world.held), nil, "retirement must still release every owned key")
 			body(world)
 		end)
@@ -155,6 +170,16 @@ local function with_action(session, action, change, body)
 end
 
 helpers.describe("explicit selection actions retain the originating destination", function()
+	for _, session in ipairs({ "x11", "wayland" }) do
+		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
+			helpers.it("preserves a concurrent copy after destination retirement: " .. action .. " " .. session, function()
+				with_action(session, action, "snapshot-copy", function(world)
+					helpers.assert_eq(world.writes, {}, "no clipboard write is owed before the sentinel")
+					helpers.assert_eq(world.pasted, {})
+				end)
+			end)
+		end
+	end
 	for _, session in ipairs({ "x11", "wayland" }) do
 		for _, action in ipairs({ "selection_uppercase", "wrap_selection" }) do
 			helpers.it("selection-action-owner commits stable " .. session .. " " .. action, function()
@@ -183,6 +208,13 @@ end)
 
 helpers.describe("plain paste retains its destination before reading the clipboard", function()
 	for _, session in ipairs({ "x11", "wayland" }) do
+		helpers.it("plain paste keeps clipboard content out of trace logs " .. session, function()
+			with_action(session, "paste_plain", "stable", function(world)
+				helpers.assert_true(world.action_result)
+				helpers.assert_true(not table.concat(world.logs, "\n"):find("saved clipboard", 1, true),
+					"clipboard contents must not enter trace logs")
+			end)
+		end)
 		helpers.it("plain-paste-owner commits stable " .. session, function()
 			with_action(session, "paste_plain", "stable", function(world)
 				helpers.assert_true(world.action_result)
@@ -212,11 +244,11 @@ end)
 --- @param change string Controlled destination retirement or native refusal.
 --- @return table world Independently recorded output and handler result.
 local function observe_compound_action(action, change)
-	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
-		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
-		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info" }
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
+		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
+		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
+		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter",
+		"platform.focus.window_info" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { events = {}, held = {}, downs = {}, changed = false }
 	local injector
@@ -230,18 +262,18 @@ local function observe_compound_action(action, change)
 				watch.barrier()
 				if change == "aba" then state.path = "/field/original"; watch.barrier() end
 			end
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(v) return "'" .. v .. "'" end,
 				has_command = function() return false end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end,
 			}
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
-			package.loaded["adapters.window_info"] = { focused_app_id = function()
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
+			package.loaded["platform.focus.window_info"] = { focused_app_id = function()
 				retire("metrics"); return "owned-editor"
 			end }
 			local first_navigation = action == "select_word" and 106 or 102
@@ -264,14 +296,14 @@ local function observe_compound_action(action, change)
 					return true
 				end,
 			}
-			package.loaded["adapters.uinput_writer"] = writer
+			package.loaded["platform.input.uinput_writer"] = writer
 			local Layout = helpers.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ ["("] = { keycode = 10, level = 2, mods = {"shift"} },
 				[")"] = { keycode = 11, level = 2, mods = {"shift"} } })
-			package.loaded["adapters.clipboard"] = nil
-			injector = helpers.load_module("modules.hotstrings.injector")
+			package.loaded["clipboard.adapters.clipboard"] = nil
+			injector = helpers.load_module("hotstrings.engine.injector")
 			injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
-			for _, name in ipairs({"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter"}) do package.loaded[name] = nil end
+			for _, name in ipairs({"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter"}) do package.loaded[name] = nil end
 			local Shortcuts = require("modules.shortcuts.manager")
 			initialize_from_main(Shortcuts, change ~= "absent" and guard.capture_text_owner or nil)
 			local original = assert(guard.capture_text_owner())
@@ -281,7 +313,7 @@ local function observe_compound_action(action, change)
 				world.action_result = perform(...)
 				return world.action_result
 			end
-			local Gestures = require("modules.gestures.manager")
+			local Gestures = require("gestures.engine.manager")
 			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
 			world.dispatch_result = Gestures.execute_action(action, "tap_3")
 			world.original_current = original.current()
@@ -344,10 +376,10 @@ end)
 --- @param change string The desktop boundary which retires the original field.
 --- @return table observations Independent output, clipboard and owner receipts.
 local function observe_configured_insertion(session, action, route, change)
-	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
-		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
-		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
+	local names = { "core.process.adapters.shell_runner", "core.ui.engine.display_server", "platform.input.keyboard_hook",
+		"platform.input.modifier_broker", "platform.input.uinput_writer", "core.events.loop",
+		"hotstrings.engine.injector", "clipboard.adapters.clipboard", "adapters.keyboard_layout",
+		"modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { documents = { ["/field/original"] = "", ["/field/successor"] = "" },
 		clipboard = "saved clipboard", events = {}, downs = {}, held = {}, reads = 0, writes = 0, changed = false }
@@ -367,10 +399,11 @@ local function observe_configured_insertion(session, action, route, change)
 				if change == "aba" then state.path = "/field/original"; watch.barrier() end
 			end
 			local pending
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				has_command = function() return true end,
-				exec_checked = function()
+				exec_checked = function(command)
+					if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
 					world.reads = world.reads + 1
 					retire("snapshot")
 					return true, world.clipboard
@@ -383,14 +416,14 @@ local function observe_configured_insertion(session, action, route, change)
 					return true
 				end,
 			}
-			package.loaded["infra.display_server"] = {
+			package.loaded["core.ui.engine.display_server"] = {
 				UNKNOWN = "unknown", kind = function() return session end,
 				is_x11 = function() return session == "x11" end,
 				is_wayland = function() return session == "wayland" end,
 			}
-			package.loaded["adapters.keyboard_hook"] = {}
-			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
+			package.loaded["platform.input.keyboard_hook"] = {}
+			package.loaded["platform.input.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
 			local writer = {
 				is_open = function() return true end,
 				emit = function(code, value)
@@ -408,14 +441,14 @@ local function observe_configured_insertion(session, action, route, change)
 					return true
 				end,
 			}
-			package.loaded["adapters.uinput_writer"] = writer
+			package.loaded["platform.input.uinput_writer"] = writer
 			local layout = helpers.load_module("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-			package.loaded["adapters.clipboard"] = nil
-			injector = helpers.load_module("modules.hotstrings.injector")
+			package.loaded["clipboard.adapters.clipboard"] = nil
+			injector = helpers.load_module("hotstrings.engine.injector")
 			injector._set_uinput(writer)
 			injector._set_nanosleep_for_test(function() retire("settle") end)
-			for _, name in ipairs({ "modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }) do
+			for _, name in ipairs({ "modules.shortcuts.manager", "gestures.engine.manager", "gestures.engine.combo_emitter" }) do
 				package.loaded[name] = nil
 			end
 			local Shortcuts = require("modules.shortcuts.manager")
@@ -436,7 +469,7 @@ local function observe_configured_insertion(session, action, route, change)
 				world.action_result = perform(...)
 				return world.action_result
 			end
-			local Gestures = require("modules.gestures.manager")
+			local Gestures = require("gestures.engine.manager")
 			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
 			local parameter = route == "clipboard" and "é" or route == "direct" and (action == "send_text" and "ok" or "o") or route
 			assert(Gestures.set_action_parameter("tap_3", action, parameter))

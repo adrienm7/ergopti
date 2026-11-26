@@ -1,7 +1,7 @@
 """Convert any macOS .keylayout into an XKB symbols file and an XCompose file.
 
 This converter regenerates the shipped Ergopti files (generate_xkb_files.py) and
-is the reference the Linux driver's Lua converter (_shared/lua/layouts/
+is the reference the Linux driver's Lua converter (_shared/layouts/engine/
 xkb_converter.lua, which installs a registry layout on the user's machine) is
 compared with, byte for byte, on every registry and archived layout
 (tools/test/test-keylayout-canonical-parity.cjs). Change the two together. It
@@ -274,7 +274,7 @@ class Keylayout:
     def to_canonical(self) -> dict:
         """The schema-1 canonical form shared with the Lua parser.
 
-        The form is documented in _shared/lua/layouts/keylayout.lua; absent
+        The form is documented in _shared/layouts/engine/composer/keylayout.lua; absent
         fields are omitted, never null.
         """
         selects = []
@@ -563,20 +563,34 @@ def resolve(layout: Keylayout, index: int, code: int) -> Resolved:
     return Resolved("none")
 
 
-def load_keycodes(path: Path, convention: str) -> List[Tuple[str, int]]:
-    """(XKB key name, macOS code) pairs from the shared keycode table."""
+def load_keycodes(path: Path, convention: str) -> List[Tuple[str, int, bool]]:
+    """(XKB key name, macOS code, optional) from the shared keycode table.
+
+    Its character keys, then its ``extra_keys`` (the JIS and ABNT keys: Yen,
+    Ro or ABNT C1, the keypad comma or ABNT C2), marked optional: the symbols
+    file writes an optional key only when the layout types on it, so a layout
+    without them keeps its bytes. Twin of the Lua converter's M.keycodes.
+    """
     table = json.loads(Path(path).read_text(encoding="utf-8"))
     if convention not in table["conventions"]:
         raise KeylayoutError("unknown keycode convention %r" % convention)
-    pairs = []
+    keys = []
     for key in table["keys"]:
         mac = key["mac"]
-        pairs.append((key["xkb"], mac[convention] if isinstance(mac, dict) else mac))
-    return pairs
+        keys.append((key["xkb"], mac[convention] if isinstance(mac, dict) else mac, False))
+    for key in table.get("extra_keys", []):
+        keys.append((key["xkb"], key["mac"], True))
+    return keys
 
 
 def load_keysym_table() -> Dict[str, str]:
     return json.loads((DATA_DIR / "key_sym.json").read_text(encoding="utf-8"))["keysyms"]
+
+
+def load_locale_extended_prefixes() -> frozenset:
+    """Keysym sequences the locale Compose table extends (key_sym.json)."""
+    data = json.loads((DATA_DIR / "key_sym.json").read_text(encoding="utf-8"))
+    return frozenset(tuple(entry.split(" ")) for entry in data["locale_extended_prefixes"])
 
 
 def unicode_keysym(char: str) -> str:
@@ -609,7 +623,8 @@ class Conversion:
         # macOS codes of keys the layout defines (an output that types
         # something, or an action) that the shared keycode table names no XKB
         # key for, keypad excepted: what they type is not on the Linux layout.
-        # A JIS or ABNT key is the usual case. Reported, so a registry layout
+        # An input-method key (Eisu, Kana) is the usual case: the JIS and ABNT
+        # character keys are the table's extra_keys. Reported, so a registry layout
         # that has one fails its conversion test instead of losing keys.
         self.unplaced: List[int] = []
 
@@ -618,20 +633,25 @@ class _Converter:
     def __init__(
         self,
         layout: Keylayout,
-        keycodes: Sequence[Tuple[str, int]],
+        keycodes: Sequence[Tuple[str, int, bool]],
         hints: XkbHints,
+        private_states: frozenset = frozenset(),
     ) -> None:
         self.layout = layout
+        # Dead states whose trigger is borrowed instead of standard, see
+        # convert_layout().
+        self.private_states = private_states
         self.keycodes = list(keycodes)
         self.keysyms = load_keysym_table()
         self.overrides = list(hints.keysym_overrides)
+        self.base_level_only = list(hints.base_level_only)
         self.level_indices = [layout.key_map_index(mods) for mods in XKB_LEVELS]
         self.result = Conversion()
         # Insertion order matters: XCompose lists these in this order.
         self.borrowed: Dict[str, str] = dict(self.overrides)
         self.grid: Dict[str, List[Resolved]] = {
             xkb: [resolve(layout, index, code) for index in self.level_indices]
-            for xkb, code in self.keycodes
+            for xkb, code, _optional in self.keycodes
         }
         for cells in self.grid.values():
             for cell in cells[1:]:
@@ -712,6 +732,9 @@ class _Converter:
         stays first when a key sends it, so those lines keep their historical
         form; a dead key also using the action adds its own trigger, and an
         action no key uses (untypable on macOS too) keeps its base keysym.
+        A ``base_level_only`` key (Ergopti+'s magic key ★) also adds the
+        keysym its base level sends: inside a dead state macOS types the
+        action's output for it, so ^ then ★ gives what ^ then j gives.
         """
         typed = self._keysyms_typing_action(action_id)
         base = self.base_keysym(action_id)
@@ -719,8 +742,9 @@ class _Converter:
             return [base]
         if base not in typed:
             return list(typed)
-        dead = set(self.dead_triggers.values())
-        return [base] + [keysym for keysym in typed if keysym in dead and keysym != base]
+        extra = set(self.dead_triggers.values())
+        extra.update(self.text_keysym(text) for text in self.base_level_only if len(text) == 1)
+        return [base] + [keysym for keysym in typed if keysym in extra and keysym != base]
 
     def dead_trigger(self, state: str) -> str:
         """Keysym a dead key entering ``state`` produces."""
@@ -728,7 +752,9 @@ class _Converter:
             return self.dead_triggers[state]
         terminator = self.layout.terminators.get(state, "")
         keysym = None
-        if terminator in self.borrowed:
+        if state in self.private_states:
+            pass
+        elif terminator in self.borrowed:
             keysym = self.borrowed[terminator]
         elif "dead_" + state in KNOWN_DEAD_KEYSYMS:
             keysym = "dead_" + state
@@ -759,7 +785,7 @@ class _Converter:
             # One pass over the keyboard, built once every keysym is chosen
             # (after symbols()): compose() asks it for every dead-key output.
             by_action: Dict[str, List[str]] = {}
-            for xkb, code in self.keycodes:
+            for xkb, code, _optional in self.keycodes:
                 for level, index in enumerate(self.level_indices):
                     entry = self.layout.key_entry(index, code)
                     if entry is None or entry[0] != "action":
@@ -814,15 +840,17 @@ class _Converter:
             lambda _match: 'name[Group1] = "%s";' % display_name,
             text,
         )
-        for xkb, _code in self.keycodes:
+        # Optional keys the template has no line for, written after its level3 include.
+        added: List[str] = []
+        for xkb, _code, optional in self.keycodes:
             names: List[str] = []
             comments: List[str] = []
+            types_something = any(cell.kind != "none" for cell in self.grid[xkb])
             for cell in self.grid[xkb]:
                 keysym = self._cell_keysym(cell)
                 names.append(keysym or NO_SYMBOL)
                 shown = cell.text if cell.kind != "none" else ""
                 comments.append('"%s"' % shown if len(shown) >= 2 else shown)
-            self.result.key_symbols[xkb] = names
             pattern = r"key <%s>[^\n]*;" % re.escape(xkb)
             line = 'key <%s> { type[group1] = "%s", [%s] }; // %s' % (
                 xkb,
@@ -830,9 +858,22 @@ class _Converter:
                 ", ".join(names),
                 " ".join(comments),
             )
+            if optional and not re.search(pattern, text):
+                # A JIS or ABNT key: written only when the layout types on it.
+                if types_something:
+                    added.append("\n\t" + line)
+                    self.result.key_symbols[xkb] = names
+                continue
             text, count = re.subn(pattern, lambda _match, line=line: line, text)
             if count != 1:
                 raise KeylayoutError("the symbols template has no single line for <%s>" % xkb)
+            self.result.key_symbols[xkb] = names
+        if added:
+            # After the template's level3 include, so a later include cannot take them back.
+            close = text.rfind("\n};")
+            if close < 0:
+                raise KeylayoutError("the symbols template has no closing };")
+            text = text[:close] + "\n" + "".join(added) + text[close:]
         return text
 
     def compose(self) -> str:
@@ -852,11 +893,15 @@ class _Converter:
                 if state != "none" and output:
                     outputs.setdefault(state, []).append((action_id, output))
 
+        explicit = self._explicit_state_keysyms()
+        chain_heads = {tuple(seq) for seqs in sequences.values() for seq in seqs}
         first = True
         emitted: Dict[str, str] = {}
+        self.emitted = emitted
         for state in sorted(outputs):
             if state not in sequences:
                 continue
+            terminator = self.layout.terminators.get(state, "")
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
@@ -874,7 +919,91 @@ class _Converter:
                             continue
                         emitted[sequence] = output
                         lines.append("%s\t: %s" % (sequence, compose_string(output)))
-        return 'include "%L"\n\n' + "\n".join(lines) + "\n"
+                if not is_printable(terminator):
+                    continue
+                for keysym, text in self._typed_texts():
+                    sequence = "%s <%s>" % (head, keysym)
+                    if (
+                        sequence in emitted
+                        or keysym in explicit.get(state, ())
+                        or tuple(prefix) + (keysym,) in chain_heads
+                    ):
+                        continue
+                    emitted[sequence] = terminator + text
+                    lines.append("%s\t: %s" % (sequence, compose_string(terminator + text)))
+        return 'include "%L"\n\n' + "\n".join(prefixes_before_extensions(lines)) + "\n"
+
+    def shadowed_states(self, extended: frozenset) -> frozenset:
+        """Dead states starting a written sequence the locale extends."""
+        by_trigger = {keysym: state for state, keysym in self.dead_triggers.items()}
+        found = set()
+        for sequence in self.emitted:
+            keysyms = tuple(re.findall(r"<([^>]+)>", sequence))
+            if keysyms in extended and keysyms[0] in by_trigger:
+                found.add(by_trigger[keysyms[0]])
+        return frozenset(found)
+
+    def _typed_texts(self) -> List[Tuple[str, str]]:
+        """(keysym, text) of every key/level typing text, in keyboard order.
+
+        Inside a dead state macOS types the dead key's terminator then what a
+        key with no composition there types; compose() writes that fallback
+        explicitly, since native Compose would cancel the sequence instead.
+        """
+        found: List[Tuple[str, str]] = []
+        seen = set()
+        for xkb, _code, _optional in self.keycodes:
+            for cell in self.grid[xkb]:
+                if cell.kind != "text":
+                    continue
+                keysym = self.text_keysym(cell.text)
+                if keysym not in seen:
+                    seen.add(keysym)
+                    found.append((keysym, cell.text))
+        return found
+
+    def _explicit_state_keysyms(self) -> Dict[str, set]:
+        """State -> keysyms whose action the .keylayout defines in that state.
+
+        An explicit <when>, even one typing nothing or chaining, is the
+        layout's answer and never gets the terminator fallback.
+        """
+        explicit: Dict[str, set] = {}
+        for action_id, action in self.layout.actions.items():
+            for state in action.whens:
+                if state != "none":
+                    explicit.setdefault(state, set()).update(self.state_keysyms(action_id))
+        return explicit
+
+
+_COMPOSE_KEYS_RE = re.compile(r"^((?:<[^>]+>\s*)+):")
+
+
+def prefixes_before_extensions(lines: List[str]) -> List[str]:
+    """Move each written sequence before every written sequence it starts.
+
+    A dead state's own line (``<dead_abovedot> : "˙"``) can be written after a
+    chained state whose sequences it starts. libxkbcommon 1.6 (Ubuntu 24.04)
+    keeps the longer sequences whatever the order; 1.13 (Ubuntu 26.04) lets a
+    shorter line written later replace them, so that one line cut every
+    sequence the dead key starts. Written first, the shorter line is extended by
+    the longer ones on both. Lines already in that order keep their place.
+    """
+    keys_of = []
+    for line in lines:
+        match = _COMPOSE_KEYS_RE.match(line)
+        keys_of.append(tuple(re.findall(r"<([^>]+)>", match.group(1))) if match else None)
+    first_extension: Dict[tuple, int] = {}
+    for index, keys in enumerate(keys_of):
+        for size in range(1, len(keys or ())):
+            first_extension.setdefault(keys[:size], index)
+    order = []
+    for index, keys in enumerate(keys_of):
+        target = min(index, first_extension.get(keys, index)) if keys else index
+        # A moved line goes just before the first line it starts, a shorter
+        # prefix before a longer one.
+        order.append((target, 0 if target < index else 1, len(keys or ()), index))
+    return [lines[entry[3]] for entry in sorted(order)]
 
 
 def compose_string(text: str) -> str:
@@ -890,7 +1019,7 @@ def compose_string(text: str) -> str:
 
 def convert(
     keylayout_text: str,
-    keycodes: Sequence[Tuple[str, int]],
+    keycodes: Sequence[Tuple[str, int, bool]],
     layout_id: str,
     display_name: str,
     hints: Optional[XkbHints] = None,
@@ -899,7 +1028,7 @@ def convert(
 
     Args:
         keylayout_text: Content of the .keylayout.
-        keycodes: (XKB key name, macOS code) pairs, see load_keycodes().
+        keycodes: (XKB key name, macOS code, optional), see load_keycodes().
         layout_id: Name of the xkb_symbols section (no dots).
         display_name: Name shown by desktop layout pickers.
         hints: Per-layout choices from the registry index (XkbHints).
@@ -909,7 +1038,7 @@ def convert(
 
 def convert_layout(
     layout: Keylayout,
-    keycodes: Sequence[Tuple[str, int]],
+    keycodes: Sequence[Tuple[str, int, bool]],
     layout_id: str,
     display_name: str,
     hints: Optional[XkbHints] = None,
@@ -917,8 +1046,31 @@ def convert_layout(
     """Convert a parsed Keylayout (from parse_keylayout or from_canonical)."""
     if not re.fullmatch(r"[A-Za-z0-9_]+", layout_id):
         raise KeylayoutError("layout id %r must be letters, digits and _" % layout_id)
-    converter = _Converter(layout, keycodes, hints or XkbHints())
     template = (DATA_DIR / "xkb_symbols.txt").read_text(encoding="utf-8")
+    extended = load_locale_extended_prefixes()
+    # The table starts with include "%L": a locale sequence longer than one
+    # of ours makes Compose skip ours (Bépo's monnaie then cedilla waits for
+    # the locale's cedi sign instead of typing ₢). The dead key starting such
+    # a sequence gets a borrowed trigger, which the locale does not extend,
+    # and the conversion runs again until no written sequence is shadowed.
+    private: frozenset = frozenset()
+    while True:
+        converter = _Converter(layout, keycodes, hints or XkbHints(), private)
+        result = _run_conversion(converter, layout, keycodes, template, layout_id, display_name)
+        shadowed = converter.shadowed_states(extended) - private
+        if not shadowed:
+            return result
+        private = private | shadowed
+
+
+def _run_conversion(
+    converter: "_Converter",
+    layout: Keylayout,
+    keycodes: Sequence[Tuple[str, int, bool]],
+    template: str,
+    layout_id: str,
+    display_name: str,
+) -> Conversion:
     # Dead triggers first, in state order, so borrowed keysyms do not depend
     # on the order keys happen to be listed in.
     for state in sorted(
@@ -934,9 +1086,9 @@ def convert_layout(
     return result
 
 
-def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int]]) -> List[int]:
+def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int, bool]]) -> List[int]:
     """Codes of defined keys the keycode table places nowhere (keypad excepted)."""
-    placed = {code for _xkb, code in keycodes}
+    placed = {code for _xkb, code, _optional in keycodes}
     found = set()
     for maps in layout.key_map_sets.values():
         for entries in maps.values():

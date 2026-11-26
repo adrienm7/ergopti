@@ -4,9 +4,10 @@
 ; MODULE: Key Combination Chord Policy (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/tap_hold/key_combination_chords.json against
-; KeyCombinationChordPolicy, as _shared/lua/test/key_combination_chords_contract.lua
+; KeyCombinationChordPolicy, as _shared/tests/lua/core/key_combination_chords_contract.lua
 ; does on macOS and Linux, with the same catalogue and the same refusals.
-; The contract's plan_chord_copy has no Windows owner: the bulk copy is not offered.
+; It also replays _shared/tests/corpus/tap_hold/key_combination_chord_copy.json
+; against KeyCombinationChordCopyRows, as the contract replays it against plan_chord_copy.
 ; The engine that uses this policy is test_key_combination_chord_engine.ahk.
 ; ==============================================================================
 
@@ -83,3 +84,29 @@ _KCCP_RefusesCatalogues() {
 	AssertThrows(_KCCP_Build.Bind([One], Map(One["id"], 5), Settings))
 }
 Test("key chord policy: refuses a catalogue with same-key or duplicate pairs", _KCCP_RefusesCatalogues)
+
+; Decision KCD-1 of 2026-11-21: « Copy tap → combo » writes each order's own
+; chord under symmetry too, as the shared plan_chord_copy does.
+_KCCP_ReplayCopy(Vector) {
+	Got := Map()
+	for Row in KeyCombinationChordCopyRows(ConfigTomlDecodeSnapshot(Vector["source"]), (*) => true) {
+		AssertEqual("combo", Row.Key, "only the chord leaf moves")
+		Got[Row.Section] := Row.HasOwnProp("Delete") && Row.Delete ? "<delete>" : Row.Value
+	}
+	Want := Map()
+	for Row in Vector["rows"]
+		Want[Row["section"]] := Row.Has("delete") ? "<delete>" : Row["value"]
+	AssertEqual(Want.Count, Got.Count, "row count")
+	for Section, Value in Want
+		AssertEqual(Value, Got.Get(Section, "<missing>"), Section)
+}
+
+_KCCP_RegisterCopyCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\tap_hold\key_combination_chord_copy.json", "UTF-8"))
+	if Corpus["cases"].Length < 5
+		throw Error("The key chord copy corpus lost its cases.")
+	for Vector in Corpus["cases"]
+		Test("key chord copy corpus (kcd-1-copy-each-order): " . Vector["name"], _KCCP_ReplayCopy.Bind(Vector))
+}
+_KCCP_RegisterCopyCorpus()

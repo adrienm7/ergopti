@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater / Release Install From the Versions Window
 ; DESCRIPTION:
-; The Windows port of _shared/lua/updater/release_install.lua: the one-click
+; The Windows port of _shared/updater/engine/release_install.lua: the one-click
 ; install of a release chosen in the Versions window (install_release), in the
 ; same order as on macOS and Linux. Back the configuration up
 ; (modules/updater/config_backup.ahk), find the release's authenticated asset,
@@ -34,7 +34,10 @@ global RELEASE_INSTALL_REASONS := Map(
 	"verify",          "changelog_window.install_error_verify",
 	"install",         "changelog_window.install_error_install",
 	"unknown_release", "changelog_window.install_error_unknown_release",
-	"no_details",      "changelog_window.install_error_no_details")
+	"no_details",      "changelog_window.install_error_no_details",
+	"feed_not_newest", "changelog_window.install_error_feed_not_newest",
+	"feed_signature",  "changelog_window.install_error_feed_signature",
+	"signature",       "changelog_window.install_error_signature")
 
 ; The tag of the release being installed from the Versions window, or "".
 global _ReleaseInstallTag := ""
@@ -59,7 +62,7 @@ global _ReleaseInstallFailureEpoch := 0
 ; @param Deps {Map} The ports, production or test:
 ;   "busy"    () -> Boolean: the updater's own transaction or recovery runs.
 ;   "blocked" () -> String: locale key of why this build cannot install, or "".
-;   "find"    (Tag) -> Map("release", Release) or Map("reason", key).
+;   "find"    (Tag, Channel) -> Map("release", Release) or Map("reason", key).
 ;   "backup"  (Release) -> Map record (its "path" is shown); throws on failure.
 ;   "asset"   (Release) -> Object, or 0 when the release has none for Windows.
 ;   "install" (Release, Observer) -> Boolean: the update path started.
@@ -84,13 +87,15 @@ ReleaseInstall_Start(Tag, Channel, Deps) {
 		_ReleaseInstall_Report(Deps, Map("tag", Tag, "phase", "failed", "reason_key", RELEASE_INSTALL_REASONS["unexpected"]))
 		return false
 	}
-	Found := Deps["find"].Call(Tag)
+	Found := Deps["find"].Call(Tag, Channel)
 	if !(Found is Map) || !Found.Has("release") {
 		Reason := (Found is Map && Found.Has("reason")) ? Found["reason"] : RELEASE_INSTALL_REASONS["unknown_release"]
 		; Expected while the API is rate limited: the page says why and when to
 		; retry, so no error window opens over it (#99, the Lua drivers' twin).
 		if (Reason == RELEASE_INSTALL_REASONS["no_details"]) {
 			try LoggerWarn("ReleaseInstall", "Refused to install {1}: the window's list came from the Atom feed, which names no files or digests to verify.", Tag)
+		} else if (Reason == RELEASE_INSTALL_REASONS["feed_not_newest"]) {
+			try LoggerWarn("ReleaseInstall", "Refused to install {1}: from the Atom feed only the channel's newest release installs, through its detached signature.", Tag)
 		} else {
 			try LoggerError("ReleaseInstall", "Refused to install {1}: it is not in the release list the window loaded.", Tag)
 		}
@@ -114,7 +119,11 @@ ReleaseInstall_Start(Tag, Channel, Deps) {
 	}
 	BackupPath := (Backup is Map && Backup.Has("path")) ? Backup["path"] : ""
 	Current["backup_path"] := BackupPath
-	Asset := Deps["asset"].Call(Release)
+	try Asset := Deps["asset"].Call(Release)
+	catch {
+		try LoggerError("ReleaseInstall", "Install of {1} refused: the release asset resolver failed.", Tag)
+		return _ReleaseInstall_Fail(Deps, Tag, "unexpected", BackupPath, Current)
+	}
 	if !IsObject(Asset) {
 		try LoggerError("ReleaseInstall", "Install of {1} refused: the release has no asset for Windows.", Tag)
 		return _ReleaseInstall_Fail(Deps, Tag, "no_asset", BackupPath, Current)

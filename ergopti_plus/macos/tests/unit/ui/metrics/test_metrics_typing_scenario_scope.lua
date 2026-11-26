@@ -11,14 +11,15 @@ local helpers = require("tests.helpers")
 -- Stateless shared helpers that the typing metrics modules load on first use.
 -- The leak check below compares package.loaded around each scenario, so the
 -- snapshot must already hold them: they are not scenario state.
-require("table_util")
-require("native_path")
-require("text_utils")
+require("core.text.engine.table_util")
+require("core.fs.engine.native_path")
+require("core.text.engine.utils_core")
 -- The fixtures install the real timing registry (helpers.provide_timings); it is no scenario state.
 helpers.provide_timings()
-require("toml_codec.source_memo")
-require("file_system.ports") -- the file-system owner checks itself against it when it loads
-require("adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
+require("core.text.engine.toml_codec.source_memo")
+require("core.fs.engine.ports") -- the file-system owner checks itself against it when it loads
+require("core.fs.adapters.write_lock_path") -- the file-system owner names its cooperative locks with it
+require("lfs") -- a native library: a scenario that loads it first cannot unload it again
 
 --- Collects actual scoped callbacks without publishing replacement registrations.
 --- @return table scenarios Registered names and callbacks.
@@ -50,7 +51,8 @@ local function collect_scenarios()
 	end)
 end
 
--- Independent enrollment oracle: original families retain their 99 scenarios.
+-- Independent enrollment oracle: original families retain their 100 scenarios,
+-- the refused Studio saved-read retirement of the cache reset included.
 -- These eight additional native JSON regressions must join the same full scope.
 local SCALAR_SCENARIOS = {
 	"(hs-scalar-json-metrics) native table-only encoder accepts request 1",
@@ -67,14 +69,14 @@ helpers.describe("typing scenario lifetime (typing-scenario-scope)", function()
 	for _, failure in ipairs({ false, true }) do
 		helpers.it("restores every actual scenario after " .. (failure and "assertion failure" or "success"), function()
 			local scenarios = collect_scenarios()
-			helpers.assert_eq(#scenarios, 107, "all complete scenario families must be replayed")
+			helpers.assert_eq(#scenarios, 108, "all complete scenario families must be replayed")
 			local original_count, scalar_names = 0, {}
 			for _, scenario in ipairs(scenarios) do
 				if scenario.name:find("(hs-scalar-json-metrics)", 1, true) then
 					scalar_names[#scalar_names + 1] = scenario.name
 				else original_count = original_count + 1 end
 			end
-			helpers.assert_eq(original_count, 99, "all original scenario families must remain enrolled")
+			helpers.assert_eq(original_count, 100, "all original scenario families must remain enrolled")
 			helpers.assert_eq(scalar_names, SCALAR_SCENARIOS, "all eight native JSON cases must remain enrolled")
 			for _, scenario in ipairs(scenarios) do
 				local before, native, original_open = {}, _G.hs, io.open

@@ -25,12 +25,12 @@ enum OwnedRuntimeBuildValidationEntry {
 	}
 	private static func certificateBytes(at url: URL) throws -> Data {
 		let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-		guard fd >= 0 else { throw OwnedRuntimeInstallFailure.source }
+		guard fd >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var descriptorOwned = true
 		defer { if descriptorOwned { close(fd) } }
 		var before = stat()
 		guard fstat(fd, &before) == 0, before.st_mode & S_IFMT == S_IFREG,
-			before.st_size > 0, before.st_size <= 65_536 else { throw OwnedRuntimeInstallFailure.source }
+			before.st_size > 0, before.st_size <= 65_536 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		var bytes = Data(count: Int(before.st_size))
 		let count = bytes.withUnsafeMutableBytes { raw in pread(fd, raw.baseAddress!, raw.count, 0) }
 		var after = stat()
@@ -40,9 +40,9 @@ enum OwnedRuntimeBuildValidationEntry {
 			before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
 			before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec,
 			before.st_ctimespec.tv_sec == after.st_ctimespec.tv_sec,
-			before.st_ctimespec.tv_nsec == after.st_ctimespec.tv_nsec else { throw OwnedRuntimeInstallFailure.source }
+			before.st_ctimespec.tv_nsec == after.st_ctimespec.tv_nsec else { throw OwnedRuntimeInstallFailure.traced(.source) }
 		descriptorOwned = false
-		guard close(fd) == 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard close(fd) == 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		return bytes
 	}
 }

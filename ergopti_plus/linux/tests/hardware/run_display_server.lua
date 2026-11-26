@@ -37,7 +37,7 @@
 --- Exit 0 = every assertion held. 1 = a failure. 2 = no display server at all.
 --- ==============================================================================
 
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 
 local _failures = 0
 local _checks   = 0

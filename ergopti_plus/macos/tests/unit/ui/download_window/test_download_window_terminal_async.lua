@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"ui.download_window",
-	"ui.ui_builder", "ui.webview_close_owner",
-	"infra.logger",
-	"adapters.shell_runner",
+	"core.ui.ui.builder", "core.ui.ui.webview_close_owner",
+	"core.logger.engine.logger",
+	"core.process.adapters.shell_runner",
 }
 
 local function make_webview_overrides(state)
@@ -92,8 +92,8 @@ local function with_terminal_bridge(callback)
 			end
 			return true, table.unpack(results, 2, results.n)
 		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.process.adapters.shell_runner"] = {
 			applescript = function(script, on_done)
 				state.applescript_calls = state.applescript_calls + 1
 				state.script = script
@@ -107,7 +107,7 @@ local function with_terminal_bridge(callback)
 		local callback_ok, callback_err = xpcall(function()
 			callback(DownloadWindow, state)
 		end, debug.traceback)
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not callback_ok then error(callback_err, 0) end
 	end)
 end
@@ -159,7 +159,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 			helpers.assert_true(window.show({ kind = "ollama_model", model = model }))
 			state.bridge({ body = { action = "terminal", session = window.session_id() } })
 			local command = [[ollama pull 'owner'\''s/model; $(printf EXPANDED) `printf EXPANDED`']]
-			local expected = require("infra.text_utils").applescript_format(
+			local expected = require("core.text.engine.utils").applescript_format(
 				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
 			helpers.assert_eq(state.applescript_calls, 1)
 			helpers.assert_eq(state.script, expected)
@@ -182,7 +182,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 				state.logger.today_log_path = function() return case.path end
 				helpers.assert_true(window.show({ kind = "mlx_install" }))
 				state.bridge({ body = { action = "terminal", session = window.session_id() } })
-				local expected = require("infra.text_utils").applescript_format(
+				local expected = require("core.text.engine.utils").applescript_format(
 					'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', case.command)
 				helpers.assert_eq(state.applescript_calls, 1)
 				helpers.assert_eq(state.script, expected,
@@ -199,7 +199,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 				kind = "mlx_model", model = "controlled-model", terminal_cmd = command,
 			}))
 			state.bridge({ body = { action = "terminal", session = window.session_id() } })
-			local expected = require("infra.text_utils").applescript_format(
+			local expected = require("core.text.engine.utils").applescript_format(
 				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
 			helpers.assert_eq(state.applescript_calls, 1)
 			helpers.assert_eq(state.script, expected,

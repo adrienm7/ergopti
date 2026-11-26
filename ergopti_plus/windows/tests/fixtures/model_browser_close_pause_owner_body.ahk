@@ -1,9 +1,9 @@
 ﻿; tests/fixtures/model_browser_close_pause_owner_body.ahk
 
 ; ==============================================================================
-; MODULE: Model Browser Native Close Pause Child
+; MODULE: Model Browser Close Pause Child
 ; DESCRIPTION:
-; Exercises the actual SDK message entry and its native deferred model apply.
+; Exercises the actual SDK message entry and its timer-deferred model apply.
 ; The component host is a real private Gui, with COM/controller state absent.
 ; Migration, boot loading, menu candidates, full collection and TOML writes are
 ; genuine. The real menu coordinator owns an explicitly refusing repaint port.
@@ -117,7 +117,8 @@ _MBPO_Prepare() {
 	global _LLM_MenuBuildCoordinator, _LLM_MBW_Gui, _LLM_MBW_SessionEpoch
 	global _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub, _LLM_MBW_ResetDone, _LLM_MBW_Ready
 	Directory := A_Args[2] . "\config"
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	_MBPO_Require((Creation is Integer) && Creation == 1, "The private configuration directory must be acquired exclusively")
 	ConfigurationFile := Directory . "\config.toml"
 	Index := LLM_GetModelIndex()
 	_MBPO.ModelA := LLM_Defaults["llm_model"]
@@ -130,8 +131,10 @@ _MBPO_Prepare() {
 	}
 	_MBPO_Require(_MBPO.ModelB != "" && _LLM_MBW_IsCatalogueModelName(_MBPO.ModelB),
 		"A distinct real catalogue model must pass the actual SDK value admission.")
+	_MBPO.InitialBackend := "api"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion()
-		. '`n[script]`nlocale = "fr"`n[llm]`nenabled = false`n[llm.models]`nselected = "api"`nollama = '
+		. '`n[script]`nlocale = "fr"`n[llm]`nenabled = false`n[llm.models]`nselected = '
+		. JsonStringLiteral(_MBPO.InitialBackend) . '`nollama = '
 		. JsonStringLiteral(_MBPO.ModelA) . '`n[llm.profiles]`nauto_profile_for_model = false`n'
 	_MBPO_Require(FSWriteCreateDurable(ConfigurationFile, Source), "The private source must be created exclusively and durably.")
 	Boot := ConfigMigrateBoot(ConfigurationFile)
@@ -146,9 +149,9 @@ _MBPO_Prepare() {
 	MetricsFiltersApplyManifestDefaults()
 	_MBPO_Require(_LLM_Menu_RestoreSavedOptsOnce(LLM_Menu_BuildSavedOpts(_IniCache)),
 		"The genuine menu restore must consume options derived from the actual boot features/cache.")
-	_MBPO_Require(!_LLM_Menu["enabled"] && _LLM_Menu["backend"] == "api"
+	_MBPO_Require(!_LLM_Menu["enabled"] && _LLM_Menu["backend"] == _MBPO.InitialBackend
 		&& _LLM_Menu["model"] == _MBPO.ModelA && !_LLM_Menu["auto_profile_for_model"],
-		"The private disabled/API state must avoid backend bootstrap without replacing mutation or persistence.")
+		"The private disabled state must preserve its actual backend/model without starting network dependencies.")
 	_MBPO_Require(!_LLM_Menu_Loaded, "Candidate collection must use its real explicit menu source, not a fabricated loaded flag.")
 	_MBPO.Original := FSReadBytesStrict(ConfigurationFile)
 	_MBPO.OriginalHash := CryptoSha256Bytes(_MBPO.Original)
@@ -202,6 +205,22 @@ _MBPO_Receipt(Hash) {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "page-close" {
+		; The page's Escape (PCK-19) posts close: the real SDK entry retires
+		; the exact host and writes nothing.
+		_MBPO.Args := _MBPO_Message('{"action":"close"}')
+		_MBPO.CommandIssued := true
+		_LLM_MBW_OnWebMessage(_MBPO.Epoch, 0, _MBPO.Args)
+		_MBPO_Observe()
+		Hash := CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile))
+		_MBPO_Receipt(Hash)
+		_MBPO_Require(_MBPO.Args.Reads == 1 && _MBPO.DestroyCalls == 1
+			&& !DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
+			"pck-19: the page's close must retire and destroy its exact native host.")
+		_MBPO_Require(_MBPO.WriterEntries == 0 && Hash == _MBPO.OriginalHash,
+			"pck-19: closing writes no configuration.")
+		return
+	}
 	_MBPO.Args := _MBPO_Message('{"action":"select_model","name":' . JsonStringLiteral(_MBPO.ModelB) . "}")
 	if _MBPO.Mode == "paused-entry"
 		Suspend(true)
@@ -215,16 +234,23 @@ _MBPO_Run() {
 	_MBPO_Require(!IsObject(_MBPO.Failure) && _MBPO.Errors.Length == 0,
 		"A startup, schema, collector or runtime diagnostic cannot qualify as a model-selection refusal.")
 	_MBPO_Require(_MBPO.Args.Reads == 1 && Hash != "", "The real SDK must consume the transport and the final RAW image must be read.")
-	if _MBPO.Mode == "current" {
+	; A pause stops typing, not configuration (EDD-1): an SDK selection sent
+	; while paused commits exactly as a current one does, under the pause.
+	if _MBPO.Mode == "current" || _MBPO.Mode == "paused-entry" {
+		Paused := _MBPO.Mode == "paused-entry"
 		_MBPO_Require(_MBPO.DestroyCalls == 1 && !DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
 			"The real deferred SDK action must close and destroy its exact native component host.")
 		_MBPO_Require(_MBPO.WriterEntries == 1 && _MBPO.WriterConfirmed == 1
-			&& _MBPO.PausedWriterEntries == 0 && _MBPO.MutationConfirmed == 1,
-			"The current positive must confirm the real collector/writer/transaction, not only call a fake sink.")
+			&& _MBPO.PausedWriterEntries == (Paused ? 1 : 0) && _MBPO.MutationConfirmed == 1,
+			"The positive must confirm the real collector/writer/transaction, not only call a fake sink.")
 		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
 		_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
 			&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB && Hash != _MBPO.OriginalHash,
 			"Model B must be durable in independently parsed private TOML and published into both real RAM owners.")
+		if Paused {
+			_MBPO_Require(A_IsSuspended, "The paused selection must commit without lifting the pause.")
+			Suspend(false)
+		}
 		return
 	}
 	if _MBPO.Mode == "during-close" {
@@ -237,15 +263,7 @@ _MBPO_Run() {
 			"The actual file image captured at pause must survive; a legitimate commit before Close is permitted.")
 		return
 	}
-	_MBPO_Require(A_IsSuspended && _MBPO.DestroyCalls == 0 && _MBPO.WriterEntries == 0
-		&& _LLM_Menu["model"] == _MBPO.ModelA && Hash == _MBPO.OriginalHash
-		&& _LLM_MBW_SessionEpoch == _MBPO.Epoch && DllCall("User32\IsWindow", "Ptr", _MBPO.Hwnd, "Int"),
-		"An already paused SDK command must leave its host and durable selection untouched.")
-	Suspend(false)
-	_MBPO_Observe()
-	_MBPO_Require(_MBPO.DestroyCalls == 0 && _MBPO.WriterEntries == 0
-		&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
-		"Resume alone cannot replay the refused paused-entry command.")
+	_MBPO_Require(false, "Unknown SDK selection mode: " . _MBPO.Mode)
 }
 
 _MBPO_Main() {
@@ -254,8 +272,8 @@ _MBPO_Main() {
 		OriginalHash: "", ReadyReads: 0, PauseImage: 0, PauseHash: "", ModelA: "", ModelB: "", CommandIssued: false,
 		DestroyCalls: 0, PauseObserved: false, WriterEntries: 0, WriterConfirmed: 0,
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
-		Pulses: 0, Cleaning: false, Errors: [], Failure: 0}
-	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry",
+		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, InitialBackend: ""}
+	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "page-close" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)

@@ -19,6 +19,7 @@ M.bridge_name = "hsOnboarding"
 M.ACTIONS = {
 	ready = true,
 	previewLocale = true,
+	setReadingPreference = true,
 	localeSelected = true,
 	pickConfigDir = true,
 	resolveMetricsPath = true,
@@ -28,12 +29,12 @@ M.ACTIONS = {
 	registerGesturesManual = true,
 }
 
-local Json = require("json")
-local Logger = require("logger.shim")
-local Paths = require("infra.paths")
-local TomlCodec = require("toml_codec")
-local Answers = require("onboarding_answers")
-local ConfigDirPicker = require("ui.config_dir_picker")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local Paths = require("core.fs.engine.paths")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Answers = require("onboarding.engine.answers")
+local ConfigDirPicker = require("settings.ui.dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
 -- The catalogue platform this host reads and the id the config migration
@@ -49,7 +50,10 @@ local _catalogue = nil
 
 -- This exact request owner outlives view disposal and daemon-state replacement.
 local _publication = nil
-local _finish_gate = require("onboarding_publication").callback_gate()
+-- The language chosen on the first step, until Finish persists it: the host's
+-- dialogs during the wizard speak it, as on Windows and macOS (OBM-001).
+local _chosen_strings = nil
+local _finish_gate = require("onboarding.engine.publication").callback_gate()
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -58,17 +62,18 @@ local function dependency(state, field, module_name)
 end
 
 local function webview(state)
-	return dependency(state, "webview_manager", "ui.webview_manager")
+	return dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 end
 
-local function push(state, function_name, payload)
+local function push(state, function_name, payload, current)
 	local manager = webview(state)
-	if not manager or type(manager.eval_js) ~= "function" then return false end
+	if not manager or type(manager.eval_js) ~= "function" or current and not current() then return false end
 	local ok, encoded = pcall(Json.encode, payload)
 	if not ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "Could not encode the %s onboarding payload.", function_name)
 		return false
 	end
+	if current and not current() then return false end
 	local pushed, accepted = pcall(manager.eval_js, APP_NAME,
 		"if(window." .. function_name .. ") window." .. function_name .. "(" .. encoded .. ")")
 	return pushed and accepted == true
@@ -80,10 +85,11 @@ end
 --- @param state table Daemon state and optional test-injected authorities.
 --- @param strings table|nil Locale strings.
 --- @return boolean true when the live window was retitled.
-local function retitle(state, strings)
+local function retitle(state, strings, current)
 	local manager = webview(state)
 	local label = type(strings) == "table" and strings[WINDOW_TITLE_KEY] or nil
-	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string" then
+	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string"
+		or current and not current() then
 		return false
 	end
 	local ok, applied = pcall(manager.set_title, APP_NAME, label)
@@ -105,15 +111,12 @@ end
 --- @return string|nil content
 local function read_shared(relative)
 	local path = Paths.shared(relative)
-	local fh = path and io.open(path, "r") or nil
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+	if not path then return nil end
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 local function locale_strings(code)
-	local raw = read_shared("data/locales/" .. tostring(code) .. ".json")
+	local raw = read_shared("core/i18n/data/locales/" .. tostring(code) .. ".json")
 	if not raw then
 		Logger.error(LOG, "Onboarding locale '%s' is unreadable.", tostring(code))
 		return nil
@@ -160,8 +163,8 @@ local function tap_hold_values_of(state, path)
 		return nil
 	end
 	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
-	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/defaults.toml"),
-		folder .. "/" .. writer.FILE_NAME)
+	local ok, report, err = pcall(loader.key_report, Paths.shared("tap_hold/data/defaults.toml"),
+		folder .. "/" .. writer.FILE_NAME, path)
 	if not ok or not report then
 		Logger.error(LOG, "The tap-hold keys in force could not be read: %s.", tostring(ok and err or report))
 		return nil
@@ -176,17 +179,22 @@ end
 --- @return table|nil values Empty for absent files, nil when one is unreadable.
 local function values_of(state, path)
 	local values = {}
-	local fh, err, code = io.open(path, "r")
+	local reader = require("core.fs.engine.regular_file_reader")
+	local fh, err, code = reader.open_source(path)
 	if fh then
-		local raw = fh:read("*a")
-		fh:close()
+		local read, raw = pcall(fh.read, fh, "*a")
+		local closed, accepted = pcall(fh.close, fh)
+		if not read or type(raw) ~= "string" or not closed or accepted ~= true then
+			Logger.error(LOG, "The configuration in force could not be read and closed.")
+			return nil
+		end
 		local ok, parsed = pcall(TomlCodec.decode, raw)
 		if not ok or type(parsed) ~= "table" then
 			Logger.error(LOG, "The configuration in force could not be decoded.")
 			return nil
 		end
 		values = M.config_values(parsed)
-	elseif code ~= 2 then
+	elseif code ~= reader.ENOENT then
 		Logger.error(LOG, "The configuration in force could not be read: %s.", tostring(err))
 		return nil
 	end
@@ -211,8 +219,8 @@ local function number_row_capability(state)
 end
 
 local function build_init_data(state)
-	local i18n = dependency(state, "i18n", "infra.i18n")
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	if not i18n or not config_paths then return nil end
 	local ok_catalogue, catalogue_error = pcall(catalogue)
 	if not ok_catalogue then
@@ -230,7 +238,12 @@ local function build_init_data(state)
 		platform = CATALOGUE_DRIVER,
 		-- Gesture registration with the system is a Windows host action only. The number-row
 		-- order is applied live when the session loads a layout and one of ours is installed.
-		capabilities = { gesture_registration = false, number_row_live = number_row_capability(state) },
+		capabilities = {
+			gesture_registration = false,
+			-- A Unix path is read literally: a trailing space is part of a valid name.
+			literal_absolute_paths = true,
+			number_row_live = number_row_capability(state),
+		},
 		locale = current_locale,
 		strings = strings,
 		default_config_dir = default_dir,
@@ -238,7 +251,8 @@ local function build_init_data(state)
 		config_dir = current_dir ~= default_dir and current_dir or "",
 		-- The consent text names the metrics store.
 		metrics_path = config_paths.metrics_path(),
-		system_layout = type(state.layout) == "string" and state.layout or "",
+		-- The trigger the wizard proposes: the default the session layout gave.
+		magic_key_default = require("hotstrings.engine.magic_key").default(),
 		locales = require("_generated.locale_table"),
 		current = values,
 	}
@@ -246,8 +260,22 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
+--- Translates a host string in the language chosen in the wizard, else in the
+--- running one.
+--- @param state table Daemon state.
+--- @return table translator { get(key) }.
+local function wizard_translator(state)
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
+	local strings = _chosen_strings
+	return { get = function(key)
+		if strings and type(strings[key]) == "string" then return strings[key] end
+		return i18n.get(key)
+	end }
+end
+
 --- Tells the user what the wizard could not save, as the other hosts' dialogs
---- do; a refused commit leaves the window open for a retry.
+--- do, in the language chosen in the wizard; a refused commit leaves the window
+--- open for a retry.
 --- @param state table Daemon state.
 --- @param key string Locale key of the message.
 local function report_failure(state, key)
@@ -255,7 +283,7 @@ local function report_failure(state, key)
 		Logger.error(LOG, "Onboarding failure '%s' has no notifier to reach the user.", key)
 		return
 	end
-	local ok, err = pcall(state.notify_error, key)
+	local ok, err = pcall(state.notify_error, key, wizard_translator(state).get)
 	if not ok then
 		Logger.error(LOG, "Onboarding failure '%s' could not be shown: %s.", key, tostring(err))
 	end
@@ -321,11 +349,15 @@ end
 --- @return boolean writable
 --- @return string|nil detail
 local function prepare_destination(path)
-	local ConfigMigrate = require("config_migrate")
+	local ConfigMigrate = require("settings.engine.migration.migrate")
+	local SharedFile = require("tap_hold.engine.shared_file")
+	local folder = assert(path:match("^(.*)/[^/]*$"), "a config.toml path names its folder")
 	local result = ConfigMigrate.boot({
 		path          = path,
 		driver        = MIGRATION_DRIVER,
 		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
+		-- The v22 step moves the tap-hold rows out of the folder's tap_hold.toml.
+		companions    = { [SharedFile.FILE_NAME] = folder .. "/" .. SharedFile.FILE_NAME },
 	})
 	if result.read_only then return false, result.detail end
 	return true
@@ -347,7 +379,7 @@ local function import_tap_holds(state, target_dir, keys)
 		return false
 	end
 	local ok, imported, detail = pcall(function()
-		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		local preset = loader.preset_keys(Paths.shared("tap_hold/data/defaults.toml"))
 		return writer.import_recommended(target_dir .. "/" .. writer.FILE_NAME, keys, preset)
 	end)
 	if ok and imported == true then return true end
@@ -366,11 +398,11 @@ end
 --- @return boolean ok False when the layer was due and could not be written.
 local function import_nav_layer(state, target_dir, keys)
 	local loader = dependency(state, "tap_hold_loader", "platform.remap.tap_hold_loader")
-	local LayerPreset = dependency(state, "layer_preset", "keymap.layer_preset")
+	local LayerPreset = dependency(state, "layer_preset", "layouts.engine.layers.preset")
 	local ok, import, err = pcall(function()
 		local shared_root = Paths.shared_root()
 		local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
-		local preset = loader.preset_keys(Paths.shared("tap_hold/defaults.toml"))
+		local preset = loader.preset_keys(Paths.shared("tap_hold/data/defaults.toml"))
 		local enters = false
 		for _, key_id in ipairs(keys) do
 			enters = enters or (type(preset[key_id]) == "table" and preset[key_id].hold_layer == layer_id)
@@ -399,10 +431,10 @@ local function finish_owned(state, answers)
 		return { done = false }
 	end
 	local authorities = {
-		i18n = dependency(state, "i18n", "infra.i18n"),
-		config_paths = dependency(state, "config_paths", "infra.config_paths"),
-		manifest = dependency(state, "manifest", "infra.manifest_reader"),
-		writer = dependency(state, "writer", "toml_codec.writer"),
+		i18n = dependency(state, "i18n", "core.i18n.engine.i18n"),
+		config_paths = dependency(state, "config_paths", "settings.engine.paths"),
+		manifest = dependency(state, "manifest", "menu.engine.manifest_reader"),
+		writer = dependency(state, "writer", "core.text.engine.toml_codec.writer"),
 		prepare = type(state.prepare_destination) == "function" and state.prepare_destination
 			or prepare_destination,
 	}
@@ -434,7 +466,7 @@ local function finish_owned(state, answers)
 		return { done = false }
 	end
 
-	local files = dependency(state, "file_system", "adapters.file_system")
+	local files = dependency(state, "file_system", "core.fs.adapters.file_system")
 	if not files or type(files.read_with_status) ~= "function" then
 		report_failure(state, "onboarding.error.write_failed")
 		return { done = false }
@@ -443,16 +475,16 @@ local function finish_owned(state, answers)
 	local path_set, path_get = authorities.config_paths.set_config_dir, authorities.config_paths.get_config_dir
 	local locale_set, locale_get = authorities.i18n.set_locale, authorities.i18n.get_locale
 	local locale_persist = authorities.i18n.persist_locale
-	_publication = require("onboarding_publication").new({
+	_publication = require("onboarding.engine.publication").new({
 		files = files,
 		write = function(path, batch, source)
 			return native_write(path, batch, files, source)
 		end,
 		current = function()
-			return dependency(state, "writer", "toml_codec.writer") == authorities.writer
-				and dependency(state, "file_system", "adapters.file_system") == files
-				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
-				and dependency(state, "i18n", "infra.i18n") == authorities.i18n
+			return dependency(state, "writer", "core.text.engine.toml_codec.writer") == authorities.writer
+				and dependency(state, "file_system", "core.fs.adapters.file_system") == files
+				and dependency(state, "config_paths", "settings.engine.paths") == authorities.config_paths
+				and dependency(state, "i18n", "core.i18n.engine.i18n") == authorities.i18n
 				and authorities.config_paths.set_config_dir == path_set and authorities.config_paths.get_config_dir == path_get
 				and authorities.i18n.set_locale == locale_set and authorities.i18n.get_locale == locale_get
 				and authorities.i18n.persist_locale == locale_persist
@@ -541,14 +573,13 @@ local function finish(state, answers)
 	return result
 end
 
-local function pick_config_dir(state, current)
-	local shell = dependency(state, "shell", "adapters.shell_runner")
-	local config_paths = dependency(state, "config_paths", "infra.config_paths")
-	local i18n = dependency(state, "i18n", "infra.i18n")
+local function pick_config_dir(state, current, page_current)
+	local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
+	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 	if not shell or not config_paths then return { picked = false } end
-	local normalized = ConfigDirPicker.pick(shell, config_paths, i18n, current)
-	if not normalized then return { picked = false } end
-	push(state, "setConfigDir", normalized)
+	local normalized = ConfigDirPicker.pick(shell, config_paths, wizard_translator(state), current)
+	if not normalized or not page_current() then return { picked = false } end
+	push(state, "setConfigDir", normalized, page_current)
 	return { picked = true, path = normalized }
 end
 
@@ -556,7 +587,7 @@ end
 --- @param payload any String or action table from host_bridge.js.
 --- @param state table Daemon state and optional test-injected authorities.
 --- @return table|nil Diagnostic response; the page receives pushes through eval_js.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then
 		local ok, decoded = pcall(Json.decode, tostring(payload))
@@ -565,6 +596,24 @@ function M.on_message(payload, state)
 	end
 
 	local action = payload.action
+	local manager = webview(state)
+	local epoch = type(context) == "table" and context.epoch or nil
+	local epoch_read, native_current = manager and manager.current_epoch, manager and manager.page_current
+	local function page_current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(epoch_read) ~= "function" or not manager
+			or webview(state) ~= manager or manager.current_epoch ~= epoch_read then return false end
+		local ok, observed = pcall(epoch_read, APP_NAME)
+		if not ok or observed ~= epoch or webview(state) ~= manager or manager.current_epoch ~= epoch_read then return false end
+		if action == "ready" then return true end
+		if type(native_current) ~= "function" or manager.page_current ~= native_current then return false end
+		local checked, live = pcall(native_current, APP_NAME, epoch)
+		if not checked or live ~= true or manager.page_current ~= native_current or manager.current_epoch ~= epoch_read then return false end
+		local reread, final = pcall(epoch_read, APP_NAME)
+		return reread and final == epoch and webview(state) == manager
+			and manager.current_epoch == epoch_read and manager.page_current == native_current
+	end
+	if not page_current() then return nil end
 	if (action == "ready" or action == "loadExistingConfig") and _finish_gate.busy() then
 		return { pushed = false }
 	end
@@ -574,38 +623,62 @@ function M.on_message(payload, state)
 		return { pushed = false }
 	end
 	if action == "ready" then
+		-- A fresh page starts in the running language.
+		_chosen_strings = nil
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end
-		return { pushed = push(state, "initData", data), data = data,
-			titled = retitle(state, data.strings) }
+		return { pushed = push(state, "initData", data, page_current), data = data,
+			titled = retitle(state, data.strings, page_current) }
 	elseif action == "previewLocale" then
-		local i18n = dependency(state, "i18n", "infra.i18n")
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
 		local strings = locale_strings(payload.locale)
 		if not strings then return { pushed = false } end
 		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
-		}), titled = retitle(state, strings) }
+		}, page_current), titled = retitle(state, strings, page_current) }
+	elseif action == "setReadingPreference" then
+		-- The reader's font or spacing, picked beside the languages: saved by
+		-- the choice's owner, as the Configuration menu saves it, then pushed
+		-- to every open window, this one included, with the font inlined; the
+		-- menu is rebuilt so its tick follows.
+		local preference = require("core.ui.engine.webview.reading_preferences").for_name(payload.name)
+		if preference == nil then
+			Logger.error(LOG, "setReadingPreference refused — '%s' is not a reading choice.", tostring(payload.name))
+			return { accepted = false }
+		end
+		if not require(preference.module).set(payload.value) then
+			Logger.error(LOG, "Reading choice %s could not be saved; it is unchanged.", tostring(payload.value))
+			return { accepted = false }
+		end
+		local manager = webview(state)
+		if manager and type(manager.push_reading_preferences) == "function" then manager.push_reading_preferences() end
+		if type(state.on_config_changed) == "function" then state.on_config_changed() end
+		return { accepted = true }
 	elseif action == "localeSelected" then
-		local i18n = dependency(state, "i18n", "infra.i18n")
-		return { accepted = locale_available(i18n, payload.locale) }
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
+		if not locale_available(i18n, payload.locale) then return { accepted = false } end
+		local strings = locale_strings(payload.locale)
+		if not strings then return { accepted = false } end
+		_chosen_strings = strings
+		return { accepted = true }
 	elseif action == "pickConfigDir" then
-		return pick_config_dir(state, payload.current)
+		return pick_config_dir(state, payload.current, page_current)
 	elseif action == "resolveMetricsPath" then
 		-- The store lives in the data directory and does not follow the chosen
 		-- configuration folder; answering keeps the page on the keystats's path.
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		if type(payload.request) ~= "number" or not config_paths then
 			Logger.error(LOG, "resolveMetricsPath refused — request number or path authority missing.")
 			return { pushed = false }
 		end
 		local path = config_paths.metrics_path()
-		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }),
+		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }, page_current),
 			path = path }
 	elseif action == "loadExistingConfig" then
 		-- The pages restart from the chosen folder's config.toml: its values when
 		-- it exists, the neutral ones when it does not.
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		local chosen = config_paths and normalize_config_dir(config_paths, payload.config_dir) or nil
 		if not chosen or type(payload.request) ~= "number" then
 			Logger.error(LOG, "loadExistingConfig refused — folder or request number invalid.")
@@ -613,7 +686,7 @@ function M.on_message(payload, state)
 		end
 		local ok_values, values = pcall(values_of, state, chosen .. "/" .. CONFIG_FILE)
 		if not ok_values or not values then return { loaded = false } end
-		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }),
+		return { loaded = push(state, "applyCurrentValues", { request = payload.request, values = values }, page_current),
 			values = values }
 	elseif action == "finish" then
 		return finish(state, payload.answers)

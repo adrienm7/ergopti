@@ -10,10 +10,11 @@
 ; equivalent guard, so 100+ DllCall and 100+ FileRead calls outside adapters/
 ; were completely unwatched.
 ;
-; This test counts the direct-OS-call lines outside adapters/ and fails only if
-; a total INCREASES beyond its captured baseline. New OS access must be routed
-; through windows/adapters/ (or, if truly adapter-worthy, the baseline updated
-; with an explicit note). Lower is better; the long-term target is zero. Comment
+; This test counts the direct-OS-call lines outside adapters/ per file and fails
+; when a file's count differs from its line in os_purity_ledger.txt: a rise, a
+; fall the line must follow, or a new file. New OS access must be routed through
+; windows/adapters/ (or, if truly adapter-worthy, a line changed with an explicit
+; note). Lower is better; the long-term target is zero. Comment
 ; lines (leading ``;``) are skipped so a comment mentioning DllCall does not
 ; inflate the count.
 ;
@@ -26,7 +27,8 @@
 ; excluded the most OS-bound code in the driver. And a single combined total
 ; means an improvement in one tree silently pays for a regression in another:
 ; route ten FileReads through an adapter in modules/ and you may add ten
-; DllCalls to ui/ for free. Each tree therefore carries its own frozen number.
+; DllCalls to ui/ for free. Each tree therefore carries its own ledger, and since
+; 2026-11-22 each file its own line, so one file cannot pay for another either.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -98,8 +100,41 @@ _AOPR_WholeIdentifiers() {
 
 Test("OS purity counter: whole native identifiers and captured built-ins (os-purity-token-boundaries)", _AOPR_WholeIdentifiers)
 
+; True for a UI source: a file under a ui\ folder of any feature. The core\ui
+; feature's own name is no such folder: its adapters and engine are not UI
+; sources, its ui\ role folder is. The ratchets partition by this role, so a
+; structure move keeps a file in its tree whichever feature folder it lands in.
+_AOPR_IsUiSource(Path) {
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	if SubStr(Relative, 1, 8) = "core\ui\"
+		Relative := SubStr(Relative, 9)
+	return InStr("\" . Relative, "\ui\") > 0
+}
+
+; The structure plan's platform domains (tools/audit/structure/rules.cjs
+; PLATFORM_DOMAINS, held equal by tools/test/test-ahk-os-purity-platform.cjs):
+; platform\<domain>\ is the home of a driver's OS bindings and has no adapters\
+; role folder, so its files are the isolation layer as adapters\ is (decided by
+; the coordinator on 2026-11-14, to review by the maintainer). Today's
+; platform\remap\ and tray\adapters\ are layer folders, not platform domains.
+_AOPR_PLATFORM_DOMAINS := ["desktop_focus", "focus", "input", "native", "system"]
+
+_AOPR_IsPlatformAdapter(Path) {
+	global _AOPR_PLATFORM_DOMAINS
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	for Domain in _AOPR_PLATFORM_DOMAINS
+		if SubStr(Relative, 1, StrLen(Domain) + 10) = "platform\" . Domain . "\"
+			return true
+	return false
+}
+
 ; Every .ahk file under the given driver subdirectories, recursively, with
-; adapters/ excluded — OS calls there are the legitimate isolation layer.
+; adapters/ and the platform domains excluded — OS calls there are the
+; legitimate isolation layer. The
+; crypto adapter (S02), the boot clock and timer scheduler (S03) and the
+; driver control adapter (S06), the one adapter of core/lifecycle, live in
+; core/ outside any adapters/ folder: they stay the same isolation layer.
+; The UI sources are left to the ui pair, which counts them wherever they live.
 _AOPR_FilesIn(SubDirs) {
 	Files := []
 	Root := _AOPR_DriverRoot()
@@ -108,7 +143,9 @@ _AOPR_FilesIn(SubDirs) {
 		if !DirExist(Base)
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
-			if InStr(A_LoopFilePath, "\adapters\")
+			if InStr(A_LoopFilePath, "\adapters\") || _AOPR_IsUiSource(A_LoopFilePath)
+				|| _AOPR_IsPlatformAdapter(A_LoopFilePath)
+				|| RegExMatch(A_LoopFilePath, "\\core\\(?:crypto\\crypto|events\\(?:boot_clock|timer_scheduler)|lifecycle\\driver_control)\.ahk$")
 				continue
 			Files.Push(A_LoopFilePath)
 		}
@@ -116,23 +153,95 @@ _AOPR_FilesIn(SubDirs) {
 	return Files
 }
 
-; Sums the three categories into the single number each baseline freezes.
+; Every UI source of the driver, adapters/ excluded, wherever its feature keeps
+; it; the suite and vendored code are no driver source.
+_AOPR_UiFiles() {
+	Files := []
+	Root := _AOPR_DriverRoot()
+	Loop Files, Root . "\*.ahk", "R" {
+		Relative := SubStr(A_LoopFilePath, StrLen(Root) + 2)
+		if SubStr(Relative, 1, 6) = "tests\" || SubStr(Relative, 1, 7) = "vendor\"
+			continue
+		if InStr(A_LoopFilePath, "\adapters\") || !_AOPR_IsUiSource(A_LoopFilePath)
+			continue
+		Files.Push(A_LoopFilePath)
+	}
+	if Files.Length == 0
+		throw Error("OS-purity UI source inventory is empty under " . Root)
+	return Files
+}
+
+; Sums the three categories into one file's count.
 _AOPR_Total(C) {
 	return C["DllCall"] + C["COM"] + C["FileIO"]
 }
 
-; Shared assertion body: counts one tree and compares it to its own baseline.
-_AOPR_AssertTree(Label, Files, Baseline) {
+; Per-file counts admitted in os_purity_ledger.txt beside this file, one
+; "<ledger> <driver-relative path> <count>" line each. A file whose count
+; differs from its line fails: a rise is a regression, a fall lowers the line
+; in the same change, and a file without a line makes no such call. Six tree
+; totals held this until 2026-11-22; a total let one file pay for another.
+; The paths live in a data file so this source does not pin them.
+
+/**
+ * Reads one ledger of os_purity_ledger.txt.
+ * @param {String} Name - The ledger, such as "calls:core".
+ * @returns {Map} Driver-relative path to admitted count.
+ */
+_AOPR_Ledger(Name) {
+	SplitPath(A_LineFile, , &OwnDir)
+	Ledger := Map()
+	for Line in StrSplit(FileRead(OwnDir . "\os_purity_ledger.txt", "UTF-8"), "`n", "`r") {
+		Line := Trim(Line)
+		if Line == "" || SubStr(Line, 1, 1) == "#"
+			continue
+		Parts := StrSplit(Line, " ")
+		if Parts.Length != 3 || !IsInteger(Parts[3]) || Parts[3] < 1
+			throw Error("os_purity_ledger.txt: malformed line " . Line)
+		if Parts[1] != Name
+			continue
+		if Ledger.Has(Parts[2])
+			throw Error("os_purity_ledger.txt lists " . Name . " " . Parts[2] . " twice")
+		Ledger[Parts[2]] := Integer(Parts[3])
+	}
+	return Ledger
+}
+
+/**
+ * Counts each file apart and compares the counts with one ledger.
+ * @param {String} Name - The ledger, such as "calls:core".
+ * @param {Array} Files - Absolute paths of the tree.
+ * @param {Func} Total - Returns one file's count, given a one-file array.
+ * @returns {String} The differences, one "path: measured N, ledger M" per line; "" when none.
+ */
+_AOPR_LedgerDifferences(Name, Files, Total) {
+	Root := _AOPR_DriverRoot()
+	Measured := Map()
+	for FilePath in Files {
+		Count := Total.Call([FilePath])
+		if Count
+			Measured[StrReplace(SubStr(FilePath, StrLen(Root) + 2), "\", "/")] := Count
+	}
+	Ledger := _AOPR_Ledger(Name)
+	Differences := ""
+	for Rel, Count in Measured
+		if !Ledger.Has(Rel) || Ledger[Rel] != Count
+			Differences .= "`n    " . Rel . ": measured " . Count . ", ledger " . (Ledger.Has(Rel) ? Ledger[Rel] : 0)
+	for Rel, Count in Ledger
+		if !Measured.Has(Rel)
+			Differences .= "`n    " . Rel . ": measured 0, ledger " . Count
+	return Differences
+}
+
+_AOPR_AssertTree(Label, Files, LedgerName) {
 	Assert(Files.Length > 0,
 		"OS-purity ratchet found NO .ahk file for '" . Label . "' — the walk is broken, "
 		. "not the tree. A ratchet that scans nothing passes forever.")
-	C := _AOPR_CountFiles(Files)
-	Total := _AOPR_Total(C)
-	Assert(Total <= Baseline,
-		"Direct OS calls in " . Label . " (outside adapters/) rose to " . Total . " (baseline "
-		. Baseline . "): DllCall=" . C["DllCall"] . " COM=" . C["COM"]
-		. " FileIO=" . C["FileIO"]
-		. " — route new OS access through windows/adapters/, do not raise the baseline.")
+	Differences := _AOPR_LedgerDifferences(LedgerName, Files, (One) => _AOPR_Total(_AOPR_CountFiles(One)))
+	Assert(Differences == "",
+		"Direct OS calls in " . Label . " (outside adapters/) differ from os_purity_ledger.txt "
+		. LedgerName . " — route new OS access through windows/adapters/; lower a line that fell, "
+		. "never raise one:" . Differences)
 }
 
 
@@ -145,9 +254,9 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ; ====================================
 ; ====================================
 
-; Baselines captured from this counter's own runs. Drive toward zero by routing
-; OS access through windows/adapters/. NEVER raise a number to make a change
-; pass — that defeats the guard.
+; Former tree totals, captured from this counter's own runs, now one ledger line
+; per file. Drive toward zero by routing OS access through windows/adapters/.
+; NEVER raise a line to make a change pass — that defeats the guard.
 ;
 ; modules+lib: 2026-06-21 at 256 (DllCall=110, COM=19, FileIO=127), re-measured
 ;              2026-07-31 at 253 and tightened to the real value, re-measured
@@ -168,15 +277,20 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              window_manager adapter, and tightened to that value.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
 ; 2026-11-03: the startup smoke's mutex probe, exit and deadline moved into
-; adapters/process_lifecycle.ahk; read from this counter at modules+lib 248
+; core/process/adapters/lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
-_AOPR_BASELINE_CORE  := 248
-_AOPR_BASELINE_UI    := 125
-_AOPR_BASELINE_ENTRY := 7
+; 2026-11-12: the layout registry watch and the metrics time zone conversions
+; moved into hotstrings/adapters/registry_notify.ahk and platform/system/time_zone.ahk;
+; read from this counter at modules+lib 247, tightened.
+; 2026-11-22: the deferred menu build probe's thread, module and process
+; counters moved into core/events/boot_clock.ahk; read at modules+lib 236
+; (DllCall=159 COM=1 FileIO=76), tightened.
+; 2026-11-22: the totals became the per-file ledger os_purity_ledger.txt.
 
+; apps\engine holds the app picker and folders the structure plan took out of
+; infra\; the bundled apps beside it were never part of this tree's count.
 _AOPR_RatchetCore() {
-	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps\engine"]), "calls:core")
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -184,18 +298,16 @@ Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCor
 ; and window handles faster than anything else in the driver. It was the one
 ; tree the ratchet did not look at.
 _AOPR_RatchetUi() {
-	global _AOPR_BASELINE_UI
-	_AOPR_AssertTree("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_BASELINE_UI)
+	_AOPR_AssertTree("windows/ui", _AOPR_UiFiles(), "calls:ui")
 }
 Test("meta: windows/ OS-call purity ratchet — ui", _AOPR_RatchetUi)
 
 ; The entry point is a single file, but it is the one file every deployment
 ; runs, and nothing was watching what it calls directly.
 _AOPR_RatchetEntry() {
-	global _AOPR_BASELINE_ENTRY
 	Entry := _AOPR_DriverRoot() . "\ErgoptiPlus.ahk"
 	Assert(FileExist(Entry), "OS-purity ratchet: entry point not found at " . Entry)
-	_AOPR_AssertTree("windows/ErgoptiPlus.ahk", [Entry], _AOPR_BASELINE_ENTRY)
+	_AOPR_AssertTree("windows/ErgoptiPlus.ahk", [Entry], "calls:entry")
 }
 Test("meta: windows/ OS-call purity ratchet — entry point", _AOPR_RatchetEntry)
 
@@ -276,18 +388,15 @@ _AOPR_FamilyTotal(C) {
 	return C["Timer"] + C["Binding"] + C["GuiMenu"] + C["Process"] + C["Window"] + C["KeyState"]
 }
 
-_AOPR_AssertFamilies(Label, Files, Baseline) {
+_AOPR_AssertFamilies(Label, Files, LedgerName) {
 	Assert(Files.Length > 0,
 		"family ratchet found NO .ahk file for '" . Label . "' — the walk is broken, not the tree. "
 		. "A ratchet that scans nothing passes forever.")
-	C := _AOPR_CountFamilies(Files)
-	Total := _AOPR_FamilyTotal(C)
-	Assert(Total <= Baseline,
-		"Platform-API family lines in " . Label . " rose to " . Total . " (baseline " . Baseline
-		. "): Timer=" . C["Timer"] . " Binding=" . C["Binding"] . " GuiMenu=" . C["GuiMenu"]
-		. " Process=" . C["Process"] . " Window=" . C["Window"] . " KeyState=" . C["KeyState"]
-		. " — prefer a manifest row or an existing helper over a new direct binding; "
-		. "do not raise the baseline.")
+	Differences := _AOPR_LedgerDifferences(LedgerName, Files, (One) => _AOPR_FamilyTotal(_AOPR_CountFamilies(One)))
+	Assert(Differences == "",
+		"Platform-API family lines in " . Label . " differ from os_purity_ledger.txt " . LedgerName
+		. " — prefer a manifest row or an existing helper over a new direct binding; lower a line "
+		. "that fell, never raise one:" . Differences)
 }
 
 ; Baselines: 2026-07-31, first measurement of these families. Not regressions —
@@ -311,27 +420,25 @@ _AOPR_AssertFamilies(Label, Files, Baseline) {
 ; entry: 10 (Timer=8 Binding=1 GuiMenu=0 Process=0 Window=0 KeyState=1)
 ; 2026-11-03, read from this counter: core 593 (Timer=226 Binding=230 GuiMenu=32
 ; Process=25 Window=49 KeyState=31), tightened; entry 10 (Timer=9 KeyState=1).
-_AOPR_FAMILY_BASELINE_CORE  := 593
-_AOPR_FAMILY_BASELINE_UI    := 186
-_AOPR_FAMILY_BASELINE_ENTRY := 10
+; 2026-11-12: the touchpad, layout registry watch and deferred hotstring
+; timers moved onto the timer adapter; read from this counter at core 592 and
+; ui 182, tightened.
+; 2026-11-22: the totals became the per-file ledger os_purity_ledger.txt.
 
 _AOPR_FamilyRatchetCore() {
-	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps\engine"]), "families:core")
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 
 _AOPR_FamilyRatchetUi() {
-	global _AOPR_FAMILY_BASELINE_UI
-	_AOPR_AssertFamilies("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
+	_AOPR_AssertFamilies("windows/ui", _AOPR_UiFiles(), "families:ui")
 }
 Test("meta: windows/ platform-API family ratchet — ui", _AOPR_FamilyRatchetUi)
 
 _AOPR_FamilyRatchetEntry() {
-	global _AOPR_FAMILY_BASELINE_ENTRY
 	Entry := _AOPR_DriverRoot() . "\ErgoptiPlus.ahk"
 	Assert(FileExist(Entry), "family ratchet: entry point not found at " . Entry)
-	_AOPR_AssertFamilies("windows/ErgoptiPlus.ahk", [Entry], _AOPR_FAMILY_BASELINE_ENTRY)
+	_AOPR_AssertFamilies("windows/ErgoptiPlus.ahk", [Entry], "families:entry")
 }
 Test("meta: windows/ platform-API family ratchet — entry point", _AOPR_FamilyRatchetEntry)
 

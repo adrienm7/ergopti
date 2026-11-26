@@ -112,8 +112,10 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 			continue ; called below
 		if (InStr(C, "CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey(") == 1)
 			continue ; CapsWord's own Space and Enter, a separate mode
-		if (C == "KeyCombinationOwnsHotkey()")
-			continue ; a key combination the user bound, held first key and all
+		; A key combination the user bound, held first key and all. The parse-time
+		; IsSet guard only keeps the criterion boot-safe (hotif-globals-boot-safe).
+		if (C == "IsSet(Features) && KeyCombinationOwnsHotkey()")
+			continue
 		if RegExMatch(C, "^\(?\s*LayerEnabled\b") {
 			LayerMapped[Keys[Hotkey.Key]] := true
 			continue
@@ -130,7 +132,7 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 		. (Offenders.Length ? Offenders[1] : ""))
 	; AltGr is registered from the resolved layer instead of a static label.
 	Ctx := KeymapLayers_LoadContext(A_ScriptDir . "\..\..\_shared")
-	Resolved := KeymapLayers_Load("windows", Ctx, FileRead(A_ScriptDir . "\..\..\_shared\keymap\layers.recommended.toml", "UTF-8"))
+	Resolved := KeymapLayers_Load("windows", Ctx, FileRead(A_ScriptDir . "\..\..\_shared\layouts\data\layers.recommended.toml", "UTF-8"))
 	AssertTrue(Resolved["ok"], "the recommended layer must resolve")
 	AltGrLabels := Map()
 	for Row in NavLayer_BuildTable(Resolved["layers"]["nav"], Ctx) {

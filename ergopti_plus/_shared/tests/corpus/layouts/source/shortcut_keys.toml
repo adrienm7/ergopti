@@ -1,0 +1,46 @@
+# Shortcut-key fixture (tools/test/test-layout-shortcut-keys.cjs): each key's
+# shortcut_key carried natively. KeyQ and KeyA name each other (an exact
+# exchange on Windows), KeyZ names KeyC (KeyC's own Windows shortcuts move),
+# KeyX names KeyC too (macOS and XKB carry it, Windows refuses a second claim),
+# KeyB names Space, which types no character here. The command layer is a
+# shortcut level of its own; Control falls to the default keyMap, so the
+# compilers add one for it.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "shortcut_keys"
+name = "Shortcut Keys"
+
+[physical]
+base = "iso"
+
+[keys]
+KeyQ = { shortcut_key = "KeyA" }
+KeyA = { shortcut_key = "KeyQ" }
+KeyZ = { shortcut_key = "KeyC" }
+KeyX = { shortcut_key = "KeyC" }
+KeyB = { shortcut_key = "Space" }
+
+[[layers]]
+id = "base"
+required = []
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "a" }, KeyW = { text = "z" }, KeyA = { text = "q" }, KeyZ = { text = "w" }, KeyX = { text = "x" }, KeyC = { text = "c" }, KeyB = { text = "b" } }
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "A" }, KeyW = { text = "Z" }, KeyA = { text = "Q" }, KeyZ = { text = "W" }, KeyX = { text = "X" }, KeyC = { text = "C" }, KeyB = { text = "B" } }
+
+[[layers]]
+id = "command"
+required = ["meta"]
+optional = ["shift"]
+keys = { KeyQ = { text = "a" }, KeyW = { text = "z" }, KeyA = { text = "q" }, KeyZ = { text = "w" }, KeyX = { text = "x" }, KeyC = { text = "c" }, KeyB = { text = "b" } }
+
+[exports.windows]
+locale = "fr-FR"
+layout_id = "0000040c"
+dll_name = "kbdshort"

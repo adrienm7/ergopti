@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local lfs = require("lfs")
 
 local OWNED_MODULES = {
 	"platform.remap.defaults",
@@ -15,56 +16,60 @@ local OWNED_MODULES = {
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
-	"infra.timings",
-	"adapters.timer_scheduler",
-	"infra.config_paths",
+	"platform.input.hotkey_registrar",
+	"core.timing.engine.timings",
+	"core.events.timer_scheduler",
+	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"platform.remap.onboarding",
 	"platform.remap",
-	"infra.logger",
-	"infra.i18n",
-	"infra.notifications",
-	"infra.text_utils",
+	"core.logger.engine.logger",
+	"core.i18n.engine.i18n",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
 	"platform.remap.ke_paths",
-	"adapters.task_lifecycle",
-	"infra.keycodes",
-	"modules.gestures.actions",
-	"adapters.key_state",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"core.process.adapters.task_lifecycle",
+	"platform.input.keycodes",
+	"gestures.engine.actions",
+	"platform.input.key_state",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
-	"adapters.json_codec",
-	"adapters.shell_runner",
-	"infra.deferred_work",
+	"core.fs.adapters.json_codec",
+	"core.process.adapters.shell_runner",
+	"core.timing.engine.deferred_work",
 	"platform.remap.lease_contract",
 	"modules.keymap.layout",
-	"adapters.file_system",
-	"infra.fs_dir",
-	"adapters.event_provenance",
-	"adapters.storage",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.dir",
+	"diagnostics.adapters.event_provenance",
+	"core.fs.adapters.storage",
 	"platform.remap.managed_rule_removal",
 }
 
 --- Runs native construction and every retained callback before restoring state.
 --- @param run function Receives the scoped fixture constructors and observers.
 return function(run, dependencies)
-	return helpers.with_stub_scope(OWNED_MODULES, function()
+	local config_dir = os.tmpname(); assert(os.remove(config_dir)); assert(lfs.mkdir(config_dir))
+	local results = table.pack(xpcall(helpers.with_stub_scope, debug.traceback, OWNED_MODULES, function()
 		if dependencies ~= nil then
 			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
-			package.loaded["adapters.file_system"] = dependencies.files
+			package.loaded["core.fs.adapters.file_system"] = dependencies.files
 		end
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
+		-- This fixture models a Mac on the shared runtime: a file that names no
+		-- runtime reads as shared here, while Ergopti's own runtime is the product default.
+		RealConfig.RUNTIME_DEFAULT = "shared"
 
 		local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
 
@@ -147,6 +152,8 @@ return function(run, dependencies)
 				combo_symmetric = false,
 			}
 			package.loaded["platform.remap.config"] = {
+				-- The boot reads this when a file names no runtime (a first launch).
+				RUNTIME_DEFAULT = RealConfig.RUNTIME_DEFAULT,
 				load_available_actions = function()
 					if options.empty_data then return {} end
 					if type(options.real_action_catalogue_path) == "string" then
@@ -155,7 +162,9 @@ return function(run, dependencies)
 					return { { id = "none" } }
 				end,
 				load_tap_hold_keys = function() return { { id = "left_shift" } } end,
-				load_mod_combos = function() return { { id = "left_shift+right_shift" } } end,
+				-- A real combination when the caller writes the shared tap_hold.toml,
+				-- which names a combination by its pair id.
+				load_mod_combos = function() return { { id = options.mod_combo_id or "left_shift+right_shift" } } end,
 				compute_non_canonical_combos = function() return {} end,
 				load_user_config = function(tap_hold_keys, mod_combos)
 					if type(options.real_user_config_path) == "string" then
@@ -167,6 +176,8 @@ return function(run, dependencies)
 					end
 					if options.config_error then return nil, "error" end
 					return {
+						-- This fixture models a Mac on the shared runtime; owned is the default.
+						runtime = "shared",
 						enabled = options.initially_enabled ~= false,
 						tap_hold_config = {},
 						mod_combos_config = {},
@@ -214,9 +225,9 @@ return function(run, dependencies)
 			}
 			-- Controlled source port for the shared copy planner. The original save
 			-- callback and its failure/counter contract remain the publication port.
-			local CopyCodec = require("toml_codec")
-			local CopyWriter = require("toml_codec.writer")
-			local CopyPolicy = require("tap_hold.key_combinations")
+			local CopyCodec = require("core.text.engine.toml_codec")
+			local CopyWriter = require("core.text.engine.toml_codec.writer")
+			local CopyPolicy = require("tap_hold.engine.key_combinations")
 			local copy_config = package.loaded["platform.remap.config"]
 			local original_save = copy_config.save_user_config
 			calls.copy_source = ""
@@ -264,6 +275,10 @@ return function(run, dependencies)
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.
 				key_combinations_enabled = function(state)
+					if type(state.key_combinations_enabled) == "boolean" then return state.key_combinations_enabled end
+					return true
+				end,
+				chords_enabled = function(state)
 					if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
 					return true
 				end,
@@ -433,13 +448,13 @@ return function(run, dependencies)
 				stop_input_source_watcher = function() return true end,
 				stop_alt_tab_apps_tracker = function() return true end,
 			}
-			package.loaded["adapters.hotkey_registrar"] = {
+			package.loaded["platform.input.hotkey_registrar"] = {
 				unbind = function()
 					calls.unbound = calls.unbound + 1
 					return options.unbind_succeeds ~= false
 				end,
 			}
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			local timer_scheduler = {}
 			function timer_scheduler.after(delay, callback)
 				calls.timer_after_attempts = calls.timer_after_attempts + 1
@@ -477,11 +492,13 @@ return function(run, dependencies)
 				return true
 			end
 			function timer_scheduler.every() return { committed = false, fired = true }, false end
-			package.loaded["adapters.timer_scheduler"] = timer_scheduler
-			-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-			package.loaded["infra.config_paths"] = {
+			package.loaded["core.events.timer_scheduler"] = timer_scheduler
+			-- layers.toml, read at every regeneration, lives in get_config_dir(); none
+			-- at start. The folder exists, as the product's does, so choosing the
+			-- layer hold imports the recommended layer the way a Mac would.
+			package.loaded["settings.engine.paths"] = {
 				get = function() return "missing-config.toml" end,
-				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+				get_config_dir = function() return config_dir end,
 			}
 			package.loaded["modules.keystats.kc_bridge"] = {
 				refresh_managed_set = function()
@@ -494,7 +511,7 @@ return function(run, dependencies)
 					return true
 				end,
 			}
-			package.loaded["modules.gestures.engine"] = {}
+			package.loaded["gestures.engine.engine"] = {}
 			package.loaded["modules.shortcuts"] = {
 				is_paused = function() return paused_now end,
 			}
@@ -613,13 +630,14 @@ return function(run, dependencies)
 			local saved_hs = _G.hs
 			local absent_module = {}
 			local isolated_module_names = {
-				"infra.logger",
-				"infra.i18n",
-				"infra.notifications",
-				"infra.text_utils",
+				"core.logger.engine.logger",
+				"core.i18n.engine.i18n",
+				"core.ui.engine.notifications",
+				"core.text.engine.utils",
 				"platform.remap.ke_paths",
-				"adapters.timer_scheduler",
-				"adapters.task_lifecycle",
+				"core.events.timer_scheduler",
+				"core.process.adapters.task_lifecycle",
+				"platform.remap.network_download",
 				"platform.remap.onboarding",
 			}
 			local saved_modules = {}
@@ -669,10 +687,10 @@ return function(run, dependencies)
 
 			local function noop() end
 			_G.hs = hs_stub
-			package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.text_utils"] = {
+			package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, has = function() return false end }
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
+			package.loaded["core.text.engine.utils"] = {
 				applescript_format = function(format, value) return string.format(format, value) end,
 				escape_gsub_replacement = function(value) return value end,
 				shell_quote = function(value) return value end,
@@ -682,7 +700,7 @@ return function(run, dependencies)
 				CORE_SERVICE = "/test/Karabiner-Core-Service",
 				GRABBER = "/test/karabiner_grabber",
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(delay, callback)
 					local timer = { callback = callback, cancelled = false, delay = delay }
 					installer.timers[#installer.timers + 1] = timer
@@ -694,7 +712,16 @@ return function(run, dependencies)
 				end,
 				every = function() return nil, false end,
 			}
-			package.loaded["adapters.task_lifecycle"] = nil
+			-- The DMG download's network route, in its production shell shape
+			-- (platform/remap/network_download.lua, NET-001).
+			package.loaded["platform.remap.network_download"] = {
+				command = function(tag, curl_args)
+					local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
+					for _, value in ipairs(curl_args) do args[#args + 1] = value end
+					return "/bin/sh", args, function() return nil end
+				end,
+			}
+			package.loaded["core.process.adapters.task_lifecycle"] = nil
 			package.loaded["platform.remap.onboarding"] = nil
 			local onboarding = require("platform.remap.onboarding")
 			onboarding.load_manifest = function()
@@ -749,7 +776,7 @@ return function(run, dependencies)
 				end
 			end
 
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind)
 					effects.notifications[#effects.notifications + 1] = {
 						title = title,
@@ -758,7 +785,7 @@ return function(run, dependencies)
 					}
 				end,
 			}
-			package.loaded["infra.keycodes"] = {
+			package.loaded["platform.input.keycodes"] = {
 				F13_KARABINER_RETURN = 0x6A,
 				F14_KARABINER_BACKSPACE = 0x6B,
 				F15_KARABINER_ESCAPE = 0x6C,
@@ -766,27 +793,27 @@ return function(run, dependencies)
 				RETURN = 0x24,
 				ESCAPE = 0x35,
 			}
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = {
 				get_label = function(name) return name end,
 				execute_single = function() return true end,
 				SG_NAMES = { "none", "script_pause_toggle" },
 				AX_NAMES = {},
 			}
-			package.loaded["adapters.key_state"] = {
+			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
-			package.loaded["modules.llm.warmup_controller"] = {
+			package.loaded["ai.engine.local_servers.warmup_controller"] = {
 				stop = record("warmup_stop"),
 				schedule_warmup_with_retry = record("warmup_resume"),
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				stop_warmup = record("mlx_stop"),
 				resume_warmup = record("mlx_resume"),
 			}
-			package.loaded["modules.llm.api_ollama"] = { stop_warmup = record("ollama_stop") }
-			package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+			package.loaded["ai.engine.api.ollama"] = { stop_warmup = record("ollama_stop") }
+			package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
 			package.loaded["ui.wpm.wpm_menubar"] = {
 				is_running = function() return false end,
 			}
@@ -799,7 +826,7 @@ return function(run, dependencies)
 					return true
 				end,
 			}
-			package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 			package.loaded["modules.keystats"] = {
 				resync_context = record("keystats_resync"),
 				log_shortcut = function() end,
@@ -807,8 +834,8 @@ return function(run, dependencies)
 
 			-- Bind both native timer owners to the same fresh hs run loop as script_control;
 			-- cached adapters would retain prior timers or an obsolete commitment contract.
-			package.loaded["adapters.synthetic_input"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["platform.input.synthetic_input"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 			local script_hs = hs
 			package.loaded["modules.shortcuts"] = {
@@ -865,5 +892,9 @@ return function(run, dependencies)
 			clone_payload = clone_payload,
 			count_notifications = count_notifications,
 		})
-	end)
+	end))
+	os.remove(config_dir .. "/layers.toml")
+	assert(lfs.rmdir(config_dir), "the fixture configuration folder holds only layers.toml")
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
 end

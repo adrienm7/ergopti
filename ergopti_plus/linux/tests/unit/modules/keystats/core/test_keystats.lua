@@ -247,6 +247,49 @@ helpers.describe("keystats", function()
       helpers.assert_true(type(data.apps) == "table")
       helpers.assert_true(data.session_started_ms ~= nil)
     end)
+    it("exports zero rolling speed after the typing window expires", function()
+      keystats.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keystats)
+      local now = require("core.logger.engine.monotonic").now_ms()
+      local window = require("core.timing.engine.timings").ms("keystats", "wpm_window_ms")
+      local first = now - window - 2000
+      keystats.on_keydown("a", first, "test-app")
+      keystats.on_keydown("b", first + 200, "test-app")
+      local data = keystats.export_session()
+      helpers.assert_eq(data.wpm, 0, "an expired typing burst must not remain a live speed")
+      helpers.assert_eq(data.keystrokes, 2)
+      helpers.assert_eq(data.duration_ms, 200, "pruning the rolling window preserves session duration")
+      local decoded = assert(require("core.text.engine.json").decode(keystats.export_json()))
+      helpers.assert_eq(decoded.wpm, 0)
+      helpers.assert_eq(keystats.export_session().duration_ms, 200, "later exports keep the same session duration")
+      keystats.on_keydown("c", now - 200, "test-app")
+      keystats.on_keydown("d", now - 50, "test-app")
+      helpers.assert_true(keystats.export_session().wpm > 0, "new typing starts a fresh rolling window")
+    end)
+    it("keystats-export-physical-map: preserves sparse and dense evdev codes as JSON objects", function()
+      keystats.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keystats)
+      keystats.record_physical_key("editor", 1, 100)
+      keystats.record_physical_key("editor", 30, 200)
+      local json = keystats.export_json()
+      local decoded = assert(require("core.text.engine.json").decode(json))
+      helpers.assert_eq(decoded.apps.editor.physical_scancodes["1"], 1)
+      helpers.assert_eq(decoded.apps.editor.physical_scancodes["30"], 1)
+      helpers.assert_true(json:find('"physical_scancodes":{', 1, true) ~= nil)
+    end)
+    it("keystats-export-physical-map: empty collections and dense codes retain object shape", function()
+      keystats.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keystats)
+      helpers.assert_true(keystats.export_json():find('"apps":{}', 1, true) ~= nil)
+      keystats.on_keydown("a", 100, "empty-physical")
+      keystats.record_physical_key("dense", 1, 200)
+      keystats.record_physical_key("dense", 2, 300)
+      local json = keystats.export_json()
+      local decoded = assert(require("core.text.engine.json").decode(json))
+      helpers.assert_true(json:find('"physical_scancodes":{}', 1, true) ~= nil)
+      helpers.assert_eq(decoded.apps.dense.physical_scancodes["1"], 1)
+      helpers.assert_eq(decoded.apps.dense.physical_scancodes["2"], 1)
+    end)
     it("export_json returns valid JSON string", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
@@ -277,6 +320,7 @@ helpers.describe("keystats", function()
       local fake_writer = {
         open_db = function() return true end,
         ensure_token_encoding = function() return true end,
+        ensure_awake_definition = function() return true end,
         register_device = function() return true end,
         read_open_walk = function() return nil, true end,
         upsert_open_walk = function() return true end,
@@ -455,6 +499,20 @@ helpers.describe("keystats", function()
       helpers.assert_true(type(payload.app_icons) == "table")
     end)
 
+    it("linux-unmeasured-kpis: the dashboard payload names each unmeasured KPI with its reason", function()
+      keystats.init({ sqlite_path = fresh_db() })
+      local SystemMetrics = require("modules.keystats.system.system_metrics")
+      local availability = SystemMetrics.space_change_availability()
+      local unmeasured = keystats.get_dashboard_payload({ include_prefetch = false }).driver_meta.unmeasured
+      helpers.assert_true(type(unmeasured) == "table", "the payload carries the unmeasured map")
+      if availability.measured == false then
+        helpers.assert_eq(unmeasured.space_switches, availability.reason,
+          "a zero this session cannot measure must reach the page with its reason")
+      else
+        helpers.assert_eq(unmeasured.space_switches, nil)
+      end
+    end)
+
     it("records hotstring output and its physical trigger separately", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
@@ -596,7 +654,7 @@ helpers.describe("keystats events_json controls are escaped (json-controls)", fu
     }, { __index = function() return function() return true end end })
     require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keystats.sqlite_writer"])
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -624,6 +682,18 @@ helpers.describe("keystats events_json controls are escaped (json-controls)", fu
 end)
 
 helpers.describe("manual-marker-chars", function()
+  it("manual-marker-chars: live reserved app labels use distinct manifest keys", function()
+		keystats.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		keystats.on_keydown("a", 1000, "_system")
+		keystats.on_keydown("b", 1100, "_sys")
+		keystats.on_keydown("c", 1200, "~app")
+		local today = os.date("%Y-%m-%d")
+		local day = keystats.get_dashboard_payload({ include_prefetch = false }).metrics_manifest[today]
+		helpers.assert_eq(day["~_system"].chars, 1)
+		helpers.assert_eq(day["~_sys"].chars, 1)
+		helpers.assert_eq(day["~~app"].chars, 1)
+	end)
   it("manual-marker-chars: public corrections preserve literal typed-character counts", function()
     keystats.init({ sqlite_path = fresh_db() })
     require("tests.support.metrics_consent_fixture").enable(keystats)
@@ -680,7 +750,7 @@ helpers.describe("physical-backspace-corrections", function()
     }, { __index = function() return function() return true end end })
     require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keystats.sqlite_writer"])
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -697,7 +767,7 @@ helpers.describe("physical-backspace-corrections", function()
       kl.flush()
       local row = captured[1] and captured[1][1]
       helpers.assert_true(row ~= nil, "the typed events must reach the writer")
-      local events = require("json").decode(row.events_json)
+      local events = require("core.text.engine.json").decode(row.events_json)
       helpers.assert_eq(#events, 3)
       helpers.assert_eq(events[2][1], "[BS]")
       helpers.assert_eq(events[2][2], 100, "the correction keeps its own inter-key delay")
@@ -711,6 +781,7 @@ helpers.describe("physical-backspace-corrections", function()
   end)
   it("physical-backspace-corrections: corrections leave the live speed unchanged", function()
     local function live_wpm(stream)
+      require("modules.keystats.sqlite_writer").close_db()
       keystats = helpers.load_module("modules.keystats.keystats")
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
@@ -725,6 +796,43 @@ helpers.describe("physical-backspace-corrections", function()
     helpers.assert_true(expected > 0, "the healthy control produces a speed")
     helpers.assert_eq(live_wpm(corrected), expected,
       "a held Backspace must not read as a burst of fast typing")
+  end)
+  -- MET-17 (decided by the maintainer on 2026-11-21): the live speed counts the
+  -- produced text, as macOS does; Linux added the whole output and kept the
+  -- erased trigger, so a hotstring read faster than the text on the page.
+  it("(met-17-2026-11-21) the live speed replays the shared produced-text vectors", function()
+    local path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json"
+    local file = assert(io.open(path, "r"), "live WPM produced-text vectors not found")
+    local data = assert(require("core.text.engine.json").decode(file:read("*a")))
+    file:close()
+    local base = 1000
+    local producers = {
+      hotstring = function(at, count, deletes)
+        keystats.record_hotstring("owned-produced", string.rep("t", deletes), string.rep("x", count),
+          at, "test", deletes)
+      end,
+      llm = function(at, count, deletes)
+        keystats.record_synthetic_output("owned-produced", string.rep("x", count), "llm", at, deletes, 0)
+      end,
+    }
+    for name, produce in pairs(producers) do
+      for _, case in ipairs(data.cases) do
+        require("modules.keystats.sqlite_writer").close_db()
+        keystats = helpers.load_module("modules.keystats.keystats")
+        keystats.init({ sqlite_path = fresh_db() })
+        require("tests.support.metrics_consent_fixture").enable(keystats)
+        keystats.reset_session()
+        for _, step in ipairs(case.steps) do
+          if step.typed then
+            keystats.on_keydown("a", base + step.at, "owned-produced")
+          else
+            produce(base + step.at, step.produced, step.deletes)
+          end
+        end
+        helpers.assert_eq(keystats.get_live_stats(base + case.read_at).wpm, case.wpm,
+          name .. " " .. case.id .. ": the readout counts the produced text")
+      end
+    end
   end)
   it("physical-backspace-corrections: corrections leave the session speed and n-grams unchanged", function()
     keystats.init({ sqlite_path = fresh_db() })
@@ -751,7 +859,7 @@ end)
 -- typed zero milliseconds after the previous one.
 helpers.describe("linux-cross-flush-walk", function()
   it("linux-cross-flush-walk: the flushes carry one session, one word and the pair across the cut", function()
-    local Monotonic = require("infra.monotonic")
+    local Monotonic = require("core.logger.engine.monotonic")
     local previous_writer = package.loaded["modules.keystats.sqlite_writer"]
     local previous_now = Monotonic.now_ms
     local now = 10000
@@ -780,7 +888,7 @@ helpers.describe("linux-cross-flush-walk", function()
     package.loaded["modules.keystats.sqlite_writer"] = writer
     local ok, err = pcall(function()
       Monotonic.now_ms = function() return now end
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
@@ -802,7 +910,7 @@ helpers.describe("linux-cross-flush-walk", function()
       helpers.assert_nil(words.hel)
       helpers.assert_nil(words.lo, "the refused snapshot's context was never adopted")
       helpers.assert_eq(bigrams.ll, 1, "the pair across the cut is counted once")
-      helpers.assert_eq(require("json").decode(typing[2].events_json)[1][2], 100,
+      helpers.assert_eq(require("core.text.engine.json").decode(typing[2].events_json)[1][2], 100,
         "the first key of a flush keeps its delay after the previous flush's last key")
       now = last + 300001
       helpers.assert_true(kl.flush(), "the settled session commits")
@@ -827,12 +935,12 @@ helpers.describe("linux-cross-flush-walk", function()
     require("tests.support.sqlite_flush_fake").attach(writer)
     package.loaded["modules.keystats.sqlite_writer"] = writer
     local ok, err = pcall(function()
-      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["core.fs.adapters.storage"] = Fakes.storage()
       package.loaded["modules.keystats.keystats"] = nil
       local kl = require("modules.keystats.keystats")
       kl.init({})
       require("tests.support.metrics_consent_fixture").enable(kl)
-      local Monotonic = require("infra.monotonic")
+      local Monotonic = require("core.logger.engine.monotonic")
       local at = math.floor(Monotonic.now_ms())
       kl.on_keydown("a", at, "owned-stop")
       kl.on_keydown("b", at + 100, "owned-stop")
@@ -850,6 +958,49 @@ helpers.describe("linux-cross-flush-walk", function()
 end)
 
 helpers.describe("live-source-projection", function()
+	it("does not reopen focus metrics for an excluded application", function()
+		keystats.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		helpers.assert_true(keystats.set_disabled_apps({ "excluded-app" }))
+		keystats.observe_hold_focus("excluded-app")
+		keystats.on_app_focus("excluded-app", 1000)
+		helpers.assert_nil(keystats.get_app_stats()["excluded-app"])
+		keystats.on_app_focus("allowed-app", 2000)
+		NativeFixture.flush(keystats)
+		helpers.assert_nil(keystats.get_app_stats()["excluded-app"])
+	end)
+
+	it("does not persist shortcuts from an excluded application", function()
+		keystats.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		helpers.assert_true(keystats.set_disabled_apps({ "excluded-app" }))
+		keystats.observe_hold_focus("excluded-app")
+		keystats.record_shortcut("excluded-app", "Ctrl+S", 1000)
+		keystats.record_shortcut("allowed-app", "Ctrl+S", 1000)
+		NativeFixture.flush(keystats)
+		local writer = require("modules.keystats.sqlite_writer")
+		helpers.assert_eq(writer.query_rows("SELECT app FROM events_shortcut;"), { "allowed-app" })
+	end)
+
+	it("keeps late logical metrics out of an excluded source application", function()
+		keystats.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		helpers.assert_true(keystats.set_disabled_apps({ "excluded-app" }))
+		keystats.on_app_focus("allowed-app", 1000)
+		keystats.record_suggestion("excluded-app", "llm", 1100)
+		keystats.record_hotstring("excluded-app", ";x", "private expansion", 1100)
+		keystats.record_synthetic_output("excluded-app", "private completion", "llm", 1100)
+		keystats.record_llm_event("excluded-app", "accepted", { prediction = "private completion" })
+		keystats.record_llm_event("allowed-app", "accepted", { prediction = "allowed" })
+		helpers.assert_nil(keystats.get_app_stats()["excluded-app"], "excluded source must not gain live metrics")
+		NativeFixture.flush(keystats)
+		local payload = keystats.get_range_payload()
+		helpers.assert_nil(payload.today["excluded-app"], "excluded source must not gain persisted metrics")
+		local writer = require("modules.keystats.sqlite_writer")
+		helpers.assert_eq(writer.query_rows("SELECT app FROM events_llm;"), { "allowed-app" },
+			"only the allowed application's LLM event may reach storage")
+	end)
+
 	local function fresh_live()
 		keystats = helpers.load_module("modules.keystats.keystats")
 		keystats.init({ sqlite_path = fresh_db() })
@@ -915,10 +1066,10 @@ end)
 -- Replayed terminators belong to the physical output journal, independently of
 -- the logical replacement used for hotstring counters and its event row.
 local function with_replayed_hotstring(options, callback)
-  local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "adapters.storage",
-    "modules.hotstrings.injector", "adapters.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
+  local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
+    "hotstrings.engine.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
-  local Monotonic = require("infra.monotonic")
+  local Monotonic = require("core.logger.engine.monotonic")
   local previous_now, now = Monotonic.now_ms, 10000
   local world = { typing = {}, hotstrings = {}, groups = {}, app_days = {}, document = "", wire = {} }
   local injector
@@ -939,14 +1090,14 @@ local function with_replayed_hotstring(options, callback)
     writer.upsert_app_day = function(_, _, _, fields) world.app_days[#world.app_days + 1] = fields; return true end
     require("tests.support.sqlite_flush_fake").attach(writer)
     package.loaded["modules.keystats.sqlite_writer"] = writer
-    package.loaded["adapters.storage"] = Fakes.storage()
+    package.loaded["core.fs.adapters.storage"] = Fakes.storage()
     package.loaded["modules.keystats.keystats"] = nil
     Monotonic.now_ms = function() return now end
     local collector = require("modules.keystats.keystats")
     assert(collector.init({ sqlite_path = "/controlled/replayed-hotstring.sqlite" }) ~= false)
     require("tests.support.metrics_consent_fixture").enable(collector)
     collector.reset_session()
-    package.loaded["adapters.keyboard_hook"] = { get_layout = function() return "qwerty" end,
+    package.loaded["platform.input.keyboard_hook"] = { get_layout = function() return "qwerty" end,
       held_text_modifier_codes = function() return {} end,
       held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
       emergency_stop = function() world.stopped = true end }
@@ -956,7 +1107,7 @@ local function with_replayed_hotstring(options, callback)
     local keys, text_of = {}, { [28] = "\n", [15] = "\t" }
     for char, code in pairs(codes) do keys[char] = { keycode = code, mods = {} }; text_of[code] = char end
     layout._set_table_for_test(keys)
-    injector = helpers.load_module("modules.hotstrings.injector")
+    injector = helpers.load_module("hotstrings.engine.injector")
     injector._set_nanosleep_for_test(function() end)
     injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
       world.wire[#world.wire + 1] = { code, value }
@@ -967,7 +1118,7 @@ local function with_replayed_hotstring(options, callback)
       end
       return true
     end })
-    local engine = require("hotstring_engine").new()
+    local engine = require("hotstrings.engine.matcher").new()
     assert(engine:load_mappings({ { trigger = "adn", replacement = "ADN", is_word = true,
       auto_expand = options.auto == true, is_private = options.private == true } }))
     local destination = { current = function() return true end, cached = function() return true end }
@@ -976,8 +1127,11 @@ local function with_replayed_hotstring(options, callback)
       Monotonic = Monotonic, _cached_app_id = "tail-editor",
       script_actions = { is_paused = function() return false end },
       secure_focus_guard = { capture_text_owner = function() return destination end,
-        blocks_text = function() return false end, invalidate = function() world.invalidated = true end },
-      WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+      current_context = function() return { app_id = "tail-editor", title = "Document", native_identity = "fixture:tail" } end,
+        blocks_text = function() return false end, invalidate = function() world.invalidated = true end,
+        text_automation = function() return true, "field", "field_admitted" end },
+      WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+      CommitFollowup = require("hotstrings.engine.commit_followup"),
       RepeatKey = { is_enabled = function() return false end },
       -- Main sizes the expansion delay from the physically held modifiers.
       keyboard_hook = { held_modifiers = function() return {} end },
@@ -1000,7 +1154,7 @@ local function with_replayed_hotstring(options, callback)
     assert(collector.flush(), "the real collector must commit its actual journal and derived walk")
     world.events = {}
     for _, row in ipairs(world.typing) do
-      for _, event in ipairs(require("json").decode(row.events_json)) do world.events[#world.events + 1] = event end
+      for _, event in ipairs(require("core.text.engine.json").decode(row.events_json)) do world.events[#world.events + 1] = event end
     end
     world.collector = collector
     callback(world)
@@ -1076,7 +1230,7 @@ helpers.describe("hotstring journal retains the replayed terminator", function()
       with_replayed_hotstring({ tail = " ", consumed = true }, function(world)
         world.collector.record_hotstring("tail-editor", "tag", "ADN", 20000, "dynamic", 3, false, tail or nil)
         helpers.assert_true(world.collector.flush())
-        local events = require("json").decode(world.typing[#world.typing].events_json)
+        local events = require("core.text.engine.json").decode(world.typing[#world.typing].events_json)
         helpers.assert_eq(#events, tail and 7 or 6)
         if tail then
           helpers.assert_eq(events[#events][1], tail)

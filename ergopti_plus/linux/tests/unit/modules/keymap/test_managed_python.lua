@@ -40,12 +40,26 @@ local function machine(options)
 		end,
 		download = function(url, path, bytes, callback)
 			world.downloads[#world.downloads + 1] = { url = url, path = path, bytes = bytes }
+			local operation = { started = true, closed = false, listeners = {} }
+			function operation:is_settled() return self.closed end
+			function operation:settled_result() return self.result end
+			function operation:on_settled(fn)
+				self.listeners[#self.listeners + 1] = fn
+				if self.closed then fn() end
+				return true
+			end
 			world.pending = function()
 				world.files[path] = true
-				callback({ ok = (options.status or 200) == 200, status = options.status or 200 })
+				operation.result = { ok = (options.status or 200) == 200, status = options.status or 200 }
+				callback(operation.result)
+				world.retire = function()
+					operation.closed = true
+					for _, listener in ipairs(operation.listeners) do listener() end
+				end
+				if not options.hold_physical then world.retire() end
 			end
 			if not options.hold then world.pending() end
-			return true
+			return true, operation
 		end,
 		size = function(path) return world.files[path] and (options.bytes or archive.bytes) or nil end,
 		sha256 = function(_, callback) callback(options.digest or archive.sha256, nil) end,
@@ -55,7 +69,10 @@ local function machine(options)
 			if options.interpreter ~= false then world.files[into .. "/python/bin/python3"] = true end
 			callback(true)
 		end,
-		ensure_dir = function() return true end,
+		create_stage = function(root)
+			local path = root .. ".staging.fixture"
+			return path, function() return true end
+		end,
 		remove_tree = function(path, callback)
 			world.removed[#world.removed + 1] = path
 			for file in pairs(world.files) do
@@ -115,9 +132,32 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		h.assert_eq(world.offered, archive.bytes)
 		h.assert_eq(world.downloads[1].url, archive.url)
 		h.assert_eq(world.downloads[1].bytes, archive.bytes, "the download is capped at the pinned size")
-		h.assert_eq(world.renamed[1], { from = ROOT_GNU .. ".staging", to = ROOT_GNU })
+		h.assert_eq(world.renamed[1], { from = ROOT_GNU .. ".staging.fixture", to = ROOT_GNU })
 		h.assert_true(world.files[ROOT_GNU .. "/python/bin/python3"])
 		h.assert_nil(world.files[ROOT_GNU .. "/archive.tar.gz"], "the archive is not published")
+	end)
+
+	h.it("preserves a pre-existing staging directory owned by another installation", function()
+		local deps, world = machine()
+		local marker = ROOT_GNU .. ".staging/another-owner"
+		world.files[marker] = true
+		local result = ensure(deps)
+		h.assert_true(result.ok)
+		h.assert_true(world.files[marker], "an existing staging directory must never be removed")
+	end)
+
+	h.it("does not remove or publish a staging directory replaced during download", function()
+		local deps, world = machine({ hold = true })
+		local retained = true
+		deps.create_stage = function(root) return root .. ".staging.fixture", function() return retained end end
+		local result, Managed = ensure(deps)
+		retained = false
+		world.pending()
+		h.assert_eq(result.calls, 1)
+		h.assert_eq(result.ok, false)
+		h.assert_eq(result.value, Managed.FAILURE_PUBLISH)
+		h.assert_eq(#world.removed, 0)
+		h.assert_eq(#world.renamed, 0)
 	end)
 
 	h.it("(managed-python) an installed interpreter is answered without a question or a download", function()
@@ -169,7 +209,7 @@ h.describe("Ergopti's own Python (managed-python)", function()
 			h.assert_eq(result.ok, false)
 			h.assert_eq(result.value, Managed[case[3]])
 			h.assert_nil(world.files[ROOT_GNU .. "/python/bin/python3"], "no unverified interpreter is published")
-			h.assert_eq(world.removed[#world.removed], ROOT_GNU .. ".staging")
+			h.assert_eq(world.removed[#world.removed], ROOT_GNU .. ".staging.fixture")
 		end)
 	end
 
@@ -187,4 +227,81 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		h.assert_eq(outcomes[1], outcomes[2])
 		h.assert_true(outcomes[1][1])
 	end)
+	for _, status in ipairs({ 200, 404 }) do
+		h.it("delivers all Python installation waiters when one callback raises (HTTP " .. status .. ")", function()
+			local deps, world = machine({ hold = true, status = status })
+			local Managed = h.load_module("modules.keymap.managed_python")
+			Managed._reset_for_test()
+			local answered = 0
+			Managed.ensure(deps, function() error("first waiter failed") end)
+			Managed.ensure(deps, function(ok) answered = answered + 1; h.assert_eq(ok, status == 200) end)
+			local returned = pcall(world.pending)
+			h.assert_true(returned, "a waiter cannot interrupt settlement")
+			h.assert_eq(answered, 1)
+		end)
+	end
+
+	h.it("retains a refused download until its physical settlement", function()
+		local deps, world = machine()
+		local operation = { started = false, closed = false, listeners = {} }
+		function operation:is_settled() return self.closed end
+		function operation:settled_result() return { ok = false, status = 0, error = "shutdown" } end
+		function operation:on_settled(fn) self.listeners[#self.listeners + 1] = fn; if self.closed then fn() end; return true end
+		deps.download = function() return false, operation end
+		local Managed = h.load_module("modules.keymap.managed_python")
+		Managed._reset_for_test()
+		local outcomes = {}
+		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
+		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
+		h.assert_eq(#outcomes, 0, "refusal does not acknowledge native retirement")
+		h.assert_eq(#world.removed, 0, "staging must remain until the transport closes")
+		operation.closed = true
+		for _, listener in ipairs(operation.listeners) do listener() end
+		h.assert_eq(#outcomes, 2)
+		h.assert_eq(outcomes[1], { false, Managed.FAILURE_DOWNLOAD })
+		h.assert_eq(outcomes[2], outcomes[1])
+		h.assert_eq(#world.removed, 1)
+	end)
+
+	h.it("answers an already settled refused download without a logical callback", function()
+		local deps = machine()
+		local operation = { started = false }
+		function operation:is_settled() return true end
+		function operation:settled_result() return { ok = false, status = 0, error = "shutdown" } end
+		function operation:on_settled(fn) fn(); return true end
+		deps.download = function() return false, operation end
+		local result, Managed = ensure(deps)
+		h.assert_eq(result.calls, 1)
+		h.assert_eq(result.ok, false)
+		h.assert_eq(result.value, Managed.FAILURE_DOWNLOAD)
+	end)
+
+	h.it("waits for native HTTP retirement after logical success before unpacking", function()
+		local deps, world = machine({ hold = true, hold_physical = true })
+		local result = ensure(deps)
+		world.pending()
+		h.assert_eq(result.calls, 0)
+		h.assert_eq(world.unpacked, 0)
+		world.retire()
+		h.assert_eq(result.calls, 1)
+		h.assert_true(result.ok)
+		h.assert_eq(world.unpacked, 1)
+	end)
+
+	h.it("retains staging if settlement subscription invokes inline then refuses", function()
+		local deps, world = machine()
+		local operation = { started = false, listener = nil }
+		function operation:is_settled() return true end
+		function operation:settled_result() return { ok = false, status = 0 } end
+		function operation:on_settled(fn) self.listener = fn; fn(); return false end
+		deps.download = function() return false, operation end
+		local result, Managed = ensure(deps)
+		h.assert_eq(result.calls, 0)
+		h.assert_eq(#world.removed, 0)
+		operation.listener()
+		h.assert_eq(result.calls, 0, "a refused subscription cannot later authorize cleanup")
+		h.assert_eq(#world.removed, 0)
+		Managed._reset_for_test()
+	end)
+
 end)

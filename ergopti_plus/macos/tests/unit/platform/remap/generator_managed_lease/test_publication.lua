@@ -338,7 +338,7 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 		with_fixture(function(fixture)
 			local Generator = fixture.Generator
 			local decisions = {}
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local previous_info = logger.info
 			logger.info = function(_, format_string, ...)
 				local line = string.format(format_string, ...)

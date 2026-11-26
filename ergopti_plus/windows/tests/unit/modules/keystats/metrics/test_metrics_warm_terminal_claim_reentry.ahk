@@ -107,7 +107,6 @@ _MWTCR_Exercise(World) {
 _MWTCR_Case() {
 	global _SharedDir, KLPF_LAST_JSON, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	static Serial := 0
 	PreviousCritical := Critical("On")
 	try {
@@ -147,7 +146,6 @@ _MWTCR_Case() {
 				AssertFalse(FSStrictExists(Path), "never adopt another owner's hashed sidecar")
 			SidecarsReady := true
 			_ResetLogger()
-			LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 			_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 			KLWV.windows := Map(), KLPFWorker.jobs := Map(), KLPF_LAST_JSON := Map(), Installed := true
 			KLPFWorker.spawn_fn := _MWI_Spawn.Bind(World), KLPFWorker.publish_fn := 0

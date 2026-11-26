@@ -1,4 +1,4 @@
-// AUTO-GENERATED from _shared/data/identifiers.json.
+// AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 // DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 
 // Application names, bundle ids, service labels and external hosts for the
@@ -9,7 +9,8 @@ const ERGOPTI_IDENTIFIERS = Object.freeze({
 		name: 'ErgoptiPlus',
 		ahk: 'ErgoptiPlus.ahk',
 		exe: 'ErgoptiPlus.exe',
-		bundle: 'ErgoptiPlus.app'
+		bundle: 'ErgoptiPlus.app',
+		display_name: 'Ergopti+'
 	}),
 	bundle_ids: Object.freeze({
 		launcher: 'com.ergoptiplus.app',
@@ -41,6 +42,7 @@ const ERGOPTI_IDENTIFIERS = Object.freeze({
 	field_report: Object.freeze({
 		branch_prefix: 'field/',
 		folder: 'docs/field-reports',
-		base_config_key: 'ergoptiFieldBase'
+		base_config_key: 'ergoptiFieldBase',
+		environment: 'ERGOPTI_FIELD_RUN_ROOT'
 	})
 });

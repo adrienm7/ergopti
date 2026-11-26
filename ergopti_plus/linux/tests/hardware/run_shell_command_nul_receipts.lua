@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 assert(uv.getuid() ~= 0, "native shell byte checks require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-shell-command-nul-XXXXXX"))
 local target = root .. "/retained"

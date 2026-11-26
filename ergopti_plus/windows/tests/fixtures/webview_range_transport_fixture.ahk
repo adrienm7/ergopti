@@ -10,9 +10,9 @@
 #Include ../../vendor/ComVar.ahk
 #Include ../../vendor/Promise.ahk
 #Include ../../vendor/WebView2.ahk
-#Include ../../infra/json.ahk
-#Include ../../infra/text_utils.ahk
-#Include ../../adapters/webview_profiles.ahk
+#Include ../../core/text/engine/json.ahk
+#Include ../../core/text/engine/utils.ahk
+#Include ../../core/ui/adapters/webview_profiles.ahk
 #Include ../../modules/keystats/keystats_webview_range_script.ahk
 #Include ../../modules/keystats/keystats_webview_range_mount.ahk
 

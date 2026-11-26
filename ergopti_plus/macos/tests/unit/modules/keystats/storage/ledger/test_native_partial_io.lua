@@ -15,7 +15,7 @@ if arg and arg[0] and arg[0]:match("test_native_partial_io%.lua$") then
 end
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
 
 local function verify(cache_loss)
@@ -33,14 +33,14 @@ with tempfile.TemporaryDirectory(prefix="ergopti-ledger-partial-") as temporary:
     cache=folder/"ergopti_metrics/device";cache.mkdir(parents=True)
     ledger=device/"data.sql";database=cache/"db.sqlite"
     prefix="-- canonical existing prefix\nBEGIN TRANSACTION;\n"
-    prefix+="INSERT OR IGNORE INTO events_system VALUES ('device',0,'2026-10-19 12:00:00','2026-10-19','sleep','{}');\nCOMMIT;\n"
+    prefix+="INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('device',0,'2026-10-19 12:00:00','2026-10-19','sleep','{}');\nCOMMIT;\n"
     batch="\n-- === ingest batch 2026-10-20 12:00:00.000 (offset 0 -> 123, 100 entry(ies)) ===\nBEGIN TRANSACTION;\n"
-    batch+="".join("INSERT OR IGNORE INTO events_system VALUES ('device',%d,'2026-10-20 12:00:00','2026-10-20','wake','{\"pad\":\"%s\"}');\n"%(i,"x"*80) for i in range(1,101))+"COMMIT;\n"
+    batch+="".join("INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('device',%d,'2026-10-20 12:00:00','2026-10-20','wake','{\"pad\":\"%s\"}');\n"%(i,"x"*80) for i in range(1,101))+"COMMIT;\n"
     ledger.write_text(prefix)
     (device/"device.json").write_text(json.dumps({"device_id":"device","host_signature":"fixture-host-identity"}))
     with sqlite3.connect(database) as db:
         for name in ("schema.sql","media_schema.sql"):
-            db.executescript((root/"static/ergopti_plus/_shared/data/db"/name).read_text())
+            db.executescript((root/"static/ergopti_plus/_shared/metrics/data/db"/name).read_text())
         db.execute("INSERT OR REPLACE INTO meta VALUES('local_data_sql_outbox',?)",(batch,))
     def run(phase):
         os.environ["ERGOPTI_LEDGER_IO_PHASE"]=phase
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix="ergopti-ledger-partial-") as temporary:
     if case=="cache_loss":
         assert result["events"]==101 and result["cursor"]==123 and result["timers"]==1,result
     with sqlite3.connect(":memory:") as db:
-        db.executescript((root/"static/ergopti_plus/_shared/data/db/schema.sql").read_text())
+        db.executescript((root/"static/ergopti_plus/_shared/metrics/data/db/schema.sql").read_text())
         db.executescript(ledger.read_text())
         assert db.execute("SELECT COUNT(*) FROM events_system").fetchone()[0]==101
     assert resource.getrlimit(resource.RLIMIT_FSIZE)==limits,"parent limits changed"

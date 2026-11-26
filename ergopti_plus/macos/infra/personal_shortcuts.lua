@@ -28,10 +28,10 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
-local FileSystem = require("adapters.file_system")
-local text_utils = require("infra.text_utils")
-local DeferredWork = require("infra.deferred_work")
+local Logger = require("core.logger.engine.logger")
+local FileSystem = require("core.fs.adapters.file_system")
+local text_utils = require("core.text.engine.utils")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local LOG    = "personal_shortcuts"
 
 
@@ -87,7 +87,7 @@ local TEMPLATE = [[
 --- Resolve the absolute path via the central menu_paths module.
 --- No local fallback — menu_paths handles defaults internally.
 local function resolve_path()
-	local MenuPaths = require("infra.config_paths")
+	local MenuPaths = require("settings.engine.paths")
 	return MenuPaths.get("PersonalShortcutsLuaPath")
 end
 

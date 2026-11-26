@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local TEXT_ENTRY_ID = "vision-cerebras"
 local TEXT_MODEL = "qwen-3.8-27b"
 local VISION_ENTRY_ID = "vision-openai"
@@ -50,13 +50,12 @@ local function build_world()
 		local_gets = {}, alerts = {}, installs = {},
 	}
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
-	local _gestures = helpers.load_with_stubs("modules.gestures")
-	world.actions = require("modules.gestures.actions")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
+	world.actions = require("gestures.engine.actions")
 	world.actions.init({ action_params = {} })
 	local front_app = {
 		title = function() return "VisionApp" end,
@@ -65,21 +64,21 @@ local function build_world()
 		path = function() return "/Applications/Vision.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
-		"modules.llm.screen_answer",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
+		"ai.engine.prediction.screen_answer",
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end, window_mode_admits = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -88,7 +87,7 @@ local function build_world()
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -112,6 +111,7 @@ local function build_world()
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function()
 			world.hides = world.hides + 1
 			return true
@@ -121,7 +121,7 @@ local function build_world()
 			return true
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, message, first, second)
 			world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second } }
 			return first
@@ -140,7 +140,7 @@ local function build_world()
 		screen_frame_under_cursor = function() return { x = 1512, y = 0, w = 1920, h = 1080.5 } end,
 	}
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	world.core = core
 	local CoreState = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(CoreState) == "table", "the LLM core state must be reachable")
@@ -173,7 +173,7 @@ local function build_world()
 	local vision = get_upvalue(api.request_vision, "_vision_client")
 	assert(type(vision) == "table", "the remote vision owner must be reachable")
 	vision.post = capture_into(world.vision_posts)
-	local ollama = require("modules.llm.api_ollama")
+	local ollama = require("ai.engine.api.ollama")
 	local local_vision = get_upvalue(ollama.request_vision, "_vision_client")
 	assert(type(local_vision) == "table", "the local vision owner must be reachable")
 	local_vision.post = capture_into(world.local_posts)
@@ -181,13 +181,13 @@ local function build_world()
 		world.local_gets[#world.local_gets + 1] = { url = url, headers = headers, callback = callback }
 		return true
 	end
-	local offer = require("modules.llm.local_model_offer")
+	local offer = require("ai.engine.ollama.local_model_offer")
 	offer.set_installer(function(model)
 		world.installs[#world.installs + 1] = model
 		return true
 	end)
 
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	world.engine = engine
 	engine.init({
 		buffer = "",
@@ -199,13 +199,13 @@ local function build_world()
 		suppress_rescan_keep_buffer = function() end,
 	})
 	engine.set_llm_enabled(true)
-	world.flow = require("modules.llm.screen_answer")
-	package.loaded["modules.keymap"] = {
+	world.flow = require("ai.engine.prediction.screen_answer")
+	package.loaded["hotstrings.engine.expander"] = {
 		request_screen_answers = function(value, mode, parent, answers)
 			return world.flow.run(value, mode, parent, answers)
 		end,
 	}
-	world.language = require("modules.llm.profiles").prompt_language()
+	world.language = require("ai.engine.settings.profiles").prompt_language()
 	return world
 end
 

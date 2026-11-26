@@ -11,7 +11,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The phases and actions are the shared session's
----    (_shared/lua/updater/check_session.lua), identical on macOS: "checking",
+---    (_shared/updater/engine/check_session.lua), identical on macOS: "checking",
 ---    then the answer of modules/updater/manager.lua's check, with every other
 ---    channel whose latest release is newer than the installed build.
 --- 2. Update downloads and installs the offered release through the updater,
@@ -32,10 +32,10 @@
 local M = {}
 M.bridge_name = "update_check_bridge"
 
-local Json         = require("json")
-local Logger       = require("logger.shim")
-local CheckSession = require("updater.check_session")
-local Installation = require("infra.installation")
+local Json         = require("core.text.engine.json")
+local Logger       = require("core.logger.engine.shim")
+local CheckSession = require("updater.engine.check_session")
+local Installation = require("core.lifecycle.engine.installation")
 
 local LOG = "bridge.update_check"
 
@@ -76,7 +76,7 @@ local function push(message)
 		Logger.error(LOG, "An update-check message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	return require("ui.webview_manager").eval_js(APP,
+	return require("core.ui.ui.webview_manager").eval_js(APP,
 		"if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. json .. ")")
 end
 
@@ -93,10 +93,12 @@ function M.download_offered(updater, release, ctx)
 		Logger.info(LOG, "Update refused: the release was found through the public feed, which names no installable asset.")
 		return false
 	end
-	-- A system package is updated by its package manager: downloading a release
-	-- the updater will then refuse to install only ends in an ERROR.
-	if type(updater.installation_kind) == "function" and updater.installation_kind() == "package" then
-		Logger.info(LOG, "Update refused: a system package is updated by its package manager.")
+	-- A system package, an AppImage or a Flatpak is updated by its own updater:
+	-- downloading a release the updater will then refuse to install only ends in
+	-- an ERROR.
+	local kind = type(updater.installation_kind) == "function" and updater.installation_kind() or nil
+	if require("modules.updater.install_origin").update_blocked_key(kind) then
+		Logger.info(LOG, "Update refused: this %s installation is updated by its own updater.", tostring(kind))
 		return false
 	end
 	local state = updater.get_state()
@@ -108,7 +110,7 @@ function M.download_offered(updater, release, ctx)
 	local channel = updater.get_channel()
 	local owner = { active = false, terminal = false, attempt = 0, failed_download = false }
 	local session_id
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	local DownloadWindow = require("ui.download_window.bridge")
 	local function current()
 		if serial ~= _offer_serial or owner.cancelled or owner.succeeded
@@ -132,16 +134,20 @@ function M.download_offered(updater, release, ctx)
 	end
 	local function diagnostics_available()
 		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		if shell.has_command("xdg-open") ~= true then return false end
-		local file = io.open(require("infra.logger_sink").main_log_path(), "rb")
-		return file ~= nil and file:close() == true
+		local file = require("core.fs.engine.regular_file_reader").open(require("core.logger.engine.sink").main_log_path())
+		if not file then return false end
+		local closed, accepted = pcall(file.close, file)
+		return closed and accepted == true and current()
 	end
 	local completion_hook = ctx.on_update_finished
+	--- Hands the outcome to the menu hook; true only when it armed the restart.
 	local function finished(installed, stage)
-		if type(completion_hook) ~= "function" then return end
-		local ok = pcall(completion_hook, installed, tag, stage)
+		if type(completion_hook) ~= "function" then return false end
+		local ok, restarted = pcall(completion_hook, installed, tag, stage)
 		if not ok then Logger.error(LOG, "The bound update-completion hook raised.") end
+		return ok and restarted == true
 	end
 	local function dispatch(retry)
 		if not current() or owner.active or (retry and not can_retry()) then return false end
@@ -154,19 +160,28 @@ function M.download_offered(updater, release, ctx)
 			completed = true
 			owner.active, owner.terminal, owner.installing = false, true, false
 			owner.succeeded = installed
-			owner.failed_download = archive == nil and stage ~= "verify"
+			-- A refused check (digest, signature) is no failed transfer to retry
+			local transfer_failed = archive == nil and stage ~= "verify" and stage ~= "signature"
+			owner.failed_download = transfer_failed
 			if installed then Logger.success(LOG, "Update %s installed.", tag)
 			else Logger.error(LOG, "Update %s failed at the %s: %s.", tag,
 				archive and "install" or (stage or "download"), tostring(err)) end
+			-- The restart is tried before the window says it happens (UPD-09)
+			local restarted = finished(installed, archive and "install" or (stage or "download"))
+			if installed and not restarted then
+				Logger.error(LOG, "Update %s is installed but the restart on it was refused; the old daemon keeps running.", tag)
+			end
 			if session_id ~= nil then
 				DownloadWindow.complete(session_id, installed, installed
-					and I18n.get("updater.installed_restarting"):gsub("{1}", function() return tag end)
-					or (stage == "verify"
-						and I18n.get("changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
+					and I18n.get(restarted and "updater.installed_restarting" or "updater.installed_restart_refused")
+						:gsub("{1}", function() return tag end)
+					or ((stage == "verify" or stage == "signature")
+						-- A refused signature is named as one (UPD-10)
+						and I18n.get(stage == "signature" and "changelog_window.install_error_signature"
+							or "changelog_window.install_error_verify"):gsub("{tag}", function() return tag end)
 						or I18n.get(archive and "updater.install_error" or "updater.install_error_download")),
-					archive == nil and stage ~= "verify" and failure_receipt or nil)
+					transfer_failed and failure_receipt or nil)
 			end
-			finished(installed, archive and "install" or (stage or "download"))
 		end
 		local function done(archive, err, stage, failure_receipt)
 			if serial ~= _offer_serial or attempt ~= owner.attempt or owner.terminal or owner.cancelled then return end
@@ -179,14 +194,12 @@ function M.download_offered(updater, release, ctx)
 			local native_install = updater.install_update_async
 			if type(native_install) == "function" then
 				owner.installing = true
-				local window_admit = DownloadWindow.install_admission_current
+				-- The offer's own consent admits the install, never the window: a
+				-- closed or unopened download window leaves the update to finish, as
+				-- on Windows; only its Cancel stops it (UPD-05, decided by the agent
+				-- on 2026-11-21, to review by the maintainer).
 				local function admit_install()
-					if type(window_admit) ~= "function" or session_id == nil or not current()
-						or serial ~= _offer_serial or attempt ~= owner.attempt or not owner.installing then return false end
-					local checked, admitted = pcall(window_admit, session_id)
-					return checked and admitted == true and current() and serial == _offer_serial
-						and attempt == owner.attempt and owner.installing
-						and package.loaded["ui.download_window.bridge"] == DownloadWindow
+					return current() and serial == _offer_serial and attempt == owner.attempt and owner.installing
 				end
 				local constructing, admitted, seen, early = true, false, false, nil
 				local function install_completed(installed, detail, receipt)
@@ -212,9 +225,20 @@ function M.download_offered(updater, release, ctx)
 				finish_attempt(updater.install_update(archive) == true, archive, err, stage, failure_receipt)
 			end
 		end
+		-- The download's progress reaches its window (UPD-07): a percentage of the
+		-- size GitHub declares, or only « Downloading… » without one
+		local last_percent = nil
+		local function progress(bytes)
+			if session_id == nil or attempt ~= owner.attempt or owner.terminal or type(bytes) ~= "number" then return end
+			local size = tonumber(release.size)
+			local percent = size and size > 0 and math.floor(math.min(bytes / size, 1) * 100) or nil
+			if percent ~= nil and percent == last_percent then return end
+			last_percent = percent
+			DownloadWindow.update(session_id, percent, I18n.get("menu.about.update_downloading"))
+		end
 		local started
-		if retry then started = updater.download_release(release, done)
-		else started = updater.download_update(url, done) end
+		if retry then started = updater.download_release(release, done, nil, progress)
+		else started = updater.download_update(url, done, progress) end
 		if started ~= true and not owner.terminal then done(nil, "update dispatch refused", "download") end
 		return started == true
 	end
@@ -231,7 +255,7 @@ function M.download_offered(updater, release, ctx)
 		end,
 		on_diagnostics = ctx.on_open_today_log, can_open_diagnostics = diagnostics_available,
 	})
-	if session_id == nil then Logger.warn(LOG, "The download window could not open; the update downloads without it.") end
+	if session_id == nil then Logger.warn(LOG, "The download window could not open; the update downloads and installs without it.") end
 	Logger.start(LOG, "Downloading the update %s…", tag)
 	return dispatch(false)
 end
@@ -250,10 +274,13 @@ end
 --- @param updater table modules.updater.manager
 --- @return table session
 local function new_session(updater)
-	local manager = require("ui.webview_manager")
-	return CheckSession.new({
+	local manager = require("core.ui.ui.webview_manager")
+	local session
+	session = CheckSession.new({
 		push = push,
 		check = function(channel, on_result)
+			-- Publishing "checking" can synchronously retire this session.
+			if _session ~= session then return false end
 			local dispatched = updater.check_for_updates(channel, function(_, _, _, result)
 				on_result(result)
 				hook("on_menu_changed")
@@ -284,7 +311,7 @@ local function new_session(updater)
 		end,
 		open_changelog = function() return manager.show("changelog") == true end,
 		report = function(result, complete, current)
-			return require("ui.error_dialog.bridge").report({
+			return require("diagnostics.ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),
@@ -295,7 +322,7 @@ local function new_session(updater)
 		-- The notes pane's links: the session checked them against the repository
 		repository = updater.repo_info,
 		open_url = function(url)
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			if not Shell.has_command("xdg-open") then
 				Logger.error(LOG, "xdg-open is unavailable: the release link cannot be opened.")
 				return false
@@ -313,13 +340,20 @@ local function new_session(updater)
 			return open() == true
 		end,
 		close = function()
-			if _session ~= nil then _session.retire() end
-			_session = nil
-			manager.hide(APP)
+			if _session ~= session then return end
+			if manager.hide(APP) ~= true then
+				Logger.warn(LOG, "The update-check window could not close; its session is retained.")
+				return
+			end
+			if _session == session then
+				_session = nil
+				session.retire()
+			end
 		end,
-		log_path = function() return require("infra.logger_sink").main_log_path() end,
+		log_path = function() return require("core.logger.engine.sink").main_log_path() end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
+	return session
 end
 
 
@@ -349,7 +383,7 @@ function M.open(ctx)
 	-- Windows. Starting a check would replace the pending answer with a failure
 	if _session ~= nil and _session.result() == nil then
 		_ctx = ctx
-		if require("ui.webview_manager").show(APP) ~= true then
+		if require("core.ui.ui.webview_manager").show(APP) ~= true then
 			Logger.error(LOG, "The update-check window could not be shown again.")
 			return false
 		end
@@ -365,17 +399,23 @@ function M.open(ctx)
 	-- A click while the window shows an answer checks again, over the updater
 	-- and hooks of the menu that asked; the replaced session's late answer is
 	-- ignored
-	if _session ~= nil then _session.retire() end
+	local previous = _session
+	if previous ~= nil then
+		previous.retire()
+		if _session ~= previous then return false end
+	end
 	_ctx = ctx
 	local session = new_session(ctx.updater)
 	_session = session
-	if require("ui.webview_manager").show(APP) ~= true then
+	if require("core.ui.ui.webview_manager").show(APP) ~= true then
+		if _session == session then _session = nil end
 		session.retire()
-		_session = nil
 		Logger.error(LOG, "The update-check window could not open.")
 		return false
 	end
+	if _session ~= session then return false end
 	session.start()
+	if _session ~= session then return false end
 	Logger.success(LOG, "Update-check window opened.")
 	return true
 end
@@ -394,8 +434,9 @@ end
 
 --- Forgets the session when the user closes the window with its close box.
 function M.on_window_closed()
-	if _session ~= nil then _session.retire() end
+	local previous = _session
 	_session = nil
+	if previous ~= nil then previous.retire() end
 end
 
 --- Test seam: forgets the session and the context.

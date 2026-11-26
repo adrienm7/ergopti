@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local ASSET = "ergopti-plus-linux.tar.gz"
 local DIGEST = string.rep("ab", 32)
@@ -39,6 +39,29 @@ local function release(tag, with_bundle)
 		html_url = "https://github.com/adrienm7/ergopti/releases/tag/" .. tag, body = "notes", assets = assets }
 end
 
+--- The fake public feed of a window whose API is unavailable: dev.142 is the
+--- channel's newest release, dev.141 an older one.
+local function feed_xml(tags)
+	local entries = {}
+	for _, tag in ipairs(tags) do
+		entries[#entries + 1] = '<entry><id>tag:github.com,2008:Repository/1/' .. tag .. '</id>'
+			.. '<updated>2026-11-01T10:00:00Z</updated>'
+			.. '<link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/'
+			.. tag .. '"/><title>' .. tag .. '</title></entry>'
+	end
+	return '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
+		.. table.concat(entries) .. '</feed>'
+end
+local FEED = feed_xml({ "v0.0.0-dev.142", "v0.0.0-dev.141", "v0.0.0-dev.139" })
+
+--- The throwaway key and the signed record of the "archive" bundle the stubs serve.
+local function feed_vectors()
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/updater/feed_install_vectors.json", "rb"))
+	local raw = handle:read("*a")
+	handle:close()
+	return Json.decode(raw)
+end
+
 local LIST = Json.encode({
 	release("v0.0.0-dev.141", false),
 	release("v0.0.0-dev.140", true),
@@ -49,7 +72,7 @@ local LIST = Json.encode({
 --- they do not qualify native FD sealing, HTTP, hashing or tar installation.
 local function native_fixture(ctx, options)
 	local dependency = {}
-	for _, name in ipairs({ "infra.archive_output", "infra.monotonic" }) do
+	for _, name in ipairs({ "infra.archive_output", "core.logger.engine.monotonic" }) do
 		dependency[name] = { value = package.loaded[name] }
 	end
 	local owners, now = {}, 0.25
@@ -168,7 +191,7 @@ local function native_fixture(ctx, options)
 	end
 	-- Literal portable clock port, isolated to this model's module cache.
 	-- The production monotonic backend is neither replaced globally nor qualified here.
-	package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+	package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
 		backend = function() return "luv.hrtime" end, now_ms = function() return now end }
 	package.loaded["infra.archive_output"] = { native_artifact = make_artifact }
 	ctx.manager._http_client.get_owned = function(url, headers, opts, done)
@@ -203,13 +226,13 @@ local function native_fixture(ctx, options)
 		bind_document_clock = function()
 			-- The authentic document fixture owns this clock after its handshake.
 			-- Delegate that same model time to the unit-only native capability port.
-			local clock = package.loaded["infra.monotonic"]
+			local clock = package.loaded["core.logger.engine.monotonic"]
 			assert(type(clock) == "table")
 			local read, hires = rawget(clock, "now_ms"), rawget(clock, "has_hires")
 			assert(type(read) == "function" and type(hires) == "function" and hires() == true)
 			now = read()
 			assert(type(now) == "number" and now >= 0 and now < math.huge)
-			package.loaded["infra.monotonic"] = {
+			package.loaded["core.logger.engine.monotonic"] = {
 				has_hires = hires,
 				backend = function() return "luv.hrtime" end, -- Explicit modeled capability, not native evidence.
 				now_ms = function() now = read(); return now end,
@@ -224,7 +247,8 @@ local function native_fixture(ctx, options)
 end
 
 --- Builds the real bridge over the real manager with every effect recorded.
---- @param opts table|nil { version, source_run, kind, digest, feed, backup_fails }
+--- @param opts table|nil { version, source_run, kind, digest, feed, feed_xml, feed_key,
+---   signature, backup_fails }
 --- @return table ctx
 local function harness(opts)
 	opts = opts or {}
@@ -238,7 +262,7 @@ local function harness(opts)
 	package.loaded["infra.version"] = setmetatable({ VERSION = opts.version or "0.0.0-dev.140" },
 		{ __index = RealVersion })
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local manager = helpers.load_module("modules.updater.manager")
@@ -255,6 +279,15 @@ local function harness(opts)
 	end
 	manager._http_client = {
 		get = function(url, _, _, callback)
+			if url:sub(-4) == ".sig" then
+				event("signature:" .. url)
+				if opts.signature then
+					callback({ ok = true, status = 200, body = opts.signature .. "\n" })
+				else
+					callback({ ok = false, status = 404, error = "HTTP 404" })
+				end
+				return true
+			end
 			event("checksum:" .. url)
 			callback({ ok = true, status = 200, body = DIGEST .. "  " .. ASSET .. "\n" })
 			return true
@@ -278,6 +311,20 @@ local function harness(opts)
 		cancel = function() return true end,
 	}
 	ctx.manager = manager
+	if opts.feed_key then
+		-- The shipped signing policy with the fixture's throwaway key (or no key
+		-- at all for ""), enforcement as shipped: each case states its key, so
+		-- the maintainer's provisioned key changes no fixture verdict.
+		local policy = Json.decode(assert(io.open(helpers.driver_root()
+			.. "/../_shared/updater/data/asset_signing.json", "rb")):read("*a"))
+		policy.public_key_spki_base64 = opts.feed_key
+		manager._signature_gate = require("modules.updater.signature_gate").new({
+			verifier = require("infra.asset_signature"),
+			read_policy = function() return policy end,
+			asset_name = ASSET,
+			logger = require("core.logger.engine.shim"),
+		})
+	end
 	ctx.native_fixture = native_fixture(ctx, opts)
 	local bridge = helpers.load_module("ui.changelog.bridge")
 	bridge._push = function(payload) ctx.pushes[#ctx.pushes + 1] = payload; return true end
@@ -310,8 +357,16 @@ local function harness(opts)
 		end,
 	}
 	ctx.state = {
-		restart_after_update = function() event("restart"); return true end,
-		restart = function(reason) event("restart:" .. reason); return true end,
+		restart_after_update = function()
+			event("restart")
+			if opts.update_restarts then return table.remove(opts.update_restarts, 1) end
+			return true
+		end,
+		restart = function(reason)
+			event("restart:" .. reason)
+			if opts.restart == "throw" then error("restart raised") end
+			return opts.restart ~= false
+		end,
 	}
 	ctx.bridge = bridge
 	function ctx.restore_modules()
@@ -328,7 +383,7 @@ local function harness(opts)
 		bridge._http_get = function(url, _, _, callback)
 			if url:find("releases.atom", 1, true) and not fed then
 				fed = true
-				callback(200, "<feed></feed>", nil)
+				callback(200, opts.feed_xml or "<feed></feed>", nil)
 			else
 				callback(0, "", "blocked")
 			end
@@ -364,6 +419,16 @@ local function index_of(list, prefix)
 end
 
 helpers.describe("changelog_bridge: one-click release install", function()
+	helpers.it("does not install the previous list during a release refresh", function()
+		local ctx = harness()
+		ctx.bridge._http_get = function() return true end
+		ctx.bridge.on_message({ action = "fetch", channel = "dev" }, ctx.state)
+		local answer = ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
+		local events = #ctx.events
+		ctx.restore_modules()
+		helpers.assert_eq(events, 0, "a pending fetch must not authorize the old release")
+		helpers.assert_eq(answer.reason_key, "changelog_window.install_error_unknown_release")
+	end)
 	helpers.it("announces the installed build and the restorable backup when the page is ready", function()
 		local ctx = harness({ latest = { id = "pre-install-b", created_at = "2026-09-30T10:00:00Z", tag = "v1" } })
 		ctx.restore_modules()
@@ -391,6 +456,35 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		helpers.assert_eq(ctx.backup_meta.tag, "v0.0.0-dev.139")
 		helpers.assert_eq(ctx.backup_meta.from_version, "0.0.0-dev.140")
 		helpers.assert_eq(progress(ctx)[4].backup_path, "/cfg/backups/pre-install-x")
+	end)
+
+	-- The release was installed but a refused daemon restart reported it failed,
+	-- with a retry over the installed files and no way to restart on it (MUR-001).
+	helpers.it("holds an installed release whose daemon restart is refused (release-restart-pending)", function()
+		local ctx = harness({ update_restarts = { false, false, true } })
+		local redraws = 0
+		ctx.bridge.set_pending_install_observer(function() redraws = redraws + 1 end)
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
+		local held_phases = phases(ctx)
+		local held = ctx.bridge.pending_install()
+		local reopened = ctx.bridge.on_message({ action = "fetch", channel = "dev" }, ctx.state)
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.141", channel = "dev" }, ctx.state)
+		local refused_phases, installs = phases(ctx), #ctx.installs
+		ctx.bridge.on_message({ action = "complete_install_restart" }, ctx.state)
+		local still = ctx.bridge.pending_install()
+		local completed = ctx.bridge.complete_pending_install()
+		local after = ctx.bridge.pending_install()
+		ctx.restore_modules()
+		helpers.assert_eq(held_phases, "backing_up,downloading,installing,restarting,restart_pending")
+		helpers.assert_eq(held, { tag = "v0.0.0-dev.139", backup_path = "/cfg/backups/pre-install-x" })
+		helpers.assert_eq(reopened.install.pending, held, "a window opened later shows the waiting release")
+		helpers.assert_eq(refused_phases, held_phases .. ",restart_pending", "a second install is refused meanwhile")
+		helpers.assert_eq(installs, 1, "the refused second install installs nothing")
+		helpers.assert_eq(still.tag, "v0.0.0-dev.139", "a second refused restart keeps it waiting")
+		helpers.assert_eq(completed, true, "the tray row completes it")
+		helpers.assert_eq(after, nil)
+		helpers.assert_eq(phases(ctx), refused_phases .. ",restart_pending,restarting")
+		helpers.assert_eq(redraws, 2, "the tray redraws when the wait starts and when it ends")
 	end)
 
 	helpers.it("refuses a release without the Linux bundle, keeping the backup", function()
@@ -440,11 +534,72 @@ helpers.describe("changelog_bridge: one-click release install", function()
 	end)
 
 	helpers.it("refuses to install from the Atom feed, which lists no files", function()
-		local ctx = harness({ feed = true })
+		local ctx = harness({ feed = true, feed_key = "" })
 		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" }, ctx.state)
 		ctx.restore_modules()
 		helpers.assert_eq(#ctx.events, 0)
 		helpers.assert_eq(progress(ctx)[1].reason_key, "changelog_window.install_error_no_details")
+	end)
+
+	-- Decided 2026-11-06 (align on macOS): a feed-only list installs the
+	-- channel's newest release, under its conventional asset names, once the
+	-- downloaded bundle's size and SHA-256 match a signature of the pinned key.
+	helpers.it("(feed-only-install) installs the feed's newest release once its signature verifies", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+			signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		local base = "https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.142/" .. ASSET
+		helpers.assert_eq(phases(ctx), "backing_up,downloading,installing,restarting")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "checksum:")], "checksum:" .. base .. ".sha256")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "signature:")], "signature:" .. base .. ".sig")
+		helpers.assert_eq(ctx.events[index_of(ctx.events, "download:")], "download:" .. base)
+		helpers.assert_eq(#ctx.installs, 1)
+		helpers.assert_eq(ctx.installs[1].expected_version, "v0.0.0-dev.142")
+	end)
+
+	helpers.it("(feed-only-install) refuses the feed's newest release whose signature does not verify", function()
+		local V = feed_vectors()
+		for _, signature in ipairs({ false, (V.linux.signature_base64:gsub("^.", "A")) }) do
+			local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+				signature = signature or nil })
+			ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+			ctx.restore_modules()
+			helpers.assert_eq(#ctx.installs, 0, "nothing installs without a verified signature")
+			helpers.assert_nil(index_of(ctx.events, "restart"))
+			local last = progress(ctx)[#progress(ctx)]
+			helpers.assert_eq(last.reason_key, "changelog_window.install_error_feed_signature")
+			helpers.assert_eq(last.backup_path, "/cfg/backups/pre-install-x")
+		end
+	end)
+
+	helpers.it("(feed-only-install) refuses an older feed row, and every row without a key", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, feed_key = V.public_key_spki_base64,
+			signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.141", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		helpers.assert_eq(#ctx.events, 0, "an older row backs nothing up and downloads nothing")
+		helpers.assert_eq(progress(ctx)[1].reason_key, "changelog_window.install_error_feed_not_newest")
+		local unkeyed = harness({ feed = true, feed_xml = FEED, feed_key = "", signature = V.linux.signature_base64 })
+		unkeyed.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, unkeyed.state)
+		unkeyed.restore_modules()
+		helpers.assert_eq(#unkeyed.events, 0, "a keyless policy: the refusal stays")
+		helpers.assert_eq(progress(unkeyed)[1].reason_key, "changelog_window.install_error_no_details")
+	end)
+
+	-- The shipped policy holds the maintainer's key with enforcement off: a feed
+	-- row still installs only on a signature of that key, and the fixture's
+	-- throwaway signature is not one.
+	helpers.it("(feed-only-install) the shipped key refuses a feed row it did not sign", function()
+		local V = feed_vectors()
+		local ctx = harness({ feed = true, feed_xml = FEED, signature = V.linux.signature_base64 })
+		ctx.bridge.on_message({ action = "install_release", tag = "v0.0.0-dev.142", channel = "dev" }, ctx.state)
+		ctx.restore_modules()
+		helpers.assert_eq(#ctx.installs, 0, "nothing installs on a foreign signature")
+		helpers.assert_nil(index_of(ctx.events, "restart"))
+		helpers.assert_eq(progress(ctx)[#progress(ctx)].reason_key, "changelog_window.install_error_feed_signature")
 	end)
 
 	helpers.it("restores a backup and restarts the daemon on it", function()
@@ -464,17 +619,30 @@ helpers.describe("changelog_bridge: one-click release install", function()
 		helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
 		helpers.assert_nil(index_of(ctx.events, "restart"), "a failed restore restarts nothing")
 	end)
+
+	-- (restore-restart-refused) The disk is restored but the daemon did not take
+	-- the restart: the page must not promise one (Linux LC-001).
+	for _, mode in ipairs({ false, "throw" }) do
+		helpers.it("reports a refused restore restart as failed (" .. tostring(mode) .. ")", function()
+			local ctx = harness({ restart = mode })
+			local answer = ctx.bridge.on_message({ action = "restore_backup", id = "pre-install-x" }, ctx.state)
+			ctx.restore_modules()
+			helpers.assert_eq(answer.phase, "failed")
+			helpers.assert_eq(answer.reason_key, "changelog_window.restore_error_unexpected")
+			helpers.assert_eq(answer.backup_path, "/cfg/backups/pre-restore-y")
+		end)
+	end
 end)
 
 helpers.describe("updater: nothing installs without a click (Linux)", function()
 	helpers.it("a background check announces a newer release and downloads nothing", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local saved = {}
-		for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+		for _, name in ipairs({ "core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager" }) do
 			saved[name] = package.loaded[name]
 		end
 		local timers = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			HAS_ASYNC = true,
 			after = function(delay, fn)
 				local handle = { armed = true, delay = delay, fn = fn }
@@ -483,7 +651,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 			end,
 			cancel = function(handle) handle.armed = false; return true end,
 		}
-		package.loaded["adapters.storage"] = Fakes.storage({ initial = {} })
+		package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 		package.loaded["modules.updater.manager"] = nil
 		local M = require("modules.updater.manager")
 		local Installer = require("modules.updater.installer")
@@ -507,7 +675,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 		local config_path = os.tmpname()
 		pcall(os.remove, config_path)
 		-- An installed build: the checkout the suite runs from checks for nothing.
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, err = pcall(function()

@@ -1,5 +1,5 @@
 {
-	"description": "Hand-checked .keylayout fixtures and the canonical form (schema 1, documented in _shared/lua/layouts/keylayout.lua) every parser must produce from them. 'error' fixtures must be refused, a malformed tag of an element the readers walk included. Replayed by the macOS and Linux Lua suites, the Python converter tests and the AutoHotkey suite; the web composer replays it when it adopts the form. Real layouts: composed.canonical.json (the composer corpus layout) and, for every registry layout, tools/test/test-keylayout-canonical-parity.cjs.",
+	"description": "Hand-checked .keylayout fixtures and the canonical form (schema 1, documented in _shared/layouts/engine/composer/keylayout.lua) every parser must produce from them. 'error' fixtures must be refused, a malformed tag of an element the readers walk included. Replayed by the macOS and Linux Lua suites, the Python converter tests and the AutoHotkey suite; the web composer replays it when it adopts the form. Real layouts: composed.canonical.json (the composer corpus layout) and, for every registry layout, tools/test/test-keylayout-canonical-parity.cjs.",
 	"vectors": [
 		{
 			"name": "everything: modifiers, bases, duplicates, entities, comments",

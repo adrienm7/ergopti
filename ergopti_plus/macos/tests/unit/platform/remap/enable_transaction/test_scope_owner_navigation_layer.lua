@@ -274,7 +274,7 @@ helpers.describe("macOS remap cohort source races", function()
 		with_fixture(function(fixture)
 			local remap, _, disk = cohort_remap(fixture)
 			helpers.assert_true(request(remap, "tap_holds", "recommended", "/remap/cohort-race-1"))
-			local files, base = require("adapters.file_system"), require("adapters.file_system").read_with_status
+			local files, base = require("core.fs.adapters.file_system"), require("core.fs.adapters.file_system").read_with_status
 			local reads = 0
 			files.read_with_status = function(path)
 				if path == LAYERS then
@@ -294,7 +294,7 @@ helpers.describe("macOS remap cohort source races", function()
 		with_fixture(function(fixture)
 			local remap, _, disk = cohort_remap(fixture)
 			helpers.assert_true(request(remap, "tap_holds", "recommended", "/remap/cohort-race-2"))
-			require("adapters.file_system").remove_exact = function() return true end
+			require("core.fs.adapters.file_system").remove_exact = function() return true end
 			disk.terminal(false, "candidate-failed")
 			helpers.assert_eq(remap.settings_pending(), true)
 			helpers.assert_eq(disk.files[LAYERS], preset())
@@ -307,7 +307,7 @@ helpers.describe("macOS remap cohort source races", function()
 			local remap, calls, disk = cohort_remap(fixture)
 			local snapshot, receipt = committed_layer_scope(remap, disk)
 			local saves = calls.save
-			require("adapters.file_system").remove_exact = function(path)
+			require("core.fs.adapters.file_system").remove_exact = function(path)
 				disk.files[path], disk.unreadable = nil, true
 				return true
 			end
@@ -327,7 +327,7 @@ helpers.describe("macOS remap cohort source races", function()
 			local remap, calls, disk = cohort_remap(fixture)
 			local snapshot, receipt = committed_layer_scope(remap, disk)
 			local saves = calls.save
-			require("adapters.file_system").remove_exact = function(path)
+			require("core.fs.adapters.file_system").remove_exact = function(path)
 				disk.files[path], disk.unreadable = nil, true
 				return false, "controlled refusal after partial removal"
 			end
@@ -369,7 +369,7 @@ helpers.describe("macOS parent inverse removal-release debt", function()
 			local snapshot, receipt = committed_layer_scope(remap, disk)
 			local blocked, cleanup_calls, outcomes = true, 0, {}
 			local saves = calls.save
-			require("adapters.file_system").remove_if_unchanged = function(path, expected)
+			require("core.fs.adapters.file_system").remove_if_unchanged = function(path, expected)
 				helpers.assert_eq(path, LAYERS)
 				helpers.assert_eq(expected.content, disk.files[path])
 				return false, "unlink refused without effect; release retained", function()

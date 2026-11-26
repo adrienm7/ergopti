@@ -26,24 +26,33 @@ local M = {}
 --- @param expected table Independent { default, named, decorated } captions.
 --- @param bypass boolean|nil Causal control routes through the original generic port.
 function M.run(assert_eq, driver, compose, expected, bypass)
-	local names = { "adapters.application_notifier", "adapters.notifier", "application_notifier",
-		"window_titles", "adapters.shell_runner", "infra.i18n", "infra.logger", "logger.shim" }
+	local names = { "platform.focus.application_notifier", "platform.system.notifier", "platform.focus.application_notifier_core",
+		"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.logger.engine.shim" }
 	local previous, previous_hs = {}, _G.hs
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local commands, notes, native_mode = {}, {}, "accept"
 	local native_callback
 	local logger = { info = function() end, warn = function() end, error = function() end }
-	package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		return key == "common.warning" and "Warning" or "Error"
 	end }
-	package.loaded["window_titles"] = { compose = compose }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.ui.engine.window_titles"] = { compose = compose }
+	package.loaded["core.process.adapters.shell_runner"] = {
 		has_command = function() return native_mode ~= "unavailable" end,
 		quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
-		run = function(command)
-			commands[#commands + 1] = command
-			return native_mode ~= "refuse"
+		run = function() error("notify-send runs as an argv, never a shell line") end,
+		-- Linux starts notify-send through run_async (NUI-003): options are
+		-- rendered bare and operands quoted; "refuse" is a refused spawn.
+		run_async = function(executable, args, _options, callback)
+			local words = { executable }
+			for index, arg in ipairs(args) do
+				words[#words + 1] = index <= 4 and arg or ("'" .. tostring(arg):gsub("'", "'\\''") .. "'")
+			end
+			commands[#commands + 1] = table.concat(words, " ")
+			if native_mode == "refuse" then return nil, "spawn refused" end
+			callback({ ok = true, code = 0 })
+			return { cancel = function() return true end, on_settled = function() return true end }
 		end,
 	}
 	_G.hs = { notify = { new = function(first, properties)
@@ -59,11 +68,11 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 		notes[#notes + 1] = note
 		return note
 	end } }
-	package.loaded["adapters.application_notifier"] = nil
-	package.loaded["adapters.notifier"] = nil
+	package.loaded["platform.focus.application_notifier"] = nil
+	package.loaded["platform.system.notifier"] = nil
 	local ok, detail = xpcall(function()
-		local generic = require("adapters.notifier")
-		local application = require("adapters.application_notifier")
+		local generic = require("platform.system.notifier")
+		local application = require("platform.focus.application_notifier")
 		if bypass then application = generic end
 		if driver == "macos" then
 			assert_eq(generic.send("Literal title", { body = "Literal body" }), true)
@@ -94,14 +103,14 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			assert_eq(application.send("Bare label", options), false)
 		else
 			assert_eq(generic.send("Literal body", { title = "Literal title", level = "warning" }), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=normal --expire-time=5000 -- '⚠ Literal title' 'Literal body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=normal --expire-time=5000 -- '⚠ Literal title' 'Literal body'")
 			assert_eq(generic.send("Literal body"), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=low --expire-time=5000 -- 'Ergopti+' 'Literal body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=low --expire-time=5000 -- 'Ergopti+' 'Literal body'")
 			assert_eq(application.send("Native body"), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=low --expire-time=5000 -- '" .. expected.default .. "' 'Native body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=low --expire-time=5000 -- '" .. expected.default .. "' 'Native body'")
 			local options = { title = "Bare label", level = "warning", onClick = function() end }
 			assert_eq(application.send("Native body", options), true)
-			assert_eq(commands[#commands], "notify-send --app-name='Ergopti+' --urgency=normal --expire-time=5000 -- '" .. expected.decorated .. "' 'Native body' >/dev/null 2>&1 &")
+			assert_eq(commands[#commands], "notify-send --app-name=Ergopti+ --urgency=normal --expire-time=5000 -- '" .. expected.decorated .. "' 'Native body'")
 			assert_eq(options.title, "Bare label")
 			assert_eq(options.level, "warning")
 			native_mode = "refuse"
@@ -109,7 +118,7 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			local count = #commands
 			assert_eq(application.send("", options), false)
 			assert_eq(#commands, count)
-			package.loaded["adapters.notifier"] = nil
+			package.loaded["platform.system.notifier"] = nil
 			native_mode = "unavailable"
 			assert_eq(application.send("Native body", options), false)
 			assert_eq(#commands, count)

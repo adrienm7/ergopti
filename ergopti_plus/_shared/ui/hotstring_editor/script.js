@@ -26,6 +26,11 @@ function _t(key) {
 let D = null;
 let TRIGGER_CHAR = '★';
 let STAR = '★';
+// The magic key as every UI shows it, « ★ (ù) » for another character
+// (_shared/hotstrings/data/magic_key.json display_format, pinned by
+// tools/test/test-magic-key-rules.cjs): never a bare ★ for another character,
+// never that character alone.
+const MAGIC_KEY_DISPLAY_FORMAT = '★ ({char})';
 
 let edSec = null;
 let edEntry = null;
@@ -36,6 +41,8 @@ let autoClose = false;
 let defaultSec = null;
 let defaultPrio = null;
 let openMode = 'menu';
+let rowIdentityMode = false;
+let nextNewRowId = 0;
 
 // Lower-cased, trimmed live filter applied to the entry list (trigger + output).
 let searchQuery = '';
@@ -110,14 +117,23 @@ function getCmdGroups() {
 // ====================================
 
 /**
- * Normalizes a raw token name into its canonical PascalCase representation.
+ * Normalizes known token aliases while preserving unknown literal brace text.
  * @param {string} name - The raw token name.
  * @returns {string} The normalized token name.
  */
 function normToken(name) {
-	const canonical = TOKEN_NORM[name.toLowerCase()];
-	if (canonical) return canonical;
-	return name.charAt(0).toUpperCase() + name.slice(1);
+	const key = name.toLowerCase();
+	return Object.hasOwn(TOKEN_NORM, key) ? TOKEN_NORM[key] : name;
+}
+
+/**
+ * How the configured magic key is shown: the marker alone when it is the marker.
+ * @param {string} char - Configured magic key.
+ * @returns {string} « ★ » or « ★ (char) ».
+ */
+function magicKeyDisplay(char) {
+	if (char === STAR) return STAR;
+	return MAGIC_KEY_DISPLAY_FORMAT.replace('{char}', char);
 }
 
 /**
@@ -128,6 +144,17 @@ function normToken(name) {
 function toDisplay(s) {
 	if (!s || TRIGGER_CHAR === STAR) return s || '';
 	return String(s).split(STAR).join(TRIGGER_CHAR);
+}
+
+/**
+ * Shows a stored string as a message or a read-only view does: each ★ becomes
+ * the magic key's display, « ★ (ù) ».
+ * @param {string} s - The internal string containing stars.
+ * @returns {string} The string as shown.
+ */
+function toShown(s) {
+	if (!s) return '';
+	return String(s).split(STAR).join(magicKeyDisplay(TRIGGER_CHAR));
 }
 
 /**
@@ -164,20 +191,57 @@ function toLua(action, data) {
 // ====================================
 // ====================================
 
+// The open dialogs, innermost last, each with the element that had the focus
+// when it opened. A confirmation can open over the entry form.
+const openModals = [];
+// What the keyboard can reach first in a dialog that has just opened.
+const MODAL_FOCUSABLE =
+	'button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
+	'[contenteditable="true"], summary';
+
 /**
- * Safely adds the 'on' class to display a modal.
- * @param {string} id - The modal container ID.
+ * Makes everything but the innermost open dialog inert, so Tab and a screen
+ * reader stay in the dialog (WCAG 2.4.3) and leave it only to the window's
+ * frame. The autocomplete popup serves the entry form and stays live.
  */
-function openModal(id) {
-	document.getElementById(id).classList.add('on');
+function syncModalInertness() {
+	const top = openModals.length ? document.getElementById(openModals.at(-1).id) : null;
+	for (const child of document.body.children) {
+		if (child.tagName === 'SCRIPT' || child.id === 'ac-popup') continue;
+		child.inert = top !== null && child !== top;
+	}
 }
 
 /**
- * Safely removes the 'on' class to hide a modal and resets related form states.
+ * Shows a dialog, keeps the keyboard inside it, and moves the focus into it
+ * unless the caller already did: a dialog opened from the keyboard was
+ * unreachable behind its overlay, and its Enter and Escape keys never fired.
+ * @param {string} id - The modal container ID.
+ */
+function openModal(id) {
+	const modal = document.getElementById(id);
+	if (!openModals.some((entry) => entry.id === id))
+		openModals.push({ id, opener: document.activeElement });
+	modal.classList.add('on');
+	syncModalInertness();
+	if (!modal.contains(document.activeElement)) {
+		const first = modal.querySelector(MODAL_FOCUSABLE);
+		if (first) first.focus();
+	}
+}
+
+/**
+ * Hides a dialog, resets its form state, and gives the focus back to the
+ * element that opened it when that element is still on the page.
  * @param {string} id - The modal container ID.
  */
 function closeModal(id) {
 	document.getElementById(id).classList.remove('on');
+	const index = openModals.findIndex((entry) => entry.id === id);
+	const closed = index >= 0 ? openModals.splice(index, 1)[0] : null;
+	syncModalInertness();
+	if (closed && closed.opener && closed.opener.isConnected && !closed.opener.closest('[inert]'))
+		closed.opener.focus();
 	if (id === 'entry-modal') clearEntryErrors();
 	if (id === 'sec-modal') clearSecErrors();
 }
@@ -200,22 +264,20 @@ let _confirmCb = null;
  * @param {Object} [opts] - Additional UI modifiers for the dialog.
  */
 function showConfirm(msg, fn, opts = {}) {
-	let titleHtml = '';
-	if (opts.isWarning) {
-		titleHtml =
-			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> ' +
-			(_t('common.warning') || 'Attention') +
-			'</div>';
-	}
-	document.getElementById('confirm-text').innerHTML =
-		titleHtml +
-		'<div style="font-size:13px;line-height:1.5;margin-bottom:16px;color:var(--text);">' +
-		msg +
-		'</div>';
+	// A warning is the dialog's heading and names it; the question describes it.
+	const title = document.getElementById('confirm-title');
+	const dialog = title.closest('[role="alertdialog"]');
+	title.textContent = opts.isWarning ? _t('common.warning') : '';
+	title.hidden = !opts.isWarning;
+	if (opts.isWarning) dialog.setAttribute('aria-labelledby', 'confirm-title');
+	else dialog.removeAttribute('aria-labelledby');
+	document.getElementById('confirm-text').innerHTML = msg;
 
 	const okBtn = document.getElementById('confirm-ok');
 	okBtn.textContent = opts.okLabel || _t('common.delete');
-	okBtn.style.background = opts.okColor || 'var(--danger)';
+	// Deep tones under the white label (7:1, WCAG 1.4.6): the system red and
+	// orange are too light for it.
+	okBtn.style.background = opts.okColor || 'var(--theme-hue-8a1a14)';
 
 	_confirmCb = fn;
 	openModal('confirm-modal');
@@ -279,7 +341,7 @@ function updateCbDescs() {
 		? (
 				_t('editor.hotstrings.desc_auto_on') ||
 				'Expands immediately (ideal for triggers ending with %s).'
-			).replace('%s', escapeHtml(TRIGGER_CHAR))
+			).replace('%s', escapeHtml(magicKeyDisplay(TRIGGER_CHAR)))
 		: _t('editor.hotstrings.desc_auto_off') ||
 			'Requires Space or Enter to expand (recommended for autocorrect).';
 
@@ -296,26 +358,11 @@ function updateCbDescs() {
 }
 
 /**
- * Updates visual hints explaining trigger characters.
+ * Shows the configured magic key on the button that inserts it.
  */
 function updateHints() {
-	const hint = document.getElementById('trig-hint');
-	if (hint) {
-		if (TRIGGER_CHAR !== STAR) {
-			hint.innerHTML =
-				'<span class="star-badge">' +
-				escapeHtml(TRIGGER_CHAR) +
-				'</span> ' +
-				(_t('editor.hotstrings.trig_hint_text') || 'shown, stored as') +
-				' <span class="star-badge">' +
-				escapeHtml(STAR) +
-				'</span>';
-		} else {
-			hint.textContent = '';
-		}
-	}
 	const mb = document.getElementById('magic-btn');
-	if (mb) mb.textContent = TRIGGER_CHAR;
+	if (mb) mb.textContent = magicKeyDisplay(TRIGGER_CHAR);
 }
 
 function updateCompactBtn() {
@@ -336,7 +383,7 @@ function toggleCompact() {
 function checkPh() {
 	const ed = document.getElementById('e-out');
 	const ph = document.getElementById('e-out-ph');
-	const isEmpty = ed.textContent.length === 0 && ed.innerHTML.indexOf('<span') === -1;
+	const isEmpty = ed.textContent.length === 0 && ed.innerHTML.indexOf('<kbd') === -1;
 	ph.style.display = isEmpty ? 'block' : 'none';
 }
 
@@ -346,8 +393,9 @@ function checkPh() {
 // ====================================
 // ====================================
 
+// A token of the output is a key or a command the engine types: kbd.
 function makeChip(name) {
-	const s = document.createElement('span');
+	const s = document.createElement('kbd');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.token = name;
@@ -356,11 +404,11 @@ function makeChip(name) {
 }
 
 function makeTrigChip() {
-	const s = document.createElement('span');
+	const s = document.createElement('kbd');
 	s.className = 'token-chip';
 	s.contentEditable = 'false';
 	s.dataset.trigChar = 'true';
-	s.textContent = TRIGGER_CHAR;
+	s.textContent = magicKeyDisplay(TRIGGER_CHAR);
 	return s;
 }
 
@@ -385,6 +433,13 @@ function serializeTrigEditor(el) {
 	return s.trim();
 }
 
+// Distinguish an intentional Enter command from WebKit's empty-editor BR.
+function makeEnterBreak() {
+	const br = document.createElement('br');
+	br.dataset.enter = 'true';
+	return br;
+}
+
 function parseToNodes(text) {
 	if (!text) return [document.createTextNode('')];
 	text = toDisplay(text);
@@ -395,7 +450,7 @@ function parseToNodes(text) {
 	while ((m = re.exec(text)) !== null) {
 		if (m.index > last) nodes.push(document.createTextNode(text.slice(last, m.index)));
 		const tname = normToken(m[1]);
-		if (tname === 'Enter') nodes.push(document.createElement('br'));
+		if (tname === 'Enter') nodes.push(makeEnterBreak());
 		else nodes.push(makeChip(tname));
 		last = re.lastIndex;
 	}
@@ -407,7 +462,12 @@ function serializeEditor(el) {
 	const nodes = Array.from(el.childNodes);
 	while (nodes.length > 0) {
 		const last = nodes[nodes.length - 1];
-		if (last.nodeType === 1 && last.tagName === 'BR' && !last.classList.contains('token-chip')) {
+		if (
+			last.nodeType === 1 &&
+			last.tagName === 'BR' &&
+			!last.dataset.enter &&
+			!last.classList.contains('token-chip')
+		) {
 			nodes.pop();
 		} else {
 			break;
@@ -440,7 +500,7 @@ function insertBrAtCursor() {
 	const ed = document.getElementById('e-out');
 	ed.focus();
 	let sel = window.getSelection();
-	const br = document.createElement('br');
+	const br = makeEnterBreak();
 	if (sel && sel.rangeCount) {
 		const r = sel.getRangeAt(0);
 		if (ed.contains(r.commonAncestorContainer)) {
@@ -549,7 +609,7 @@ function tryConvertToken(editor) {
 
 	if (tokenName === 'Enter') {
 		const anch = sel.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();
@@ -623,30 +683,40 @@ function showAc(matches) {
 		return;
 	}
 	const rect = sel.getRangeAt(0).getBoundingClientRect();
+	// A list box the output editor owns: the editor keeps the focus and names
+	// the highlighted suggestion through aria-activedescendant, so the arrow
+	// keys' choice is announced (WCAG 4.1.2).
 	matches.forEach((name, i) => {
-		const d = document.createElement('div');
-		d.className = 'ac-item' + (i === 0 ? ' active' : '');
-		d.textContent = name;
-		d.addEventListener('mousedown', (e) => {
+		const option = document.createElement('li');
+		option.className = 'ac-item' + (i === 0 ? ' active' : '');
+		option.id = 'ac-option-' + i;
+		option.setAttribute('role', 'option');
+		option.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+		option.textContent = name;
+		option.addEventListener('mousedown', (e) => {
 			e.preventDefault();
 			applyAc(name);
 		});
-		popup.appendChild(d);
+		popup.appendChild(option);
 	});
 	popup.style.left = rect.left + 'px';
 	popup.style.top = rect.bottom + 4 + 'px';
 	popup.classList.add('on');
+	document.getElementById('e-out').setAttribute('aria-activedescendant', 'ac-option-0');
 }
 
 function hideAc() {
 	document.getElementById('ac-popup').classList.remove('on');
 	acItems = [];
+	document.getElementById('e-out').removeAttribute('aria-activedescendant');
 }
 
 function updateAcSel() {
 	document.querySelectorAll('.ac-item').forEach((el, i) => {
 		el.classList.toggle('active', i === acIdx);
+		el.setAttribute('aria-selected', i === acIdx ? 'true' : 'false');
 	});
+	document.getElementById('e-out').setAttribute('aria-activedescendant', 'ac-option-' + acIdx);
 }
 
 function applyAc(name) {
@@ -664,7 +734,7 @@ function applyAc(name) {
 	if (normToken(name) === 'Enter') {
 		const sel2 = window.getSelection();
 		const anch = sel2.getRangeAt(0);
-		const br = document.createElement('br');
+		const br = makeEnterBreak();
 		anch.insertNode(br);
 		if (!br.nextSibling) br.parentNode.appendChild(document.createTextNode(''));
 		const nr = document.createRange();
@@ -744,6 +814,27 @@ function onDragEnd() {
 	cleanDrag();
 }
 
+/**
+ * Moves a section one place up or down from the keyboard, the way a drag
+ * does (WCAG 2.1.1, 2.5.7), keeps the focus on its handle and says where it
+ * now stands.
+ * @param {number} si - The section's index.
+ * @param {number} step - -1 to move it up, 1 to move it down.
+ */
+function moveSection(si, step) {
+	const to = si + step;
+	if (to < 0 || to >= D.sections.length) return;
+	const moved = D.sections.splice(si, 1)[0];
+	D.sections.splice(to, 0, moved);
+	persist();
+	const handle = document.getElementById('dh-' + to);
+	if (handle) handle.focus();
+	document.getElementById('move-status').textContent = _t('editor.hotstrings.section_moved')
+		.replace('{name}', moved.description || moved.name)
+		.replace('{n}', String(to + 1))
+		.replace('{total}', String(D.sections.length));
+}
+
 function cleanDrag() {
 	dragSrcIdx = null;
 	document
@@ -766,25 +857,28 @@ function buildCmdGrid() {
 			s.className = 'cmd-sep';
 			b.appendChild(s);
 		}
-		const l = document.createElement('div');
+		// Each group of commands under its heading, inside the dialog's h2.
+		const l = document.createElement('h3');
 		l.className = 'cmd-grp-lbl';
 		l.textContent = g.lbl;
 		b.appendChild(l);
 		g.cmds.forEach((c) => {
-			const el = document.createElement('div');
+			// A button: the keyboard inserts a command as the mouse does.
+			const el = document.createElement('button');
+			el.type = 'button';
 			el.className = 'cmd-ref';
 			el.title = '{' + c.token + '} — ' + c.desc;
 			// Label shows the canonical token name (Enter, Tab, Left…) — identical
 			// across every locale and always capitalised; the localisable French
 			// description stays in the hover tooltip above.
 			el.innerHTML =
-				'<span class="cmd-sym" data-tok="' +
+				'<b class="cmd-sym" aria-hidden="true" data-tok="' +
 				escapeHtml(c.token) +
 				'">' +
 				escapeHtml(c.sym) +
-				'</span><span class="cmd-lbl">' +
+				'</b><kbd class="cmd-lbl">' +
 				escapeHtml(c.token) +
-				'</span>';
+				'</kbd>';
 			el.addEventListener('mousedown', (e) => e.preventDefault());
 			el.addEventListener('click', () => insertChipAtCursor(c.token));
 			b.appendChild(el);
@@ -796,18 +890,25 @@ function dispTrig(s) {
 	if (!s) return '';
 	return escapeHtml(toDisplay(s))
 		.split(escapeHtml(TRIGGER_CHAR))
-		.join('<span class="trig-star">' + escapeHtml(TRIGGER_CHAR) + '</span>');
+		.join('<kbd class="trig-star">' + escapeHtml(magicKeyDisplay(TRIGGER_CHAR)) + '</kbd>');
 }
 
 function dispOutput(s) {
 	if (!s) return '';
-	let out = escapeHtml(toDisplay(s));
-	out = out.replace(/\{([^}]+)\}/g, function (_, name) {
-		const canon = normToken(name);
-		return '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
-	});
+	const display = toShown(s);
+	const tokens = /\{([^}]+)\}/g;
+	let out = '';
+	let last = 0;
+	let match;
+	while ((match = tokens.exec(display)) !== null) {
+		out += escapeHtml(display.slice(last, match.index));
+		const canon = normToken(match[1]);
+		out += '<kbd class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</kbd>';
+		last = tokens.lastIndex;
+	}
+	out += escapeHtml(display.slice(last));
 	if (!compactView) {
-		out = out.replace(/<span class="tc" data-tok="Enter">Enter<\/span>/g, '<br>');
+		out = out.replace(/<kbd class="tc" data-tok="Enter">Enter<\/kbd>/g, '<br>');
 	}
 	return out;
 }
@@ -819,21 +920,32 @@ function onRowMouseDown(e) {
 	_rowMouseDownY = e.clientY;
 }
 
-function handleSecTitleClick(e, si) {
+/**
+ * Whether a click ends a drag or a text selection rather than a plain click.
+ * A click the keyboard made (detail 0, Enter or Space on a button) has no
+ * pointer travel and always counts.
+ * @param {MouseEvent} e
+ * @returns {boolean}
+ */
+function isDragOrSelection(e) {
+	if (e.detail === 0) return false;
 	const dx = e.clientX - _rowMouseDownX,
 		dy = e.clientY - _rowMouseDownY;
-	if (Math.sqrt(dx * dx + dy * dy) > 4) return;
+	if (Math.sqrt(dx * dx + dy * dy) > 4) return true;
 	const sel = window.getSelection();
-	if (sel && sel.toString().length > 0) return;
+	return !!sel && sel.toString().length > 0;
+}
+
+function handleSecTitleClick(e, si) {
+	if (isDragOrSelection(e)) return;
 	showEditSec(si);
 }
 
 function handleRowClick(e, si, ei) {
-	const dx = e.clientX - _rowMouseDownX,
-		dy = e.clientY - _rowMouseDownY;
-	if (Math.sqrt(dx * dx + dy * dy) > 4) return;
-	const sel = window.getSelection();
-	if (sel && sel.toString().length > 0) return;
+	if (isDragOrSelection(e)) return;
+	// The checkbox's label is its 44 px target (theme.css): a click on it
+	// selects the row, the checkbox's own click following, and edits nothing.
+	if (e.target.closest('.entry-cb-wrap')) return;
 
 	let target = e.target;
 	let field = null;
@@ -847,9 +959,20 @@ function handleRowClick(e, si, ei) {
 	showEditEntry(si, ei, field);
 }
 
+/**
+ * Tells whether a section shows its entries. A section starts collapsed: only
+ * an explicit fold choice made in this window, or a section the user just
+ * created or added to, opens it.
+ * @param {Object} s - The section.
+ * @returns {boolean} True when the section is expanded.
+ */
+function isSectionExpanded(s) {
+	return s._exp === true;
+}
+
 function togSec(si) {
 	if (D.sections[si]) {
-		D.sections[si]._exp = D.sections[si]._exp === false;
+		D.sections[si]._exp = !isSectionExpanded(D.sections[si]);
 		render();
 	}
 }
@@ -922,73 +1045,114 @@ function render() {
 
 		const cnt = allEntries.length;
 		// Force-expand while searching so matches are always visible.
-		const exp = searching ? true : s._exp !== false;
+		const exp = searching ? true : isSectionExpanded(s);
 
-		html += '<div class="sec-card" id="sc-' + si + '">';
-		html += '<div class="sec-head' + (exp ? ' open' : '') + '">';
-		// Reordering by drag is meaningless on a filtered view, so hide the handle.
+		html += '<li class="sec-card" id="sc-' + si + '">';
+		html += '<header class="sec-head' + (exp ? ' open' : '') + '">';
+		// Buttons, not clickable spans: the keyboard folds, edits, deletes and
+		// moves a section as the mouse does (WCAG 2.1.1), and the fold says its
+		// state.
+		const secName = escapeHtml(s.description || s.name);
+		// Reordering is meaningless on a filtered view, so hide the handle. It
+		// drags with the mouse and moves with the Up and Down arrows.
 		if (!searching)
 			html +=
-				'<span class="drag-handle" id="dh-' +
+				'<button type="button" class="drag-handle" id="dh-' +
 				si +
 				'" title="' +
 				(_t('editor.hotstrings.drag_handle_title') || 'Drag') +
-				'">☰</span>';
+				'" aria-label="' +
+				escapeHtml(
+					_t('editor.hotstrings.move_section').replace('{name}', s.description || s.name)
+				) +
+				'" aria-keyshortcuts="ArrowUp ArrowDown">☰</button>';
 		html +=
-			'<span class="caret' + (exp ? ' open' : '') + '" onclick="togSec(' + si + ')">▶</span>';
+			'<button type="button" class="caret' +
+			(exp ? ' open' : '') +
+			'" aria-expanded="' +
+			exp +
+			'" aria-label="' +
+			secName +
+			'" onclick="togSec(' +
+			si +
+			')">▶</button>';
 		html +=
-			'<span class="sec-title" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
+			'<h2 class="sec-heading"><button type="button" class="sec-title" title="' +
+			escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+			'" onmousedown="onRowMouseDown(event)" onclick="handleSecTitleClick(event,' +
 			si +
 			')">' +
-			escapeHtml(s.description || s.name) +
-			'</span>';
-		html += '<span class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</span>';
+			secName +
+			'</button></h2>';
+		html += '<small class="sec-cnt">(' + (searching ? idx.length : cnt) + ')</small>';
 		html +=
-			'<button class="sec-del" onclick="delSec(' +
+			'<button type="button" class="sec-del" aria-label="' +
+			escapeHtml(_t('common.delete')) +
+			' ' +
+			secName +
+			'" title="' +
+			escapeHtml(_t('common.delete')) +
+			'" onclick="delSec(' +
 			si +
 			')" onmousedown="event.stopPropagation()">✕</button>';
-		html += '</div>';
+		html += '</header>';
 
 		if (exp) {
-			html += '<div class="' + (compactView ? 'compact' : 'expanded') + '">';
+			html += '<ul class="entries ' + (compactView ? 'compact' : 'expanded') + '">';
 			idx.forEach((ei) => {
 				const e = allEntries[ei];
 				html +=
-					'<div class="entry-row" onmousedown="onRowMouseDown(event)" onclick="handleRowClick(event,' +
+					'<li class="entry-row" onmousedown="onRowMouseDown(event)" onclick="handleRowClick(event,' +
 					si +
 					',' +
 					ei +
 					')">';
 				html +=
-					'<div class="entry-cb-wrap"><input type="checkbox" class="entry-cb" data-si="' +
+					'<label class="entry-cb-wrap"><input type="checkbox" class="entry-cb" data-si="' +
 					si +
 					'" data-ei="' +
 					ei +
-					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
+					'" aria-label="' +
+					escapeHtml(_t('editor.hotstrings.select_entry') + ' ' + e.trigger) +
+					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></label>';
 				html +=
-					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="' +
+					'<div class="e-trig"><button type="button" class="trig-lbl" data-f="trig" title="' +
 					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
 					'">' +
 					dispTrig(e.trigger) +
-					'</span></div>';
-				html += '<span class="e-arrow">→</span>';
+					'</button></div>';
+				html += '<span class="e-arrow" aria-hidden="true">→</span>';
 				html +=
-					'<div class="e-out-cell"><div class="e-out" data-f="out" title="' +
+					'<div class="e-out-cell"><p class="e-out" data-f="out" title="' +
 					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
 					'">' +
 					dispOutput(e.output) +
-					'</div></div>';
-				html += '<div class="e-tags">';
-				if (e.is_word) html += '<span class="tag on" data-f="cb-word">Mot</span>';
-				if (e.auto_expand) html += '<span class="tag on" data-f="cb-auto">Auto</span>';
-				if (e.is_case_sensitive) html += '<span class="tag on" data-f="cb-case">Casse</span>';
-				if (e.final_result) html += '<span class="tag on" data-f="cb-final">Final</span>';
+					'</p></div>';
+				// The options the entry has, as a list of tags.
+				const tag = (field, key) =>
+					'<li class="tag on" data-f="' + field + '">' + escapeHtml(_t(key)) + '</li>';
+				html += '<ul class="e-tags">';
+				if (e.is_word) html += tag('cb-word', 'editor.hotstrings.tag_word');
+				if (e.auto_expand) html += tag('cb-auto', 'editor.hotstrings.tag_auto');
+				if (e.is_case_sensitive) html += tag('cb-case', 'editor.hotstrings.tag_case');
+				if (e.final_result) html += tag('cb-final', 'editor.hotstrings.tag_final');
+				if (e.action) html += tag('e-action', 'editor.hotstrings.tag_action');
 				if (typeof e.priority === 'number')
-					html += '<span class="tag on tag-prio" data-f="prio">P' + e.priority + '</span>';
-				html += '</div>';
-				html += '<span class="e-del" onclick="delEntryStop(event,' + si + ',' + ei + ')">✕</span>';
-				html += '</div>';
+					html += '<li class="tag on tag-prio" data-f="prio">P' + e.priority + '</li>';
+				html += '</ul>';
+				html +=
+					'<button type="button" class="e-del" aria-label="' +
+					escapeHtml(_t('common.delete') + ' ' + e.trigger) +
+					'" title="' +
+					escapeHtml(_t('common.delete')) +
+					'" onclick="delEntryStop(event,' +
+					si +
+					',' +
+					ei +
+					')">✕</button>';
+				html += '</li>';
 			});
+			html += '</ul>';
 			// The add button is hidden on a filtered view to avoid appending into
 			// a section the user is only browsing through search results.
 			if (!searching)
@@ -998,9 +1162,8 @@ function render() {
 					')">' +
 					(_t('editor.hotstrings.btn_add_entry') || '＋ Add a hotstring') +
 					'</button>';
-			html += '</div>';
 		}
-		html += '</div>';
+		html += '</li>';
 	});
 
 	if (searching && shownSections === 0) {
@@ -1021,6 +1184,11 @@ function render() {
 
 		handle.addEventListener('mousedown', () => {
 			card.draggable = true;
+		});
+		handle.addEventListener('keydown', (e) => {
+			if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+			e.preventDefault();
+			moveSection(si, e.key === 'ArrowUp' ? -1 : 1);
 		});
 		card.addEventListener('dragstart', (e) => onDragStart(e, si));
 		card.addEventListener('dragover', (e) => onDragOver(e, si));
@@ -1142,6 +1310,87 @@ function parsePrio(raw) {
 	return Math.max(0, Math.min(100, n));
 }
 
+// ========================================
+// ======= Hotstring actions ==============
+// ========================================
+
+/**
+ * Fills the action picker from the host's lists: nothing, the parameterless
+ * actions, then the user's workflows. Hidden when the host offers none.
+ */
+function fillActionSelect() {
+	const select = document.getElementById('e-action');
+	const actions = Array.isArray(D.actions) ? D.actions : [];
+	const workflows = Array.isArray(D.workflows) ? D.workflows : [];
+	document.getElementById('action-box').hidden = actions.length === 0 && workflows.length === 0;
+	select.replaceChildren();
+	const none = document.createElement('option');
+	none.value = '';
+	none.textContent = _t('editor.hotstrings.action_none');
+	select.appendChild(none);
+	const group = (key, items, prefix) => {
+		if (items.length === 0) return;
+		const optgroup = document.createElement('optgroup');
+		optgroup.label = _t(key);
+		for (const item of items) {
+			const option = document.createElement('option');
+			option.value = prefix + item.value;
+			option.textContent = item.label;
+			optgroup.appendChild(option);
+		}
+		select.appendChild(optgroup);
+	};
+	group('editor.hotstrings.action_group_workflows', workflows, 'w:');
+	group('editor.hotstrings.action_group_actions', actions, 'a:');
+}
+
+/** Shows the erase option only when an action is chosen. */
+function updateActionFields() {
+	const chosen = document.getElementById('e-action').value !== '';
+	document.getElementById('erase-row').hidden = !chosen;
+	document.getElementById('erase-desc').hidden = !chosen;
+}
+
+/**
+ * The action picker's value for an entry.
+ * @param {object} e
+ * @returns {string}
+ */
+function actionValueOf(e) {
+	if (!e || !e.action) return '';
+	return e.action === 'run_workflow' ? 'w:' + (e.workflow || '') : 'a:' + e.action;
+}
+
+/**
+ * Selects a stored action, keeping one this OS does not offer: a missing
+ * option would blank the picker and the next save would drop the action.
+ * @param {string} value An actionValueOf() result.
+ */
+function selectActionValue(value) {
+	const select = document.getElementById('e-action');
+	if (value !== '' && ![...select.options].some((option) => option.value === value)) {
+		const option = document.createElement('option');
+		option.value = value;
+		option.textContent = value.slice(2);
+		select.appendChild(option);
+	}
+	if (value !== '') document.getElementById('action-box').hidden = false;
+	select.value = value;
+}
+
+/**
+ * Writes the picker and the erase box into an entry being saved.
+ * @param {object} entry
+ */
+function applyActionFields(entry) {
+	const value = document.getElementById('e-action').value;
+	if (value.startsWith('w:')) {
+		entry.action = 'run_workflow';
+		entry.workflow = value.slice(2);
+	} else if (value.startsWith('a:')) entry.action = value.slice(2);
+	if (entry.action && !document.getElementById('cb-erase').checked) entry.erase_trigger = false;
+}
+
 function resetEntryForm() {
 	document.getElementById('e-trig').innerHTML = '';
 	setEditorContent(document.getElementById('e-out'), '');
@@ -1150,6 +1399,9 @@ function resetEntryForm() {
 	document.getElementById('cb-case').checked = false;
 	document.getElementById('cb-final').checked = false;
 	document.getElementById('e-prio').value = '';
+	document.getElementById('e-action').value = '';
+	document.getElementById('cb-erase').checked = true;
+	updateActionFields();
 	clearEntryErrors();
 	updateHints();
 	updateCbDescs();
@@ -1183,6 +1435,9 @@ function showEditEntry(si, ei, focusField) {
 	document.getElementById('cb-case').checked = !!e.is_case_sensitive;
 	document.getElementById('cb-final').checked = !!e.final_result;
 	document.getElementById('e-prio').value = typeof e.priority === 'number' ? e.priority : '';
+	selectActionValue(actionValueOf(e));
+	document.getElementById('cb-erase').checked = e.erase_trigger !== false;
+	updateActionFields();
 
 	clearEntryErrors();
 	updateHints();
@@ -1213,6 +1468,19 @@ function showEditEntry(si, ei, focusField) {
 	}, 80);
 }
 
+// Sorting uses the same normalized key for single edits and bulk moves. The
+// original trigger is never changed, and ASCII punctuation keeps its old order.
+function compareTriggers(a, b) {
+	const key = (entry) =>
+		(entry.trigger || '')
+			.toLowerCase()
+			.normalize('NFC')
+			.replace(/[^\p{L}\p{M}\p{N}_]/gu, '');
+	const left = key(a);
+	const right = key(b);
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function saveEntry(andNew) {
 	clearEntryErrors();
 	const trig = serializeTrigEditor(document.getElementById('e-trig'));
@@ -1227,7 +1495,8 @@ function saveEntry(andNew) {
 		setTimeout(() => document.getElementById('e-trig').focus(), 0);
 		return;
 	}
-	if (!out.trim()) {
+	// An entry that runs an action may type nothing.
+	if (!out.trim() && document.getElementById('e-action').value === '') {
 		setFieldError(
 			'e-out',
 			'out-err',
@@ -1259,20 +1528,27 @@ function saveEntry(andNew) {
 			// personal "sru" -> "SRU" still fired on a typed "SRU".
 			is_case_sensitive_strict: document.getElementById('cb-case').checked
 		};
+		if (rowIdentityMode) {
+			entry.origin_id =
+				edEntry.ei === null
+					? 'new:' + ++nextNewRowId
+					: D.sections[edEntry.si].entries[edEntry.ei].origin_id;
+		}
 		// Optional collision-priority override; omitted when the field is blank
 		// so the entry inherits the personal source default.
 		const prio = parsePrio(document.getElementById('e-prio').value);
 		if (prio !== null) entry.priority = prio;
+		applyActionFields(entry);
 
 		const si = edEntry.si;
-		if (edEntry.ei === null) D.sections[si].entries.push(entry);
-		else D.sections[si].entries[edEntry.ei] = entry;
+		if (edEntry.ei === null) {
+			D.sections[si].entries.push(entry);
+			// Sections start collapsed; open this one so the new row is visible
+			// (the shortcut mode adds to a section the user never opened).
+			D.sections[si]._exp = true;
+		} else D.sections[si].entries[edEntry.ei] = entry;
 
-		D.sections[si].entries.sort((a, b) => {
-			const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			return ta < tb ? -1 : ta > tb ? 1 : 0;
-		});
+		D.sections[si].entries.sort(compareTriggers);
 
 		persist();
 
@@ -1301,12 +1577,12 @@ function saveEntry(andNew) {
 				_t('editor.hotstrings.err_trigger_dup_msg') ||
 				'The trigger <strong>%s</strong> already exists in <em>%s</em>.<br><br>Do you really want to redefine it?'
 			)
-				.replace('%s', escapeHtml(toDisplay(trig)))
+				.replace('%s', escapeHtml(toShown(trig)))
 				.replace('%s', escapeHtml(dupSection)),
 			executeSave,
 			{
 				okLabel: _t('editor.hotstrings.btn_redefine') || 'Redefine',
-				okColor: ThemeTokens.color('orange'),
+				okColor: ThemeTokens.color('hue-5c3800'),
 				isWarning: true
 			}
 		);
@@ -1321,7 +1597,7 @@ function delEntryStop(e, si, ei) {
 }
 
 function delEntry(si, ei) {
-	const trig = toDisplay(D.sections[si].entries[ei].trigger);
+	const trig = toShown(D.sections[si].entries[ei].trigger);
 	showConfirm(
 		(_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', escapeHtml(trig)),
 		function () {
@@ -1349,6 +1625,8 @@ window.updateBulk = function () {
 				? _t('editor.hotstrings.bulk_selected_other')
 				: _t('editor.hotstrings.bulk_selected_one'));
 		const sel = document.getElementById('bulk-sec-sel');
+		// The list's first option names it, and is replaced on every refresh.
+		sel.setAttribute('aria-label', _t('editor.hotstrings.bulk_move_placeholder'));
 		sel.innerHTML =
 			'<option value="">' +
 			(_t('editor.hotstrings.bulk_move_placeholder') || 'Move to…') +
@@ -1397,11 +1675,7 @@ window.bulkMove = function () {
 		D.sections[destSi].entries.push(entry);
 	});
 
-	D.sections[destSi].entries.sort((a, b) => {
-		const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		return ta < tb ? -1 : ta > tb ? 1 : 0;
-	});
+	D.sections[destSi].entries.sort(compareTriggers);
 
 	sel.value = '';
 	window.clearBulk();
@@ -1430,8 +1704,14 @@ function persist() {
 					final_result: !!e.final_result,
 					is_case_sensitive_strict: !!e.is_case_sensitive_strict
 				};
+				if (rowIdentityMode && typeof e.origin_id === 'string') o.origin_id = e.origin_id;
 				// Carry an explicit per-hotstring priority through the save.
 				if (typeof e.priority === 'number') o.priority = e.priority;
+				if (e.action) {
+					o.action = e.action;
+					if (e.workflow) o.workflow = e.workflow;
+					if (e.erase_trigger === false) o.erase_trigger = false;
+				}
 				return o;
 			})
 		};
@@ -1445,6 +1725,8 @@ function persist() {
 }
 
 window.initData = function (d) {
+	rowIdentityMode = d.row_identity === true;
+	nextNewRowId = 0;
 	D = d;
 	TRIGGER_CHAR = d.trigger_char || '★';
 	STAR = d.star || '★';
@@ -1455,6 +1737,7 @@ window.initData = function (d) {
 	setDefaultPrio(d.default_priority);
 
 	buildCmdGrid();
+	fillActionSelect();
 	updateHints();
 	updateCompactBtn();
 
@@ -1466,6 +1749,18 @@ window.initData = function (d) {
 		const si = D.sections.findIndex((s) => s.name === defaultSec);
 		if (si >= 0) setTimeout(() => showAddEntry(si), ADD_ENTRY_DELAY_MS);
 	}
+};
+
+// A host preference change must not replace the user's unsaved document.
+window.updatePreferences = function (d) {
+	if (!d) return;
+	TRIGGER_CHAR = d.trigger_char || TRIGGER_CHAR;
+	compactView = !!d.compact_view;
+	autoClose = !!d.auto_close;
+	defaultSec = d.default_section || null;
+	updateHints();
+	updateCompactBtn();
+	render();
 };
 
 window.updateData = function (d) {
@@ -1505,21 +1800,48 @@ function setDefaultPrio(value) {
 // ====================================
 // ====================================
 
-window.addEventListener(
-	'focus',
-	function (e) {
-		if (e.target === window || e.target === document) toLua('window_focus', { focused: true });
-	},
-	true
-);
+// Only the field that records a trigger holds the daemon's capture gate
+// (maintainer decision of 2026-11-25): the layout emulation and the hotstrings
+// keep typing in every other Ergopti field, while the trigger is typed raw, so
+// writing an existing trigger there never expands it. The message keeps its
+// name; `focused` now means "the trigger field has the focus".
+const TRIGGER_FIELD_ID = 'e-trig';
+let triggerFieldFocused = false;
+
+/**
+ * Tells the daemon whether the trigger field records the keys, once per change.
+ * @param {boolean} focused - Whether the trigger field has the focus.
+ */
+function setTriggerFieldFocused(focused) {
+	if (focused === triggerFieldFocused) return;
+	triggerFieldFocused = focused;
+	toLua('window_focus', { focused: focused });
+}
+
+document.addEventListener('focusin', function (e) {
+	setTriggerFieldFocused(Boolean(e.target && e.target.id === TRIGGER_FIELD_ID));
+});
+
+document.addEventListener('focusout', function (e) {
+	if (e.target && e.target.id === TRIGGER_FIELD_ID) setTriggerFieldFocused(false);
+});
 
 window.addEventListener(
 	'blur',
 	function (e) {
-		if (e.target === window || e.target === document) toLua('window_focus', { focused: false });
+		if (e.target === window || e.target === document) setTriggerFieldFocused(false);
 	},
 	true
 );
+
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
 
 document.querySelectorAll('.overlay').forEach((el) => {
 	el.addEventListener('click', (e) => {
@@ -1528,10 +1850,12 @@ document.querySelectorAll('.overlay').forEach((el) => {
 });
 
 document.getElementById('msg-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter' || e.key === 'Escape') closeModal('msg-modal');
 });
 
 document.getElementById('confirm-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') {
 		_confirmCb = null;
 		closeModal('confirm-modal');
@@ -1564,6 +1888,7 @@ function runConfirm() {
 }
 
 document.getElementById('sec-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter') {
 		e.preventDefault();
 		saveSec();
@@ -1572,6 +1897,7 @@ document.getElementById('sec-modal').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('entry-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') closeModal('entry-modal');
 });
 
@@ -1586,6 +1912,7 @@ document.getElementById('sec-id').addEventListener('input', function () {
 });
 
 document.getElementById('sec-id').addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		[
 			'Backspace',
@@ -1606,7 +1933,9 @@ document.getElementById('sec-id').addEventListener('keydown', function (e) {
 	if (!/^[a-z0-9_]$/i.test(e.key)) e.preventDefault();
 });
 
-document.addEventListener('selectionchange', ejectFromChip);
+document.addEventListener('selectionchange', function () {
+	if (!imeComposing) ejectFromChip();
+});
 
 // Trigger Editor logic
 (function () {
@@ -1614,7 +1943,11 @@ document.addEventListener('selectionchange', ejectFromChip);
 	te.addEventListener('input', () => clearFieldError('e-trig', 'trig-err'));
 
 	te.addEventListener('keydown', function (e) {
-		if (e.key === 'Enter' || e.key === 'Tab') {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
+		// Enter moves on to the expansion. Tab keeps the page order (the magic
+		// key button, then the expansion): taking Tab here, Shift+Tab included,
+		// held the focus between the two editors for good (WCAG 2.1.2).
+		if (e.key === 'Enter') {
 			e.preventDefault();
 			document.getElementById('e-out').focus();
 			return;
@@ -1736,6 +2069,7 @@ document.addEventListener('selectionchange', ejectFromChip);
 	ed.addEventListener('input', () => clearFieldError('e-out', 'out-err'));
 
 	ed.addEventListener('keydown', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (acItems.length > 0) {
 			if (e.key === 'Tab') {
 				e.preventDefault();
@@ -1764,16 +2098,11 @@ document.addEventListener('selectionchange', ejectFromChip);
 				hideAc();
 				return;
 			}
-		} else if (e.key === 'Tab') {
-			// Focus on the main validate button in the entry modal
-			e.preventDefault();
-			var entryModal = document.getElementById('entry-modal');
-			if (entryModal) {
-				var btns = entryModal.querySelectorAll('.btn.btn-p');
-				if (btns.length > 0) btns[0].focus();
-			}
-			return;
 		}
+		// Tab keeps the page order (the special commands, the options, the
+		// priority, then the buttons; Ctrl or Cmd + Enter saves): jumping to
+		// Save on Tab and Shift+Tab alike skipped the options and held the
+		// focus coming back (WCAG 2.1.2, 2.4.3).
 
 		if (e.key === 'Enter' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
 			e.preventDefault();
@@ -1849,13 +2178,15 @@ document.addEventListener('selectionchange', ejectFromChip);
 		}
 	});
 
-	ed.addEventListener('input', function () {
+	ed.addEventListener('input', function (e) {
+		if (imeComposing || e.isComposing) return;
 		tryConvertToken(ed);
 		checkAc();
 		checkPh();
 	});
 
 	ed.addEventListener('keyup', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (
 			acItems.length > 0 &&
 			['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(

@@ -87,6 +87,9 @@ Test("corpus: the info bar replays every request plan vector (corpus-request-pla
 _CTRP_ContextOp(Op, Cleared) {
 	global _LLM_Bridge_Buffer, _LLM_Engine
 	Text := Op.Get("text", "")
+	; Each directly seeded edit must belong to the same real bridge source
+	; before a later public Backspace consumes it. Clear/reset may retire it.
+	AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(Map("hwnd", 101, "control", 102), true)))
 	switch Op["op"] {
 		case "append":
 			loop Op.Get("repeat", 1)
@@ -127,25 +130,35 @@ _CTRP_ContextCase(Row) {
 
 _CTRP_Context() {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Engine, LLM_BRIDGE_BUFFER_MAX_CHARS
+	global _LLM_Bridge_PrefixObserver
 	Corpus := _CTRP_Read("llm\context_buffer_vectors.json")
 	AssertEqual(13, Corpus["cases"].Length, "the context buffer vectors changed")
 	SavedCap := LLM_BRIDGE_BUFFER_MAX_CHARS
 	SavedEngine := _LLM_Engine
 	SavedActive := _LLM_Bridge_Active
-	SavedBuffer := _LLM_Bridge_Buffer
-	_LLM_Engine := SavedEngine.Clone()
+	AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "The corpus cannot retire another observer")
+	PreviousCritical := Critical("On"), Privacy := 0
 	try {
+		Privacy := _LLM_TestPrivacyEnter(Map("hwnd", 101, "control", 102))
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Engine["pending_timer"] := "", _LLM_Engine["timer_active"] := false
+		if _LLM_Engine.Has("request_plan")
+			_LLM_Engine.Delete("request_plan")
 		LLM_BRIDGE_BUFFER_MAX_CHARS := Corpus["capacity"]
 		_LLM_Bridge_Active := true
 		_LLM_Engine["enabled"] := false
 		for Row in Corpus["cases"]
 			_CTRP_ContextCase(Row)
 	} finally {
-		LLM_BRIDGE_BUFFER_MAX_CHARS := SavedCap
-		_LLM_Engine := SavedEngine
-		_LLM_Bridge_Active := SavedActive
-		_LLM_Bridge_ApplyBufferEdit()
-		_LLM_Bridge_ApplyBufferEdit(0, SavedBuffer)
+		try {
+			LLM_BRIDGE_BUFFER_MAX_CHARS := SavedCap
+			if IsObject(Privacy)
+				LLM_Bridge_CancelPrefixObserver()
+			_LLM_Engine := SavedEngine
+			_LLM_Bridge_Active := SavedActive
+			if IsObject(Privacy)
+				_LLM_TestPrivacyExit(Privacy)
+		} finally Critical(PreviousCritical)
 	}
 }
 Test("corpus: the context buffer replays every shared case (corpus-request-plan)", _CTRP_Context)

@@ -20,9 +20,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Paths = require("infra.paths")
-local Corpus = require("test.keystats_aggregation_corpus")
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
+local Corpus = require("tests.lua.metrics.aggregation_corpus")
 local Walker = helpers.load_module("modules.keystats.aggregate_walker")
 
 local corpus_path = assert(Paths.shared("tests/corpus/keystats/aggregation_vectors.json"))
@@ -82,6 +82,7 @@ local SKIP = {
 	app_switch_accumulates_duration = OUTSIDE_THE_WALK,
 	window_switch_credits_title_ms = OUTSIDE_THE_WALK,
 	system_event_wifi_change = OUTSIDE_THE_WALK,
+	system_event_night_wake = OUTSIDE_THE_WALK,
 	system_event_modifier_hold = OUTSIDE_THE_WALK,
 	system_event_manifest_increment_hs = OUTSIDE_THE_WALK,
 	mixed_batch_typing_and_system = OUTSIDE_THE_WALK,

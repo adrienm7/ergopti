@@ -460,3 +460,56 @@ _KALO_NoRawAltGrReleaseOutsideTheOwner() {
 }
 Test("kana altgr lift: no raw AltGr release bypasses the owner (kana-altgr-lift-owner-2026-09-25)",
 	_KALO_NoRawAltGrReleaseOutsideTheOwner)
+
+
+_KALO_RacedRepressRetainsReleaseDebt(RepairByAcquisition) {
+	global _AHK_SendInput, _KALO_Sent, _KALO_Physical
+	global _TH_SyntheticReleasePendingKeys, _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	Saved := _KALO_Begin(true, "user")
+	Paused := A_IsSuspended, Repressed := false, Refuse := true, DeliveredUps := 0
+	Transport(Keys) {
+		_KALO_Sent.Push(Keys)
+		if Keys == "{Blind}{vkDF Down}" {
+			Repressed := true
+			_KALO_Physical := false
+		} else if Keys == "{Blind}{vkDF Up}" {
+			if Repressed && Refuse
+				throw Error("Controlled raced release refusal")
+			DeliveredUps += 1
+		}
+	}
+	try {
+		Suspend(false)
+		_AHK_SendInput := Transport
+		_HSE_SendWithAltGrUp(_KALO_Burst)
+		AssertTrue(Repressed, "The actual expansion must first re-press the user-held Kana AltGr")
+		AssertEqual(1, DeliveredUps, "Only the initial lift succeeded; the balancing Up was refused")
+		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("SC138"), "A proven re-press whose balancing Up failed must remain owned for repair")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+		if RepairByAcquisition {
+			Refuse := false
+			B := TapHoldNewOwner()
+			AssertTrue(TapHoldSyntheticKeyDown("SC138", B))
+			AssertFalse(_TH_SyntheticReleasePendingKeys.Has("SC138"))
+			AssertEqual(2, DeliveredUps, "A fresh acquisition must repair the old native debt first")
+			AssertTrue(TapHoldSyntheticKeyUp("SC138", B))
+			AssertEqual(3, DeliveredUps, "The fresh owner must retain its own balancing release")
+		} else {
+			Suspend(true)
+			AssertFalse(TapHoldReleaseSyntheticKeys(), "A persistently refused repair must remain observable")
+			AssertTrue(_TH_SyntheticReleasePendingKeys.Has("SC138"))
+			AssertEqual(1, DeliveredUps)
+			Refuse := false
+			AssertTrue(TapHoldReleaseSyntheticKeys())
+			AssertFalse(_TH_SyntheticReleasePendingKeys.Has("SC138"))
+			AssertEqual(2, DeliveredUps, "Genuine lifecycle cleanup must deliver the retained balancing release")
+		}
+	} finally {
+		Suspend(Paused)
+		_KALO_End(Saved)
+		_TSUH_End()
+	}
+}
+Test("kana altgr lift: refused raced release remains repairable by lifecycle cleanup (raced-repress-release-debt)", _KALO_RacedRepressRetainsReleaseDebt.Bind(false))
+Test("kana altgr lift: a fresh acquisition repairs refused raced release before arming (raced-repress-release-debt)", _KALO_RacedRepressRetainsReleaseDebt.Bind(true))

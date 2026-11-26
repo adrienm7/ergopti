@@ -30,11 +30,11 @@
 --- Exit code 0 = every assertion held. 1 = a failure, printed with what it was.
 --- ==============================================================================
 
-local InputEvent  = require("infra.input_event")
-local DeviceNames = require("infra.device_names")
-local UinputWriter = require("adapters.uinput_writer")
-local EvdevReader  = require("adapters.evdev_reader")
-local DeviceFinder = require("modules.hotstrings.device_finder")
+local InputEvent  = require("platform.input.event")
+local DeviceNames = require("platform.input.device_names")
+local UinputWriter = require("platform.input.uinput_writer")
+local EvdevReader  = require("platform.input.evdev_reader")
+local DeviceFinder = require("hotstrings.engine.device_finder")
 
 
 

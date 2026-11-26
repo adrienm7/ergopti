@@ -7,4 +7,4 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("test.tap_hold_copy_check_contract")(helpers, require("tap_hold.copy_check"))
+require("tests.lua.keyboard.tap_hold_copy_check_contract")(helpers, require("tap_hold.engine.copy_check"))

@@ -34,18 +34,18 @@ local KEYCODE_LEFT_COMMAND = 55
 local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
-	"adapters.event_provenance", "adapters.file_system",
-	"adapters.input_source_broker", "adapters.keyboard_hook",
-	"adapters.process_lifecycle", "adapters.synthetic_input",
-	"adapters.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
-	"hs.timer", "infra.config_paths", "infra.dialog_util", "infra.i18n",
-	"infra.logger", "infra.manifest_reader", "infra.timings",
-	"keystats.metrics", "modules.keystats", "modules.keystats.aggregator",
+	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system",
+	"adapters.input_source_broker", "platform.input.keyboard_hook",
+	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
+	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
+	"hs.timer", "settings.engine.paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
+	"core.logger.engine.logger", "menu.engine.manifest_reader", "core.timing.engine.timings",
+	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
-	"modules.keystats.watchers", "modules.keymap", "tests.stubs.hs",
+	"modules.keystats.watchers", "hotstrings.engine.expander", "tests.stubs.hs",
 	"ui.metrics_typing",
 }
 
@@ -115,7 +115,7 @@ local function load_fixture(options)
 	}
 	local appended = {}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() return true end,
 		is_initialized = function() return true end,
@@ -167,7 +167,7 @@ local function load_fixture(options)
 		get_sqlite_path = function() return nil end,
 		get_db_rev = function() return 0 end,
 	}
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function()
 			counters.wpm = counters.wpm + 1
 			if callback_active then counters.inside_wpm = counters.inside_wpm + 1 end
@@ -207,12 +207,12 @@ local function load_fixture(options)
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() return true end,
 		start = function() return true end,
 		stop = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(config)
 			handle_key = config and config.onEvent
 			hook_event_types = config and config.eventTypes
@@ -225,29 +225,29 @@ local function load_fixture(options)
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		STATUS_FOREIGN = "foreign",
 		current_action_epoch = function() return "epoch-1", 0 end,
 		claim_physical_fence = function() return nil end,
 		register_action_listener = function() return true end,
 		unregister_action_listener = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = {
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return options.shift_side or "none" end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return true end }
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,
 		metrics_dir = function() return "/tmp/ergopti_eventtap_deferred/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_eventtap_deferred/cache" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { alert = function() end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,
@@ -315,7 +315,7 @@ local function load_fixture(options)
 		},
 		execute = function() return "" end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -328,7 +328,7 @@ local function load_fixture(options)
 	}
 
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], true)
+		package.loaded["core.fs.adapters.file_system"], true)
 	local keystats = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
 	local script_control = { is_paused = function() return paused end }
 	local timers_before_start = #timers
@@ -433,6 +433,17 @@ end
 
 
 helpers.describe("keystats persistence stays outside eventtaps", function()
+	helpers.it("requires a Shift flag before using the cached side, while preserving Caps Lock (keystats-shift-flag)", function()
+		with_fixture({ shift_side = "left" }, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a", {}))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "A", { shift = true }))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "A", { capslock = true }))
+			helpers.assert_eq(fixture.state.buffer_events[1][3].ss, "none")
+			helpers.assert_eq(fixture.state.buffer_events[2][3].ss, "left")
+			helpers.assert_eq(fixture.state.buffer_events[3][3].ss, "capslock")
+		end)
+	end)
 	helpers.it("bins a deferred midnight tail by its first keystroke", function()
 		local before_midnight = os.time({
 			year = 2026, month = 8, day = 27, hour = 23, min = 59, sec = 50,

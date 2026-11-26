@@ -9,23 +9,23 @@
 local helpers = require("tests.helpers")
 
 local STUBBED_MODULES = {
-	"infra.logger",
-	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"modules.keymap.utils",
-	"infra.text_utils",
-	"modules.llm",
-	"infra.keycodes",
+	"core.logger.engine.logger",
+	"diagnostics.adapters.event_provenance",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"hotstrings.engine.expander.utils",
+	"core.text.engine.utils",
+	"ai.engine",
+	"platform.input.keycodes",
 	"modules.keystats",
-	"ui.tooltip",
-	"modules.llm.prediction_engine",
-	"modules.keymap.registry",
-	"modules.hotstrings.hotstrings_config",
-	"modules.keymap.expander",
-	"infra.manifest_reader",
-	"modules.keymap.llm_bridge",
-	"modules.diagnostics.hid_diagnostic_mailbox",
+	"core.ui.ui.tooltip",
+	"ai.engine.prediction.engine",
+	"hotstrings.engine.expander.registry",
+	"hotstrings.engine.catalogue.config",
+	"hotstrings.engine.expander.expander",
+	"menu.engine.manifest_reader",
+	"ai.engine.bridge",
+	"diagnostics.engine.hid_diagnostic_mailbox",
 }
 
 local function load_fixture(options, lifetime)
@@ -39,12 +39,12 @@ local function load_fixture(options, lifetime)
 	local engine_resets = 0
 	local hides = 0
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return epoch end,
 		defer_after_callback = function(_label, callback)
 			if options.defer_throws then error("DEFER_THROW") end
@@ -53,27 +53,27 @@ local function load_fixture(options, lifetime)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return {}, true
 		end,
 	}
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		plain_text = function(value) return tostring(value or "") end,
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
 	}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		is_letter_char = function() return false end,
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
@@ -95,10 +95,11 @@ local function load_fixture(options, lifetime)
 		hide_forced = function() hides = hides + 1; return true end,
 		hide_forced_silent = function() hides = hides + 1; return true end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 
-	package.loaded["modules.llm.prediction_engine"] = setmetatable({
+	package.loaded["ai.engine.prediction.engine"] = setmetatable({
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		reset = function() engine_resets = engine_resets + 1; return true end,
@@ -106,24 +107,24 @@ local function load_fixture(options, lifetime)
 	}, {
 		__index = function() return function() end end,
 	})
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["hotstrings.engine.expander.registry"] = {
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["modules.keymap.expander"] = {
+	package.loaded["hotstrings.engine.expander.expander"] = {
 		would_fire = function() return nil end,
 		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "*" end,
 	}
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = require("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = require("ai.engine.bridge")
 	lifetime.bridge = Bridge
 	local state = {
 		buffer = "agé",
@@ -137,6 +138,8 @@ local function load_fixture(options, lifetime)
 		no_rescan_until = 0,
 		is_repeat_feature_enabled = function() return false end,
 	}
+	-- The bridge owns an AI context independent of the hotstring buffer.
+	require("ai.engine.api.context").seed(state, state.buffer, "")
 	helpers.assert_true(Bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

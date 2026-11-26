@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local h = require("tests.helpers")
-local Brightness = require("brightness_actions")
-local Json = require("json")
-local Files = require("keymap.layer_editor")
+local Brightness = require("shortcuts.engine.brightness_actions")
+local Json = require("core.text.engine.json")
+local Files = require("layouts.engine.layers.editor")
 local shared = h.driver_root() .. "/../_shared"
 local data = Brightness.load()
 local corpus = Json.decode(Files.read_shipped(shared .. "/tests/corpus/brightness_actions.json"))

@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SEED = "7f3a9c21e5b04d68"
 local T0 = 1700000000
@@ -22,7 +22,7 @@ local URL = "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100
 local FEED_URL = "https://github.com/adrienm7/ergopti/releases.atom"
 
 local function read_defaults()
-	local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -67,9 +67,14 @@ local function build(opts)
 		state = ctx.state,
 		save = function() ctx.saves = ctx.saves + 1; return opts.save_refused ~= true end,
 		channel = function() return ctx.channel end,
-		is_paused = function() return ctx.paused end,
+		is_paused = function()
+			if opts.pause_error then error("pause state unavailable") end
+			if opts.pause_unknown then return nil end
+			return ctx.paused
+		end,
 		on_available = function(release)
 			ctx.announced[#ctx.announced + 1] = release.tag
+			if ctx.notification_hook then ctx.notification_hook() end
 			if ctx.notification_refusal == "throw" then error("notification unavailable") end
 			return ctx.notification_refusal ~= "false"
 		end,
@@ -91,10 +96,18 @@ local function build(opts)
 			end,
 		},
 		storage = {
-			get = function(key, default) local v = ctx.values[key]; if v == nil then return default end; return v end,
+			get = function(key, default)
+				if key == ctx.state_key and ctx.record_read_error then return default end
+				local v = ctx.values[key]; if v == nil then return default end; return v
+			end,
+			read_exact = function(key)
+				if key == ctx.state_key and ctx.record_read_error then return false, nil end
+				return true, ctx.values[key]
+			end,
 			set = function(key, value) ctx.values[key] = value; return true end,
 		},
 		http = transport(), manual_http = transport(),
+		failure_contract = AutoCheck.failure_contract(),
 		now = function() return ctx.clock.now end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,
@@ -112,6 +125,55 @@ local function fire(ctx)
 end
 
 helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check", function()
+	helpers.it("refuses a storage port without exact-read capability", function()
+		local ok, err = pcall(load_module().new, {
+			state = {}, save = function() end, channel = function() end, is_paused = function() end,
+			on_available = function() end, timer = {}, storage = { get = function() end },
+			http = {}, manual_http = {}, now = function() end,
+		})
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("exact storage read", 1, true) ~= nil)
+	end)
+	helpers.it("retains the stored check record across an unavailable read", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.150" }
+		local ctx = build({ now = T0, record = original, defer = true })
+		ctx.record_read_error = true
+		helpers.assert_true(ctx.owner.start())
+		helpers.assert_eq(ctx.values[ctx.state_key], original, "an unavailable read cannot overwrite stored state")
+		helpers.assert_eq(#ctx.requests, 0)
+		ctx.record_read_error = false
+		ctx.clock.now = ctx.clock.now + ctx.timing.reevaluate_sec
+		fire(ctx)
+		helpers.assert_eq(ctx.values[ctx.state_key], original)
+		helpers.assert_eq(#ctx.requests, 0, "the recovered record still controls the schedule")
+	end)
+	helpers.it("restarts the boot delay if the wall clock moves behind startup", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = T0 - 86400
+		fire(ctx)
+		helpers.assert_eq(last_timer(ctx).delay, ctx.timing.boot_check_delay_sec)
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		helpers.assert_eq(#ctx.requests, 1, "the check resumes without waiting for the old wall clock")
+	end)
+	helpers.it("does not check automatically while pause state is unknown", function()
+		for _, mode in ipairs({ "pause_error", "pause_unknown" }) do
+			local options = { now = T0, record = { seed = SEED }, defer = true }
+			options[mode] = true
+			local ctx = build(options)
+			helpers.assert_true(ctx.owner.start())
+			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.requests, 0, "unknown pause state must not dispatch")
+			helpers.assert_nil(ctx.values[ctx.state_key].last_check_at)
+			helpers.assert_true(last_timer(ctx).armed, "pause read failures remain retryable")
+			options[mode] = false
+			ctx.clock.now = ctx.clock.now + ctx.timing.reevaluate_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.requests, 1, "the check resumes after pause state recovers")
+		end
+	end)
 	helpers.it("a retired timer cannot replace the current timer (updater-owner-boundary)", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
 		helpers.assert_true(ctx.owner.start())
@@ -223,6 +285,21 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(#ctx.announced, 1, "the current generation still publishes")
 	end)
 
+	helpers.it("does not save an old notification after its callback changes channel", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.notification_hook = function()
+			ctx.channel = "main"
+			ctx.owner.on_channel_changed()
+		end
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
+		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag,
+			"the retired channel cannot save a notification after reentry")
+		helpers.assert_nil(ctx.owner.latest())
+	end)
+
 	helpers.it("notification refusal leaves the release retryable", function()
 		for _, refusal in ipairs({ "false", "throw" }) do
 			local response = { ok = true, status = 200, body = LIST, headers = {} }
@@ -328,6 +405,19 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(fresh.owner.interval(), fresh.timing.default_check_interval_sec, "absent: the shared default")
 	end)
 
+	helpers.it("uses the default for an infinite saved interval", function()
+		local ctx = build({ now = T0, state = { update_check_interval_seconds = math.huge } })
+		helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
+	end)
+
+	-- The shared value schema's declaration (value-validation).
+	for _, stored in ipairs({ 2147483648, "3600", 3600.5, 0 / 0 }) do
+		helpers.it("uses the default for a saved interval its declaration refuses: " .. tostring(stored), function()
+			local ctx = build({ now = T0, state = { update_check_interval_seconds = stored } })
+			helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
+		end)
+	end
+
 	helpers.it("a refused save keeps the previous interval", function()
 		local ctx = build({ now = T0, state = { update_check_interval_seconds = 3600 }, save_refused = true })
 		helpers.assert_eq(ctx.owner.set_interval(86400), false)
@@ -336,8 +426,8 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 
 	helpers.it("a menu session wires the production ports and a wake watcher", function()
 		local native = { started = 0, stopped = 0 }
-		for _, name in ipairs({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
-			"adapters.timer_scheduler" }) do
+		for _, name in ipairs({ "core.events.wake_watcher", "core.network.adapters.http_client", "core.fs.adapters.storage",
+			"core.events.timer_scheduler" }) do
 			package.loaded[name] = nil
 		end
 		local AutoCheck = helpers.load_with_stubs("modules.updater.auto_check", {
@@ -369,15 +459,55 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		package.loaded["modules.updater.auto_check"] = nil
 	end)
 
+	helpers.it("retains failed startup cleanup until the next session retries it", function()
+		local AutoCheck = load_module()
+		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
+		local created, first_stops = 0, 0
+		local ok, err = pcall(function()
+			helpers.with_stub_scope({ "core.events.wake_watcher", "core.network.adapters.http_client", "core.fs.adapters.storage",
+				"core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
+					start = function() return true end, stop = function() return true end,
+				} end }
+				package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+				package.loaded["core.fs.adapters.storage"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
+				AutoCheck.load_config = function() return { timeout_sec = 1 } end
+				AutoCheck.new = function()
+					created = created + 1
+					local id = created
+					return {
+						on_wake = function() end,
+						start = function() return id ~= 1 end,
+						stop = function()
+							if id == 1 then first_stops = first_stops + 1; return first_stops > 2 end
+							return true
+						end,
+					}
+				end
+				local started = pcall(AutoCheck.start_session, {})
+				helpers.assert_eq(started, false)
+				helpers.assert_eq(first_stops, 1)
+				helpers.assert_eq(pcall(AutoCheck.start_session, {}), false, "unreleased cleanup blocks a successor")
+				helpers.assert_eq(created, 1)
+				local owner = AutoCheck.start_session({})
+				helpers.assert_eq(first_stops, 3, "the previous owner is retried before its successor")
+				helpers.assert_true(owner.stop())
+			end)
+		end)
+		AutoCheck.new, AutoCheck.load_config = old_new, old_config
+		if not ok then error(err, 0) end
+	end)
+
 	-- Windows opens its update prompt from the balloon; here a click on the
 	-- notification asks Sparkle for the found release on its channel.
 	helpers.it("announces a release with a click that asks Sparkle for it", function()
 		local sent, checks = {}, {}
 		local previous = {
-			notifications = package.loaded["infra.notifications"],
+			notifications = package.loaded["core.ui.engine.notifications"],
 			launcher = package.loaded["adapters.update_launcher"],
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				sent[#sent + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 				return true
@@ -397,7 +527,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 			sent[1].on_click()
 			helpers.assert_eq(checks, { "dev" }, "the click asks Sparkle for the release's channel")
 		end)
-		package.loaded["infra.notifications"] = previous.notifications
+		package.loaded["core.ui.engine.notifications"] = previous.notifications
 		package.loaded["adapters.update_launcher"] = previous.launcher
 		package.loaded["modules.updater.auto_check"] = nil
 		if not ok then error(err, 0) end
@@ -427,6 +557,173 @@ local function check_now(ctx, channel)
 end
 
 helpers.describe("updater.auto_check (macOS): the manual check answers the update-check window", function()
+	helpers.it("answers a manual check without overwriting an unreadable record", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.149" }
+		local ctx = build({ now = T0, record = original,
+			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
+		ctx.record_read_error = true
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.values[ctx.state_key], original)
+	end)
+	helpers.it("a late automatic check cannot overwrite a newer manual check", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		local manual = check_now(ctx, "dev")
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
+		helpers.assert_eq(manual[1].latest, "v0.0.0-dev.150")
+		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"')
+		helpers.assert_eq(#ctx.announced, 0)
+	end)
+
+	helpers.it("a late manual check cannot overwrite a newer automatic check", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		helpers.assert_true(ctx.owner.start())
+		local manual = check_now(ctx, "dev")
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
+		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
+		helpers.assert_eq(manual[1].latest, "v0.0.0-dev.140")
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"')
+	end)
+	helpers.it("a late older manual check cannot replace the latest result", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local older = check_now(ctx, "dev")
+		local newer = check_now(ctx, "dev")
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
+		helpers.assert_eq(newer[1].latest, "v0.0.0-dev.150")
+		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
+		helpers.assert_eq(older[1].latest, "v0.0.0-dev.140", "the older window still gets its own answer")
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the newer check owns the About row")
+		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"', "the older response cannot replace the list cache")
+	end)
+	helpers.it("a late older failure cannot replace a newer successful check record", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local older = check_now(ctx, "dev")
+		check_now(ctx, "dev")
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = {} })
+		ctx.pending[1]({ ok = true, status = 200, body = "[", headers = {} })
+		helpers.assert_eq(older[1].reason_key, "updater.parse_failed")
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0)
+		helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v0.0.0-dev.150")
+	end)
+	helpers.it("pairs each 304 with the list used by its own request", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true,
+			list_copy = { url = URL, etag = '"old"', body = UP_TO_DATE } })
+		local first = check_now(ctx, "dev")
+		local second = check_now(ctx, "dev")
+		helpers.assert_eq(ctx.requests[1].headers["If-None-Match"], '"old"')
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
+		helpers.assert_eq(second[1].latest, "v0.0.0-dev.150")
+		ctx.pending[1]({ ok = false, status = 304, headers = {} })
+		helpers.assert_eq(first[1].latest, "v0.0.0-dev.140", "304 answers only its own validator")
+	end)
+	helpers.it("does not answer an unconditional 304 from another request's cache", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local first = check_now(ctx, "dev")
+		check_now(ctx, "dev")
+		helpers.assert_nil(ctx.requests[1].headers["If-None-Match"])
+		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
+		ctx.pending[1]({ ok = false, status = 304, headers = {} })
+		helpers.assert_eq(#first, 0, "an unassociated 304 triggers fallback")
+		helpers.assert_eq(ctx.requests[3].url, FEED_URL)
+	end)
+	helpers.it("ignores duplicate API callbacks while the fallback feed is pending", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#ctx.pending, 2)
+		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
+		helpers.assert_eq(#answers, 0, "the first completion owns the pending fallback")
+		ctx.pending[2]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+	end)
+
+	-- UPD-06: an exhausted rate limit read « Could not reach GitHub »
+	helpers.it("upd-06: names an exhausted rate limit once the feed failed too", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+	end)
+
+	-- UPD-13: hs.http gave status -1 and a localized sentence, so a refusing
+	-- proxy, an offline Mac or a refused certificate read « Could not reach
+	-- GitHub ». The worker's closed reason now reaches the window through its
+	-- receipt, by the vectors Linux and the shared contract replay.
+	local Protocol = require("core.network.engine.managed_http_protocol")
+	local corpus_file = assert(io.open(helpers.shared("tests/corpus/updater/check_session_vectors.json"), "rb"))
+	local native_receipts = Json.decode(corpus_file:read("*a")).native_receipts
+	corpus_file:close()
+	for _, vector in ipairs(native_receipts) do
+		helpers.it("upd-13: " .. vector.id, function()
+			helpers.assert_eq(Protocol.failure_receipt(vector.terminal), vector.receipt,
+				"the worker protocol proves the corpus receipt")
+			local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+			local answers = check_now(ctx, "dev")
+			-- The worker's own stdout: one terminal frame naming the reason
+			local terminal = '{"version":1,"success":false,"reason":"' .. vector.terminal .. '"}'
+			ctx.pending[1](Protocol.result(74, string.pack(">I4", #terminal + 1)
+				.. string.char(Protocol.TAG_TERMINAL) .. terminal))
+			helpers.assert_eq(ctx.requests[2].url, FEED_URL, "the feed is still read")
+			ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native offline (exit 74)" })
+			helpers.assert_eq(#answers, 1)
+			helpers.assert_eq(answers[1].reason_key, vector.expect)
+		end)
+	end
+
+	helpers.it("upd-13: the rate limit still wins over a native cause of the feed", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native proxy (exit 74)",
+			failure_receipt = Protocol.failure_receipt("proxy") })
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+	end)
+
+	helpers.it("upd-13: the production session checks through the launcher worker", function()
+		local AutoCheck = load_module()
+		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
+		local worker, worker_opts, seen = { get = function() end }, nil, nil
+		local ok, err = pcall(function()
+			helpers.with_stub_scope({ "core.events.wake_watcher", "core.network.adapters.http_client",
+				"core.network.adapters.managed_http_worker", "core.fs.adapters.storage", "core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
+					start = function() return true end, stop = function() return true end,
+				} end }
+				package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+				package.loaded["core.network.adapters.managed_http_worker"] = {
+					new = function(opts) worker_opts = opts; return worker end,
+				}
+				package.loaded["core.fs.adapters.storage"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
+				AutoCheck.load_config = function() return { timeout_sec = 7 } end
+				AutoCheck.new = function(opts)
+					seen = opts
+					return { on_wake = function() end, start = function() return true end, stop = function() return true end }
+				end
+				helpers.assert_true(AutoCheck.start_session({}).stop())
+			end)
+		end)
+		AutoCheck.new, AutoCheck.load_config = old_new, old_config
+		if not ok then error(err, 0) end
+		helpers.assert_true(seen.manual_http == worker, "the manual check goes through the launcher worker")
+		helpers.assert_eq(worker_opts, { timeout_sec = 7 }, "the worker gets the configured timeout")
+		helpers.assert_eq(type(seen.failure_contract.classify), "function", "the managed-network contract is passed")
+	end)
+
 	helpers.it("offers a newer release of the checked channel without announcing it", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
@@ -458,6 +755,19 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_nil(ctx.owner.latest(), "the About row offers no release of the previous channel")
 		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag,
 			"a release of the previous channel does not silence the new channel's announcement")
+	end)
+
+	helpers.it("does not republish a manual result after the channel changes away and back", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.channel = "main"
+		ctx.owner.on_channel_changed()
+		ctx.channel = "dev"
+		ctx.owner.on_channel_changed()
+		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150", "the original window still gets its result")
+		helpers.assert_nil(ctx.owner.latest(), "a previous channel epoch cannot republish the About row")
+		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag)
 	end)
 
 	helpers.it("says up to date and still lists newer releases of other channels", function()
@@ -519,6 +829,24 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
 	end)
 
+	helpers.it("does not cache or send a malformed release ETag", function()
+		for _, etag in ipairs({ "garbage", "   ", '"unfinished' }) do
+			local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+				{ ok = true, status = 200, body = LIST, headers = { etag = etag } },
+				{ ok = true, status = 200, body = LIST, headers = {} },
+			} })
+			check_now(ctx, "dev")
+			helpers.assert_nil(ctx.values[ctx.list_key], "an invalid validator must not be saved")
+			check_now(ctx, "dev")
+			helpers.assert_nil(ctx.requests[2].headers["If-None-Match"])
+		end
+		local restored = build({ now = T0, record = { seed = SEED },
+			list_copy = { url = URL, etag = "garbage", body = LIST },
+			responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
+		check_now(restored, "dev")
+		helpers.assert_nil(restored.requests[1].headers["If-None-Match"], "a restored invalid ETag is dropped")
+	end)
+
 	helpers.it("drops a stored copy of another list URL and sends a full request", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			list_copy = { url = URL .. "&page=2", etag = '"v1"', body = "[]" },
@@ -528,11 +856,23 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_nil(ctx.values[ctx.list_key], "a response without an ETag leaves no copy")
 	end)
 
+	helpers.it("drops a damaged stored list before sending a conditional request", function()
+		for _, body in ipairs({ '[{"tag_name":"v0.0.0-dev.150"', '[{}]' }) do
+			local ctx = build({ now = T0, record = { seed = SEED },
+				list_copy = { url = URL, etag = '"v1"', body = body },
+				responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
+			local answers = check_now(ctx, "dev")
+			helpers.assert_nil(ctx.requests[1].headers["If-None-Match"])
+			helpers.assert_eq(answers[1].state, "available")
+		end
+	end)
+
 	helpers.it("names an exhausted GitHub rate limit and its reset time", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, responses = { { ok = false, status = 403,
 			headers = { ["X-RateLimit-Remaining"] = "0", ["x-ratelimit-reset"] = "86400" } } } })
 		local answers = check_now(ctx, "dev")
-		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		-- The window names the limit, not a network failure (UPD-06)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
 		helpers.assert_contains(answers[1].detail, "1970-01-02 00:00:00 UTC")
 	end)
@@ -614,7 +954,7 @@ local RATE_LIMITED = { ok = false, status = 403,
 
 helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API gives no list (update-check-feed-99)", function()
 	helpers.it("reads the feed's repository tags in order, as the update check's list", function()
-		local ReleaseSources = require("updater.release_sources")
+		local ReleaseSources = require("updater.engine.release_sources")
 		local list = assert(ReleaseSources.feed_release_list(FEED, "adrienm7", "ergopti"))
 		helpers.assert_eq(Json.decode(list), {
 			{ tag_name = "v0.0.0-dev.150", published_at = "2026-09-02T00:00:00Z" },
@@ -650,10 +990,40 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 			RATE_LIMITED, { ok = true, status = 200, body = "<html>proxy page</html>", headers = {} } } })
 		local answers = check_now(ctx, "dev")
 		helpers.assert_eq(answers[1].state, "error")
-		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		-- The API's exhausted limit names the failure; the detail keeps both causes (UPD-06)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
 		helpers.assert_contains(answers[1].detail, "Atom feed: HTTP 200 without an Atom feed")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+	end)
+
+	-- UPD-1 (decided by the maintainer on 2026-11-11): the three drivers read a
+	-- 200 that does not open a JSON array as no connection through one shared
+	-- rule (updater.release_sources.opens_release_array), then the feed.
+	helpers.it("a captive-portal page from the API is no list: the feed answers (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "<html>Please sign in to the hotel Wi-Fi</html>", headers = {} },
+			{ ok = true, status = 200, body = FEED, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 2, "the API, then the feed")
+		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("a cut array stays a list that could not be read, with no feed (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = '[{"tag_name":"v1.0.0"}', headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a release list cut short is no connection problem")
+		helpers.assert_eq(answers[1].reason_key, "updater.parse_failed")
+	end)
+
+	helpers.it("a page opening after a byte-order mark is still read as a list (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "\239\187\191[]", headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a BOM before the array is the list, not a portal page")
 	end)
 
 	helpers.it("a manual check reads no feed for a list the API answered unusable", function()

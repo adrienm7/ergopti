@@ -10,12 +10,13 @@ The module therefore owns four responsibilities:
 
 - refuse, or drop back to, the desktop user before touching any session state;
 - apply the layout on the desktop that owns the setting (GNOME-based sessions
-  through gsettings, KDE Plasma through kwriteconfig, X11 through setxkbmap)
-  and report each outcome, without pretending a write into a setting nobody
-  reads is an activation;
+  through gsettings, KDE Plasma through kwriteconfig, Hyprland through
+  ``hyprctl keyword``, X11 through setxkbmap) and report each outcome, without
+  pretending a write into a setting nobody reads is an activation;
 - print an exact, copy-pasteable instruction for every other session, because
-  wlroots compositors (Sway, Hyprland, niri, river, ...) have no shared setting
-  and can only be configured from their own configuration file;
+  the other wlroots compositors (Sway, niri, river, ...) expose no setting
+  another program can both write and read back, and can only be configured
+  from their own configuration file;
 - prove, with the real compilers, that the installed layout resolves, binds
   the custom key type to its keys and carries the Ctrl level, alone and next
   to another layout; a compiler's own diagnostics are printed whenever a check
@@ -29,6 +30,7 @@ does not verify is a failed installation.
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
@@ -720,7 +722,36 @@ def apply_gnome(specs: list[LayoutSpec], tokens: set[str]) -> bool:
     else:
         print("   ✅ GNOME : la disposition est déjà en première position.")
     _gnome_make_most_recent(wanted, changed)
+    if is_gnome_session(tokens):
+        # Only a GNOME session runs the Shell the extension lives in.
+        _gnome_switch_running_shell("xkb:" + wanted[0][1])
     return True
+
+
+def _gnome_switch_running_shell(source_id: str) -> None:
+    """Switches the running Shell, which ignores the lists until the next login.
+
+    Only the Ergopti GNOME Shell extension can; a Shell that does not list the
+    layout yet (registered after it started) keeps its own, never the "us"
+    fallback, since the extension activates listed sources only."""
+    state = gnome_activate_when_listed(source_id)
+    if state == GNOME_SWITCH_SWITCHED:
+        print("   ✅ GNOME : disposition activée dans la session en cours.")
+    elif state == GNOME_SWITCH_MISSING:
+        print(
+            "   ℹ️  GNOME : l'extension Ergopti n'est pas active ; la disposition "
+            "sera active à la prochaine connexion."
+        )
+    elif state == GNOME_SWITCH_UNLISTED:
+        print(
+            "   ℹ️  GNOME Shell ne connaît pas encore cette disposition : elle sera "
+            "active à la prochaine connexion."
+        )
+    else:
+        print(
+            "   ⚠️  GNOME : la session en cours n'a pas changé de disposition ; elle "
+            "sera active à la prochaine connexion."
+        )
 
 
 def _gnome_make_most_recent(wanted: list[tuple[str, str]], sources_changed: bool) -> None:
@@ -851,6 +882,117 @@ def apply_kde(specs: list[LayoutSpec], tokens: set[str]) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Hyprland
+# ---------------------------------------------------------------------------
+
+# Hyprland is the one wlroots-family compositor whose keyboard setting another
+# program can write and read back at runtime (``hyprctl keyword`` and
+# ``hyprctl getoption``); it compiles the layout with libxkbcommon, which reads
+# the user XKB tree. The runtime value lasts until Hyprland reloads its
+# configuration file or a new session starts. Sway accepts a runtime layout
+# but reports only layout descriptions, never the configured ids, so a
+# refused selection could not be put back there: it keeps the printed snippet.
+HYPRLAND_TOKEN = "hyprland"
+HYPRLAND_LAYOUT_OPTION = "input:kb_layout"
+HYPRLAND_VARIANT_OPTION = "input:kb_variant"
+# What ``hyprctl getoption`` prints for an option holding the empty string.
+HYPRLAND_EMPTY_VALUE = "[[EMPTY]]"
+
+
+def is_hyprland_session(tokens: set[str]) -> bool:
+    return HYPRLAND_TOKEN in tokens
+
+
+def hyprland_get(option: str) -> str | None:
+    """The string value of a Hyprland option, ``None`` when it cannot be read."""
+    raw = run_capture(["hyprctl", "-j", "getoption", option])
+    if raw is None:
+        return None
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    value = data.get("str") if isinstance(data, dict) else None
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return "" if value == HYPRLAND_EMPTY_VALUE else value
+
+
+def hyprland_set(option: str, value: str, label: str) -> bool:
+    """Sets one Hyprland option at runtime and proves it by reading it back."""
+    output = run_capture(["hyprctl", "keyword", option, value])
+    accepted = output is not None and output.strip() == "ok" and hyprland_get(option) == value
+    print(f"   {'✅' if accepted else '❌'} {label} ({option} = {value!r})")
+    return accepted
+
+
+def hyprland_read_layouts() -> tuple[str, str] | None:
+    """The ``kb_layout`` and ``kb_variant`` lists, ``None`` when either is unreadable."""
+    layouts = hyprland_get(HYPRLAND_LAYOUT_OPTION)
+    variants = hyprland_get(HYPRLAND_VARIANT_OPTION)
+    if layouts is None or variants is None:
+        return None
+    return layouts, variants
+
+
+def hyprland_write_layouts(layout_list: str, variant_list: str, label: str) -> bool:
+    """Writes both aligned lists, in the order that never pairs a layout with a
+    variant it lacks.
+
+    Each write recompiles the keymap at once. Going from (us / intl) to
+    (ergol,us / ,intl), writing the variants first keeps ``us`` without a
+    variant; coming back, writing the layouts first keeps ``us`` with
+    ``,intl``. So the variant list goes first when its first entry is empty,
+    the layout list first otherwise."""
+    steps = [
+        (HYPRLAND_VARIANT_OPTION, variant_list),
+        (HYPRLAND_LAYOUT_OPTION, layout_list),
+    ]
+    if variant_list.split(",")[0] != "":
+        steps.reverse()
+    return all(hyprland_set(option, value, label) for option, value in steps)
+
+
+def apply_hyprland(specs: list[LayoutSpec]) -> bool:
+    """Put the layouts first in Hyprland's runtime layout list."""
+    current = hyprland_read_layouts()
+    if current is None:
+        print("   ⚠️  Hyprland : lecture de input:kb_layout impossible (hyprctl), étape ignorée.")
+        return False
+    merged, changed = merge_layout_specs(parse_kde_layouts(*current), specs)
+    if not changed:
+        print("   ✅ Hyprland : la disposition est déjà en première position.")
+        return True
+    layout_list, variant_list = format_kde_layouts(merged)
+    return hyprland_write_layouts(layout_list, variant_list, "Hyprland : dispositions")
+
+
+def deactivate_hyprland(owned: Callable[[LayoutSpec], bool]) -> CleanupStatus:
+    """Drop the owned layouts from Hyprland's runtime list.
+
+    A list that keeps an id whose files are gone makes the next keymap reload
+    fail. Outside a Hyprland session, or without hyprctl, nothing is owed."""
+    if not is_hyprland_session(desktop_tokens()) or shutil.which("hyprctl") is None:
+        return CleanupStatus.ABSENT
+    current = hyprland_read_layouts()
+    if current is None:
+        return CleanupStatus.FAILED
+    kept, removed = remove_layout_specs(parse_kde_layouts(*current), owned)
+    if not removed:
+        return CleanupStatus.ABSENT
+    if not kept:
+        # An empty list is Hyprland's own default, "us": say it explicitly.
+        kept = [LayoutSpec("us")]
+    layout_list, variant_list = format_kde_layouts(kept)
+    if hyprland_write_layouts(
+        layout_list, variant_list, "Hyprland : dispositions Ergopti retirées"
+    ):
+        return CleanupStatus.CHANGED
+    return CleanupStatus.FAILED
+
+
+# ---------------------------------------------------------------------------
 # X11
 # ---------------------------------------------------------------------------
 
@@ -968,21 +1110,49 @@ def keymap_group_symbols(keymap: str, key: str, group: int) -> list[str]:
     return [part.strip() for part in bare[-1].split(",") if part.strip()] if bare else []
 
 
+def _group_matches(held: str, held_group: int, expected: str, expected_group: int) -> bool:
+    for key in ROW_PROBE_KEYS:
+        wanted = keymap_group_symbols(expected, key, expected_group)
+        if keymap_group_symbols(held, key, held_group) != wanted:
+            return False
+    return True
+
+
+def keymap_is_unnamed(keymap: str) -> bool:
+    """Whether a server keymap names no layouts: a compositor's upload (mutter
+    gives XWayland an "(unnamed)" symbols section), read by content instead."""
+    match = _SYMBOLS_NAME.search(keymap or "")
+    return match is not None and match.group(1) == "(unnamed)"
+
+
+def keymap_held_group(held: str, expected: str, layout: str) -> int | None:
+    """The group of ``held`` that holds ``layout``: by the symbols section's
+    layout names, or, in an unnamed keymap, the first group typing the probe
+    keys exactly as ``expected`` does."""
+    named = keymap_layout_group(held, layout)
+    if named is not None or not keymap_is_unnamed(held):
+        return named
+    expected_group = keymap_layout_group(expected, layout)
+    if expected_group is None:
+        return None
+    groups = [int(number) for number in re.findall(r"symbols\[[Gg]roup(\d+)\]", held)] or [1]
+    for group in range(1, max(groups) + 1):
+        if _group_matches(held, group, expected, expected_group):
+            return group
+    return None
+
+
 def keymap_carries_layout(held: str, expected: str, layout: str) -> bool:
     """Whether the keymap ``held`` by a server types ``layout`` as compiled in ``expected``.
 
     Both are printed by ``xkbcomp``, so keysym names are spelled the same way;
     the layout may sit in another group of ``held`` (a desktop with several
     input sources)."""
-    held_group = keymap_layout_group(held, layout)
+    held_group = keymap_held_group(held, expected, layout)
     expected_group = keymap_layout_group(expected, layout)
     if held_group is None or expected_group is None:
         return False
-    for key in ROW_PROBE_KEYS:
-        wanted = keymap_group_symbols(expected, key, expected_group)
-        if keymap_group_symbols(held, key, held_group) != wanted:
-            return False
-    return True
+    return _group_matches(held, held_group, expected, expected_group)
 
 
 def apply_x11_user_tree(
@@ -1032,7 +1202,7 @@ def apply_x11_user_tree(
 
 
 # ---------------------------------------------------------------------------
-# Wayland live replacement (GNOME, KDE)
+# Wayland live replacement (GNOME, KDE, Hyprland)
 # ---------------------------------------------------------------------------
 
 # A compositor compiles a keymap again when the selected layout id changes;
@@ -1051,11 +1221,73 @@ WAYLAND_COMPILE_FAILED = "compile_failed"
 WAYLAND_SELECT_REFUSED = "select_refused"
 WAYLAND_NOT_LOADED = "not_loaded"
 WAYLAND_STALE_KEYMAP = "stale_keymap"
+WAYLAND_NEEDS_RELOGIN = "needs_relogin"
+WAYLAND_GNOME_EXTENSION_MISSING = "gnome_extension_missing"
 
 # The compositor compiles the new keymap in its own time after the setting
 # changes; XWayland then receives it. A bounded poll, never a fixed sleep.
 WAYLAND_READBACK_SECONDS = 10.0
 WAYLAND_READBACK_INTERVAL_SECONDS = 0.2
+
+
+# GNOME Shell (checked on 46) reads the layout registry, the user tree's
+# rules/evdev.xml included, once when it starts: an id registered later is
+# unknown to it until the next login, and it falls back to "us" when the
+# setting names that id alone. A process start time is known to the second
+# (/proc/stat btime), so a registry written within this margin of the shell
+# start counts as written after it.
+GNOME_SHELL_PROCESS = "gnome-shell"
+GNOME_REGISTRY_MARGIN_SECONDS = 1.0
+
+
+def process_started_at(name: str, proc: Path = Path("/proc")) -> float | None:
+    """When the newest process ``name`` of this user started (epoch seconds),
+    or ``None`` when this user runs none."""
+    boot = next(
+        (
+            float(line.split()[1])
+            for line in (proc / "stat").read_text(encoding="ascii").splitlines()
+            if line.startswith("btime ")
+        ),
+        None,
+    )
+    if boot is None:
+        raise RuntimeError("%s/stat has no btime line" % proc)
+    ticks_per_second = os.sysconf("SC_CLK_TCK")
+    newest = None
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != os.getuid():
+                continue
+            if (entry / "comm").read_text(encoding="utf-8").strip() != name:
+                continue
+            fields = (entry / "stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            # The process ended (or hides itself) while the folder was read.
+            continue
+        # Field 22 of /proc/<pid>/stat, the 20th after the command name.
+        started = boot + int(fields[19]) / ticks_per_second
+        newest = started if newest is None else max(newest, started)
+    return newest
+
+
+def registry_lists_layout(registry: Path, layout_id: str) -> bool:
+    """Whether a rules/evdev.xml registry names ``layout_id``."""
+    try:
+        text = registry.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    return ("<name>%s</name>" % layout_id) in text
+
+
+def gnome_shell_knows_layout(registry: Path, layout_id: str, shell_started_at: float) -> bool:
+    """Whether a GNOME Shell started at ``shell_started_at`` read ``layout_id``
+    from the user registry: the registry named it before the shell started."""
+    if not registry_lists_layout(registry, layout_id):
+        return False
+    return registry.stat().st_mtime < shell_started_at - GNOME_REGISTRY_MARGIN_SECONDS
 
 
 def live_slots(layout_id: str) -> tuple[str, str]:
@@ -1064,12 +1296,16 @@ def live_slots(layout_id: str) -> tuple[str, str]:
 
 
 def wayland_live_desktop(environ: dict[str, str] | None = None) -> str | None:
-    """``gnome`` or ``kde`` when this Wayland session selects layouts through a
-    setting this module can write and read back; ``None`` for every other session."""
+    """``gnome``, ``kde`` or ``hyprland`` when this Wayland session selects layouts
+    through a setting this module can write and read back; ``None`` for every
+    other session."""
     if session_type(environ) != "wayland":
         return None
-    owner = owning_desktop(desktop_tokens(environ))
-    return owner if owner in ("gnome", "kde") else None
+    tokens = desktop_tokens(environ)
+    owner = owning_desktop(tokens)
+    if owner in ("gnome", "kde"):
+        return owner
+    return HYPRLAND_TOKEN if is_hyprland_session(tokens) else None
 
 
 @dataclass
@@ -1110,27 +1346,119 @@ def _read_kde_selection(slots: tuple[str, str]) -> DesktopSelection | None:
     return DesktopSelection("kde", values, in_use)
 
 
+def _read_hyprland_selection(slots: tuple[str, str]) -> DesktopSelection | None:
+    current = hyprland_read_layouts()
+    if current is None:
+        return None
+    layouts = parse_kde_layouts(*current)
+    in_use = next(
+        (spec.layout for spec in layouts if spec.layout in slots and not spec.variant), None
+    )
+    return DesktopSelection(
+        HYPRLAND_TOKEN,
+        {HYPRLAND_LAYOUT_OPTION: current[0], HYPRLAND_VARIANT_OPTION: current[1]},
+        in_use,
+    )
+
+
 def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelection | None:
     """The current setting, or ``None`` when it cannot be read (never overwritten then)."""
     if desktop == "gnome":
         return _read_gnome_selection(slots)
+    if desktop == HYPRLAND_TOKEN:
+        return _read_hyprland_selection(slots)
     return _read_kde_selection(slots)
 
 
-def _gnome_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+# The Ergopti GNOME Shell extension's layout switch
+# (static/ergopti_plus/linux/platform/desktop_focus/gnome/extension.js, which
+# tests/test_desktop_activation.py pins against these).
+GNOME_SWITCH_PATH = "/org/ergopti/InputSource"
+GNOME_SWITCH_INTERFACE = "org.ergopti.InputSource1"
+GNOME_SWITCH_SWITCHED = "switched"
+GNOME_SWITCH_UNLISTED = "unlisted"
+GNOME_SWITCH_MISSING = "extension_missing"
+GNOME_SWITCH_FAILED = "failed"
+# What GDBus answers for a path or method nobody exports on the Shell.
+_GNOME_SWITCH_MISSING_ERRORS = (
+    "org.freedesktop.DBus.Error.UnknownMethod",
+    "org.freedesktop.DBus.Error.UnknownObject",
+    "org.freedesktop.DBus.Error.UnknownInterface",
+)
+
+
+def gnome_extension_activate(source_id: str) -> str:
+    """Asks the Ergopti GNOME Shell extension to activate ``source_id`` ("xkb:<id>").
+
+    A running GNOME Shell keeps its input sources in memory and ignores
+    runtime writes of ``current`` and ``mru-sources``: only code inside the
+    Shell switches it reliably. Returns one of the GNOME_SWITCH_* states."""
+    try:
+        result = subprocess.run(
+            [
+                "gdbus",
+                "call",
+                "--session",
+                "--dest",
+                "org.gnome.Shell",
+                "--object-path",
+                GNOME_SWITCH_PATH,
+                "--method",
+                GNOME_SWITCH_INTERFACE + ".Activate",
+                "'" + source_id + "'",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return GNOME_SWITCH_FAILED
+    if result.returncode == 0:
+        answer = result.stdout.strip()
+        if answer == "(true,)":
+            return GNOME_SWITCH_SWITCHED
+        return GNOME_SWITCH_UNLISTED if answer == "(false,)" else GNOME_SWITCH_FAILED
+    if any(marker in result.stderr for marker in _GNOME_SWITCH_MISSING_ERRORS):
+        return GNOME_SWITCH_MISSING
+    return GNOME_SWITCH_FAILED
+
+
+def gnome_activate_when_listed(source_id: str) -> str:
+    """Activates ``source_id`` once the Shell lists it.
+
+    The Shell reads a `sources` write in its own time: until then the
+    extension answers that it does not list the source. A bounded poll,
+    never a fixed sleep."""
+    deadline = time.monotonic() + WAYLAND_READBACK_SECONDS
+    while True:
+        state = gnome_extension_activate(source_id)
+        if state != GNOME_SWITCH_UNLISTED or time.monotonic() >= deadline:
+            return state
+        time.sleep(WAYLAND_READBACK_INTERVAL_SECONDS)
+
+
+def _gnome_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> str:
+    """Writes the merged lists with the slot first, then activates it through
+    the Ergopti GNOME Shell extension; returns a GNOME_SWITCH_* state.
+
+    The lists keep the slot first for the next login; the running Shell
+    switches only through the extension."""
     for key in (GNOME_KEY, GNOME_MRU_KEY):
         current = parse_gsettings_sources(selection.values[key]) or []
         wanted = [("xkb", slot)] + [
             pair for pair in current if not (pair[0] == "xkb" and pair[1] in slots)
         ]
         if not _gnome_set(key, wanted, "GNOME : disposition " + slot):
-            return False
+            return GNOME_SWITCH_FAILED
         readback = parse_gsettings_sources(
             run_capture(["gsettings", "get", GNOME_SCHEMA, key]) or ""
         )
         if readback != wanted:
-            return False
-    return True
+            return GNOME_SWITCH_FAILED
+    return gnome_activate_when_listed("xkb:" + slot)
 
 
 def _kde_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
@@ -1159,8 +1487,23 @@ def _kde_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) 
     return True
 
 
+def _hyprland_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+    current = parse_kde_layouts(
+        selection.values[HYPRLAND_LAYOUT_OPTION], selection.values[HYPRLAND_VARIANT_OPTION]
+    )
+    kept, _ = remove_layout_specs(current, lambda spec: spec.layout in slots and not spec.variant)
+    layout_list, variant_list = format_kde_layouts([LayoutSpec(slot)] + kept)
+    return hyprland_write_layouts(layout_list, variant_list, "Hyprland : disposition " + slot)
+
+
 def restore_desktop_selection(selection: DesktopSelection) -> bool:
     """Writes back the setting read before a refused live selection."""
+    if selection.desktop == HYPRLAND_TOKEN:
+        return hyprland_write_layouts(
+            selection.values[HYPRLAND_LAYOUT_OPTION],
+            selection.values[HYPRLAND_VARIANT_OPTION],
+            "Hyprland : réglage précédent rétabli",
+        )
     if selection.desktop == "gnome":
         restored = True
         for key in (GNOME_KEY, GNOME_MRU_KEY):
@@ -1192,7 +1535,7 @@ def wait_for_xwayland_keymap(spec: LayoutSpec, tree_root: Path, display: str) ->
     deadline = time.monotonic() + WAYLAND_READBACK_SECONDS
     while True:
         held = x11_loaded_keymap(display) or ""
-        if keymap_layout_group(held, spec.layout) is None:
+        if keymap_held_group(held, expected, spec.layout) is None:
             code = WAYLAND_NOT_LOADED
         elif keymap_carries_layout(held, expected, spec.layout):
             return WAYLAND_APPLIED
@@ -1228,8 +1571,17 @@ def select_live_slot(
     if refusal is not None:
         return False, refusal
     display = (os.environ if environ is None else environ)["DISPLAY"]
-    select = _gnome_select if selection.desktop == "gnome" else _kde_select
-    if not select(slot, slots, selection):
+    if selection.desktop == "gnome":
+        state = _gnome_select(slot, slots, selection)
+        if state == GNOME_SWITCH_MISSING:
+            restore_desktop_selection(selection)
+            return False, WAYLAND_GNOME_EXTENSION_MISSING
+        selected = state == GNOME_SWITCH_SWITCHED
+    elif selection.desktop == HYPRLAND_TOKEN:
+        selected = _hyprland_select(slot, slots, selection)
+    else:
+        selected = _kde_select(slot, slots, selection)
+    if not selected:
         restore_desktop_selection(selection)
         return False, WAYLAND_SELECT_REFUSED
     code = wait_for_xwayland_keymap(LayoutSpec(slot), tree_root, display)
@@ -1757,6 +2109,11 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                         failed = True
                 else:
                     failed = True
+    hyprland_status = deactivate_hyprland(owned)
+    if hyprland_status is CleanupStatus.FAILED:
+        failed = True
+    elif hyprland_status is CleanupStatus.CHANGED:
+        changed = True
     if failed:
         return CleanupStatus.FAILED
     return CleanupStatus.CHANGED if changed else CleanupStatus.ABSENT
@@ -1803,9 +2160,13 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
         kde_applied = apply_kde(specs, tokens)
     else:
         print(f"   ℹ️  Réglage KDE ignoré : le bureau « {desktop} » ne le lit pas.")
+    hyprland_applied = is_hyprland_session(tokens) and apply_hyprland(specs)
     x11_applied = apply_x11(primary, environ)
     handled = (
-        (gnome_applied and owner == "gnome") or (kde_applied and owner == "kde") or x11_applied
+        (gnome_applied and owner == "gnome")
+        or (kde_applied and owner == "kde")
+        or hyprland_applied
+        or x11_applied
     )
     if not handled:
         for line in manual_instructions(primary, tokens, kind):
@@ -1822,4 +2183,4 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
             "   ⚠️  Disposition non activée automatiquement : appliquez les instructions ci-dessus."
         )
     print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
-    return gnome_applied or kde_applied or x11_applied
+    return gnome_applied or kde_applied or hyprland_applied or x11_applied

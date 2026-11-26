@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Chord Notation Corpus Consumer (AHK)
 ; DESCRIPTION:
-; Runs the shared chord corpus (_shared/lua/chord/vectors.json) against the
+; Runs the shared chord corpus (_shared/keyboard/engine/chord/vectors.json) against the
 ; AutoHotkey notation twin in infra/chord.ahk. The macOS driver runs the SAME file
 ; against the shared Lua core (macos/tests/unit/meta/test_chord_notation.lua),
 ; which is the only thing that makes "one notation, two implementations" a fact
@@ -33,7 +33,7 @@
 ; ================================
 
 _Chord_RunAll() {
-	CorpusPath := A_ScriptDir . "\..\..\_shared\lua\chord\vectors.json"
+	CorpusPath := A_ScriptDir . "\..\..\_shared\keyboard\engine\chord\vectors.json"
 
 	_Chord_FileExists() {
 		AssertTrue(FileExist(CorpusPath) != "", "chord corpus must exist at: " . CorpusPath)

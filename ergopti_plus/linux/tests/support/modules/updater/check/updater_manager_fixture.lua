@@ -14,7 +14,7 @@ local Fakes = helpers.load_module("tests.fakes")
 
 local Installer = helpers.load_module("modules.updater.installer")
 
-local Fs = helpers.load_module("adapters.file_system")
+local Fs = helpers.load_module("core.fs.adapters.file_system")
 
 --- Authors native evidence for controlled responses independently of request options.
 --- Each literal endpoint names one fixture representation, including bodyless 304s.
@@ -25,7 +25,7 @@ local function etag_response(result, endpoint, validator, conditional)
 	return result
 end
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Runs a body against a fresh manager bound to a temporary config.toml.
 local function with_config(initial, body)
@@ -53,7 +53,7 @@ end
 local function read_config(path)
 	local handle = io.open(path, "r")
 	if not handle then return nil end
-	local decoded = require("toml_codec").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 	handle:close()
 	return decoded
 end

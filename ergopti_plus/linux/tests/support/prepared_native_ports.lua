@@ -185,7 +185,7 @@ end
 --- @return table
 local function load_against_fake(module_name, fake)
 	local saved = {}
-	for _, name in ipairs({ "luv", module_name, "adapters.shell_runner", "infra.monotonic" }) do
+	for _, name in ipairs({ "luv", module_name, "core.process.adapters.shell_runner", "core.logger.engine.monotonic" }) do
 		saved[#saved + 1] = { name = name, value = package.loaded[name] }
 	end
 	package.loaded["luv"] = fake
@@ -201,7 +201,7 @@ end
 --- @return table client, table state
 local function fresh_client(config)
 	local fake, state = fake_luv(config)
-	return load_against_fake("adapters.curl_http_client", fake), state
+	return load_against_fake("core.network.adapters.curl_http_client", fake), state
 end
 
 --- Loads a fresh file digest adapter against one fake libuv instance.
@@ -209,7 +209,7 @@ end
 --- @return table digest, table state
 local function fresh_digest(config)
 	local fake, state = fake_luv(config)
-	return load_against_fake("adapters.file_digest", fake), state
+	return load_against_fake("core.fs.adapters.file_digest", fake), state
 end
 
 

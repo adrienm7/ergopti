@@ -103,7 +103,9 @@ on load_ui(loc, locales_dir)
 		btn_close: my json_get(json_path, "common.close", "Close"), ¬
 		warn_overwrite: my json_get(json_path, "apps.encryptor.warn_overwrite", "A destination file already exists. Overwrite?"), ¬
 		btn_overwrite: my json_get(json_path, "apps.encryptor.btn_overwrite", "Overwrite"), ¬
-		lbl_file: my json_get(json_path, "apps.encryptor.lbl_file", "File:")}
+		lbl_file: my json_get(json_path, "apps.encryptor.lbl_file", "File:"), ¬
+		reason_destination_folder: my json_get(json_path, "apps.encryptor.reason_destination_folder", "The destination is a folder."), ¬
+		reason_cannot_write: my json_get(json_path, "apps.encryptor.reason_cannot_write", "The file could not be written in this folder.")}
 end load_ui
 
 -- Hardcoded English strings used only when the locales directory is unavailable.
@@ -128,7 +130,9 @@ on hardcoded_en_strings()
 		btn_close: "Close", ¬
 		warn_overwrite: "A destination file already exists. Overwrite?", ¬
 		btn_overwrite: "Overwrite", ¬
-		lbl_file: "File:"}
+		lbl_file: "File:", ¬
+		reason_destination_folder: "The destination is a folder.", ¬
+		reason_cannot_write: "The file could not be written in this folder."}
 end hardcoded_en_strings
 
 -- Resolve the absolute path to the locales directory.
@@ -169,6 +173,24 @@ on ask_password(prompt_text, dialog_title, btn_cancel_label)
 		buttons {btn_cancel_label, "OK"} default button "OK" cancel button btn_cancel_label
 	return text returned of r
 end ask_password
+
+
+-- Write the password into an existing private file, without a newline.
+-- OpenSSL "-pass file:" reads its first line, so the bytes match what the
+-- former "-pass pass:" argument carried. Throws when the file cannot be written.
+on write_private_password(pw_file, secret_text)
+	set fh to open for access (POSIX file pw_file) with write permission
+	try
+		set eof of fh to 0
+		write secret_text to fh as «class utf8»
+		close access fh
+	on error err_msg number err_num
+		try
+			close access fh
+		end try
+		error err_msg number err_num
+	end try
+end write_private_password
 
 
 -- ====================================================
@@ -246,11 +268,18 @@ on process_file(file_path, is_encrypt, s)
 		set dest_exists to true
 	end try
 	if dest_exists then
-		set overwrite_answer to button returned of ¬
-			(display alert (warn_overwrite of s) ¬
-				buttons {btn_cancel of s, btn_overwrite of s} ¬
-				default button btn_overwrite of s ¬
-				cancel button btn_cancel of s)
+		-- A cancel button raises error -128 instead of returning it: caught
+		-- here, it skips this file only, and the next dropped file is still
+		-- processed, as on Windows and Linux (BAP-003).
+		try
+			set overwrite_answer to button returned of ¬
+				(display alert (warn_overwrite of s) ¬
+					buttons {btn_cancel of s, btn_overwrite of s} ¬
+					default button btn_overwrite of s ¬
+					cancel button btn_cancel of s)
+		on error number -128
+			return
+		end try
 		if overwrite_answer is (btn_cancel of s) then return
 	end if
 
@@ -296,43 +325,54 @@ on process_file(file_path, is_encrypt, s)
 		end if
 	end repeat
 
-	-- Run openssl.
+	-- Run openssl through encryptor_convert.sh.
 	-- AES-256-CBC with PBKDF2 key derivation (-pbkdf2 -iter 600000).
 	-- -pbkdf2 is supported by the LibreSSL shipped with macOS 10.15+ and
 	-- by any OpenSSL 1.1.1+; it eliminates the legacy MD5 key derivation
 	-- warning and dramatically increases brute-force cost.
-	set openssl_cmd to ""
-	if is_encrypt then
-		set openssl_cmd to "openssl enc -aes-256-cbc -pbkdf2 -iter 600000" ¬
-			& " -in " & quoted form of file_path ¬
-			& " -out " & quoted form of dest_path ¬
-			& " -pass pass:" & quoted form of the_password
-	else
-		set openssl_cmd to "openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000" ¬
-			& " -in " & quoted form of file_path ¬
-			& " -out " & quoted form of dest_path ¬
-			& " -pass pass:" & quoted form of the_password
+	-- The password never enters a shell command: every argument is visible to
+	-- local processes through the process table. It is written into a private
+	-- folder and OpenSSL reads it from that file.
+	set convert_mode to "decrypt"
+	if is_encrypt then set convert_mode to "encrypt"
+	set openssl_ok to false
+	set convert_status to 0
+	set pw_dir to ""
+	try
+		set pw_dir to do shell script "umask 077; d=$(mktemp -d) && : > \"$d/password\" && printf %s \"$d\""
+		set pw_file to pw_dir & "/password"
+		my write_private_password(pw_file, the_password)
+		set helper_path to POSIX path of (path to resource "encryptor_convert.sh")
+		do shell script "/bin/sh " & quoted form of helper_path ¬
+			& " " & convert_mode ¬
+			& " " & quoted form of file_path ¬
+			& " " & quoted form of dest_path ¬
+			& " " & quoted form of pw_file
+		set openssl_ok to true
+	on error number error_number
+		set convert_status to error_number
+	end try
+	if pw_dir is not "" then
+		try
+			do shell script "rm -rf " & quoted form of pw_dir
+		end try
 	end if
 
-	set openssl_ok to false
-	try
-		do shell script openssl_cmd
-		set openssl_ok to true
-	on error
-		-- Remove partial output file on failure.
-		try
-			do shell script "rm -f " & quoted form of dest_path
-		end try
-	end try
-
 	if not openssl_ok then
-		if is_encrypt then
-			display alert (err_encrypt_failed of s) as critical ¬
-				buttons {btn_close of s} default button 1
-		else
-			display alert (err_decrypt_failed of s) as critical ¬
-				buttons {btn_close of s} default button 1
+		set failure_msg to err_decrypt_failed of s
+		if is_encrypt then set failure_msg to err_encrypt_failed of s
+		-- A refused write carries its reason, as Windows appends the system's
+		-- (BAP-007). Status 1 is OpenSSL's own refusal (a wrong password or a
+		-- corrupted file, which the message already names).
+		if convert_status is not 1 then
+			set failure_reason to reason_cannot_write of s
+			try
+				do shell script "test -d " & quoted form of dest_path
+				set failure_reason to reason_destination_folder of s
+			end try
+			set failure_msg to failure_msg & return & return & failure_reason
 		end if
+		display alert failure_msg as critical buttons {btn_close of s} default button 1
 		return
 	end if
 

@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of the check-only answer: the public releases Atom feed (releases_feed.atom in this folder) read as a release list, then classified by _shared/lua/updater/check_result.lua with check_only set. The feed names tags only, so an available release is announced but never installable. Replayed by the Linux and macOS Lua suites. The foreign entry of the feed (another repository) never counts.",
+	"_comment": "Vectors of the check-only answer: the public releases Atom feed (releases_feed.atom in this folder) read as a release list, then classified by _shared/updater/engine/check_result.lua with check_only set. The feed names tags only, so an available release is announced but never installable. Replayed by the Linux and macOS Lua suites. The foreign entry of the feed (another repository) never counts.",
 	"feed": "releases_feed.atom",
 	"owner": "adrienm7",
 	"repo": "ergopti",

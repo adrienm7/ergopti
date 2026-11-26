@@ -38,9 +38,7 @@ import keylayout_to_xkb  # noqa: E402
 LINUX_DIR = SCRIPT_DIR.parent
 BUNDLES_DIR = LINUX_DIR.parent / "macos" / "bundles"
 STATIC_DIR = LINUX_DIR.parent.parent
-KEYCODES_PATH = (
-    STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
-)
+KEYCODES_PATH = STATIC_DIR / "ergopti_plus" / "_shared" / "layouts" / "data" / "mac_keycodes.json"
 REGISTRY_INDEX_PATH = STATIC_DIR / "layouts" / "registry" / "index.json"
 
 # Registry entry whose keysym choices every Ergopti file uses.

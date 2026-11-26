@@ -46,7 +46,7 @@ body {
 	position: relative;
 }
 
-h2 {
+h1 {
 	color: var(--theme-white);
 	font-size: 14px;
 	font-weight: 600;
@@ -54,14 +54,14 @@ h2 {
 }
 
 #model {
-	color: var(--theme-grey-999);
+	color: var(--theme-hue-c8c8cc);
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
 	word-break: break-all;
 }
 
 #subtitle {
-	color: var(--theme-grey-aaa);
+	color: var(--theme-grey-ccc);
 	font-size: 12px;
 	margin-top: 2px;
 }
@@ -123,24 +123,33 @@ body.mode-bootstrap .btn-row {
 /* ======================================= */
 /* ======================================= */
 
-#bar-bg {
+/* A progress element drawn as the track and its gradient fill; the
+   WebKit and Chromium engines of the three hosts style its two parts. */
+#bar-fill {
+	appearance: none;
 	background: var(--theme-gray4-dark);
+	border: 0;
 	border-radius: 4px;
+	display: block;
 	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
 	margin-bottom: 14px;
 	overflow: hidden;
+	width: 100%;
 }
 
-#bar-fill {
+#bar-fill::-webkit-progress-bar {
+	background: var(--theme-gray4-dark);
+	border-radius: 4px;
+}
+
+#bar-fill::-webkit-progress-value {
 	background: linear-gradient(90deg, var(--theme-green-dark), var(--theme-green));
 	border-radius: 4px;
-	height: 100%;
 	transition: width 0.35s ease;
-	width: 0%;
 }
 
-#bar-fill.error {
+#bar-fill.error::-webkit-progress-value {
 	background: linear-gradient(90deg, var(--theme-red-dark), var(--theme-hue-ff6b5f));
 }
 
@@ -165,13 +174,15 @@ body.mode-bootstrap .btn-row {
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
 	font-weight: 600;
-	margin-left: auto; /* Pushed completely to the right */
+	margin-inline-start: auto; /* Pushed to the end of the line */
 }
 
 #stats {
-	color: var(--theme-grey-888);
+	/* A light grey holds 7:1 on the window (WCAG 1.4.6). */
+	color: var(--theme-hue-c8c8cc);
 	font-size: 12px;
 	line-height: 1.8;
+	list-style: none;
 	min-height: 44px;
 }
 
@@ -189,11 +200,6 @@ body.mode-bootstrap .btn-row {
 	font-size: 16px;
 }
 
-.gap {
-	display: inline-block;
-	width: 1em;
-}
-
 /* ============================================== */
 /* ===== 3.1) Bootstrap step / detail / bar ===== */
 /* ============================================== */
@@ -206,52 +212,60 @@ body.mode-bootstrap .btn-row {
 }
 
 body.is-error #step-line {
-	color: var(--theme-hue-ff8e85);
+	color: var(--theme-hue-ffc4bf);
 }
 
 #detail-line {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	direction: rtl; /* Truncate from the LEFT so the trailing actionable info stays visible */
 	font-family: 'SF Mono', monospace;
 	font-size: 11px;
 	margin-bottom: 10px;
 	min-height: 14px;
 	overflow: hidden;
-	text-align: left;
+	text-align: start;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-#bootstrap-bar-bg {
+/* The bootstrap progress element, a thin track and a fill coloured by kind. */
+#bootstrap-bar-fill {
+	appearance: none;
 	background: var(--theme-gray4-dark);
+	border: 0;
 	border-radius: 2px;
+	display: block;
 	height: 4px;
 	overflow: hidden;
+	width: 100%;
 }
 
-#bootstrap-bar-fill {
+#bootstrap-bar-fill::-webkit-progress-bar {
+	background: var(--theme-gray4-dark);
+	border-radius: 2px;
+}
+
+#bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-4da6ff);
 	border-radius: 2px;
-	height: 100%;
 	transition:
 		width 0.35s ease,
 		background 0.25s ease;
-	width: 0%;
 }
 
-body.kind-mlx_install #bootstrap-bar-fill {
+body.kind-mlx_install #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-4da6ff);
 }
-body.kind-ollama_install #bootstrap-bar-fill {
+body.kind-ollama_install #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-73d98c);
 }
-body.kind-mlx_model #bootstrap-bar-fill {
+body.kind-mlx_model #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-9973f2);
 }
-body.kind-ollama_model #bootstrap-bar-fill {
+body.kind-ollama_model #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-hue-f2bf4d);
 }
-body.is-error #bootstrap-bar-fill {
+body.is-error #bootstrap-bar-fill::-webkit-progress-value {
 	background: var(--theme-red-dark);
 }
 
@@ -279,7 +293,8 @@ button {
 #btn-cancel {
 	background: rgba(255, 59, 48, 0.12);
 	border-color: rgba(255, 59, 48, 0.45);
-	color: var(--theme-red-dark);
+	/* The system red was 4.1:1 on its own wash. */
+	color: var(--theme-hue-ffc4bf);
 }
 
 #btn-cancel:hover {
@@ -294,8 +309,8 @@ button {
 #btn-term {
 	background: rgba(100, 100, 100, 0.15);
 	border-color: rgba(150, 150, 150, 0.35);
-	color: var(--theme-grey-aaa);
-	margin-left: auto; /* Pushed completely to the right */
+	color: var(--theme-grey-ccc);
+	margin-inline-start: auto; /* Pushed to the end of the line */
 }
 
 #btn-term:hover {
@@ -322,7 +337,7 @@ button {
 	display: none;
 	font-size: 13px;
 	font-weight: 600;
-	margin-left: 12px;
+	margin-inline-start: 12px;
 	margin-top: 0;
 }
 
@@ -331,13 +346,13 @@ button {
 }
 
 #done-msg.error {
-	color: var(--theme-red-dark);
+	color: var(--theme-hue-ff9d9d);
 }
 
 #log-area {
 	background: var(--theme-hue-1a1a1c);
 	border-radius: 6px;
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	display: none; /* Hidden by default; bootstrap mode overrides via CSS */
 	flex: 1 1 auto;
 	font-family: 'SF Mono', monospace;

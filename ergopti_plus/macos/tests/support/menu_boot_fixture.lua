@@ -26,16 +26,16 @@ local M = {}
 -- Production modules this fixture runs for real; each boot reloads them so no
 -- case inherits the previous case's session state.
 local REAL_MODULES = {
-	"ui.menu.init",
-	"ui.menu.menu_state",
-	"ui.menu.preferences_transaction",
-	"ui.menu.session_demotions",
-	"ui.menu.keymap_lifecycle",
-	"ui.menu.global_actions_transaction",
-	"ui.menu.recoverable_file_moves",
-	"ui.menu.click_gate",
+	"menu.ui.init",
+	"menu.ui.builder.state",
+	"settings.ui.menu.preferences_transaction",
+	"menu.ui.transactions.session_demotions",
+	"menu.ui.keyboard.keymap_lifecycle",
+	"menu.ui.transactions.global_actions_transaction",
+	"menu.ui.transactions.recoverable_file_moves",
+	"menu.ui.builder.click_gate",
 	-- Captures hs at require time; each boot gets a fresh stub table.
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 --- Deep-copies plain Lua data so fixture snapshots cannot alias live state.
@@ -59,26 +59,25 @@ local function format_message(fmt, ...)
 end
 
 --- Returns the saved config.toml flat state every case starts from.
---- @return table saved Every feature ON, with a hotstring-editor chord.
+--- @return table saved Every feature ON.
 local function saved_config()
 	return {
 		gestures = true,
 		keystats_enabled = true,
 		llm_enabled = true,
 		shortcuts = true,
-		custom_editor_shortcut = { mods = { "ctrl" }, key = "k" },
 	}
 end
 
 --- Boots ui.menu.start once over in-memory boundaries.
---- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, editor_bind, gestures_enable,
+--- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, gestures_enable,
 --- gestures_query, keystats_start; generate(ctx, actions) returns the menu tree, and
 --- before_start() runs on the reset stubs just before ui.menu.start.
 --- @return table fixture Live state, saves, log records and the menu ctx.
 function M.boot(opts)
 	opts = opts or {}
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 	hs_stub.__reset()
 
 	local logs = { errors = {}, warns = {} }
@@ -112,21 +111,21 @@ function M.boot(opts)
 	local refused_saves = 0
 
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["menu.engine.ui_restore"] = {}
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return true
 		end,
 	}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function()
 			if opts.load_status == "corrupt" then return {}, "corrupt" end
@@ -149,15 +148,10 @@ function M.boot(opts)
 		end,
 		get_group_name = function() return "common" end,
 	}
-	package.loaded["ui.hotstring_editor"] = {
+	package.loaded["hotstrings.ui.hotstring_editor"] = {
 		set_update_menu = noop,
-		set_shortcut = function()
-			if opts.editor_bind == false then return false end
-			return true
-		end,
-		clear_shortcut = function() return true end,
 	}
-	package.loaded["ui.menu.builder"] = {
+	package.loaded["menu.ui.builder.builder"] = {
 		generate = function(ctx, _menu_mods, actions)
 			fixture.ctx = ctx
 			fixture.actions = actions
@@ -166,14 +160,23 @@ function M.boot(opts)
 		end,
 		invalidate_cache = noop,
 	}
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
+	-- The virtual base directory holds no logo: the boot draws a present,
+	-- decodable one, so a missing logo is never logged here (TRAY-05 has its
+	-- own cases in test_menubar_logo_missing.lua).
+	package.loaded["menu.ui.menubar_logo"] = nil
+	local MenubarLogo = require("menu.ui.menubar_logo")
+	package.loaded["menu.ui.menubar_logo"] = setmetatable({
+		file_exists = function() return true end,
+		load_image = function(path) return { path = path }, nil end,
+	}, { __index = MenubarLogo })
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(config_path) return config_path .. ".ergopti-reset-journal-v1.json" end,
 		create = function()
 			return {
@@ -184,7 +187,7 @@ function M.boot(opts)
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function() return { stop = function() return true end } end,
 		start_theme_watcher = function() return { stop = function() return true end } end,
 	}
@@ -192,7 +195,7 @@ function M.boot(opts)
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = function() return true end,
 		setMenu = function(provider)
 			if type(provider) == "function" then fixture.menu_provider = provider end
@@ -200,32 +203,32 @@ function M.boot(opts)
 		end,
 		destroy = noop,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_exit = function() return true end,
 		is_pending = function() return fixture.terminal_pending == true end,
 	}
 	for _, module_name in ipairs({
-		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
-		"ui.menu.menu_apps", "ui.menu.menu_about",
+		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end
-	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
+	package.loaded["ai.ui.menu"] = { create = function() return {} end }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
-	package.loaded["modules.dynamic_hotstrings"] = {}
-	package.loaded["modules.gestures"] = {
+	package.loaded["hotstrings.engine.dynamic"] = {}
+	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left" }, DEFAULT_GESTURES = { swipe_left = "none" },
 	}
 	package.loaded["modules.keystats.text_cipher"] = { set_enabled = function() return true end }
 
 	local identity = function() return true end
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		set_backend = identity,
 		set_user_profiles = identity,
 		set_active_profile = identity,
@@ -311,15 +314,15 @@ function M.boot(opts)
 		set_preview_ai_enabled = function() return true end,
 	}
 
-	local Menu = require("ui.menu.init")
+	local Menu = require("menu.ui.init")
 	-- Tap-Holds owner with the surface the global actions require.
 	local karabiner = {
 		snapshot_settings = function() return {} end,
 		reset_to_defaults = function() return true end,
 		get_tap_holds_enabled = function() return false end,
 		set_tap_holds_enabled = function() return true end,
-		get_mod_combos_enabled = function() return false end,
-		set_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return false end,
+		set_key_combinations_enabled = function() return true end,
 		regenerate = function(callback)
 			if type(callback) == "function" then callback(true) end
 			return true

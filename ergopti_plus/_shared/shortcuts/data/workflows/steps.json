@@ -1,0 +1,252 @@
+{
+	"$description": "The user workflow model: the file layout, every step kind with its closed field set, the conditions of an « if » and the bounds a workflow file must keep. One source for the canonical JS check of the editor (_shared/ui/workflow_model.js), the shared Lua validator and interpreter (_shared/shortcuts/engine/workflows/, macOS and Linux) and the AutoHotkey port (Windows). Vectors: _shared/tests/corpus/workflows/. A step's run deadline is the timing registry key its `timeout` names, in [workflows] of _shared/core/timing/data/constants.toml. A `service` step needs the per-OS screen services (capture, OCR, template matching) and stops with a named notice while they are absent. A `shell` step of an imported workflow runs only once its commands' digest is approved in the editor (README.md).",
+	"schema_version": 1,
+	"limits": {
+		"file_bytes": 16777216,
+		"workflows_max": 200,
+		"steps_max": 500,
+		"depth_max": 8,
+		"name_bytes": 120,
+		"text_bytes": 4096,
+		"images_max": 32,
+		"image_base64_bytes": 1398104,
+		"template_pixels_max": 4194304,
+		"variables_max": 64,
+		"repeat_max": 1000,
+		"coordinate_max": 100000,
+		"click_count_max": 3,
+		"run_steps_max": 100000
+	},
+	"identifier_pattern": "^[A-Za-z_][A-Za-z0-9_]{0,31}$",
+	"workflow_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
+	"png_base64_prefix": "iVBORw0KGgo",
+	"placeholder": { "open": "{{", "close": "}}" },
+	"origins": ["local", "import"],
+	"workflow_keys": ["id", "name", "origin", "steps", "images"],
+	"common_step_keys": ["kind", "note"],
+	"kinds": {
+		"send_keys": {
+			"fields": { "combo": { "type": "shortcut", "required": true } },
+			"timeout": "step_timeout_ms"
+		},
+		"type_text": {
+			"fields": {
+				"text": { "type": "text", "required": true, "placeholders": true, "multiline": true }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"wait": {
+			"fields": {
+				"duration_ms": { "type": "integer", "required": true, "min": 0, "max_limit": "wait_max_ms" }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"wait_for": {
+			"fields": {
+				"target": { "type": "target", "required": true },
+				"timeout_ms": {
+					"type": "integer",
+					"required": true,
+					"min": 100,
+					"max_limit": "wait_max_ms"
+				}
+			},
+			"service": true,
+			"timeout": "screen_step_timeout_ms"
+		},
+		"open": {
+			"fields": {
+				"target_kind": { "type": "enum", "required": true, "values": ["app", "url", "file"] },
+				"value": { "type": "text", "required": true, "placeholders": true }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"focus_app": {
+			"fields": { "app": { "type": "text", "required": true, "placeholders": true } },
+			"timeout": "step_timeout_ms"
+		},
+		"capture": {
+			"fields": {
+				"mode": { "type": "enum", "required": true, "values": ["full", "window", "region"] },
+				"into": { "type": "variable", "required": false }
+			},
+			"service": true,
+			"timeout": "screen_step_timeout_ms"
+		},
+		"ocr": {
+			"fields": {
+				"mode": { "type": "enum", "required": true, "values": ["full", "window", "region"] },
+				"into": { "type": "variable", "required": true }
+			},
+			"service": true,
+			"timeout": "screen_step_timeout_ms"
+		},
+		"clipboard_get": {
+			"fields": { "into": { "type": "variable", "required": true } },
+			"timeout": "step_timeout_ms"
+		},
+		"clipboard_set": {
+			"fields": {
+				"text": { "type": "text", "required": true, "placeholders": true, "multiline": true }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"click_target": {
+			"fields": {
+				"target": { "type": "target", "required": true },
+				"button": { "type": "enum", "required": false, "values": ["left", "right", "middle"] }
+			},
+			"service": true,
+			"timeout": "screen_step_timeout_ms"
+		},
+		"mouse_move": {
+			"fields": {
+				"x": { "type": "integer", "required": true, "min": 0, "max_limit": "coordinate_max" },
+				"y": { "type": "integer", "required": true, "min": 0, "max_limit": "coordinate_max" }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"mouse_click": {
+			"fields": {
+				"x": { "type": "integer", "required": true, "min": 0, "max_limit": "coordinate_max" },
+				"y": { "type": "integer", "required": true, "min": 0, "max_limit": "coordinate_max" },
+				"button": { "type": "enum", "required": false, "values": ["left", "right", "middle"] },
+				"count": { "type": "integer", "required": false, "min": 1, "max_limit": "click_count_max" }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"run_action": {
+			"fields": {
+				"action": { "type": "action", "required": true }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"notify": {
+			"fields": {
+				"text": { "type": "text", "required": true, "placeholders": true, "multiline": true }
+			},
+			"timeout": "step_timeout_ms"
+		},
+		"shell": {
+			"fields": {
+				"command": { "type": "text", "required": true, "multiline": true },
+				"into": { "type": "variable", "required": false }
+			},
+			"shell": true,
+			"timeout": "shell_timeout_ms"
+		},
+		"set_variable": {
+			"fields": {
+				"name": { "type": "variable", "required": true },
+				"value": {
+					"type": "text",
+					"required": true,
+					"placeholders": true,
+					"multiline": true,
+					"allow_empty": true
+				}
+			},
+			"timeout": null
+		},
+		"if": {
+			"fields": {
+				"condition": { "type": "condition", "required": true },
+				"then": { "type": "steps", "required": true },
+				"else": { "type": "steps", "required": false }
+			},
+			"timeout": "screen_step_timeout_ms"
+		},
+		"repeat": {
+			"fields": {
+				"count": { "type": "integer", "required": true, "min": 1, "max_limit": "repeat_max" },
+				"steps": { "type": "steps", "required": true }
+			},
+			"timeout": null
+		}
+	},
+	"targets": {
+		"image": { "image": { "type": "image", "required": true } },
+		"text": { "text": { "type": "text", "required": true, "placeholders": true } }
+	},
+	"conditions": {
+		"visible": { "fields": { "target": { "type": "target", "required": true } }, "service": true },
+		"app_front": {
+			"fields": { "app": { "type": "text", "required": true, "placeholders": true } }
+		},
+		"matches": {
+			"fields": {
+				"source": { "type": "enum", "required": true, "values": ["clipboard", "variable"] },
+				"variable": { "type": "variable", "required": false },
+				"op": {
+					"type": "enum",
+					"required": true,
+					"values": ["equals", "contains", "starts_with", "empty"]
+				},
+				"value": {
+					"type": "text",
+					"required": false,
+					"placeholders": true,
+					"multiline": true,
+					"allow_empty": true
+				}
+			}
+		}
+	},
+	"reasons": [
+		"not_object",
+		"schema_version",
+		"unknown_key",
+		"missing_field",
+		"bad_type",
+		"too_long",
+		"out_of_range",
+		"bad_enum",
+		"bad_identifier",
+		"bad_shortcut",
+		"bad_text",
+		"unknown_kind",
+		"too_many_steps",
+		"too_deep",
+		"too_many_workflows",
+		"too_many_images",
+		"too_many_variables",
+		"unknown_image",
+		"bad_image",
+		"duplicate_id",
+		"variable_required",
+		"value_required"
+	],
+	"run_reasons": [
+		"aborted",
+		"already_running",
+		"unknown_variable",
+		"shell_not_approved",
+		"too_many_steps",
+		"step_failed",
+		"timeout",
+		"screen_service_missing",
+		"text_not_found",
+		"image_not_found",
+		"screen_permission_missing",
+		"screen_capture_refused",
+		"ocr_unavailable",
+		"screen_read_failed"
+	],
+	"screen_reasons": {
+		"capture_permission_missing": "screen_permission_missing",
+		"capture_unavailable": "screen_capture_refused",
+		"capture_no_x_display": "screen_capture_refused",
+		"capture_wayland_region": "screen_capture_refused",
+		"capture_unsupported_visual": "screen_capture_refused",
+		"capture_refused": "screen_capture_refused",
+		"capture_empty": "screen_capture_refused",
+		"no_foreground_window": "screen_capture_refused",
+		"ocr_engine_missing": "ocr_unavailable",
+		"ocr_language_missing": "ocr_unavailable",
+		"ocr_timeout": "screen_read_failed",
+		"ocr_failed": "screen_read_failed",
+		"template_uniform": "screen_read_failed",
+		"template_unreadable": "screen_read_failed"
+	},
+	"screen_reason_other": "screen_read_failed"
+}

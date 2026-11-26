@@ -65,7 +65,7 @@ local function with_open(replacement, callback)
 end
 
 local function preferences()
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			local open_ok, fh, open_detail, open_code = pcall(io.open, path, "r")
 			if not open_ok or not fh then
@@ -80,8 +80,8 @@ local function preferences()
 			return content, "ok"
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences")
 end
 
 
@@ -213,8 +213,8 @@ helpers.describe("Preferences.load: corrupt is not absent", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = nil
-package.loaded["infra.preferences"] = nil
+package.loaded["core.fs.adapters.file_system"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 
 

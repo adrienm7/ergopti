@@ -24,9 +24,14 @@ _ULH_Keys(Down*) {
 
 _ULH_AltGrLCtrlIsNotTheUsers() {
 	Body := _DriverFuncBody("BackSpaceLogic")
-	AssertFalse(InStr(Body, 'KS_IsDown("SC01D")') > 0,
+	Assert(Body != "", "BackSpaceLogic must be found before its reads are counted")
+	AssertFalse(InStr(Body, '"SC01D"') > 0,
 		"BackSpaceLogic must not read AltGr's fake LCtrl as the user's LCtrl")
-	StrReplace(Body, "TapHoldUserLCtrlHeld()", , , &Reads)
+	; The user's LCtrl is a seam since the shared thumb Backspace vectors (THD-4):
+	; its default is TapHoldUserLCtrlHeld, and every LCtrl branch asks it.
+	Assert(InStr(Body, "UserLCtrlFn := TapHoldUserLCtrlHeld") > 0,
+		"BackSpaceLogic's LCtrl defaults to the user's own LCtrl")
+	StrReplace(Body, "UserLCtrlFn.Call()", , , &Reads)
 	AssertEqual(3, Reads, "every LCtrl branch of BackSpaceLogic must ask for the user's own LCtrl")
 	Family := _TestSetAltGrFamily(false)
 	try {
@@ -84,3 +89,58 @@ _ULH_QwertyLCtrlWithRAltIsTheUsers() {
 }
 Test("user lctrl: on QWERTY an LCtrl held with right Alt is the user's (qwerty-user-lctrl-2026-09-26)",
 	_ULH_QwertyLCtrlWithRAltIsTheUsers)
+
+; What a sequence of BackSpaceLogic presses deletes, in the corpus' words: the
+; last key decides the direction (Delete, or Right then Backspace, is forward),
+; Ctrl on it a word.
+_ULH_Deletion(Presses) {
+	if (Presses.Length == 0)
+		return "char_back"
+	Last := Presses[Presses.Length]
+	Word := InStr(Last.Modifiers, "Ctrl") ? "word" : "char"
+	Forward := Last.Key == "Delete" || (Presses.Length == 2 && Presses[1].Key == "Right" && Last.Key == "BackSpace")
+	return Word . (Forward ? "_forward" : "_back")
+}
+
+; A seam answering Value.
+_ULH_Constant(Value) {
+	return () => Value
+}
+
+; A sender seam recording each key and its modifiers into Presses.
+_ULH_Recorder(Presses) {
+	return (Key, Modifiers) => (Presses.Push({Key: Key, Modifiers: Modifiers}), true)
+}
+
+; The shared thumb Backspace vectors, replayed through the real BackSpaceLogic
+; with its key state and sender as seams; macOS and Linux replay the same file
+; (maintainer decision THD-4 of 2026-11-21, thumb-backspace-vectors).
+_ULH_ThumbBackspaceVectors() {
+	global TapHold, _TH_SyntheticEpoch
+	Corpus := JsonParse(FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\tap_hold\thumb_backspace_vectors.json", "UTF-8"))
+	Vectors := Corpus["vectors"]
+	AssertEqual(8, Vectors.Length, "every thumb Backspace vector is replayed")
+	SavedTapHold := TapHold
+	Names := Map("shift", "Shift", "right_ctrl", "SC11D")
+	try {
+		for _, Vector in Vectors {
+			TapHold := Map("keys", Map("right_ctrl", Map("tap_action", Vector["right_ctrl_tap"])))
+			HeldNames := [], LCtrl := false
+			for _, HeldKey in Vector["held"] {
+				if (HeldKey == "left_ctrl")
+					LCtrl := true
+				else
+					HeldNames.Push(Names[HeldKey])
+			}
+			Presses := []
+			Typed := BackSpaceLogic(_TH_SyntheticEpoch, _ULH_Keys(HeldNames*), _ULH_Constant(LCtrl),
+				_ULH_Recorder(Presses))
+			AssertEqual(Presses.Length > 0, Typed, Vector["id"] . ": the logic reports whether it typed")
+			AssertEqual(Vector["expected"], _ULH_Deletion(Presses), Vector["id"])
+		}
+	} finally {
+		TapHold := SavedTapHold
+	}
+}
+Test("thumb backspace: BackSpaceLogic replays the shared vectors (thumb-backspace-vectors)",
+	_ULH_ThumbBackspaceVectors)

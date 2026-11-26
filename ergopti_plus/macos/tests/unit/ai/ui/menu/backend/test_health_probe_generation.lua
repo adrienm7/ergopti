@@ -1,0 +1,691 @@
+--- tests/unit/ai/ui/menu/backend/test_health_probe_generation.lua
+
+--- ==============================================================================
+--- MODULE: LLM Health Probe Generation Regression
+--- DESCRIPTION:
+--- Drives the real menu and backend actions with deferred HTTP completions.
+--- A local probe loses write authority when its backend, enable state, or
+--- lifecycle owner changes; only a probe for the current live MLX state commits.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local MODULES = {
+	"ai.ui.menu",
+	"ai.ui.menu.panels.backend_panel",
+	"ai.engine",
+	"ui.menu.shortcut_utils",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"ai.ui.menu.models.manager",
+	"ai.ui.menu.profiles_manager",
+	"ai.ui.menu.profile_label",
+	"ai.engine.settings.profiles",
+	"ai.ui.menu.settings_manager",
+	"ai.ui.menu.panels.temperature_panel",
+	"ai.ui.menu.panels.streaming_panel",
+	"ai.ui.menu.warmup_controller",
+	"ai.ui.menu.panels.trigger_panel",
+	"ai.ui.menu.panels.api_panel",
+	"ai.ui.menu.models.selector_page",
+	"ai.ui.menu.models.custom_models",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.activation_pause_owner",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.engine.api.mlx",
+	"ai.engine.ollama.endpoint",
+	"ai.ui.menu.startup_controller",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.layout",
+	"menu.engine.manifest_menu",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.ollama.deps_checker",
+}
+
+local function build_fixture(callback, options)
+	return helpers.with_fresh_modules(MODULES, function()
+		local native_renderer = require("menu.engine.manifest_menu")
+		local noop = function() end
+		local accept = function() return true end
+		local updates = 0
+		local probes = {}
+		local stop_mode = "sync"
+		local pending_stop
+		local last_stop
+		local pending_stop_cancel
+		local last_stop_cancel
+		local pending_stop_kind
+		local stop_kinds = {}
+		local current_port = 3460
+		local ollama_port = 11470
+		local last_render_ctx = nil
+		local port_commits = 0
+		local mlx_restarts = {}
+		local state = {
+			llm_enabled = true,
+			llm_backend = "mlx",
+			llm_model = "",
+			llm_model_mlx = "",
+			llm_model_ollama = "",
+			llm_num_predictions = 1,
+			llm_min_words = 1,
+			llm_max_words = 16,
+			llm_context_length = 2048,
+			llm_temperature = 0.1,
+			llm_reset_on_nav = true,
+			llm_active_profile = "basic",
+			llm_profile_shortcuts = {},
+			llm_user_profiles = {},
+		}
+
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
+		assert(locale_file:close())
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
+			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
+			return helpers.I18N_PLACEHOLDER_FORMATS[key] or key
+		end }
+		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["ai.engine"] = {
+			DEFAULT_STATE = {
+				llm_enabled = false,
+				llm_debounce = 0.2,
+				llm_min_request_interval = 0,
+				llm_model_mlx = "",
+				llm_model_ollama = "",
+				llm_context_length = 2048,
+				llm_reset_on_nav = true,
+				llm_temperature = 0.1,
+				llm_num_predictions = 1,
+				llm_arrow_nav_enabled = true,
+				llm_nav_modifiers = {},
+				llm_show_info_bar = true,
+				llm_val_modifiers = {},
+				llm_pred_indent = false,
+				llm_active_profile = "basic",
+				llm_after_hotstring = true,
+				llm_auto_raise_temp = false,
+				llm_min_words = 1,
+				llm_streaming = true,
+				llm_streaming_multi = false,
+				llm_instant_on_word_end = false,
+			},
+			get_backend = function() return state.llm_backend end,
+			get_current_model = function() return state.llm_model or "" end,
+			set_backend = function() return true end,
+			set_llm_model_mlx = function() return true end,
+			set_llm_model_ollama = function() return true end,
+			is_backend_ready = function() return false end,
+			is_backend_load_failed = function() return false end,
+			load_api_entries = accept,
+		}
+
+		local models = {
+			create_requirement_owner = function() return {} end,
+			pause_requirements = function() return true, false end,
+			get_presets = function() return {} end,
+			get_actual_model_name = function(name) return name end,
+			get_model_info = function() return {} end,
+			get_model_ram = function() return 0 end,
+			check_requirements = function(model, _, _, opts)
+				mlx_restarts[#mlx_restarts + 1] = { model = model, opts = opts }
+				return true
+			end,
+			stop_mlx_server_if_needed = function(on_stopped, opts)
+				local kind = type(opts) == "table" and opts.kind or "stop"
+				local on_cancel = type(opts) == "table" and opts.on_cancel or nil
+				stop_kinds[#stop_kinds + 1] = kind
+				if stop_mode == "throw" then error("fixture stop failure") end
+				if stop_mode == "false" then return false end
+				if stop_mode == "deferred" then
+					pending_stop = on_stopped
+					last_stop = on_stopped
+					pending_stop_cancel = on_cancel
+					last_stop_cancel = on_cancel
+					pending_stop_kind = kind
+					return true
+				end
+				if type(on_stopped) == "function" then on_stopped() end
+				return true
+			end,
+		}
+		package.loaded["ai.ui.menu.models.manager"] = {
+			new = function() return models end,
+		}
+		package.loaded["ai.ui.menu.settings_manager"] = {
+			new = function()
+				return {
+					build_nav_modifier_menu = function() return {} end,
+					build_val_modifier_menu = function() return {} end,
+					set_context_length = noop,
+					reset_context_length = noop,
+					set_min_words = noop,
+					reset_min_words = noop,
+					set_max_words = noop,
+					reset_max_words = noop,
+					set_temperature = noop,
+					reset_temperature = noop,
+					apply_setting_transaction = accept,
+					set_mlx_port = function(on_applied)
+						local committed = false
+						local function commit_port()
+							if committed then return true end
+							committed = true
+							current_port = 4567
+							port_commits = port_commits + 1
+							return true
+						end
+						return on_applied(4567, commit_port)
+					end,
+					reset_mlx_port = noop,
+				}
+			end,
+		}
+		package.loaded["ai.ui.menu.panels.temperature_panel"] = nil
+		package.loaded["ai.ui.menu.panels.streaming_panel"] = {
+			build = function() return {} end,
+		}
+		package.loaded["ai.ui.menu.warmup_controller"] = { warmup = accept }
+		package.loaded["ai.ui.menu.panels.trigger_panel"] = {
+			build = function() return {} end,
+		}
+		package.loaded["ai.ui.menu.panels.api_panel"] = {
+			build = function() return nil, nil end,
+			active_entry_caption_text = function() return nil end,
+		}
+		package.loaded["ai.ui.menu.models.switcher"] = {
+			new = function()
+				return {
+					switch_model = accept,
+					disable_model = accept,
+					set_llm_profile = accept,
+					settle_recovery_debts = accept,
+					apply_recommended_prompt_profile = accept,
+					get_display_model_name = function(name) return name end,
+					get_model_power_level = function() return 1 end,
+					guarded_check_requirements = noop,
+					dispatch_resumable_requirements = function(model, on_ok, on_fail, opts)
+						return models.check_requirements(model, on_ok, on_fail, opts)
+					end,
+				}
+			end,
+		}
+		package.loaded["ai.engine.ollama.endpoint"] = {
+			get_base_url = function() return "http://127.0.0.1:" .. tostring(ollama_port) end,
+		}
+		package.loaded["ai.engine.api.mlx"] = {
+			get_base_url = function() return "http://127.0.0.1:3460" end,
+			get_port = function() return current_port end,
+			get_default_port = function() return 3460 end,
+		}
+		package.loaded["ai.ui.menu.startup_controller"] = {
+			new = function() return noop end,
+		}
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = {
+			new = function()
+				return {
+					bind_hotkey = noop,
+					activate_hotkey = noop,
+					apply_llm_profile_shortcut = noop,
+					restore_shortcuts = function() return true end,
+				}
+			end,
+		}
+		package.loaded["ai.ui.menu.layout"] = {
+			row_disabled = function() return false end,
+			title_health_dot = function(status)
+				return ({ ready = "🟢", warming = "🟡", unreachable = "🔴" })[status]
+			end,
+		}
+		local presentation_renderer = assert(require("menu.engine.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
+			i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
+			logger = package.loaded["core.logger.engine.logger"],
+		}))
+		package.loaded["menu.engine.manifest_menu"] = {
+			command_row = native_renderer.command_row,
+			group_row = presentation_renderer.group_row,
+			template_rows = presentation_renderer.template_rows,
+		check_row = native_renderer.check_row,
+			native_child_rows = native_renderer.native_child_rows,
+			get_array = presentation_renderer.get_array,
+			render_rows = function(rows, slot)
+				if slot == "llm_profile" then return presentation_renderer.render_rows(rows, slot) end
+				-- The AI parents over a completed native submenu are materialised by
+				-- the renderer; the API panel's own provider rows stay data here.
+				if slot == "llm_backend" and #rows == 1 and type(rows[1].submenu) == "table" then
+					return presentation_renderer.render_rows(rows, slot)
+				end
+				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
+				return rows
+			end,
+			build = function(key, _, _, _, render_ctx, providers)
+				-- Only the health-bearing top-level model row is observed here.
+				-- Generation's declared child retains the old pass-through numeric
+				-- provider; its real check is covered by test_settings_transaction.
+				if key == "llm_generation_menu" then
+					return providers.llm_generation_values()
+				end
+				last_render_ctx = render_ctx
+				-- The model row is list DATA: the shared renderer materialises it.
+				return native_renderer.render_rows(providers.llm_model(), "llm_model")
+			end,
+		}
+		local core = package.loaded["ai.engine"]
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
+		local profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		require("ai.ui.menu.profiles_manager")
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
+			check_and_install_deps = accept,
+		})
+		package.loaded["ai.engine.ollama.deps_checker"] = require("tests.support.runtime_checker_stub")({
+			check_and_install_deps = accept,
+		})
+
+		local previous_async_get = hs.http.asyncGet
+		local previous_hs_execute = hs.execute
+		local previous_os_execute = os.execute
+		hs.http.asyncGet = function(url, _, completion)
+			probes[#probes + 1] = { url = url, completion = completion }
+		end
+		hs.execute = function() return "arm64" end
+		os.execute = function() return true end
+
+		local ok, err = xpcall(function()
+			package.loaded["ai.ui.menu.panels.backend_panel"] = nil
+			if options and options.actual_api_panel then
+				package.loaded["ai.ui.menu.panels.api_panel"] = nil
+				require("ai.ui.menu.panels.api_panel")
+			end
+			local MenuLLM = require("ai.ui.menu")
+			local script_control = {
+				is_paused = function() return false end,
+				get_pause_epoch = function() return 0 end,
+				register_pause_owner = function() return true end,
+			}
+			local handler = MenuLLM.create({
+				state = state,
+				keymap = {
+					set_llm_enabled = accept,
+					set_llm_model = function() return true end,
+					set_llm_display_model_name = noop,
+					set_llm_backend_name = accept,
+				},
+				save_prefs = function() return true end,
+				update_menu = function()
+					updates = updates + 1
+					return true
+				end,
+				active_tasks = {},
+				script_control = script_control,
+			})
+			callback({
+				MenuLLM = MenuLLM,
+				script_control = script_control,
+				handler = handler,
+				state = state,
+				probes = probes,
+				-- The IA switch: the command the menu registers for llm_toggle.
+				toggle = function()
+					return last_render_ctx and last_render_ctx.commands
+						and last_render_ctx.commands["llm_toggle"]
+				end,
+				updates = function() return updates end,
+				set_stop_mode = function(mode) stop_mode = mode end,
+				settle_stop = function()
+					local callback = pending_stop
+					pending_stop = nil
+					pending_stop_cancel = nil
+					pending_stop_kind = nil
+					if type(callback) == "function" then return callback() end
+				end,
+				refuse_stop = function(reason)
+					local callback = pending_stop_cancel
+					pending_stop = nil
+					pending_stop_cancel = nil
+					pending_stop_kind = nil
+					if type(callback) == "function" then return callback(reason) end
+				end,
+				repeat_stop = function()
+					if type(last_stop) == "function" then return last_stop() end
+				end,
+				repeat_stop_cancel = function(reason)
+					if type(last_stop_cancel) == "function" then return last_stop_cancel(reason) end
+				end,
+				pending_stop = function() return pending_stop end,
+				pending_stop_cancel = function() return pending_stop_cancel end,
+				pending_stop_kind = function() return pending_stop_kind end,
+				stop_kinds = stop_kinds,
+				set_ollama_port = function(port) ollama_port = port end,
+				port = function() return current_port end,
+				port_commits = function() return port_commits end,
+				mlx_restarts = mlx_restarts,
+			})
+		end, debug.traceback)
+
+		hs.http.asyncGet = previous_async_get
+		hs.execute = previous_hs_execute
+		os.execute = previous_os_execute
+		if not ok then error(err, 0) end
+	end)
+end
+
+local function with_fixture(callback, options)
+	local predecessor = {}; for name, value in pairs(package.loaded) do predecessor[name] = value end
+	local outcome = table.pack(xpcall(function() return build_fixture(callback, options) end, debug.traceback))
+	for name in pairs(package.loaded) do if rawget(predecessor, name) == nil then package.loaded[name] = nil end end
+	for name, value in pairs(predecessor) do package.loaded[name] = value end
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
+end
+
+local function find_row(rows, identity)
+	for _, row in ipairs(rows or {}) do
+		local label = row.label or row.title
+		if type(label) == "string" and label:find(identity, 1, true) then
+			return row
+		end
+	end
+	return nil
+end
+
+--- The Backend selection the model selector page runs (the Backend submenu
+--- left the tray on 2026-10-27; its rows' actions are collected by the page).
+local function backend_action(target)
+	local collected = require("ai.ui.menu.models.selector_page").collected()
+	helpers.assert_type(collected, "table")
+	helpers.assert_type(collected.select[target], "function")
+	return collected.select[target]
+end
+
+--- The MLX port tool of the page's MLX group.
+local function port_action()
+	return function() return require("ai.ui.menu.models.selector_page").group_action("mlx", "mlx_port") end
+end
+
+--- The AI title's text, whichever field the renderer filled.
+local function title_text(item)
+	return type(item) == "table" and (item.title or item.label) or nil
+end
+
+--- Asserts the AI title ends with the health dot and the model button has none.
+local function assert_title_dot(item, model_row, glyph, message)
+	local title = title_text(item)
+	helpers.assert_type(title, "string")
+	helpers.assert_true(title:sub(-(#glyph + 1)) == " " .. glyph, message .. " (AI title: " .. title .. ")")
+	for _, dot in ipairs({ "🟢", "🟡", "🔴" }) do
+		helpers.assert_true(model_row.title:find(dot, 1, true) == nil,
+			"the model button must no longer carry the health dot: " .. model_row.title)
+	end
+end
+
+--- The tray's model button: the backend's emoji, then the model.
+local function model_button(item, fixture)
+	local emoji = require("ai.ui.menu.backend_labels").emoji(fixture.state.llm_backend)
+	for _, row in ipairs(item and item.submenu or {}) do
+		if type(row.title) == "string" and row.title:find(emoji .. " ", 1, true) then return row end
+	end
+	return nil
+end
+
+local function build_and_assert_red(fixture)
+	local item = fixture.handler.build_item()
+	local model_row = model_button(item, fixture)
+	helpers.assert_type(model_row, "table")
+	assert_title_dot(item, model_row, "🔴",
+		"an invalidated health cache must render the current backend as unprobed")
+	return item
+end
+
+helpers.describe("LLM health probe ownership", function()
+	helpers.it("rejects stale local health completions after backend, disable, and teardown changes (hs-018)", function()
+		for _, target in ipairs({ "api", "ollama" }) do
+			with_fixture(function(fixture)
+				local item = fixture.handler.build_item()
+				helpers.assert_eq(#fixture.probes, 1)
+				backend_action(target)()
+				local updates_before_stale = fixture.updates()
+				fixture.probes[1].completion(200)
+				helpers.assert_eq(fixture.updates(), updates_before_stale,
+					"a stale MLX completion must not repaint after switching to " .. target)
+				build_and_assert_red(fixture)
+			end)
+		end
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			local stale_probe = fixture.probes[1]
+			local toggle = fixture.toggle()
+			helpers.assert_type(toggle, "function")
+			toggle()
+			local updates_before_stale = fixture.updates()
+			stale_probe.completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before_stale,
+				"a probe dispatched before disable must not repaint")
+			fixture.state.llm_enabled = true
+			build_and_assert_red(fixture)
+		end)
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			local stale_probe = fixture.probes[1]
+			fixture.MenuLLM.stop_mlx_server()
+			local updates_before_stale = fixture.updates()
+			stale_probe.completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before_stale,
+				"a probe dispatched before teardown must not repaint")
+			build_and_assert_red(fixture)
+		end)
+
+		with_fixture(function(fixture)
+			local item = build_and_assert_red(fixture)
+			local model_row = model_button(item, fixture)
+			helpers.assert_type(model_row, "table")
+			assert_title_dot(item, model_row, "🔴", "an unprobed backend shows red on the AI title")
+			local updates_before_current = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before_current + 1,
+				"the current MLX probe must commit and repaint exactly once")
+			local refreshed = fixture.handler.build_item()
+			local refreshed_model = model_button(refreshed, fixture)
+			helpers.assert_type(refreshed_model, "table")
+			assert_title_dot(refreshed, refreshed_model, "🟡",
+				"a committed current MLX response must render the reachable state")
+		end)
+	end)
+
+	helpers.it("repaints only when a probe changes the health status (probe loop, 2026-06-19)", function()
+		-- Each build fires a probe. When the probe's completion repainted the menu
+		-- unconditionally, the repaint built the menu, which probed again: about
+		-- ten to twenty rebuilds a second with live HTTP. A completion that leaves
+		-- the status as it was must therefore repaint nothing.
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 1, "opening the menu must probe once")
+			local updates_before = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that turns the status from unknown to reachable must repaint once")
+
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 2, "the repainted menu probes again")
+			fixture.probes[2].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that confirms the same status must not repaint, or build and probe loop")
+
+			fixture.handler.build_item()
+			fixture.probes[3].completion(0)
+			helpers.assert_eq(fixture.updates(), updates_before + 2,
+				"a probe that finds the server gone must repaint")
+		end)
+	end)
+
+	helpers.it("reports shutdown settled only from the exact stop callback (HS-008)", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			with_fixture(function(fixture)
+				fixture.handler.build_item()
+				fixture.set_stop_mode(mode)
+				local settlements = 0
+				helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function()
+					settlements = settlements + 1
+				end), false)
+				helpers.assert_eq(fixture.pending_stop(), nil)
+				helpers.assert_eq(settlements, 0)
+			end)
+		end
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			local stale_probe = fixture.probes[1]
+			fixture.set_stop_mode("deferred")
+			local settlements = 0
+			helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function(settled)
+				helpers.assert_eq(settled, true)
+				settlements = settlements + 1
+			end), true,
+				"accepted SIGTERM must transfer exact callback ownership")
+			helpers.assert_eq(type(fixture.pending_stop()), "function")
+			helpers.assert_eq(fixture.pending_stop_kind(), "shutdown")
+			helpers.assert_eq(settlements, 0)
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(settlements, 1)
+			fixture.repeat_stop()
+			helpers.assert_eq(settlements, 1,
+				"a duplicate native completion cannot publish shutdown twice")
+			local updates_before_stale = fixture.updates()
+			stale_probe.completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before_stale)
+		end)
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			fixture.set_stop_mode("deferred")
+			local terminals = {}
+			helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function(settled, detail)
+				terminals[#terminals + 1] = { settled = settled, detail = detail }
+			end), true)
+			helpers.assert_eq(type(fixture.pending_stop_cancel()), "function",
+				"shutdown must own the exact cleanup-refusal terminal")
+			helpers.assert_eq(fixture.refuse_stop("cleanup_refused"), false)
+			helpers.assert_eq(#terminals, 1)
+			helpers.assert_eq(terminals[1].settled, false)
+			helpers.assert_eq(terminals[1].detail, "cleanup_refused")
+			helpers.assert_eq(fixture.repeat_stop_cancel("cleanup_refused"), false)
+			helpers.assert_eq(#terminals, 1,
+				"a duplicate cleanup refusal cannot publish shutdown twice")
+		end)
+	end)
+
+	helpers.it("routes real port and backend actions through one latest intent (HS-008)", function()
+		with_fixture(function(fixture)
+			fixture.state.llm_model = "A"
+			fixture.state.llm_model_mlx = "A"
+			fixture.set_stop_mode("deferred")
+			local item = fixture.handler.build_item()
+			helpers.assert_type(item, "table")
+			local port = port_action()
+			local backend = backend_action("api")
+
+			helpers.assert_eq(port(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "port")
+			helpers.assert_eq(fixture.port(), 3460)
+			helpers.assert_eq(backend(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
+			helpers.assert_eq(fixture.state.llm_backend, "mlx")
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(fixture.state.llm_backend, "api")
+			helpers.assert_eq(fixture.port(), 3460,
+				"a superseded port callback cannot publish its candidate")
+			helpers.assert_eq(fixture.port_commits(), 0)
+			helpers.assert_eq(#fixture.mlx_restarts, 0)
+			helpers.assert_eq(fixture.stop_kinds, { "port", "backend" })
+		end)
+
+		with_fixture(function(fixture)
+			fixture.state.llm_model = "A"
+			fixture.state.llm_model_mlx = "A"
+			fixture.set_stop_mode("deferred")
+			local item = fixture.handler.build_item()
+			helpers.assert_type(item, "table")
+			local port = port_action()
+			local backend = backend_action("api")
+
+			helpers.assert_eq(backend(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
+			helpers.assert_eq(port(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "port")
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(fixture.state.llm_backend, "mlx",
+				"a superseded backend callback cannot publish")
+			helpers.assert_eq(fixture.port(), 4567)
+			helpers.assert_eq(fixture.port_commits(), 1)
+			helpers.assert_eq(#fixture.mlx_restarts, 1)
+			helpers.assert_eq(fixture.mlx_restarts[1].model, "A")
+			helpers.assert_eq(fixture.mlx_restarts[1].opts._mlx_port, 4567)
+			helpers.assert_eq(fixture.stop_kinds, { "backend", "port" })
+		end)
+	end)
+end)
+
+
+helpers.describe("API active commands: actual native pause context", function()
+	helpers.it("the real menu builder passes the live ScriptControl reader into the retained Test", function()
+		with_fixture(function(fixture)
+			local paused, requests = false, 0
+			fixture.script_control.is_paused = function() return paused end
+			local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
+			package.loaded["ai.engine"].api_remote = {
+				PROVIDER_ORDER = {}, PROVIDERS = {},
+				get_entries = function() return { entry } end,
+				get_active_entry = function() return entry end,
+				get_active_entry_id = function() return entry.id end,
+				entry_key_missing = function() return false end,
+				get_test_request_spec = function() return {} end,
+				test_request = function() requests = requests + 1; return true end,
+			}
+			fixture.state.llm_backend = "api"
+			fixture.handler.build_item()
+			-- The page collects the real API panel's Test action.
+			local held = require("ai.ui.menu.models.selector_page").collected().test_active
+			helpers.assert_type(held, "function", "the real native API provider supplies the active Test row")
+			paused = true
+			local observed = held()
+			helpers.assert_eq(observed, false)
+			helpers.assert_eq(requests, 0, "a retained native action cannot create a request after real pause")
+		end, { actual_api_panel = true })
+	end)
+end)
+
+
+helpers.describe("LLM health follows the configured endpoint", function()
+	helpers.it("(health-probe-origin) reads the configured Ollama origin and rejects its superseded receipt", function()
+		with_fixture(function(fixture)
+			fixture.state.llm_backend = "ollama"
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 1)
+			helpers.assert_eq(fixture.probes[1].url, "http://127.0.0.1:11470/api/version")
+			fixture.set_ollama_port(11471)
+			local before = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), before)
+			build_and_assert_red(fixture)
+			helpers.assert_eq(fixture.probes[2].url, "http://127.0.0.1:11471/api/version")
+		end)
+	end)
+end)
+
+return true

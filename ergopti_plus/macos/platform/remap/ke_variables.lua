@@ -30,10 +30,10 @@
 
 local M = {}
 
-local Logger        = require("infra.logger")
-local JsonCodec     = require("adapters.json_codec")
-local ShellRunner   = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger        = require("core.logger.engine.logger")
+local JsonCodec     = require("core.fs.adapters.json_codec")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
 local KePaths       = require("platform.remap.ke_paths")
 local LeaseContract = require("platform.remap.lease_contract")
 local LeaseController = require("platform.remap.lease_controller")

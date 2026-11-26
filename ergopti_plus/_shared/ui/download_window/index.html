@@ -3,6 +3,8 @@
 	<head>
 		<meta charset="utf-8" />
 		<title data-i18n="download_window.window_title"></title>
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
 		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css" />
@@ -10,42 +12,43 @@
 		<script src="../host_bridge.js"></script>
 	</head>
 	<body>
-		<div id="ui-controls">
-			<div class="header-group">
-				<h2 id="title" data-i18n="download_window.title"></h2>
-				<div id="model">—</div>
-				<div id="subtitle"></div>
-			</div>
+		<main id="ui-controls">
+			<header class="header-group">
+				<h1 id="title" data-i18n="download_window.title"></h1>
+				<p id="model">—</p>
+				<p id="subtitle"></p>
+			</header>
 
 			<div class="progress-group">
-				<div id="status-line">
-					<div id="pct">0 %</div>
-					<div id="done-msg"></div>
-					<div id="file-count" style="display: none"></div>
-				</div>
+				<p id="status-line">
+					<output id="pct">0 %</output>
+					<strong id="done-msg" role="status"></strong>
+					<output id="file-count" style="display: none"></output>
+				</p>
 
-				<div id="bar-bg">
-					<div id="bar-fill"></div>
-				</div>
+				<progress id="bar-fill" max="100" value="0" aria-labelledby="title"></progress>
 
-				<div id="stats">
-					<div id="stats-details" style="display: none"></div>
-					<div id="eta-container" style="display: none">
+				<ul id="stats">
+					<li id="stats-details" style="display: none"></li>
+					<li id="eta-container" style="display: none">
 						<span data-i18n="download_window.eta_label"></span> <b id="eta"></b>
-					</div>
-					<div id="stats-fallback" data-i18n="download_window.starting"></div>
-				</div>
+					</li>
+					<li id="stats-fallback" data-i18n="download_window.starting"></li>
+				</ul>
 			</div>
 
 			<div id="bootstrap-group">
-				<div id="step-line" data-i18n="download_window.preparing"></div>
-				<div id="detail-line"></div>
-				<div id="bootstrap-bar-bg">
-					<div id="bootstrap-bar-fill"></div>
-				</div>
+				<p id="step-line" data-i18n="download_window.preparing" aria-live="polite"></p>
+				<p id="detail-line"></p>
+				<progress
+					id="bootstrap-bar-fill"
+					max="100"
+					value="0"
+					aria-labelledby="step-line"
+				></progress>
 			</div>
 
-			<div class="btn-row">
+			<footer class="btn-row">
 				<button
 					id="btn-cancel"
 					onclick="doCancel()"
@@ -58,10 +61,11 @@
 					style="display: none"
 					data-i18n="download_window.btn_retry"
 				></button>
-			</div>
-		</div>
+			</footer>
+		</main>
 
-		<div id="log-area"></div>
+		<!-- Scroll box: a keyboard stop, so the keyboard scrolls it (WCAG 2.1.1). -->
+		<pre id="log-area" tabindex="0" aria-labelledby="btn-term"></pre>
 
 		<script src="script.js"></script>
 		<script src="network_failure.js"></script>

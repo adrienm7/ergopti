@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local function with_spy_logger(body)
-	local logger_name = "logger.shim"
+	local logger_name = "core.logger.engine.shim"
 	local collector_name = "modules.keystats.metrics_collector"
 	local previous_logger = package.loaded[logger_name]
 	local previous_collector = package.loaded[collector_name]

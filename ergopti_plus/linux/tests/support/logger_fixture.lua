@@ -7,7 +7,7 @@
 local M = {}
 
 function M.with(module_names, body)
-	local names = { "logger", "logger.shim" }
+	local names = { "core.logger.engine", "core.logger.engine.shim" }
 	for _, name in ipairs(module_names) do names[#names + 1] = name end
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end

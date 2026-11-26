@@ -4,6 +4,8 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title data-i18n="update_check.window_title"></title>
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
 		<link rel="stylesheet" href="style.css" />
 		<script src="../host_bridge.js"></script>
@@ -18,15 +20,17 @@
 	</head>
 	<body>
 		<main id="panel">
-			<div id="spinner" class="spinner" hidden></div>
-			<p id="line1" class="line1"></p>
-			<p id="line2" class="line2"></p>
+			<h1 class="theme-sr-only" data-i18n="update_check.window_title"></h1>
+			<progress id="spinner" class="spinner" aria-labelledby="line1" hidden></progress>
+			<!-- The answer replaces « checking » in place: announced, not only drawn. -->
+			<p id="line1" class="line1" aria-live="polite"></p>
+			<p id="line2" class="line2" aria-live="polite"></p>
 			<p id="logged" class="logged" hidden></p>
 			<button type="button" id="btn-whats-new" class="link" hidden></button>
 			<ul id="others" class="others" hidden></ul>
 			<section id="notes" class="notes" hidden>
 				<p id="empty-notes" class="empty-notes" hidden></p>
-				<div id="release-notes"></div>
+				<article id="release-notes"></article>
 			</section>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
 		</main>

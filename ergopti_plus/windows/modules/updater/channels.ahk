@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater / Update Channel Registry
 ; DESCRIPTION:
-; Interprets the shared update-channel registry (_shared/modules/updater/channels.json,
+; Interprets the shared update-channel registry (_shared/updater/data/channels.json,
 ; generated as UpdateChannelRegistryData() in _generated/update_channels.ahk):
 ; which channel a release tag belongs to, how a persisted value maps to a
 ; channel, which releases a channel's Versions view lists, whether an update
@@ -14,7 +14,7 @@
 ; 1. Port of the canonical JavaScript matcher (_shared/ui/update_channels.js).
 ;    The tag rule is structured data interpreted here, never a regular
 ;    expression copied from another dialect. tests/unit/modules/updater/test_updater_channel_registry.ahk
-;    replays the shared _shared/modules/updater/channel_vectors.json.
+;    replays the shared _shared/updater/data/channel_vectors.json.
 ; 2. Identity is exact: channel ids, aliases and prerelease labels compare with
 ;    the case-sensitive == and !== operators and Map keys.
 ; 3. Fail fast: malformed generated data throws on first use instead of

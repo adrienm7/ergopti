@@ -11,26 +11,27 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.i18n",
-	"infra.logger",
-	"infra.fs_dir",
-	"infra.notifications",
-	"infra.text_utils",
-	"modules.llm.ollama_binary",
-	"modules.llm.ollama_server_command",
-	"modules.llm.network_env",
-	"modules.llm.opaque_network_admission",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"adapters.http_client",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.fs.engine.dir",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
+	"ai.engine.ollama.binary",
+	"ai.engine.ollama.server_command",
+	"ai.engine.api.network_env",
+	"ai.engine.api.opaque_network_admission",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
 	"ui.download_window",
-	"ui.ui_builder",
-	"infra.paths", "infra.timings",
-	"infra.deferred_work",
+	"core.ui.ui.builder",
+	"core.fs.engine.paths", "core.timing.engine.timings",
+	"core.timing.engine.deferred_work",
 	"ui.download_window.javascript",
-	"ui.menu.menu_llm.requirement_operation_registry",
-	"ui.menu.menu_llm.models_manager_ollama",
+	"ai.ui.menu.requirement_operation_registry",
+	"ai.ui.menu.models.manager_ollama",
+	"ai.engine.ollama.install_error_messages",
 }
 
 local function with_fixture(options, callback)
@@ -38,7 +39,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.fs.engine.dir"] = nil
 
 	local pulls = {}
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
@@ -51,8 +52,8 @@ local function with_fixture(options, callback)
 	local terminate_mode = options.terminate_mode or "self"
 
 	local noop = function() end
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop,
 		start = noop,
 		success = noop,
@@ -67,27 +68,27 @@ local function with_fixture(options, callback)
 			return xpcall(fn, debug.traceback, ...)
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(...)
 			notifications = notifications + 1
 			notification_records[#notification_records + 1] = table.pack(...)
 			return true
 		end,
 	}
-	package.loaded["infra.text_utils"] = nil
-	package.loaded["modules.llm.ollama_binary"] = {
+	package.loaded["core.text.engine.utils"] = nil
+	package.loaded["ai.engine.ollama.binary"] = {
 		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
 	}
-	package.loaded["modules.llm.ollama_server_command"] = {
+	package.loaded["ai.engine.ollama.server_command"] = {
 		build = function() return "fixture restart" end,
 	}
-	if options.network_admission then package.loaded["modules.llm.opaque_network_admission"] = options.network_admission end
-	package.loaded["modules.llm.network_env"] = options.network_env or {
+	if options.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = options.network_admission end
+	package.loaded["ai.engine.api.network_env"] = options.network_env or {
 		prelude = function() return "", nil end,
 		opaque_prelude = function() return "", nil end,
 	}
-	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function() return nil end }
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, fn)
 			local handle = { callback = fn, timer = {}, observers = {} }
@@ -108,7 +109,7 @@ local function with_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			local client = { settled = false, observers = {} }
 			function client.post(_, _, _, done)
@@ -159,7 +160,7 @@ local function with_fixture(options, callback)
 		end,
 		complete = function() progress.completes = progress.completes + 1; return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(label, executable, on_done, on_stream, args)
 			if label == "Ollama model pull" and options.construct_result == false then
 				return nil
@@ -194,7 +195,7 @@ local function with_fixture(options, callback)
 	}
 
 	-- Its loader reads the shared tree through hs.fs, which this fixture omits
-	package.loaded["modules.llm.thinking_families"] = { ollama_think = function() return false end }
+	package.loaded["ai.engine.api.thinking_families"] = { ollama_think = function() return false end }
 	_G.hs = {
 		execute = function() return "", true end,
 		http = {
@@ -207,16 +208,19 @@ local function with_fixture(options, callback)
 		},
 		urlevent = { openURL = noop },
 	}
-	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
+	package.loaded["ai.ui.menu.models.manager_ollama"] = nil
+	-- A failed pull reads the shared install classes (OLL-14) through
+	-- core.fs.engine.paths, whose hs.fs this fixture omits: the real data file.
+	package.loaded["ai.engine.ollama.install_error_messages"] = nil
+	package.loaded["core.fs.engine.paths"] = { shared = function(relative)
+		return helpers.driver_root() .. "../_shared" .. (relative and ("/" .. relative) or "")
+	end }
 	local real_window, native_window
 	if options.real_window then
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = { shared = function()
-			return helpers.driver_root() .. "../_shared"
-		end }
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.download_window.javascript"] = nil
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 460, height = 380 } end,
 			show_webview = function(opts)
 				native_window = { codes = {}, opts = opts }
@@ -243,7 +247,7 @@ local function with_fixture(options, callback)
 	local active_tasks = {}
 	local state = { llm_model = "old-model" }
 	local effects = { runtime = 0, display = 0, saves = 0 }
-	local manager = require("ui.menu.menu_llm.models_manager_ollama").new({
+	local manager = require("ai.ui.menu.models.manager_ollama").new({
 		active_tasks = active_tasks,
 		state = state,
 		keymap = {
@@ -282,7 +286,7 @@ local function with_fixture(options, callback)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

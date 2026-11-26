@@ -54,6 +54,7 @@ local function load_karabiner(paused)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = true,
 				tap_hold_config = {},
 				mod_combos_config = {},
@@ -129,12 +130,12 @@ local function load_karabiner(paused)
 		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function() return true end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 
 	package.loaded["platform.remap"] = nil
 	-- load_with_stubs replaces hs.keycodes wholesale, so the override must carry its

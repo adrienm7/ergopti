@@ -103,3 +103,83 @@ _THLT_ChoiceCommitsTheSparseOperation() {
 }
 Test("tap-hold menu: a choice commits its sparse operation, then reloads once (lone-tap-window)",
 	_THLT_ChoiceCommitsTheSparseOperation)
+
+_RBC_WithActualBootCache(Extra, Body) {
+	global ConfigurationFile, _ConfigBootReadFailed
+	SavedPath := ConfigurationFile, SavedFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_raw_boot_reader_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "a boot-reader fixture must affirmatively own its native directory")
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Extra
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		Cache := ParseConfigTomlFile(Path)
+		AssertTrue(IsObject(ConfigTomlBootSnapshot(Cache)), "the real reader must receive the published typed-source boot cache")
+		Body.Call(Cache)
+		AssertEqual(Source, FSReadUtf8Exact(Path), "outdated values remain authored data, never rewritten by a boot reader")
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedFailed
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+
+_RBC_LoneTap(Mode) {
+	Raw := Mode == "quoted-zero" ? '"0"' : Mode == "boolean-false" ? "false" : Mode == "zero-control" ? "0" : "750"
+	_RBC_WithActualBootCache("[tap_holds]`nlone_modifier_tap_max_ms = " . Raw . "`n", _RBC_LoneTapRead.Bind(Mode))
+}
+
+_RBC_LoneTapRead(Mode, Cache) {
+	Expected := Mode == "zero-control" ? 0 : Mode == "number-control" ? 750
+		: ManifestDefaultFor(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.TAP_HOLDS, ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS, &Admitted)
+	AssertEqual(Expected, Admitted, "the canonical boot owner already identifies the native lone-tap setting")
+	TapHoldLoneTapReadConfig(Cache)
+	AssertEqual(Max(200, Expected), TapHoldTapMaxMs("caps_lock", 0.2), "outdated source types cannot shorten the real lone modifier tap window")
+	AssertEqual(Expected, TapHoldLoneTapMaxMs())
+}
+
+_RBC_CapsWord(Mode) {
+	Raw := Mode == "idle-boolean-false" ? "[shortcuts.caps_word]`nidle_timeout_seconds = false`n"
+		: Mode == "pointer-number-zero" ? "[shortcuts.caps_word.pointer]`nleft_click = -0`n"
+		: Mode == "idle-zero-control" ? "[shortcuts.caps_word]`nidle_timeout_seconds = 0`n"
+		: Mode == "idle-number-control" ? "[shortcuts.caps_word]`nidle_timeout_seconds = 2`n"
+		: Mode == "pointer-false-control" ? "[shortcuts.caps_word.pointer]`nleft_click = false`n"
+		: "[shortcuts.caps_word.pointer]`nleft_click = true`n"
+	_RBC_WithActualBootCache(Raw, _RBC_CapsWordRead.Bind(Mode))
+}
+
+_RBC_CapsWordRead(Mode, Cache) {
+	Saved := {values: CapsWordAutoOff.Values, configured: CapsWordAutoOff.Configured}
+	try {
+		ExpectedIdle := Mode == "idle-zero-control" ? 0 : Mode == "idle-number-control" ? 2000
+			: ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS) * 1000
+		ExpectedPointer := Mode == "pointer-false-control" ? false : true
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		ConfigTomlBootSnapshotValue(Snapshot, "shortcuts.caps_word", "idle_timeout_seconds", &AdmittedIdle)
+		ConfigTomlBootSnapshotValue(Snapshot, "shortcuts.caps_word.pointer", "left_click", &AdmittedPointer)
+		AssertEqual(ExpectedIdle, AdmittedIdle * 1000)
+		AssertEqual(ExpectedPointer, AdmittedPointer)
+		CapsWordAutoOffReadConfig(Cache)
+		Policy := CapsWordAutoOff.Configured
+		AssertEqual(ExpectedIdle > 0, CapsWordAutoOffIdleExpired(Policy, 0, Max(ExpectedIdle, 10000)), "a malformed false cannot silently turn off the real default inactivity policy")
+		AssertEqual(ExpectedPointer, CapsWordAutoOffEndsOnPointer(Policy, "left_click"), "a numeric zero cannot disable the real default pointer termination")
+		AssertEqual(ExpectedIdle, CapsWordAutoOffIdleDelayMs(Policy))
+	} finally {
+		CapsWordAutoOff.Values := Saved.values
+		CapsWordAutoOff.Configured := Saved.configured
+	}
+}
+
+for _RBC_LoneMode in ["quoted-zero", "boolean-false", "zero-control", "number-control"]
+	Test("raw boot cache lone-tap admission: " . _RBC_LoneMode, _THLT_With.Bind(_RBC_LoneTap.Bind(_RBC_LoneMode)))
+for _RBC_CapsMode in ["idle-boolean-false", "pointer-number-zero", "idle-zero-control", "idle-number-control", "pointer-false-control", "pointer-true-control"]
+	Test("raw boot cache CapsWord admission: " . _RBC_CapsMode, _RBC_CapsWord.Bind(_RBC_CapsMode))

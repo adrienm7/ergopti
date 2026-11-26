@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Rows = require("layouts.keylayout_rows")
+local Json = require("core.text.engine.json")
+local Rows = require("layouts.engine.composer.keylayout_rows")
 
 local M = {}
 
@@ -22,7 +22,7 @@ local function read(path)
 	return text
 end
 
-local KEYCODES = Json.decode(read(helpers.shared("modules/layouts/mac_keycodes.json")))
+local KEYCODES = Json.decode(read(helpers.shared("layouts/data/mac_keycodes.json")))
 
 --- A Mac the build drives: files, the enabled list, the selection and a probe that
 --- translates the selected build's base level from its file.

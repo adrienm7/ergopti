@@ -10,6 +10,15 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import tomllib
+
+# The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
+# boot creates it and the updater only sends conditional requests when it exists.
+FOLDER = tomllib.loads(
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
+)["app"]["linux_folder_name"]
 
 
 def main():
@@ -17,7 +26,7 @@ def main():
     os.umask(0o077)
     with tempfile.TemporaryDirectory(prefix="ergopti-updater-release-notes-") as folder:
         root = pathlib.Path(folder)
-        (root / ".cache").mkdir()
+        (root / "cache" / FOLDER).mkdir(parents=True)
         cert, key = root / "cert.pem", root / "key.pem"
         subprocess.run(
             [
@@ -65,14 +74,17 @@ def main():
             "Actual release notes",
         ]
         for index, note in enumerate(notes, 1):
+            # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
             assets = [
                 {
                     "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz",
                 },
                 {
                     "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
+                    "browser_download_url": origin
+                    + "/releases/download/v1.2.0/ergopti-plus-linux.tar.gz.sha256",
                 },
             ]
             release = {

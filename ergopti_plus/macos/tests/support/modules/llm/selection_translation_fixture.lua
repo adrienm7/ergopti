@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 -- The shared logger is a process singleton; Scope preserves its exact identity.
-require("logger")
+require("core.logger.engine")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Translate = require("llm.translate")
+local Translate = require("ai.engine.prediction.translate")
 
 local ENTRY_ID = "translate-cerebras"
 local MODEL = "qwen-3.8-27b"
@@ -34,8 +34,8 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-local CONFIG = read_json("modules/llm/translate.json")
-local NAMES = read_json("data/locale_names.json")
+local CONFIG = read_json("ai/data/translate.json")
+local NAMES = read_json("core/i18n/data/locale_names.json")
 
 --- Returns one named closure upvalue, or nil when the closure does not own it.
 --- @param fn function Closure to inspect.
@@ -139,15 +139,14 @@ local function build_world(selection, ui_locale, options)
 	}
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
-	local _gestures = helpers.load_with_stubs("modules.gestures")
-	world.actions = require("modules.gestures.actions")
+	local _gestures = helpers.load_with_stubs("gestures.engine")
+	world.actions = require("gestures.engine.actions")
 	world.actions.init({ action_params = {} })
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local hs_stub = _G.hs
 	world.clock_ns = 0
@@ -170,6 +169,7 @@ local function build_world(selection, ui_locale, options)
 	hs_stub.application.frontmostApplication = function() return front_app end
 	hs_stub.pasteboard = {
 		changeCount = function() return world.clipboard_generation end,
+		allContentTypes = function() return { {} } end,
 		readAllData = function()
 			if world.clipboard == nil then return {} end
 			return { ["public.utf8-plain-text"] = world.clipboard }
@@ -192,16 +192,16 @@ local function build_world(selection, ui_locale, options)
 	}
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
-		"modules.llm.selection_translation", "modules.shortcuts.actions.text",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
+		"ai.engine.prediction.selection_translation", "modules.shortcuts.actions.text",
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.synthetic_input"] = make_synthetic(world)
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.input.synthetic_input"] = make_synthetic(world)
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return world.focus end,
 		getFocused = function()
 			return { appId = "TranslateApp", windowTitle = "Draft", bundleId = "test.translate", executablePath = "" }
@@ -217,7 +217,7 @@ local function build_world(selection, ui_locale, options)
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -241,6 +241,7 @@ local function build_world(selection, ui_locale, options)
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function()
 			world.hides = world.hides + 1
 			return true
@@ -253,11 +254,11 @@ local function build_world(selection, ui_locale, options)
 
 	-- The i18n stub of load_with_stubs, fresh for every world: its locale is
 	-- the interface language "ui" follows
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get_locale = function() return ui_locale or "fr" end
 	world.i18n = i18n
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	world.core = core
 	local CoreState = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(CoreState) == "table", "the LLM core state must be reachable")
@@ -279,7 +280,7 @@ local function build_world(selection, ui_locale, options)
 		return true
 	end
 
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	world.engine = engine
 	local engine_state = {
 		buffer = "",
@@ -293,10 +294,10 @@ local function build_world(selection, ui_locale, options)
 	engine.init(engine_state)
 	world.engine_state = engine_state
 	engine.set_llm_enabled(true)
-	world.flow = require("modules.llm.selection_translation")
+	world.flow = require("ai.engine.prediction.selection_translation")
 	-- Only the timers of the actions run: the backend's own stay untouched
 	world.timer_baseline = #hs_stub.timer.__timers
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_selection_translation = function(value, parent) return world.flow.run(value, parent) end,
 	}
 	return world

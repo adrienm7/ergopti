@@ -20,12 +20,14 @@
 ---    regeneration after it. This module only asks and reports.
 --- 4. The report is deferred to the timer scheduler: the regeneration's outcome
 ---    arrives from a lease callback, where no modal dialog may run.
+--- 5. The report says what happened in the user's language; the bridge's
+---    technical reason goes to the log only, never into the dialog.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("infra.logger")
-local i18n   = require("infra.i18n")
+local Logger = require("core.logger.engine.logger")
+local i18n   = require("core.i18n.engine.i18n")
 
 local LOG = "legacy_rules_cleanup"
 
@@ -62,13 +64,20 @@ local function listed_rules(descriptions)
 	return table.concat(lines, "\n")
 end
 
---- Shows one result on the timer scheduler, outside the caller's stack.
+--- Shows one result on the timer scheduler, outside the caller's stack. A
+--- dialog that raises is this module's error line, as in virtual_hid_update:
+--- the scheduler's generic callback line would not say which result was lost.
 --- @param message string Localized result.
 --- @return boolean scheduled
 local function show_report(message)
-	local committed = require("infra.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
-			i18n.get("common.ok"))
+	local committed = require("core.timing.engine.deferred_work").after(0, function()
+		local shown, err = xpcall(function()
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
+				i18n.get("common.ok"))
+		end, debug.traceback)
+		if not shown then
+			Logger.error(LOG, "The legacy-rule cleanup result could not be shown: %s.", tostring(err))
+		end
 	end, "legacy_rules_cleanup.report")
 	if committed ~= true then
 		Logger.error(LOG, "The legacy-rule cleanup result could not be shown to the user.")
@@ -84,7 +93,7 @@ local function report(ok, result)
 	result = type(result) == "table" and result or {}
 	if result.stage ~= "regeneration" then
 		Logger.error(LOG, "The legacy Karabiner rules were not removed: %s.", tostring(result.reason))
-		return show_report(i18n.format("karabiner.legacy_cleanup.removal_failed", tostring(result.reason)))
+		return show_report(i18n.get("karabiner.legacy_cleanup.removal_failed"))
 	end
 	local removed_count = result.removed_count or 0
 	local parts = {}
@@ -98,7 +107,7 @@ local function report(ok, result)
 	else
 		Logger.error(LOG, "Legacy Karabiner rules removed (%d), but the regeneration failed: %s.",
 			removed_count, tostring(result.reason))
-		parts[#parts + 1] = i18n.format("karabiner.legacy_cleanup.apply_failed", tostring(result.reason))
+		parts[#parts + 1] = i18n.get("karabiner.legacy_cleanup.apply_failed")
 	end
 	return show_report(table.concat(parts, "\n\n"))
 end
@@ -124,7 +133,7 @@ local function present(remap, trigger)
 	local body = count == 1 and i18n.format("karabiner.legacy_cleanup.body_one", list)
 		or i18n.format("karabiner.legacy_cleanup.body_other", count, list)
 	local remove_label = i18n.get("karabiner.legacy_cleanup.remove")
-	local clicked = require("infra.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), body,
+	local clicked = require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), body,
 		remove_label, i18n.get("common.later"), "warning")
 	if clicked ~= remove_label then
 		Logger.info(LOG, "Removal of %d legacy Karabiner rule(s) postponed (%s).", count, trigger)
@@ -137,7 +146,7 @@ local function present(remap, trigger)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "The legacy-rule removal raised: %s.", tostring(err))
-		show_report(i18n.format("karabiner.legacy_cleanup.removal_failed", "removal-raised"))
+		show_report(i18n.get("karabiner.legacy_cleanup.removal_failed"))
 	end
 	return true
 end

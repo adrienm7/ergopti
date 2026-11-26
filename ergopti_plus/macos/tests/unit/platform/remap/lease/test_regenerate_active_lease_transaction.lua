@@ -62,7 +62,7 @@ local function load_active_remap(options)
 		if calls.phase_listener then calls.phase_listener(phase, TOKEN) end
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		error = function(_, message, ...)
 			calls.errors[#calls.errors + 1] = string.format(message, ...)
@@ -82,6 +82,7 @@ local function load_active_remap(options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = true,
 				tap_hold_config = {},
 				mod_combos_config = {},
@@ -201,7 +202,7 @@ local function load_active_remap(options)
 		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function()
@@ -211,12 +212,12 @@ local function load_active_remap(options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- unless the test hands a folder of its own.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "tests/unit/platform/remap/active-regeneration.toml" end,
 		get_config_dir = function() return options.config_dir or "tests/unit/platform/remap/no-layers-toml" end,
 	}
@@ -286,7 +287,7 @@ end
 --- The deployment port records its input; it does not acknowledge native reload.
 --- @param run function Receives remap, protocol observations and a menu pick function.
 local function with_live_picker(run)
-	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils", "ui.action_picker" }, function()
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "menu.ui.builder.utils", "ui.action_picker" }, function()
 		local remap, calls = load_active_remap({ actions = {
 			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
 			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },

@@ -13,12 +13,12 @@ helpers.describe("boot_cleanup.lua: grep -c . is guarded with || true (audit-v5)
 
 	helpers.it("grep -c . is followed by || true", function()
 		-- The MLX boot kill_cmd was extracted from init.lua into the
-		-- modules/llm/boot_cleanup.lua sibling; the set -e guard moved with it.
-		-- Selected by a declaration unique to modules/llm/boot_cleanup.lua rather than by
+		-- ai/engine/bootstrap/boot_cleanup.lua sibling; the set -e guard moved with it.
+		-- Selected by a declaration unique to ai/engine/bootstrap/boot_cleanup.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("function M.run_selective_cleanup")
-		helpers.assert_true(src ~= nil, "modules/llm/boot_cleanup.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "ai/engine/bootstrap/boot_cleanup.lua source must be locatable")
 		helpers.assert_true(
 			src:find("grep -c . || true", 1, true) ~= nil,
 			"boot_cleanup.lua kill_cmd must use `grep -c . || true` to survive set -e shells")

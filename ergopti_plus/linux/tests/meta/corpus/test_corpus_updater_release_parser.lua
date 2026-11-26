@@ -38,7 +38,7 @@ local function read_corpus()
 	fh:close()
 	-- Use the shared pure-Lua JSON decoder (no hs.* on Linux). It returns nil
 	-- on parse failure rather than raising.
-	local decoded = require("json").decode(raw)
+	local decoded = require("core.text.engine.json").decode(raw)
 	if not decoded then return nil, "JSON parse error for " .. corpus_path end
 	return decoded, nil
 end
@@ -55,8 +55,8 @@ local corpus_root, corpus_err = read_corpus()
 -- ===============================================
 
 local function load_parser()
-	package.loaded["updater.release_parser"] = nil
-	return require("updater.release_parser")
+	package.loaded["updater.engine.release_parser"] = nil
+	return require("updater.engine.release_parser")
 end
 
 --- Coerces a decoded corpus value to a string, or nil when it is not one.
@@ -162,7 +162,7 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_notes vectors
-	require("test.release_parser_contract").run(helpers, P)
+	require("tests.lua.updater.release_parser_contract").run(helpers, P)
 
 	for _, vec in ipairs(by_cat["parse_notes"] or {}) do
 		helpers.it("parse_notes: " .. vec.id, function()
@@ -199,6 +199,10 @@ helpers.describe("updater release parser corpus — vector replay", function()
 	end
 
 	-- parse_html_url vectors
+	helpers.it("reads only the release html_url and decodes JSON escapes", function()
+		helpers.assert_eq(P.parse_html_url('{"html_url":null,"author":{"html_url":"https://wrong.example"}}'), "")
+		helpers.assert_eq(P.parse_html_url('{"author":{"html_url":"https://wrong.example"},"html_url":"https:\\/\\/correct.example\\/release"}'), "https://correct.example/release")
+	end)
 	for _, vec in ipairs(by_cat["parse_html_url"] or {}) do
 		helpers.it("parse_html_url: " .. vec.id, function()
 			helpers.assert_eq(dispatch(P, vec), vec.expected,

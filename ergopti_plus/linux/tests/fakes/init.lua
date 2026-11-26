@@ -51,7 +51,7 @@ function M.uinput_writer(opts)
 	-- Only its syscall port is controlled: no device, kernel ACK or origin exists.
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local driver = assert(source:match("^(.*)/tests/fakes/init.lua$"))
-	local fake = assert(loadfile(driver .. "/adapters/uinput_writer.lua"))()
+	local fake = assert(loadfile(driver .. "/platform/input/uinput_writer.lua"))()
 	fake.events, fake.opened, fake.closed, fake.test = {}, false, false, {}
 	local pending
 	local function uint(bytes, at, count)
@@ -109,7 +109,8 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason?,
+---   abs?, mt_slots? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -183,9 +184,34 @@ function M.evdev_reader(opts)
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
+	function fake.grabbed_paths()
+		local paths = {}
+		for slot in pairs(fake.grabbed) do
+			if fake.open_slots[slot] ~= nil then paths[#paths + 1] = fake.open_slots[slot] end
+		end
+		table.sort(paths)
+		return paths
+	end
 	function fake.pressed_keys(slot, max_code)
 		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
 		return opts.pressed_keys or {}
+	end
+	-- Multitouch registers: opts.abs = { [code] = absinfo table }, opts.mt_slots =
+	-- { [code] = { [slot] = value } }. A scripted reader without them answers as
+	-- a device whose query is refused.
+	function fake.abs_info(slot, code)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local info = (opts.abs or {})[code]
+		if info == nil then return nil, "no scripted absinfo" end
+		return info
+	end
+	function fake.mt_slot_values(slot, code, count)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local values = (opts.mt_slots or {})[code]
+		if values == nil then return nil, "no scripted slot values" end
+		local out = {}
+		for index = 0, count - 1 do out[index] = values[index] or 0 end
+		return out
 	end
 	function fake.active_leds(slot, max_code)
 		if type(opts.active_leds) == "function" then return opts.active_leds(slot, max_code) end
@@ -250,7 +276,7 @@ function M.shell_runner(opts)
 	-- contact, and a fake that answered differently from the real validator would
 	-- let a test pass on an argv that production refuses -- the exact failure the
 	-- double is supposed to rule out (keystats-worker-timings-must-be-strings).
-	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
+	fake.validate_spawn_args = require("core.process.adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
 		fake.commands[#fake.commands + 1] = command
@@ -331,7 +357,7 @@ function M.storage(opts)
 
 	-- This is an in-memory ownership model, never a native persistence receipt.
 	local gates, aliases, generations, receipts, epoch = {}, {}, {}, setmetatable({}, { __mode = "k" }), 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local function copy(value)
 		if value == nil then return nil end
 		local bytes = assert(json.encode(value))
@@ -458,12 +484,32 @@ function M.storage(opts)
 	end
 
 	-- The store's file, which the configuration backup copies.
-	function fake.path() return opts.path or "/fake/ergopti_plus/storage.json" end
+	function fake.path() return opts.path or ("/fake/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/storage.json") end
 
 	function fake.set(key, value)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = value
 		generations[key] = (generations[key] or 0) + 1
+		return true
+	end
+	-- A modal string edit: a one-shot receipt that commits only while the
+	-- captured cell and its generation are unchanged, as the real adapter does.
+	local string_edits = setmetatable({}, { __mode = "k" })
+	function fake.capture_string_edit(key)
+		if type(key) ~= "string" or key == "" or aliases[key] ~= nil then return nil end
+		local receipt = {}
+		string_edits[receipt] = { key = key, cell = cell(key), generation = generations[key] or 0 }
+		return copy(fake.values[key]), receipt
+	end
+	function fake.commit_string_edit(receipt, value)
+		if type(receipt) ~= "table" then return false end
+		local expected = string_edits[receipt]
+		string_edits[receipt] = nil
+		if not expected or type(value) ~= "string" or opts.writes_fail or aliases[expected.key] ~= nil
+			or not cells_equal(cell(expected.key), expected.cell)
+			or (generations[expected.key] or 0) ~= expected.generation then return false end
+		fake.values[expected.key] = value
+		generations[expected.key] = expected.generation + 1
 		return true
 	end
 	function fake.set_many(values)
@@ -481,6 +527,7 @@ function M.storage(opts)
 		if stored == nil then return default_value end
 		return stored
 	end
+	function fake.read_exact(key) return true, fake.values[key] end
 	function fake.delete(key)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
 		fake.values[key] = nil
@@ -520,6 +567,14 @@ function M.clipboard(opts)
 	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
 	fake.counter = 0
 	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	-- The transient hint: armed once, as the daemon's boot does.
+	function fake.arm_transient_hint()
+		if fake.transient_armed then error("the transient clipboard hint is already armed", 2) end
+		fake.transient_armed = true
+	end
+	function fake.transient_targets(text)
+		return { { name = "text/plain;charset=utf-8", data = text }, { name = "x-kde-passwordManagerHint", data = "secret" } }
+	end
 	function fake.change_counter()
 		if opts.available == false then return nil, "unsupported" end
 		return fake.counter
@@ -538,6 +593,8 @@ function M.clipboard(opts)
 		fake.contents = previous
 		return true
 	end
+	-- The fake always puts the previous contents back: no restore is ever lost.
+	function fake.restore_failures() return 0 end
 	-- The copy probe: the selection, the clipboard left as it was.
 	function fake.read_selection(emit_combo, sleep_ms)
 		if opts.available == false then return false, "", "clipboard unavailable" end
@@ -695,7 +752,7 @@ function M.sqlite_writer(opts)
 	local system_day_paths = {}
 	local fake = {
 		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
-		session_events = {}, system_events = {},
+		session_events = {}, system_events = {}, network_events = {}, clipboard_events = {}, window_topo_events = {}, av_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
@@ -707,8 +764,9 @@ function M.sqlite_writer(opts)
 	function fake.is_available() return available end
 	function fake.flush_transport_available() return available end
 	function fake.has_private_file_debt() return false end
-	function fake.open_db(path) fake.path = path ; return available end
+	function fake.open_db(path) fake.path = path ; if not available then return false, "sqlite_unavailable" end; return true end
 	function fake.ensure_token_encoding() return true end
+	function fake.ensure_awake_definition() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end
@@ -753,6 +811,10 @@ function M.sqlite_writer(opts)
 	fake.insert_window_switch_events = collect(fake.window_switches)
 	fake.insert_session_events = collect(fake.session_events)
 	fake.insert_system_events = collect(fake.system_events)
+	fake.insert_network_events = collect(fake.network_events)
+	fake.insert_clipboard_events = collect(fake.clipboard_events)
+	fake.insert_window_topo_events = collect(fake.window_topo_events)
+	fake.insert_av_events = collect(fake.av_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
@@ -832,9 +894,9 @@ function M.sqlite_writer(opts)
 		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
 		if media_policy then return true end
 		local ok, store, policy = pcall(function()
-			local shared = require("keystats.media_store")
-			local json = require("json")
-			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
+			local shared = require("metrics.engine.media.store")
+			local json = require("core.text.engine.json")
+			local path = require("tests.helpers").driver_root() .. "/../_shared/layouts/data/keycodes/metrics_media_keys.json"
 			local file = assert(io.open(path, "rb"))
 			local read, body = pcall(file.read, file, "*a")
 			local closed, acknowledged = pcall(file.close, file)
@@ -870,7 +932,7 @@ function M.sqlite_writer(opts)
 				assert(type(events[index]) == "table")
 				local row = {}; for key, value in pairs(events[index]) do row[key] = value end
 				rows[index] = row
-				media_store.raw_sql(device_id, index, row, require("json").encode)
+				media_store.raw_sql(device_id, index, row, require("core.text.engine.json").encode)
 			end
 			local aggregate = previous and copy(previous.batch) or { media_ngram = {}, media_hold = {} }
 			media_store.replay(media_policy, aggregate, rows, threshold_ms)
@@ -906,7 +968,17 @@ function M.sqlite_writer(opts)
 	end
 
 	function fake.exec_sql(sql) fake.executed[#fake.executed + 1] = sql ; return true end
-	function fake.query_rows() return {} end
+	-- Renders nothing: the fake keeps no derived formatter of its own.
+	function fake.derived_statement() return nil end
+	-- The ledger identity asks whether the store already knows its pre-ledger
+	-- "linux-<hostname>" id. A fake store is an existing one unless the test
+	-- says it is new (opts.fresh_store), so the historical id stays in force.
+	function fake.query_rows(sql)
+		if type(sql) == "string" and sql:match("^SELECT count%(%*%) FROM devices WHERE device_id=") then
+			return { opts.fresh_store and "0" or "1" }
+		end
+		return {}
+	end
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
 	function fake.upsert_open_walk(device_id, encoded)

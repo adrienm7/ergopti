@@ -7,6 +7,16 @@
 
 #Requires AutoHotkey v2.0
 
+_MMS_ManifestKeyVectors() {
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\keystats\manifest_key_vectors.json"
+	Vectors := JsonParse(FileRead(Path, "UTF-8"))
+	for Vector in Vectors {
+		AssertEqual(Vector["key"], KLR_ManifestAppKey(Vector["label"]))
+		AssertEqual(Vector["label"], KLR_ManifestAppLabel(Vector["key"]))
+	}
+}
+Test("system manifest: application keys follow shared vectors", _MMS_ManifestKeyVectors)
+
 _MMS_Check(Manifest) {
 	AssertTrue(Manifest.Has("2026-01-01") && Manifest["2026-01-01"].Has("_system"),
 		"the dashboard must receive system counters alongside application cells")
@@ -17,12 +27,21 @@ _MMS_Check(Manifest) {
 		"passive_count", 77, "night_wake_count", 88)
 		AssertEqual(Expected, System[Field], "cross-device system field " . Field)
 	AssertFalse(System.Has("chars"), "system totals are not typing application metrics")
+	for Key, Count in Map("~_system", 7, "~_sys", 8, "~~app", 9)
+		AssertEqual(Count, Manifest["2026-01-01"][Key]["chars"], "reserved application must survive")
 	AssertFalse(System.Has("hourly"), "system counters do not carry typing time series")
 	AssertTrue(Manifest.Has("2026-01-02"), "a system-only day must not disappear")
 	EmptyBattery := Manifest["2026-01-02"]["_system"]
 	AssertEqual(0, EmptyBattery["battery_count"])
 	AssertFalse(EmptyBattery.Has("battery_min"), "absent battery samples are not zero-percent readings")
 	AssertFalse(EmptyBattery.Has("battery_max"))
+}
+
+_MMS_Contains(Apps, Name) {
+	for Value in Apps
+		if Value == Name
+			return true
+	return false
 }
 
 _MMS_Projection(Db, Mode) {
@@ -44,7 +63,8 @@ _MMS_Projection(Db, Mode) {
 			. "('two','2026-01-01',10,20,80,1,80,80,30,40,50,60,70,80);"
 			. "INSERT INTO agg_system_day(device_id,date,battery_sum,battery_count,battery_min,battery_max)"
 			. " VALUES('zero','2026-01-01',0,1,0,0),('one','2026-01-02',NULL,0,9,99);"
-			. "INSERT INTO agg_app_day(device_id,date,app,chars) VALUES('one','2026-01-01','editor.exe',3);"))
+			. "INSERT INTO agg_app_day(device_id,date,app,chars) VALUES('one','2026-01-01','editor.exe',3),"
+			. "('one','2026-01-01','_system',7),('one','2026-01-01','_sys',8),('one','2026-01-01','~app',9);"))
 		if Mode = "normal" {
 			Manifest := KLR_ReadManifest(Db)
 			_MMS_Check(Manifest)
@@ -62,8 +82,9 @@ _MMS_Projection(Db, Mode) {
 			Blob := KLPF_BuildTyping(Db, "full")
 			_MMS_Check(Blob["metrics_manifest"])
 			Apps := KLPF_UniqueAppsFromManifest(Blob["metrics_manifest"])
-			AssertEqual(1, Apps.Length, "system pseudo-apps must not enter n-gram filters")
-			AssertEqual("editor.exe", Apps[1])
+			AssertEqual(4, Apps.Length, "system totals must not hide real application names")
+			for App in ["editor.exe", "_system", "_sys", "~app"]
+				AssertTrue(_MMS_Contains(Apps, App), "filter must use the exact application label")
 			_MMJ_CacheIsolation(Db, Blob["metrics_manifest"])
 			AssertTrue(SQLite_Exec(Db, "UPDATE agg_system_day SET sleep_ms=9 WHERE date='2026-01-02';"))
 			Live := KLPF_BuildTyping(Db, "live", false, "2026-01-02")

@@ -139,15 +139,15 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		llm_backend = "mlx",
 		llm_model = "startup-model",
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.llm"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["ai.engine"] = {
 		BUILTIN_PROFILES = {},
 		get_current_model = function() return state.llm_model end,
 	}
-	reset_module("adapters.timer_scheduler")
-	reset_module("adapters.json_codec")
-	reset_module("ui.menu.menu_llm.startup_controller")
-	local StartupController = require("ui.menu.menu_llm.startup_controller")
+	reset_module("core.events.timer_scheduler")
+	reset_module("core.fs.adapters.json_codec")
+	reset_module("ai.ui.menu.startup_controller")
+	local StartupController = require("ai.ui.menu.startup_controller")
 	local check_startup = StartupController.new({
 		state = state,
 		keymap = keymap,

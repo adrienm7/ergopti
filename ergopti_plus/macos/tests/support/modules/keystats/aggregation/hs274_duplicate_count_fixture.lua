@@ -34,14 +34,14 @@ end
 local function with_system_policy_callback(vector, body)
 	Accounting.run(function(scenario)
 		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
-		local lifecycle = package.loaded["adapters.process_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		local manager = package.loaded["modules.keystats.log_manager"]
 		local previous_activation, previous_append = lifecycle.onAppActivate, manager.append_log
 		local ports = { "init", "app_watcher_cb", "update_private_status", "update_ax_observer",
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(ports) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "adapters.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_app, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate
@@ -324,7 +324,7 @@ local private_modifier_vectors = {
 local function with_private_window_callback(vector, body)
 	Accounting.run(function(scenario)
 		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
-		local lifecycle = package.loaded["adapters.process_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		local manager = package.loaded["modules.keystats.log_manager"]
 		local original_activation = lifecycle.onAppActivate
 		local original_append = manager.append_log
@@ -332,7 +332,7 @@ local function with_private_window_callback(vector, body)
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(port_names) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "adapters.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_application, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate

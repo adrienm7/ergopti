@@ -8,7 +8,7 @@
 --- 0 = never), `shortcuts.caps_word.terminators` (word delimiters of the
 --- hotstring catalogue) and `[shortcuts.caps_word.pointer]` (one switch per
 --- pointer kind). The rule itself is the shared policy
---- (_shared/lua/caps_word/auto_off.lua); this module reads and writes the
+--- (_shared/keyboard/engine/caps_word_auto_off.lua); this module reads and writes the
 --- settings and names the pointer kind of a native evdev event.
 ---
 --- FEATURES & RATIONALE:
@@ -25,18 +25,18 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local Manifest = require("infra.manifest_reader")
-local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigOutdated = require("config_outdated")
-local Policy = require("caps_word.auto_off")
-local EvdevCodes = require("infra.evdev_codes")
-local InputEvent = require("infra.input_event")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local Manifest = require("menu.engine.manifest_reader")
+local Paths = require("settings.engine.paths")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Policy = require("keyboard.engine.caps_word_auto_off")
+local EvdevCodes = require("platform.input.evdev_codes")
+local InputEvent = require("platform.input.event")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.caps_word_auto_off"
 
@@ -212,7 +212,7 @@ local function resolve_settings(document, mark)
 			settings.idle_timeout_seconds = idle
 			if mark then mark("shortcuts", "caps_word", ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS) end
 		else
-			ConfigOutdated.report(IDLE_PATH, "the value is not a non-negative number of seconds", Logger)
+			ConfigOutdated.report(IDLE_PATH, "the value is not a number of seconds in the declared range (0 = never)", Logger)
 		end
 	end
 
@@ -244,9 +244,9 @@ end
 local function read_settings()
 	local content, status, detail = Writer.read_classified(Paths.config("config.toml"))
 	assert(status == "ok" or status == "absent", "CapsWord configuration is unreadable: " .. tostring(detail))
-	local decoded = Codec.decode(content or "")
-	assert(type(decoded) == "table", "CapsWord configuration is malformed")
-	return resolve_settings(decoded), { status = status, content = content }
+	local decoded, shapes = Codec.decode_with_shapes(content or "")
+	assert(type(decoded) == "table" and type(shapes) == "table", "CapsWord configuration is malformed")
+	return resolve_settings(decoded), { status = status, content = content }, decoded, shapes
 end
 
 --- Marks the same canonical values used by every read.
@@ -291,7 +291,7 @@ end
 --- @param value any Validated value.
 --- @param apply function Mutates a settings copy.
 --- @return boolean committed
-local function persist(path, value, apply)
+local function persist(path, value, apply, resolve_value)
 	-- The Shortcuts scope owns every [shortcuts] leaf while it publishes.
 	local manager = package.loaded["modules.shortcuts.manager"]
 	if type(manager) == "table" and type(manager.configuration_admitted) == "function"
@@ -299,8 +299,15 @@ local function persist(path, value, apply)
 		Logger.error(LOG, "CapsWord auto-off change refused: a shortcut configuration scope is still pending.")
 		return false
 	end
+	local staged
 	local called, committed, detail = pcall(function()
-		local _, source = read_settings()
+		local source, decoded, shapes
+		staged, source, decoded, shapes = read_settings()
+		if resolve_value then
+			local reason
+			value, reason = resolve_value(staged, decoded, shapes)
+			if value == nil then return false, reason end
+		end
 		return Writer.batch_write(Paths.config("config.toml"),
 			{ Manifest.sparse_operation(path, value) }, nil, source)
 	end)
@@ -308,10 +315,14 @@ local function persist(path, value, apply)
 		Logger.error(LOG, "CapsWord auto-off change was not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
-	local updated = M.settings()
-	apply(updated)
-	publish(updated)
+	apply(staged, value)
+	publish(staged)
 	Logger.info(LOG, "%s set to %s.", path, type(value) == "table" and table.concat(value, ", ") or tostring(value))
+	-- The running session follows an acknowledged change from its next event.
+	manager = package.loaded["modules.shortcuts.manager"]
+	if type(manager) == "table" and type(manager.caps_word_policy_published) == "function" then
+		manager.caps_word_policy_published(_policy)
+	end
 	return true
 end
 
@@ -331,12 +342,26 @@ end
 --- @param checked boolean Wanted state.
 --- @return boolean committed
 function M.set_terminator(key, checked)
-	local list, reason = Policy.with_terminator(M.settings().terminators, key, checked)
-	if not list then
-		Logger.warn(LOG, "CapsWord delimiter change '%s' refused: %s.", tostring(key), tostring(reason))
-		return false
-	end
-	return persist(TERMINATORS_PATH, list, function(settings) settings.terminators = list end)
+	return persist(TERMINATORS_PATH, nil,
+		function(settings, list) settings.terminators = assert(resolve_terminators(list)) end,
+		function(settings, decoded, shapes)
+			local next_list, reason = Policy.with_terminator(settings.terminators, key, checked)
+			if not next_list then return nil, reason end
+			local shortcuts = decoded.shortcuts
+			if shortcuts ~= nil and type(shortcuts) ~= "table" then return nil, "invalid shortcuts section" end
+			local section = shortcuts and shortcuts.caps_word
+			if section ~= nil and type(section) ~= "table" then return nil, "invalid CapsWord section" end
+			local raw = section and section.terminators
+			if raw ~= nil then
+				if type(raw) ~= "table" or shapes.arrays[raw] ~= true
+						or TableUtil.count(raw) ~= #raw then return nil, "invalid delimiter list" end
+				for _, item in ipairs(raw) do
+					if type(item) ~= "string" then return nil, "invalid delimiter entry" end
+					if not Policy.is_terminator_key(item) then next_list[#next_list + 1] = item end
+				end
+			end
+			return next_list
+		end)
 end
 
 --- Switches one pointer kind.

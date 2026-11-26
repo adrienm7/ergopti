@@ -159,8 +159,10 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 				return {
 					read = function(_, mode)
 						if mode == "*l" then return "CREATE TABLE devices (os CHECK (os IN ('linux')))" end
+						local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+							and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
 						return command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true)
-							and ("\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
+							and (body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
 					end,
 					close = function() return true end, -- LuaJIT's ambiguous success is deliberate.
 				}
@@ -208,7 +210,7 @@ helpers.describe("sqlite_writer", function()
     it("seeds every app-time and hotstring metric on the initial upsert", function()
       -- The statement is the catalogue's agg.app_day; the writer passes 0 for a counter it
       -- does not track, so the initial INSERT carries every field and not only the conflict update.
-      local Queries = require("keystats.queries")
+      local Queries = require("metrics.engine.queries")
       local values = {}
       for _, slot in ipairs(Queries.slots("agg.app_day")) do
         values[slot.name] = slot.kind == "s" and "x" or 0
@@ -237,7 +239,7 @@ helpers.describe("sqlite_writer", function()
 			helpers.assert_contains(sql, "(device_id, date, app, token, c, td, cd, e, esrc_json)")
 			local admitted = sql:match(",14,7,2,1,'([^']*)'")
 			helpers.assert_type(admitted, "string", "known and arbitrary source counts must accompany the scalar fields")
-			helpers.assert_eq(require("json").decode(admitted), {
+			helpers.assert_eq(require("core.text.engine.json").decode(admitted), {
 				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
 			})
 			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
@@ -254,7 +256,7 @@ helpers.describe("sqlite_writer", function()
 		end)
 		helpers.assert_true(src:find('"agg.ngram_scancode"', 1, true) ~= nil,
 			"evdev hardware counts must be rendered through the catalogue")
-		helpers.assert_contains(require("keystats.queries").render("agg.ngram_scancode", "cli_json",
+		helpers.assert_contains(require("metrics.engine.queries").render("agg.ngram_scancode", "cli_json",
 			{ device_id = "d", date = "x", app = "a", scancode = 30, c = 1 }), "INSERT INTO ngram_scancodes",
 			"evdev hardware counts must be persisted in the canonical scancode table")
 	end)
@@ -273,7 +275,7 @@ helpers.describe("sqlite_writer", function()
         "a restart-safe SQLite event sequence is required")
       helpers.assert_true(src:find('"events.typing"', 1, true) ~= nil,
         "raw typing rows must be rendered through the catalogue")
-      helpers.assert_contains(require("keystats.queries").render("events.typing", "cli_json", {
+      helpers.assert_contains(require("metrics.engine.queries").render("events.typing", "cli_json", {
         device_id = "d", id = 1, ts = "t", date = "x", app = "a", is_fullscreen = 0, in_meeting = 0,
         mouse_clicks = 0, mouse_scrolls = 0, mouse_distance_px = 0, text = "", events_json = "[]",
       }), "INSERT OR IGNORE INTO events_typing", "raw typing rows must never be replaced on an ID collision")
@@ -309,7 +311,9 @@ helpers.describe("sqlite_writer", function()
               return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
             end
             -- Mirror the reservation SELECT and the actual terminal status.
-            local body = command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or ""
+            local body = command:find("SELECT sql FROM sqlite_master", 1, true)
+              and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n"
+              or (command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or "")
             return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
           close = function() return true end,
@@ -550,7 +554,7 @@ end)
 
 helpers.describe("linux-sqlite-burst-histogram-keys", function()
 	for _, key in ipairs({ "owned\\bucket", "owned\\literal", 'quoted" clé', "LF\nCR\rtab\tcontrol\1\31", "apostrophe's" }) do
-		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("json").encode(key), function()
+		it("linux-sqlite-burst-histogram-keys: supplied key retains " .. require("core.text.engine.json").encode(key), function()
 			local row = { date = "2000-01-01", app = "owned-app", length_buckets = { [key] = 2.9 } }
 			with_burst_histogram_statement(row, function(decoded)
 				helpers.assert_eq(decoded[key], 2, "positive counts retain their existing floor")
@@ -637,7 +641,7 @@ helpers.describe("linux-sqlite-local-event-days", function()
 							return previous_popen(command)
 						end
 						local event = explicit and { date = "1999-12-31", ts = "1999-12-31 23:59:59" } or {}
-						local original = require("json").encode(event)
+						local original = require("core.text.engine.json").encode(event)
 						local ok, err = xpcall(function()
 							helpers.assert_true(writer[method]("owned", { event }))
 							local ts = explicit and event.ts or "2026-01-01 23:59:59"
@@ -647,7 +651,7 @@ helpers.describe("linux-sqlite-local-event-days", function()
                             helpers.assert_true(statement:find("'" .. ts .. "','" .. date .. "'", 1, true) ~= nil
                                 or statement:find("'" .. ts .. "', '" .. date .. "'", 1, true) ~= nil,
                                 "the event carries its own timestamp and local day")
-							helpers.assert_eq(require("json").encode(event), original)
+							helpers.assert_eq(require("core.text.engine.json").encode(event), original)
 						end, debug.traceback)
 						io.popen = previous_popen
 						cipher.set_enabled(enabled)
@@ -714,3 +718,132 @@ helpers.describe("linux-sqlite-raw-batch-transactions", function()
 	end
 end)
 
+
+it("SQLite device migration refuses an unreadable schema instead of rebuilding", function()
+	local command = require("modules.keystats.sqlite_command")
+	local build, execute, popen = command.build, os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+	local statements, current = {}, nil
+	command.build = function(selected, sql, options)
+		current = sql; statements[#statements + 1] = sql
+		return build(selected, sql, options)
+	end
+	os.execute = function() return 0 end
+	io.popen = function()
+		local status = current:find("SELECT sql FROM sqlite_master", 1, true) and 7 or 0
+		return { read = function() return "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			close = function() return true end }
+	end
+	local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local called, opened = pcall(Writer.open_db, path)
+	command.build, os.execute, io.popen = build, execute, popen
+	Writer.close_db(); os.remove(path)
+	helpers.assert_true(called)
+	helpers.assert_eq(opened, false, "unknown schema must not be treated as an old schema")
+	for _, sql in ipairs(statements) do
+		helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "failed schema inspection must not rebuild devices")
+	end
+end)
+
+for _, fault in ipairs({ "seek_throw", "close_throw" }) do
+	it("SQLite open safely refuses file inspection " .. fault, function()
+		local Reader = require("core.fs.engine.regular_file_reader")
+		local open, execute, popen = Reader.open, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local closes, failing = 0, true
+		Reader.open = function(target, ...)
+			local stream, detail, code = open(target, ...)
+			if target ~= path or not stream or not failing then return stream, detail, code end
+			return { seek = function(_, ...)
+				if fault == "seek_throw" then error("injected seek failure") end
+				return stream:seek(...)
+			end, close = function()
+				closes = closes + 1; assert(stream:close())
+				if fault == "close_throw" then error("injected close failure") end
+				return true
+			end }, detail, code
+		end
+		os.execute = function() return 0 end
+		io.popen = function(command)
+			local content = command:find("SELECT sql FROM sqlite_master", 1, true)
+				and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
+			return { read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=0\n" end, close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		failing = false
+		local retry = called and opened == false and Writer.open_db(path)
+		Reader.open, os.execute, io.popen = open, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called, "inspection exceptions must become explicit refusal")
+		helpers.assert_eq(opened, false)
+		helpers.assert_eq(closes, 1, "every inspected stream is closed")
+		helpers.assert_true(retry, "a later healthy inspection can reopen the store")
+	end)
+end
+
+for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
+	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
+		local command = require("modules.keystats.sqlite_command")
+		local build, execute, popen = command.build, os.execute, io.popen
+		local path = os.tmpname()
+		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+		local statements, current = {}, nil
+		command.build = function(selected, sql, options)
+			current = sql; statements[#statements + 1] = sql
+			return build(selected, sql, options)
+		end
+		os.execute = function() return 0 end
+		io.popen = function()
+			local body, status = "", 0
+			if current:find("SELECT sql FROM sqlite_master", 1, true) then
+				body = [[CREATE TABLE devices (
+ device_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+ os TEXT NOT NULL CHECK(os IN ('darwin','windows')), os_version TEXT,
+ host_signature TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
+)]] .. "\n"
+				if receipt == "extra_check" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL CHECK(length(name)>0)") end
+			elseif current:find("pragma_foreign_key_list", 1, true) then
+				if receipt == "error" then status = 7
+				elseif receipt == "1" then body = "1\n" else body = "0\n" end
+			end
+			return { read = function() return body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+				close = function() return true end }
+		end
+		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local called, opened = pcall(Writer.open_db, path)
+		command.build, os.execute, io.popen = build, execute, popen
+		Writer.close_db(); os.remove(path)
+		helpers.assert_true(called)
+		helpers.assert_eq(opened, receipt == "0", "only a proven known schema may be migrated")
+		local observed_guard, observed_migration = false, false
+		for _, sql in ipairs(statements) do
+			if sql:find("pragma_foreign_key_list", 1, true) then
+				observed_guard = true
+				helpers.assert_contains(sql, "pragma_table_xinfo")
+				helpers.assert_contains(sql, "pragma_index_list")
+			end
+			if sql:find("ALTER TABLE devices RENAME", 1, true) then observed_migration = true end
+		end
+		if receipt == "0" or receipt == "1" or receipt == "error" then helpers.assert_true(observed_guard) end
+		helpers.assert_eq(observed_migration, receipt == "0", "unsafe device migration cannot start")
+	end)
+end
+
+it("SQLite open distinguishes absent executable from refused store", function()
+	local prior_programs, prior_writer = package.loaded["settings.engine.preferences.owned_programs"], package.loaded["modules.keystats.sqlite_writer"]
+	package.loaded["settings.engine.preferences.owned_programs"] = { available = function() return false end, path = function() return "sqlite3" end }
+	package.loaded["modules.keystats.sqlite_writer"] = nil
+	local ok, detail = pcall(function()
+		local writer = require("modules.keystats.sqlite_writer")
+		local absent, why_absent = writer.open_db("/controlled/metrics.sqlite")
+		helpers.assert_eq(absent, false); helpers.assert_eq(why_absent, "sqlite_unavailable")
+		local rejected, why_rejected = writer.open_db("")
+		helpers.assert_eq(rejected, false); helpers.assert_eq(why_rejected, "store_refused")
+	end)
+	package.loaded["settings.engine.preferences.owned_programs"], package.loaded["modules.keystats.sqlite_writer"] = prior_programs, prior_writer
+	if not ok then error(detail, 0) end
+end)

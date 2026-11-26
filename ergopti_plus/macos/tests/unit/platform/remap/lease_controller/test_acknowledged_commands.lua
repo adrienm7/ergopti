@@ -296,6 +296,50 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 		end)
 	end)
 
+	helpers.it("(lease-output-turn-inline) settles an output turn delivered during probe start", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.output_probe_immediate_echo = true
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "fencing", "the synchronous echo proves the worker silent")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 1)
+		end)
+	end)
+
+	helpers.it("(lease-output-turn-inline-ack) retires a probe if its ACK arrives while it starts", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.output_probe_on_input = function() ctx.chunk(1, "PONG 1\n") end
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "active")
+			helpers.assert_true(ctx.output_probe().closed, "the no-longer-needed child must be retired")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 0)
+		end)
+	end)
+
+	helpers.it("(lease-output-turn-inline-refusal) keeps a settled ACK when probe input is refused", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.output_probe_on_input = function() ctx.chunk(1, "PONG 1\n") end
+			ctx.output_probe_input_refused = true
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "active", "a received ACK outranks the probe refusal")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 0)
+		end)
+	end)
+
 	helpers.it("(lease-output-turn) a probe that cannot start leaves the deadline's verdict", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()
@@ -1128,10 +1172,10 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 	end)
 
 	helpers.it("(keystroke-exposure-report) fencing a live lease names the keys typed across it", function()
-		local saved = package.loaded["infra.keystroke_integrity"]
+		local saved = package.loaded["core.logger.engine.keystroke_integrity"]
 		local causes = {}
 		local ok, err = pcall(with_fixture, function(load_controller)
-			package.loaded["infra.keystroke_integrity"] = {
+			package.loaded["core.logger.engine.keystroke_integrity"] = {
 				note_exposure = function(cause) causes[#causes + 1] = cause; return true end,
 			}
 			local controller, ctx = load_controller()
@@ -1148,7 +1192,7 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			live_ctx.clock = live_ctx.clock + 4.5
 			live_ctx.fire_ack_deadline()
 		end)
-		package.loaded["infra.keystroke_integrity"] = saved
+		package.loaded["core.logger.engine.keystroke_integrity"] = saved
 		if not ok then error(err, 0) end
 		helpers.assert_eq(causes, { "a Karabiner lease fence that switched Ergopti's rules off" },
 			"the live lease's fence is the transition a held key can be lost across")

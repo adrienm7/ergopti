@@ -6,7 +6,7 @@
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/dynamic_hotstrings/prefix_vectors.json and validates
 --- it against the shared reference implementation itself
---- (_shared/lua/dynamic_hotstrings/init.lua) — the same module macOS's
+--- (_shared/hotstrings/engine/dynamic/core.lua) — the same module macOS's
 --- rules_engine.lua delegates to at runtime. Pinning the corpus against the
 --- reference (rather than a driver-local reimplementation) proves the corpus
 --- itself is correct; the AHK half in
@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DynamicHotstrings = require("dynamic_hotstrings")
+local DynamicHotstrings = require("hotstrings.engine.dynamic.core")
 
 
 
@@ -70,7 +70,7 @@ helpers.describe("dynamic hotstrings prefix corpus (macOS): shared reference mat
 	helpers.it("compute_prefix_counts matches every prefix_count_vector", function()
 		if not corpus then return end
 		for _, v in ipairs(corpus.prefix_count_vectors) do
-			local result = DynamicHotstrings.compute_prefix_counts(v.phone, v.fphone, v.ssn_raw, v.iban_raw)
+			local result = DynamicHotstrings.compute_prefix_counts(v.phone, v.fphone, v.ssn, v.iban)
 			helpers.assert_eq(result.phoneprefixes, v.expected.phoneprefixes,
 				"[" .. v.id .. "] phoneprefixes")
 			helpers.assert_eq(result.ssnprefixes, v.expected.ssnprefixes,
@@ -92,6 +92,22 @@ helpers.describe("dynamic hotstrings prefix corpus (macOS): shared reference mat
 		for _, v in ipairs(corpus.spaced_prefix_vectors) do
 			local result = DynamicHotstrings.spaced_prefix(v.spaced, v.raw_count)
 			helpers.assert_eq(result, v.expected, "[" .. v.id .. "] spaced_prefix")
+		end
+	end)
+
+
+
+
+	-- ==================================================
+	-- ======= 5/ international_prefix parity ===========
+	-- ==================================================
+
+	helpers.it("international_prefix matches every international_prefix_vector", function()
+		helpers.assert_true(type(corpus) == "table" and type(corpus.international_prefix_vectors) == "table"
+			and #corpus.international_prefix_vectors > 0, "corpus must contain international_prefix_vectors")
+		for _, v in ipairs(corpus.international_prefix_vectors) do
+			helpers.assert_eq(DynamicHotstrings.international_prefix(v.phone, v.plain_count), v.expected,
+				"[" .. v.id .. "] international_prefix")
 		end
 	end)
 end)

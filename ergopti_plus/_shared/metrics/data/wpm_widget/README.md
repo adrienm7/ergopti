@@ -1,0 +1,40 @@
+# wpm_widget (shared constants)
+
+## Purpose
+
+The one description of how the typing-speed readouts look on every driver:
+the floating pill, its real-time graph mode, and the menu bar (macOS) or tray
+(Windows, Linux) readout. No driver restates a value
+from `constants.toml`: each reads it at runtime and refuses to draw when a key
+is missing.
+
+Refresh rates, the colour hold and the idle hide are timings, and live in
+`_shared/core/timing/data/constants.toml` (`[ui]` and `[keystats]`).
+
+## Key files
+
+| File             | Description                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| `constants.toml` | Pill and graph geometry, colours, neutral sources, opacity, menu bar style, typing burst keys |
+
+## Driver implementations
+
+| Driver  | Consumer                                                                                                 |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| macOS   | `macos/ui/wpm/{wpm_widget,wpm_menubar,shared}.lua` through `_shared/metrics/engine/wpm_widget_model.lua` |
+| Linux   | `linux/ui/wpm/{widget,tray_readout}.lua` through `_shared/metrics/engine/wpm_widget_model.lua`           |
+| Windows | `windows/ui/wpm/wpm_config.ahk` (`WPMWidget_LoadSharedConst`)                                            |
+
+The two Lua drivers also share every decision the readouts make — colours per
+source, the graph's curve, when to show, the default place — in
+`_shared/metrics/engine/wpm_widget_model.lua`, and the live speed in
+`_shared/metrics/engine/wpm/live_wpm.lua` (Linux; macOS keeps its keystats's own
+buffers over the same timings).
+
+The widget shows only while text is typed (`[typing_burst]`, decided by the
+maintainer on 2026-11-16): any pointer input ends a burst, and the keys that end
+one, the shortcut modifiers, the level modifiers (Shift, AltGr) and the neutral
+keys are named by `KeyboardEvent.code` and mapped to each driver's codes
+through `_shared/layouts/data/keycodes/physical_keys.json`
+(`_shared/metrics/engine/wpm/typing_keys.lua` on macOS and Linux,
+`WPMWidget_TypingBurstIndex` on Windows).

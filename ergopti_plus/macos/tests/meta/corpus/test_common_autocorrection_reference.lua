@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Reader = require("toml_codec.reader")
-local Codec = require("toml_codec.codec")
+local Json = require("core.text.engine.json")
+local Reader = require("core.text.engine.toml_codec.reader")
+local Codec = require("core.text.engine.toml_codec.codec")
 
 --- Reads an independent, checked-in reference through the shared JSON codec.
 --- @return table
@@ -54,17 +54,17 @@ helpers.describe("common autocorrection historical reference", function()
 
 	helpers.it("(common-autocorrection-reference) registers every historical mapping once with its native priority and insertion order", function()
 		helpers.with_stub_scope({
-			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"hotstrings.engine.expander.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+			"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminators", "core.fs.adapters.storage",
+			"hotstrings.engine.catalogue.config", "core.text.engine.toml.reader",
 		}, function()
 			-- The registry is real; the override port represents an empty user file.
-			package.loaded["modules.hotstrings.hotstrings_config"] = {
+			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_user_override = function() return nil end,
 			}
-			local State = helpers.load_with_stubs("modules.keymap.state")
-			local Registry = helpers.load_with_stubs("modules.keymap.registry")
-			local Storage = require("adapters.storage")
+			local State = helpers.load_with_stubs("hotstrings.engine.expander.state")
+			local Registry = helpers.load_with_stubs("hotstrings.engine.expander.registry")
+			local Storage = require("core.fs.adapters.storage")
 			local expected = reference()
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 			helpers.assert_true(Registry.init(state))
@@ -170,18 +170,18 @@ helpers.describe("common autocorrection interleaved source order", function()
 		end
 		local ok, failure = pcall(function()
 			helpers.with_stub_scope({
-				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-				"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
-				"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+				"hotstrings.engine.expander.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+				"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminators", "core.fs.adapters.storage",
+				"hotstrings.engine.catalogue.config", "core.text.engine.toml.reader",
 			}, function()
-				package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
-				local State = helpers.load_with_stubs("modules.keymap.state")
-				local Registry = helpers.load_with_stubs("modules.keymap.registry")
-				local Storage = require("adapters.storage")
+				package.loaded["hotstrings.engine.catalogue.config"] = { get_user_override = function() return nil end }
+				local State = helpers.load_with_stubs("hotstrings.engine.expander.state")
+				local Registry = helpers.load_with_stubs("hotstrings.engine.expander.registry")
+				local Storage = require("core.fs.adapters.storage")
 				local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 				helpers.assert_true(Registry.init(state))
 				for _, section in ipairs(expected.sections) do
-					helpers.assert_true(Storage.set("hotstrings_section_" .. category .. "_" .. section,
+					helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current(category, section),
 						section ~= "unknown" and (not caps_only or section == "caps")))
 				end
 				local sources = bound_mode and { { path = bound_path, sections = { "caps" } } } or nil
@@ -233,7 +233,7 @@ helpers.describe("common autocorrection interleaved source order", function()
 	end)
 	helpers.it("(source-ordered-autocorrection) reparses old grouped cache documents before claiming source order", function()
 		local path = helpers.shared("tests/corpus/hotstrings/common_autocorrection_legacy/autocorrection.toml")
-		local reader = helpers.load_with_stubs("toml_codec.reader")
+		local reader = helpers.load_with_stubs("core.text.engine.toml_codec.reader")
 		local old, accepted = reader.parse(path)
 		helpers.assert_true(accepted); old.source_entries = nil
 		local stored, observed_count = 0, nil
@@ -250,24 +250,24 @@ helpers.describe("common autocorrection interleaved source order", function()
 	end)
 end)
 
-require("test.common_autocorrection_split_contract").register(helpers, helpers.shared)
+require("tests.lua.common_autocorrection_split_contract").register(helpers, helpers.shared)
 
 --- Qualifies each selectable family and their original composed registration order.
 local function shipped_split_registry(only)
 		helpers.with_stub_scope({
-			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
-			"modules.keymap.expander", "modules.keymap.terminator_replay",
-			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
+			"hotstrings.engine.expander.registry", "hotstrings.engine.expander.registry_groups", "hotstrings.engine.expander.registry_index",
+			"hotstrings.engine.expander.state", "hotstrings.engine.expander.terminators", "core.fs.adapters.storage",
+			"hotstrings.engine.expander.expander", "hotstrings.engine.expander.terminator_replay",
+			"hotstrings.engine.catalogue.config", "core.text.engine.toml.reader",
 		}, function()
 			-- The registry is real; the override port represents an empty user file.
-			package.loaded["modules.hotstrings.hotstrings_config"] = {
+			package.loaded["hotstrings.engine.catalogue.config"] = {
 				get_user_override = function() return nil end,
 			}
-			local State = helpers.load_with_stubs("modules.keymap.state")
-			local Registry = helpers.load_with_stubs("modules.keymap.registry")
-			local Storage = require("adapters.storage")
-			local expected, assignment = require("test.common_autocorrection_split_contract").reference(helpers.shared)
+			local State = helpers.load_with_stubs("hotstrings.engine.expander.state")
+			local Registry = helpers.load_with_stubs("hotstrings.engine.expander.registry")
+			local Storage = require("core.fs.adapters.storage")
+			local expected, assignment = require("tests.lua.common_autocorrection_split_contract").reference(helpers.shared)
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 			helpers.assert_true(Registry.init(state))
 			Registry.set_group_context("personal_reference")
@@ -295,9 +295,9 @@ local function shipped_split_registry(only)
 				helpers.assert_eq(observed, baseline, "loading or disabling current families preserves every foreign mapping field")
 			end
 			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_true(Storage.set("hotstrings_section_autocorrection_" .. section, only == nil or section == only))
+				helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("autocorrection", section), only == nil or section == only))
 			end
-			helpers.assert_true(Registry.load_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")))
+			helpers.assert_true(Registry.load_toml("autocorrection", helpers.shared("hotstrings/data/catalogue/autocorrection.toml")))
 			-- Native registration adds NBSP/NNBSP aliases to these three spaced
 			-- triggers. Name the six expectations explicitly, independently of
 			-- the production variant builder or the captured source reader.
@@ -347,9 +347,9 @@ local function shipped_split_registry(only)
 			helpers.assert_eq(canonical_count, ({ names = 34, abbreviations = 95, technical_terms = 11 })[only] or 140)
 			helpers.assert_eq(alias_count, ({ names = 2, abbreviations = 0, technical_terms = 4 })[only] or 6)
 			helpers.assert_eq(state.groups.autocorrection.delay_metadata.delay,
-				require("test.common_autocorrection_split_contract").SHIPPED_DELAY,
+				require("tests.lua.common_autocorrection_split_contract").SHIPPED_DELAY,
 				"the split file's category delay reaches the registry")
-			local Expander = helpers.load_with_stubs("modules.keymap.expander")
+			local Expander = helpers.load_with_stubs("hotstrings.engine.expander.expander")
 			helpers.assert_true(Expander.init(state, Registry, {}))
 			for _, case in ipairs({
 				{ section = "names", trigger = "chatgpt", output = "ChatGPT" },
@@ -366,9 +366,9 @@ local function shipped_split_registry(only)
 				end
 			end
 			for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
-				helpers.assert_true(Storage.set("hotstrings_section_autocorrection_" .. section, false))
+				helpers.assert_true(Storage.set(require("hotstrings.engine.expander.section_keys").current("autocorrection", section), false))
 			end
-			helpers.assert_true(Registry.reload_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")))
+			helpers.assert_true(Registry.reload_toml("autocorrection", helpers.shared("hotstrings/data/catalogue/autocorrection.toml")))
 			helpers.assert_eq(#state.mappings, baseline_count, "disabled current families remove their canonical rules and native aliases only")
 			for _, mapping in ipairs(state.mappings) do
 				helpers.assert_true(mapping.group ~= expected.category, "the complete disabled section stays absent")
@@ -386,7 +386,7 @@ end)
 
 helpers.describe("common autocorrection cold boot receipts", function()
 	helpers.it("(common-autocorrection-split) rejects false, nil and raising native cold loaders without advertising their sources", function()
-		local Boot = require("infra.common_hotstrings_boot")
+		local Boot = require("hotstrings.engine.common_hotstrings_boot")
 		for _, load in ipairs({ function() return false end, function() return nil end,
 			function() error("private source bytes must never escape the receipt") end }) do
 			local files, paths = { "previous" }, { previous = "proven" }
@@ -399,7 +399,7 @@ helpers.describe("common autocorrection cold boot receipts", function()
 
 	helpers.it("(common-autocorrection-split) routes every actual root cold TOML loop through admitted boot receipts", function()
 		local code = assert(helpers.read_driver_unit('local common_file_count = 0')):gsub("%-%-[^\n]*", "")
-		local start = assert(code:find('local CommonHotstringsBoot = require("infra.common_hotstrings_boot")', 1, true))
+		local start = assert(code:find('local CommonHotstringsBoot = require("hotstrings.engine.common_hotstrings_boot")', 1, true))
 		local finish = assert(code:find('Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s)', start, true))
 		local loops = code:sub(start, finish - 1)
 		local function consumes_receipts(source)

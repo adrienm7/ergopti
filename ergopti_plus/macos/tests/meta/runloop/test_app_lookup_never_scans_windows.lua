@@ -15,7 +15,7 @@
 --- Spotlight hint (emitted inside find() just before the window fallback) and
 --- froze for 13.4 s. The event taps were disabled, the logger stalled and the
 --- Karabiner lease worker fenced after 17.5 s without a heartbeat (issue #99).
---- Every production lookup goes through adapters/running_application.lua, which
+--- Every production lookup goes through platform/focus/running_application.lua, which
 --- stays on the process list. This ratchet admits no new direct call.
 ---
 --- ROOT CAUSE ENCODED (webview-window-no-global-scan):
@@ -23,7 +23,7 @@
 --- alias of hs.window.get, which runs find() over hs.window.allWindows(). Every
 --- webview open and every focus retry paid that scan: 2.8 s to 3.2 s per window
 --- on macOS 26 (issue #100). Webview and console windows are resolved by
---- adapters/own_window.lua among this process's windows; the global window
+--- core/ui/adapters/own_window.lua among this process's windows; the global window
 --- enumerations below are ratcheted, and none may appear on a window open path.
 --- ==============================================================================
 
@@ -39,7 +39,7 @@ local DIRECT_LOOKUP_BASELINE = {}
 
 -- The one owner allowed to call hswindow(): it records the window number
 -- instead of letting windowForID scan.
-local WINDOW_LOOKUP_OWNER = "adapters.own_window"
+local WINDOW_LOOKUP_OWNER = "core.ui.adapters.own_window"
 
 -- Production modules that still enumerate every window of every application,
 -- with their count of calls. Only ever lower these. All of them answer a user
@@ -47,9 +47,9 @@ local WINDOW_LOOKUP_OWNER = "adapters.own_window"
 -- WindowManager and WindowInfo ports, the unused focus filter of the process
 -- lifecycle); none runs when a window opens.
 local WINDOW_SCAN_BASELINE = {
-	["adapters.process_lifecycle"] = 2,
-	["adapters.window_info"] = 1,
-	["adapters.window_manager"] = 5,
+	["core.process.adapters.lifecycle"] = 2,
+	["platform.focus.window_info"] = 1,
+	["platform.focus.window_manager"] = 5,
 	["platform.remap.watchers"] = 1,
 }
 
@@ -186,7 +186,7 @@ helpers.describe("application lookups never scan windows (app-lookup-no-window-s
 		end
 		table.sort(drift)
 		helpers.assert_eq(#drift, 0,
-			"resolve running applications through adapters.running_application instead:\n"
+			"resolve running applications through platform.focus.running_application instead:\n"
 			.. table.concat(drift, "\n"))
 	end)
 end)
@@ -227,7 +227,7 @@ helpers.describe("webview windows never scan every window (webview-window-no-glo
 		end
 		table.sort(callers)
 		helpers.assert_eq(#callers, 0,
-			"resolve webview and console windows through adapters.own_window instead:\n"
+			"resolve webview and console windows through core.ui.adapters.own_window instead:\n"
 			.. table.concat(callers, "\n"))
 	end)
 
@@ -247,7 +247,7 @@ helpers.describe("webview windows never scan every window (webview-window-no-glo
 		end
 		table.sort(drift)
 		helpers.assert_eq(#drift, 0,
-			"find a window among one application's windows (adapters.own_window for this process):\n"
+			"find a window among one application's windows (core.ui.adapters.own_window for this process):\n"
 			.. table.concat(drift, "\n"))
 	end)
 

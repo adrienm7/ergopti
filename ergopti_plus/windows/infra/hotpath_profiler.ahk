@@ -22,17 +22,17 @@
 ;    single-threaded but Gui creation and COM calls PUMP the message loop, so a
 ;    physically typed key's whole InputHook callback can run nested inside
 ;    Tooltip.Build, and the wall clock then bills that keystroke to the tooltip.
-;    The driver documents that re-entrancy itself (ui/tooltip/core.ahk, the
+;    The driver documents that re-entrancy itself (core/ui/ui/tooltip/core.ahk, the
 ;    generation counter exists because of it), and the largest number this
 ;    profiler ever reported was produced by it: 112.86 ms for a one-row tooltip
 ;    that benches at ~7 ms. The attribution and the line are those of macOS and
-;    Linux (_shared/lua/hotpath_segments.lua new_nesting); the shared vectors in
+;    Linux (_shared/metrics/engine/perf/hotpath_segments.lua new_nesting); the shared vectors in
 ;    _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json bind all three.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-#Include ../adapters/boot_clock.ahk
+#Include ../core/events/boot_clock.ahk
 #Include phase_stats.ahk
 
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on
@@ -41,7 +41,7 @@ global _HOTPATH_QPC_FREQ := 0
 ; Keystrokes whose hot-path processing exceeds this many milliseconds are logged
 ; at WARNING. 5 ms is below the threshold of perceptible single-keystroke lag yet
 ; high enough that a healthy keystroke (sub-millisecond) never trips it.
-; Single source: _shared/modules/timings/constants.toml [logger] hotpath_slow_ms,
+; Single source: _shared/core/timing/data/constants.toml [logger] hotpath_slow_ms,
 ; assigned by HotPath_LoadTimings. Declared unset on purpose: every reader already
 ; skips an unset threshold (a message-pumping Bundle_Init reaches the profiler
 ; before this file's initializers), so a sample taken before the registry is read
@@ -58,7 +58,7 @@ global _HOTPATH_SLOW_MS
 ;
 ; Every entry MUST carry its measured normal cost in a comment: an override
 ; without a measurement behind it is indistinguishable from hiding a regression,
-; and tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk enforces the comment.
+; and tests/unit/platform/input/dispatch/test_hotpath_per_segment_threshold.ahk enforces the comment.
 global _HOTPATH_SLOW_MS_BY_SEGMENT := Map(
 	; 2 Hz unattended cross-process UIA/COM round trip on the message thread.
 	; Measured 2026-07-29 21:15-21:46: n=2993, mean 14.3 ms, max 301.0 ms, ~80 %
@@ -96,7 +96,7 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; ==================================================
 
 ; Assign the slow-segment threshold from the shared registry. AHK v2 runs global
-; initializers before the auto-execute body, so infra/boot.ahk calls this right
+; initializers before the auto-execute body, so core/lifecycle/engine/boot.ahk calls this right
 ; after TimingsLoadShared(). Fail-fast: TimingsGet throws on a missing key, and a
 ; threshold of zero would report every keystroke as slow.
 HotPath_LoadTimings() {
@@ -156,9 +156,45 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	Tracker.Close(Label, StartTicks, now, SlowMs, Detail)
 }
 
+; Opens a paired span line for a path a person waits on (an expansion typed, a
+; tray branch filled, a layout switched): at DEBUG it writes "[TRACE] [Span]
+; <name>…", the tag and names of the Linux and macOS drivers, so one search finds
+; the line on every OS. It opens no nesting frame: the segment that times the
+; same work (HSE.Dispatch, Menu.deferred_build) keeps its own attribution.
+; @param Name {String} Span name shared with the other drivers (e.g. "hotstring.expand").
+; @returns {Integer} QPC stamp to pass to HotPath_SpanDone.
+HotPath_SpanTrace(Name) {
+	global _LOGGER_DEBUG_ENABLED
+	; The logger's flag is assigned at its include position; a span closed by an
+	; early boot pump before it has no line to write, only its stamp.
+	if IsSet(_LOGGER_DEBUG_ENABLED) && _LOGGER_DEBUG_ENABLED
+		LoggerTrace("Span", "{1}…", Name)
+	return PerfClockTicks()
+}
+
+; Closes a span opened with HotPath_SpanTrace, or measured from an existing
+; HotPath_Now stamp, with its "[DONE] [Span] <name> done in N ms" line at DEBUG.
+; Below DEBUG it costs one flag read and formats nothing.
+; @param Name {String} The span HotPath_SpanTrace opened.
+; @param StartTicks {Integer} QPC stamp taken when the work started.
+; @param Detail {String} A short outcome: names and counts only, never typed text.
+; @returns {Number} Elapsed milliseconds at DEBUG, 0 below it (nothing was read).
+HotPath_SpanDone(Name, StartTicks, Detail := "") {
+	global _LOGGER_DEBUG_ENABLED, _HOTPATH_QPC_FREQ
+	ElapsedMs := 0.0
+	if !(IsSet(_LOGGER_DEBUG_ENABLED) && _LOGGER_DEBUG_ENABLED)
+		return ElapsedMs
+	if !IsSet(_HOTPATH_QPC_FREQ) || _HOTPATH_QPC_FREQ == 0
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	ElapsedMs := (PerfClockTicks() - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
+	LoggerDone("Span", "{1} done in {2} ms{3}.", Name, Format("{:.2f}", ElapsedMs),
+		(Detail is String && Detail != "") ? " (" . Detail . ")" : "")
+	return ElapsedMs
+}
+
 /**
  * The open segments of the one AutoHotkey thread stack; the port of
- * _shared/lua/hotpath_segments.lua new_nesting. Threads interrupt one another
+ * _shared/metrics/engine/perf/hotpath_segments.lua new_nesting. Threads interrupt one another
  * last in, first out, so a stack fits even when a pump runs a whole callback
  * inside a segment. A span closed without a limit (a sub-step, or a sample taken
  * before the thresholds exist) is transparent: its time stays its enclosing
@@ -325,13 +361,13 @@ class HotPathNesting {
 }
 
 /**
- * The rate limiter of the slow-segment WARNING, as in hotpath_segments.lua
+ * The rate limiter of the slow-segment WARNING, as in metrics/engine/perf/hotpath_segments.lua
  * new_slow_gate: a segment that stays slow is slow on every keystroke, so one
  * line per segment per window keeps the first occurrence and the log readable.
  * The latency summaries keep counting every occurrence.
  */
 class HotPathSlowGate {
-	; The window of LOG_WINDOW_MS in _shared/lua/hotpath_segments.lua, which
+	; The window of LOG_WINDOW_MS in _shared/metrics/engine/perf/hotpath_segments.lua, which
 	; AutoHotkey cannot load; test_hotpath_nesting_vectors.ahk compares the two.
 	static SLOW_LINE_WINDOW_MS := 10000
 
@@ -381,12 +417,18 @@ _HotPathReportSlow(Report, NowMs) {
 		try LoggerWarn("HotPath", "Slow {1} detail: {2}.", Report.Segment, Report.Detail)
 }
 
-/** Forgets every open frame and the rate limiter. Tests only. */
+/**
+ * Forgets every open frame and the rate limiter. Tests only. A discarded frame's
+ * billed child time goes with it: Open reuses the slot as it finds it, so a
+ * stale count would be subtracted from the next segment opened at that depth.
+ */
 _HotPathResetForTest() {
 	Owner := _HotPathNestingOwner()
 	Owner.Tracker.Depth := 0
-	loop HotPathNesting.MAX_DEPTH
+	loop HotPathNesting.MAX_DEPTH {
 		Owner.Tracker.Pending[A_Index] := ""
+		Owner.Tracker.Nested[A_Index] := 0
+	}
 	Owner.Gate.Reset()
 }
 
@@ -543,11 +585,14 @@ HotPath_StartStatistics() {
 	Owner := _HotPathStatisticsOwner()
 	if Owner.Started
 		throw Error("Latency statistics already started")
+	IntervalMs := TimingsGet("logger", "hotpath_statistics_interval_ms")
+	if (IntervalMs <= 0)
+		throw ValueError(Format("[logger] hotpath_statistics_interval_ms must be positive, got {1}.", IntervalMs))
 	Owner.Started := true
 	Owner.Timer := HotPath_FlushStatistics
-	; One minute retains distributions without turning normal typing into log I/O.
-	SetTimer(Owner.Timer, 60000, -1)
-	try LoggerInfo("HotPath", "Latency statistics started (interval=60000 ms, labels={1}).", Owner.Stats.Limit)
+	; The period is read at the call so the fast-timer inventory resolves it.
+	SetTimer(Owner.Timer, TimingsGet("logger", "hotpath_statistics_interval_ms"), -1)
+	try LoggerInfo("HotPath", "Latency statistics started (interval={1} ms, labels={2}).", IntervalMs, Owner.Stats.Limit)
 }
 
 /** Detaches the numeric snapshot before logging can pump callbacks into the next window. */
@@ -717,6 +762,30 @@ PerfCounters_Flush() {
 		try LoggerEvidence("Perf", "Interval counters ({1} ms): {2}.", IntervalMs, PerfCountersText(Counts))
 	if Refused > 0
 		try LoggerWarn("Perf", "Interval counters refused {1} increment(s) beyond the registry capacity.", Refused)
+	if IsSet(TOML_DocumentParseOwnersTake) {
+		ParseOwners := TOML_DocumentParseOwnersTake()
+		if ParseOwners.Count > 0
+			try LoggerEvidence("Perf", "Document parses by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(ParseOwners))
+	}
+	; A text a reader parsed twice in one interval, by the owner of the second parse.
+	if IsSet(TOML_ParseRepeatOwnersTake) {
+		for Reader, Label in Map("document", "Document", "flat", "Flat") {
+			Repeats := TOML_ParseRepeatOwnersTake(Reader)
+			if Repeats.Count > 0
+				try LoggerEvidence("Perf", "{1} re-parses by owner ({2} ms): {3}.", Label, IntervalMs, PerfCountersText(Repeats))
+		}
+	}
+	; Whole-image proofs by the owner that asked for each.
+	if IsSet(ConfigTomlSnapshotReadOwnersTake) {
+		Owners := ConfigTomlSnapshotReadOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Snapshot reads by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
+	}
+	if IsSet(ConfigMigrateDeepCompareOwnersTake) {
+		Owners := ConfigMigrateDeepCompareOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Registry deep compares by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
+	}
 	State := PerfProcessState()
 	; The log-volume figures ride on this record as they ride on the macOS memory
 	; record: both are process-wide and one record per interval is what is read back.

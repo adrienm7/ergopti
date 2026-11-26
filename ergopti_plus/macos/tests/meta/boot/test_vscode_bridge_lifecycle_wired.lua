@@ -15,10 +15,10 @@ helpers.describe("retired VS Code bridge", function()
 		local source = helpers.read_driver_source("local function has_common_hotstring_groups")
 		helpers.assert_type(source, "string")
 		helpers.assert_true(#source > 0, "the real startup source must be present")
-		helpers.assert_nil(source:find('require("infra.vscode_bridge").setup()', 1, true))
+		helpers.assert_nil(source:find('require("core.network.engine.vscode_bridge").setup()', 1, true))
 		local owner = source:match('name = "vscode%-bridge"([%s%S]-)name = "llm%-helper%-processes"')
 		helpers.assert_type(owner, "string")
-		helpers.assert_true(owner:find('package.loaded["infra.vscode_bridge"]', 1, true) ~= nil)
+		helpers.assert_true(owner:find('package.loaded["core.network.engine.vscode_bridge"]', 1, true) ~= nil)
 		helpers.assert_true(owner:find("return module.stop_server()", 1, true) ~= nil)
 		helpers.assert_true(owner:find("module == nil then return true", 1, true) ~= nil)
 	end)
@@ -27,7 +27,7 @@ end)
 Fixture.it("tooltip uses the standard caret locator without the retired bridge", function()
 	helpers.with_stub_scope({ "hs.axuielement" }, function()
 		local legacy_calls = 0
-		package.loaded["infra.vscode_bridge"] = {
+		package.loaded["core.network.engine.vscode_bridge"] = {
 			is_vscode = function() legacy_calls = legacy_calls + 1; return true end,
 			estimate_position = function() return { x = 999, y = 999, h = 20, type = "retired" } end,
 		}

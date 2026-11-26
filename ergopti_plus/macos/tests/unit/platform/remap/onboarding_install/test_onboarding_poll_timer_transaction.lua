@@ -29,14 +29,14 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
 	"hs",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
-	"infra.text_utils",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"platform.remap.onboarding",
 	"tests.stubs.hs",
@@ -82,21 +82,21 @@ local function with_fixture(scenario)
 		handle.timer = nil
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	local function noop() end
-	package.loaded["adapters.task_lifecycle"] = { start = function() return false end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = { start = function() return false end }
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "karabiner.onboarding.btn_open_settings" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			notices[#notices + 1] = { message = message, kind = kind }
 		end,
 	}
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CLI = "/test/karabiner_cli",
 		CORE_SERVICE = "/test/Karabiner-Core-Service",

@@ -1,13 +1,15 @@
 --- ui/menu/key_combinations.lua
 
 --- Renders shared ordered slots through the actual native picker and publisher.
---- Same-device chord choices retain the original source and publication owner.
-local SaveFailure = require("config_save_failure")
-local Shared = require("tap_hold.key_combinations")
-local HoldOptions = require("tap_hold.hold_options")
-local KeyCatalog = require("tap_hold.key_catalog")
-local Features = require("infra.manifest_reader")
-local Codec = require("toml_codec")
+--- Chord choices retain the original source and publication owner.
+local SaveFailure = require("settings.engine.publication.save_failure")
+local Shared = require("tap_hold.engine.key_combinations")
+local HoldOptions = require("tap_hold.engine.hold_options")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
+local Features = require("menu.engine.manifest_reader")
+local Codec = require("core.text.engine.toml_codec")
+local CombinationLabels = require("tap_hold.engine.combination_labels")
+local LabelValue = require("core.i18n.engine.label_value")
 local M = {}
 
 --- Builds the manifest's ordered-pair group, using a native context's UI ports.
@@ -15,16 +17,16 @@ local M = {}
 --- @param ui table Shared renderer, translator, picker, prompt and feedback ports.
 --- @return table rows Native submenu rows.
 function M.build(ctx,ui)
-	local declaration = Features.find_entry_by_path("category_enabled.key_combinations")
+	local declaration = Features.find_entry_by_path(require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	if type(declaration) ~= "table" or declaration.type ~= "boolean" or declaration.default ~= true then return {} end
 	local th,actions = ctx.tap_holds,ctx.gestures
 	local pairs = require("modules.shortcuts.key_combinations")
 	local Scope = require("infra.key_combinations_scope")
 	local t,renderer = ui.get,ui.manifest
-	if type(th)~="table" or type(actions)~="table" or type(ctx.is_paused)~="function" then return {} end
+	if type(th)~="table" or type(actions)~="table" then return {} end
 	local keys,holds = th.key_catalog(),th.hold_options()
-	local delay_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
-	local symmetry_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
+	local delay_entry=Features.find_entry_by_path(require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+	local symmetry_entry=Features.find_entry_by_path(require("settings.engine.keys").KEY.MOD_COMBOS_SYMMETRIC)
 	local chord_declared=type(delay_entry)=="table" and delay_entry.type=="number"
 		and type(symmetry_entry)=="table" and symmetry_entry.type=="boolean"
 		and type(pairs.get_chord)=="function" and type(pairs.chord_settings)=="function"
@@ -35,8 +37,6 @@ function M.build(ctx,ui)
 		return accepted==true
 	end
 	local function snapshot()
-		local observed,paused=pcall(ctx.is_paused)
-		if ctx.paused==true or not observed or paused~=false then return nil end
 		local retried,settled=pcall(Scope.retry_restore)
 		if not retried or settled~=true then return nil end
 		local captured,receipt=pcall(pairs.capture_edit_source)
@@ -55,11 +55,11 @@ function M.build(ctx,ui)
 	end
 	local function edit(rows,source)
 		if not source then return feedback(false) end
-		return feedback(Scope.edit(rows,ctx.is_paused,source))
+		return feedback(Scope.edit(rows,source))
 	end
 	local editable = snapshot() ~= nil
 	local function action_label(action)
-		if action==Shared.NONE then return t("tap_hold.tap.none") end
+		if action==Shared.NONE then return t("dialog.action_picker.disabled") end
 		return ui.action_label(action,actions)
 	end
 	local function hold_option(value)
@@ -107,9 +107,14 @@ function M.build(ctx,ui)
 			return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
 		end)
 	end
+	-- The Windows layout (maintainer decision KCD-8 of 2026-11-21, shared in
+	-- tap_hold.engine.combination_labels): one submenu per first key, ticked
+	-- when any of its pairs is set, then one row per pair and its summary,
+	-- naming its tap, hold and chord in that order.
 	local function hand_rows(hand)
-		local rows={}
+		local groups={}
 		for _,first in ipairs(KeyCatalog.of_hand(keys,hand)) do
+			local rows,any={},false
 			for _,second in ipairs(keys) do
 				if first.id~=second.id then
 					local pair=Shared.pair(first.id,second.id)
@@ -124,7 +129,7 @@ function M.build(ctx,ui)
 					local hold_label=chosen and HoldOptions.label(chosen,t,"linux") or t("tap_hold.hold.none")
 					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
-						commands={[require("config_keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
+						commands={[require("settings.engine.keys").COMMAND.KEY_COMBINATION_CLEAR]=function()
 							local rows={{section=Shared.TAP_SECTION,key=pair,delete=true},{section=Shared.HOLD_SECTION,key=pair,delete=true}}
 							if chord_pair then rows[#rows+1]={section="mod_combos.config."..chord_pair,key="combo",delete=true} end
 							return edit(rows,snapshot())
@@ -140,42 +145,47 @@ function M.build(ctx,ui)
 						end
 						return slots
 					end})
-					rows[#rows+1]={label=label.."  :  "..tap_label.."  /  "..hold_label,checked=assigned or nil,submenu=sub}
+					any=any or assigned
+					local summary=CombinationLabels.summary({tap=tap~=Shared.NONE and tap_label or nil,
+						hold=hold~=Shared.NONE and hold_label or nil,chord=chord~=Shared.NONE and action_label(chord) or nil},
+						t("dialog.action_picker.disabled"))
+					rows[#rows+1]={label=LabelValue.compose(t,label,summary),checked=assigned or nil,submenu=sub}
 				end
 			end
+			groups[#groups+1]={label=ui.key_label(first),checked=any or nil,items=rows}
 		end
-		return rows
+		return groups
 	end
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
-	render.commands[require("config_keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
+	render.commands[require("settings.engine.keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
-		local committed=feedback(Scope.set_enabled(desired,ctx.is_paused,source))
-		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
+		local committed=feedback(Scope.set_enabled(desired,source))
+		if committed==true then require("menu.ui.builder.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
-	render.commands[require("config_keys").COMMAND.SCOPE_RESTORE]=function()
+	render.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]=function()
 		local source=snapshot();if not source then return feedback(false) end
-		return feedback(Scope.apply("recommended",ctx.is_paused,source))
+		return feedback(Scope.apply("recommended",source))
 	end
-	render.commands[require("config_keys").COMMAND.SCOPE_CLEAR]=function()
+	render.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR]=function()
 		local source=snapshot();if not source then return feedback(false) end
-		return feedback(Scope.apply("clear",ctx.is_paused,source))
+		return feedback(Scope.apply("clear",source))
 	end
-	render.state_getters[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
+	render.state_getters[require("settings.engine.keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local settings=chord_declared and pairs.chord_settings() or nil
 		return settings~=nil and settings.combo_symmetric==true
 	end
 	if chord_declared then
-	render.commands[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
+	render.commands[require("settings.engine.keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local source=snapshot();local settings=chord_declared and pairs.chord_settings() or nil
 		if not source or not settings then return feedback(false) end
 		settings.combo_symmetric=not settings.combo_symmetric
-		return feedback(Scope.set_chord_settings(settings,ctx.is_paused,source))
+		return feedback(Scope.set_chord_settings(settings,source))
 	end
-	render.commands[require("config_keys").COMMAND.COPY_TAP_TO_COMBO]=function()
+	render.commands[require("settings.engine.keys").COMMAND.COPY_TAP_TO_COMBO]=function()
 		local source=snapshot();if not source or not chord_declared then return feedback(false) end
-		return feedback(Scope.copy_taps_to_chords(ctx.is_paused,source))
+		return feedback(Scope.copy_taps_to_chords(source))
 	end
 	end
 	local function timing_rows()
@@ -186,10 +196,18 @@ function M.build(ctx,ui)
 				local source=snapshot();if not source or type(ui.prompt_delay)~="function" then return feedback(false) end
 				local selected=ui.prompt_delay(settings.simultaneous_threshold_ms,delay_entry.default)
 				if selected==nil then return false end
-				if type(selected)~="string" or not selected:match("^%s*%d+%.?%d*%s*$") then return feedback(false) end
-				local delay=tonumber(selected)
-				if not delay or delay<=0 or delay>=math.huge or source.guard()~=true then return feedback(false) end
-				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},ctx.is_paused,source))
+				-- The shared value check names the accepted range; a refusal writes nothing.
+				local ValueCheck=require("settings.engine.value_check")
+				local key=require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS
+				-- A blank answer resets it to its default (maintainer decision PCK-13).
+				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected,delay_entry.default)
+				if not typed.ok then
+					ui.error(ValueCheck.refusal_text(key,typed,t),t("dialog.value_check.title"))
+					return false
+				end
+				local delay=typed.value
+				if source.guard()~=true then return feedback(false) end
+				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},source))
 			end}}
 	end
 	return renderer.build("key_combinations_group","KeyCombinations",nil,nil,render,{

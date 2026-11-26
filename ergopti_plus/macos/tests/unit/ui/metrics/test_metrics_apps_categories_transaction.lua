@@ -10,24 +10,24 @@
 
 local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
-local CategoryStore = require("keystats.app_category_store")
+local CategoryStore = require("metrics.engine.apps.category_store")
 local CATEGORY_OWNERS = {
 	"hs",
 	"tests.stubs.hs",
 	"hs.fs",
 	"hs.json",
 	"ui.metrics_apps",
-	"ui.ui_builder",
-	"infra.logger",
-	"infra.dialog_util",
-	"adapters.file_system",
-	"infra.config_paths",
-	"adapters.timer_scheduler",
+	"core.ui.ui.builder",
+	"core.logger.engine.logger",
+	"core.ui.engine.dialog_util",
+	"core.fs.adapters.file_system",
+	"settings.engine.paths",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
-	"adapters.webview_result",
-	"adapters.running_application",
-	"adapters.own_window",
-	"native_path",
+	"core.ui.adapters.webview_result",
+	"platform.focus.running_application",
+	"core.ui.adapters.own_window",
+	"core.fs.engine.native_path",
 }
 
 -- The driver folder of an installed app is inside its read-only bundle, and
@@ -46,6 +46,7 @@ local function with_category_store_owned(spec, callback)
 	local original_open = io.open
 	local state = {
 		target = spec.initial or INITIAL_JSON,
+		config_dir = CONFIG_DIR,
 		exists = spec.initial_status ~= "absent",
 		read_calls = 0,
 		writes = 0,
@@ -56,12 +57,12 @@ local function with_category_store_owned(spec, callback)
 
 	io.open = function(path, mode)
 		if path == TARGET_PATH then
-			error("category persistence bypassed adapters.file_system in mode " .. tostring(mode))
+			error("category persistence bypassed core.fs.adapters.file_system in mode " .. tostring(mode))
 		end
 		return original_open(path, mode)
 	end
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			helpers.assert_eq(path, TARGET_PATH)
 			state.read_calls = state.read_calls + 1
@@ -106,7 +107,7 @@ local function with_category_store_owned(spec, callback)
 	}
 
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop, trace = noop, done = noop, info = noop, start = noop, success = noop,
 		warn = function(_log, format_string, ...)
 			logs[#logs + 1] = string.format(format_string, ...)
@@ -115,26 +116,27 @@ local function with_category_store_owned(spec, callback)
 			logs[#logs + 1] = string.format(format_string, ...)
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(_title, _prompt, _prior, confirm, _cancel)
+			if spec.during_prompt then spec.during_prompt(state) end
 			return confirm, spec.score_input or "1"
 		end,
 		alert = noop,
 	}
-	state.warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
+	state.warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 	local previous_modules = {}
-	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keystats.log_manager",
-			"infra.config_paths" }) do
+	for _, name in ipairs({ "hs.fs", "core.events.timer_scheduler", "modules.keystats.log_manager",
+			"settings.engine.paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return CONFIG_DIR end }
+	package.loaded["settings.engine.paths"] = { get_config_dir = function() return state.config_dir end }
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { timer = {} }, true end,
 		cancel = function(handle) handle.timer = nil; return true end,
 	}
 	package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		show_webview = function()
 			return {
 				show = function(self) return self end,
@@ -174,10 +176,10 @@ local function with_category_store_owned(spec, callback)
 
 	io.open = original_open
 	package.loaded["ui.metrics_apps"] = nil
-	package.loaded["ui.ui_builder"] = nil
-	package.loaded["infra.dialog_util"] = nil
-	package.loaded["infra.logger"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.ui.ui.builder"] = nil
+	package.loaded["core.ui.engine.dialog_util"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end
 	if not ok then error(result, 0) end
 	return result
@@ -217,6 +219,35 @@ end
 -- ======= 1/ Read Ownership Is Fail-Closed =======
 -- ================================================
 -- ================================================
+
+helpers.describe("metrics_apps categories: concurrent edit", function()
+	helpers.it("preserves a category changed while the score prompt is open", function()
+		local changed = '{"Example":{"score":2,"type":"Concurrent"}}'
+		with_category_store({ during_prompt = function(state) state.target = changed end }, function(metrics, state, callbacks)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(state.target, changed)
+		end)
+	end)
+	helpers.it("refuses a configuration folder change during confirmation", function()
+		with_category_store({ during_prompt = function(state) state.config_dir = "/virtual/other/" end },
+			function(metrics, state, callbacks)
+				attempt_edit(metrics, callbacks)
+				helpers.assert_eq(state.target, INITIAL_JSON)
+				helpers.assert_eq(state.writes, 0)
+			end)
+	end)
+
+	helpers.it("preserves a category changed while the rename prompt is open", function()
+		local changed = '{"Example":{"score":2,"type":"Concurrent"}}'
+		with_category_store({ during_prompt = function(state) state.target = changed end }, function(metrics, state, callbacks)
+			metrics.prompt_category("Example", "Old", 0)
+			callbacks[1]({ _kind = "rename" })
+			callbacks[2]({ text = "Old" })
+			helpers.assert_eq(state.target, changed)
+		end)
+	end)
+
+end)
 
 helpers.describe("metrics_apps categories: unsafe input is never treated as empty", function()
 	for _, case in ipairs({
@@ -346,7 +377,7 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 		with_category_store({ initial = flat }, function(metrics, state, callbacks, _logs)
 			attempt_edit(metrics, callbacks)
 			helpers.assert_eq(state.writes, 1)
-			local saved = assert(CategoryStore.decode(state.target, require("json").decode))
+			local saved = assert(CategoryStore.decode(state.target, require("core.text.engine.json").decode))
 			helpers.assert_eq(saved.legacy, false, "the file is rewritten in the shared versioned layout")
 			helpers.assert_eq(saved.apps, {
 				Example = { type = "New", score = 1 },
@@ -383,12 +414,15 @@ end)
 
 helpers.describe("metrics warning native signature", function()
 	helpers.it("presents an invalid score warning without saving the category", function()
-		for _, input in ipairs({ "abc", "3" }) do
+		-- The shared value check's refusal names the declared range (value-validation):
+		-- a word, past the maximum, a fraction past it written with a comma and a
+		-- hexadecimal string. A blank answer returns to the unedited score (PCK-13).
+		for _, input in ipairs({ "abc", "3", "2,5", "0x1" }) do
 			with_category_store({ score_input = input }, function(metrics, state, callbacks)
 				local before = state.target
 				attempt_edit(metrics, callbacks)
 				helpers.assert_eq(state.warnings.shown, {
-					{ "common.warning", "metrics_apps.score_error", "button.ok" },
+					{ "dialog.value_check.title", "dialog.value_check.range_decimal", "button.ok" },
 				}, "Invalid scores must show their warning through the native message/button contract")
 				helpers.assert_eq(state.warnings.refused, 0)
 				helpers.assert_eq(state.target, before)

@@ -91,3 +91,20 @@ _SAH_ChordsNeedAnAltGrLayout() {
 }
 Test("script altgr: the chords need a layout whose AltGr key is an AltGr, on every family (qwerty-script-chords-2026-09-26)",
     _SAH_ChordsNeedAnAltGrLayout)
+
+; A script shortcut is AltGr pressed, then its key, nothing between: on
+; Ergopti+ a fast « (# » then Enter with AltGr still down paused the driver,
+; and Backspace reloaded it (the maintainer, 2026-11-17).
+_SAH_ShortcutNeedsAltGrJustBefore() {
+    AssertTrue(ScriptAltGrPressedJustBefore("sc138"), "the AltGr scan code just before")
+    AssertTrue(ScriptAltGrPressedJustBefore(GetKeyName("SC138")),
+        "AltGr's own name on this layout (« ^ » on a Kana-style one, RAlt elsewhere)")
+    AssertFalse(ScriptAltGrPressedJustBefore(""), "no key in the history")
+    for Typed in ["i", "j", "Enter", "Backspace", "LControl", "Space"]
+        AssertFalse(ScriptAltGrPressedJustBefore(Typed), "a symbol typed under AltGr: " . Typed)
+    for Criterion in ["ScriptAltGrChordRunsSlot", "ScriptAltGrKanaChordRunsSlot", "ScriptAltGrPausedChordRunsSlot"]
+        AssertTrue(InStr(_DriverFuncBody(Criterion), "ScriptAltGrPressedJustBefore()") > 0,
+            Criterion . " needs AltGr pressed just before its key")
+}
+Test("script altgr: a shortcut needs AltGr pressed just before its key, not a symbol typed under AltGr (altgr-shortcut-sequence-2026-11-17)",
+    _SAH_ShortcutNeedsAltGrJustBefore)

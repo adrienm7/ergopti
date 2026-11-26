@@ -17,7 +17,7 @@
 ---    so the JS never touches the network directly.
 --- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
 ---    API request falls back to the public releases Atom feed through the
----    shared order in _shared/lua/updater/release_sources.lua. The outcome, or
+---    shared order in _shared/updater/engine/release_sources.lua. The outcome, or
 ---    a translated error, always reaches the page.
 --- 2. Singleton window: a second call to M.open() while the window is already
 ---    visible brings it to the front instead of opening a duplicate.
@@ -29,16 +29,19 @@
 --- 4. One document policy: the page's browser-host CSP only allows external
 ---    same-origin scripts, which blocks every script once inlined, so the page
 ---    never left its loading state. The generated document instead carries the
----    shared driver policy (_shared/lua/webview/document_csp.lua) with a
+---    shared driver policy (_shared/core/ui/engine/webview/document_csp.lua) with a
 ---    per-document nonce on every script.
 --- 5. One-click release install: « Install this version » posts install_release.
----    The shared sequence (_shared/lua/updater/release_install.lua) backs the
+---    The shared sequence (_shared/updater/engine/release_install.lua) backs the
 ---    configuration up (modules/updater/config_backup.lua), finds the release
 ---    in the list this window last fetched from the GitHub API, then downloads
 ---    and verifies it and arms the app replacement
 ---    (modules/updater/release_installer.lua) before the controlled quit. Each
 ---    phase reaches the page through setInstallProgress(). The restore banner
 ---    posts restore_backup; the driver reloads on the restored configuration.
+---    A quit the coordinator refuses leaves the armed release waiting
+---    (restart_pending, with « Restart now » here and in the About menu) for
+---    as long as the swap worker waits; only then is it reported not installed.
 --- 6. Feed-only list: the Atom feed names no files and no digests, so a direct
 ---    install is refused (install_error_no_details). Sparkle verifies a release
 ---    on its own, against the EdDSA signature of the channel's appcast, and
@@ -50,24 +53,24 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
-local Logger     = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
-local Paths      = require("infra.paths")
-local ui_builder = require("ui.ui_builder")
-local i18n       = require("infra.i18n")
-local FileSystem = require("adapters.file_system")
-local HttpClient = require("adapters.http_client")
-local Json       = require("json")
-local JsonCodec  = require("adapters.json_codec")
-local ReleaseSources = require("updater.release_sources")
-local RepositoryUrl = require("updater.repository_url")
-local UpdateChannels = require("updater.channels")
-local DocumentCsp = require("webview.document_csp")
-local ReleaseInstall = require("updater.release_install")
-local VersionOrder = require("updater.version")
-local NetworkFailure = require("network.failure")
+local Logger     = require("core.logger.engine.logger")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local Paths      = require("core.fs.engine.paths")
+local ui_builder = require("core.ui.ui.builder")
+local i18n       = require("core.i18n.engine.i18n")
+local FileSystem = require("core.fs.adapters.file_system")
+local HttpClient = require("core.network.adapters.http_client")
+local Json       = require("core.text.engine.json")
+local JsonCodec  = require("core.fs.adapters.json_codec")
+local ReleaseSources = require("updater.engine.release_sources")
+local RepositoryUrl = require("updater.engine.repository_url")
+local UpdateChannels = require("updater.engine.channels")
+local DocumentCsp = require("core.ui.engine.webview.document_csp")
+local ReleaseInstall = require("updater.engine.release_install")
+local VersionOrder = require("updater.engine.version_core")
+local NetworkFailure = require("core.network.engine.failure")
 
 local LOG = "changelog_window"
 
@@ -79,7 +82,7 @@ local _channels = nil
 --- @return string|nil error
 local function load_sources()
 	if _sources then return _sources, nil end
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "shared updater defaults are unreadable" end
 	local ok, decoded = pcall(Json.decode, raw)
@@ -96,7 +99,7 @@ end
 --- @return string|nil error
 local function load_channels()
 	if _channels then return _channels, nil end
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "the shared update channel registry is unreadable" end
 	local ok, decoded = pcall(Json.decode, raw)
@@ -184,8 +187,10 @@ local _last_list = nil
 -- The install session (created on the first request).
 local _install_session = nil
 local _failure_contract = nil
+-- The menu session's redraw, told when a release starts or stops waiting for its restart.
+local _pending_observer = nil
 
--- Test seam: { updater, backup, installer, coordinator, handoff }.
+-- Test seam: { updater, backup, installer, coordinator, handoff, timer }.
 M._deps = nil
 
 --- The owners the install and the restore go through.
@@ -196,8 +201,9 @@ local function deps()
 		updater = require("modules.updater"),
 		backup = require("modules.updater.config_backup"),
 		installer = require("modules.updater.release_installer"),
-		coordinator = require("infra.termination_coordinator"),
+		coordinator = require("core.lifecycle.engine.shutdown.termination_coordinator"),
 		handoff = require("modules.updater.feed_handoff"),
+		timer = require("core.events.timer_scheduler"),
 	}
 end
 
@@ -407,6 +413,7 @@ local function fetch_and_inject(channel)
 	if not session_is_current(owner, view, controller) then return end
 	if not registry_channel(channel, "release fetch") then return end
 	local request_generation = next_fetch_generation()
+	_last_list = nil
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
@@ -452,7 +459,6 @@ local function fetch_and_inject(channel)
 		end
 
 		local releases = data
-		_last_list = { kind = "json", releases = data }
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
@@ -460,6 +466,7 @@ local function fetch_and_inject(channel)
 				request_generation)
 			return
 		end
+		_last_list = { kind = "json", releases = data }
 
 		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
 			request_generation, #releases)
@@ -529,7 +536,7 @@ end
 --- @return table session
 local function failure_contract()
 	if _failure_contract then return _failure_contract end
-	local path = Paths.shared("modules/network/managed_network.json")
+	local path = Paths.shared("core/network/data/managed_network.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
 	_failure_contract = NetworkFailure.new(Json.decode(raw))
@@ -557,17 +564,31 @@ local function install_session()
 		resolve_asset = function(release) return deps().installer.find_asset(release) end,
 		download = function(asset, _, done)
 			return deps().installer.stage(asset, function(staged, stage, detail, failure_receipt)
-				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
+				done(staged, ReleaseInstall.download_reason(stage, false),
 					detail, failure_receipt)
 			end) == true
 		end,
 		install_async = function(staged, release, asset, done)
 			return deps().installer.arm_swap(staged, function(armed, detail)
-				done(armed == true, ReleaseInstall.REASON.install, detail)
+				local reason = detail == "previous_backup_occupied" and ReleaseInstall.REASON.previous_backup
+					or ReleaseInstall.REASON.install
+				done(armed == true, reason, detail)
 			end) == true
 		end,
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true
+		end,
+		-- The armed swap worker waits SWAP_WAIT_SECONDS for the quit, from its
+		-- ARMED receipt, just before this refusal: past that it has replaced
+		-- nothing, so the held release is reported not installed.
+		pending_changed = function()
+			if _pending_observer then _pending_observer() end
+		end,
+		restart_pending_expiry = function(_, _, expire)
+			local timer, wait = deps().timer, deps().installer.SWAP_WAIT_SECONDS
+			if type(timer) ~= "table" or type(timer.after) ~= "function" or type(wait) ~= "number" then return false end
+			local _, committed = timer.after(wait, expire)
+			return committed == true
 		end,
 		report = function(message, native_owner)
 			-- Visibility does not cancel an accepted transaction. Only its original
@@ -607,15 +628,36 @@ local function restore_from_page(id)
 				or "changelog_window.restore_error_unexpected" })
 		return
 	end
-	answer({ phase = "restored", backup_path = pre and pre.path or nil })
-	local ok, accepted = pcall(deps().coordinator.request_reload, "config_restore")
-	if not ok or accepted ~= true then
-		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(accepted))
+	local backup_path = pre and pre.path or nil
+	-- The disk is restored either way; only an accepted, still-live handoff may
+	-- promise a restart. A refusal or a later abort leaves the old runtime up, so
+	-- the page reports the failure with the pre-restore copy, as on Windows.
+	local function reload_refused(detail)
+		Logger.error(LOG, "The configuration is restored but the reload was refused: %s.", tostring(detail))
+		answer({ phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" })
 	end
+	local ok, accepted = pcall(deps().coordinator.request_reload_owned, "config_restore", reload_refused)
+	if not ok or accepted ~= true then
+		reload_refused(accepted)
+		return
+	end
+	answer({ phase = "restored", backup_path = backup_path })
 end
 
 -- The page's reason when the launcher did not take the hand-off.
 local HANDOFF_FAILED = "changelog_window.install_error_handoff"
+
+--- Reports a stale action while a replacement list is not yet available.
+local function report_missing_list(tag)
+	local owner = install_owner()
+	local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+		or ReleaseInstall.REASON.unknown_release
+	local message = js_value({ tag = tag, phase = "failed", reason_key = reason })
+	if message and install_owner_retained(owner) then
+		eval(string.format("setInstallProgress(%s)", message), owner.generation, nil, owner)
+	end
+end
 
 --- Hands the newest release of a feed-only list to Sparkle. The feed names no
 --- digest, so this host cannot verify a download itself; Sparkle verifies the
@@ -684,10 +726,11 @@ local function install_seed()
 	local ok, seed = pcall(function()
 		local blocked = install_blocked()
 		local backup = restorable_backup()
+		local pending = _install_session and _install_session.pending() or nil
 		return string.format("window.__installed_version=%s;window.__install_blocked_key=%s;"
-			.. "window.__restorable_backup=%s;window.__feed_install_handoff=true;",
+			.. "window.__restorable_backup=%s;window.__install_pending=%s;window.__feed_install_handoff=true;",
 			js_str(deps().updater.current_version()), js_str(blocked or ""),
-			backup and js_value(backup) or "null")
+			backup and js_value(backup) or "null", pending and js_value(pending) or "null")
 	end)
 	if not ok then
 		Logger.error(LOG, "The Versions page gets no install buttons: %s.", tostring(seed))
@@ -771,10 +814,18 @@ local function ensure_ucc(owner)
 			subscribe_from_page(body.channel)
 		elseif body.action == "install_release" then
 			-- Only this click installs a chosen release: nothing else calls the session.
-			install_session().install(body.tag, body.channel)
+			if _last_list == nil then
+				report_missing_list(body.tag)
+			else
+				install_session().install(body.tag, body.channel)
+			end
 		elseif body.action == "install_through_updater" then
 			-- A feed-only list's newest release: Sparkle verifies and asks the user.
-			hand_off_to_updater(body.tag, body.channel)
+			if _last_list == nil then report_missing_list(body.tag)
+			else hand_off_to_updater(body.tag, body.channel) end
+		elseif body.action == "complete_install_restart" then
+			-- « Restart now » of an installed release whose restart was refused.
+			if _install_session then _install_session.complete_restart() end
 		elseif body.action == "install_failure_action" then
 			if _install_session then
 				_install_session.failure_action(body.operation, body.epoch, body.id)
@@ -879,7 +930,7 @@ local function build_window(channel, opening_generation, focus_owner)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
+				DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
@@ -918,7 +969,7 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	local scheduled = DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
+	local scheduled = DeferredWork.after(require("core.timing.engine.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
@@ -1009,6 +1060,27 @@ function M.open(opts)
 	end
 	Logger.success(LOG, "Changelog window created.")
 	return _focus_owner == owner and _wv_committed == true
+end
+
+--- The installed release that waits for a restart the coordinator refused.
+--- @return table|nil { tag, backup_path }
+function M.pending_install()
+	return _install_session and _install_session.pending() or nil
+end
+
+--- Names the menu session's redraw; the menu caches its tree, so the row that
+--- completes a held release appears only when this is told. A new menu
+--- session (a reload builds one) replaces the previous redraw.
+--- @param observer function
+function M.set_pending_install_observer(observer)
+	assert(type(observer) == "function", "the held-install observer must be a function")
+	_pending_observer = observer
+end
+
+--- Asks again for the restart that completes the held release (the menu row).
+--- @return boolean accepted
+function M.complete_pending_install()
+	return _install_session ~= nil and _install_session.complete_restart() == true
 end
 
 --- The open window, for ui/window_toggle (nil when closed).

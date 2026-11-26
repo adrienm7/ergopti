@@ -13,15 +13,20 @@ import socket
 import stat
 import subprocess
 import tempfile
+import tomllib
+
+# The application folder under every XDG base, read from the one declaration.
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
 ORIGINAL = '{"preserve":"original"}'
 WORKER = r"""
 local baseline = os.getenv("ERGOPTI_STORAGE_BASELINE")
 if baseline then
-	package.preload["adapters.storage"] = function() return assert(loadfile(baseline))() end
+	package.preload["core.fs.adapters.storage"] = function() return assert(loadfile(baseline))() end
 end
-local S = require("adapters.storage")
+local S = require("core.fs.adapters.storage")
 local regular = os.getenv("ERGOPTI_STORAGE_REGULAR") == "yes"
 assert(S.get("preserve", "default") == (regular and "original" or "default"))
 local operation = os.getenv("ERGOPTI_STORAGE_OPERATION")
@@ -58,7 +63,7 @@ def main():
             )
         ):
             root = pathlib.Path(folder) / str(number)
-            source = root / "ergopti_plus" / "storage.json"
+            source = root / FOLDER / "storage.json"
             source.parent.mkdir(parents=True)
             endpoint = root / "endpoint"
             native_socket = None
@@ -85,7 +90,7 @@ def main():
             env = dict(os.environ)
             env.update(
                 XDG_CONFIG_HOME=str(root),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 ERGOPTI_STORAGE_REGULAR="yes" if kind.startswith("regular") else "no",
                 ERGOPTI_STORAGE_OPERATION=operation,
             )
@@ -98,7 +103,7 @@ def main():
                 if not kind.startswith("regular"):
                     after = source.lstat()
                     assert (after.st_ino, after.st_mode) == (before.st_ino, before.st_mode)
-                    assert not pathlib.Path(str(source) + ".tmp").exists()
+                    assert not list(source.parent.glob(source.name + ".*.tmp"))
                     assert not pathlib.Path(str(source) + ".corrupt").exists()
                     if kind == "fifo-link":
                         assert source.readlink() == endpoint and stat.S_ISFIFO(

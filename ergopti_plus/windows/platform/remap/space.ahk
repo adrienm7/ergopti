@@ -102,9 +102,12 @@ _SpaceTap() {
 				CommittedScreenEffect := 0
 				; The user pressed Space when the key went down, not when the tap was
 				; decided: measure a trigger's time gate there.
+				SpanStart := HSEMatch != "" ? HotPath_SpanTrace("hotstring.expand") : 0
 				Fired := HSEMatch != "" and HSE_DispatchMatch(
 						HSEMatch, HSE_LastEndChar, &CommittedScreenEffect, false, unset,
 						TapHoldRollTapDownTick())
+				if (HSEMatch != "")
+						HotPath_SpanDone("hotstring.expand", SpanStart, HotstringDispatchOutcome(Fired))
 				if (Fired is Map) && Fired.Has("Pending")
 						return true
 				if Fired {

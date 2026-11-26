@@ -9,32 +9,49 @@
 local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
-local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader",
+--- Opens the apps dashboard over a virtual store and hands the observations over.
+--- @param cached boolean Whether a disk snapshot exists.
+--- @param callback function Receives dashboard, state, evaluations, errors, successes, pending.
+--- @param store table|nil { missing = boolean, complete = boolean, metrics_off = boolean }:
+---   no db.sqlite, an incomplete manifest read, or the real context tracker that keystats
+---   never started; a present, complete store with a started tracker by default.
+---   state.disk_writes counts the snapshot writes.
+local function with_delivery(cached, callback, store)
+	store = store or {}
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
 		"modules.keystats.context_tracker" }, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
-				if path:find("ergopti_metrics_apps_cache.json", 1, true) then
+				if path:find("ergopti_metrics_apps_cache_v3.json", 1, true) then
 					if cached then return "cache", "ok" end
 					return nil, "absent"
 				end
 				return "{}", "ok"
 			end,
 		}
-		package.loaded["modules.keystats.sqlite_reader"] = { read_manifest = function() return {}, true end }
-		package.loaded["modules.keystats.context_tracker"] = { get_active_app_snapshot = function() end }
+		package.loaded["modules.keystats.sqlite_reader"] = {
+			read_manifest = function() return {}, store.complete ~= false end,
+		}
+		if not store.metrics_off then
+			package.loaded["modules.keystats.context_tracker"] = {
+				is_initialized = function() return true end,
+				get_active_app_snapshot = function() end,
+			}
+		end
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}
+			state.disk_writes = 0
 			local original_open = io.open
 			local ok, err = xpcall(function()
 				io.open = function(_, mode)
 					if mode == "w" then
+						state.disk_writes = state.disk_writes + 1
 						return { write = function(self) return self end, close = function() return true end }
 					end
 					if cached then return { read = function() return "cache" end, close = function() end } end
 					return nil
 				end
-				package.loaded["hs.fs"].attributes = function() return true end
+				package.loaded["hs.fs"].attributes = function() return not store.missing end
 				package.loaded["hs.json"].encode = function() return "{}" end
 				package.loaded["hs.json"].decode = function(value)
 					return value == "cache" and { manifest = "{}" } or {}
@@ -47,7 +64,7 @@ local function with_delivery(cached, callback)
 				-- the zero-delay turns it arms, so one call still stands for one
 				-- refresh. Delayed retries and the fresh load stay queued.
 				local delivering, slices = false, nil
-				package.loaded["adapters.timer_scheduler"].after = function(delay, fn)
+				package.loaded["core.events.timer_scheduler"].after = function(delay, fn)
 					local handle = { timer = {} }
 					local entry = function() handle.timer = nil; fn() end
 					if delivering and delay == 0 then
@@ -77,7 +94,7 @@ local function with_delivery(cached, callback)
 					if state.submit then return state.submit(self, code, done) end
 					return self
 				end
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				logger.success = function(_, message, ...) successes[#successes + 1] = string.format(message, ...) end
 				pending[#pending]()

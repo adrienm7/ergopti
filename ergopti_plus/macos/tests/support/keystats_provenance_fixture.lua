@@ -37,23 +37,25 @@ function M.load_keystats()
 	-- require-time. This fixture deliberately uses the production instances, so it
 	-- owns their reload rather than making the generic helper erase intentional
 	-- adapter stubs installed by unrelated tests.
-	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return true end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti-test" end,
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,
 	}
-	package.loaded["infra.dialog_util"] = { alert = function() end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
 	package.loaded["modules.keystats.log_manager"] = {
 		init = function(core_state) state = core_state; return true end,
 		ensure_ingest_running = function() return true end,
+		-- The session rows (session_start, idle_start…) the engine queues.
+		append_log = function() return true end,
 		defer_flush_buffer = function() return true end,
 		defer_typing_builder = function(builder)
 			deferred_typing_builders[#deferred_typing_builders + 1] = builder
@@ -124,13 +126,14 @@ function M.load_keystats()
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function(callback) return type(callback) == "function" end,
 		start = function() return true end,
 		stop = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
-		start = function() return true end,
+	local keyboard_event
+	package.loaded["platform.input.keyboard_hook"] = {
+		start = function(opts) keyboard_event = opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
@@ -146,11 +149,12 @@ function M.load_keystats()
 
 	local fixture = {
 		keystats = keystats,
+		dispatch = function(event) return assert(keyboard_event, "start the physical hook first")(event) end,
 		state = state,
 		flushes = flushes,
 		hs = _G.hs,
-		synthetic_input = require("adapters.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		synthetic_input = require("platform.input.synthetic_input"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 	}
 	--- Runs deferred keystats builders after the simulated eventtap returns.
 	function fixture.drain()

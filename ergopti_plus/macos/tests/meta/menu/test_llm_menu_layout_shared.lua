@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The IA submenu's disabled-when-off POLICY (and row order) is a single shared
 --- source of truth — the menu manifest's ``llm_menu`` key — consumed by BOTH the
---- macOS renderer (ui/menu/menu_llm/init.lua via ui.menu.menu_llm.menu_layout) and
+--- macOS renderer (ai/ui/menu/init.lua via ui.menu.menu_llm.menu_layout) and
 --- the Windows renderer (windows .../menu_main.ahk). This test pins the macOS half
 --- of that contract so the two menus can never drift again (a greying mismatch —
 --- backend/model wrongly greyed while the feature is off — was the motivating bug):
@@ -20,7 +20,7 @@
 ---      MenuLayout.row_disabled(<id>, ...) rather than hardcoding is_disabled/paused.
 ---   5. The retired second description has not come back.
 ---
---- MOVED 2026-08-07: this contract used to read _shared/modules/llm/menu_layout.json,
+--- MOVED 2026-08-07: this contract used to read _shared/ai/data/menu_layout.json,
 --- a spec file of its own. One menu therefore had TWO shared descriptions — that
 --- file and the manifest's ``llm_menu`` key, which described a two-row menu only
 --- the Linux driver drew — and neither mentioned the other. Case 5 below is what
@@ -44,6 +44,7 @@ local CANON = {
 	{ id = "llm_generation_settings", greys_off = true },
 	{ id = "llm_display",             greys_off = true },
 	{ id = "llm_navigation",          greys_off = true },
+	{ id = "llm_ollama_runtime",      greys_off = true },
 }
 
 -- Takes a selector unique to one production file rather than that file's
@@ -57,8 +58,8 @@ end
 --- Reads and decodes the whole shared menu manifest.
 --- @return table The decoded manifest.
 local function manifest()
-	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
-	helpers.assert_true(fh ~= nil, "_shared/modules/menu/menu_manifest.json must be readable")
+	local fh = io.open(DRIVER_ROOT .. "../_shared/menu/data/menu_manifest.json", "r")
+	helpers.assert_true(fh ~= nil, "_shared/menu/data/menu_manifest.json must be readable")
 	local raw = fh:read("*a")
 	fh:close()
 	return hs.json.decode(raw)
@@ -70,8 +71,8 @@ end
 --- as menu_layout.lua filters them at runtime.
 --- @return table Ordered list of manifest rows.
 local function manifest_rows()
-	local fh = io.open(DRIVER_ROOT .. "../_shared/modules/menu/menu_manifest.json", "r")
-	helpers.assert_true(fh ~= nil, "_shared/modules/menu/menu_manifest.json must be readable")
+	local fh = io.open(DRIVER_ROOT .. "../_shared/menu/data/menu_manifest.json", "r")
+	helpers.assert_true(fh ~= nil, "_shared/menu/data/menu_manifest.json must be readable")
 	local raw = fh:read("*a")
 	fh:close()
 	local data = hs.json.decode(raw)
@@ -118,7 +119,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the live MenuLayout policy matches the canonical policy", function()
-		local MenuLayout = helpers.load_with_stubs("ui.menu.menu_llm.menu_layout")
+		local MenuLayout = helpers.load_with_stubs("ai.ui.menu.layout")
 		for _, c in ipairs(CANON) do
 			helpers.assert_true(MenuLayout.greys_when_off(c.id) == c.greys_off,
 				"MenuLayout.greys_when_off('" .. c.id .. "') must be " .. tostring(c.greys_off))
@@ -145,13 +146,13 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		helpers.assert_eq(llm_top.health_dot.ready, "🟢")
 		helpers.assert_eq(llm_top.health_dot.warming, "🟡")
 		helpers.assert_eq(llm_top.health_dot.unreachable, "🔴")
-		local MenuLayout = helpers.load_with_stubs("ui.menu.menu_llm.menu_layout")
+		local MenuLayout = helpers.load_with_stubs("ai.ui.menu.layout")
 		for status, glyph in pairs(llm_top.health_dot) do
 			helpers.assert_eq(MenuLayout.title_health_dot(status), glyph,
 				"title_health_dot('" .. status .. "') must read the manifest glyph")
 		end
 		helpers.assert_eq(MenuLayout.title_health_dot("unknown"), nil)
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		helpers.assert_true(src:find("MenuLayout%.title_health_dot%(health_status%)") ~= nil,
 			"init.lua must take the title glyph from the manifest, not a literal")
 		helpers.assert_true(src:find('"🟢 "', 1, true) == nil and src:find('"🔴 "', 1, true) == nil,
@@ -159,7 +160,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the menu_layout.lua fallback mirrors the canonical policy", function()
-		local src = read_source("local function load_policy") -- ui/menu/menu_llm/menu_layout.lua
+		local src = read_source("local function load_policy") -- ai/ui/menu/layout.lua
 		local block = src:match("FALLBACK_GREYS_WHEN_OFF%s*=%s*{(.-)}")
 		helpers.assert_true(block ~= nil, "menu_layout.lua must define FALLBACK_GREYS_WHEN_OFF")
 		for _, c in ipairs(CANON) do
@@ -171,7 +172,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("init.lua resolves every settings row's greying via the shared spec", function()
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		for _, c in ipairs(CANON) do
 			helpers.assert_true(src:find('MenuLayout%.row_disabled%("' .. c.id .. '"', 1, false) ~= nil,
 				"init.lua must resolve the '" .. c.id .. "' row greying via MenuLayout.row_disabled (shared spec) — not a hardcoded is_disabled/paused")
@@ -179,7 +180,7 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the manifest PLACES the rows — init.lua no longer orders them itself", function()
-		local src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
+		local src = read_source("local function format_shortcut_title") -- ai/ui/menu/init.lua
 		helpers.assert_true(src:find('ManifestMenu%.build%("llm_menu"') ~= nil,
 			"init.lua must build this menu through the shared renderer")
 		-- The settings rows that are not groups are declared `list` rows: init.lua
@@ -201,10 +202,10 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 	end)
 
 	helpers.it("the retired second description has not come back", function()
-		local fh = io.open(DRIVER_ROOT .. "../_shared/modules/llm/menu_layout.json", "r")
+		local fh = io.open(DRIVER_ROOT .. "../_shared/ai/data/menu_layout.json", "r")
 		if fh then fh:close() end
 		helpers.assert_true(fh == nil,
-			"_shared/modules/llm/menu_layout.json must not exist — the IA menu is described in the " ..
+			"_shared/ai/data/menu_layout.json must not exist — the IA menu is described in the " ..
 			"menu manifest's llm_menu key, and a second shared description would drift from it")
 	end)
 end)
@@ -221,7 +222,7 @@ helpers.describe("shared fixed LLM group declarations", function()
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, nil)
 				count = count + 1
-			elseif row.id == "llm_generation_settings" then
+			elseif row.id == "llm_generation_settings" or row.id == "llm_ollama_runtime" then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, nil)
@@ -231,13 +232,13 @@ helpers.describe("shared fixed LLM group declarations", function()
 			end
 		end
 		helpers.assert_eq(count, 3)
-		helpers.assert_eq(additional_groups, 1)
+		helpers.assert_eq(additional_groups, 2, "the generation settings and Ergopti's Ollama (OLL-11)")
 	end)
 end)
 
 helpers.describe("Single manual LLM profile selection", function()
 	helpers.it("retires shortcut overrides without losing the original transaction returns", function()
 		local source = read_source("deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts")
-		require("test.manual_profile_selection").assert_selection(helpers, "hs", source)
+		require("tests.lua.manual_profile_selection").assert_selection(helpers, "hs", source)
 	end)
 end)

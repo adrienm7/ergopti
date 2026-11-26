@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function quit_action_body()
 	local source, err = helpers.read_driver_unit("local function safe_require")
-	helpers.assert_true(source ~= nil, "ui.menu.init source must be unique: " .. tostring(err))
+	helpers.assert_true(source ~= nil, "menu.ui.init source must be unique: " .. tostring(err))
 	local start_at = source:find("quit%s*=%s*function%(%)")
 	local end_at = source:find("open_logs%s*=", start_at or 1)
 	helpers.assert_true(start_at ~= nil and end_at ~= nil, "quit action must be locatable")
@@ -26,12 +26,12 @@ end
 local function load_menu_quit_action()
 	-- Reset the shared hs double before installing module doubles captured by
 	-- ui.menu.init at require time.
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
 	local stock_calls = { execute = 0, launch = 0, notifications = {}, timers = {}, clock = 0 }
-	local real_scheduler = require("adapters.timer_scheduler")
-	package.loaded["adapters.timer_scheduler"] = setmetatable({
+	local real_scheduler = require("core.events.timer_scheduler")
+	package.loaded["core.events.timer_scheduler"] = setmetatable({
 		after = function(_, callback)
 			stock_calls.timers[#stock_calls.timers + 1] = callback
 			return {}, true
@@ -47,7 +47,7 @@ local function load_menu_quit_action()
 		return true
 	end
 
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message)
 			stock_calls.notifications[#stock_calls.notifications + 1] = message
 		end,
@@ -55,7 +55,7 @@ local function load_menu_quit_action()
 	-- Menu startup loads optional user code; the quit contract must never acquire
 	-- a real personal configuration file or its persistent cooperative lock.
 	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
-	package.loaded["ui.menu.global_actions_transaction"] = {
+	package.loaded["menu.ui.transactions.global_actions_transaction"] = {
 		create = function(deps)
 			return {
 				is_exclusive_blocked = function() return stock_calls.writer_blocked == true end,
@@ -67,15 +67,15 @@ local function load_menu_quit_action()
 			}
 		end,
 	}
-	package.loaded["ui.hotstring_editor"] = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.text_utils"] = {
+	package.loaded["hotstrings.ui.hotstring_editor"] = {}
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.text.engine.utils"] = {
 		shell_quote = function(value) return tostring(value) end,
 		escape_gsub_replacement = function(value) return tostring(value) end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.preferences"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["menu.engine.ui_restore"] = {}
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function()
 			return {
 				hotstrings = {},
@@ -89,14 +89,14 @@ local function load_menu_quit_action()
 		get_group_name = function() return "group" end,
 		save = function() return true end,
 	}
-	package.loaded["ui.menu.builder"] = { generate = function() return {} end }
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["menu.ui.builder.builder"] = { generate = function() return {} end }
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = function() end }
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(config_path)
 			if type(config_path) ~= "string" or config_path == "" then return nil end
 			return config_path .. ".ergopti-reset-journal-v1.json"
@@ -113,10 +113,10 @@ local function load_menu_quit_action()
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_state"] = {
+	package.loaded["menu.ui.builder.state"] = {
 		sync_state_to_modules = function() return true end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function() return {} end,
 		start_theme_watcher = function() return {} end,
 	}
@@ -124,15 +124,15 @@ local function load_menu_quit_action()
 		get_check_interval = function() return 3600 end,
 		start_background_checks = function() end,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = function() end,
 		setMenu = function() return true end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		publication_pending = function() return stock_calls.publication_blocked == true end,
 		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		is_pending = function() return exit_mode.kind ~= nil end,
 		pending_kind = function() return exit_mode.kind end,
 		request_user_exit = function(reason)
@@ -145,10 +145,10 @@ local function load_menu_quit_action()
 	}
 
 	for _, module_name in ipairs({
-		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_llm", "ui.menu.menu_metrics",
-		"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about",
-		"modules.llm", "modules.keystats", "modules.dynamic_hotstrings", "modules.gestures",
+		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"hotstrings.ui.menu.hotstrings", "ai.ui.menu", "ui.menu.menu_metrics",
+		"ui.menu.menu_tap_holds", "apps.ui.menu.apps", "ui.menu.menu_about",
+		"ai.engine", "modules.keystats", "hotstrings.engine.dynamic", "gestures.engine",
 	}) do
 		package.loaded[module_name] = {}
 	end
@@ -158,8 +158,8 @@ local function load_menu_quit_action()
 		set_extras = function(actions) captured_actions = actions end,
 	}
 
-	package.loaded["ui.menu.init"] = nil
-	local menu = require("ui.menu.init")
+	package.loaded["menu.ui.init"] = nil
+	local menu = require("menu.ui.init")
 	local program_admission
 	local gestures = { configure_program_admission = function(callback)
 		helpers.assert_type(callback, "function")
@@ -167,7 +167,7 @@ local function load_menu_quit_action()
 		return true
 	end }
 	local started, start_err = pcall(menu.start, ".", {}, gestures, nil, nil, {}, nil, {})
-	helpers.assert_true(started, "ui.menu.init must start over the quit harness: " .. tostring(start_err))
+	helpers.assert_true(started, "menu.ui.init must start over the quit harness: " .. tostring(start_err))
 	helpers.assert_type(program_admission, "function", "quit startup retains its required program admission callback")
 	helpers.assert_true(type(captured_actions) == "table" and type(captured_actions.quit) == "function",
 		"the real menu start must publish its quit action")

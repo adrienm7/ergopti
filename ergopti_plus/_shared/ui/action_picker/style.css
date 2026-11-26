@@ -109,6 +109,13 @@ body {
 #toc-btn:hover {
 	border-color: var(--accent);
 }
+/* The glyph is drawn, not read: the button is named by its title (the
+   « / '' » alternative keeps it out of the name; an engine that does not read
+   it keeps the first declaration). */
+#toc-btn::before {
+	content: '☰';
+	content: '☰' / '';
+}
 
 #search-bar {
 	align-items: center;
@@ -129,8 +136,10 @@ body {
 	box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.search-ico {
+#search-bar::before {
 	color: var(--sub);
+	content: '⌕';
+	content: '⌕' / '';
 	flex-shrink: 0;
 	font-size: 16px;
 }
@@ -151,43 +160,64 @@ body {
 /* =============================== */
 /* =============================== */
 
+/* A keyboard stop (the arrows work from it): its ring is the theme's, drawn
+   inside so the scroll box does not clip it. */
 #list {
 	flex: 1;
-	outline: 0;
 	overflow-y: auto;
 	padding: 0 12px 8px;
 }
 
-/* ----- Headings (h1/h2/h3…) ----- */
+#list:focus-visible {
+	outline-offset: -2px;
+}
 
+/* ----- Headings (h2/h3… under the window's h1) ----- */
+
+/* The heading stays at the top of the list while its actions scroll; it takes
+   the list's text, its row its look. */
+.heading-row {
+	background: var(--bg);
+	font: inherit;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+/* A foldable heading holds a button: it keeps the row's look, not the
+   button's. */
 .heading {
 	align-items: center;
 	background: var(--bg);
+	border: 0;
 	color: var(--sub);
 	cursor: pointer;
 	display: flex;
+	font: inherit;
 	gap: 6px;
 	padding: 8px;
-	position: sticky;
-	top: 0;
+	text-align: start;
 	user-select: none;
-	z-index: 1;
+	width: 100%;
 }
 .heading.static {
 	cursor: default;
 }
 
-.heading .caret {
+/* The fold caret, drawn and not read (aria-expanded says it). */
+.heading::before {
 	color: var(--sub);
+	content: '▾';
+	content: '▾' / '';
 	flex-shrink: 0;
 	font-size: 10px;
 	transition: transform 0.12s ease;
 	width: 12px;
 }
-.heading.collapsed .caret {
+.heading.collapsed::before {
 	transform: rotate(-90deg);
 }
-.heading.static .caret {
+.heading.static::before {
 	visibility: hidden;
 }
 
@@ -221,6 +251,12 @@ body {
 
 /* ----- Action rows ----- */
 
+.options,
+#toc-inner,
+#param-program-arguments {
+	list-style: none;
+}
+
 .row {
 	align-items: center;
 	border-radius: 8px;
@@ -233,11 +269,13 @@ body {
 .row:hover {
 	background: var(--surface);
 }
+/* The fill behind white text: the dark accent is made to be read on dark
+   surfaces and gives white text 3.6:1 (WCAG 1.4.3). */
 .row.active {
-	background: var(--accent);
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
-.row.active .row-tick {
+.row.active::before {
 	color: var(--theme-white);
 }
 
@@ -248,14 +286,17 @@ body {
 	white-space: nowrap;
 }
 
-.row-tick {
+/* The current action's tick, drawn; the row's hidden words say it too. */
+.row::before {
 	color: var(--accent);
+	content: '✓';
+	content: '✓' / '';
 	flex-shrink: 0;
 	font-size: 13px;
 	visibility: hidden;
 	width: 14px;
 }
-.row.current .row-tick {
+.row.current::before {
 	visibility: visible;
 }
 
@@ -326,13 +367,19 @@ body {
 }
 
 .toc-item {
+	background: none;
+	border: 0;
 	border-radius: 6px;
 	color: var(--text);
 	cursor: pointer;
+	display: block;
+	font: inherit;
 	overflow: hidden;
 	padding: 7px 10px;
+	text-align: start;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	width: 100%;
 }
 .toc-item:hover {
 	background: var(--accent-soft);
@@ -385,14 +432,16 @@ body {
 	border-color: var(--accent);
 }
 
+/* Accent text on the page background: on the dark surface the accent gives
+   3.8:1 (WCAG 1.4.3), on the background 4.6:1. */
 #btn-edit-current {
-	background: var(--surface);
+	background: var(--bg);
 	border: 1px solid var(--accent);
 	border-radius: 7px;
 	color: var(--accent);
 	cursor: pointer;
 	font: inherit;
-	margin-left: auto;
+	margin-inline-start: auto;
 	padding: 6px 16px;
 }
 #btn-edit-current[hidden] {
@@ -496,10 +545,18 @@ body {
 	font: inherit;
 	padding: 6px 16px;
 }
+/* White text: the fill accent, as for the highlighted row. */
 #param-save {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
+}
+
+/* The program's groups keep the editor's flat look. */
+#param-program,
+#param-program-provider {
+	border: 0;
+	min-inline-size: 0;
 }
 
 #param-program input,

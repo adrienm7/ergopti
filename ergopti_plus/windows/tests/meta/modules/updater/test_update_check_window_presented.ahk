@@ -11,7 +11,7 @@
 ;
 ; SCOPE: source introspection. The window hosts WebView2 or a native Gui and the
 ; helper focuses a real window, which the headless runner may not do; the helper
-; itself is exercised in tests/unit/ui/windows/test_window_manager_present_window.ahk.
+; itself is exercised in tests/unit/core/ui/windows/test_manager_present_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,7 +36,7 @@ _MetaUpdateCheckWindowPresented() {
 		"a manual check re-opens the window")
 	Result := _DriverFuncBody("UpdateCheck_ShowResult")
 	Assert(Result != "", "UpdateCheck_ShowResult must exist in ui/update_check/init.ahk")
-	Assert(InStr(Result, "_UpdateCheck_Present(State)") > 0,
+	Assert(InStr(Result, "_UpdateCheck_Present(State, false, Current)") > 0,
 		"an answer updates the window where it is, without taking the focus")
 }
 Test("update check: the window is presented, never topmost (ui-focus-not-topmost)",

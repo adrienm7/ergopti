@@ -367,3 +367,91 @@ Test("navigation indicator: recovers a throwing publication", _NL_IndicatorRecov
 Test("navigation indicator: retries a false restoration", _NL_IndicatorRecoversRefusal.Bind("false", true))
 Test("navigation indicator: retries an empty restoration", _NL_IndicatorRecoversRefusal.Bind("empty", true))
 Test("navigation indicator: retries a throwing restoration", _NL_IndicatorRecoversRefusal.Bind("throws", true))
+
+_NL_RetiredOwnerPreservesNewLayer(BeforeActivation) {
+	global LayerEnabled, _TH_LayerOwner, NumberOfRepetitions
+	AssertFalse(IsObject(_TH_LayerOwner), "A foreign active layer owner cannot be parked")
+	Saved := {Enabled: LayerEnabled, Repetitions: NumberOfRepetitions, Paused: A_IsSuspended}
+	_TSUH_Begin(Map(), Map())
+	B := 0, Clock := 900, Waits := 0
+	Replace() {
+		Suspend(true)
+		try {
+			AssertTrue(TapHoldReleaseSyntheticKeys())
+			AssertFalse(LayerEnabled, "The actual teardown must retire the layer before resume")
+		} finally Suspend(false)
+		B := TapHoldNewOwner()
+		AssertTrue(ActivateLayer(B), "B must activate the actual layer through its own current owner")
+	}
+	Now() {
+		Clock += 100
+		if BeforeActivation && Clock == 1000
+			Replace()
+		return Clock
+	}
+	Wait(*) {
+		Waits += 1
+		AssertTrue(LayerEnabled)
+		Replace()
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2, Wait, (*) => false, Now)
+		AssertFalse(Result["tap"])
+		AssertTrue(LayerEnabled && _TH_LayerOwner == B, "The retired activation/finalizer must leave B's actual layer enabled")
+		AssertEqual(BeforeActivation ? 0 : 1, Waits)
+		if BeforeActivation
+			AssertFalse(Result["activated"], "A frame revoked in its clock port must not activate or wait")
+		AssertTrue(DisableLayer(B), "B must retain its own independent acknowledged deactivation")
+		AssertFalse(LayerEnabled)
+	} finally {
+		if IsObject(B)
+			DisableLayer(B)
+		LayerEnabled := Saved.Enabled, _TH_LayerOwner := 0, NumberOfRepetitions := Saved.Repetitions
+		Suspend(Saved.Paused)
+		_TSUH_End()
+	}
+}
+for _NL_OwnerBefore in [false, true]
+	Test("Layer owner: revocation before activation=" . _NL_OwnerBefore . " preserves a resumed successor (synthetic-owner-layer)",
+		_NL_RetiredOwnerPreservesNewLayer.Bind(_NL_OwnerBefore))
+
+; A key combination's own layer hold asks the activity tracker before its tap:
+; a layer key struck under the pair's second key makes the press a hold, as
+; the shared pair policy decides (maintainer decision THD-3 of 2026-11-21).
+; The old owner reported the tap whatever was struck under it.
+_NL_PairLayerTapCancelledByLayerKey(StrikeUnder) {
+	global _TH_TapHoldTrackState, LayerEnabled := false
+	SavedState := _TH_TapHoldTrackState
+	try {
+		_TH_TapHoldTrackState := Map("space", Map("down", true, "down_at", A_TickCount))
+		_NL_ImmediateReset([7000, 7100], [true])
+		Wait := StrikeUnder
+			? (KeyName, TimeoutSec) => (TapHoldTrackActivityCancel("", TAPHOLD_CANCEL_BY_OTHER_KEY),
+				_NL_ImmediateWait(KeyName, TimeoutSec))
+			: _NL_ImmediateWait
+		Result := TapHoldOwnImmediateLayer("space", "Space", 0.2, Wait, _NL_ImmediateIsDown,
+			_NL_ImmediateNow, _NL_ImmediateActivate, _NL_ImmediateDisable, 0, 0, TapHoldShouldCancelTap)
+		if StrikeUnder
+			AssertFalse(Result["tap"], "a layer key struck under the pair's layer hold cancels its tap")
+		else
+			AssertTrue(Result["tap"], "a quick lone release of the pair's second key is still its tap")
+	} finally {
+		_TH_TapHoldTrackState := SavedState
+	}
+}
+Test("tap-hold layer: a key struck under a pair's layer hold cancels its tap (pair-layer-hold-activity)",
+	_NL_PairLayerTapCancelledByLayerKey.Bind(true))
+Test("tap-hold layer: a pair's lone layer-hold tap stays a tap (pair-layer-hold-activity)",
+	_NL_PairLayerTapCancelledByLayerKey.Bind(false))
+
+; The pair's own layer hold hands the activity tracker to its owner.
+_NL_PairLayerPortAsksTheTracker() {
+	Body := _DriverFuncBody("_KeyCombinationPorts")
+	Assert(Body != "", "_KeyCombinationPorts must be found before its wiring is read")
+	Assert(RegExMatch(Body, "s)TapHoldOwnImmediateLayer\(.*TapHoldShouldCancelTap\)"),
+		"the pair's own_layer port passes TapHoldShouldCancelTap")
+}
+Test("key combinations: the pair's layer hold port asks the activity tracker (pair-layer-hold-activity)",
+	_NL_PairLayerPortAsksTheTracker)

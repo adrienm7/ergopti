@@ -2,7 +2,7 @@
 
 --- Independent aggregate facts controls; ports are modeled unless explicitly actual.
 local helpers = require("tests.helpers")
-local function module() return require("keystats.physical_lifecycle_conjunction") end
+local function module() return require("metrics.engine.capture.physical_lifecycle_conjunction") end
 local function record(domain, revision, source, stage)
 	local r = { kind = "physical_lifecycle", domain = domain, revision = revision, at = revision * 10,
 		source = source, stage = stage or "boundary", fields_complete = false, complete = false, allowed = false }
@@ -204,7 +204,7 @@ helpers.describe("source-derived conjunction boundary controls", function()
 		helpers.assert_eq(o.accept("engine", sources.engine.owner, sources.engine.token, record("engine", 2, "start", "complete")), true)
 	end)
 	helpers.it("routes exact actual shared actor receipts and waits for writer unwinding", function()
-		local Actor = require("keystats.physical_lifecycle_observation")
+		local Actor = require("metrics.engine.capture.physical_lifecycle_observation")
 		local source, actors, bootstrap, revisions = {}, {}, {}, 0
 		for _, domain in ipairs({ "engine", "system" }) do
 			local actor = Actor.new(domain, function() revisions = revisions + 1; return revisions end, function() end)
@@ -221,7 +221,7 @@ end)
 
 helpers.describe("actual shared lifecycle source-frame integration", function()
 	helpers.it("waits for the actual source writer after in-writer detach", function()
-		local Actor = require("keystats.physical_lifecycle_observation")
+		local Actor = require("metrics.engine.capture.physical_lifecycle_observation")
 		local sources, actors, queue, now, conjunction = {}, {}, {}, 0, nil
 		for _, domain in ipairs({ "engine", "system" }) do
 			local source_owner = {}; local actor = Actor.new(domain, function() now = now + 1; return now end, function() end)

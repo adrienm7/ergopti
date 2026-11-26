@@ -9,12 +9,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Registry = require("layouts.registry")
-local Catalogue = require("layouts.catalogue")
-local Channels = require("updater.channels")
+local Json = require("core.text.engine.json")
+local Registry = require("layouts.engine.registry.registry_core")
+local Catalogue = require("layouts.engine.composer.catalogue")
+local Channels = require("updater.engine.channels")
 local root = helpers.driver_root() .. "/../_shared/"
-local fh = assert(io.open(root .. "modules/updater/channels.json", "rb"))
+local fh = assert(io.open(root .. "updater/data/channels.json", "rb"))
 local channels = assert(Channels.load(Json.decode(fh:read("*a"))))
 fh:close()
 

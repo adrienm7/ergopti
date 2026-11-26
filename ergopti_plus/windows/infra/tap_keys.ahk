@@ -26,7 +26,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\ai_action_gate.ahk
+#Include %A_LineFile%\..\..\ai\engine\action_gate.ahk
 
 
 
@@ -39,7 +39,7 @@
 ; =======================================
 
 ; The tap keys in menu order, with their scancodes. Pinned to
-; _shared/modules/actions/tap_keys.json by tools/test/test-tap-keys-single-source.cjs,
+; _shared/shortcuts/data/actions/tap_keys.json by tools/test/test-tap-keys-single-source.cjs,
 ; which also checks the hotkeys name the same scancodes.
 global TAP_KEY_ORDER := ["number_row_left", "number_row_right_1", "number_row_right_2"]
 global TAP_KEY_SCANCODES := Map(
@@ -127,7 +127,8 @@ _TapKeysCategoryEnabled() {
 }
 
 ; The #HotIf predicate of one tap key: assigned to a known action that is armed
-; (an AI action is not while the AI is off), and the Shortcuts category on.
+; (an AI action is not while the AI is off), the Shortcuts category on, and
+; no Kana AltGr held: its ordinary virtual key is not an AHK modifier.
 ; Evaluated by the keyboard hook on every press, so it
 ; only reads memory.
 ; @param {String} Id A tap key id.
@@ -137,7 +138,8 @@ TapKeyShouldFire(Id) {
 	if !IsSet(TapKeyAssignments) || !IsSet(GESTURE_ACTIONS)
 		return false
 	Action := TapKeyAssignments.Get(Id, "none")
-	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action) && _TapKeysCategoryEnabled()
+	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action)
+		&& _TapKeysCategoryEnabled() && !TapHoldKanaAltGrHeld()
 }
 
 ; Runs a tap key's action, then holds the hotkey thread until the key is up so
@@ -165,7 +167,7 @@ TapKeyFire(Id, WaitFn := "") {
 ; ======================================
 ; ======================================
 
-; The OS calls a label needs, all in adapters/key_state.ahk; reading a dead key
+; The OS calls a label needs, all in platform/input/key_state.ahk; reading a dead key
 ; there leaves the keyboard state alone, so a label cannot arm it for the user's
 ; next keystroke. The unit suite passes a fake layout instead.
 global _TapKeyOsProbe := {

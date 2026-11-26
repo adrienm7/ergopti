@@ -18,7 +18,8 @@ _LMSO_Case(Mode) {
 	static Serial := 0, Debt := 0
 	AssertFalse(IsObject(Debt), "A previous unretired child prevents another component")
 	Root := A_Temp . "\ergopti_layout_open_" . A_ScriptHwnd . "_" . ++Serial
-	FSCreateDirectoryExclusiveStrict(Root)
+	Creation := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue(Creation is Integer && Creation == 1, "The native component must exclusively acquire its private directory before cleanup")
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0
 	Retired := false, AtDeadline := 0, ExportFailure := 0, PreviousCritical := Critical("Off")
 	try {
@@ -82,3 +83,22 @@ _LMSO_Case(Mode) {
 
 for _LMSO_Mode in ["current", "close", "reopen"]
 	Test("Layout native Show: " . _LMSO_Mode . " preserves exact window ownership (layout-early-show)", _LMSO_Case.Bind(_LMSO_Mode))
+
+for _LMSO_SettingsMode in ["settings-current", "settings-close"]
+	Test("Layout native settings continuation: " . _LMSO_SettingsMode . " respects actual Close (layout-settings-close-owner)",
+		_LMSO_Case.Bind(_LMSO_SettingsMode))
+
+Test("Layout native settings continuation: settings-reopen preserves the exact successor (layout-settings-successor-owner)",
+	_LMSO_Case.Bind("settings-reopen"))
+
+for _LMSO_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Layout native subscription continuation: " . _LMSO_SubscriptionMode . " retires its exact handle (layout-subscription-close-owner)",
+		_LMSO_Case.Bind(_LMSO_SubscriptionMode))
+
+for _LMSO_RetirementMode in ["subscription-refuse-close", "subscription-destroy-throw"]
+	Test("Layout native retirement retry: " . _LMSO_RetirementMode . " preserves exact resources (layout-subscription-retirement-retry)",
+		_LMSO_Case.Bind(_LMSO_RetirementMode))
+
+for _LMSO_NavigationMode in ["navigation-close", "navigation-reopen"]
+	Test("Layout navigation subscription: " . _LMSO_NavigationMode . " preserves carried and returned handles (layout-navigation-subscription-owner)",
+		_LMSO_Case.Bind(_LMSO_NavigationMode))

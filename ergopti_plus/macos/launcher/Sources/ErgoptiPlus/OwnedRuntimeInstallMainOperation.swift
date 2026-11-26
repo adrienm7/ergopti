@@ -1,0 +1,265 @@
+// Sources/ErgoptiPlus/OwnedRuntimeInstallMainOperation.swift
+// The user's confirmed first install of the owned runtime: the verified download's helper, staged behind the admin prompt.
+import CryptoKit
+import Darwin
+import Foundation
+import Security
+
+/// Started only by the Lua install port after the user confirmed it (Tap-Holds row), never at startup. The helper
+/// comes from the verified download only (OwnedRuntimeDownloadedHelper), must carry this launcher's own
+/// certificate leaf and its code hashes, and the administrator shell copies it root-owned and proves that
+/// requirement and its digest again before its one `--owned-install-first` transaction runs.
+///
+/// One stdout line answers, for platform/remap/runtime_install.lua:
+/// - `OWNED_RUNTIME_INSTALL|1|<result>` relays the helper's own closed line (exit 0);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|refused|<reason>` before any prompt (exit 77);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>[|<step>[|<trail>]]` when the administrator shell failed
+///   (exit 75), with the staged program's failing step when it named one and the helper's trail notes
+///   (`trailCause`) when it wrote any.
+///
+/// `--request-owned-runtime-repair` runs the same staged helper's service repair (`--owned-repair-service`,
+/// OwnedRuntimeServiceRepairEntry) for an already published Runtime (MRT-004), with the same lines under the
+/// `OWNED_RUNTIME_REPAIR` and `OWNED_RUNTIME_REPAIR_REQUEST` kinds. It installs no driver package: a Mac without
+/// pqrs' daemon is refused before the prompt and keeps the first install's route.
+enum OwnedRuntimeInstallMainOperation {
+	/// The two transactions this role stages the helper for.
+	enum Mode {
+		case install, repair
+		var flag: String { self == .install ? OwnedRuntimeInstallMainOperation.flag : OwnedRuntimeInstallMainOperation.repairFlag }
+		/// The helper's argument.
+		var helperArgument: String { self == .install ? "--owned-install-first" : OwnedRuntimeServiceRepairEntry.argument }
+		/// The helper's closed result values (OwnedRuntimeIdleServiceEntry.Result, OwnedRuntimeServiceRepairEntry.Result).
+		var helperResults: Set<String> {
+			self == .install ? OwnedRuntimeInstallMainOperation.helperResults : ["service-repaired-observed", "service-repair-pending"]
+		}
+		/// The kind of the helper's relayed line, and of this role's own lines.
+		var helperKind: String { self == .install ? "OWNED_RUNTIME_INSTALL" : "OWNED_RUNTIME_REPAIR" }
+		var requestKind: String { helperKind + "_REQUEST" }
+		var logName: String { self == .install ? "owned runtime install" : "owned runtime service repair" }
+	}
+	static let flag = "--request-owned-runtime-install"
+	static let repairFlag = "--request-owned-runtime-repair"
+	/// The helper's two closed result values (OwnedRuntimeIdleServiceEntry.Result).
+	static let helperResults: Set<String> = ["files-published-services-observed-staging-retired", "files-published-service-cleanup-pending"]
+	private static let installerExecutable = "Contents/MacOS/ErgoptiPlus-Runtime-Installer"
+	/// AppleScript's error number for a prompt the user closed.
+	private static let userCancelled = -128
+
+	static func mode(arguments: [String]) -> Mode? {
+		guard arguments.count == 2 else { return nil }
+		return arguments[1] == flag ? .install : arguments[1] == repairFlag ? .repair : nil
+	}
+	static func handles(arguments: [String]) -> Bool { mode(arguments: arguments) != nil }
+
+	/// The `cdhash` of each architecture slice the helper carries, for the staged copy's requirement. The
+	/// requirement language compares the 20-byte truncated hash, and `codesign --all-architectures` checks every
+	/// slice: the full SHA-256 of the host slice alone matched neither, so the administrator shell refused every
+	/// install with status 1 (field report 2026-11-05).
+	/// - Parameter helper: The helper bundle.
+	/// - Returns: One 20-byte hash per slice present, or nil when a present slice reports none or two collide.
+	static func sliceCodeHashes(_ helper: URL) -> [Data]? {
+		var hashes: [Data] = []
+		for architecture in ["arm64", "x86_64"] {
+			var code: SecStaticCode?
+			let attributes = [kSecCodeAttributeArchitecture as String: architecture] as CFDictionary
+			// An architecture the universal file does not carry has no slice to admit.
+			guard SecStaticCodeCreateWithPathAndAttributes(helper as CFURL, [], attributes, &code) == errSecSuccess,
+				let code else { continue }
+			var information: CFDictionary?
+			guard SecCodeCopySigningInformation(code, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
+				let unique = (information as? [String: Any])?[kSecCodeInfoUnique as String] as? Data, unique.count == 20 else { return nil }
+			hashes.append(unique)
+		}
+		return hashes.isEmpty || Set(hashes).count != hashes.count ? nil : hashes
+	}
+
+	/// The staged helper's requirement: Ergopti's installer identifier, this launcher's leaf and one slice's cdhash.
+	/// - Parameters:
+	///   - leaf: The launcher's certificate leaf.
+	///   - slices: The helper's slice hashes (sliceCodeHashes).
+	/// - Returns: The requirement text `codesign --test-requirement` reads.
+	static func stagedRequirement(leaf: Data, slices: [Data]) -> String {
+		let codeHashes = slices.map { "cdhash H\"" + hex($0) + "\"" }.sorted().joined(separator: " or ")
+		return "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\""
+			+ hex(Insecure.SHA1.hash(data: leaf)) + "\" and (" + codeHashes + ")"
+	}
+
+	/// The step the staged program names on stderr (OwnedVirtualHIDDaemonReportMainOperation.failedStepMarker),
+	/// which `do shell script` returns as the error message of a failed shell.
+	/// - Parameter message: The AppleScript error message.
+	/// - Returns: The step, lower-case letters and underscores only, or nil when none is named.
+	static func failedStep(_ message: String) -> String? {
+		guard let range = message.range(of: OwnedVirtualHIDDaemonReportMainOperation.failedStepMarker, options: .backwards) else { return nil }
+		let step = message[range.upperBound...].prefix { $0 == "_" || ("a"..."z").contains($0) }
+		return step.isEmpty || step.count > 32 ? nil : String(step)
+	}
+	/// The prefix of each install trail note (OwnedRuntimeInstallTrail.note).
+	static let trailMarker = "OWNED_RUNTIME_INSTALL_TRAIL|"
+	/// The longest trail the answer line carries.
+	static let trailLimit = 600
+	/// The helper's trail notes as one closed token for the answer line: field report 2026-11-15 read only
+	/// « the helper left cleanup pending » in the driver log and the field check, while the cause
+	/// (`refused-source-root-dup-errno-24`) was on the launcher's own log line alone.
+	/// - Parameter message: The AppleScript error message, which carries the shell's stderr.
+	/// - Returns: The notes in order, deduplicated, joined by commas, each cut at its first character outside
+	///   letters, digits and `._@:+-`; nil when there is none.
+	static func trailCause(_ message: String) -> String? {
+		var notes: [String] = []
+		for piece in message.components(separatedBy: trailMarker).dropFirst() {
+			let note = String(piece.prefix { $0.isASCII && ($0.isLetter || $0.isNumber || "._@:+-".contains($0)) })
+			if !note.isEmpty && !notes.contains(note) { notes.append(note) }
+		}
+		guard !notes.isEmpty else { return nil }
+		let joined = notes.joined(separator: ",")
+		return joined.count > trailLimit ? String(joined.prefix(trailLimit)) : joined
+	}
+	/// The longest stderr one log line keeps. The helper names every refusal it meets on its trail, with the
+	/// file and line, so a failed install needs room for all of them, not only the first few.
+	static let oneLineLimit = 8000
+	/// The shell's stderr on one bounded log line: codesign, ditto and the helper's trail say there why they refused.
+	static func oneLine(_ message: String) -> String {
+		let flat = message.split(whereSeparator: { $0.isNewline }).map { $0.trimmingCharacters(in: .whitespaces) }
+			.filter { !$0.isEmpty }.joined(separator: " | ")
+		return flat.count > oneLineLimit ? String(flat.prefix(oneLineLimit)) + "…" : flat
+	}
+
+	/// Writes the one answer line, then returns the exit status.
+	private static func answer(_ line: String, _ status: Int32) -> Int32 {
+		do { try FileHandle.standardOutput.write(contentsOf: Data((line + "\n").utf8)) } catch { return 75 }
+		return status
+	}
+	private static func refuse(_ reason: String, _ explanation: String, mode: Mode = .install) -> Int32 {
+		LauncherLog.write("\(mode.logName): refused (\(reason)): \(explanation).")
+		return answer(mode.requestKind + "|1|refused|" + reason, 77)
+	}
+	private static func hex(_ bytes: some Sequence<UInt8>) -> String { bytes.map { String(format: "%02x", $0) }.joined() }
+
+	/// Exit statuses of the driver step's own checks (runtime_vhid_update.lua EXIT_DIGEST and EXIT_SIGNATURE).
+	static let driverDigestStatus = 78, driverSignatureStatus = 79
+
+	/// Root-owned copy of the kept package, its pinned digest and pqrs' Developer ID Installer team checked on that
+	/// copy, then /usr/sbin/installer; the same checks as the driver-only update's administrator shell.
+	static func driverProgram(_ package: OwnedRuntimeDownloadedHelper.DriverPackage) -> String {
+		let quote = OwnedVirtualHIDDaemonReportMainOperation.quote
+		return "task_step=driver_package; task_work=$(/usr/bin/mktemp -d /private/tmp/ergoptiplus-vhid.XXXXXX); "
+			+ "/bin/cp -X " + quote(package.path) + " \"$task_work/driver.pkg\"; "
+			+ "task_sum=$(/usr/bin/shasum -a 256 \"$task_work/driver.pkg\"); task_sum=${task_sum%% *}; "
+			+ "[ \"$task_sum\" = " + quote(package.sha256) + " ] || { /bin/rm -rf \"$task_work\"; exit \(driverDigestStatus); }; "
+			+ "task_sig=$(/usr/sbin/pkgutil --check-signature \"$task_work/driver.pkg\") || { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -q '^ *Status: signed by a developer certificate issued by Apple' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -Eq '^ *1\\. Developer ID Installer: .*\\(" + package.team + "\\)$' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "/usr/sbin/installer -pkg \"$task_work/driver.pkg\" -target / >/dev/null; /bin/rm -rf \"$task_work\"; "
+	}
+
+	/// Deliberate signed Main CLI request, off the main thread (the AppleScript prompt runs here).
+	static func run(arguments: [String]) -> Int32 {
+		guard let mode = Self.mode(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
+		func refuse(_ reason: String, _ explanation: String) -> Int32 { Self.refuse(reason, explanation, mode: mode) }
+		guard let publisher = OwnedRuntimePublisherIdentity.currentLauncher(), publisher.current() else {
+			return refuse("launcher_unsigned", "this launcher carries no stable Ergopti signature to vouch for the installer helper")
+		}
+		defer { _ = publisher.retire() }
+		let helper: URL
+		switch OwnedRuntimeDownloadedHelper.current() {
+		case .success(let located): helper = located
+		case .failure(let refusal): return refuse(refusal.rawValue, refusal.explanation)
+		}
+		// pqrs' driver package, when no pqrs daemon is installed yet: the Lua install port downloaded and
+		// verified it (runtime_vhid_update.lua fetch), and this same shell checks it again before the helper.
+		// A service repair installs no package: without the daemon there is no job to repair.
+		var driverStep = ""
+		if mode == .repair && !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+			return refuse("driver_absent", "no VirtualHIDDevice daemon is installed, so the first install must run instead")
+		}
+		if mode == .install && !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+			guard let package = OwnedRuntimeDownloadedHelper.currentDriverPackage() else {
+				return refuse("driver_package_absent", "no verified VirtualHIDDevice package is kept for the driver install")
+			}
+			driverStep = Self.driverProgram(package)
+		}
+		let staleStep = mode == .install ? OwnedRuntimeUninstall.staleRuntimeProgram() : ""
+		let program: String
+		do {
+			let source = try OwnedRuntimeInstallTree(root: helper, protected: false)
+			defer { _ = source.releaseOwnedDescriptors() }
+			// One refusal per cause: a single "helper_signature" for all three left an
+			// install refused on a signed release with nothing to tell them apart
+			// (field report 2026-11-05, issue #106).
+			var code: SecStaticCode?
+			guard SecStaticCodeCreateWithPath(helper as CFURL, [], &code) == errSecSuccess, let code,
+				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
+				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate],
+				let certificate = certificates.first else {
+				return refuse("helper_signature_invalid",
+					"the downloaded installer helper fails its strict signature check or is not Ergopti's installer")
+			}
+			guard SecCertificateCopyData(certificate) as Data == publisher.leaf else {
+				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
+			}
+			guard OwnedRuntimePublisherSignature.codeDirectoryHashes(fields) != nil, let slices = sliceCodeHashes(helper) else {
+				return refuse("helper_code_hashes", "the downloaded installer helper's code hashes could not be read")
+			}
+			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))
+			guard OwnedRuntimeInstallOwner.systemClosedExecutableForInstaller(bytes) else {
+				return refuse("helper_executable", "the downloaded installer helper links outside the system libraries")
+			}
+			try source.verify()
+			let stage = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/.runtime-installer-" + UUID().uuidString + "/Helper.app")
+			let requirement = stagedRequirement(leaf: publisher.leaf, slices: slices)
+			let directory = OwnedVirtualHIDDaemonReportMainOperation.quote(stage.deletingLastPathComponent().path)
+			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
+				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
+				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
+				driverStep + staleStep + "task_step=helper; task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
+					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " " + mode.helperArgument + ") || task_status=$?; "
+					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
+					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""
+			}
+		} catch {
+			return refuse("helper_unreadable", "the downloaded installer helper could not be read and verified")
+		}
+		guard publisher.current(), let script = NSAppleScript(source: "do shell script "
+			+ OwnedVirtualHIDDaemonReportMainOperation.appleQuote("/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -c "
+				+ OwnedVirtualHIDDaemonReportMainOperation.quote(program)) + " with administrator privileges") else {
+			return refuse("launcher_changed", "this launcher's signature changed before the administrator prompt")
+		}
+		LauncherLog.write("\(mode.logName): asking for the administrator prompt.")
+		var error: NSDictionary?
+		let output = script.executeAndReturnError(&error)
+		if let error {
+			let number = error[NSAppleScript.errorNumber] as? Int ?? 0
+			if number == userCancelled {
+				LauncherLog.write("\(mode.logName): the administrator prompt was cancelled.")
+				return answer(mode.requestKind + "|1|cancelled", 1)
+			}
+			let message = error[NSAppleScript.errorMessage] as? String ?? ""
+			let step = failedStep(message)
+			LauncherLog.write("\(mode.logName): the administrator shell failed with status \(number) at step "
+				+ (step ?? "unnamed") + ": " + oneLine(message) + ".")
+			let cause = step == nil ? nil : trailCause(message)
+			return answer(mode.requestKind + "|1|failed|" + String(number) + (step.map { "|" + $0 } ?? "")
+				+ (cause.map { "|" + $0 } ?? ""), 75)
+		}
+		let line = (output.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+		guard let relayed = relayedLine(line, mode: mode) else {
+			LauncherLog.write("\(mode.logName): the helper answered no closed result line.")
+			return answer(mode.requestKind + "|1|failed|unanswered", 75)
+		}
+		LauncherLog.write("\(mode.logName): the helper answered \(relayed).")
+		return answer(relayed, 0)
+	}
+
+	/// The helper's closed result line for this mode, or nil for anything else (another mode's line included).
+	/// - Parameters:
+	///   - line: The administrator shell's output, trimmed.
+	///   - mode: The transaction this role ran.
+	/// - Returns: The line to relay unchanged.
+	static func relayedLine(_ line: String, mode: Mode) -> String? {
+		let prefix = mode.helperKind + "|1|"
+		guard line.hasPrefix(prefix), mode.helperResults.contains(String(line.dropFirst(prefix.count))) else { return nil }
+		return line
+	}
+}

@@ -33,7 +33,7 @@ local function startup_slice(available)
 		menu = { start = function() facts.menu_calls = facts.menu_calls + 1; return available and {} or nil end },
 		package = { loaded = {} },
 		require = function(name)
-			helpers.assert_eq(name, "infra.vscode_bridge")
+			helpers.assert_eq(name, "core.network.engine.vscode_bridge")
 			facts.bridge_calls = facts.bridge_calls + 1
 			error("retired feature must not load or install")
 		end,

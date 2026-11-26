@@ -18,7 +18,7 @@
 ---    is mid-decision about a physical event, and an action that types (send_text)
 ---    must not start injecting before that decision has returned.
 --- 3. The key identity, the order and the default action are shared data
----    (_shared/modules/actions/tap_keys.json and the manifest's
+---    (_shared/shortcuts/data/actions/tap_keys.json and the manifest's
 ---    shortcuts.tap_keys entries), so the three drivers offer the same keys.
 --- 4. The menu names each key by what a tap on it types under the keymap the
 ---    session has loaded (adapters/keyboard_layout over infra/xkb_keymap), a dead
@@ -26,17 +26,17 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Paths = require("infra.paths")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Paths = require("core.fs.engine.paths")
 local AiActions = require("modules.shortcuts.ai_actions")
-local Manifest = require("infra.manifest_reader")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigKeys = require("config_keys")
+local Manifest = require("menu.engine.manifest_reader")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.tap_keys"
 
@@ -51,21 +51,17 @@ local BLOCKING_MODIFIERS = { "ctrl", "shift", "alt", "altgr", "meta" }
 -- The shared key list (tap_keys.json) in menu order and its published identity,
 -- shared with macOS.
 local TapKeys = ShortcutCatalogue.new_tap_keys({
-	keys_rel_path = "modules/actions/tap_keys.json",
+	keys_rel_path = "shortcuts/data/actions/tap_keys.json",
 	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
 	resolve_path = function(rel) return Paths.shared(rel) end,
 	read = function(path)
-		local handle = path and io.open(path, "r")
-		if not handle then error("tap_keys: cannot read " .. tostring(path)) end
-		local read_ok, body = pcall(handle.read, handle, "*a")
-		local close_ok, closed = pcall(handle.close, handle)
-		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-			error("tap_keys: cannot complete read of " .. tostring(path))
-		end
+		local body, status
+		if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
+		if status ~= "ok" then error("tap_keys: cannot read " .. tostring(path)) end
 		return body
 	end,
 	decode = function(body)
-		local ok, parsed = pcall(require("json").decode, body)
+		local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 		return ok and parsed or nil
 	end,
 	valid_entry = function(entry) return type(entry.id) == "string" and type(entry.linux) == "number" end,
@@ -82,6 +78,7 @@ local _is_active = NEVER_ACTIVE
 
 -- Injected by init(): queues a function for the next loop tick.
 local _defer = nil
+local _pause_epoch = nil
 local _configuration_owner = nil
 local _dispatch_generation = 0
 
@@ -176,7 +173,7 @@ end
 --- Reads every assignment from config.toml, or the manifest default.
 local function load_assignments()
 	if _assignments then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("tap_keys: cannot read configuration: " .. tostring(detail))
@@ -235,10 +232,25 @@ function M.set_action(id, action_id)
 			tostring(action_id), id)
 		return false
 	end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
+	local assignments, generation = _assignments, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or "")).assignments
+	end)
+	if not ok or type(expected) ~= "table" or _assignments ~= assignments
+		or _dispatch_generation ~= generation or _configuration_owner ~= nil then return false end
+	for key, value in pairs(assignments) do
+		if expected[key] ~= value then
+			Logger.warn(LOG, "Tap key configuration changed externally; reload shortcuts before editing.")
+			return false
+		end
+	end
+	for key, value in pairs(expected) do if assignments[key] ~= value then return false end end
 	local committed, detail = TomlWriter.batch_write(path, {
 		{ section = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, key = id, value = action_id },
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist tap key '%s': %s.", id, tostring(detail))
 		return false
@@ -261,13 +273,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_active = fn(action|nil) -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_active) ~= "function" or type(opts.defer) ~= "function" then
 		error("tap_keys.init() needs is_active and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("tap_keys.init() pause_epoch must be a function")
+	end
 	_is_active = opts.is_active
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
@@ -287,14 +304,28 @@ function M.on_key(detail)
 		if mods[name] then return false end
 	end
 	-- Initial admission is itself a foreign callback and can revoke this source.
-	local generation, active = _dispatch_generation, _is_active
+	local generation, active, epoch_reader = _dispatch_generation, _is_active, _pause_epoch
+	local epoch
+	if epoch_reader then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local action = M.get_action(id)
 	local function current()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active then return false end
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active
+			or not epoch_current() then return false end
 		-- Re-read at delivery: the AI may be switched off between press and run.
 		if AiActions.blocked(action) then return false end
 		local admitted = active(action)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation and _is_active == active
+			and epoch_current()
 	end
 	if action == "none" or not current() then return false end
 	if not _defer then
@@ -359,6 +390,7 @@ function M._reset()
 	_assignments = nil
 	_is_active = NEVER_ACTIVE
 	_defer = nil
+	_pause_epoch = nil
 end
 
 
@@ -431,7 +463,7 @@ BindingPublication.register(ShortcutCatalogue.TAP_OWNER, ShortcutCatalogue.TAP_M
 function M.capture_collision_inventory()
 	load_assignments()
 	if _configuration_owner ~= nil then return nil end
-	local Routes = require("infra.config_paths")
+	local Routes = require("settings.engine.paths")
 	local route, read, factory = Routes.config, TomlWriter.read_classified, M.capture_collision_inventory
 	local path = route("config.toml")
 	local bytes, status = read(path)
@@ -442,7 +474,7 @@ function M.capture_collision_inventory()
 	local function runtime()
 		if not rawequal(package.loaded["modules.shortcuts.tap_keys"], M) or _configuration_owner ~= nil
 			or _dispatch_generation ~= epoch or not rawequal(_assignments, actual) or not rawequal(TapKeys.loaded_keys(), keys)
-			or _is_active ~= active or not rawequal(package.loaded["infra.config_paths"], Routes)
+			or _is_active ~= active or not rawequal(package.loaded["settings.engine.paths"], Routes)
 			or Routes.config ~= route or TomlWriter.read_classified ~= read or M.capture_collision_inventory ~= factory then return false end
 		if #keys ~= #key_source then return false end
 		for index, key in ipairs(keys) do

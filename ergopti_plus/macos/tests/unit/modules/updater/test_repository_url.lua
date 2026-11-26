@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.repository_url_contract")(helpers)
+require("tests.lua.repository_url_contract")(helpers)

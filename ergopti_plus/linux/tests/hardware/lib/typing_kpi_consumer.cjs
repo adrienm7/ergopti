@@ -7,6 +7,27 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 /**
+ * Words a key as the page does before any language switch: the dashboard opens
+ * in French, and its units come from the shared catalogue (MET-12), not from
+ * literals in data.js.
+ * @param {string} root Repository root.
+ * @returns {function(string): string} The French text of a key; throws on a key the catalogue lacks.
+ */
+function frenchText(root) {
+	const catalogue = JSON.parse(
+		fs.readFileSync(
+			path.join(root, 'static/ergopti_plus/_shared/core/i18n/data/locales/fr.json'),
+			'utf8'
+		)
+	);
+	return (key) => {
+		if (typeof catalogue[key] !== 'string')
+			throw new Error('typing consumer: fr.json has no text for ' + key);
+		return catalogue[key];
+	};
+}
+
+/**
  * Creates an isolated dashboard consumer without replacing its selection logic.
  * @param {string} root Repository root.
  * @param {object} manifest Native or explicitly modeled manifest.
@@ -45,11 +66,20 @@ function createTypingConsumer(root, manifest) {
 		format_number: String,
 		escape_html: String,
 		render_apps_table: () => {},
-		_t: (key) => key,
+		_t: frenchText(root),
 		KEYCODE_NAMES: { 29: 'Left Ctrl' }
 	});
 	// data.js draws its colours through ThemeTokens, as the page loads it first.
 	require(path.join(root, 'tools/test/support/theme-tokens.cjs')).installThemeTokens(context);
+	// The page loads the shared manifest codec before the typing data owner.
+	vm.runInContext(
+		fs.readFileSync(
+			path.join(root, 'static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'),
+			'utf8'
+		),
+		context,
+		{ filename: 'metrics_manifest_keys.js' }
+	);
 	// The complete data owner brings its real helper closure, never policy stubs.
 	vm.runInContext(
 		fs.readFileSync(

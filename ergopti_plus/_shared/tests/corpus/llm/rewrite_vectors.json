@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for rewrite requests: the sentence a rewrite prompt rewrites (the exact suffix of the typed buffer) and the completion token budget for it. Replayed by the shared Lua module (_shared/lua/llm/rewrite.lua, used by macOS and Linux) and its AutoHotkey port.",
+	"description": "Golden vectors for rewrite requests: the sentence a rewrite prompt rewrites (the exact suffix of the typed buffer) and the completion token budget for it. Replayed by the shared Lua module (_shared/ai/engine/prediction/rewrite.lua, used by macOS and Linux) and its AutoHotkey port.",
 	"rule": "Skip trailing spacing, then the sentence's own final terminators (. ! ? …). Scan back to the last line break, or the last terminator followed by spacing; the span starts after it, without leading spacing, and runs to the end of the buffer. max_tokens = max(64, codepoints(span) * 2 + 16). A system prompt is a rewrite prompt when it contains REWRITE:.",
 	"sentence_vectors": [
 		{

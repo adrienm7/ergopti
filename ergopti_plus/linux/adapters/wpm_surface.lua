@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Draws a frame, decides nothing. The pill's colours, its text, the graph's
----    curve and when to show are _shared/lua/wpm_widget/model.lua's; this file
+---    curve and when to show are _shared/metrics/engine/wpm_widget_model.lua's; this file
 ---    only turns a frame into pixels, so macOS and Linux cannot drift apart on
 ---    anything but the pixels.
 --- 2. Its own window. It used to call a `show_widget` the preview renderer
@@ -22,11 +22,16 @@
 ---    keeps it.
 --- 5. Degrades to nothing. Without lgi, GTK or a display, is_available() is
 ---    false and every call is a no-op.
+--- 6. Named for AT-SPI. A cairo surface has no text Orca can read: while the
+---    desktop's screen reader is on, the window is named by the speed it draws
+---    (« 72 WPM »), as the Windows widget is, and the name is set only when it
+---    changes. Nothing is spoken: the speed changes on every refresh.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
 
 local LOG = "adapters.wpm_surface"
 
@@ -57,6 +62,8 @@ local _window = nil
 local _frame = nil
 local _drag = nil
 local _on_moved = nil
+-- The name the window carries for AT-SPI, "" for none set yet.
+local _accessible_name = ""
 
 --- Binds lgi and the GTK namespaces, or records that it cannot.
 --- @return table|nil
@@ -75,6 +82,13 @@ local function bind()
 			cairo = lgi.cairo,
 			Pango = lgi.require("Pango"),
 			PangoCairo = lgi.require("PangoCairo"),
+			GLib = lgi.GLib,
+			-- Names the window for AT-SPI; a machine without its
+			-- introspection data still draws.
+			Atk = (function()
+				local found, atk = pcall(lgi.require, "Atk")
+				return found and atk or nil
+			end)(),
 		}
 	end)
 	if not ok or type(bound) ~= "table" then
@@ -82,6 +96,7 @@ local function bind()
 		return nil
 	end
 	_gtk = bound
+	SystemA11y.ensure_started()
 	return _gtk
 end
 
@@ -265,6 +280,33 @@ local function ensure_window()
 	return _window
 end
 
+--- The speed a frame draws, as a screen reader says it (« 72 WPM »).
+--- @param frame table From the shared model.
+--- @return string|nil
+function M.readout(frame)
+	if type(frame.label) == "string" and frame.label ~= "" then return frame.label end
+	if type(frame.number) == "string" and type(frame.unit) == "string" then return frame.number .. " " .. frame.unit end
+	return nil
+end
+
+--- Names the window by the speed it draws while the screen reader is on, and
+--- only when that name changes: one AT-SPI call per new speed, none per tick.
+--- @param window userdata
+--- @param frame table
+--- @return boolean named True when a new name was set.
+local function name_for_readers(window, frame)
+	if not SystemA11y.settings().screen_reader then
+		_accessible_name = ""
+		return false
+	end
+	local text = M.readout(frame)
+	if not text or text == _accessible_name then return false end
+	local g = bind()
+	if not g or not SystemA11y.name_window(window, g.Atk, nil, text) then return false end
+	_accessible_name = text
+	return true
+end
+
 --- Shows `frame` with its top-left corner at (x, y). A drag in progress keeps
 --- the window where the user holds it.
 --- @param frame table From the shared model.
@@ -278,6 +320,7 @@ function M.draw(frame, x, y)
 	local called, drawn = pcall(function()
 		if window:resize(frame.width, frame.height) == false then return false end
 		if not _drag and window:move(math.floor(x + 0.5), math.floor(y + 0.5)) == false then return false end
+		name_for_readers(window, frame)
 		if not window:get_visible() and window:show_all() == false then return false end
 		if window:queue_draw() == false then return false end
 		return window:get_visible() == true
@@ -360,12 +403,40 @@ function M.pointer_position()
 	return x, y
 end
 
+--- Drains pending GTK events for the widget's window without blocking.
+---
+--- The widget owns its window and so its event delivery: a draw, a hide and a
+--- drag only reach the screen when the default GLib context is iterated, and
+--- the tray adapter (which also iterates it) exists only under --tray. Without
+--- this the floating widget stayed queued whenever the daemon ran without a
+--- tray, though Windows and macOS draw it independently of any tray.
+--- @param budget integer|nil Maximum iterations, default 32.
+--- @return integer Iterations performed (0 while no window exists).
+function M.pump(budget)
+	if not _window then return 0 end
+	local g = bind()
+	if not g then return 0 end
+	local context = g.GLib.MainContext.default()
+	local done = 0
+	for _ = 1, budget or 32 do
+		if not context:pending() then break end
+		context:iteration(false)
+		done = done + 1
+	end
+	return done
+end
+
+-- GTK can enter a Lua callback during any iteration, which LuaJIT forbids from
+-- compiled code (the tray's pump carries the same guard).
+if jit then jit.off(M.pump) end
+
 --- Destroys the window.
 function M.destroy()
 	if _window then pcall(function() _window:destroy() end) end
 	_window = nil
 	_frame = nil
 	_drag = nil
+	_accessible_name = ""
 end
 
 return M

@@ -1,0 +1,48 @@
+{
+	"_description": "What a layout's own repeat and magic keys type after a text (docs/design/magic-and-repeat-keys.md): one source for the Studio's analysis (LAYOUT_ANALYSIS.contextOutput, tools/test/test-layout-context-keys.cjs) and the three drivers' emulation. « before » is the output text typed so far, never the keys pressed; « types » is what the key types, the empty string when it types nothing. A repeat key types the character « repeat » places back; a magic key types its table's rule whose « after » is the longest end of the text, else the table's fallback. A context holds at most two characters (_shared/layouts/data/analysis/analysis_model.json, context_keys).",
+	"schema_version": 1,
+	"magic": {
+		"sfb": {
+			"rules": [
+				{ "after": "e", "types": "d" },
+				{ "after": "d", "types": "e" },
+				{ "after": "ce", "types": "s" },
+				{ "after": "é", "types": "😀" },
+				{ "after": "😀", "types": "é" }
+			],
+			"fallback": ""
+		},
+		"vowels": {
+			"rules": [
+				{ "after": "q", "types": "u" },
+				{ "after": "qu", "types": "e" }
+			],
+			"fallback": "a"
+		}
+	},
+	"vectors": [
+		{ "action": { "repeat": 1 }, "before": "", "types": "" },
+		{ "action": { "repeat": 1 }, "before": "a", "types": "a" },
+		{ "action": { "repeat": 1 }, "before": "book", "types": "k" },
+		{ "action": { "repeat": 1 }, "before": "ça é", "types": "é" },
+		{ "action": { "repeat": 1 }, "before": "x😀", "types": "😀" },
+		{ "action": { "repeat": 2 }, "before": "", "types": "" },
+		{ "action": { "repeat": 2 }, "before": "a", "types": "" },
+		{ "action": { "repeat": 2 }, "before": "ed", "types": "e" },
+		{ "action": { "repeat": 2 }, "before": "😀😀a", "types": "😀" },
+		{ "action": { "repeat": 2 }, "before": "a b", "types": " " },
+		{ "action": { "magic": "sfb" }, "before": "", "types": "" },
+		{ "action": { "magic": "sfb" }, "before": "the", "types": "d" },
+		{ "action": { "magic": "sfb" }, "before": "ed", "types": "e" },
+		{ "action": { "magic": "sfb" }, "before": "ace", "types": "s" },
+		{ "action": { "magic": "sfb" }, "before": "a e", "types": "d" },
+		{ "action": { "magic": "sfb" }, "before": "x", "types": "" },
+		{ "action": { "magic": "sfb" }, "before": "é", "types": "😀" },
+		{ "action": { "magic": "sfb" }, "before": "😀", "types": "é" },
+		{ "action": { "magic": "vowels" }, "before": "", "types": "a" },
+		{ "action": { "magic": "vowels" }, "before": "q", "types": "u" },
+		{ "action": { "magic": "vowels" }, "before": "qu", "types": "e" },
+		{ "action": { "magic": "vowels" }, "before": "u", "types": "a" },
+		{ "action": { "magic": "vowels" }, "before": "Q", "types": "a" }
+	]
+}

@@ -9,14 +9,14 @@
 
 local helpers = require("tests.helpers")
 local Native = require("luv")
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 local SourceFile = require("tests.support.source_file")
 local DIRECTORY_MODE = tonumber("700", 8)
 local FILE_MODE = tonumber("600", 8)
 local MARKER_VARIABLE = "ERGOPTI_SOURCE_CENSUS_PROBE_MARKER"
 local WINDOWS = package.config:sub(1, 1) == "\\"
 local helper_source = assert(Native.fs_realpath(assert(package.searchpath("tests.helpers", package.path))))
-local privacy_source = assert(Native.fs_realpath(helpers.shared("modules/diagnostics/redaction.json")))
+local privacy_source = assert(Native.fs_realpath(helpers.shared("diagnostics/data/redaction.json")))
 
 local units = {
 	storage = { anchor = "MODULE: Storage Adapter (Hammerspoon)" },
@@ -69,7 +69,7 @@ local function with_fixture(prefix, body)
 	end
 	function fixture.load()
 		fixture.copy(helper_source, fixture.driver .. "/tests/helpers/init.lua")
-		fixture.copy(privacy_source, root .. "/" .. prefix .. "/_shared/modules/diagnostics/redaction.json")
+		fixture.copy(privacy_source, root .. "/" .. prefix .. "/_shared/diagnostics/data/redaction.json")
 		return assert(loadfile(fixture.driver .. "/tests/helpers/init.lua"))()
 	end
 	function fixture.standard()

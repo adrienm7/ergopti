@@ -103,10 +103,10 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		RawTransitionCount++
 		Pos := Found + Match.Len
 	}
-	; Seven owner-internal transitions: the transactional Down, the retrying Up,
-	; the pass-through physical Up, and the owner's lift, re-press, raced-release
-	; Up and unless-owned release around an output (kana-altgr-lift-owner-2026-09-25,
-	; kana-altgr-user-hold-2026-09-25).
+	; Seven owner-internal transitions: transactional Down, retrying Up, physical
+	; Up, lift, restoration Down, unless-owned Up and the Up of the stray LCtrl a
+	; synthetic AltGr leaves that no ledger owns (issue #109). Restoration
+	; compensation reuses the retrying Up and cannot bypass the pending ledger.
 	AssertEqual(7, RawTransitionCount,
 		"the complete driver may contain only the owner-internal sustained transitions; every other sustained transition must route through an explicit owner")
 	PhysicalRelease := _DriverFuncBody("TapHoldReleasePhysicalKey")
@@ -114,8 +114,9 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		"the sole untracked sustained transition must remain the status-bearing physical-key release helper")
 	for Owner, Transition in Map(
 			"TapHoldLiftKey", 'TextPressKey(Name, "Up", false)',
-			"TapHoldRestoreLiftedKey", 'Ok := TextPressKey(Name, "Down", false)',
-			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)') {
+			"TapHoldRestoreLiftedKey", 'Ok := TextPressKey([Name], "Down", false, Transition)',
+			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)',
+			"_TH_ReleaseStrayAltGrLCtrl", 'Released := TextPressKey("LCtrl", "Up", false)') {
 		Body := _DriverFuncBody(Owner)
 		Assert(Body != "" and InStr(Body, Transition) > 0,
 			Owner . " must own its sustained transition and report its verdict")
@@ -212,8 +213,10 @@ _THSB_EverySyntheticDownCallerConsumesTheVerdict() {
 	while Found := RegExMatch(Src, Needle, &Match, Pos) {
 		Line := Match[0]
 		Pos := Found + Match.Len
-		if InStr(Line, "TapHoldSyntheticKeyDown(Key) {")
+		if RegExMatch(Line, "^\s*TapHoldSyntheticKeyDown\([^{}]*\)\s*\{")
 			continue
+		if RegExMatch(Line, "^\s*KeyDownFn\s*:=\s*\(Key\)\s*=>\s*TapHoldSyntheticKeyDown\(Key, Owner\)")
+			continue ; The unchanged verdict is consumed by the common owner below.
 		CallCount++
 		Assert(RegExMatch(Line, "i)^\s*if\b[^`r`n]*!\s*TapHoldSyntheticKeyDown\("),
 			"every synthetic Down caller must stop when ownership is not proven: " . Line)

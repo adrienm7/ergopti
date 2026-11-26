@@ -6,8 +6,12 @@
 			"description": "Key present in the active locale (fr) — no fallback needed",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "menu.hello": "Bonjour" },
-				"en": { "menu.hello": "Hello" }
+				"fr": {
+					"menu.hello": "Bonjour"
+				},
+				"en": {
+					"menu.hello": "Hello"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",
@@ -18,8 +22,12 @@
 			"description": "Key absent from active locale (fr) but found in en fallback",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "menu.goodbye": "Au revoir" },
-				"en": { "menu.hello": "Hello" }
+				"fr": {
+					"menu.goodbye": "Au revoir"
+				},
+				"en": {
+					"menu.hello": "Hello"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",
@@ -30,9 +38,15 @@
 			"description": "Key absent from active (de) and en, found only in fr fallback",
 			"active_locale": "de",
 			"locales": {
-				"de": { "menu.goodbye": "Tschüss" },
-				"en": { "menu.goodbye": "Goodbye" },
-				"fr": { "menu.hello": "Bonjour" }
+				"de": {
+					"menu.goodbye": "Tschüss"
+				},
+				"en": {
+					"menu.goodbye": "Goodbye"
+				},
+				"fr": {
+					"menu.hello": "Bonjour"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",
@@ -53,21 +67,25 @@
 		},
 		{
 			"id": "star_substitution_with_known_trigger",
-			"description": "★ placeholder replaced with the trigger character (e.g. '£')",
+			"description": "★ shown as the magic key's display, « ★ (£) », for another trigger character (_shared/hotstrings/data/magic_key.json)",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "hotstrings.trigger": "Appuyez sur ★ pour déclencher" }
+				"fr": {
+					"hotstrings.trigger": "Appuyez sur ★ pour déclencher"
+				}
 			},
 			"trigger": "£",
 			"key": "hotstrings.trigger",
-			"expected": "Appuyez sur £ pour déclencher"
+			"expected": "Appuyez sur ★ (£) pour déclencher"
 		},
 		{
 			"id": "star_substitution_no_trigger_provider",
 			"description": "★ remains literal when no trigger provider is set",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "hotstrings.trigger": "Appuyez sur ★" }
+				"fr": {
+					"hotstrings.trigger": "Appuyez sur ★"
+				}
 			},
 			"trigger": null,
 			"key": "hotstrings.trigger",
@@ -75,10 +93,12 @@
 		},
 		{
 			"id": "multiple_stars_in_same_string",
-			"description": "Multiple ★ characters all get replaced",
+			"description": "A ★ trigger shows every ★ as itself",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "multi.star": "★ et ★ et ★" }
+				"fr": {
+					"multi.star": "★ et ★ et ★"
+				}
 			},
 			"trigger": "★",
 			"key": "multi.star",
@@ -86,23 +106,29 @@
 		},
 		{
 			"id": "star_substitution_active_en_fallback",
-			"description": "★ substitution in a value retrieved from en fallback",
+			"description": "★ shown as « ★ (£) » in a value retrieved from en fallback",
 			"active_locale": "de",
 			"locales": {
 				"de": {},
-				"en": { "hotstrings.trigger": "Press ★ to fire" }
+				"en": {
+					"hotstrings.trigger": "Press ★ to fire"
+				}
 			},
 			"trigger": "£",
 			"key": "hotstrings.trigger",
-			"expected": "Press £ to fire"
+			"expected": "Press ★ (£) to fire"
 		},
 		{
 			"id": "locale_switch_rebuilds_cache",
 			"description": "After set_locale('en'), the active strings come from en, not fr",
 			"active_locale": "en",
 			"locales": {
-				"fr": { "menu.hello": "Bonjour" },
-				"en": { "menu.hello": "Hello" }
+				"fr": {
+					"menu.hello": "Bonjour"
+				},
+				"en": {
+					"menu.hello": "Hello"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",
@@ -113,8 +139,12 @@
 			"description": "A key whose value is '' (empty string) in the active locale falls through to en",
 			"active_locale": "fr",
 			"locales": {
-				"fr": { "menu.empty": "" },
-				"en": { "menu.empty": "Not empty" }
+				"fr": {
+					"menu.empty": ""
+				},
+				"en": {
+					"menu.empty": "Not empty"
+				}
 			},
 			"trigger": null,
 			"key": "menu.empty",
@@ -126,7 +156,9 @@
 			"active_locale": "en",
 			"locales": {
 				"en": {},
-				"fr": { "menu.hello": "Bonjour" }
+				"fr": {
+					"menu.hello": "Bonjour"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",
@@ -138,7 +170,9 @@
 			"active_locale": "fr",
 			"locales": {
 				"fr": {},
-				"en": { "menu.hello": "Hello" }
+				"en": {
+					"menu.hello": "Hello"
+				}
 			},
 			"trigger": null,
 			"key": "menu.hello",

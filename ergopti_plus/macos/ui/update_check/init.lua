@@ -14,7 +14,7 @@
 ---    offered channel to the launcher (adapters/update_launcher.lua), whose
 ---    Sparkle controller verifies, downloads, installs and relaunches.
 --- 2. The page's actions and phases are the shared session's
----    (_shared/lua/updater/check_session.lua), identical on Linux; this module
+---    (_shared/updater/engine/check_session.lua), identical on Linux; this module
 ---    only creates the window, forwards messages and wires the driver's owners.
 --- 3. Singleton: a second click focuses the open window and checks again, over
 ---    the owners of the menu session that asked. Only the exact window this
@@ -29,15 +29,15 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
-local DeferredWork   = require("infra.deferred_work")
-local i18n           = require("infra.i18n")
-local Paths          = require("infra.paths")
-local Json           = require("json")
-local CheckSession   = require("updater.check_session")
+local Logger         = require("core.logger.engine.logger")
+local DeferredWork   = require("core.timing.engine.deferred_work")
+local i18n           = require("core.i18n.engine.i18n")
+local Paths          = require("core.fs.engine.paths")
+local Json           = require("core.text.engine.json")
+local CheckSession   = require("updater.engine.check_session")
 local Updater        = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local WebviewResult  = require("adapters.webview_result")
+local WebviewResult  = require("core.ui.adapters.webview_result")
 
 local LOG = "update_check"
 
@@ -163,8 +163,8 @@ end
 --- Opens today's log in the default application.
 --- @return boolean opened
 local function open_today_log()
-	local ShellRunner = require("adapters.shell_runner")
-	return require("ui.log_openers").open_today_log(function(target) return (ShellRunner.open(target)) end)
+	local ShellRunner = require("core.process.adapters.shell_runner")
+	return require("diagnostics.ui.log_openers").open_today_log(function(target) return (ShellRunner.open(target)) end)
 end
 
 --- The session of one window, bound to that exact window and the menu's owners.
@@ -203,7 +203,7 @@ local function session_for(view, ctx)
 		end,
 		report = function(result, on_complete, is_current)
 			if not is_current() then return end
-			return require("ui.error_dialog").report({
+			return require("diagnostics.ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),
@@ -213,7 +213,7 @@ local function session_for(view, ctx)
 		end,
 		-- The notes pane's links: the session checked them against the repository
 		repository = function() return { owner = Updater.GH_OWNER, repo = Updater.GH_REPO } end,
-		open_url = function(url) return require("ui.ui_builder").open_http_url(url) == true end,
+		open_url = function(url) return require("core.ui.ui.builder").open_http_url(url) == true end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,
 		log_path = Logger.today_log_path,
@@ -246,7 +246,7 @@ function M.open(ctx)
 		Logger.error(LOG, "The update-check window needs the menu session's channel owner.")
 		return false
 	end
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui then
 		Logger.error(LOG, "The update-check window cannot open: ui_builder is unavailable.")
 		return false
@@ -254,7 +254,9 @@ function M.open(ctx)
 	if revision ~= _open_revision or package.loaded["ui.update_check"] ~= M then return false end
 	if _webview ~= nil then
 		local view = _webview
-		ui_builder.force_focus(view, false)
+		ui_builder.force_focus(view, false, { is_current = function()
+			return rawequal(_webview, view)
+		end })
 		if revision ~= _open_revision or _webview ~= view then return false end
 		retire_session()
 		if revision ~= _open_revision or _webview ~= view then return false end

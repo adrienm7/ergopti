@@ -4,8 +4,8 @@
 // launcher's main queue, which supervises the embedded Hammerspoon process
 // (a Sparkle modal once stalled that supervision in CI). One panel at
 // a time: a prompt with its buttons, or a progress bar. Closing a prompt with
-// its close button reports "no choice"; closing it programmatically reports
-// nothing.
+// its close button or Escape reports "no choice", and a progress window
+// reports its onClose; closing either programmatically reports nothing.
 
 import AppKit
 
@@ -25,9 +25,28 @@ private final class UpdatePromptAction: NSObject {
 	}
 }
 
+/// The update window. Escape closes it as its close button does (WCAG 2.1.2):
+/// the panel has no Cancel button carrying the Escape key equivalent, so a
+/// keyboard user had no way out of a prompt but a choice. The close goes
+/// through the delegate, which reports « no choice » and starts no download.
+final class UpdatePromptWindow: NSPanel {
+	/// The virtual key code of Escape (kVK_Escape, Carbon HIToolbox Events.h).
+	static let escapeKeyCode: UInt16 = 0x35
+
+	override func keyDown(with event: NSEvent) {
+		if event.keyCode == Self.escapeKeyCode && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
+			performClose(nil)
+			return
+		}
+		super.keyDown(with: event)
+	}
+}
+
 @MainActor
 final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegate {
 	private static let contentWidth: CGFloat = 400
+	/// Space between the window's edges and its content, on every side.
+	static let contentMargin: CGFloat = 20
 
 	private var panel: NSPanel?
 	private var actions: [UpdatePromptAction] = []
@@ -68,11 +87,23 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		show(title: prompt.title, rows: [heading, body, buttons], activate: activate)
 	}
 
-	func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?) {
+	func showProgress(_ text: UpdateProgressText, fraction: Double?,
+					  onCancel: (() -> Void)?, onClose: (() -> Void)?) {
 		if let indicator = progressIndicator, let message = progressMessage, let panel {
 			panel.title = WindowTitles.compose(text.title)
+			let changed = message.stringValue != text.message
 			message.stringValue = text.message
+			indicator.setAccessibilityLabel(text.message)
 			apply(fraction: fraction, to: indicator)
+			// A screen reader does not read a label that changes under it:
+			// the new step (checking, downloading, installing) is announced.
+			if changed {
+				NSAccessibility.post(element: message, notification: .announcementRequested, userInfo: [
+					.announcement: text.message,
+					.priority: NSAccessibilityPriorityLevel.medium.rawValue,
+				])
+			}
+			onUserClose = onClose
 			return
 		}
 		closeAll()
@@ -83,6 +114,9 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		indicator.minValue = 0
 		indicator.maxValue = 1
 		indicator.widthAnchor.constraint(equalToConstant: Self.contentWidth).isActive = true
+		// VoiceOver reads a bare bar as « progress indicator, 50 % » with no
+		// word on what progresses: the step's message names it.
+		indicator.setAccessibilityLabel(text.message)
 		apply(fraction: fraction, to: indicator)
 
 		var rows: [NSView] = [message, indicator]
@@ -93,8 +127,10 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 			}
 			actions.append(action)
 			rows.append(NSButton(title: cancelTitle, target: action, action: #selector(UpdatePromptAction.fire(_:))))
-			onUserClose = onCancel
 		}
+		// The close box is not Cancel: a download goes on when its window is
+		// closed (UPD-05); the caller says what closing means.
+		onUserClose = onClose
 		progressIndicator = indicator
 		progressMessage = message
 		show(title: text.title, rows: rows, activate: false)
@@ -151,10 +187,28 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		stack.orientation = .vertical
 		stack.alignment = .leading
 		stack.spacing = 12
-		stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+		stack.translatesAutoresizingMaskIntoConstraints = false
 
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth + 40, height: 120),
+		// The stack is pinned inside a plain content view on all four sides.
+		// As the window's own content view it took the window's autoresizing
+		// frame, so a row wider than the frame computed before layout (the
+		// progress bar, a long localized button row) ran into the right edge
+		// with no margin.
+		let content = NSView()
+		content.addSubview(stack)
+		NSLayoutConstraint.activate([
+			stack.topAnchor.constraint(equalTo: content.topAnchor, constant: Self.contentMargin),
+			stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: Self.contentMargin),
+			content.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: Self.contentMargin),
+			content.bottomAnchor.constraint(equalTo: stack.bottomAnchor, constant: Self.contentMargin),
+		])
+
+		// Measured before the view enters the window: a content view takes
+		// fixed autoresizing constraints from the window's frame, which would
+		// win over the rows' own widths.
+		let size = content.fittingSize
+		let panel = UpdatePromptWindow(
+			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.titled, .closable],
 			backing: .buffered,
 			defer: false)
@@ -163,8 +217,7 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		panel.hidesOnDeactivate = false
 		// Normal level: the prompt is ordered front (and focused when the user
 		// asked for it), never kept above the windows the user opens next.
-		panel.contentView = stack
-		panel.setContentSize(stack.fittingSize)
+		panel.contentView = content
 		panel.delegate = self
 		panel.center()
 		self.panel = panel

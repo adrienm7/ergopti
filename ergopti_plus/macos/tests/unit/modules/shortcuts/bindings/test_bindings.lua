@@ -12,14 +12,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
 -- at module level. The real implementation iterates hs.keycodes.map, which
 -- is not populated in the unit-test stub, so to_name would error. We provide
 -- the two fields that system.lua actually needs.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F18_WAKE_OS             = 79,
 	F19_LAYER_NAV_EXITED    = 80,
 	to_name = function(code)
@@ -31,7 +31,7 @@ package.loaded["infra.keycodes"] = {
 -- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
 -- shortcut labels. The real module depends on locale JSON files unavailable
 -- in unit tests.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -194,7 +194,7 @@ helpers.describe("shortcuts.bindings: public API", function()
 		-- Drift guard: the macOS default MUST equal the
 		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
 		-- silently diverge from the AHK driver, which reads the same default.
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
 	end)
 end)
@@ -231,10 +231,12 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("lists the Cmd+* switch that is not a catalogue action", function()
+	-- Cmd+★ → Cmd+S left on 2026-11-21 (the magic key is a configured character).
+	helpers.it("no longer lists the modifiers + magic key save switch", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.cmd_star, "missing shortcut: cmd_star")
+		helpers.assert_nil(seen.cmd_star, "retired switch still listed: cmd_star")
+		helpers.assert_true(seen.wrap_text_if_selected, "missing shortcut: wrap_text_if_selected")
 	end)
 
 	helpers.it("no longer lists the switches that became role-named slots", function()
@@ -245,12 +247,12 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("includes the standalone tap_keys and layer_wheel entries", function()
+	helpers.it("includes the standalone tap_keys entry and not the layer's wheel", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
 		helpers.assert_true(seen.tap_keys)
 		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
-		helpers.assert_true(seen.layer_wheel)
+		helpers.assert_nil(seen.layer_wheel, "the layer's wheel is no shortcut: modules/shortcuts/layer_wheel.lua")
 		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
@@ -261,12 +263,6 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("orders cmd_* entries before the catch-all bucket", function()
-		local idx = {}
-		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.cmd_star < idx.tap_keys)
-		helpers.assert_true(idx.cmd_star < idx.layer_wheel)
-	end)
 end)
 
 
@@ -285,33 +281,33 @@ helpers.describe("shortcuts.bindings: enable/disable", function()
 	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("is_bound is false before enable(), while the preference is on", function()
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("enable() binds the hotkey and keeps the preference on", function()
-		helpers.assert_eq(B.enable("cmd_star"), true)
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
-		helpers.assert_eq(B.is_bound("cmd_star"), true)
+		helpers.assert_eq(B.enable("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("enable() is idempotent — re-enabling does not crash", function()
-		B.enable("cmd_star")
-		B.enable("cmd_star")
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
-		helpers.assert_eq(B.is_bound("cmd_star"), true)
+		B.enable("wrap_text_if_selected")
+		B.enable("wrap_text_if_selected")
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("disable() unbinds the hotkey and switches the preference off", function()
-		helpers.assert_eq(B.disable("cmd_star"), true)
-		helpers.assert_eq(B.is_enabled("cmd_star"), false)
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
+		helpers.assert_eq(B.disable("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
 	end)
 
 	helpers.it("disable() is idempotent — disabling an inactive id does nothing", function()
-		B.disable("cmd_star")
-		helpers.assert_eq(B.is_enabled("cmd_star"), false)
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
+		B.disable("wrap_text_if_selected")
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
 	end)
 end)
 
@@ -410,6 +406,17 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 		local B = fresh_bindings()
 		B.set_chatgpt_url("")
 		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
+	end)
+
+	helpers.it("refuses a URL its value schema declaration refuses and keeps the current one", function()
+		local B = fresh_bindings()
+		local configured_url = "https://chatgpt.example.test/configured"
+		helpers.assert_eq(B.set_chatgpt_url(configured_url), true)
+		for _, refused in ipairs({ "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+			"https://line\nbreak", 42, "https://example.test/" .. string.rep("a", 2048) }) do
+			helpers.assert_eq(B.set_chatgpt_url(refused), false, tostring(refused))
+			helpers.assert_eq(B.get_chatgpt_url(), configured_url)
+		end
 	end)
 end)
 
@@ -636,6 +643,21 @@ helpers.describe("shortcuts.bindings: exact system-pixel child composition", fun
 end)
 
 helpers.describe("bindings effective URL snapshot", function()
+	helpers.it("keeps the configured conversation URL out of diagnostics", function()
+		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+		local logger = require("core.logger.engine.logger")
+		local original, logs = logger.debug, {}
+		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
+		local ok, result = pcall(subject.set_chatgpt_url, url)
+		logger.debug = original
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(subject.get_chatgpt_url(), url)
+		helpers.assert_true(not table.concat(logs, " "):find("private", 1, true),
+			"diagnostics must not contain the private conversation or prompt")
+	end)
+
 	helpers.it("reads the exact URL consumed by dispatch and settles its setter", function()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
 		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)

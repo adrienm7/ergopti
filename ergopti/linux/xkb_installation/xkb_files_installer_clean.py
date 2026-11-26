@@ -68,6 +68,8 @@ from layout_package import (  # noqa: E402
     VARIANT_PLUS,
     VARIANT_STANDARD,
     build_evdev_post,
+    inline_xcompose_block,
+    strip_xcompose_block,
     add_variant_alias,
     build_registry_xml,
     build_french_variant_symbols,
@@ -434,43 +436,19 @@ def write_user_text(
         temporary.unlink(missing_ok=True)
 
 
-def compose_include_line(source: Path) -> str:
-    escaped = str(source).replace("\\", "\\\\").replace('"', '\\"')
-    return f'include "{escaped}"'
-
-
-def strip_owned_xcompose_block(content: str) -> tuple[list[str], bool]:
-    """Remove the exact marker and its following include, never adjacent user data."""
-    lines = content.splitlines()
-    kept: list[str] = []
-    removed = False
-    index = 0
-    while index < len(lines):
-        if lines[index].strip() != XCOMPOSE_OWNER_MARKER:
-            kept.append(lines[index])
-            index += 1
-            continue
-        removed = True
-        index += 1
-        if index < len(lines) and lines[index].lstrip().startswith('include "'):
-            index += 1
-    return kept, removed
-
-
 def install_user_xcompose(source: Path, home: Path | None = None) -> bool:
-    """Append one owned include while preserving the user's Compose rules."""
+    """Append the owned block (the rules inline) while preserving the user's Compose rules."""
     resolved_home, uid, gid = resolve_user_identity()
     if home is not None:
         resolved_home, uid, gid = home, None, None
     destination = resolved_home / ".XCompose"
     try:
         existing = destination.read_text(encoding="utf-8") if destination.exists() else ""
-        kept, _ = strip_owned_xcompose_block(existing)
-        include_line = compose_include_line(source)
-        content = "\n".join(kept)
-        if content and not content.endswith("\n"):
-            content += "\n"
-        content += f"{XCOMPOSE_OWNER_MARKER}\n{include_line}\n"
+        kept, _ = strip_xcompose_block(existing, XCOMPOSE_OWNER_MARKER)
+        block = inline_xcompose_block(
+            XCOMPOSE_OWNER_MARKER, [(source, source.read_text(encoding="utf-8"))]
+        )
+        content = "\n".join(kept + block) + "\n"
         if destination.exists() and destination.read_text(encoding="utf-8") == content:
             print("   ℹ️  Inclusion ~/.XCompose déjà en place.")
             return False
@@ -492,7 +470,7 @@ def remove_user_xcompose_include(home: Path | None = None) -> CleanupStatus:
         return CleanupStatus.ABSENT
     try:
         existing = destination.read_text(encoding="utf-8")
-        kept, removed = strip_owned_xcompose_block(existing)
+        kept, removed = strip_xcompose_block(existing, XCOMPOSE_OWNER_MARKER)
         if not removed:
             return CleanupStatus.ABSENT
         content = "\n".join(kept)

@@ -15,7 +15,7 @@
  *    with Escape for keyboard users.
  * 3. Custom Find-in-Page: window.find() is unreliable in Hammerspoon's WKWebView.
  *    Instead we walk all visible text nodes with a TreeWalker, wrap matches in
- *    <span class="find-highlight"> elements, and navigate between them while
+ *    <mark class="find-highlight"> elements, and navigate between them while
  *    displaying an "i / n" counter.  A full re-scan runs whenever the query
  *    changes; same-query presses only advance the index.  If the table re-renders
  *    mid-search the stale spans are detected and a transparent re-scan fires.
@@ -42,6 +42,12 @@ window.apply_quick_date_range = apply_quick_date_range;
 window.toggle_hs_source = toggle_hs_source;
 window.toggle_llm_source = toggle_llm_source;
 window.reset_filters = reset_filters;
+
+// Export and Purge (maintenance.js)
+window.ask_metrics_maintenance = ask_metrics_maintenance;
+window.cancel_metrics_maintenance = cancel_metrics_maintenance;
+window.confirm_metrics_maintenance = confirm_metrics_maintenance;
+window.complete_metrics_maintenance = complete_metrics_maintenance;
 
 // Table interactions
 window.switch_tab = switch_tab;
@@ -81,7 +87,7 @@ window.find_in_page = find_in_page;
 // =================================
 
 // Internal state — all private (underscore prefix, not exported)
-let _find_matches = []; // Ordered array of .find-highlight <span> elements
+let _find_matches = []; // Ordered array of .find-highlight <mark> elements
 let _find_index = -1; // Index of the currently active match
 let _find_query = ''; // Lower-cased query that produced _find_matches
 
@@ -113,12 +119,12 @@ function close_find_bar() {
 }
 
 /**
- * Removes every .find-highlight span from the DOM, restoring plain text nodes.
+ * Removes every .find-highlight mark from the DOM, restoring plain text nodes.
  * Adjacent text nodes are merged afterwards so the DOM stays clean.
  */
 function _clear_highlights() {
 	const parents = new Set();
-	document.querySelectorAll('span.find-highlight').forEach((span) => {
+	document.querySelectorAll('mark.find-highlight').forEach((span) => {
 		const parent = span.parentNode;
 		if (!parent) return;
 		parent.replaceChild(document.createTextNode(span.textContent), span);
@@ -135,7 +141,7 @@ function _clear_highlights() {
 /**
  * Walks all visible text nodes in document.body and wraps every occurrence of
  * lower_query (matched case-insensitively against the original text) in a
- * <span class="find-highlight">. Populates _find_matches with the new spans.
+ * <mark class="find-highlight">. Populates _find_matches with the new spans.
  * @param {string} lower_query - Already lower-cased search string.
  */
 function _scan_and_highlight(lower_query) {
@@ -192,7 +198,7 @@ function _scan_and_highlight(lower_query) {
 			if (start > last_idx) {
 				fragment.appendChild(document.createTextNode(text.slice(last_idx, start)));
 			}
-			const span = document.createElement('span');
+			const span = document.createElement('mark');
 			span.className = 'find-highlight';
 			span.textContent = text.slice(start, end);
 			fragment.appendChild(span);
@@ -308,6 +314,30 @@ function find_in_page(forward) {
 // Generated media labels are rendered again after the actual locale changes.
 document.addEventListener('i18n:applied', render_media_keys);
 
+// The heatmap's key names come from the locale: name them again once it lands.
+document.addEventListener('i18n:applied', () => {
+	if (window.keycode_layout_source)
+		window.keycode_layout = name_keycode_layout(window.keycode_layout_source, window.driver_meta);
+});
+
+// The remaining record labels are rendered from accepted data rather than
+// data-i18n attributes. Refresh them after a late native locale delivery.
+document.addEventListener('i18n:applied', () => {
+	render_sfb_kpi();
+	render_lexical_kpi();
+	render_rhythm_kpi();
+	render_sessions_kpi();
+	render_charmix_kpi();
+	render_records_kpi();
+	_render_activity_calendar();
+	render_apps_kpi();
+	// The units, headings and tables of the views read the locale too: data
+	// published before a fetched locale landed (Windows) showed their keys
+	// (ui_typing.unit_mpm). Draw them again from the data already accepted.
+	if (app_state.did_apply_initial_reset) compute_manifest_metrics();
+	apply_local_filters();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
 	// Set Chart.js default tick/label color based on system color scheme.
 	// The default rgba(0,0,0,0.6) is nearly invisible in dark mode.
@@ -324,8 +354,16 @@ document.addEventListener('DOMContentLoaded', () => {
 			show_find_bar();
 			return;
 		}
-		// Escape → close find bar first, then app modal if open
+		// Escape → hide a shown tooltip first, then close the find bar, then the
+		// app modal if open
 		if (e.key === 'Escape') {
+			const shown = Array.from(
+				document.querySelectorAll('.tooltip:hover, .tooltip:focus-visible')
+			).filter((tip) => !tip.classList.contains('tooltip-dismissed'));
+			if (shown.length) {
+				shown.forEach((tip) => tip.classList.add('tooltip-dismissed'));
+				return;
+			}
 			const find_bar = document.getElementById('find_bar');
 			if (find_bar && find_bar.style.display !== 'none') {
 				close_find_bar();
@@ -355,6 +393,49 @@ document.addEventListener('DOMContentLoaded', () => {
 		});
 	}
 
+	// A table box that scrolls takes the keyboard focus, named by its card's
+	// heading, so its rows scroll without a pointer (WCAG 2.1.1); a box that fits
+	// is no stop. Its rows and its visibility change after every render.
+	document.querySelectorAll('.ekpi-table-wrap').forEach((box) => {
+		// The card's heading: a box can sit deeper than its card's first level.
+		const card = box.closest('.expanded-kpi-block') || box.parentElement;
+		const heading = card && card.querySelector('h2, h3');
+		const sync = () => {
+			// The heading's own words, without its info tooltip; empty until translated.
+			let name = '';
+			if (heading) {
+				const words = heading.cloneNode(true);
+				words.querySelectorAll('.tooltip').forEach((tip) => tip.remove());
+				name = words.textContent.replace(/\s+/g, ' ').trim();
+			}
+			if (box.scrollHeight > box.clientHeight || box.scrollWidth > box.clientWidth) {
+				box.tabIndex = 0;
+				// A region needs its name: an unnamed box stays a plain focusable box.
+				if (name) {
+					box.setAttribute('role', 'region');
+					box.setAttribute('aria-label', name);
+				} else {
+					box.removeAttribute('role');
+					box.removeAttribute('aria-label');
+				}
+			} else {
+				box.removeAttribute('tabindex');
+				box.removeAttribute('role');
+				box.removeAttribute('aria-label');
+			}
+		};
+		new MutationObserver(sync).observe(box, { childList: true, subtree: true });
+		// The heading is translated after this runs: name the box again then.
+		if (heading)
+			new MutationObserver(sync).observe(heading, {
+				childList: true,
+				subtree: true,
+				characterData: true
+			});
+		new ResizeObserver(sync).observe(box);
+		sync();
+	});
+
 	// Close the app filter modal when clicking outside the modal-content box
 	const modal = document.getElementById('app_modal');
 	if (modal) {
@@ -366,27 +447,33 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Smart tooltip positioning: flip to the left when the tooltip would overflow the
 	// right edge of the viewport. Uses event delegation so dynamically injected tooltips
 	// (KPI cards rebuilt by data.js) are handled without re-binding.
-	document.addEventListener(
-		'mouseenter',
-		(e) => {
-			// e.target may be a text node when mouseenter bubbles in capture-mode
-			// from document — text nodes have no .closest(). Guard with Element.
-			if (!(e.target instanceof Element)) return;
-			const tooltip = e.target.closest('.tooltip');
-			if (!tooltip) return;
-			const text_box = tooltip.querySelector('.tooltiptext');
-			if (!text_box) return;
-			// Temporarily make it visible at zero opacity to measure its bounding rect
-			text_box.style.visibility = 'hidden';
-			text_box.style.opacity = '0';
-			text_box.style.display = 'block';
-			const rect = text_box.getBoundingClientRect();
-			const overflow = rect.right > window.innerWidth - 8;
-			text_box.style.display = '';
-			text_box.style.visibility = '';
-			text_box.style.opacity = '';
-			tooltip.classList.toggle('tooltip-left', overflow);
-		},
-		true
-	);
+	// The keyboard focus shows a tooltip as the pointer does, so it is placed
+	// the same way; a tooltip hidden by Escape shows again once left.
+	const place_tooltip = (e) => {
+		// e.target may be a text node when mouseenter bubbles in capture-mode
+		// from document — text nodes have no .closest(). Guard with Element.
+		if (!(e.target instanceof Element)) return;
+		const tooltip = e.target.closest('.tooltip');
+		if (!tooltip) return;
+		const text_box = tooltip.querySelector('.tooltiptext');
+		if (!text_box) return;
+		// Temporarily make it visible at zero opacity to measure its bounding rect
+		text_box.style.visibility = 'hidden';
+		text_box.style.opacity = '0';
+		text_box.style.display = 'block';
+		const rect = text_box.getBoundingClientRect();
+		const overflow = rect.right > window.innerWidth - 8;
+		text_box.style.display = '';
+		text_box.style.visibility = '';
+		text_box.style.opacity = '';
+		tooltip.classList.toggle('tooltip-left', overflow);
+	};
+	document.addEventListener('mouseenter', place_tooltip, true);
+	document.addEventListener('focusin', place_tooltip);
+	const rearm_tooltip = (e) => {
+		if (e.target instanceof Element && e.target.matches('.tooltip'))
+			e.target.classList.remove('tooltip-dismissed');
+	};
+	document.addEventListener('mouseleave', rearm_tooltip, true);
+	document.addEventListener('focusout', rearm_tooltip);
 });

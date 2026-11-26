@@ -21,20 +21,20 @@
 ; ================================
 ; ================================
 
-; Jitter parameters -- mirrored from Hammerspoon's AWAKE_JITTER_* constants
-global AWAKE_TICK_MIN_MS   := 1000  ; Minimum interval between ticks
-global AWAKE_TICK_MAX_MS   := 5000  ; Maximum interval between ticks
-global AWAKE_JITTER_PX     := 80    ; Max pixel offset around origin per tick
-global AWAKE_RETURN_MS     := 200   ; Delay before returning cursor to origin
+; The jitter radius, the tick bounds and the return delay are the shared
+; registry's [keep_awake], which macOS reads too.
 
 ; Origin captured at toggle-on; shared between Start and SimulateActivity
 global AwakeOriginX := 0, AwakeOriginY := 0
+
+; GetTickCount64 at the session's start: its length is the day's awake_ms.
+global AwakeStartedTick := 0
 
 ; InputHook used to detect any real keypress while keep-awake is active
 global AwakeInputHook := ""
 
 StartActivitySimulation(*) {
-		global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+		global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook, AwakeStartedTick
 		; Tray callbacks remain available while native Suspend is active. Refuse
 		; a new session here because its timers and InputHook bypass Suspend.
 		if A_IsSuspended
@@ -48,11 +48,13 @@ StartActivitySimulation(*) {
 				return false
 		}
 		ActivitySimulation := True
+		AwakeStartedTick := DllCall("GetTickCount64", "Int64")
 		; Capture the current cursor position as the jitter origin
-		MouseGetPos(&AwakeOriginX, &AwakeOriginY)
+		Position := MCGetPos()
+		AwakeOriginX := Position["x"], AwakeOriginY := Position["y"]
 		; Reset the user-move baseline so the first tick never self-cancels
 		SimulateActivity(True)
-		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+		SetTimer(SimulateActivity, AwakeNextTickMs())
 		; Arm mouse-button cancel hooks
 		; These arm the CANCELLATION paths — swallowing a failure silently would leave
 		; keep-awake running with no way for the user to interrupt it (§5.3: never
@@ -73,7 +75,7 @@ StartActivitySimulation(*) {
 				return false
 		}
 		; Start a fast timer to instantly detect if the user moves the mouse
-		SetTimer(AwakeCheckMouseMoved, 150)
+		SetTimer(AwakeCheckMouseMoved, TimingsGet("keep_awake", "mouse_check_poll_ms"))
 		; Use InputHook to detect any keypress -- does not conflict with other hotkeys
 		try {
 				AwakeInputHook := AwakeCreateCancellationHook()
@@ -87,21 +89,50 @@ StartActivitySimulation(*) {
 				StopActivitySimulation(false)
 				return false
 		}
-		try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
+		LoggerInfo("shortcuts", "Keep-awake started.")
+		try NotifierSend(t("keepawake.started"), Map("title", t("keepawake.title")))
 		return true
 }
 
+; The next jitter tick, drawn between the shared [keep_awake] bounds.
+AwakeNextTickMs() {
+		return Random(TimingsGet("keep_awake", "tick_min_ms"), TimingsGet("keep_awake", "tick_max_ms"))
+}
+
+; The largest jitter offset per axis, and the move that marks the user's own
+; mouse: the shared [keep_awake] jitter_px, an integer so Random draws whole
+; pixels.
+AwakeJitterPx() {
+		return TimingsGet("keep_awake", "jitter_px")
+}
+
+; Credits a finished session to the day's awake_ms, as macOS and Linux do
+; (maintainer decision KMD-3): a passive_period row of kind awake.
+; @param StartedTick {Integer} GetTickCount64 at the session's start.
+; @returns {Integer} True once the metrics owner accepted the session.
+AwakeCreditSession(StartedTick) {
+		DurationMs := Max(0, DllCall("GetTickCount64", "Int64") - StartedTick)
+		if !IsSet(KL_RecordAwakeSession)
+				return false
+		try Credited := KL_RecordAwakeSession(DurationMs)
+		catch as Err {
+				LoggerWarn("shortcuts", "The keep-awake session was not credited to the metrics: {1}.", Err.Message)
+				return false
+		}
+		if Credited != true
+				LoggerWarn("shortcuts", "The keep-awake session was not credited to the metrics.")
+		return Credited == true
+}
+
+; Ctrl+M: the anti-sleep mode runs the active preset, keep awake, automatic
+; clicks or both (modules/shortcuts/auto_click.ahk); a second press stops both.
 ToggleActivitySimulation(*) {
 		global ActivitySimulation
-		if ActivitySimulation {
-				StopActivitySimulation()
-		} else {
-				StartActivitySimulation()
-		}
+		return AutoClickToggleMode(StartActivitySimulation, StopActivitySimulation, (*) => ActivitySimulation)
 }
 
 StopActivitySimulation(Notify := true) {
-		global ActivitySimulation, AwakeInputHook
+		global ActivitySimulation, AwakeInputHook, AwakeStartedTick
 		; Ergopti_OnSuspendEnter calls this unconditionally on every pause so
 		; keep-awake can never outlive a suspend ("pause = tout eteint"
 		; invariant). Capture the prior state so the "stopped" toast below only
@@ -121,8 +152,14 @@ StopActivitySimulation(Notify := true) {
 		try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
 		; Stop the keypress detector
 		HookStopped := AwakeStopCancellationHook()
+		if WasActive {
+				LoggerInfo("shortcuts", "Keep-awake stopped.")
+				AwakeCreditSession(AwakeStartedTick)
+		}
+		; One short notice for every end (toggle, user activity, pause), the same
+		; key on the three OS (maintainer decision SNU-12, 21 November 2026).
 		if WasActive and Notify
-				try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+				try NotifierSend(t("shortcuts.keep_awake_ended"), Map("title", t("keepawake.title")))
 		return HookStopped
 }
 
@@ -162,8 +199,10 @@ AwakeCheckMouseMoved() {
 		global ActivitySimulation, AwakeOriginX, AwakeOriginY
 		if not ActivitySimulation
 				return
-		MouseGetPos(&CurX, &CurY)
-		if (Abs(CurX - AwakeOriginX) > AWAKE_JITTER_PX or Abs(CurY - AwakeOriginY) > AWAKE_JITTER_PX) {
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
+		JitterPx := AwakeJitterPx()
+		if (Abs(CurX - AwakeOriginX) > JitterPx or Abs(CurY - AwakeOriginY) > JitterPx) {
 				SetTimer(StopActivitySimulation, -1)
 		}
 }
@@ -178,6 +217,9 @@ AwakeCancelOnMouse(*) {
 }
 
 AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
+		global ActivitySimulation, AwakeInputHook
+		if !IsObject(ih) || ih != AwakeInputHook
+				return
 		if A_IsSuspended
 				return
 		; Ignore key presses with modifiers to prevent the trigger hotkey
@@ -190,8 +232,7 @@ AwakeCancelOnKeypress(ih, arg1:="", arg2:="") {
 						or GetKeyState(KS_AltGrKeyName())
 						return
 		}
-		global ActivitySimulation
-		if ActivitySimulation {
+		if ih == AwakeInputHook && ActivitySimulation {
 				StopActivitySimulation()
 		}
 }
@@ -234,17 +275,19 @@ SimulateActivity(ResetOnly := False) {
 				return
 		}
 
-		; If the cursor moved more than AWAKE_JITTER_PX from where we left it,
+		; If the cursor moved more than the jitter radius from where we left it,
 		; the user touched the mouse or touchpad -- stop without moving again.
-		MouseGetPos(&CurX, &CurY)
-		if (LastX != -1 and (Abs(CurX - LastX) > AWAKE_JITTER_PX or Abs(CurY - LastY) > AWAKE_JITTER_PX)) {
+		JitterPx := AwakeJitterPx()
+		Position := MCGetPos()
+		CurX := Position["x"], CurY := Position["y"]
+		if (LastX != -1 and (Abs(CurX - LastX) > JitterPx or Abs(CurY - LastY) > JitterPx)) {
 				StopActivitySimulation()
 				return
 		}
 
-		; Move to a random offset around the captured origin (+-AWAKE_JITTER_PX)
-		OffX := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
-		OffY := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
+		; Move to a random offset around the captured origin (+-JitterPx)
+		OffX := Random(-JitterPx, JitterPx)
+		OffY := Random(-JitterPx, JitterPx)
 		MCSetPos(AwakeOriginX + OffX, AwakeOriginY + OffY)
 
 		; Signal OS activity without a visible keystroke
@@ -255,11 +298,11 @@ SimulateActivity(ResetOnly := False) {
 		LastY := AwakeOriginY + OffY
 
 		; Return to origin via a separate one-shot timer -- avoids blocking the thread
-		; with Sleep(), which would delay input-cancel detection by up to AWAKE_RETURN_MS
-		SetTimer(AwakeReturnToOrigin, -AWAKE_RETURN_MS)
+		; with Sleep(), which would delay input-cancel detection by up to the return delay
+		SetTimer(AwakeReturnToOrigin, -TimingsGet("keep_awake", "return_delay_ms"))
 
 		; Re-schedule the next tick at a new random interval
-		SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+		SetTimer(SimulateActivity, AwakeNextTickMs())
 }
 
 
@@ -289,12 +332,28 @@ _SearchSelectionReady(Text, SearchInExplorer) {
 ; searched. A target that is recognised but cannot be opened (a path that
 ; does not exist, a bare file name) is reported, never searched instead:
 ; the user asked to open that thing.
-SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
+; Only the native absence receipts allow trying a punctuation-stripped path.
+_SearchPathStatus(Path) {
+		try {
+				Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
+				if (Attributes != 0xFFFFFFFF)
+						return "present"
+				NativeError := A_LastError
+				return (NativeError == 2 || NativeError == 3) ? "absent" : "error"
+		} catch {
+				return "error"
+		}
+}
+
+SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, PathStatusFn := _SearchPathStatus) {
 		Target := OpenTarget_Classify(SelectedText)
 		Kind := Target["kind"]
 		Value := Target["target"]
 		if (Kind == "empty") {
-				try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine"])
+				; A search address its shared value schema declaration refuses
+				; throws before the launch and is logged below.
+				try LaunchFn.Call(ValueCheckRequire(ConfigKey.SHORTCUTS_SEARCH_SEARCH_ENGINE,
+						Features["shortcuts"][ConfigLeaf.SEARCH][ConfigLeaf.SEARCH_ENGINE]))
 				catch as SearchError {
 						LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
 				}
@@ -303,7 +362,8 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
 		if (Kind == "search") {
 				; Preserve the existing CRLF-to-space selection policy, then encode one component.
 				Query := UriEncode(StrReplace(Value, "`r`n", " "))
-				try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine_url_query"] . Query)
+				try LaunchFn.Call(ValueCheckRequire(ConfigKey.SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY,
+						Features["shortcuts"][ConfigLeaf.SEARCH][ConfigLeaf.SEARCH_ENGINE_URL_QUERY]) . Query)
 				catch as SearchError {
 						LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
 				}
@@ -311,6 +371,17 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
 		}
 		LoggerStart("Search", "Opening the selected {1} '{2}'…", Kind, Value)
 		if (Kind == "path") {
+				if Target.Has("exact_path") {
+						try Status := PathStatusFn.Call(Target["exact_path"])
+						catch
+								Status := "error"
+						if (Status != "present" && Status != "absent") {
+								ReportFn.Call("open_target.open_failed", Target["exact_path"], "exact selected path could not be inspected")
+								return false
+						}
+						if (Status == "present")
+								Value := Target["exact_path"]
+				}
 				if !FileExist(Value) {
 						ReportFn.Call("open_target.missing_path", Value, "no file or folder exists at that path")
 						return false
@@ -359,7 +430,7 @@ SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
 ; @param {String} Reason English detail for the log.
 _SearchReportUnopened(MessageKey, Target, Reason) {
 		LoggerError("Search", "Could not open '{1}': {2}.", Target, Reason)
-		try TrayTip(StrReplace(t(MessageKey), "%s", Target), "ErgoptiPlus", "Iconx Mute")
+		try NotifierSend(StrReplace(t(MessageKey), "%s", Target), Map("level", "error"))
 		catch as Err {
 				LoggerError("Search", "The notice for '{1}' could not be shown: {2}.", Target, Err.Message)
 		}
@@ -403,7 +474,7 @@ _RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
 						A_IsSuspended ? "driver paused" : "selection command superseded")
 				return false
 		}
-		RunFn.Call("Regedit.exe")
+		RunFn.Call(ShellRunner_SystemProgramCommand("regedit.exe"))
 		return true
 }
 
@@ -498,7 +569,7 @@ OpenDownloads(*) {
 				return _OpenDownloadsWith(GetKnownFolderDownloads, Run)
 		} catch as Err {
 				LoggerError("Shortcuts", "OpenDownloads failed: {1}", Err.Message)
-				try TrayTip(t("notify.open_downloads_failed"), "ErgoptiPlus", "Iconx Mute")
+				try NotifierSend(t("notify.open_downloads_failed"), Map("level", "error"))
 				return false
 		}
 }
@@ -507,7 +578,7 @@ OpenDownloads(*) {
 ; folder redirected by the user or by company policy.
 _OpenDownloadsWith(ResolveFn, LaunchFn) {
 		DownloadsPath := ResolveFn.Call()
-		LaunchFn.Call('explorer.exe "' DownloadsPath '"')
+		LaunchFn.Call(ShellRunner_SystemProgramCommand("explorer.exe", '"' . DownloadsPath . '"'))
 		return true
 }
 
@@ -547,4 +618,4 @@ GetKnownFolderDownloads(CallFn := DllCall) {
 		}
 }
 
-; UriDecode is defined in infra/text_utils.ahk and visible globally.
+; UriDecode is defined in core/text/engine/utils.ahk and visible globally.

@@ -3,7 +3,7 @@
 --- Runs the finite read-only helper with exact task ownership and pinned identity.
 --- Native HID and combined-session receipts remain distinct from Quartz tap ACKs.
 local M = {}
-local Environment = require("infra.launcher_environment")
+local Environment = require("core.lifecycle.engine.launcher_environment")
 local KEYS = { [54] = true, [55] = true, [56] = true, [60] = true,
 	[58] = true, [61] = true, [59] = true, [62] = true, [48] = true }
 local MASK = 0x9E0000

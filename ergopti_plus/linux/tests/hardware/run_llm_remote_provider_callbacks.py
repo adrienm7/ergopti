@@ -22,15 +22,14 @@ def expected_payload(owner, fmt):
                 "max_tokens": 40,
                 "stream": False,
             },
+            # An empty system prompt is left out, as OpenAI's system turn is.
             "anthropic": {
                 "model": "fixture-model",
-                "system": "",
                 "messages": [{"role": "user", "content": "fixture prompt"}],
                 "temperature": 0.25,
                 "max_tokens": 40,
             },
             "gemini": {
-                "systemInstruction": {"parts": [{"text": ""}]},
                 "contents": [{"role": "user", "parts": [{"text": "fixture prompt"}]}],
                 "generationConfig": {"temperature": 0.25, "maxOutputTokens": 40},
             },

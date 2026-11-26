@@ -19,12 +19,12 @@ local hs          = hs
 local text_acts   = require("modules.shortcuts.actions.text")
 local sys_acts    = require("modules.shortcuts.actions.system")
 local app_acts    = require("modules.shortcuts.actions.apps")
-local Logger      = require("infra.logger")
-local i18n        = require("infra.i18n")
-local Manifest    = require("infra.manifest_reader")
+local Logger      = require("core.logger.engine.logger")
+local i18n        = require("core.i18n.engine.i18n")
+local Manifest    = require("menu.engine.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.bindings"
@@ -83,8 +83,6 @@ local refusal_retry
 
 local EXACT_RELEASE_IDS = {
 	tap_keys = true,
-	layer_wheel = true,
-	cmd_star = true,
 	wrap_text_if_selected = true,
 }
 
@@ -227,7 +225,7 @@ local function decide_tap_key(keycode, keyboard_type)
 	local action, binding = TapKeys.decide(keycode, keyboard_type)
 	if not action then return nil end
 	return function()
-		local GestActions = require("modules.gestures.actions")
+		local GestActions = require("gestures.engine.actions")
 		return GestActions.execute_single(action, binding)
 	end
 end
@@ -237,56 +235,13 @@ end
 hotkey_labels.tap_keys = i18n.get("menu.shortcuts.header_tap_keys")
 hotkey_defs.tap_keys   = function()
 	-- Read before the tap starts: its callback may only consult memory.
-	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	return sys_acts.bind_tap_keys(delivery_admitted, decide_tap_key)
 end
 
 local function has_tap_key_assignments()
-	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	TapKeys.ensure_loaded(require("gestures.engine.actions").is_assignable)
 	return TapKeys.has_assignments()
-end
-
--- The navigation layer's wheel bindings (layers.toml WheelUp, WheelDown…),
--- which Karabiner cannot take. Not a toggle and not a preference: like the tap
--- keys, the owner is derived from the file, so a layer that binds no wheel
--- direction holds no scroll tap, and a direction it leaves unbound scrolls.
--- Read when the owner is bound: layers.toml writers reconcile it
--- (M.reconcile_layer_wheel), and a hand edit applies at the next start.
-local layer_wheel_slots = { vertical = {}, horizontal = {} }
-
---- Reads the layer's wheel bindings from layers.toml.
---- @return boolean bound True when the layer binds at least one wheel direction.
-local function load_layer_wheel()
-	-- Required here, not at load: the layer data reads the configuration folder.
-	local ok, layer = xpcall(function() return require("platform.remap.nav_layer").load() end,
-		debug.traceback)
-	if not ok or type(layer) ~= "table" or type(layer.wheel) ~= "table" then
-		-- NavLayer.load() raises only on a broken shipped registry or vocabulary,
-		-- which the Karabiner regeneration reports too: no wheel runs meanwhile.
-		Logger.error(LOG, "The navigation layer's wheel bindings could not be read: %s.", tostring(layer))
-		layer_wheel_slots = { vertical = {}, horizontal = {} }
-		return false
-	end
-	layer_wheel_slots = layer.wheel
-	for _, directions in pairs(layer_wheel_slots) do
-		if next(directions) ~= nil then return true end
-	end
-	return false
-end
-
---- The loaded binding for one direction of the wheel. Memory only: asked
---- inside the scroll eventtap.
---- @param axis string "vertical" or "horizontal".
---- @param direction number 1 or -1.
---- @return table|nil slot
-local function layer_wheel_slot(axis, direction)
-	local directions = layer_wheel_slots[axis]
-	return directions and directions[direction] or nil
-end
-
-hotkey_labels.layer_wheel = i18n.get("layer_editor.window_title")
-hotkey_defs.layer_wheel   = function()
-	return sys_acts.bind_layer_wheel(delivery_admitted, layer_wheel_slot)
 end
 
 hotkey_labels.wrap_text_if_selected = i18n.get("shortcuts.label_wrap_text")
@@ -295,22 +250,15 @@ hotkey_defs.wrap_text_if_selected   = function()
 		get_live_wrap_pairs, delivery_admitted)
 end
 
--- Fixed shortcuts that are not catalogue actions. The Ctrl-letter chords (Ctrl+G
--- included since schema v20) and Cmd+Shift+V are role-named keyboard slots now;
--- see keyboard_shortcuts.lua.
-hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
-hotkey_defs.cmd_star   = function()
-	-- Pass the log callback so bind_cmd_star can log the re-fired Cmd+S
-	return sys_acts.bind_cmd_star(log_shortcut, delivery_admitted)
-end
-
+-- The Ctrl-letter chords (Ctrl+G included since schema v20) and Cmd+Shift+V are
+-- role-named keyboard slots now; see keyboard_shortcuts.lua.
 -- A master enable is not a preset import. Each child starts from its own
 -- neutral desired value and may later be enabled explicitly behind any fence.
 for name in pairs(hotkey_defs) do
 	-- Dispatcher ownership is derived from assignments when the layer starts;
-	-- there is deliberately no shortcuts.keys.tap_keys preference, nor one for
-	-- the layer's wheel, derived from layers.toml.
-	_disabled_set[name] = name == "tap_keys" or name == "layer_wheel"
+	-- there is deliberately no shortcuts.keys.tap_keys preference. The
+	-- navigation layer's wheel is no shortcut: modules/shortcuts/layer_wheel.lua.
+	_disabled_set[name] = name == "tap_keys"
 		or not Manifest.default_for("shortcuts.keys." .. name)
 end
 
@@ -665,7 +613,6 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 	end
 
 	_disabled_set.tap_keys = not has_tap_key_assignments()
-	_disabled_set.layer_wheel = not load_layer_wheel()
 	pending_refusals = {}
 	-- Only the layer's lifecycle is all-or-nothing: a pause or stop landing
 	-- mid-start must leave no published hotkey. Each hotkey is an independent
@@ -994,7 +941,6 @@ function M.enable(name)
 		return false
 	end
 	if name == "tap_keys" and not has_tap_key_assignments() then return M.disable(name) end
-	if name == "layer_wheel" and not load_layer_wheel() then return M.disable(name) end
 	if not admission_open() then
 		_disabled_set[name] = nil
 		Logger.debug(LOG, "Hotkey '%s' enabled while the layer is paused — it binds on resume.", name)
@@ -1073,21 +1019,6 @@ function M.reconcile_tap_keys()
 	return M.enable("tap_keys")
 end
 
---- Reconciles the navigation layer's wheel owner after layers.toml was written:
---- reads the file's wheel bindings again, which a bound owner runs from its
---- next turn of the wheel, and binds or releases the owner as the file binds
---- a direction or none. A stopped or paused layer retains the intent, and its
---- start reads the file again.
---- @return boolean committed
-function M.reconcile_layer_wheel()
-	if start_attempt ~= nil then return false end
-	if not started or not admission_open() then
-		_disabled_set.layer_wheel = not load_layer_wheel() or nil
-		return true
-	end
-	return M.enable("layer_wheel")
-end
-
 --- Returns the user's preference for a named hotkey, whatever the layer's
 --- lifecycle. This is what config.toml persists and the menu checks: a pause,
 --- Shortcuts OFF or a layout rebind releases the native hotkey, never the
@@ -1108,8 +1039,8 @@ end
 --- Builds a sort key that groups shortcuts in display order:
 ---   1) ctrl + single letter (ctrl_a … ctrl_z)
 ---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
----   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
----   4) everything else (tap_keys, layer_wheel — never listed by the menu)
+---   3) cmd shortcuts (cmd_shift_v, …)
+---   4) everything else (tap_keys — never listed by the menu)
 --- Within each group items sort alphabetically by id.
 --- @param id string The shortcut identifier.
 --- @return string Opaque sort key.
@@ -1139,10 +1070,22 @@ end
 --- so the action always reflects config.toml (the SSoT) instead of the hardcoded
 --- manifest default. No re-arm is needed: the action reads M.get_chatgpt_url()
 --- on every run rather than capturing the value once.
+--- A URL its shared value schema declaration refuses (another scheme, a
+--- space or control character, past 2048 characters) fails fast with a log
+--- line and leaves the current one in place.
 --- @param url string|nil The configured URL, or nil to fall back to the default.
+--- @return boolean applied
 function M.set_chatgpt_url(url)
+	if url ~= nil and url ~= "" then
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.SHORTCUTS_CHATGPT_URL), url)
+		if not checked.ok then
+			Logger.error(LOG, "ChatGPT URL refused by its value schema declaration (%s).", checked.reason)
+			return false
+		end
+	end
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
-	Logger.debug(LOG, "chatgpt_url updated: %s.", tostring(_chatgpt_url))
+	Logger.debug(LOG, "ChatGPT URL updated.")
 	return true
 end
 

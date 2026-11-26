@@ -24,15 +24,15 @@
 
 local M = {}
 
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Updater = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "updater.channel"
 
 -- The flat preference key mapped to config.toml [updater] channel by
--- infra/preferences.lua.
+-- settings/engine/preferences/preferences.lua.
 M.STATE_KEY = ConfigKeys.COMMAND.UPDATE_CHANNEL
 
 --- Creates the channel owner of one menu session.

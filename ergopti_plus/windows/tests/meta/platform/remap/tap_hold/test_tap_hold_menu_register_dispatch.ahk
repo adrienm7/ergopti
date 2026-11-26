@@ -7,7 +7,7 @@
 ;
 ; The Tap-Hold submenu's actionable items used raw Menu.Add(Label, Callback) for
 ; every callback. AHK 2.0's WM_COMMAND -> menu-callback dispatch silently drops
-; ~1 click in 3. infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry
+; ~1 click in 3. menu/engine/dispatcher.ahk installs a parallel WM_COMMAND retry
 ; path, but ONLY for items registered via RegisterMenuItem(MenuObj, Label, Cb).
 ;
 ; Since the Tap-Hold block used raw .Add, those items were never in the retry

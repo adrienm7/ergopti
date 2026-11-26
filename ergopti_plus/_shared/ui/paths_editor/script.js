@@ -8,6 +8,7 @@
 
 // Full payload received from Lua on init
 let _data = null;
+let initialized = false;
 
 // Locale strings — populated by initData; used by _t() and applyDomStrings()
 let _strings = {};
@@ -106,6 +107,7 @@ const _post = makeHostBridge('hsPaths');
  * @param {Object} data - {configDir, defaultConfigDir, logsDir, defaultLogsDir, strings}
  */
 window.initData = function (data) {
+	if (initialized) return;
 	_data = data;
 	if (data.strings) {
 		_strings = data.strings;
@@ -117,6 +119,7 @@ window.initData = function (data) {
 		if (shown) shown.textContent = data[field.fallback] || '';
 		setField(name, data[field.current] || data[field.fallback] || '');
 	});
+	initialized = true;
 };
 
 /**

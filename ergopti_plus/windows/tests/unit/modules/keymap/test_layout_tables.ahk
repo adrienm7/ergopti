@@ -635,8 +635,10 @@ _WHR_Literal(Text) {
 }
 
 _WHR_Script() {
-	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
-	Code .= '#Include ' . _DriverDir . '\infra\text_utils.ahk' . "`n"
+	; The admitted async-selection branch needs TapHoldNewOwner, absent here, so
+	; its helpers stay unreferenced at run time; unset load warnings are off.
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn VarUnset, Off`n"
+	Code .= '#Include ' . _DriverDir . '\core\text\engine\utils.ahk' . "`n"
 	for Name in ["WrapTextIfSelected", "UpdateLastSentCharacter", "_LSCPush", "_LSCResetFrom", "GetLastSentCharacterAt"] {
 		Definition := _DriverFuncBody(Name)
 		Assert(Definition != "", "the native wrap fixture needs the real production definition: " . Name)
@@ -646,8 +648,14 @@ _WHR_Script() {
 	Code .= 'global _LSC_CAP := 16, _LSC_RING := [], _LSC_CURSOR := 0, _LSC_LEN := 0' . "`n"
 	Code .= 'global _WH_Output := "", _WH_Stamped := "", _WH_SendOk := true' . "`n"
 	Code .= 'WrapSymbols_IsEnabled(*) => true`nGetUIASelection() => "selected"`n'
+	; No saved custom pair: the rows below are the layout descriptor delimiters.
+	Code .= 'WrapSymbols_CustomPairFor(*) => ""`nglobal _UIA_SelectionCache := 0`n'
 	Code .= 'AppState_TouchLastSentKey(Text) {`nglobal _WH_Stamped`n_WH_Stamped := Text`n}' . "`n"
-	Code .= 'SendInstant(Text) {`nglobal _WH_Output, _WH_SendOk`nif !_WH_SendOk`nreturn false`n_WH_Output := Text`nreturn true`n}' . "`n"
+	; This existing logical suffix/ring fixture models one stable input target.
+	; Real target changes are qualified by the separate native renderer probes.
+	Code .= '_SendInstantCaptureTarget() => Map("hwnd", 1, "control", 2, "pid", 3)' . "`n"
+	Code .= '_SendInstantTargetCurrent(Target) => Target is Map && Target["hwnd"] == 1 && Target["control"] == 2 && Target["pid"] == 3' . "`n"
+	Code .= 'SendInstant(Text, Prefix := "", ExpectedTarget := unset) {`nglobal _WH_Output, _WH_SendOk`nif !_WH_SendOk`nreturn false`n_WH_Output := Text`nreturn true`n}' . "`n"
 	Code .= 'SendNewResult(Text) {`nglobal _WH_Output`n_WH_Output := Text`nUpdateLastSentCharacter(Text)`n}' . "`n"
 	Rows := [["(", "(", ")", ")", true], [")", "(", ")", ")", true],
 		["[", "[", "]", "]", true], ["*", "*", "*", "*", true],
@@ -684,7 +692,7 @@ _WHR_ActualWrappingHistory() {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], _WHR_Completed.Bind(State))
 		AssertTrue(Handle.start(), "the real wrapping definitions must start in their native fixture")
 		Started := A_TickCount
-		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+		while State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

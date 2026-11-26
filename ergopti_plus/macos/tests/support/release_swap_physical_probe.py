@@ -180,10 +180,14 @@ def copy_mutant(program):
         raise ValueError("The occupied-path mutation needs its exact source")
     start, end = program.index(first), program.index(last) + len(last)
     program = program[:start] + program[end:]
-    statement = "replacement_path_clear || exit 8\n"
-    if program.count(statement) != 2:
-        raise ValueError("Both occupied-path admissions must remain present")
-    return program.replace(statement, "")
+    # Three admissions: before the successor's boot check, before restoring the
+    # previous app when that check fails, and before the final restore.
+    statement = "replacement_path_clear || exit 8"
+    lines = program.split("\n")
+    admissions = [line for line in lines if line.strip() == statement]
+    if len(admissions) != 3 or program.count(statement) != 3:
+        raise ValueError("All three occupied-path admissions must remain present")
+    return "\n".join(line for line in lines if line.strip() != statement)
 
 
 def native_stat_port(arguments):

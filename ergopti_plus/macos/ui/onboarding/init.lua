@@ -17,30 +17,30 @@
 ---    catalogue and they reach config.toml in one versioned batch_write, then
 ---    hs.reload() starts every module from the file. The Tap-Holds page's
 ---    checked keys go to the remap owner, which imports their recommendation
----    into config_karabiner.toml and switches the Tap-Holds on there. A key
+---    into tap_hold.toml and switches the Tap-Holds on there. A key
 ---    whose recommended hold enters the navigation layer brings Ergopti's
 ---    recommended layer along when the folder has no layers.toml of its own.
 --- 4. Re-run shows the values in force: the page receives the configured value
 ---    of every wizard path, for the folder it opens on and for any folder the
 ---    user picks, the tap-hold keys and switch included, which the remap owner
----    reports from that folder's config_karabiner.toml.
+---    reports from that folder's tap_hold.toml.
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
-local NativePath = require("native_path")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local NativePath = require("core.fs.engine.native_path")
 
-local i18n         = require("infra.i18n")
-local toml_writer  = require("infra.toml.writer")
-local toml_codec   = require("infra.toml.codec")
-local notifications = require("infra.notifications")
-local Paths        = require("infra.paths")
-local Logger       = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
-local ManifestReader = require("infra.manifest_reader")
-local FileSystem    = require("adapters.file_system")
-local Answers       = require("onboarding_answers")
-local Json          = require("json")
+local i18n         = require("core.i18n.engine.i18n")
+local toml_writer  = require("core.text.engine.toml.writer")
+local toml_codec   = require("core.text.engine.toml.codec")
+local notifications = require("core.ui.engine.notifications")
+local Paths        = require("core.fs.engine.paths")
+local Logger       = require("core.logger.engine.logger")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local ManifestReader = require("menu.engine.manifest_reader")
+local FileSystem    = require("core.fs.adapters.file_system")
+local Answers       = require("onboarding.engine.answers")
+local Json          = require("core.text.engine.json")
 local LOG          = "onboarding"
 
 -- The catalogue platform this host reads and the id the config migration
@@ -62,9 +62,12 @@ local RELOAD_DELAY_SEC = 1.5
 -- the wizard reloads without its answer: its deployment waits on the remap
 -- guardian (20 s at most to register) and the lease, never on the user.
 local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
+-- How long the reload waits for the live number-row rebuild of a stored order.
+local NUMBER_ROW_APPLY_TIMEOUT_SEC = 20
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
+local _config_path_unresolved = false
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
@@ -75,11 +78,11 @@ local _publication = nil
 local function publication_owner()
 	if not _publication then
 		local native_write, native_read = toml_writer.batch_write, FileSystem.read_with_status
-		_publication = require("onboarding_publication").new({
+		_publication = require("onboarding.engine.publication").new({
 			files = FileSystem, write = native_write, current = function()
 				return rawequal(package.loaded["ui.onboarding"], M)
-					and rawequal(package.loaded["infra.toml.writer"], toml_writer)
-					and rawequal(package.loaded["adapters.file_system"], FileSystem)
+					and rawequal(package.loaded["core.text.engine.toml.writer"], toml_writer)
+					and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem)
 					and toml_writer.batch_write == native_write and FileSystem.read_with_status == native_read
 			end,
 		})
@@ -87,7 +90,7 @@ local function publication_owner()
 	return _publication
 end
 
--- Keeps each tap-hold import's backup of config_karabiner.toml unique.
+-- Keeps each tap-hold import's backup of tap_hold.toml unique.
 local _backup_sequence = 0
 
 -- WebView + usercontent bridge state (singleton)
@@ -95,6 +98,10 @@ local _webview      = nil
 local _usercontent  = nil
 local _closing_webview = nil
 local _focus_owner = nil
+-- The language chosen on the wizard's first step. The running script keeps its
+-- own until Finish commits it, as on Windows (_ob_locale) and Linux: a wizard
+-- closed before Finish leaves the menus in the saved language.
+local _selected_locale = nil
 
 -- Absolute path to the assets folder. The onboarding frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
@@ -174,7 +181,7 @@ end
 --- @return boolean applied
 local function retitle(owner, view, title)
 	if not publication_is_current(owner, view) then return false end
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui or type(ui_builder) ~= "table" or type(ui_builder.set_window_title) ~= "function" then
 		Logger.error(LOG, "Onboarding window title cannot follow the locale; ui_builder is unavailable.")
 		return false
@@ -188,7 +195,7 @@ end
 --- @param config_dir string|nil Folder from the wizard field.
 --- @return string Absolute metrics directory.
 function M._metrics_path_for(config_dir)
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local dir = (type(config_dir) == "string" and config_dir ~= "") and config_dir
 		or ConfigPaths.get_config_dir()
 	return ConfigPaths.metrics_dir(dir)
@@ -225,7 +232,7 @@ end
 --- @param code string Locale code.
 --- @return table|nil strings
 local function locale_strings(code)
-	local text, detail = read_shared("data/locales/" .. tostring(code) .. ".json")
+	local text, detail = read_shared("core/i18n/data/locales/" .. tostring(code) .. ".json")
 	local strings = text and Json.decode(text) or nil
 	if type(strings) ~= "table" then
 		Logger.error(LOG, "Onboarding locale '%s' is unavailable (%s).", tostring(code),
@@ -233,6 +240,26 @@ local function locale_strings(code)
 		return nil
 	end
 	return strings
+end
+
+--- The language the wizard speaks: the one chosen on its first step, else the
+--- running script's.
+--- @return string
+local function wizard_locale()
+	return _selected_locale or i18n.get_locale()
+end
+
+--- A host string in the wizard's language, read from that locale file without
+--- switching the running script; the running lookup answers when it fails.
+--- @param key string Locale key.
+--- @return string
+local function wizard_text(key)
+	if _selected_locale ~= nil and _selected_locale ~= i18n.get_locale() then
+		local strings = locale_strings(_selected_locale)
+		local text = strings and strings[key]
+		if type(text) == "string" and text ~= "" then return text end
+	end
+	return i18n.get(key)
 end
 
 --- Whether a locale code is one this build ships.
@@ -256,12 +283,12 @@ function M.config_values(decoded, mark)
 	return Answers.current_values(catalogue(), decoded, mark)
 end
 
---- The config_karabiner.toml beside a config.toml: the remap settings of the
+--- The tap_hold.toml beside a config.toml: the remap settings of the
 --- same configuration folder, named as the path resolver names them.
 --- @param config_path string Absolute config.toml path.
 --- @return string
 local function remap_settings_beside(config_path)
-	local name = NativePath.basename(require("infra.config_paths").get("KarabinerConfigPath"))
+	local name = NativePath.basename(require("settings.engine.paths").get("TapHoldConfigPath"))
 	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
 	return folder .. "/" .. name
@@ -347,17 +374,90 @@ end
 
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
+--- The number-row order capability the page asks, as the Linux bridge answers
+--- it: true when a layout of ours types now (the menu's own availability,
+--- modules/keymap/number_row_live.lua), else the locale key of why not.
+--- @return boolean|string
+function M._number_row_capability()
+	local called, available, why = pcall(function() return M._number_row_live().available() end)
+	if called and available == true then return true end
+	if not called then
+		Logger.error(LOG, "The number-row capability could not be read: %s.", tostring(available))
+	end
+	if called then Logger.debug(LOG, "The wizard greys the number-row order: %s.", tostring(why)) end
+	return "platform_reason.number_row_live_no_layout"
+end
+
+--- The live number-row owner; a test seam.
+function M._number_row_live() return require("modules.keymap.number_row_live") end
+
+--- The number-row order a batch writes, or nil when it writes none.
+--- @param rows table The batch's `{ section, key, value | delete }` rows.
+--- @return string|nil order
+function M._number_row_order_written(rows)
+	for _, row in ipairs(rows or {}) do
+		if row.section == "layout" and row.key == require("settings.engine.keys").LEAF.DIRECT_ACCESS_DIGITS and type(row.value) == "string" then
+			return row.value
+		end
+	end
+	return nil
+end
+
+--- Applies a number-row order the wizard stored to the typing layout, as the
+--- menu row does, then runs `done`: a reload started earlier would cut the
+--- rebuild short. A refused application keeps the stored choice and still
+--- runs `done`, so the rest of the answers apply.
+--- @param order string The stored order ("native", "digits", "symbols").
+--- @param config_path string The config.toml the answers were written to.
+--- @param done function Called once the application has settled.
+function M._apply_number_row_then(order, config_path, done)
+	-- The edges option is the menu's, kept as config.toml holds it.
+	local edges = false
+	local content, status = FileSystem.read_with_status(config_path)
+	local decoded_ok, decoded = false, nil
+	if status == "ok" and type(content) == "string" then decoded_ok, decoded = pcall(toml_codec.decode, content) end
+	if decoded_ok and type(decoded) == "table" and type(decoded.layout) == "table" then
+		edges = decoded.layout.number_row_reorder_edges == true
+	end
+	local settled = false
+	local function settle()
+		if settled then return end
+		settled = true
+		done()
+	end
+	if DeferredWork.after(NUMBER_ROW_APPLY_TIMEOUT_SEC, function()
+		if not settled then Logger.warn(LOG, "The onboarding number-row rebuild did not answer; the reload goes on.") end
+		settle()
+	end, "onboarding.number_row") ~= true then
+		Logger.error(LOG, "The onboarding number-row rebuild could not be bounded; the reload goes on now.")
+		return settle()
+	end
+	local dispatched, dispatch_err = pcall(M._number_row_live().apply, { order = order, edges = edges },
+		function(applied, code)
+			if applied then
+				Logger.success(LOG, "The onboarding number-row order %s is applied to the typing layout.", order)
+			else
+				Logger.warn(LOG, "The onboarding number-row order %s is stored, not applied: %s.", order, tostring(code))
+			end
+			settle()
+		end)
+	if not dispatched then
+		Logger.error(LOG, "The onboarding number-row order could not be applied: %s.", tostring(dispatch_err))
+		settle()
+	end
+end
+
 local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) then return end
 
-	local current_locale = i18n.get_locale()
+	local current_locale = wizard_locale()
 	local strings = locale_strings(current_locale)
 	if not strings then return end
 
 	-- Resolve the current + default config directories so the wizard can
 	-- pre-fill the input when the driver uses a custom folder.
 	local cur_config_dir, default_config_dir = "", ""
-	local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+	local ok_mp, menu_paths = pcall(require, "settings.ui.menu.paths")
 	if ok_mp and menu_paths then
 		local ok1, v1 = pcall(menu_paths.get_config_dir)
 		if ok1 and type(v1) == "string" then cur_config_dir = v1 end
@@ -367,13 +467,9 @@ local function inject_init_data(owner, view, config_path)
 		end
 	end
 
-	-- The active input source ("U.S.", "French", "Ergopti") lets the hotstrings
-	-- page propose a trigger character the user can type.
-	local system_layout = ""
-	pcall(function()
-		local v = hs.keycodes.currentLayout()
-		if type(v) == "string" then system_layout = v end
-	end)
+	-- The hotstrings page proposes the layout's own magic key default (ù on
+	-- AZERTY, ; on QWERTY, ★ elsewhere), the value an untouched trigger keeps.
+	local magic_key_default = require("hotstrings.engine.magic_key_display").layout_default()
 
 	if not publication_is_current(owner, view) or _config_path ~= config_path then return end
 	local values = current_values(config_path)
@@ -394,8 +490,14 @@ local function inject_init_data(owner, view, config_path)
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	local _, admitted = submit_data(owner, view, "initData", {
 		platform           = CATALOGUE_DRIVER,
-		-- Gesture registration with the system is a Windows host action only.
-		capabilities       = { gesture_registration = false },
+		-- Gesture registration with the system is a Windows host action only. The
+		-- number-row order is rebuilt live into the layout of ours typing now.
+		capabilities       = {
+			gesture_registration = false,
+			-- A Unix path is read literally: a trailing space is part of a valid name.
+			literal_absolute_paths = true,
+			number_row_live = M._number_row_capability(),
+		},
 		locale             = current_locale,
 		strings            = strings,
 		-- One locale order for the wizard and every tray language menu.
@@ -405,7 +507,7 @@ local function inject_init_data(owner, view, config_path)
 		empty_config_dir   = empty_config_dir,
 		-- Empty when the folder is the OS default.
 		config_dir         = config_dir,
-		system_layout      = system_layout,
+		magic_key_default  = magic_key_default,
 		current            = values,
 		metrics_path       = metrics_path,
 	}, config_path)
@@ -498,18 +600,17 @@ end
 --- MenuPaths so a config-dir change made moments earlier is honoured. Pure apart
 --- from the injected resolver, so the retarget is testable without a webview.
 --- @param menu_paths table The ui.menu.menu_paths module (or a test double).
---- @param fallback string Path to keep when the resolver yields nothing usable.
---- @return string Absolute path to config.toml.
+--- @param fallback string Previously captured path, used only for diagnostics.
+--- @return string|nil Absolute path to config.toml, or nil on resolution failure.
 function M._resolve_commit_path(menu_paths, fallback)
 	if type(menu_paths) ~= "table" or type(menu_paths.get) ~= "function" then
-		return fallback
+		return nil
 	end
 	local ok, resolved = pcall(menu_paths.get, CONFIG_TOML_PATH_KEY)
-	-- A resolver that throws or hands back anything but a usable path must never
-	-- redirect the write: keeping the fallback still lands the answers somewhere
-	-- readable, whereas an empty target would drop them on the floor.
-	if not ok or type(resolved) ~= "string" or resolved == "" then
-		return fallback
+	-- The old capture is no longer authoritative once the folder changed.
+	if not ok or type(resolved) ~= "string" or not NativePath.is_absolute(resolved)
+		or resolved:find("\0", 1, true) then
+		return nil
 	end
 	if resolved ~= fallback then
 		Logger.info(LOG, "Config write retargeted to '%s' (was '%s').", resolved, tostring(fallback))
@@ -569,7 +670,7 @@ end
 --- @param body string Localised alert body.
 local function fail_commit(title_key, body)
 	close_webview()
-	require("infra.dialog_util").block_alert(i18n.get(title_key), body, i18n.get("onboarding.btn.ok"))
+	require("core.ui.engine.dialog_util").block_alert(wizard_text(title_key), body, wizard_text("onboarding.btn.ok"))
 end
 
 --- Versions a config.toml the wizard is about to write: the boot migration
@@ -579,12 +680,16 @@ end
 --- @return boolean writable
 --- @return string|nil detail
 local function prepare_destination(path)
-	local ConfigMigrate = require("config_migrate")
+	local ConfigMigrate = require("settings.engine.migration.migrate")
+	-- The v22 step moves the tap-hold rows out of the tap_hold.toml beside it.
+	local tap_hold_path = (require("core.fs.engine.native_path").directory_prefix(path) or "")
+		.. require("tap_hold.engine.shared_file").FILE_NAME
 	local result = ConfigMigrate.boot({
 		path          = path,
 		driver        = MIGRATION_DRIVER,
 		registry_path = Paths.shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = FileSystem,
+		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	if result.read_only then return false, result.detail end
 	return true
@@ -605,7 +710,7 @@ local function import_tap_holds(keys, moved, on_done)
 		on_done(false, "the remap owner is unavailable: " .. tostring(Remap))
 		return
 	end
-	local ok_path, path = pcall(require("infra.config_paths").get, "KarabinerConfigPath")
+	local ok_path, path = pcall(require("settings.engine.paths").get, "TapHoldConfigPath")
 	if not ok_path then
 		on_done(false, "the remap settings file cannot be resolved: " .. tostring(path))
 		return
@@ -635,7 +740,7 @@ local function import_nav_layer(keys)
 		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
 			return nil, false
 		end
-		local imported = NavLayer.import_recommended({ config_dir = require("infra.config_paths").get_config_dir() })
+		local imported = NavLayer.import_owned({ config_dir = require("settings.engine.paths").get_config_dir() })
 		return imported, imported == nil
 	end)
 	if not ok then
@@ -651,8 +756,8 @@ end
 --- @param after function|nil Work to run once the user dismissed it.
 local function deferred_notice(key, after)
 	local scheduled = DeferredWork.after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("onboarding.error.title"), i18n.get(key),
-			i18n.get("onboarding.btn.ok"))
+		require("core.ui.engine.dialog_util").block_alert(wizard_text("onboarding.error.title"), wizard_text(key),
+			wizard_text("onboarding.btn.ok"))
 		if after then after() end
 	end, "onboarding.notice")
 	if scheduled ~= true then
@@ -667,7 +772,7 @@ end
 --- Karabiner lease was taken this session, and the reload wrapper reloads
 --- natively, as it does for every caller.
 local function reload_applying_answers()
-	local TerminationCoordinator = require("infra.termination_coordinator")
+	local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 	if TerminationCoordinator.is_initialized() ~= true then
 		hs.reload()
 		return
@@ -708,7 +813,7 @@ local function commit_owned(answers, publication)
 	if not rows or not known_locale(answers.locale) or type(answers.config_dir) ~= "string" then
 		Logger.error(LOG, "Onboarding answers refused: %s.",
 			tostring(refusal or "the language or the folder is invalid"))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.invalid_answers"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.invalid_answers"))
 		return
 	end
 
@@ -718,37 +823,95 @@ local function commit_owned(answers, publication)
 	-- empty / unchanged path is a no-op (menu_paths handles the
 	-- "drop the override" case internally).
 	local previous_config_path = _config_path
+	local previous_unresolved = _config_path_unresolved
+	local previous_locale = i18n.get_locale()
+	-- The folder and the language are published before the destination is
+	-- versioned and the answers written. A refused Finish takes both back, so
+	-- later saves never target a folder whose answers were not written.
+	local published_dir, previous_dir, menu_paths = nil, nil, nil
+	local locale_switched, locale_published = false, false
+	local function restore_previous_choices()
+		local restored = true
+		if locale_switched and i18n.get_locale() == answers.locale then
+			if locale_published then
+				local ok, persisted = pcall(i18n.persist_locale, previous_locale)
+				if not ok or persisted ~= true then
+					restored = false
+					Logger.error(LOG, "The previous language could not be saved again: %s.", tostring(persisted))
+				end
+			end
+			i18n.set_locale_no_reload(previous_locale)
+		end
+		if published_dir ~= nil then
+			local ConfigPaths = require("settings.engine.paths")
+			if ConfigPaths.get_config_dir() ~= published_dir then
+				-- Something else chose a folder since: that newer choice stands.
+				Logger.warn(LOG, "The configuration folder changed during Finish; it is kept.")
+			else
+				local persisted, persist_err = M._persist_config_dir(menu_paths, previous_dir)
+				if not persisted then
+					restored = false
+					Logger.error(LOG, "The previous configuration folder could not be restored: %s.",
+						tostring(persist_err))
+				end
+			end
+		end
+		if restored then
+			_config_path = previous_config_path
+			_config_path_unresolved = previous_unresolved
+			Logger.info(LOG, "The refused Finish left the previous folder and language in force.")
+		end
+	end
+	local function fail_published(title_key, body)
+		restore_previous_choices()
+		fail_commit(title_key, body)
+	end
 	if answers.config_dir ~= "" then
-		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-		local persisted, persist_err = M._persist_config_dir(
-			ok_mp and menu_paths or nil,
-			answers.config_dir
-		)
+		_config_path_unresolved = true
+		local ok_mp, loaded_menu_paths = pcall(require, "settings.ui.menu.paths")
+		menu_paths = ok_mp and loaded_menu_paths or nil
+		previous_dir = require("settings.engine.paths").get_config_dir()
+		local persisted, persist_err = M._persist_config_dir(menu_paths, answers.config_dir)
 		if not persisted then
 			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
-			fail_commit("paths_editor.save_failed_title", i18n.get("paths_editor.save_failed"))
+			fail_commit("paths_editor.save_failed_title", wizard_text("paths_editor.save_failed"))
 			return
 		end
+		published_dir = require("settings.engine.paths").get_config_dir()
 		-- _config_path was captured in M.run() from the config dir as it stood
 		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
 		-- through the stale path would leave the NEW directory without config.toml,
 		-- so should_run() would reopen the wizard with every answer lost.
-		_config_path = M._resolve_commit_path(menu_paths, _config_path)
+		local resolved_path = M._resolve_commit_path(menu_paths, _config_path)
+		if not resolved_path then
+			Logger.error(LOG, "The selected configuration path could not be resolved; onboarding answers were not written.")
+			fail_published("paths_editor.save_failed_title", wizard_text("paths_editor.save_failed"))
+			return
+		end
+		_config_path = resolved_path
+		_config_path_unresolved = false
+	elseif _config_path_unresolved then
+		Logger.error(LOG, "The selected configuration folder must be confirmed again; onboarding answers were not written.")
+		fail_commit("paths_editor.save_failed_title", wizard_text("onboarding.error.commit_redirect_render"))
+		return
 	end
 
 	-- Switch to the chosen locale before writing so success messages are translated,
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(answers.locale)
+	locale_switched = answers.locale ~= previous_locale
 	local locale_ok, locale_persisted = xpcall(function()
 		return i18n.persist_locale(answers.locale)
 	end, debug.traceback)
 	if not locale_ok or locale_persisted ~= true then
 		Logger.error(LOG, "commit: locale persistence failed — %s.",
 			tostring(locale_persisted))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
+		-- The refused language transaction rolled its own storage back.
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.locale_persist_failed"))
 		return
 	end
+	locale_published = locale_switched
 
 	local committed, err = Answers.commit({
 		index      = index,
@@ -760,19 +923,26 @@ local function commit_owned(answers, publication)
 	})
 	if not committed then
 		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
+		fail_published("onboarding.error.title", i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err))
 		return
 	end
 
 	Logger.success(LOG, "Onboarding answers committed (%d configuration row(s)).", #rows)
 	close_webview()
 
-	local function announce_and_reload()
+	local function schedule_reload()
 		notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
 		if DeferredWork.after(RELOAD_DELAY_SEC, reload_applying_answers, "onboarding.reload") ~= true then
 			Logger.error(LOG, "The reload that applies the onboarding answers could not be scheduled.")
 			deferred_notice("onboarding.error.reload_pending")
 		end
+	end
+	-- A number-row order the batch wrote is stored; a reload does not rebuild
+	-- the typing layout, so it is applied live first and the reload waits.
+	local order = M._number_row_order_written(rows)
+	local function announce_and_reload()
+		if order == nil then return schedule_reload() end
+		M._apply_number_row_then(order, _config_path, schedule_reload)
 	end
 	if #tap_hold_keys == 0 then
 		announce_and_reload()
@@ -781,7 +951,7 @@ local function commit_owned(answers, publication)
 	-- The layer the imported keys enter is written first, so a live bridge's
 	-- regeneration already deploys it; a refused key import takes it back.
 	local layer, layer_failed
-	-- The answers are saved: a refused import leaves config_karabiner.toml as
+	-- The answers are saved: a refused import leaves tap_hold.toml as
 	-- it was, says so, and the reload still applies the rest. A bridge that
 	-- never answers cannot hold the reload back past the timeout either.
 	local settled = false
@@ -814,7 +984,7 @@ local function commit_owned(answers, publication)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
-		if not ok then require("platform.remap.nav_layer").undo_import(layer) end
+		if not ok then require("platform.remap.nav_layer").undo_owned(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))
@@ -841,14 +1011,14 @@ local function commit(answers)
 	local claim = publication.begin()
 	if claim == nil then
 		Logger.error(LOG, "Onboarding finish refused while publication compensation remains pending.")
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.write_failed"))
 		return
 	end
 	local called, detail = xpcall(function() return commit_owned(answers, publication) end, debug.traceback)
 	publication.finish(claim)
 	if not called then
 		Logger.error(LOG, "Onboarding commit refused after a native callback failure: %s.", tostring(detail))
-		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		fail_commit("onboarding.error.title", wizard_text("onboarding.error.write_failed"))
 	end
 end
 
@@ -864,27 +1034,45 @@ local function handle_message(body)
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
-		local code = type(body.locale) == "string" and body.locale or "en"
-		inject_strings(code, owner, view)
+		if not known_locale(body.locale) then
+			Logger.warn(LOG, "previewLocale refused — '%s' is not a shipped locale.", tostring(body.locale))
+			return
+		end
+		inject_strings(body.locale, owner, view)
+
+	elseif action == "setReadingPreference" then
+		-- The reader's font or spacing, picked beside the languages: saved as
+		-- the Configuration menu saves it, then pushed to every open window,
+		-- this one included, with the font inlined.
+		local preference = require("core.ui.engine.webview.reading_preferences").for_name(body.name)
+		if preference == nil then
+			Logger.warn(LOG, "setReadingPreference refused — '%s' is not a reading choice.", tostring(body.name))
+			return
+		end
+		require("menu.ui").set_reading_preference(preference.module, body.value)
 
 	elseif action == "localeSelected" then
 		-- User confirmed language and moved to step 2 — switch locale in memory
-		local code = type(body.locale) == "string" and body.locale or "en"
-		i18n.set_locale_no_reload(code)
-		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
+		-- Recorded only: Finish switches and persists it (onboarding report OBM-001).
+		if not known_locale(body.locale) then
+			Logger.warn(LOG, "localeSelected refused — '%s' is not a shipped locale.", tostring(body.locale))
+			return
+		end
+		_selected_locale = body.locale
+		Logger.info(LOG, "Onboarding locale chosen: '%s'.", body.locale)
 
 	elseif action == "pickConfigDir" then
 		-- The path editor's picker is the single native folder dialog: the
 		-- wizard's former copy read the raw AppleEvent descriptor instead of the
 		-- parsed result, so the two could disagree on the very same answer.
-		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+		local ok_mp, menu_paths = pcall(require, "settings.ui.menu.paths")
 		if not ok_mp or type(menu_paths) ~= "table" or type(menu_paths.pick_config_dir) ~= "function" then
 			Logger.error(LOG, "pickConfigDir: the native folder picker is unavailable.")
 			return
 		end
 		local seed = type(body.current) == "string" and body.current or ""
 		local picked, chosen = pcall(menu_paths.pick_config_dir, seed,
-			i18n.get("dialog.config_folder.select_title"))
+			wizard_text("dialog.config_folder.select_title"))
 		if not picked then
 			Logger.error(LOG, "pickConfigDir: the native folder picker failed: %s.", tostring(chosen))
 			return
@@ -1019,12 +1207,12 @@ function M.run(config_path)
 	-- Retained cleanup authority cannot retarget its captured configuration.
 	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
 	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
-	_config_path = config_path
+	if _webview and not _config_path_unresolved then _config_path = config_path end
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
 		local view, focus_owner = _webview, _focus_owner
-		require("ui.ui_builder").force_focus(view, false, { is_current = function()
+		require("core.ui.ui.builder").force_focus(view, false, { is_current = function()
 			return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
 		end })
 		if focus_owner ~= nil and focus_owner.init_retry ~= nil and focus_owner.init_retry.path == config_path then
@@ -1032,6 +1220,9 @@ function M.run(config_path)
 		end
 		return true
 	end
+	_config_path = config_path
+	_config_path_unresolved = false
+	_selected_locale = nil
 	if _usercontent and close_webview() ~= true then
 		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
 		return false
@@ -1039,7 +1230,7 @@ function M.run(config_path)
 
 	Logger.start(LOG, "Opening onboarding wizard…")
 
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	local ok_ui, ui_builder = pcall(require, "core.ui.ui.builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "Failed to load ui_builder module.")
 		return false
@@ -1099,7 +1290,7 @@ function M.run(config_path)
 	end
 
 	local masks       = hs.webview.windowMasks
-	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)
 
 	local closed = false
 	_focus_owner = focus_owner

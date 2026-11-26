@@ -3,18 +3,18 @@
 --- Native WebView ownership for the shared physical shortcut editor.
 local M = {}
 local hs = hs
-local Window = require("shortcuts.physical_editor_window")
-local Slots = require("shortcuts.physical_slots")
-local PhysicalAvailability = require("shortcuts.physical_availability")
-local Json = require("json")
-local JsonCodec = require("adapters.json_codec")
-local Paths = require("infra.paths")
-local Files = require("adapters.file_system")
-local I18n = require("infra.i18n")
-local ui_builder = require("ui.ui_builder")
-local Logger = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
-local ConfigKeys = require("config_keys")
+local Window = require("shortcuts.engine.physical_editor_window")
+local Slots = require("shortcuts.engine.physical_slots")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
+local Json = require("core.text.engine.json")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local Paths = require("core.fs.engine.paths")
+local Files = require("core.fs.adapters.file_system")
+local I18n = require("core.i18n.engine.i18n")
+local ui_builder = require("core.ui.ui.builder")
+local Logger = require("core.logger.engine.logger")
+local TimerScheduler = require("core.events.timer_scheduler")
+local ConfigKeys = require("settings.engine.keys")
 local active = nil
 
 --- Checks the native window constructor and declared geometry without input capture.
@@ -167,7 +167,7 @@ end
 function M.open(options)
 	if type(options) ~= "table" or not M.available(options.scope) or type(options.gestures) ~= "table" then return false end
 	if active and close(active) ~= true then return false end
-	local keycodes, decode_error = JsonCodec.decode(assert(Files.read(Paths.shared("data/keycodes/physical_keys.json"))))
+	local keycodes, decode_error = JsonCodec.decode(assert(Files.read(Paths.shared("layouts/data/keycodes/physical_keys.json"))))
 	if decode_error ~= nil or type(keycodes) ~= "table" then return false end
 	local model = Slots.new(keycodes)
 	local positions = {}
@@ -232,7 +232,7 @@ function M.open(options)
 	end
 	local window_constructed, window = pcall(function()
 		return Window.new({model=model,catalogue=gestures,parameter_section=ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS,
-			positions=positions,translate=I18n.get,label=gestures.get_action_label,page_current=current,send=send,
+			positions=positions,translate=I18n.get,platform="macos",label=gestures.get_action_label,page_current=current,send=send,
 				position_field="hs",position_available=available_position,
 				capture_position=function(guard, receive)
 					if not observation_current() or retire_observation() ~= true or not available_position() then return nil end
@@ -285,9 +285,16 @@ function M.open(options)
 	end
 	candidate.bridge = bridge
 	local bound, accepted = pcall(function() return bridge:setCallback(function(message)
-		if not current() or type(message) ~= "table" or type(message.body) ~= "table" then return end
-		if candidate.constructing and message.body.action == "ready" then candidate.pending_ready = true; return end
-		local called = pcall(candidate.window.receive,message.body)
+		-- The page sends JSON text (hs.webview would turn a JS null into nil): decoded
+		-- keeping null, an explicit null is refused, never read as absence.
+		if not current() or type(message) ~= "table" or type(message.body) ~= "string" then return end
+		local body = Json.decode_lossless(message.body)
+		if type(body) ~= "table" then
+			Logger.error("ui.physical_shortcuts", "Physical shortcut page message is not a JSON object.")
+			return
+		end
+		if candidate.constructing and body.action == "ready" then candidate.pending_ready = true; return end
+		local called = pcall(candidate.window.receive,body)
 		if not called then Logger.error("ui.physical_shortcuts", "Physical shortcut page request refused.") end
 	end) end)
 	if not bound or accepted ~= bridge then candidate.constructing = false; close(candidate); return false end

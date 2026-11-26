@@ -783,6 +783,9 @@ M.eventtap = {
 			scrollWheelEventDeltaAxis2 = 7,
 			scrollWheelEventScrollPhase = 9,
 			scrollWheelEventMomentumPhase = 10,
+			mouseEventDeltaX = 11,
+			mouseEventDeltaY = 12,
+			mouseEventClickState = 13,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -800,6 +803,8 @@ M.eventtap = {
 			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
 			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
 			scrollWheel = 22,
+			leftMouseDragged = 7, rightMouseDragged = 8, otherMouseDragged = 27,
+			rotate = 18, gesture = 29, magnify = 30, swipe = 31, smartMagnify = 32,
 		},
 		newKeyEvent   = function(mods, key, isDown)
 			local properties = {}
@@ -1043,6 +1048,20 @@ local function make_canvas(initial_frame)
 		return self
 	end
 
+	--- Mirrors hs.canvas: every tracking class starts disabled and native
+	--- delivery requires an explicit opt-in (down, up, enter/exit, move).
+	function canvas:canvasMouseEvents(down, up, enter_exit, move)
+		if down == nil and up == nil and enter_exit == nil and move == nil then
+			local flags = self._mouse_events or {}
+			return flags.down == true, flags.up == true, flags.enter_exit == true, flags.move == true
+		end
+		self._mouse_events = {
+			down = down == true, up = up == true,
+			enter_exit = enter_exit == true, move = move == true,
+		}
+		return self
+	end
+
 	function canvas:show()
 		if self._deleted then return nil end
 		self._showing = true
@@ -1143,6 +1162,8 @@ M.application = {
 	launchOrFocus = function(_) end,
 	open = function(_) end,
 	applicationsForBundleID = function(_) return {} end,
+	-- Hammerspoon returns nil when no bundle metadata can be resolved.
+	infoForBundlePath = function(_) return nil end,
 	applicationForPID = function(pid)
 		APPLICATION_QUERIES[#APPLICATION_QUERIES + 1] = pid
 		local active_watchers = 0
@@ -1272,6 +1293,19 @@ M.axuielement = {
 }
 
 M.window = {
+	__windows = {},
+	allWindows = function()
+		local result = {}
+		for _, win in ipairs(M.window.__windows) do result[#result + 1] = win end
+		return result
+	end,
+	visibleWindows = function()
+		local result = {}
+		for _, win in ipairs(M.window.__windows) do
+			if win:isVisible() == true then result[#result + 1] = win end
+		end
+		return result
+	end,
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
 	-- Like the real call (AXUIElementSetMessagingTimeout on the system-wide
@@ -1322,6 +1356,13 @@ end
 -- table references. Raw strings are immutable, so one table copy suffices.
 -- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
+	allContentTypes = function(name)
+		local data = PASTEBOARD_DATA[pasteboard_key(name)]
+		if not data or next(data) == nil then return {} end
+		local types = {}
+		for uti in pairs(data) do types[#types + 1] = uti end
+		return { types }
+	end,
 	changeCount = function(name) return PASTEBOARD_COUNTS[pasteboard_key(name)] or 0 end,
 	getContents = function(name)
 		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
@@ -1365,6 +1406,28 @@ M.pasteboard = {
 		local key = pasteboard_key(name)
 		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = nil
+	end,
+	-- libpasteboard.m writeItemForType: a trailing boolean is `add`; with it the
+	-- type joins the current item without clearContents, so the count holds.
+	writeDataForUTI = function(...)
+		local args = table.pack(...)
+		local add = false
+		if args.n >= 3 and type(args[args.n]) == "boolean" then
+			add = args[args.n]
+			args.n = args.n - 1
+		elseif args.n >= 3 and args[args.n] == nil then
+			args.n = args.n - 1
+		end
+		local name, uti, bytes
+		if args.n == 2 then uti, bytes = args[1], args[2] else name, uti, bytes = args[1], args[2], args[3] end
+		assert(type(uti) == "string" and type(bytes) == "string", "writeDataForUTI needs a UTI and its bytes")
+		local key = pasteboard_key(name)
+		if not add or PASTEBOARD_DATA[key] == nil then
+			PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
+			PASTEBOARD_DATA[key] = {}
+		end
+		PASTEBOARD_DATA[key][uti] = bytes
+		return true
 	end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
@@ -1444,7 +1507,7 @@ M.task = { new = function(_, _)
 	return task
 end }
 -- usercontent is the JavaScript bridge every webview UI builds at module load
--- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
+-- time (ui/download_window, ai/ui/model_browser, …). Omitting it made those modules
 -- unloadable under the harness, so their logic could only ever be source-guarded.
 M.webview = {
 	new = function() return {} end,
@@ -1459,6 +1522,23 @@ M.webview = {
 	},
 }
 M.distributednotifications = { new = function() return { start = function() end, stop = function() end } end }
+-- SCNetworkReachability: a target is scheduled by start() and answers through
+-- its callback (target, flags); it never answers here, as before a resolution.
+M.network = {
+	reachability = {
+		flags = {
+			transientConnection = 1, reachable = 2, connectionRequired = 4, connectionOnTraffic = 8,
+			interventionRequired = 16, connectionOnDemand = 32, isLocalAddress = 65536, isDirect = 131072,
+		},
+		forHostName = function(_)
+			local target = {}
+			function target:setCallback(_) return self end
+			function target:start() return self end
+			function target:stop() return self end
+			return target
+		end,
+	},
+}
 M.alert = setmetatable({
 	show = function() return "uuid" end,
 	closeAll = function() end,
@@ -1508,6 +1588,7 @@ M.host = {
 --- Resets all in-memory stub state. Test helpers should call this before each
 --- test to avoid cross-test pollution.
 function M.__reset()
+	M.window.__windows = {}
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end

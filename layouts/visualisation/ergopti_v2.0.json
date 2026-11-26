@@ -2,6 +2,93 @@
 	"name": "Ergopti v2.0",
 	"creator": "Adrien MOYAUX",
 	"site": "https://ergopti.fr",
+	"dead_levels": {
+		"Circonflexe": "◌̂",
+		"Trema": "◌̈",
+		"Exposant": "ᵉ",
+		"Indice": "ᵢ",
+		"Greek": "δ",
+		"R": "ℝ",
+		"Currency": "¤"
+	},
+	"level_labels": [
+		{
+			"label": "➀ Primaire",
+			"level": "Primary"
+		},
+		{
+			"label": "➁ Shift",
+			"level": "Shift"
+		},
+		{
+			"label": "➂ AltGr",
+			"level": "AltGr"
+		},
+		{
+			"label": "➃ Shift + AltGr",
+			"level": "ShiftAltGr"
+		},
+		{
+			"label": "Ctrl",
+			"level": "Ctrl"
+		},
+		{
+			"label": "Circonflexe",
+			"level": "Circonflexe"
+		},
+		{
+			"label": "Circonflexe ⇧",
+			"level": "CirconflexeShift"
+		},
+		{
+			"label": "Tréma",
+			"level": "Trema"
+		},
+		{
+			"label": "Tréma ⇧",
+			"level": "TremaShift"
+		},
+		{
+			"label": "Exposant",
+			"level": "Exposant"
+		},
+		{
+			"label": "Exposant ⇧",
+			"level": "ExposantShift"
+		},
+		{
+			"label": "Indice",
+			"level": "Indice"
+		},
+		{
+			"label": "Indice ⇧",
+			"level": "IndiceShift"
+		},
+		{
+			"label": "Grec",
+			"level": "Greek"
+		},
+		{
+			"label": "Grec ⇧",
+			"level": "GreekShift"
+		},
+		{
+			"label": "ℝ",
+			"level": "R"
+		},
+		{
+			"label": "ℝ ⇧",
+			"level": "RShift"
+		},
+		{
+			"label": "Monnaie",
+			"level": "Currency"
+		},
+		{
+			"label": "Monnaie ⇧",
+			"level": "CurrencyShift"
+		}
+	],
 	"iso": [
 		{
 			"key": "=",

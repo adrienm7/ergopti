@@ -125,3 +125,91 @@ _KCF_ModelFollowsTheFirstOfEachDuplicate() {
 	Assert(false, "the corpus must hold the everything fixture")
 }
 Test("keylayout canonical form: the keystroke model follows the form's duplicate rules (PAR-76)", _KCF_ModelFollowsTheFirstOfEachDuplicate)
+
+
+_KCF_NumericFixture(Attribute := "", Raw := "", Entity := "A") {
+ DefaultIndex := Attribute == "defaultIndex" ? Raw : "0"
+ MapIndex := Attribute == "mapIndex" ? Raw : "0"
+ Index := Attribute == "index" ? Raw : "0"
+ BaseIndex := Attribute == "baseIndex" ? Raw : "0"
+ Code := Attribute == "code" ? Raw : "3"
+ Key := Attribute == "baseIndex" ? "" : '<key code="' . Code . '" output="' . Entity . '"/>'
+ return '<keyboard name="Private numeric layout"><layouts><layout first="0" modifiers="mods" mapSet="maps"/></layouts>'
+  . '<modifierMap id="mods" defaultIndex="' . DefaultIndex . '"><keyMapSelect mapIndex="' . MapIndex . '"><modifier keys=""/></keyMapSelect></modifierMap>'
+  . '<keyMapSet id="maps"><keyMap index="' . Index . '" baseMapSet="base" baseIndex="' . BaseIndex . '">' . Key . '</keyMap></keyMapSet>'
+  . '<keyMapSet id="base"><keyMap index="0"><key code="3" output="B"/></keyMap><keyMap index="3"><key code="3" output="B"/></keyMap></keyMapSet></keyboard>'
+}
+_KCF_RequireNumericRefusal(Text, Boundary) {
+ for Parser in [Keylayout_ParseCanonical, Keylayout_Parse] {
+  Refused := false
+  try Parser.Call(Text)
+  catch ValueError as Failure {
+   AssertContains(Failure.Message, Boundary, "The actual numeric boundary must explain refusal")
+   Refused := true
+  }
+  AssertTrue(Refused, "The complete external numeric lexeme must not become a different native integer")
+ }
+}
+_KCF_AttributeIntegerDomain(Attribute) {
+ Ordinary := Attribute == "code" || Attribute == "baseIndex" ? "3" : "0"
+ Text := _KCF_NumericFixture(Attribute, Ordinary)
+ Expected := Attribute == "baseIndex" ? "B" : "A"
+ AssertEqual(Expected, Keylayout_Step(Keylayout_Parse(Text), "none", 0, 3)["Output"], "The genuine model must still type the ordinary control")
+ Raw := Ordinary == "3" ? "18446744073709551619" : "18446744073709551616"
+ Text := _KCF_NumericFixture(Attribute, Raw)
+ try {
+  Model := Keylayout_Parse(Text)
+  Step := Keylayout_Step(Model, "none", 0, 3)
+  _TestPrint("# keylayout numeric attribute=" . Attribute . " raw=" . Raw . " unintended_output=" . Step["Output"])
+ } catch ValueError {
+  ; Refusal is required below from both complete public parsers.
+ }
+ _KCF_RequireNumericRefusal(Text, Attribute)
+ Hex := Ordinary == "3" ? "0x10000000000000003" : "0x10000000000000000"
+ _KCF_RequireNumericRefusal(_KCF_NumericFixture(Attribute, Hex), Attribute)
+}
+for _KCF_NumericAttribute in ["code", "defaultIndex", "mapIndex", "index", "baseIndex"]
+ Test("Keylayout numeric attribute refuses modulo aliases: " . _KCF_NumericAttribute . " (keylayout-integer-attribute-domain)", _KCF_AttributeIntegerDomain.Bind(_KCF_NumericAttribute))
+
+_KCF_EntityIntegerDomain(Hex) {
+ Ordinary := Hex ? "&#x41" : "&#65"
+ Text := _KCF_NumericFixture("", "", Ordinary . Chr(59))
+ AssertEqual("A", Keylayout_Step(Keylayout_Parse(Text), "none", 0, 3)["Output"], "The ordinary XML character reference must still type its scalar")
+ Raw := Hex ? "&#x10000000000000041" : "&#18446744073709551681"
+ Text := _KCF_NumericFixture("", "", Raw . Chr(59))
+ try {
+  Model := Keylayout_Parse(Text)
+  Step := Keylayout_Step(Model, "none", 0, 3)
+  _TestPrint("# keylayout numeric entity=" . Raw . " unintended_output=" . Step["Output"])
+ } catch ValueError {
+  ; A large entity must be refused before it becomes an ordinary A.
+ }
+ _KCF_RequireNumericRefusal(Text, "character reference")
+}
+for _KCF_NumericHex in [false, true]
+ Test("Keylayout numeric entity refuses modulo alias: " . (_KCF_NumericHex ? "hexadecimal" : "decimal") . " (keylayout-entity-integer-domain)", _KCF_EntityIntegerDomain.Bind(_KCF_NumericHex))
+
+
+_KCF_EntityScalarDomain(Hex) {
+ for Vector in [["0", "0", Chr(0)], ["16", "10", Chr(16)], ["55295", "D7FF", Chr(0xD7FF)], ["57344", "E000", Chr(0xE000)], ["1114111", "10FFFF", Chr(0x10FFFF)]] {
+  Entity := (Hex ? "&#x" . Vector[2] : "&#" . Vector[1]) . Chr(59)
+  Parsed := Keylayout_ParseCanonical(_KCF_NumericFixture("", "", Entity))
+  Actual := Parsed["key_map_sets"][1]["key_maps"][1]["keys"][1]["output"]
+  AssertEqual(StrLen(Vector[3]), StrLen(Actual), "A scalar edge must preserve its explicit UTF-16 length, including NUL")
+  Units := ""
+  Loop StrLen(Vector[3]) {
+   ExpectedUnit := NumGet(StrPtr(Vector[3]), (A_Index - 1) * 2, "UShort")
+   ActualUnit := NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort")
+   AssertEqual(ExpectedUnit, ActualUnit, "Every stored scalar code unit must survive XML decoding")
+   Units .= (A_Index == 1 ? "" : ",") . Format("{:04X}", ActualUnit)
+  }
+  _TestPrint("# keylayout scalar hex=" . Hex . " entity=" . (Hex ? Vector[2] : Vector[1]) . " units=" . Units)
+  AssertEqual(Vector[3], Actual, "Valid scalar edges and shipped control placeholders retain exact output")
+ }
+ for Vector in [["4294967361", "100000041"], ["1114112", "110000"], ["55296", "D800"], ["57343", "DFFF"]] {
+  Entity := (Hex ? "&#x" . Vector[2] : "&#" . Vector[1]) . Chr(59)
+  _KCF_RequireNumericRefusal(_KCF_NumericFixture("", "", Entity), "character reference")
+ }
+}
+for _KCF_ScalarHex in [false, true]
+ Test("Keylayout numeric entity enforces scalar bounds: " . (_KCF_ScalarHex ? "hexadecimal" : "decimal") . " (keylayout-entity-scalar-domain)", _KCF_EntityScalarDomain.Bind(_KCF_ScalarHex))

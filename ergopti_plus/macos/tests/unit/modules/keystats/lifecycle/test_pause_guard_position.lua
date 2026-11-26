@@ -177,6 +177,9 @@ local PAUSE_EXEMPT_WRITERS = {
 	-- Called by midnight maintenance, which is explicitly documented to run late
 	-- when Ergopti was paused across the boundary.
 	split_active_app_at_midnight = true,
+	-- Called by the user's metrics pause just before collection stops, to close
+	-- the interval accumulated while collecting (HS-004).
+	suspend_collection_context = true,
 }
 
 --- Names of the functions section 2 pins as gated.

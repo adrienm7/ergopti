@@ -20,7 +20,7 @@ helpers.describe("metrics publication revisions", function()
 		helpers.it("(metrics-publication-order) reports execution outcome " .. outcome, function()
 			with_delivery(false, function(_, _, evaluations, errors, successes)
 				local decisions = {}
-				package.loaded["infra.logger"].debug = function(_, message, ...)
+				package.loaded["core.logger.engine.logger"].debug = function(_, message, ...)
 					decisions[#decisions + 1] = string.format(message, ...)
 				end
 				evaluations[1].done("function")

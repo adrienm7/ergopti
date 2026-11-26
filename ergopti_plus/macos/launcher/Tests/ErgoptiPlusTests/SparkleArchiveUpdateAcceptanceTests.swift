@@ -804,7 +804,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	/// Read the canonical checkout data, while keeping fixture tag/artifact expectations independent.
 	private func releaseRepository() throws -> ReleaseRepository {
-		let source = repository.appendingPathComponent("static/ergopti_plus/_shared/modules/updater/defaults.json")
+		let source = repository.appendingPathComponent("static/ergopti_plus/_shared/updater/data/defaults.json")
 		let descriptor = open(source.path, O_RDONLY | O_NOFOLLOW)
 		guard descriptor >= 0 else { throw Failure.prerequisite("canonical-release-repository") }
 		let stream = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)

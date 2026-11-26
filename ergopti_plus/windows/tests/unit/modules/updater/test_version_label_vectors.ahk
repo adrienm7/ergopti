@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: About Version Row Vectors
 ; DESCRIPTION:
-; Replays the shared _shared/modules/updater/version_label_vectors.json through
+; Replays the shared _shared/updater/data/version_label_vectors.json through
 ; the AHK port of the version row formatter (Updater_VersionRowLabel). The
 ; macOS and Linux suites replay the same file through the shared Lua module, so
 ; the three drivers cannot word the version row differently: the same locale
@@ -12,7 +12,7 @@
 ; ==============================================================================
 
 _VLV_Vectors() {
-	Path := A_ScriptDir . "\..\..\_shared\modules\updater\version_label_vectors.json"
+	Path := A_ScriptDir . "\..\..\_shared\updater\data\version_label_vectors.json"
 	AssertTrue(FileExist(Path) != "", "version label vectors must exist at: " . Path)
 	return JsonParse(FileRead(Path, "UTF-8"))
 }

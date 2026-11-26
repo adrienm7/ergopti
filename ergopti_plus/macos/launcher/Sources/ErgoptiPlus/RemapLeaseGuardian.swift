@@ -45,7 +45,7 @@ let kRegisterRemapGuardianFlag = "--register-remap-guardian"
 let kUnregisterRemapGuardianFlag = "--unregister-remap-guardian"
 let kGuardianLaunchctlUnknownServiceStatus: Int32 = 113
 let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
-// One source: _shared/data/identifiers.json service_labels.macos_remap_guardian.
+// One source: _shared/core/text/data/identifiers.json service_labels.macos_remap_guardian.
 let kRemapGuardianLabel = Identifiers.ServiceLabels.macosRemapGuardian
 let kRemapGuardianPlistName = kRemapGuardianLabel + ".plist"
 let kRemapGuardianServiceErrorDomain = "SMAppServiceErrorDomain"
@@ -124,7 +124,7 @@ struct LeaseGuardianPaths {
 	/// - Parameter homeDirectory: Current user's Foundation home directory.
 	init(homeDirectory: String = NSHomeDirectory()) {
 		root = homeDirectory
-			+ "/Library/Application Support/ErgoptiPlus/LeaseGuardian/v1"
+			+ "/" + kMacOSSupportHomeRelativePath + "/LeaseGuardian/v1"
 		records = root + "/records"
 		acknowledgements = root + "/acknowledgements"
 		singletonLock = root + "/guardian.lock"

@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Validates the two shared Lua LLM modules against their cross-driver test
 --- vectors, ensuring the Lua implementations stay in sync with the JS reference
---- implementations in _shared/core/domain/PromptBuilder.js and
---- _shared/core/domain/ProfileSelector.js.
+--- implementations in _shared/core/text/data/domain/PromptBuilder.js and
+--- _shared/core/text/data/domain/ProfileSelector.js.
 ---
 --- COVERAGE:
 --- 1. PromptBuilder — every vector from M.test_vectors() is executed against
@@ -28,15 +28,15 @@ local helpers = require("tests.helpers")
 -- ==========================================
 -- ==========================================
 
--- Resolve _shared/lua path relative to the driver root
-local shared_lua  = helpers.shared("lua/")
+-- Resolve _shared path relative to the driver root
+local shared_lua  = helpers.shared("/")
 
--- Prepend _shared/lua/ to the Lua package path so require("llm.xxx") resolves
+-- Prepend _shared/ to the Lua package path so require("llm.xxx") resolves
 local orig_path = package.path
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local ok_pb, PromptBuilder    = pcall(require, "llm.prompt_builder")
-local ok_ps, ProfileSelector  = pcall(require, "llm.profile_selector")
+local ok_pb, PromptBuilder    = pcall(require, "ai.engine.prediction.prompt_builder_core")
+local ok_ps, ProfileSelector  = pcall(require, "ai.engine.settings.profile_selector")
 
 -- Restore original path to avoid polluting other tests
 package.path = orig_path
@@ -53,7 +53,7 @@ package.path = orig_path
 helpers.describe("shared_lua_llm — PromptBuilder: module loads", function()
 	helpers.it("prompt_builder module is available on the shared Lua path", function()
 		helpers.assert_true(ok_pb,
-			"_shared/lua/llm/prompt_builder.lua not found or has syntax error: "
+			"_shared/ai/engine/prediction/prompt_builder_core.lua not found or has syntax error: "
 			.. tostring(PromptBuilder))
 	end)
 end)
@@ -159,7 +159,7 @@ end)
 helpers.describe("shared_lua_llm — ProfileSelector: module loads", function()
 	helpers.it("profile_selector module is available on the shared Lua path", function()
 		helpers.assert_true(ok_ps,
-			"_shared/lua/llm/profile_selector.lua not found or has syntax error: "
+			"_shared/ai/engine/settings/profile_selector.lua not found or has syntax error: "
 			.. tostring(ProfileSelector))
 	end)
 end)

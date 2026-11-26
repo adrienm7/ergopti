@@ -25,17 +25,17 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
-local ShellRunner    = require("adapters.shell_runner")
-local Storage        = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger         = require("core.logger.engine.logger")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local Storage        = require("core.fs.adapters.storage")
+local TimerScheduler = require("core.events.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local TokenReuse     = require("platform.remap.token_reuse")
 local LeaseHelper    = require("platform.remap.lease_helper")
-local TaskOutputTurn = require("adapters.task_output_turn")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
-local KeyEventHealth = require("infra.key_event_health")
+local TaskOutputTurn = require("core.process.adapters.task_output_turn")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 
 local LOG = "karabiner.lease"
@@ -77,7 +77,7 @@ local ACK_GRACE_SEC = 1.0
 -- output to Lua only in the default run loop mode, timers fire in every mode,
 -- and an open menubar menu runs the event tracking mode. Issue #100 failed
 -- seven healthy leases "0.00 s late" while the user browsed the Ergopti menu.
--- Such a deadline first waits for adapters/task_output_turn.lua to prove that
+-- Such a deadline first waits for core/process/adapters/task_output_turn.lua to prove that
 -- task output is read again, at most this long. Keepalive PINGs hold the
 -- worker's inner silence budget off meanwhile, so a menu left open costs
 -- nothing; the inner still fences on its own if Hammerspoon really went away.
@@ -827,7 +827,7 @@ local function fail_generation(generation, reason)
 	if generation.ready then
 		KeystrokeIntegrity.note_exposure("a Karabiner lease fence that switched Ergopti's rules off")
 	end
-	-- The session totals the next issue report carries (infra/key_event_health.lua).
+	-- The session totals the next issue report carries (core/logger/engine/key_event_health.lua).
 	pcall(KeyEventHealth.note_lease_failure, reason)
 	-- Starvation is the open explanation of silent PONG and READY timeouts: the
 	-- free memory at the failure confirms or rules it out (items 117/140).
@@ -986,17 +986,30 @@ local function defer_until_output_turn(generation, expected, since)
 	generation.output_turn_since = TimerScheduler.awake_time()
 	local probe
 	local probe_err
-	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token,
-		function(delivered, reason)
-			if probe == nil or generation.output_turn_probe ~= probe or generation.failed
-				or generation.awaiting ~= expected then return end
-			generation.output_turn_probe = nil
-			if not delivered then
-				Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
-					generation.token, tostring(reason))
-			end
-			fail_on_deadline(generation, expected, since, 0)
-		end)
+	local early_turn
+	local requesting = true
+	local function on_turn(delivered, reason)
+		if requesting then
+			early_turn = { delivered, reason }
+			return
+		end
+		if probe == nil or generation.output_turn_probe ~= probe or generation.failed
+			or generation.awaiting ~= expected then return end
+		generation.output_turn_probe = nil
+		if not delivered then
+			Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+				generation.token, tostring(reason))
+		end
+		fail_on_deadline(generation, expected, since, 0)
+	end
+	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token, on_turn)
+	requesting = false
+	-- An ACK may settle while request() crosses native task boundaries, before
+	-- this probe was published and therefore visible to the normal retirement.
+	if generation.failed or generation.awaiting ~= expected then
+		if probe then pcall(probe.cancel) end
+		return true
+	end
 	if not probe then
 		Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
 			generation.token, tostring(probe_err))
@@ -1004,6 +1017,10 @@ local function defer_until_output_turn(generation, expected, since)
 		return true
 	end
 	generation.output_turn_probe = probe
+	if early_turn ~= nil then
+		on_turn(early_turn[1], early_turn[2])
+		return true
+	end
 	Logger.debug(LOG,
 		"Karabiner lease %s: %s deadline passed on time; reading pending task output before judging the worker.",
 		generation.token, expected)
@@ -2314,9 +2331,16 @@ function M.stop_exact(token, reason, on_done)
 end
 
 --- Returns the current public phase and a diagnostic snapshot.
+--- @param options table|nil `{ before_init = "uninitialized" }` answers a
+---   caller that expects a controller that never started (a quit during the
+---   first-run wizard) without reporting that call as an error.
 --- @return string phase Current lifecycle phase.
 --- @return table snapshot Token-scoped state safe for status UIs.
-function M.status()
+function M.status(options)
+	if options ~= nil and (type(options) ~= "table" or options.before_init ~= "uninitialized") then
+		error("lease_controller.status: options must be nil or { before_init = \"uninitialized\" }", 2)
+	end
+	if not _state and options ~= nil then return "uninitialized", { phase = "uninitialized" } end
 	if not require_state("status") then return "uninitialized", { phase = "uninitialized" } end
 	retry_timer_cleanup()
 	local generation = _state.current

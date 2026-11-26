@@ -12,7 +12,7 @@ for key, value in pairs(original_runtime) do runtime[key] = value end
 runtime.xi = xi_path -- Explicit CONTROLLED diagnostic projection; no global/generated write.
 package.loaded["_generated.native_runtime"] = runtime
 local driver = assert(runtime_source:match("^(.*)/_generated/native_runtime%.lua$"))
-local shared = assert(logger_source:match("^(.*)/logger/shim%.lua$"))
+local shared = assert(logger_source:match("^(.*)/core/logger/engine/shim%.lua$"))
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
     .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 -- Load the real driver logger shim, including its normal LuaJIT core fallback.
@@ -23,7 +23,7 @@ print = function(...)
     for _, value in ipairs(parts) do log_bytes = log_bytes + #tostring(value) end
     assert(log_bytes <= 32768, "diagnostic logger bound")
 end
-package.loaded["logger.shim"] = assert(loadfile(logger_source))()
+package.loaded["core.logger.engine.shim"] = assert(loadfile(logger_source))()
 local Probe = assert(loadfile(candidate))()
 ffi.cdef([[
     struct _XDisplay; struct xcb_connection_t; struct xkb_context; struct xkb_keymap;

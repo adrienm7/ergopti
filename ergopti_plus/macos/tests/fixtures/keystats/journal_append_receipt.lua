@@ -11,9 +11,9 @@
 local root, temporary = assert(arg[3]), assert(arg[2])
 assert(os.getenv('HOME') == temporary, 'physical replay must own its HOME')
 local driver = root .. '/static/ergopti_plus/macos'
-package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..root..'/static/ergopti_plus/_shared/lua/?.lua;'..root..'/static/ergopti_plus/_shared/lua/?/init.lua'
+package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..root..'/static/ergopti_plus/_shared/?.lua;'..root..'/static/ergopti_plus/_shared/?/init.lua'
 package.cpath = ''
-local Json, Helpers = require('json'),require('tests.helpers')
+local Json, Helpers = require('core.text.engine.json'),require('tests.helpers')
 local function rpc(message)
  message.kind='request';assert(io.stdout:write(Json.encode(message)..'\n'));assert(io.stdout:flush())
  return assert(Json.decode_lossless(assert(io.stdin:read('*l'))))
@@ -52,14 +52,14 @@ hs.sqlite3.open=sqlite_open
 for _,name in ipairs({'fs','timer','json','sqlite3'}) do package.loaded['hs.'..name]=hs[name] end
 local errors,logger={},Helpers.make_logger_stub()
 logger.error=function(_,fmt,...) errors[#errors+1]=string.format(fmt,...) end
-package.loaded['infra.logger']=logger
+package.loaded['core.logger.engine.logger']=logger
 package.loaded['modules.keystats.export']={sync_foreign_data_sql=function()return{}end, get_native_app_category=function() return nil end}
 -- This proof isolates raw-row ingest. SQL outbox publication writes real Lua bytes
 -- and acknowledges its actual cache clear, but does not qualify LedgerAppend recovery.
 -- The stage names stay the real module's, so the ingest trace receives the
 -- order log_manager hands it and the stub cannot drift from LedgerAppend.
-local flush_stages=assert(require('adapters.ledger_append').FLUSH_STAGES)
-package.loaded['adapters.ledger_append']={FLUSH_STAGES=flush_stages,flush=function(path,batch,ack)
+local flush_stages=assert(require('core.fs.adapters.ledger_append').FLUSH_STAGES)
+package.loaded['core.fs.adapters.ledger_append']={FLUSH_STAGES=flush_stages,flush=function(path,batch,ack)
  if batch~='' then local h=assert(io.open(path,'ab'));assert(h:write(batch));assert(h:close()) end
  return ack()
 end}

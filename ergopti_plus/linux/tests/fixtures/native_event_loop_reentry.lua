@@ -11,13 +11,13 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_event_loop_reentry%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local checks, failures = 0, 0
 
 local function fresh_loop()
-	package.loaded["adapters.event_loop"] = nil
-	return require("adapters.event_loop")
+	package.loaded["core.events.loop"] = nil
+	return require("core.events.loop")
 end
 
 local function handle_count()

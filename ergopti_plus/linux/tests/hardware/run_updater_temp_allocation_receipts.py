@@ -36,7 +36,7 @@ local Output = require("infra.archive_output")
 local prepared_artifact = assert(Output.native_artifact("ergopti-plus-linux.tar.gz"),
  "Actual native archive runtime preparation unavailable")
 local prepared_output = Output.native()
-local prepared_digest = require("infra.fd_sha256").native()
+local prepared_digest = require("core.network.engine.fd_sha256").native()
 -- The detached-signature gate is built on the first download; build it now so
 -- its modules and policy are loaded before the descriptor limit applies.
 assert(type(Manager._select_signature_asset("{}")) == "string", "Actual signature gate preparation unavailable")
@@ -67,8 +67,9 @@ if wants_callback then
 	if denied then assert(received_error == "temporary path unavailable") end
 end
 assert(not uv.loop_alive(), "refused operation left a native owner alive")
-local expected_state = denied and "available" or (api == "update" and "idle" or "available")
-assert(Manager.get_state() == expected_state, "refusal changed the pre-allocation state")
+-- A refused allocation and a failed download both keep the offer, so the menu
+-- still says « Update now » (UPD-08).
+assert(Manager.get_state() == "available", "refusal changed the pre-allocation state")
 assert(Manager.get_cached_release().tag == release.tag)
 assert(Manager.cancel_update() and Manager.get_state() == "idle")
 assert(type(prepared_artifact) == "table" and type(prepared_output) == "table"
@@ -95,7 +96,7 @@ def main():
                             if limit is not None
                             else "false",
                             "ERGOPTI_NATIVE_UPDATER_CALLBACK": "true" if callback else "false",
-                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                         }
                     )
                     child = None

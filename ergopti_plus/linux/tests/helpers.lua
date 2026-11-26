@@ -25,10 +25,26 @@ local M = {}
 -- A test file run on its own, without tests/run.lua, still loads these helpers
 -- first: isolating here keeps its logs and config away from the account's own
 -- home. Idempotent, the runner already isolated.
-require("test.runner_home").isolate()
+require("tests.lua.core.runner_home").isolate()
+-- The fixtures read the French catalogue whatever the session language says
+-- (tests/support/session_language.lua); helpers load once per test process.
+require("tests.support.session_language").install()
+-- No fixture may show a real desktop notification: each case resolves the
+-- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
+-- still reaches notify-send hits a sentinel that fails the run
+-- (tests/support/notify_send_guard.lua).
+local NotifySendGuard = require("tests.support.notify_send_guard")
+NotifySendGuard.install()
+-- No fixture may open a real dialog either: a dialog host started from a test
+-- records its case and exits without a window, which fails the run
+-- (tests/support/dialog_host_guard.lua).
+local DialogHostGuard = require("tests.support.dialog_host_guard")
+DialogHostGuard.install()
+local NoticeRecorder = require("tests.support.notice_recorder")
+NoticeRecorder.install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
-local fmt = require("test.format")
+local fmt = require("tests.lua.format")
 local _timing = nil
 local _current_module = nil
 M.inspect = fmt.inspect
@@ -50,15 +66,15 @@ local _fail_msg = fmt.fail_msg_for("helpers%.lua$")
 --- @param text string Lua source text.
 --- @return string expanded
 function M.expand_config_keys(text)
-	local keys = require("config_keys")
+	local keys = require("settings.engine.keys")
 	local function resolve(whole, root_table, name)
 		local found, tbl = pcall(function() return keys[root_table] end)
 		if not found then return whole end
 		local ok, value = pcall(function() return tbl[name] end)
 		return ok and type(value) == "string" and string.format("%q", value) or whole
 	end
-	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
-		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	text = text:gsub('require%("settings.engine.keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("settings.engine.keys").' .. root_table .. "." .. name, root_table, name)
 	end)
 	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
 		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
@@ -75,6 +91,40 @@ function M.driver_root()
 	return (tests_dir:match("^(.*)[/\\\\]tests$") or tests_dir):gsub("\\\\", "/")
 end
 
+-- Top-level folders of the driver's production Lua, read once per process.
+local _production_heads = nil
+
+--- True when `name` is a module of this driver's production code: its first
+--- segment is a top-level folder holding the driver's Lua (tests/ excluded),
+--- and it does not resolve to a shared module. The folders come from the tree,
+--- never from a list of their names, so a package.loaded sweep through this
+--- predicate keeps covering a module that moves to another folder; a stub a
+--- test placed under such a name is covered too.
+--- @param name any A package.loaded key.
+--- @return boolean
+function M.is_driver_module(name)
+	if type(name) ~= "string" then return false end
+	if not _production_heads then
+		local root = (M.driver_root():gsub("[/\\]$", ""))
+		local paths, detail = require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true })
+		assert(paths, detail)
+		local heads = {}
+		for _, path in ipairs(paths) do
+			local head = path:sub(#root + 2):match("^([^/\\]+)[/\\]")
+			if head then heads[head] = true end
+		end
+		-- An empty inventory is no evidence: a sweep over it would clear nothing.
+		assert(next(heads), "no production folder under " .. root)
+		_production_heads = heads
+	end
+	local head = name:match("^([%w_]+)%.")
+	if not head or not _production_heads[head] then return false end
+	local file = package.searchpath(name, package.path)
+	return not (file and file:gsub("\\", "/"):find("/_shared/", 1, true))
+end
+
 -- Production sources, read once per process: the tree is never mutated by a test.
 local _production_sources = nil
 
@@ -82,7 +132,7 @@ local _production_sources = nil
 --- @return table bodies
 local function production_sources()
 	if _production_sources then return _production_sources end
-	local paths, detail = require("test.runner_discovery").files(M.driver_root(), function(name)
+	local paths, detail = require("tests.lua.core.runner_discovery").files(M.driver_root(), function(name)
 		return name:match("%.lua$") ~= nil
 	end, { tests = true })
 	assert(paths, detail)
@@ -122,7 +172,7 @@ end
 --- The source of a production module, resolved from its module name through
 --- package.searchpath exactly as require would find it, so a test listing
 --- several modules names them as the code does, never by a driver path.
---- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @param module_name string Dotted module name, e.g. "core.network.adapters.http_client".
 --- @return string|nil body, string|nil err Body, or nil plus why.
 function M.read_module_source(module_name)
 	local path, missing = package.searchpath(module_name, package.path)
@@ -134,27 +184,37 @@ function M.read_module_source(module_name)
 	return body
 end
 
+--- Finds a driver module's file by its module name, as require would.
+--- @param name string Module name.
+--- @return string|nil path nil when the driver holds no such module.
+function M.driver_module_path(name)
+	local root = M.driver_root()
+	return package.searchpath(name, root .. "/?.lua;" .. root .. "/?/init.lua")
+end
+
 --- Returns the tray root's source followed by every section module it binds.
---- ui/menu/builder.lua binds each section builder from its own
+--- menu/ui/builder/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.
 function M.read_menu_source()
-	local directory = M.driver_root() .. "/ui/menu/"
-	local function read(name)
-		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
+	local root = M.driver_root()
+	local search = root .. "/?.lua;" .. root .. "/?/init.lua"
+	local function read(path)
+		local handle = assert(io.open(path, "rb"))
 		local text = assert(handle:read("*a"))
 		assert(handle:close())
 		return text
 	end
 	-- A part may bind another part (the dialogs), which the root no longer names.
-	local texts, seen, index = { read("builder") }, {}, 1
+	-- The sections live in their features' folders: each is found by its module
+	-- name; a menu module outside the driver (a shared one) is not a section.
+	local texts, seen, index = { read(assert(package.searchpath("menu.ui.builder.builder", search))) }, {}, 1
 	while texts[index] do
-		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
-			if not seen[name] then
-				seen[name] = true
-				texts[#texts + 1] = read(name)
-			end
+		for name in texts[index]:gmatch('require%("([%w_%.]*menu[%w_%.]*)"%)') do
+			local path = not seen[name] and package.searchpath(name, search)
+			seen[name] = true
+			if path then texts[#texts + 1] = read(path) end
 		end
 		index = index + 1
 	end
@@ -172,8 +232,16 @@ end
 --- @param module_name string Dotted Lua module name to require.
 --- @return any The module's return value.
 function M.load_module(module_name)
+	local previous = package.loaded[module_name]
 	package.loaded[module_name] = nil
-	return require(module_name)
+	local ok, result = pcall(require, module_name)
+	if not ok then
+		-- LuaJIT leaves an error sentinel after a failed require. Restore the
+		-- original entry so later tests can still load this module normally.
+		package.loaded[module_name] = previous
+		error(result, 0)
+	end
+	return result
 end
 
 --- Loads a fresh instance of a module by name and leaves the package cache as
@@ -222,7 +290,7 @@ end
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
--- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- The seven assertions come from _shared/tests/lua/assertions.lua. Both drivers
 -- carried their own copy: six of the seven bodies were byte-identical once
 -- whitespace was normalised, and the seventh differed by a single COMMENT line.
 -- Two copies of an assertion library is two places for a fix to land in one of,
@@ -230,7 +298,7 @@ local deep_equal = fmt.deep_equal
 --
 -- fail_msg is injected because it is the one genuinely per-driver part: it skips
 -- the stack frames belonging to THIS file so a failure reports the caller's line.
-local _assertions = require("test.assertions").build("helpers%.lua$", fmt)
+local _assertions = require("tests.lua.assertions").build("helpers%.lua$", fmt)
 M.assert_eq        = _assertions.assert_eq
 M.assert_true      = _assertions.assert_true
 M.assert_nil       = _assertions.assert_nil
@@ -264,6 +332,14 @@ function M.openssl_stdout_receipt(command, output, status)
 	return output
 end
 
+--- The staging path the native TOML writer and the store use for a destination:
+--- named after this process (CFD-1, core/lifecycle/engine/stage_owner.lua).
+--- @param path string Destination path.
+--- @return string stage
+function M.stage_path(path)
+	return require("core.lifecycle.engine.stage_owner").stage_path(path)
+end
+
 --- Hands one admitted regular source to stdio on its own path name.
 --- Production reads TOML through a pinned /proc/self/fd alias, which a test's
 --- io.open double keyed on the path never sees. Native classification still
@@ -276,13 +352,13 @@ end
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
 function M.route_source_through_stdio(path, virtual)
-	local Reader = require("infra.regular_file_reader")
+	local Reader = require("core.fs.engine.regular_file_reader")
 	local native = Reader.open
 	local Writer, native_write
 	if virtual then
-		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer = require("core.fs.engine.regular_file_writer"); native_write = Writer.open
 		Writer.open = function(candidate, mode)
-			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			if candidate ~= M.stage_path(path) or mode ~= "wx" then return native_write(candidate, mode) end
 			local stream, detail, errno = io.open(candidate, "w")
 			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
 		end
@@ -354,17 +430,22 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
+	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
+	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	DialogHostGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
-		if ok == nil then return end
 	else
-		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 		ok, err = pcall(function()
 			if _before_each_fn then _before_each_fn() end
 			fn()
 		end)
 	end
+	NoticeRecorder.end_case()
+	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
+	DialogHostGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -389,6 +470,11 @@ function M.make_logger_stub()
 	}
 end
 
+--- What the current case sent through the recording notifier
+--- (tests/support/notice_recorder.lua), in order.
+--- @return table notices { { title, message, urgency, args }, ... }
+function M.recorded_notices() return NoticeRecorder.notices() end
+
 --- Returns the global test result tally.
 --- @return table { passed, failed, failures }
 function M.get_results() return _suite_results end
@@ -409,7 +495,7 @@ function M.set_only_filter(substr) _only_filter = substr end
 --- Support imports by E2E do not acquire a clock or claim unit timing coverage.
 function M.initialize_timing()
 	assert(_timing == nil, "Lua unit timing is already initialized")
-	_timing = require("test.runner_timing").capture("linux")
+	_timing = require("tests.lua.core.runner_timing").capture("linux")
 end
 
 --- Whether a package.loaded value is a test double: a table holding a function
@@ -431,6 +517,14 @@ local function is_test_double(value, roots)
 	return false
 end
 
+--- Whether a package.loaded value is a double defined by the test suite.
+--- @param value any Loaded value.
+--- @return boolean
+function M.is_fixture_double(value)
+	local driver = M.driver_root()
+	return is_test_double(value, { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/tests/lua/" })
+end
+
 --- Puts back every product module left replaced by a test double since a
 --- snapshot. Without this, one fixture that failed before its restore left
 --- doubles installed for every later module: the document fixture's timings
@@ -440,7 +534,7 @@ end
 --- @return string[] leaked Sorted names that held a double, now restored.
 function M.restore_leaked_doubles(before)
 	local driver = M.driver_root()
-	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" }
+	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/tests/lua/" }
 	local leaked = {}
 	for key, value in pairs(package.loaded) do
 		if type(key) == "string" and not key:match("^tests?%.") and value ~= before[key]
@@ -467,6 +561,37 @@ local function fail_leaked_doubles(name, before)
 	end
 end
 
+-- The tray root and the manifest facade it captured when it loaded.
+local TRAY_ROOT, TRAY_FACADE = "menu.ui.builder.builder", "menu.engine.manifest_menu"
+
+--- Forgets a tray root left cached under a manifest facade that was replaced
+--- since. The root builds nothing for a facade other than its own
+--- (menu/ui/builder/builder.lua, separator_facade_current), so every later
+--- module that required it read an empty tray: test_matches_manifest did this,
+--- and the shortcuts tests failed whenever no other file reloaded the root in
+--- between, as under `--only menu`. The new facade stays, since the modules
+--- loaded meanwhile captured it; the next require binds a fresh root to it.
+--- @param before table Shallow copy of package.loaded taken earlier.
+--- @return boolean forgotten Whether the root had been left stale.
+function M.forget_stale_tray_root(before)
+	local root = package.loaded[TRAY_ROOT]
+	if root == nil or root ~= before[TRAY_ROOT] or package.loaded[TRAY_FACADE] == before[TRAY_FACADE] then return false end
+	package.loaded[TRAY_ROOT] = nil
+	return true
+end
+
+--- Forgets a tray root a test module left stale and records one failure for it.
+--- @param name string Test module identity.
+--- @param before table Shallow copy of package.loaded before the module ran.
+local function fail_stale_tray_root(name, before)
+	if not M.forget_stale_tray_root(before) then return end
+	local err = "replaced package.loaded['" .. TRAY_FACADE .. "'] under a cached '" .. TRAY_ROOT
+		.. "'; forget the root before the module ends so the next require binds the new facade"
+	_suite_results.failed = _suite_results.failed + 1
+	_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = err, kind = "module", module = name }
+	print("  FAIL " .. name .. " — " .. err)
+end
+
 --- Records the current package.loaded entries a test module replaces, for the
 --- module to put back at its end (the runner fails a module that leaves a double).
 --- @param names string[] Module names the test module or its fixtures replace.
@@ -490,14 +615,116 @@ function M.measure_module(name, callback)
 	for key, value in pairs(package.loaded) do before[key] = value end
 	local previous = _current_module
 	_current_module = name
+	NotifySendGuard.enter_case(name .. " (outside a test case)")
+	DialogHostGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)
+	fail_stale_tray_root(name, before)
 	return ok, result
 end
 
 --- Reports timing admission failure without changing assertion counters.
 --- @return boolean failed True if clock or output diagnostics were incomplete.
 function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
+
+--- The modules of a feature family a test forgets or stubs as one set: the
+--- names that once shared one prefix (modules.keymap, modules.llm). The
+--- structure plan moves them into several feature folders over several steps,
+--- so no prefix pattern follows them; each member is listed by its module name,
+--- which every step respells. A name under the family's original prefix (a
+--- module not moved yet, or a stub's made-up name) belongs to it too.
+local MODULE_FAMILIES = {
+	["modules.llm"] = {
+		"ai.engine.agent.connectors",
+		"ai.engine.agent.learning",
+		"ai.engine.settings.agent_settings",
+		"ai.engine.settings.api_entries",
+		"ai.engine.settings.api_key_migration",
+		"ai.engine.api.api_ollama",
+		"ai.engine.api.api_remote",
+		"ai.engine.settings.api_token_store",
+		"ai.engine.api.backend_brands",
+		"ai.engine.api.context",
+		"ai.engine.settings.display_settings",
+		"ai.engine.settings.enable_admission",
+		"ai.engine.settings.error_log",
+		"ai.engine.local_servers.inference",
+		"ai.engine.ollama.local_model_offer",
+		"ai.engine.ollama.local_model_probe",
+		"ai.engine.local_servers.catalogue",
+		"ai.engine.local_servers.ports",
+		"ai.engine.local_servers.local_servers",
+		"ai.engine.ollama.managed_ollama_environment",
+		"ai.engine.ollama.managed_ollama_proxy",
+		"ai.engine.local_servers.model_delete",
+		"ai.engine.local_servers.model_download",
+		"ai.engine.local_servers.model_inventory",
+		"ai.engine.local_servers.model_profile",
+		"ai.engine.settings.navigation_settings",
+		"ai.engine.ollama.install_admission",
+		"ai.engine.ollama.install_files",
+		"ai.engine.ollama.install_resolver",
+		"ai.engine.ollama.install_state",
+		"ai.engine.ollama.installed_runtime",
+		"ai.engine.local_servers.owned_timer",
+		"ai.engine.prediction.engine",
+		"ai.engine.settings.profile_settings",
+		"ai.engine.settings.profiles",
+		"ai.engine.local_servers.runtime_composition",
+		"ai.engine.local_servers.runtime_factory",
+		"ai.engine.local_servers.runtime_source",
+		"ai.engine.settings.settings",
+		"ai.engine.prediction.translation",
+		"ai.engine.settings.trigger_settings",
+		"ai.engine.prediction.vision_request",
+		"ai.engine.local_servers.warmup",
+	},
+	["infra.llm_"] = {
+		"ai.engine.bridge",
+		"ai.engine.preferences",
+		"ai.engine.scope",
+	},
+	["modules.hotstrings"] = {
+		"hotstrings.engine.device_finder",
+		"hotstrings.engine.engine",
+		"hotstrings.engine.expansion_delay",
+		"hotstrings.engine.catalogue.config",
+		"hotstrings.engine.injector",
+		"hotstrings.engine.input_reader",
+		"hotstrings.engine.loader",
+		"hotstrings.engine.magic_key",
+		"modules.shortcuts.star_key_source",
+		"hotstrings.engine.output_tokens",
+		"hotstrings.engine.output_transaction",
+		"hotstrings.engine.preview_settings",
+		"hotstrings.engine.repeat_key",
+		"hotstrings.engine.selected_output",
+		"hotstrings.engine.matcher.terminator_settings",
+		"hotstrings.engine.word_reset",
+	},
+}
+local _family_members = {}
+for family, members in pairs(MODULE_FAMILIES) do
+	local set = {}
+	for _, name in ipairs(members) do set[name] = true end
+	_family_members[family] = set
+end
+
+--- Whether a module name belongs to a feature family of MODULE_FAMILIES.
+--- @param name any A package.loaded key.
+--- @param family string The family's original prefix, as MODULE_FAMILIES keys it.
+--- @param members_only boolean|nil true excludes the family's own root module name.
+--- @return boolean
+function M.in_module_family(name, family, members_only)
+	local members = assert(_family_members[family], "unknown module family " .. tostring(family))
+	if type(name) ~= "string" then return false end
+	if name == family then return not members_only end
+	if members[name] then return true end
+	-- A prefix that ends a name segment (infra.llm_) continues it; any other is a parent.
+	local stem = family:sub(-1) == "_" and family or family .. "."
+	return name:sub(1, #stem) == stem
+end
+
 
 return M

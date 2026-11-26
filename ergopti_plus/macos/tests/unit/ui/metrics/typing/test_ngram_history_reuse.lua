@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local TOKENS = 400
 
@@ -31,7 +31,7 @@ end
 --- Loads a fresh projection over a fake reader.
 --- @return table projection, table reader, table world
 local function fixture()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local Real = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 	local projection = helpers.load_with_stubs("ui.metrics_typing.projection")
 	projection.reset()
@@ -40,7 +40,8 @@ local function fixture()
 		next_day = Real.next_day,
 		split_bounds = Real.split_bounds,
 		merge_ngrams = Real.merge_ngrams,
-		fingerprint = function() return "unchanged" end,
+		history_fingerprint_exact = true, -- Controlled fixture with immutable historical rows.
+			fingerprint = function() return "unchanged" end,
 		read_today_split = function() return {}, true end,
 		read_ngrams = function() return dict_of(1), world.complete end,
 	}

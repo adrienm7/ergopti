@@ -11,15 +11,16 @@ local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
 local safe_read = require("tests.support.file_system_write_stub").read_with_status
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
-local VALID = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
+local VALID = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
 
 --- File content served for each read mode that reaches the payload.
 local CONTENT = {
 	success = VALID,
 	legacy_format = '{"manifest":"{}","app_icons":"{}","initial_data":"null","kc_layout":"{}"}',
-	truncated = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. (#PAYLOAD + 7) .. "\n" .. PAYLOAD,
+	truncated = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. (#PAYLOAD + 7) .. "\n" .. PAYLOAD,
 	old_version = "ERGOPTI_TYPING_METRICS_SNAPSHOT 1 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD,
 }
 
@@ -30,7 +31,7 @@ helpers.describe("typing metrics cache reads", function()
 			local previous_open, previous_remove, previous_rename = io.open, os.remove, os.rename
 			local ok, err = xpcall(function()
 				Scope.run(function()
-					package.loaded["adapters.file_system"] = {
+					package.loaded["core.fs.adapters.file_system"] = {
 						read_with_status = function(path, report)
 							if mode == "dependency" then error("PRIVATE_CACHE_PATH") end
 							if mode == "unreported_error" then return nil, "error", "PRIVATE_CACHE_PATH" end
@@ -56,11 +57,11 @@ helpers.describe("typing metrics cache reads", function()
 						codes[#codes + 1] = code
 						return self
 					end
-					package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
+					-- A present, empty store: a missing one is an incomplete read
+					EmptyStore.install(function()
 						fresh_reads = fresh_reads + 1
-						return nil
-					end
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					end)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					os.remove = function() unlinks = unlinks + 1; return true end

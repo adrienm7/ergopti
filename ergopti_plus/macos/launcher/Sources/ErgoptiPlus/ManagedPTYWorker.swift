@@ -133,7 +133,7 @@ enum ManagedPTYSource {
 	/// - Parameter home: Absolute home folder.
 	/// - Returns: The root path.
 	static func root(home: String) -> String {
-		return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/ErgoptiPlus")
+		return URL(fileURLWithPath: home).appendingPathComponent(kMacOSSupportHomeRelativePath)
 			.appendingPathComponent(folderName).standardizedFileURL.path
 	}
 
@@ -313,7 +313,7 @@ enum ManagedPTYWorker {
 	/// - Returns: The standardized admitted paths; empty for a refusal.
 	static func admittedSources(for selection: LuaSourceSelection) -> Set<String> {
 		guard let configDir = selection.configDir else { return [] }
-		let directory = URL(fileURLWithPath: configDir).appendingPathComponent("modules/llm")
+		let directory = URL(fileURLWithPath: configDir).appendingPathComponent("ai/engine")
 		return Set(admittedSourceNames.map { directory.appendingPathComponent($0).standardizedFileURL.path })
 	}
 

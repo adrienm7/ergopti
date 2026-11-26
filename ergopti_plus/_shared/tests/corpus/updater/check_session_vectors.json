@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of the update-check window's host contract and of the exhausted GitHub rate limit, replayed by _shared/lua/updater/check_session.lua and updater/rate_limit.lua (macOS and Linux, _shared/lua/test/check_session_contract.lua) and by the Windows host (windows/ui/update_check/init.ahk, modules/updater/core.ahk). answers: the window's answer per phase; checking is no answer yet. actions: the phases in which an action reaches its effect, for the answers below (a switch needs a channel its answer lists, which a failure's does not). state_messages: the fields the page receives for an answer; a field absent from expect may be anything, and a name in absent must not be sent. rate_limit: the sentence of a final response, \"\" when it is not an exhausted limit.",
+	"_comment": "Vectors of the update-check window's host contract and of the exhausted GitHub rate limit, replayed by _shared/updater/engine/check_session.lua and updater/engine/rate_limit.lua (macOS and Linux, _shared/tests/lua/check_session_contract.lua) and by the Windows host (windows/ui/update_check/init.ahk, modules/updater/core.ahk). answers: the window's answer per phase; checking is no answer yet. actions: the phases in which an action reaches its effect, for the answers below (a switch needs a channel its answer lists, which a failure's does not). state_messages: the fields the page receives for an answer; a field absent from expect may be anything, and a name in absent must not be sent. failure_reasons: the reason key a failed check shows for its reason and evidence (UPD-06). native_receipts: the managed-network receipt each closed terminal reason of the macOS launcher worker proves (core/network/engine/managed_http_protocol.lua, replayed by macos/tests/unit/modules/updater/test_update_auto_check.lua) and the key the shared contract (_shared/core/network/engine/failure.lua) and the failure rule give it on macOS and Linux (UPD-13). rate_limit: the sentence of a final response, \"\" when it is not an exhausted limit.",
 	"repository": { "owner": "adrienm7", "repo": "ergopti" },
 	"link": "https://github.com/adrienm7/ergopti/pull/1",
 	"switch_channel": "main",
@@ -84,6 +84,129 @@
 			"absent": ["notes", "check_only"]
 		}
 	],
+	"failure_reasons": [
+		{
+			"id": "no-evidence-could-not-reach-github",
+			"reason": "no_connection",
+			"expect": "updater.no_connection"
+		},
+		{
+			"id": "an-exhausted-rate-limit-is-named",
+			"reason": "no_connection",
+			"rate_limited": true,
+			"expect": "update_check.error_rate_limited"
+		},
+		{
+			"id": "a-proxy-cause-is-named",
+			"reason": "no_connection",
+			"report": { "cause": "proxy", "message_key": "network.failure.proxy" },
+			"expect": "network.failure.proxy"
+		},
+		{
+			"id": "an-offline-cause-is-named",
+			"reason": "no_connection",
+			"report": { "cause": "offline", "message_key": "network.failure.offline" },
+			"expect": "network.failure.offline"
+		},
+		{
+			"id": "a-certificate-cause-is-named",
+			"reason": "no_connection",
+			"report": { "cause": "certificate", "message_key": "network.failure.certificate" },
+			"expect": "network.failure.certificate"
+		},
+		{
+			"id": "a-blocked-host-is-named",
+			"reason": "no_connection",
+			"report": { "cause": "host_blocked", "message_key": "network.failure.host_blocked" },
+			"expect": "network.failure.host_blocked"
+		},
+		{
+			"id": "an-unknown-cause-keeps-the-reason",
+			"reason": "no_connection",
+			"report": { "cause": "unknown", "message_key": "network.failure.unknown" },
+			"expect": "updater.no_connection"
+		},
+		{
+			"id": "the-rate-limit-wins-over-a-network-report",
+			"reason": "no_connection",
+			"rate_limited": true,
+			"report": { "cause": "proxy", "message_key": "network.failure.proxy" },
+			"expect": "update_check.error_rate_limited"
+		},
+		{
+			"id": "a-parse-failure-ignores-network-evidence",
+			"reason": "parse_failed",
+			"rate_limited": true,
+			"report": { "cause": "proxy", "message_key": "network.failure.proxy" },
+			"expect": "updater.parse_failed"
+		},
+		{
+			"id": "a-key-foreign-to-its-cause-is-refused",
+			"reason": "no_connection",
+			"report": { "cause": "proxy", "message_key": "private.arbitrary" },
+			"expect": "updater.no_connection"
+		}
+	],
+	"native_receipts": [
+		{
+			"id": "an-offline-worker-is-named-offline",
+			"terminal": "offline",
+			"receipt": {
+				"backend": "urlsession",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"network_status": "disconnected"
+			},
+			"expect": "network.failure.offline"
+		},
+		{
+			"id": "a-refused-certificate-is-named",
+			"terminal": "certificate",
+			"receipt": {
+				"backend": "urlsession",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"tls_status": "untrusted_certificate"
+			},
+			"expect": "network.failure.certificate"
+		},
+		{
+			"id": "a-refusing-proxy-is-named",
+			"terminal": "proxy",
+			"receipt": {
+				"backend": "urlsession",
+				"stage": "proxy_resolve",
+				"failure_provenance": "verified",
+				"proxy_resolution_status": "unavailable"
+			},
+			"expect": "network.failure.proxy"
+		},
+		{
+			"id": "a-refused-connection-proves-no-cause",
+			"terminal": "connect",
+			"receipt": { "backend": "urlsession", "stage": "connect", "failure_provenance": "unknown" },
+			"expect": "updater.no_connection"
+		},
+		{
+			"id": "a-deadline-proves-no-cause",
+			"terminal": "deadline",
+			"receipt": {},
+			"expect": "updater.no_connection"
+		},
+		{
+			"id": "an-unavailable-route-proves-no-cause",
+			"terminal": "unavailable",
+			"receipt": {},
+			"expect": "updater.no_connection"
+		},
+		{
+			"id": "a-reason-the-table-does-not-name-proves-no-cause",
+			"terminal": "content_encoding",
+			"receipt": {},
+			"expect": "updater.no_connection"
+		}
+	],
 	"rate_limit": [
 		{
 			"id": "exhausted-403-names-the-reset",
@@ -111,6 +234,13 @@
 			"status": 429,
 			"remaining": "0",
 			"detail": "HTTP 429: the GitHub API rate limit is exhausted"
+		},
+		{
+			"id": "out-of-range-reset-is-no-time",
+			"status": 403,
+			"remaining": "0",
+			"reset": "999999999999999999999999999999999999",
+			"detail": "HTTP 403: the GitHub API rate limit is exhausted"
 		},
 		{
 			"id": "malformed-reset-is-no-time",

@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 --- Discovers source walkers themselves, so a new sibling cannot escape replay.
 --- @return table Array of test source paths and local helper symbols.

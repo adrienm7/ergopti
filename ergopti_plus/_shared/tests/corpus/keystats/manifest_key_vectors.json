@@ -1,0 +1,38 @@
+[
+	{
+		"label": "_system",
+		"key": "~_system"
+	},
+	{
+		"label": "_sys",
+		"key": "~_sys"
+	},
+	{
+		"label": "~app",
+		"key": "~~app"
+	},
+	{
+		"label": "~_system",
+		"key": "~~_system"
+	},
+	{
+		"label": "Editor",
+		"key": "Editor"
+	},
+	{
+		"label": "_SYSTEM",
+		"key": "_SYSTEM"
+	},
+	{
+		"label": "Éditeur 😀",
+		"key": "Éditeur 😀"
+	},
+	{
+		"label": "__proto__",
+		"key": "__proto__"
+	},
+	{
+		"label": "constructor",
+		"key": "constructor"
+	}
+]

@@ -35,7 +35,9 @@ _LDB_Run(Mode) {
 		Hwnd := Dialog.Hwnd
 		Dialog.Show("NoActivate w150 h100")
 		Other.Show("w150 h100")
-		Thrown := ""
+		; The caught state is the verdict for the press that must succeed: a
+		; refusal raised with an empty message is still a refusal.
+		Refused := false, Thrown := ""
 		State := LiveDriveWindow(() => Hwnd, (Found) => LiveClickDialogButton("Button1", Found), 1000)
 		try {
 			LiveAwaitDrive(State, "the owned dialog")
@@ -46,12 +48,14 @@ _LDB_Run(Mode) {
 					Sleep(10)
 				LiveAwaitDrive(State, "the owned dialog")
 			}
-		} catch Error as Refusal
+		} catch Error as Refusal {
+			Refused := true
 			Thrown := Refusal.Message
+		}
 		Sleep(100)
 		switch Mode {
 			case "pressed":
-				_LDB_Require(Thrown == "", "A press on a background dialog must succeed: " . Thrown)
+				_LDB_Require(!Refused, "A press on a background dialog must succeed: " . Thrown)
 				_LDB_Require(Pressed.Count == 1, "The button's own Click event must run once, got " . Pressed.Count)
 				_LDB_Require(!WinExist("ahk_id " . Hwnd), "The event must have closed its dialog.")
 			case "refused":

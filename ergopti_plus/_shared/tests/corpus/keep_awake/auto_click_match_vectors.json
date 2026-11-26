@@ -1,0 +1,283 @@
+{
+	"_comment": "Synthetic scenes for the anti-sleep auto-clicker matcher (_shared/shortcuts/engine/keep_awake/auto_click_matcher.lua and its Windows twin). A template is rows of characters mapped through palette to gray values. A scene is a width x height image filled with background, plus noise drawn from the Park-Miller generator (state = state * 16807 mod 2147483647, starting at seed; each pixel in row-major order adds state mod (2 * amplitude + 1) - amplitude, then clamps to 0..255), then each paste writes the template at its top-left x, y, enlarged or reduced by its power-of-two scale, with delta added to every pixel and clamped. overlay_noise, when present, is drawn the same way after the pastes, so a pasted button no longer matches exactly. A vector's template may itself be scaled (template_scale) to stand for a capture made at another density. expect is the match (top-left x, y, width, height in scene pixels and the scale factor tried on the template) or null; reason is the refusal reason when there is one. A vector with score_near also pins the best score to within 1e-6, and its threshold sits just under or over it.",
+	"palette": {
+		".": 230,
+		"x": 40,
+		"o": 120,
+		"-": 128
+	},
+	"templates": {
+		"button": [
+			"........................",
+			".xxxxxxxxxxxxxxxxxxxxxx.",
+			".x....................x.",
+			".x.ooo..o...o..ooo.o..x.",
+			".x.o.o..o...o..o.o.o..x.",
+			".x.ooo..o...o..o.o.o..x.",
+			".x.o.o..o...o..o.o.oo.x.",
+			".x.o.o..ooo.ooo.ooo.o.x.",
+			".x....................x.",
+			".x..xxxxxxxxxxxxxxxx..x.",
+			".xxxxxxxxxxxxxxxxxxxxxx.",
+			"........................"
+		],
+		"flat": ["------", "------", "------", "------", "------", "------"]
+	},
+	"options": {
+		"threshold": 0.92,
+		"scales": [1, 0.5, 2],
+		"coarse_min_px": 6,
+		"coarse_margin": 0.15,
+		"coarse_candidates": 8
+	},
+	"vectors": [
+		{
+			"id": "exact_match",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 7,
+					"amplitude": 3
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 37,
+						"y": 21,
+						"scale": 1,
+						"delta": 0
+					}
+				]
+			},
+			"template": "button",
+			"expect": {
+				"x": 37,
+				"y": 21,
+				"width": 24,
+				"height": 12,
+				"scale": 1
+			}
+		},
+		{
+			"id": "no_match",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 7,
+					"amplitude": 3
+				},
+				"pastes": []
+			},
+			"template": "button",
+			"expect": null
+		},
+		{
+			"id": "brightness_shift_still_matches",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 90,
+				"noise": {
+					"seed": 11,
+					"amplitude": 2
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 5,
+						"y": 40,
+						"scale": 1,
+						"delta": -30
+					}
+				]
+			},
+			"template": "button",
+			"expect": {
+				"x": 5,
+				"y": 40,
+				"width": 24,
+				"height": 12,
+				"scale": 1
+			}
+		},
+		{
+			"id": "threshold_edge_just_under_score",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 13,
+					"amplitude": 2
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 30,
+						"y": 30,
+						"scale": 1,
+						"delta": 0
+					}
+				],
+				"overlay_noise": {
+					"seed": 21,
+					"amplitude": 60
+				}
+			},
+			"template": "button",
+			"threshold": 0.937,
+			"score_near": 0.937058843517,
+			"expect": {
+				"x": 30,
+				"y": 30,
+				"width": 24,
+				"height": 12,
+				"scale": 1
+			}
+		},
+		{
+			"id": "threshold_edge_just_over_score",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 13,
+					"amplitude": 2
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 30,
+						"y": 30,
+						"scale": 1,
+						"delta": 0
+					}
+				],
+				"overlay_noise": {
+					"seed": 21,
+					"amplitude": 60
+				}
+			},
+			"template": "button",
+			"threshold": 0.9371,
+			"score_near": 0.937058843517,
+			"expect": null
+		},
+		{
+			"id": "retina_scene_2x",
+			"scene": {
+				"width": 128,
+				"height": 80,
+				"background": 200,
+				"noise": {
+					"seed": 3,
+					"amplitude": 3
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 50,
+						"y": 30,
+						"scale": 2,
+						"delta": 0
+					}
+				]
+			},
+			"template": "button",
+			"expect": {
+				"x": 50,
+				"y": 30,
+				"width": 48,
+				"height": 24,
+				"scale": 2
+			}
+		},
+		{
+			"id": "retina_template_on_1x_scene",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 5,
+					"amplitude": 3
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 20,
+						"y": 10,
+						"scale": 1,
+						"delta": 0
+					}
+				]
+			},
+			"template": "button",
+			"template_scale": 2,
+			"expect": {
+				"x": 20,
+				"y": 10,
+				"width": 24,
+				"height": 12,
+				"scale": 0.5
+			}
+		},
+		{
+			"id": "first_of_two_in_row_major_order",
+			"scene": {
+				"width": 96,
+				"height": 64,
+				"background": 200,
+				"noise": {
+					"seed": 9,
+					"amplitude": 0
+				},
+				"pastes": [
+					{
+						"template": "button",
+						"x": 60,
+						"y": 40,
+						"scale": 1,
+						"delta": 0
+					},
+					{
+						"template": "button",
+						"x": 4,
+						"y": 4,
+						"scale": 1,
+						"delta": 0
+					}
+				]
+			},
+			"template": "button",
+			"expect": {
+				"x": 4,
+				"y": 4,
+				"width": 24,
+				"height": 12,
+				"scale": 1
+			}
+		},
+		{
+			"id": "uniform_template_refused",
+			"scene": {
+				"width": 32,
+				"height": 32,
+				"background": 128,
+				"noise": {
+					"seed": 1,
+					"amplitude": 5
+				},
+				"pastes": []
+			},
+			"template": "flat",
+			"expect": null,
+			"reason": "template_uniform"
+		}
+	]
+}

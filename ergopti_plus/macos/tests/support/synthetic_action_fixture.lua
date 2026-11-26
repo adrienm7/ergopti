@@ -21,8 +21,8 @@ function M.load(module_name)
 	-- This fixture needs fresh production adapters for each scenario. Keep this
 	-- eviction local: the generic load helper must preserve package.loaded stubs
 	-- that a test intentionally installs before loading its subject.
-	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["tests.stubs.hs"] = nil
 	local eventtap = require("tests.stubs.hs").eventtap
 	local base_new_mouse = eventtap.event.newMouseEvent
@@ -38,8 +38,8 @@ function M.load(module_name)
 
 	local subject = helpers.load_with_stubs(module_name, { eventtap = eventtap })
 	local hs_table = _G.hs
-	local synthetic = require("adapters.synthetic_input")
-	local provenance = require("adapters.event_provenance")
+	local synthetic = require("platform.input.synthetic_input")
+	local provenance = require("diagnostics.adapters.event_provenance")
 
 	return {
 		subject = subject,

@@ -5,9 +5,9 @@ local helpers = require("tests.helpers")
 local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
-	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector",
-		"adapters.physical_observation_clock", "keystats.physical_context_observation",
-		"native_path", "error_description" }, function()
+	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector",
+		"adapters.physical_observation_clock", "metrics.engine.capture.physical_context_observation",
+		"core.fs.engine.native_path", "diagnostics.engine.reports.error_description" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
 			throw_property = nil, title = "Ordinary window", role = "AXTextField", subrole = nil,
 			queries = {}, clock = 100, records = {}, failures = {}, decision_calls = 0 }
@@ -231,6 +231,14 @@ helpers.describe("explicit dormant correlated context", function()
 		with_fixture(function(tracker, _, c)
 			c.bind(); c.activate(); c.title = "SECRET Private Browsing"; tracker.update_private_status()
 			helpers.assert_eq(last(c.records).correlated, true); helpers.assert_eq(last(c.records).complete, true)
+			helpers.assert_eq(last(c.records).private, true); helpers.assert_eq(last(c.records).allowed, false)
+		end)
+	end)
+
+	helpers.it("protects localized Firefox private titles after native identity qualification", function()
+		with_fixture(function(tracker, _, c)
+			c.bind(); c.activate(); c.title = "Mozilla Firefox — NAVIGATION PRIVÉE"; tracker.update_private_status()
+			helpers.assert_eq(last(c.records).correlated, true)
 			helpers.assert_eq(last(c.records).private, true); helpers.assert_eq(last(c.records).allowed, false)
 		end)
 	end)

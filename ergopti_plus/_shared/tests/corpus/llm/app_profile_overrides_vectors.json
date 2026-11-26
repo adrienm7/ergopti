@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of _shared/lua/llm/app_profile_overrides.lua: the per-application profile rule of llm.app_profile_overrides. normalize: the key an application is stored under; resolve: the profile for a focused application; decode: which stored texts are read, and into what; encode: the canonical text of a map (rows sorted by application). Replayed by the Linux and macOS Lua suites. The stored text is the v1 envelope Windows writes: v1: plus the Base64 of a JSON array of { app, profile } rows.",
+	"_comment": "Vectors of _shared/ai/engine/policy/app_profile_overrides.lua: the per-application profile rule of llm.app_profile_overrides. normalize: the key an application is stored under; resolve: the profile for a focused application; decode: which stored texts are read, and into what; encode: the canonical text of a map (rows sorted by application). Replayed by the Linux and macOS Lua suites. The stored text is the v1 envelope Windows writes: v1: plus the Base64 of a JSON array of { app, profile } rows.",
 	"normalize": [
 		{ "input": "slack", "expected": "slack" },
 		{ "input": "Slack", "expected": "slack" },

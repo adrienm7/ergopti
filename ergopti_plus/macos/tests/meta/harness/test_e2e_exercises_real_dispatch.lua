@@ -331,6 +331,16 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 			"a source mutation must target exactly one actual binding")
 		return source:sub(1, at - 1) .. after .. source:sub(at + #before)
 	end
+	-- A binding several jobs repeat (the Ollama build job shares the E2E
+	-- matrix env) is mutated inside the one job that owns it.
+	local function replace_in_job(source, job_id, before, after)
+		local header = "\n  " .. job_id .. ":\n"
+		local at = source:find(header, 1, true)
+		helpers.assert_true(at ~= nil and source:find(header, at + #header, true) == nil,
+			"a source mutation must target exactly one actual job")
+		local stop = source:find("\n  [%w_%-]+:[ \t]*\n", at + #header) or #source + 1
+		return source:sub(1, at - 1) .. replace_once(source:sub(at, stop - 1), before, after) .. source:sub(stop)
+	end
 	helpers.it("the actual role label resolves and a changed producer label cannot claim stub coverage", function()
 		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
 		local original = locate_harness(workflow, roles)
@@ -360,7 +370,7 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 				"the Integration output must forward the complete role map" },
 			{ "MACOS_STAGE_ROLE: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].role }}",
 				"MACOS_STAGE_ROLE: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.foreign].role }}",
-				"the human lot must retain its complete canonical role metadata" },
+				"the human lot must retain its complete canonical role metadata", "e2e-hs" },
 			{ "fromJSON(needs.integration-hs.outputs.e2e_matrix)", "fromJSON(needs.integration-hs.outputs.foreign)",
 				"the harness matrix must consume the actual Integration plan output" },
 			{ "e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}", "e2e_matrix: []",
@@ -371,7 +381,8 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 				"Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)\n        if: ${{ env.MACOS_STAGE_ROLE == 'foreign' }}",
 				"the harness must run only in its admitted matrix role" },
 		}) do
-			local changed = replace_once(workflow, mutation[1], mutation[2])
+			local changed = mutation[4] and replace_in_job(workflow, mutation[4], mutation[1], mutation[2])
+				or replace_once(workflow, mutation[1], mutation[2])
 			local accepted, reason = pcall(locate_harness, changed, roles)
 			helpers.assert_eq(accepted, false)
 			helpers.assert_true(type(reason) == "string" and reason:find(mutation[3], 1, true) ~= nil,

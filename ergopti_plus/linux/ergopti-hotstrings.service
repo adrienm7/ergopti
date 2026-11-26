@@ -30,6 +30,17 @@ Documentation=https://github.com/adrienm7/ergopti
 After=graphical-session.target
 PartOf=graphical-session.target
 
+# A bound on Restart=on-failure below. systemd's default burst (5 starts in
+# 10 s) never trips with RestartSec=3s: a daemon that fails the same way at
+# every start (no keyboard device, /dev/uinput unopenable until the next boot,
+# a keymap no tool can read) restarted every three seconds for the whole
+# session, re-showing its tray icon and notification each time, and brought
+# the icon back three seconds after Quit. Five starts within two minutes
+# covers a device or compositor that is late at login; past that the unit
+# stays failed and `systemctl --user status` says why.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
 [Service]
 Type=simple
 # The wrapper sets LUA_PATH and exec's luajit.
@@ -38,7 +49,7 @@ ExecStart=%h/.local/bin/ergopti-hotstrings --tray
 Restart=on-failure
 RestartSec=3s
 # 78 (EX_CONFIG) is the daemon saying the session cannot read the keyboard or
-# write /dev/uinput (infra/input_access.lua). The graphical launcher requests
+# write /dev/uinput (platform/input/access.lua). The graphical launcher requests
 # missing permissions and refreshes its groups before starting the daemon;
 # retrying a refused setup would repeat the prompt every three seconds.
 RestartPreventExitStatus=78
@@ -46,7 +57,7 @@ RestartPreventExitStatus=78
 # NO Environment=DISPLAY. It used to be pinned to :0 — wrong on a second seat,
 # wrong under Wayland, and worst of all silently RIGHT often enough that the bug
 # only ever appeared for the users who switch. The daemon probes the session at
-# runtime (infra/display_server.lua) and re-probes on demand, so the unit must
+# runtime (core/ui/engine/display_server.lua) and re-probes on demand, so the unit must
 # not tell it an answer.
 #
 # DBUS_SESSION_BUS_ADDRESS is not pinned either: a systemd --user service

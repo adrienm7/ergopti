@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (order, separators, sections) is read from
----    ``_shared/modules/menu/menu_manifest.json`` via ``infra/manifest_menu``.
+---    ``_shared/menu/data/menu_manifest.json`` via ``infra/manifest_menu``.
 ---    Native getters and commands supply state and effects; only the app
 ---    exclusion count needs a computed provider label.
 --- 2. Orchestration: Bridges the isolated UI components (menubar, widget) and
@@ -22,19 +22,23 @@
 local M = {}
 local hs = hs
 local fs = require("hs.fs")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local MetricsState = require("infra.metrics_state_keys")
 
-local AppPickerLib  = require("infra.app_picker")
-local dialog        = require("infra.dialog_util")
+local AppPickerLib  = require("apps.engine.picker")
+local dialog        = require("core.ui.engine.dialog_util")
 local kl_mod        = require("modules.keystats")
-local i18n          = require("infra.i18n")
-local ManifestMenu  = require("infra.manifest_menu")
-local Manifest      = require("infra.manifest_reader")
-local Logger        = require("infra.logger")
-local ParentSource = require("menu.frames.parent_source")
+local i18n          = require("core.i18n.engine.i18n")
+local ManifestMenu  = require("menu.engine.manifest_menu")
+local Manifest      = require("menu.engine.manifest_reader")
+local Logger        = require("core.logger.engine.logger")
+local ParentSource = require("menu.engine.frames.parent_source")
 
 local LOG = "menu_metrics"
+local exclusion_transactions = setmetatable({}, { __mode = "k" })
+-- Token of the Metrics start waiting for the hardware UUID read; a later toggle
+-- replaces or clears it so a stale read cannot start the engine.
+local _pending_activation = nil
 
 
 
@@ -117,23 +121,33 @@ function M.build(ctx)
 	local script_control = ctx.script_control
 
 	-- Sync widget visibility on every build so a reload restores the saved state.
-	-- Keystats start/stop is handled by sync_state_to_modules in init.lua.
+	-- Keystats start/stop is handled by sync_state_to_modules in ../../menu/ui/init.lua.
 	-- Gate the WPM UIs on pause too: pause_all() never tears them down, but the
 	-- pause-change listener calls updateMenu() (this build), so honouring the pause
 	-- state HERE is what stops the widget's 0.2 s timer + mouse eventtap and the
 	-- menubar's 0.5 s timer while « tout est éteint », and restarts them on resume.
 	-- Without it the WPM timers kept polling get_live_stats() and re-rendering the
 	-- canvas under pause.
-	local paused = script_control and type(script_control.is_paused) == "function"
-		and script_control.is_paused() or false
 	-- Live pause state for the interactive toggle handlers below. They run at CLICK
 	-- time (later than this build), so re-derive pause then — toggling a WPM feature
 	-- ON while paused must record the preference but NOT arm the 0.2s render timer +
 	-- global mouse eventtap until resume (« pause = tout éteint », F-L10).
+	local pause_warning_logged = false
 	local function paused_now()
-		return script_control and type(script_control.is_paused) == "function"
-			and script_control.is_paused() or false
+		local ok, value = false, nil
+		if type(script_control) == "table" and type(script_control.is_paused) == "function" then
+			ok, value = pcall(script_control.is_paused)
+		end
+		if not ok or type(value) ~= "boolean" then
+			if not pause_warning_logged then
+				pause_warning_logged = true
+				Logger.warn(LOG, "Pause state is unavailable; WPM surfaces remain stopped.")
+			end
+			return true
+		end
+		return value
 	end
+	local paused = paused_now()
 
 	--- Persists one WPM state transition without letting a menu callback throw.
 	--- @param label string Diagnostic operation label.
@@ -316,7 +330,7 @@ function M.build(ctx)
 		-- the tick through these instead of the handler setting it.
 		metrics_menubar_wpm    = function() return state.keystats_menubar_wpm end,
 		metrics_menubar_colors = function() return state.keystats_menubar_colors end,
-		metrics_encrypt_enabled = function() return state.keystats_encrypt end,
+		metrics_encrypt_enabled = function() return require("modules.keystats.text_cipher").is_enabled() == true end,
 		-- The user's pause is a runtime state of the keystats module, never a stored
 		-- preference: the tick reads the module itself.
 		metrics_suspended = function() return kl_mod.is_collection_suspended() end,
@@ -371,6 +385,7 @@ function M.build(ctx)
 	end
 
 	local function rows_exclude_apps(_ctx)
+		local captured_apps = state.keystats_disabled_apps
 		local disabled_count = #(type(state.keystats_disabled_apps) == "table" and state.keystats_disabled_apps or {})
 		local label = disabled_count > 0
 			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
@@ -378,13 +393,39 @@ function M.build(ctx)
 		local exclusion_menu = AppPickerLib.build_menu(
 			state.keystats_disabled_apps,
 			function(new_list)
-				state.keystats_disabled_apps = new_list
-				local Keystats = require("modules.keystats")
-				if type(Keystats.set_disabled_apps) == "function" then
-					pcall(Keystats.set_disabled_apps, new_list)
+				if exclusion_transactions[state] then return false end
+				exclusion_transactions[state] = true
+				local completed, committed = xpcall(function()
+					if state.keystats_disabled_apps ~= captured_apps then return false end
+					local Keystats = require("modules.keystats")
+					local setter = Keystats.set_disabled_apps
+					if type(setter) ~= "function" then
+						Logger.error(LOG, "Excluded-app runtime setter is unavailable.")
+						return false
+					end
+					local applied, result = pcall(setter, new_list)
+					if not applied or result == false then
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app runtime update failed; rollback called=%s.", tostring(restored))
+						return false
+					end
+					state.keystats_disabled_apps = new_list
+					local saved, receipt = pcall(save_prefs)
+					if not saved or receipt ~= true then
+						state.keystats_disabled_apps = captured_apps
+						local restored = pcall(setter, captured_apps or {})
+						Logger.error(LOG, "Excluded-app preferences were refused; runtime rollback called=%s.", tostring(restored))
+						return false
+					end
+					pcall(updateMenu)
+					return true
+				end, debug.traceback)
+				exclusion_transactions[state] = nil
+				if not completed then
+					Logger.error(LOG, "Excluded-app update raised; changes were not acknowledged.")
+					return false
 				end
-				if save_prefs() ~= true then return false end
-				pcall(updateMenu)
+				return committed == true
 			end,
 			i18n.get("menu.metrics.exclude_apps")
 		)
@@ -474,22 +515,29 @@ function M.build(ctx)
 		-- real backend, and it refuses to tick when no key can be derived.
 		local TextCipher = require("modules.keystats.text_cipher")
 		local want = not state.keystats_encrypt
+		if want and TextCipher.prepare_roi_encryption() ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		if want and not TextCipher.is_available() then
-			-- Existing keys, already translated in all 21 locales: the only
-			-- way the key derivation fails on a Mac is a missing openssl,
-			-- which is exactly what this message says.
+			TextCipher.abandon_roi_encryption(state.keystats_encrypt)
 			dialog.block_alert(
 				i18n.get("dialog.metrics.encryptor_error_title"),
-				i18n.get("apps.encryptor.err_openssl_missing"),
+				i18n.get("dialog.metrics.encryption_unavailable"),
 				i18n.get("button.ok"))
-			return
+			return false
 		end
-		TextCipher.set_enabled(want)
+		if TextCipher.set_enabled(want) ~= true then
+			dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"),
+				i18n.get("dialog.metrics.encryption_pending_write"), i18n.get("button.ok"))
+			return false
+		end
 		state.keystats_encrypt = want
 		if save_prefs() ~= true then return false end
 		local Keystats = require("modules.keystats")
 		if type(Keystats.set_options) == "function" then
-			Keystats.set_options({ encrypt = want })
+			if Keystats.set_options({ encrypt = want }) ~= true then return false end
 		end
 		-- The rows already stored predate this click, and the setting is
 		-- worthless to a user with a year of logs unless they are converted
@@ -498,6 +546,7 @@ function M.build(ctx)
 		-- would convert nothing and report success.
 		require("modules.keystats.text_migration").start_for_posture(want)
 		updateMenu()
+		return true
 	end
 
 
@@ -511,6 +560,65 @@ function M.build(ctx)
 	local list_providers = {
 		exclude_apps = rows_exclude_apps,
 	}
+
+	--- Starts the keystats engine and the WPM producers once Metrics is ON,
+	--- compensating the published preference when the engine refuses.
+	--- @param Keystats table The keystats module.
+	--- @param WpmMenubar table|nil The WPM menubar module.
+	--- @param WpmWidget table|nil The WPM widget module.
+	--- @return boolean committed
+	local function activate_runtime(Keystats, WpmMenubar, WpmWidget)
+		local start_ok, started = pcall(Keystats.start, script_control)
+		if not start_ok or started ~= true then
+			-- The preference was published before runtime activation. Compensate
+			-- transactionally so the checkmark cannot claim Metrics is active while
+			-- its security-context watcher (and therefore the engine) is absent.
+			state.keystats_enabled = false
+			local rollback_saved = save_prefs() == true
+			state.keystats_enabled = false
+			Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
+				tostring(rollback_saved))
+			if WpmMenubar then
+				call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+			end
+			if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
+			updateMenu()
+			return false
+		end
+		if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
+			pcall(WpmMenubar.set_use_source_colors, state.keystats_menubar_colors)
+		end
+		if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
+			pcall(WpmWidget.set_use_source_colors, state.keystats_float_colors)
+		end
+		-- Gate on pause exactly like the 5 sibling per-feature toggles above
+		-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
+		-- dyn_include_realtime): re-enabling the master switch while paused must
+		-- record the preference but NOT arm the widget's 0.2s render timer +
+		-- global mouse eventtap or the menubar's 0.5s timer until resume
+		-- (« pause = tout éteint », F-L10) — this call site was the one place
+		-- that still started both unconditionally on re-enable (F-LOW-13).
+		local wpm_committed = true
+		if state.keystats_menubar_wpm and not paused_now() then
+			if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
+				compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
+				wpm_committed = false
+			end
+		end
+		if state.keystats_float_wpm and not paused_now() then
+			if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
+				state.keystats_float_graph) then
+				compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
+				wpm_committed = false
+			end
+		end
+		if not wpm_committed then
+			updateMenu()
+			return false
+		end
+		updateMenu()
+		return true
+	end
 
 	--- The category switch: the metrics submenu's first row (the manifest's
 	--- metrics_toggle). It used to be the parent row's action, which AppKit never
@@ -555,55 +663,33 @@ function M.build(ctx)
 			if Keystats and type(Keystats.set_disabled_apps) == "function" then
 				pcall(Keystats.set_disabled_apps, state.keystats_disabled_apps or {})
 			end
-			local start_ok, started = pcall(Keystats.start, script_control)
-			if not start_ok or started ~= true then
-				-- The preference was published before runtime activation. Compensate
-				-- transactionally so the checkmark cannot claim Metrics is active while
-				-- its security-context watcher (and therefore the engine) is absent.
-				state.keystats_enabled = false
-				local rollback_saved = save_prefs() == true
-				state.keystats_enabled = false
-				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
-					tostring(rollback_saved))
-				if WpmMenubar then
-					call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop")
+			-- The first start needs the hardware UUID. Read on the main thread it
+			-- holds the run loop about 150 ms (field report 2026-11-03), so a toggle
+			-- with no boot prefetch reads it in an ioreg child and starts once the
+			-- read settles. A failed read resumes too: the start then reads it
+			-- synchronously, as the boot path does.
+			if type(Keystats.prepare_start) == "function" then
+				local token = {}
+				_pending_activation = token
+				local prepared, ready = pcall(Keystats.prepare_start, function()
+					if _pending_activation ~= token then return end
+					_pending_activation = nil
+					if not state.keystats_enabled then return end
+					activate_runtime(Keystats, WpmMenubar, WpmWidget)
+				end)
+				if prepared and ready == false then
+					Logger.info(LOG, "Metrics start waits for the hardware UUID read.")
+					updateMenu()
+					return true
 				end
-				if WpmWidget then call_wpm_lifecycle("WPM widget", WpmWidget, "stop") end
-				updateMenu()
-				return false
-			end
-			if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
-				pcall(WpmMenubar.set_use_source_colors, state.keystats_menubar_colors)
-			end
-			if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
-				pcall(WpmWidget.set_use_source_colors, state.keystats_float_colors)
-			end
-			-- Gate on pause exactly like the 5 sibling per-feature toggles above
-			-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
-			-- dyn_include_realtime): re-enabling the master switch while paused must
-			-- record the preference but NOT arm the widget's 0.2s render timer +
-			-- global mouse eventtap or the menubar's 0.5s timer until resume
-			-- (« pause = tout éteint », F-L10) — this call site was the one place
-			-- that still started both unconditionally on re-enable (F-LOW-13).
-			local wpm_committed = true
-			if state.keystats_menubar_wpm and not paused_now() then
-				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-					compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
-					wpm_committed = false
+				_pending_activation = nil
+				if not prepared then
+					Logger.warn(LOG, "Metrics start preparation raised (%s); starting now.", tostring(ready))
 				end
 			end
-			if state.keystats_float_wpm and not paused_now() then
-				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-					state.keystats_float_graph) then
-					compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
-					wpm_committed = false
-				end
-			end
-			if not wpm_committed then
-				updateMenu()
-				return false
-			end
+			return activate_runtime(Keystats, WpmMenubar, WpmWidget)
 		else
+			_pending_activation = nil
 			local runtime_settled = true
 			local stop_ok, stopped = pcall(Keystats.stop)
 			if not stop_ok or stopped ~= true then
@@ -632,26 +718,27 @@ function M.build(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.state_getters = STATE_GETTERS
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.METRICS_TOGGLE] = toggle_metrics,
-		[require("config_keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
-		[require("config_keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
-		[require("config_keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
-		[require("config_keys").COMMAND.FILTER_PRIVATE] = cmd_filter_private,
-		[require("config_keys").COMMAND.FILTER_SECURE]  = cmd_filter_secure,
-		[require("config_keys").COMMAND.FILTER_SYSAUTH] = cmd_filter_sysauth,
+		[require("settings.engine.keys").COMMAND.METRICS_TOGGLE] = toggle_metrics,
+		[require("settings.engine.keys").COMMAND.WPM_WIDGET] = cmd_wpm_widget,
+		[require("settings.engine.keys").COMMAND.WIDGET_COLORS] = cmd_widget_colors,
+		[require("settings.engine.keys").COMMAND.INCLUDE_REALTIME] = cmd_include_realtime,
+		[require("settings.engine.keys").COMMAND.FILTER_PRIVATE] = cmd_filter_private,
+		[require("settings.engine.keys").COMMAND.FILTER_SECURE]  = cmd_filter_secure,
+		[require("settings.engine.keys").COMMAND.FILTER_SYSAUTH] = cmd_filter_sysauth,
 		["encryption"]     = cmd_encryption,
-		[require("config_keys").COMMAND.RESET_WPM_POSITION] = cmd_reset_wpm_position,
-		[require("config_keys").COMMAND.SHOW_TYPING]    = cmd_show_typing,
-		[require("config_keys").COMMAND.SHOW_APPS]      = cmd_show_apps,
-		[require("config_keys").COMMAND.METRICS_SUSPEND] = cmd_metrics_suspend,
-		[require("config_keys").COMMAND.METRICS_RESET_SESSION] = cmd_metrics_reset_session,
-		[require("config_keys").COMMAND.WPM_MENUBAR]    = cmd_wpm_menubar,
-		[require("config_keys").COMMAND.MENUBAR_COLORS] = cmd_menubar_colors,
+		[require("settings.engine.keys").COMMAND.RESET_WPM_POSITION] = cmd_reset_wpm_position,
+		[require("settings.engine.keys").COMMAND.SHOW_TYPING]    = cmd_show_typing,
+		[require("settings.engine.keys").COMMAND.SHOW_APPS]      = cmd_show_apps,
+		[require("settings.engine.keys").COMMAND.METRICS_SUSPEND] = cmd_metrics_suspend,
+		[require("settings.engine.keys").COMMAND.METRICS_RESET_SESSION] = cmd_metrics_reset_session,
+		[require("settings.engine.keys").COMMAND.WPM_MENUBAR]    = cmd_wpm_menubar,
+		[require("settings.engine.keys").COMMAND.MENUBAR_COLORS] = cmd_menubar_colors,
 	}
 	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
 	-- The Configuration clear still composes the metrics scope owner.
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
-		if paused_now() or type(ctx.apply_preference_scope) ~= "function" then return false end
+	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
+		if type(ctx.apply_preference_scope) ~= "function" then return false end
 		return ctx.apply_preference_scope("metrics", "recommended")
 	end
 

@@ -7,17 +7,17 @@
 --- ==============================================================================
 
 local root, receipt = assert(arg[1]), assert(arg[2])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
-local Clock = require("infra.monotonic")
-local Timings = require("infra.timings")
+local Clock = require("core.logger.engine.monotonic")
+local Timings = require("core.timing.engine.timings")
 local Calendar = require("modules.keystats.calendar")
-local Hook = require("adapters.keyboard_hook")
-local Reader = require("modules.hotstrings.input_reader")
+local Hook = require("platform.input.keyboard_hook")
+local Reader = require("hotstrings.engine.input_reader")
 local helpers = require("tests.helpers")
 local known = Reader.get_layouts()
 assert(known.qwerty and known.azerty, "the actual physical family registry must support both controls")

@@ -38,9 +38,9 @@ local function expect(ok, label)
 end
 
 local Updater = require("modules.updater.manager")
-local Json = require("json")
-local Redact = require("diagnostics.redact")
-local rules = assert(Json.decode(read(DRIVER .. "/../_shared/modules/diagnostics/redaction.json")))
+local Json = require("core.text.engine.json")
+local Redact = require("diagnostics.engine.reports.redact")
+local rules = assert(Json.decode(read(DRIVER .. "/../_shared/diagnostics/data/redaction.json")))
 local http_evidence = { schema_version = 1, responses = {} }
 local evidence_dir = os.getenv("ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR")
 local transport_get = Updater._http_client.get
@@ -198,9 +198,9 @@ local get_release = Updater.get_cached_release
 local get_state = Updater.get_state
 local selected = get_release()
 local selected_tag = selected and selected.tag
-local install_done, installed = false, false
-local accepted = install(archive, function(ok)
-	install_done, installed = true, ok == true
+local install_done, installed, install_detail = false, false, nil
+local accepted = install(archive, function(ok, detail)
+	install_done, installed, install_detail = true, ok == true, detail
 end, function()
 	return probe_active and not install_done
 		and package.loaded["modules.updater.manager"] == Updater
@@ -214,7 +214,28 @@ end)
 if accepted == true or get_state() == "installing" then
 	while not install_done do luv.run("once") end
 end
-if not expect(accepted == true and install_done and installed, "installed") then finish(1) end
+-- A release published before the structure move lacks the shared sentinel
+-- this updater's receipt schema names, and the running updater owns that
+-- schema (installer.lua record_ownership_with): it refuses the release by
+-- design. The pre-move releases are recorded, with the helpers they shipped,
+-- under tools/test/fixtures/linux-pre-move-ownership, which leaves with the
+-- legacy update probes. Until a post-move release is published, the run proves
+-- that refusal and the kept installation instead of an install (exit 3).
+local tag = tostring(first.tag)
+local pre_move = tag:match("^v[%w.%-]+$") ~= nil and read(DRIVER
+	.. "/../../../tools/test/fixtures/linux-pre-move-ownership/" .. tag .. "/ownership_schema.sh.frozen") ~= nil
+if pre_move then
+	expect(accepted == true and install_done and not installed
+		and install_detail == "could not record the new installation's file ownership",
+		"the post-move updater refuses the pre-move release " .. tag .. " (" .. tostring(install_detail) .. ")")
+	local kept = read(HOME .. "/.local/lib/ergopti/_shared/build_stamp.txt") or ""
+	expect(kept:match("version=([^\n]+)") == "0.0.0-dev.1", "the installation it refused leaves the old build in place")
+	print("  (the install proof waits for the first release published after the structure move)")
+	finish(#failures == 0 and 3 or 1)
+end
+-- The installer's own refusal reason is the only CI evidence of why it failed.
+if not expect(accepted == true and install_done and installed,
+	"installed (" .. tostring(install_detail) .. ")") then finish(1) end
 
 local stamp = read(HOME .. "/.local/lib/ergopti/_shared/build_stamp.txt") or ""
 local installed = stamp:match("version=([^\n]+)")

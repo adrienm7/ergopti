@@ -26,7 +26,7 @@ helpers.describe("remap setters send their own leaf intent (remap-leaf-intent)",
 		with_fixture(function(fixture)
 			local remap, calls = fixture.load_enabled_remap()
 			local cases = {
-				{ function() return remap.set_mod_combos_enabled(false) end, "mod_combos.enabled" },
+				{ function() return remap.set_key_combinations_enabled(false) end, "category_enabled.key_combinations" },
 				{ function() return remap.set_tap_holds_enabled(true) end, "tap_holds.enabled" },
 				{ function() return remap.set_combo_symmetric(true) end, "mod_combos.symmetric" },
 				{ function() return remap.set_tap_hold_timeout(321) end, "tap_holds.timeout_ms" },

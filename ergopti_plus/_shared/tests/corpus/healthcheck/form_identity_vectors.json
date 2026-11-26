@@ -1,5 +1,6 @@
 {
-	"description": "Golden vectors for the version and operating system the Debug > Report a bug issue form shows (healthcheck share document, fields.version and fields.os). A source run reports the version \"local\" and a commit tagged (git): the form says \"dev source <commit>\", never \"unknown\". The system is the name and version the driver reported, then (desktop, session, architecture) for what is known; a name outside the closed grammar of the platform_name rule (a path, an address) is dropped and the driver name stands in. Replayed by the macOS and Linux Lua suites and the AHK suite through the share document.",
+	"description": "Golden vectors for the version and operating system the Debug > Report a bug issue form shows (healthcheck share document, fields.version and fields.os). A source run reports the version \"local\" and a commit tagged (git): the form says \"dev source <commit>\", never \"unknown\". The system is the name and version the driver reported, then (desktop, session, architecture) for what is known; a name outside the closed grammar of the platform_name rule (a path, an address) is dropped and the driver name stands in. Replayed by the macOS and Linux Lua suites and the AHK suite through the share document. `driver_options` is the Driver dropdown option each driver sends (fields.driver): the bug and feature forms list exactly these, in this order (tools/test/test-issue-templates.cjs).",
+	"driver_options": { "macos": "macOS", "windows": "Windows", "linux": "Linux" },
 	"vectors": [
 		{
 			"id": "macos_release",

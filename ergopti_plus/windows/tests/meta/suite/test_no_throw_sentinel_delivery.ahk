@@ -60,7 +60,6 @@ _AMSG_MetaCallback(Callback) {
 
 _AMSG_Vectors := [
 	["text sender containment", _TSSIF_AdapterMethodsContainSendInputFailure, TextEraseChars],
-	["logger fanout", TestLogger_FanOutQueueSurvivesFlushSwap, _LoggerFanOut],
 	["remote trim", _RemoteTrimRegistry_DetachesBeforeReentrantCallback, _LLMRemote_TrimAsyncRegistry],
 	["Ollama trim", _OllamaTrimRegistry_DetachesBeforeReentrantCallback, _LLM_Ollama_TrimAsyncRegistry],
 	["LLM containment", _AMSG_MetaCallback.Bind(_LCS_ThrowingCallbackIsLoggedNotSwallowed), _LLM_InvokeCallback],
@@ -70,7 +69,7 @@ _AMSG_Vectors := [
 	["save fixture cleanup", _CBRF_SaveFixtureRestoresPendingCaller, _CBRF_SaveDeclinesWhileFlagged],
 	["API removal cancellation", _WAR_RemovalRetainsSource.Bind("no"), _LLM_Menu_RemoveActiveApiEntry],
 	["model deletion cancellation", _LDCO_ConfirmationRetainsOwner.Bind("no"), _LLM_Menu_PromptDeleteCachedModel],
-	["native editor cohort", _MET_CohortRefusal.Bind(""), MagicEditorAcquireCohort]
+	["native editor cohort", _MET_CohortRefusal.Bind(""), StarSlotAcquireCohort]
 ]
 for _AMSG_Vector in _AMSG_Vectors {
 	Test("no-throw sentinel: " . _AMSG_Vector[1] . " healthy control (empty-message-owner)",

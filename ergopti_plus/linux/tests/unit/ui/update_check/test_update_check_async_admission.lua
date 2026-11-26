@@ -3,16 +3,17 @@
 --- Actual caller with controlled collaborator receipts; no GUI/native ACK claim.
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
-local function scenario(dispatch, body)
- local names = { "ui.update_check.bridge", "ui.download_window.bridge", "infra.installation" }
+local function scenario(dispatch, body, window)
+ local names = { "ui.update_check.bridge", "ui.download_window.bridge", "core.lifecycle.engine.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { completed = {}, finished = {}, installs = 0, paused = false }
  local ok, err = xpcall(function()
   package.loaded["ui.update_check.bridge"] = nil
-  package.loaded["infra.installation"] = { is_source_run = function() return false end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
   package.loaded["ui.download_window.bridge"] = {
-   show = function(options) h.window = options; return 7 end,
-   install_admission_current = function(id) return id == 7 and not h.paused end,
+   show = function(options) h.window = options; return (window or {}).session_id ~= false and 7 or nil end,
+   -- A closed page refuses a window admission (UPD-05): the install must not ask it
+   install_admission_current = function(id) return id == 7 and not h.paused and not (window or {}).closed end,
    complete = function(_, installed) h.completed[#h.completed + 1] = installed end,
   }
   local release = { tag = "v1.2.3", download_url = "https://release/archive", checksum_url = "https://release/checksum" }
@@ -64,12 +65,23 @@ test("update delayed accepted native completion survives later pause", function(
   assert(#h.finished == 1 and h.finished[1] == true)
  end)
 end)
-assert(#tests == 4, "actual update async admission control floor")
+test("upd-05: an update whose download window was closed still installs", function()
+ scenario(function(_, done) done(true); return true end, function(h)
+  assert(#h.finished == 1 and h.finished[1] == true, "closing the window must not refuse the install")
+ end, { closed = true })
+end)
+test("upd-05: an update whose download window never opened still installs", function()
+ scenario(function(_, done) done(true); return true end, function(h)
+  assert(#h.finished == 1 and h.finished[1] == true, "a missing window must not refuse the install")
+  assert(#h.completed == 0, "no window session receives the outcome")
+ end, { session_id = false })
+end)
+assert(#tests == 6, "actual update async admission control floor")
 
 -- Genuine normal registration retains every independent body and oracle.
 local helpers = require("tests.helpers")
 helpers.describe("Native Update Caller Admission", function()
-	assert(#tests == 4, "Independent case floor changed")
+	assert(#tests == 6, "Independent case floor changed")
 	for _, case in ipairs(tests) do
 		assert(type(case[1]) == "string" and type(case[2]) == "function", "Independent registration refused")
 		helpers.it(case[1], case[2])

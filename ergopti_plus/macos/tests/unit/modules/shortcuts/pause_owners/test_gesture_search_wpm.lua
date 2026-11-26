@@ -15,7 +15,7 @@ local load_inventory_context = fixtures.load_inventory_context
 
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
-	local input = package.loaded["adapters.synthetic_input"]
+	local input = package.loaded["platform.input.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end
 		tx.status, tx.sealed = status, true
@@ -55,7 +55,7 @@ local function load_real_wpm_surface(module_name)
 	local cancel_mode = "true"
 	local handles = {}
 	local cancellations = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		every = function(_, callback)
 			local handle = { callback = callback }
 			handles[#handles + 1] = handle
@@ -69,7 +69,7 @@ local function load_real_wpm_surface(module_name)
 			return true
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm = 0 } end,
 	}
@@ -81,13 +81,13 @@ local function load_real_wpm_surface(module_name)
 	}
 	-- A healthy idle surface still needs its canonical display configuration.
 	-- Keep only the scheduler timings controlled by this ownership fixture.
-	package.loaded["infra.paths"] = { shared = helpers.shared }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,
 	}
-	package.loaded["adapters.graphics_renderer"] = {}
-	package.loaded["ui.tooltip"] = { is_visible = function() return false end }
+	package.loaded["core.ui.adapters.graphics_renderer"] = {}
+	package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
 	reset_module(module_name)
 	local surface = require(module_name)
 	return surface, {
@@ -130,7 +130,7 @@ end)
 
 local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and name:match("^modules%.gestures%.actions") then
+		if type(name) == "string" and name:match("^gestures%.engine%.actions") then
 			package.loaded[name] = nil
 		end
 	end
@@ -141,22 +141,22 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	package.loaded["hs"] = hs_stub
 
 	local selection_reads = 0
-	hs_stub.pasteboard.readAllData = function()
-		return { ["public.utf8-plain-text"] = "ORIGINAL" }
-	end
+	-- Seed the stub's own store so readAllData, allContentTypes and changeCount
+	-- agree, as the guarded clipboard snapshot requires of the native API.
+	assert(hs_stub.pasteboard.setContents("ORIGINAL"))
 	hs_stub.pasteboard.clearContents = function() return true end
 	hs_stub.pasteboard.getContents = function()
 		selection_reads = selection_reads + 1
 		return "selected words"
 	end
 	hs_stub.pasteboard.writeAllData = function() return true end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		emit_key_stroke = function() return true end,
 		defer_after_callback = function() return false end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.actions_click"] = setmetatable({
+	package.loaded["gestures.engine.actions_click"] = setmetatable({
 		force_cleanup = function()
 			if click_mode == "false" then return false end
 			if click_mode == "nil" then return nil end
@@ -164,13 +164,13 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.sticky_modifiers"] = {
+	package.loaded["gestures.engine.sticky_modifiers"] = {
 		toggle = function() return true end,
 		clear = function() return true end,
 	}
 
 	search_transaction_ports(hs_stub)
-	local actions = require("modules.gestures.actions")
+	local actions = require("gestures.engine.actions")
 	local gestures = nil
 	local gesture_engine = nil
 	if compose_gestures then
@@ -183,18 +183,18 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 			init = function() return true end,
 			unblock_scroll = function() return true end,
 		})
-		package.loaded["modules.gestures.engine"] = gesture_engine
-		package.loaded["modules.gestures.conflicts"] = permissive()
-		package.loaded["infra.notifications"] = { notify = function() end }
-		package.loaded["infra.manifest_reader"] = {
+		package.loaded["gestures.engine.engine"] = gesture_engine
+		package.loaded["gestures.engine.conflicts"] = permissive()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}
-		package.loaded["adapters.timer_scheduler"] = permissive({
+		package.loaded["core.events.timer_scheduler"] = permissive({
 			cancel = function() return true end,
 		})
-		package.loaded["modules.gestures"] = nil
-		gestures = require("modules.gestures")
+		package.loaded["gestures.engine"] = nil
+		gestures = require("gestures.engine")
 	else
 		actions.init({ action_params = {} })
 	end
@@ -310,7 +310,7 @@ helpers.describe("HS-012 real gesture-search pause composition", function()
 			helpers.assert_eq(selection_reads(), 0)
 			helpers.assert_eq(#hs_stub.urlevent.__opened, 0)
 			script_control.stop()
-			package.loaded["modules.gestures"] = nil
+			package.loaded["gestures.engine"] = nil
 		end)
 
 		helpers.it("accepts the exact late terminal after a " .. mode .. " search stop", function()
@@ -359,7 +359,7 @@ helpers.describe("HS-012 real gesture-search pause composition", function()
 			helpers.assert_eq(selection_reads(), 0)
 			helpers.assert_eq(#hs_stub.urlevent.__opened, 0)
 			script_control.stop()
-			package.loaded["modules.gestures"] = nil
+			package.loaded["gestures.engine"] = nil
 		end)
 	end
 end)

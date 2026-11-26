@@ -31,7 +31,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- action through GestActions.execute_single. Patch the SAME table SC captured
 	-- at require time so the reference resolves to our spy.
 	local dispatched
-	package.loaded["modules.gestures.actions"].execute_single = function(a) dispatched = a end
+	package.loaded["gestures.engine.actions"].execute_single = function(a) dispatched = a end
 
 	-- Capture the eventtap handler so we can drive handle_key directly.
 	local handler
@@ -106,8 +106,8 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- is not acted on late: pause, reload or quit 1.2 s after the press is a
 	-- surprise, and macOS may already have delivered the key without the tap.
 	helpers.it("a genuine sentinel that waited behind the main thread passes untouched (stale-physical-event)", function()
-		local EventClock = require("adapters.event_clock")
-		local Health = require("infra.key_event_health")
+		local EventClock = require("core.events.clock")
+		local Health = require("core.logger.engine.key_event_health")
 		EventClock.reset()
 		Health.reset()
 		local host_ns = 3600 * 1e9
@@ -224,8 +224,8 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
-		local previous_warmup = package.loaded["modules.llm.warmup_controller"]
-		package.loaded["modules.llm.warmup_controller"] = {
+		local previous_warmup = package.loaded["ai.engine.local_servers.warmup_controller"]
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
 			stop = function() stopped = stopped + 1; return true end,
 			schedule_warmup_with_retry = function() return true end,
 		}
@@ -233,7 +233,7 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
 
-		package.loaded["modules.llm.warmup_controller"] = previous_warmup
+		package.loaded["ai.engine.local_servers.warmup_controller"] = previous_warmup
 		helpers.assert_true(stopped >= 1,
 			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
 	end)
@@ -255,7 +255,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		end
 		-- pause now treats tooltip teardown as required. Keep this unit test
 		-- behavioral and deterministic instead of loading the real TOML-backed UI.
-		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = rec("tt_hide") }
 		local keymap_spy = {
 			pause_processing  = rec("km_pause"),
 			resume_processing = rec("km_resume"),
@@ -313,7 +313,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
 
 		SC.stop()
-		package.loaded["ui.tooltip"] = nil
+		package.loaded["core.ui.ui.tooltip"] = nil
 	end)
 end)
 
@@ -459,7 +459,7 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 	end)
 
 	helpers.it("the central dispatcher reports whether it handled the action", function()
-		local actions = helpers.load_with_stubs("modules.gestures.actions")
+		local actions = helpers.load_with_stubs("gestures.engine.actions")
 		helpers.assert_eq(actions.execute_single("none"), true,
 			"a registered action must report that the central dispatcher owns it")
 		helpers.assert_eq(actions.execute_single("__script_control_unknown_action__"), false,

@@ -9,7 +9,7 @@
 --- (SUEnableAutomaticChecks is false in the launcher's Info.plist).
 ---
 --- FEATURES & RATIONALE:
---- 1. One schedule on every driver: _shared/lua/updater/schedule.lua decides
+--- 1. One schedule on every driver: _shared/updater/engine/schedule.lua decides
 ---    from the wall clock and the persisted check record (Storage port, shared
 ---    key), so every menu preset works (Sparkle refuses intervals under an
 ---    hour), a restart mid-interval does not check at boot, and a Mac that was
@@ -37,29 +37,35 @@
 ---    blocking api.github.com), both checks read the public releases Atom feed
 ---    on github.com, the changelog window's alternate source: Sparkle installs
 ---    from the channel's appcast, so the feed's tags are all a check needs (#99).
+--- 9. The manual check goes through the launcher's native HTTP worker
+---    (core/network/adapters/managed_http_worker.lua), whose closed failure
+---    reasons give a native receipt: the window names a proxy, offline or
+---    certificate cause the managed-network contract classified from it, as on
+---    Windows and Linux (UPD-13). The background check only logs its failure.
 --- ==============================================================================
 
 local M = {}
+local pending_session_cleanup = nil
 
-local Logger    = require("infra.logger")
-local Paths     = require("infra.paths")
-local FileSystem = require("adapters.file_system")
-local JsonCodec = require("adapters.json_codec")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local Parser   = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local ReleaseSources = require("updater.release_sources")
+local Logger    = require("core.logger.engine.logger")
+local Paths     = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local Parser   = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local ReleaseSources = require("updater.engine.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local notifications = require("infra.notifications")
-local i18n      = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local i18n      = require("core.i18n.engine.i18n")
 
 local LOG = "updater.auto_check"
 
 -- The flat preference key mapped to config.toml [updater] check_interval_seconds
--- by infra/preferences.lua.
+-- by settings/engine/preferences/preferences.lua.
 M.STATE_KEY = "update_check_interval_seconds"
 
 local USER_AGENT = "ErgoptiPlus-Updater-macOS/1.0"
@@ -79,7 +85,7 @@ local MS_PER_SEC = 1000
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
 --- @return table config { timing, state_key, list_key, releases_url, feed_url, timeout_sec }
 function M.load_config()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then error("the shared updater defaults are unreadable", 0) end
 	local decoded, decode_err = JsonCodec.decode(raw)
@@ -117,6 +123,20 @@ function M.load_config()
 		feed_url = expand(feed_template), timeout_sec = timeout_sec }
 end
 
+--- The managed-network failure contract over the canonical policy; it has no
+--- fallback: without it no failed check could name a cause.
+--- @return table contract core.network.engine.failure instance.
+function M.failure_contract()
+	local path = Paths.shared("core/network/data/managed_network.json")
+	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then error("the canonical managed network policy is unreadable", 0) end
+	local decoded, decode_err = JsonCodec.decode(raw)
+	if decode_err or type(decoded) ~= "table" then
+		error("the canonical managed network policy is not JSON: " .. tostring(decode_err), 0)
+	end
+	return require("core.network.engine.failure").new(decoded)
+end
+
 --- Reads a header case-insensitively (HTTP/2 lowercases names, Foundation
 --- capitalises them).
 --- @param headers table|nil
@@ -130,6 +150,13 @@ local function header_value(headers, wanted)
 		end
 	end
 	return nil
+end
+
+--- An HTTP entity-tag is a quoted opaque value, optionally prefixed by W/.
+local function valid_etag(value)
+	if type(value) ~= "string" then return false end
+	local opaque = value:sub(1, 2) == "W/" and value:sub(3) or value
+	return opaque:match('^"[^"%c]*"$') ~= nil
 end
 
 
@@ -150,8 +177,12 @@ end
 local function stored_interval(state, timing)
 	local raw = state[M.STATE_KEY]
 	if raw == nil then return timing.default_check_interval_sec end
-	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s).",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max))
 		return timing.default_check_interval_sec
 	end
 	local seconds = Schedule.snap_interval(raw, timing)
@@ -188,9 +219,12 @@ end
 ---   on_available function(release) A new release { tag, channel } was found.
 ---   config table|nil load_config() result (tests pass one).
 ---   timer table { after(sec, fn) -> handle, committed; cancel(handle) -> boolean }
----   storage table { get(key, default), set(key, value) -> boolean }
+---   storage table { get(key, default), read_exact(key) -> ok, value, set(key, value) -> boolean }
 ---   http table Background transport { get(url, headers, callback(result)) -> boolean }.
----   manual_http table Distinct manual transport with the same contract.
+---   manual_http table Distinct manual transport with the same contract; a
+---     failed transfer's result carries failure_receipt, its native receipt.
+---   failure_contract table The managed-network contract
+---     (core.network.engine.failure) that classifies that receipt.
 ---   now function(): number Wall clock in epoch seconds.
 ---   current_version function(): string|nil, installed_channel function(): string|nil
 --- @return table owner
@@ -201,6 +235,12 @@ function M.new(opts)
 		or type(opts.storage) ~= "table" or type(opts.http) ~= "table"
 		or type(opts.manual_http) ~= "table" or opts.manual_http == opts.http or type(opts.now) ~= "function" then
 		error("the automatic update-check owner needs its state, save, channel, pause, callback and distinct transport ports", 2)
+	end
+	if type(opts.storage.read_exact) ~= "function" then
+		error("the automatic update-check owner needs an exact storage read", 2)
+	end
+	if type(opts.failure_contract) ~= "table" or type(opts.failure_contract.classify) ~= "function" then
+		error("the automatic update-check owner needs the managed-network failure contract", 2)
 	end
 	local config = opts.config or M.load_config()
 	if type(config.feed_url) ~= "string" or config.feed_url == "" then
@@ -221,11 +261,18 @@ function M.new(opts)
 	local generation = 0
 	-- Manual answers survive channel changes, but not a retired schedule owner.
 	local manual_generation = 0
+	local check_sequence = 0
+	local published_sequence = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
 		if record then return record end
-		local state, dropped = Schedule.sanitize_state(opts.storage.get(config.state_key, nil))
+		local called, read_ok, stored = pcall(opts.storage.read_exact, config.state_key)
+		if not called or read_ok ~= true then
+			Logger.error(LOG, "The update-check record could not be read; retrying without overwriting it.")
+			return nil
+		end
+		local state, dropped = Schedule.sanitize_state(stored)
 		for _, field in ipairs(dropped) do
 			Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
 		end
@@ -259,6 +306,21 @@ function M.new(opts)
 			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
 			return nil
 		end
+		if not valid_etag(copy.etag) then
+			Logger.warn(LOG, "Dropped the stored release list with an invalid ETag.")
+			return nil
+		end
+		local decoded, decode_error = JsonCodec.decode(copy.body)
+		if decode_error or type(decoded) ~= "table" then
+			Logger.warn(LOG, "Dropped the malformed stored copy of the release list.")
+			return nil
+		end
+		for _, entry in pairs(decoded) do
+			if type(entry) ~= "table" or type(entry.tag_name) ~= "string" or entry.tag_name == "" then
+				Logger.warn(LOG, "Dropped the stored release list containing an invalid entry.")
+				return nil
+			end
+		end
 		return copy
 	end
 	list_cache = load_list_cache()
@@ -269,7 +331,7 @@ function M.new(opts)
 	--- @param etag string|nil The response's validator.
 	local function store_list_cache(decoded, etag)
 		-- An empty array would encode as a JSON object, which no copy may hold.
-		if not etag or #decoded == 0 then
+		if not valid_etag(etag) or #decoded == 0 then
 			list_cache = nil
 			if opts.storage.set(config.list_key, nil) ~= true then
 				Logger.error(LOG, "The stale copy of the release list could not be removed.")
@@ -341,9 +403,13 @@ function M.new(opts)
 	end
 
 	--- Records one completed check and announces a new release once.
-	local function complete(ok, release)
+	local function complete(ok, release, request_sequence)
 		in_flight = false
-		local state = Schedule.record_check(load_record(), opts.now(), ok)
+		if request_sequence < published_sequence then return end
+		published_sequence = request_sequence
+		local previous = load_record()
+		if not previous then return end
+		local state = Schedule.record_check(previous, opts.now(), ok)
 		save_record(state)
 		Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 			ok and "success" or "failure", state.failures)
@@ -364,6 +430,7 @@ function M.new(opts)
 			Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
 			return
 		end
+		if not active or request_sequence ~= published_sequence then return end
 		notified.last_notified_tag = release.tag
 		save_record(notified)
 	end
@@ -390,26 +457,30 @@ function M.new(opts)
 	end
 
 	--- The headers of one list request, conditional on the stored copy.
-	local function list_headers()
+	local function list_headers(copy)
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
-		if list_cache then headers["If-None-Match"] = list_cache.etag end
+		if copy then headers["If-None-Match"] = copy.etag end
 		return headers
 	end
 
 	--- Reads one list response: the usable body, or nil with the failure reason
-	--- (an updater.check_result reason name) and its English cause.
+	--- (an updater.check_result reason name), its English cause and the
+	--- evidence a failed check names (updater.check_result failure_key).
 	--- @param result table|nil The HTTP port's result.
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
-	local function read_response(result)
+	--- @return table|nil evidence { rate_limited = true } for an exhausted limit,
+	---   { receipt } for a failed transfer whose transport gave its native receipt
+	local function read_response(result, request_copy, may_store)
 		local status = type(result) == "table" and tonumber(result.status) or 0
-		if status == 304 and list_cache then
+		if status == 304 and request_copy then
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
-			return list_cache.body
+			return request_copy.body
 		end
-		if type(result) == "table" and result.ok == true and type(result.body) == "string"
-			and result.body:match("^%s*%[") then
+		-- An answer that does not open a JSON array (a proxy or captive portal
+		-- answering with HTTP 200) is no list, by the rule Linux shares (UPD-1).
+		if type(result) == "table" and result.ok == true and ReleaseSources.opens_release_array(result.body) then
 			local decoded, decode_error = JsonCodec.decode(result.body)
 			if decode_error or type(decoded) ~= "table" then
 				return nil, "parse_failed", "a malformed release list: " .. tostring(decode_error)
@@ -419,14 +490,33 @@ function M.new(opts)
 					return nil, "parse_failed", "a release without a tag"
 				end
 			end
-			store_list_cache(decoded, header_value(result.headers, "etag"))
+			if may_store ~= false then store_list_cache(decoded, header_value(result.headers, "etag")) end
 			return result.body
 		end
 		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
 			header_value(result.headers, "x-ratelimit-reset"))
-		if limited then return nil, "no_connection", limited end
+		if limited then return nil, "no_connection", limited, { rate_limited = true } end
+		local receipt = type(result) == "table" and type(result.failure_receipt) == "table"
+			and result.failure_receipt or nil
 		return nil, "no_connection",
-			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
+			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result"),
+			receipt and { receipt = receipt } or nil
+	end
+
+	--- The evidence a failed check names (updater.check_result failure_key):
+	--- the exhausted rate limit, and the cause the managed-network contract
+	--- classifies from the transfer's native receipt. No receipt, no cause.
+	--- @param evidence table|nil read_response()'s evidence.
+	--- @return table|nil { rate_limited, report }
+	local function check_evidence(evidence)
+		if type(evidence) ~= "table" then return nil end
+		local report = nil
+		if type(evidence.receipt) == "table" and next(evidence.receipt) ~= nil then
+			local classified, value = pcall(opts.failure_contract.classify, evidence.receipt, {})
+			if classified then report = value
+			else Logger.error(LOG, "The check's failure receipt could not be classified: %s.", tostring(value)) end
+		end
+		return { rate_limited = evidence.rate_limited == true, report = report }
 	end
 
 	--- Reads the public releases Atom feed after the API gave no list, and
@@ -460,8 +550,11 @@ function M.new(opts)
 	local function dispatch(channel)
 		in_flight = true
 		local request_generation = generation
+		check_sequence = check_sequence + 1
+		local request_sequence = check_sequence
 		local completed = false
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(result)
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(request_copy), function(result)
 			if completed or not active or request_generation ~= generation then return end
 			completed = true
 			if channel ~= opts.channel() then
@@ -469,7 +562,7 @@ function M.new(opts)
 				Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
 				return
 			end
-			local body, reason, detail = read_response(result)
+			local body, reason, detail = read_response(result, request_copy, request_sequence >= published_sequence)
 			if not body and reason == "no_connection" then
 				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
 				read_feed(opts.http, detail, function(feed_body, feed_detail)
@@ -481,10 +574,10 @@ function M.new(opts)
 					end
 					if not feed_body then
 						Logger.warn(LOG, "Background check failed: %s.", feed_detail)
-						complete(false, nil)
+						complete(false, nil, request_sequence)
 						return
 					end
-					complete(true, read_list(feed_body, channel))
+					complete(true, read_list(feed_body, channel), request_sequence)
 				end)
 				return
 			end
@@ -494,15 +587,15 @@ function M.new(opts)
 				else
 					Logger.warn(LOG, "Background check failed: %s.", detail)
 				end
-				complete(false, nil)
+				complete(false, nil, request_sequence)
 				return
 			end
-			complete(true, read_list(body, channel))
+			complete(true, read_list(body, channel), request_sequence)
 		end)
 		if (not ok_dispatch or sent ~= true) and not completed and active and request_generation == generation then
 			completed = true
 			Logger.error(LOG, "The update-check request was not dispatched: %s.", tostring(sent))
-			complete(false, nil)
+			complete(false, nil, request_sequence)
 		end
 	end
 
@@ -511,9 +604,17 @@ function M.new(opts)
 	evaluate = function()
 		if not active then return false end
 		local now = opts.now()
+		if now < started_at then
+			Logger.info(LOG, "The wall clock moved behind startup; restarting the update-check boot delay.")
+			started_at = now
+		end
+		local interval = owner.interval()
+		if interval == 0 then return true end
+		local current_record = load_record()
+		if not current_record then return arm(timing.reevaluate_sec) end
 		local due_at, reason = Schedule.next_due({
-			now = now, started_at = started_at, interval = owner.interval(),
-			state = load_record(), timing = timing,
+			now = now, started_at = started_at, interval = interval,
+			state = current_record, timing = timing,
 		})
 		if due_at == nil then
 			Logger.debug(LOG, "Automatic update checks are off.")
@@ -523,7 +624,12 @@ function M.new(opts)
 			return arm(Schedule.delay_until(due_at, now, timing))
 		end
 		if not arm(timing.reevaluate_sec) then return false end
-		if opts.is_paused() == true then
+		local pause_ok, paused = pcall(opts.is_paused)
+		if not pause_ok or type(paused) ~= "boolean" then
+			Logger.warn(LOG, "Update check deferred: the driver pause state is unavailable.")
+			return true
+		end
+		if paused then
 			Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
 			return true
 		end
@@ -549,6 +655,7 @@ function M.new(opts)
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
 		local request_generation = manual_generation
+		local request_sequence
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
@@ -557,11 +664,18 @@ function M.new(opts)
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
-		local function fail(reason, detail)
+		local function fail(reason, detail, evidence)
 			if answered or request_generation ~= manual_generation then return end
-			save_record(Schedule.record_check(load_record(), opts.now(), false))
+			if request_sequence >= published_sequence then
+				published_sequence = request_sequence
+				local previous = load_record()
+				if previous then save_record(Schedule.record_check(previous, opts.now(), false)) end
+			end
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
-			answer(CheckResult.failure(base, reason, detail))
+			-- An exhausted rate limit (UPD-06) and a proxy, offline or certificate
+			-- cause the launcher's worker proved natively (UPD-13) are named in
+			-- the window; the API attempt's evidence stands when the feed fails too
+			answer(CheckResult.failure(base, reason, detail, check_evidence(evidence)))
 		end
 		Logger.start(LOG, "Manual update check (channel %s)…", tostring(channel))
 		if type(channel) ~= "string" or Updater.channels().channel(channel) == nil then
@@ -569,6 +683,8 @@ function M.new(opts)
 			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
 			return false
 		end
+		check_sequence = check_sequence + 1
+		request_sequence = check_sequence
 		--- Answers the window from one release list, the API's or the feed's.
 		--- @param body string Release list JSON.
 		local function answer_from(body)
@@ -576,7 +692,14 @@ function M.new(opts)
 				registry = Updater.channels(), channel = channel,
 				current = base.current, installed = installed_channel(),
 			})
-			local state = Schedule.record_check(load_record(), opts.now(), true)
+			if request_sequence < published_sequence then
+				answer(result)
+				return
+			end
+			published_sequence = request_sequence
+			local previous = load_record()
+			if not previous then answer(result); return end
+			local state = Schedule.record_check(previous, opts.now(), true)
 			-- A channel switched while the request ran leaves the About row to the
 			-- new channel, as dispatch() does: the window still gets its answer
 			if channel ~= opts.channel() then
@@ -592,20 +715,23 @@ function M.new(opts)
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
 		end
-		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
-			if answered or request_generation ~= manual_generation then return end
-			local body, reason, detail = read_response(response)
+		local api_completed = false
+		local request_copy = list_cache
+		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
+			if api_completed or answered or request_generation ~= manual_generation then return end
+			api_completed = true
+			local body, reason, detail, evidence = read_response(response, request_copy, request_sequence >= published_sequence)
 			if body then return answer_from(body) end
-			if reason ~= "no_connection" then return fail(reason, detail) end
+			if reason ~= "no_connection" then return fail(reason, detail, evidence) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
 				tostring(channel), detail)
 			read_feed(opts.manual_http, detail, function(feed_body, feed_detail)
 				if answered or request_generation ~= manual_generation then return end
-				if not feed_body then return fail("no_connection", feed_detail) end
+				if not feed_body then return fail("no_connection", feed_detail, evidence) end
 				answer_from(feed_body)
 			end)
 		end)
-		if not ok_dispatch or sent ~= true then
+		if (not ok_dispatch or sent ~= true) and not api_completed then
 			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
 			return false
 		end
@@ -659,6 +785,8 @@ function M.new(opts)
 	--- Revokes pending results when the durable channel owner publishes a change.
 	function owner.on_channel_changed()
 		generation = generation + 1
+		check_sequence = check_sequence + 1
+		published_sequence = check_sequence
 		in_flight = false
 		latest = nil
 		if active and disarm() then return evaluate() end
@@ -728,6 +856,11 @@ end
 --- @param opts table { state, save, channel, is_paused, on_available } as for new().
 --- @return table owner The started owner.
 function M.start_session(opts)
+	if pending_session_cleanup then
+		local ok, stopped = pcall(pending_session_cleanup.stop)
+		if not ok or stopped ~= true then error("the previous update session still needs cleanup", 0) end
+		pending_session_cleanup = nil
+	end
 	local config = M.load_config()
 	local owner = M.new({
 		state = opts.state,
@@ -736,23 +869,27 @@ function M.start_session(opts)
 		is_paused = opts.is_paused,
 		on_available = opts.on_available,
 		config = config,
-		timer = require("adapters.timer_scheduler"),
-		storage = require("adapters.storage"),
-		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
-		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		timer = require("core.events.timer_scheduler"),
+		storage = require("core.fs.adapters.storage"),
+		http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("core.network.adapters.managed_http_worker").new({ timeout_sec = config.timeout_sec }),
+		failure_contract = M.failure_contract(),
 		now = os.time,
 	})
-	local watcher = require("adapters.wake_watcher").new(owner.on_wake)
-	if not watcher.start() then
+	local watcher = require("core.events.wake_watcher").new(owner.on_wake)
+	local watcher_ok, watcher_started = pcall(watcher.start)
+	if not watcher_ok or watcher_started ~= true then
 		Logger.error(LOG, "The wake watcher did not start; a wake is caught at the next bounded re-evaluation.")
 	end
 	local stop_owner = owner.stop
 	function owner.stop()
-		local watcher_stopped = watcher.stop()
-		return stop_owner() == true and watcher_stopped == true
+		local watcher_ok, watcher_stopped = pcall(watcher.stop)
+		local owner_ok, owner_stopped = pcall(stop_owner)
+		return watcher_ok and watcher_stopped == true and owner_ok and owner_stopped == true
 	end
-	if not owner.start() then
-		owner.stop()
+	local started_ok, started = pcall(owner.start)
+	if not started_ok or started ~= true then
+		if not owner.stop() then pending_session_cleanup = owner end
 		error("the automatic update checks could not start", 0)
 	end
 	return owner

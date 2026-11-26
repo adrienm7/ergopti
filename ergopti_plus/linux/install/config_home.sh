@@ -2,7 +2,7 @@
 # static/ergopti_plus/linux/install/config_home.sh
 #
 # The XDG specification ignores relative environment bases. Keep installation,
-# startup and removal on the same base as infra/config_paths.lua. Assign the
+# startup and removal on the same base as settings/engine/paths.lua. Assign the
 # caller's variable directly so native trailing newlines survive unchanged.
 
 # @param $1 Caller variable receiving the absolute configuration base.
@@ -11,7 +11,14 @@ ergopti_resolve_config_home() {
 	case "$ergopti_config_base" in
 		/*) ;;
 		*)
-			local ergopti_account_home="$HOME"
+			local ergopti_account_home="${HOME:-}"
+			case "$ergopti_account_home" in
+				/*) ;;
+				*)
+					ergopti_account_home="${TMPDIR:-}"
+					case "$ergopti_account_home" in /*) ;; *) ergopti_account_home=/tmp ;; esac
+					;;
+			esac
 			while [[ "$ergopti_account_home" != / && "$ergopti_account_home" == */ ]]; do
 				ergopti_account_home="${ergopti_account_home%/}"
 			done

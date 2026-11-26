@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/shipped_dead_rolls_and_personal_switches_removed/expected.toml
+
+[_meta]
+schema_version = 24
+
+[hotstrings.rolls.chevron_equal]
+enabled = true
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = true
+time_activation_seconds = 0.5
+
+[shortcuts.personal]
+lock_screen = true

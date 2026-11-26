@@ -28,6 +28,9 @@
  *    renderer the Windows update prompt uses. A clicked repository link posts
  *    open_url with the URL only; the host checks it against the repository again.
  *    A state without notes shows no pane.
+ * 6. Keyboard and screen reader: Escape posts close on the three hosts, and
+ *    the two answer lines are live regions, so the answer that replaces
+ *    "checking" is announced, not only drawn.
  * ==============================================================================
  */
 
@@ -138,7 +141,7 @@
 		entries.forEach(function (entry) {
 			if (!entry || typeof entry.channel !== 'string' || typeof entry.tag !== 'string') return;
 			var item = document.createElement('li');
-			var line = document.createElement('span');
+			var line = document.createElement('p');
 			line.textContent = t('update_check.also_available', {
 				channel: channelName(entry.channel),
 				tag: entry.tag
@@ -321,6 +324,14 @@
 		document.getElementById(id).addEventListener('click', function () {
 			post({ action: BUTTONS[id] });
 		});
+	});
+
+	// Escape closes the window, as it closes the Windows native one. The
+	// WebView holds the keyboard focus, so no host window sees the key.
+	document.addEventListener('keydown', function (event) {
+		if (event.key !== 'Escape' || event.defaultPrevented) return;
+		event.preventDefault();
+		post({ action: 'close' });
 	});
 
 	// The labels arrive with the locale; the window renders again in the menu

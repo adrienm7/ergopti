@@ -1,5 +1,6 @@
 """Exercise the real launcher and daemon bootstrap with live flock ownership."""
 
+import fcntl
 import os
 import pathlib
 import shlex
@@ -24,7 +25,7 @@ class SessionLockTests(unittest.TestCase):
             # The logger shim is the first module Main loads past the lock;
             # compat.utf8 also serves the bootstrap record of a refusal.
             bootstrap.write_text(
-                "package.preload['logger.shim'] = function() os.exit(0) end\n",
+                "package.preload['core.logger.engine.shim'] = function() os.exit(0) end\n",
                 encoding="utf-8",
             )
             for marker in (None, "invalid", "2", "9"):
@@ -49,6 +50,97 @@ class SessionLockTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0 if marker is None else 78, result.stderr)
                     if marker is not None:
                         self.assertIn("[session_lock]", result.stderr)
+
+    def test_relative_runtime_refuses_both_entry_points(self):
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        runtime = shutil.which("luajit")
+        self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            stubs = root / "bin"
+            stubs.mkdir()
+            (stubs / "luajit").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (stubs / "luajit").chmod(0o755)
+            environment = dict(os.environ)
+            environment["XDG_RUNTIME_DIR"] = "relative-runtime"
+            environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
+            code = (
+                "package.path = "
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
+                + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); local ok, reason = lock.acquire(); "
+                + "if ok then lock.release() else io.stderr:write(reason .. '\\n') end; os.exit(ok and 0 or 78)"
+            )
+            for entry, command in (
+                ("launcher", ["bash", str(driver / "install/launch.sh"), "--service"]),
+                ("direct", [runtime, "-e", code]),
+            ):
+                for source in ("runtime", "home"):
+                    with self.subTest(entry=entry, source=source):
+                        selected = dict(environment)
+                        if source == "home":
+                            selected.pop("XDG_RUNTIME_DIR")
+                            selected["HOME"] = "relative-home"
+                        result = subprocess.run(
+                            command, cwd=root, env=selected, capture_output=True, timeout=5
+                        )
+                        self.assertEqual(result.returncode, 78, result.stderr)
+                        self.assertIn(b"absolute", result.stderr)
+            self.assertFalse((root / "relative-runtime").exists(), "refusal precedes lock creation")
+
+            localized = dict(environment, LANG="fr_FR.UTF-8", LC_ALL="")
+            result = subprocess.run(
+                ["bash", str(driver / "install/launch.sh"), "--service"],
+                cwd=root,
+                env=localized,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            self.assertEqual(result.returncode, 78)
+            self.assertIn("chemin absolu", result.stderr)
+
+    def test_inherited_marker_rejects_unrelated_descriptor(self):
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        runtime = shutil.which("luajit")
+        self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            folder = root / "runtime" / "ergopti"
+            folder.mkdir(parents=True)
+            lock = folder / "ergopti.lock"
+            other = root / "unrelated"
+            other.write_text("unrelated", encoding="utf-8")
+            environment = dict(
+                os.environ, XDG_RUNTIME_DIR=str(root / "runtime"), ERGOPTI_SESSION_LOCK_FD="9"
+            )
+            code = (
+                "package.path = "
+                + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
+                + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); "
+                + "local protected = lock.protect(); local acquired = protected and lock.acquire(); "
+                + "os.exit(acquired and 0 or 78)"
+            )
+            with lock.open("w+") as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                for candidate in (other, lock):
+                    with self.subTest(candidate=candidate.name):
+                        result = subprocess.run(
+                            [
+                                "bash",
+                                "-c",
+                                'exec 9<>"$1"; exec "$2" -e "$3"',
+                                "test",
+                                str(candidate),
+                                runtime,
+                                code,
+                            ],
+                            env=environment,
+                            capture_output=True,
+                            timeout=5,
+                        )
+                        self.assertEqual(
+                            result.returncode, 78, "fd 9 cannot bypass the held singleton lock"
+                        )
 
     def test_nonregular_lock_never_blocks_or_admits_startup(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
@@ -86,10 +178,8 @@ class SessionLockTests(unittest.TestCase):
                     environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
                     code = (
                         "package.path = "
-                        + repr(
-                            str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua")
-                        )
-                        + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
+                        + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
+                        + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); local ok, reason = lock.acquire(); "
                         + "if ok then lock.release() else io.stderr:write('[session_lock] ' .. reason .. '\\n') end; os.exit(ok and 0 or 78)"
                     )
                     command = (
@@ -121,6 +211,66 @@ class SessionLockTests(unittest.TestCase):
                         if node_socket is not None:
                             node_socket.close()
 
+    def test_second_launch_restarts_the_running_daemon(self):
+        """A second direct launch asks the running daemon for its controlled exit
+        (SIGTERM) and takes the lock, as Windows' #SingleInstance Force restarts;
+        the login autostart leaves it alone (MLC-003, second-launch-restarts)."""
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            stubs = root / "bin"
+            stubs.mkdir()
+            marks = root / "marks"
+            # The daemon stand-in holds the inherited lock descriptor and leaves
+            # on SIGTERM, as the daemon's controlled exit does.
+            (stubs / "luajit").write_text(
+                "#!/bin/bash\n"
+                'trap \'echo "exit $$" >> "$MARKS"; exit 0\' TERM\n'
+                'echo "start $$" >> "$MARKS"\n'
+                "while :; do sleep 0.05; done\n",
+                encoding="utf-8",
+            )
+            (stubs / "luajit").chmod(0o755)
+            environment = dict(os.environ)
+            environment.pop("ERGOPTI_SESSION_LOCK_FD", None)
+            environment["XDG_RUNTIME_DIR"] = str(root / "runtime")
+            environment["HOME"] = str(root / "home")
+            environment["MARKS"] = str(marks)
+            environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
+            launch = ["bash", str(driver / "install/launch.sh")]
+            first = subprocess.Popen(launch, env=environment, stderr=subprocess.DEVNULL)
+            second = None
+            try:
+                deadline = time.monotonic() + 10
+                while not (marks.exists() and "start" in marks.read_text()):
+                    self.assertLess(time.monotonic(), deadline, "the first daemon never started")
+                    time.sleep(0.05)
+                autostart = subprocess.run(
+                    launch + ["--session-start"], env=environment, capture_output=True, timeout=10
+                )
+                self.assertEqual(autostart.returncode, 0, autostart.stderr)
+                self.assertNotIn(
+                    "exit", marks.read_text(), "the login autostart leaves the daemon alone"
+                )
+                second = subprocess.Popen(launch, env=environment, stderr=subprocess.DEVNULL)
+                first.wait(timeout=20)
+                deadline = time.monotonic() + 20
+                while marks.read_text().count("start") < 2:
+                    self.assertLess(time.monotonic(), deadline, "the second launch never took over")
+                    time.sleep(0.05)
+                lines = marks.read_text().split()
+                self.assertEqual(
+                    lines[0::2],
+                    ["start", "exit", "start"],
+                    "the running daemon left before the second one started",
+                )
+                self.assertIsNone(second.poll(), "the second launch now runs the daemon")
+            finally:
+                for process in (first, second):
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
+
     def test_child_outlives_daemon_without_retaining_lock(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
         runtime = shutil.which("luajit")
@@ -144,8 +294,11 @@ class SessionLockTests(unittest.TestCase):
                         encoding="utf-8",
                     )
                     bootstrap = root / "bootstrap.lua"
+                    # The logger shim is the first module Main loads past the
+                    # lock; compat.utf8 now loads before it, through the host
+                    # environment's shared quoting.
                     bootstrap.write_text(
-                        "package.preload['compat.utf8'] = function()\n"
+                        "package.preload['core.logger.engine.shim'] = function()\n"
                         "  assert(os.getenv('ERGOPTI_SESSION_LOCK_FD') == nil)\n"
                         "  local status = os.execute(os.getenv('TEST_CHILD_COMMAND'))\n"
                         "  assert(status == 0 or status == true)\n"

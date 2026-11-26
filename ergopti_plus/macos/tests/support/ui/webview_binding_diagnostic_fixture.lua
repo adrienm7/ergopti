@@ -9,16 +9,16 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
-	"adapters.json_codec", "adapters.timer_scheduler", "infra.locale", "json", "locale.core",
-	"webview.i18n_seed", "webview.presentation", "window_titles", "adapters.webview_result", "hs.json", "lfs" }
+local OWNED = { "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.logger.engine.logger",
+	"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
+	"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "core.ui.adapters.webview_result", "hs.json", "lfs" }
 
 --- Runs one diagnostic transaction with native messages and completions held apart.
 --- @param scenario function Assertions over the controlled observation.
 local function with_diagnostic(scenario)
 	local previous_lfs = rawget(_G, "lfs")
 	local scoped, scope_error = pcall(helpers.with_stub_scope, OWNED, function()
-		local json, lfs = require("json"), require("lfs")
+		local json, lfs = require("core.text.engine.json"), require("lfs")
 		local output = os.tmpname()
 		assert(os.remove(output)); assert(lfs.mkdir(output))
 		local driver = helpers.driver_root()
@@ -110,7 +110,7 @@ local function with_diagnostic(scenario)
 		end
 		local logger = helpers.make_logger_stub()
 		logger.initialize_privacy = function() return true end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local function new_view(_, _, controller)
 			-- A closed file supplies actual userdata without retaining an OS file.
 			-- Its test metatable models the native view, never WebKit behavior.
@@ -131,7 +131,7 @@ local function with_diagnostic(scenario)
 				h.writes[path:match("[^/]+$")] = value
 				local file = assert(io.open(path, "wb")); assert(file:write(json.encode(value))); assert(file:close()); return true
 			end }
-		local builder = helpers.load_with_stubs("ui.ui_builder", {
+		local builder = helpers.load_with_stubs("core.ui.ui.builder", {
 			webview = { new = new_view, usercontent = { new = new_controller }, windowMasks = { titled = 1, closable = 2 } },
 			timer = { new = timer, doAfter = function(delay, fn) return timer(delay, fn):start() end,
 				absoluteTime = function() return h.now * 1e9 end },

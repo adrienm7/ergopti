@@ -142,9 +142,9 @@ local function fresh_pixel_owner()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
@@ -152,7 +152,7 @@ local function fresh_pixel_owner()
 			}
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			local mode = table.remove(fixture.next_temp_modes, 1)
 			if mode == "false" then return false, "allocation refused" end
@@ -161,6 +161,7 @@ local function fresh_pixel_owner()
 			local path = string.format("/private/tmp/ergopti-pixel-%d", #fixture.temp_paths + 1)
 			fixture.temp_paths[#fixture.temp_paths + 1] = path
 			fixture.existing_temp_paths[path] = true
+			if fixture.on_allocate then fixture.on_allocate() end
 			return path
 		end,
 		remove_exact = function(path)
@@ -179,9 +180,9 @@ local function fresh_pixel_owner()
 			return nil, "absent"
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.screen_capture"] = nil
-	package.loaded["adapters.python_interpreter"] = helpers.healthy_python_resolver()
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["platform.system.screen_capture"] = nil
+	package.loaded["ai.adapters.python_interpreter"] = helpers.healthy_python_resolver()
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	package.loaded["modules.shortcuts.actions.system_pixel"] = nil
 	subject = require("modules.shortcuts.actions.system_pixel")
@@ -517,6 +518,47 @@ end)
 -- ======================================================
 
 helpers.describe("system_pixel parent scopes", function()
+	helpers.it("refuses an unreadable mouse position without retaining the capture", function()
+		for _, pos in ipairs({ {}, { x = 0/0, y = 1 }, { x = math.huge, y = 1 }, { x = 1e100, y = 1 } }) do
+			local subject, fixture = fresh_pixel_owner()
+			hs.mouse.absolutePosition = function() return pos end
+			local ok, accepted = pcall(subject.copy_pixel_color)
+			helpers.assert_eq(ok, true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(subject.has_pending_pixel_action(), false)
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(next(fixture.existing_temp_paths), nil)
+			hs.mouse.absolutePosition = function() return { x = 10, y = 20 } end
+			helpers.assert_eq(subject.copy_pixel_color(), true, "a later valid position can start a capture")
+		end
+	end)
+	helpers.it("does not copy an interactive capture after pause while loading the image", function()
+		local subject, fixture = fresh_pixel_owner()
+		local pause_result
+		hs.image.imageFromPath = function(path)
+			pause_result = subject.pause_pixel_actions()
+			return { path = path }
+		end
+		helpers.assert_eq(subject.interactive_screenshot(), true)
+		fixture.tasks[1]:deliver(0, "", "")
+		helpers.assert_eq(pause_result, false)
+		helpers.assert_eq(#fixture.clipboard_writes, 0)
+		helpers.assert_eq(#fixture.notifications, 0)
+		helpers.assert_eq(subject.has_pending_pixel_action(), false)
+	end)
+	for _, action in ipairs({ "copy_pixel_color", "interactive_screenshot" }) do
+		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
+			local subject, fixture = fresh_pixel_owner()
+			fixture.on_allocate = function()
+				helpers.assert_eq(subject.pause_pixel_actions(), false)
+				helpers.assert_eq(subject.copy_pixel_color("gestures"), false)
+			end
+			helpers.assert_eq(subject[action](), false)
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(next(fixture.existing_temp_paths), nil)
+			helpers.assert_eq(subject.has_pending_pixel_action(), false)
+		end)
+	end
 	helpers.it("a paused shortcut scope leaves the gesture's pixel read open", function()
 		local subject = fresh_pixel_owner()
 		helpers.assert_eq(subject.pause_pixel_actions(), true)

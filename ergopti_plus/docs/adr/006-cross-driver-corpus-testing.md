@@ -39,7 +39,7 @@ Current corpus directories:
   expansion input/output pairs.
 - `static/ergopti_plus/_shared/tests/corpus/hotstrings/family_samples.json` —
   two or three shipped expansions per hotstring family of the menu manifest,
-  read from the shipped packs by `_shared/lua/test/hotstring_family_samples.lua`
+  read from the shipped packs by `_shared/tests/lua/hotstrings/family_samples.lua`
   and replayed by the macOS and Linux E2E harnesses.
 - `static/ergopti_plus/_shared/tests/corpus/hotstrings/sequence_vectors.json` —
   typed sequences over several mappings (chaining, synthetic output, erase
@@ -49,7 +49,7 @@ Current corpus directories:
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/decision_vectors.json` —
   timed key streams and the keystrokes the tap-versus-hold decision lets
   through, replayed by the macOS and Linux engines through
-  `_shared/lua/test/tap_hold_decision_contract.lua`; a driver that decides
+  `_shared/tests/lua/keyboard/tap_hold_decision_contract.lua`; a driver that decides
   otherwise is listed in the vector's `divergences` with its reason.
 
 Hammerspoon consumption is implemented in:

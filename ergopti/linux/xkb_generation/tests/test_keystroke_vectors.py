@@ -12,7 +12,7 @@ answers:
 - a dead-key sequence is the Compose sequence of the keys' keysyms;
 - a shortcut vector is the key's Command level (the fifth XKB level).
 
-Two vector kinds describe behaviour XKB does not have, and are skipped by id
+One vector kind describes behaviour XKB does not have, and is skipped by id
 with the reason below.
 """
 
@@ -47,9 +47,6 @@ LEVELS = {
 COMMAND_LEVEL = 4
 
 SKIPPED = {
-    # macOS types a dead key's terminator, then the next key; XCompose cancels
-    # a sequence that has no entry instead.
-    "ergol_one_dead_key_terminator": "XCompose has no terminators",
     # A shortcut on a dead key keeps the physical key on Windows; XKB has no
     # shortcut level distinct from the dead key it carries.
     "ergol_shortcut_dead_key": "no XKB counterpart",

@@ -307,6 +307,43 @@ _KLMig_DecryptsBackToTheOriginal() {
 
 Test("KL_Mig: disabling decrypts the stored rows in place", _KLMig_DecryptsBackToTheOriginal)
 
+; Typed text that merely looks like an envelope is sealed at ingress, so the
+; reverse pass completes and restores it literally instead of refusing a row
+; it cannot decrypt (WCR-001).
+_KLMig_DecryptsMarkerPrefixedTypedText() {
+    global _KLMigSuccesses
+    oldSuccess := KLMigration.success_fn
+    _KLMig_Reset()
+    canary := "SENTINEL-PRIVATE-CONTENT"
+    texts := [KL_ENC_MARKER . KL_ENC_SEPARATOR . canary,
+        KL_ENC_MARKER . KL_ENC_SEPARATOR . "00000000000000000000000000000000" . KL_ENC_SEPARATOR . canary]
+    KLMigration.success_fn := _KLMig_RecordSuccess
+    _KLMigSuccesses := []
+    try {
+        KL_Enc_SetEnabled(true)
+        _KLMig_WriteLedger(texts)
+        AssertTrue(!InStr(FileRead(Keystats.data_sql_path, "UTF-8"), canary),
+            "encrypted ingress must not write the marker-prefixed literal in clear")
+
+        KL_Enc_SetEnabled(false)
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_DECRYPT, false), "the reverse pass must start")
+        _KLMig_Drain()
+        AssertEqual(1, _KLMigSuccesses.Length, "the reverse pass must complete")
+        after := FileRead(Keystats.data_sql_path, "UTF-8")
+        loop texts.Length {
+            AssertTrue(texts[A_Index] == _KLMig_FieldOf(after, A_Index, "text"),
+                "row " . A_Index . " must come back as the literal typed text")
+        }
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.success_fn := oldSuccess
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig: disabling restores marker-prefixed typed text literally (WCR-001)",
+    _KLMig_DecryptsMarkerPrefixedTypedText)
+
 
 
 
@@ -738,6 +775,44 @@ _KLMig_NewLedgerPublishesUniformPostureWithoutScan() {
 
 Test("KL_Mig lifecycle: a new uniform ledger records posture and skips proof scan",
     _KLMig_NewLedgerPublishesUniformPostureWithoutScan)
+
+; A paused boot (a restored pause, or a startup smoke quarantined beside a
+; resident driver) created data.sql, refused the marker I/O and then aborted the
+; whole startup as if the ledger were unusable.
+_KLMig_PausedNewLedgerDefersItsMarker() {
+    global _KLMigTimers
+    oldTimer := KLMigration.timer_fn
+    _KLMig_Reset()
+    FileAppend("-- brand-new ledger created while paused`n", Keystats.data_sql_path, "UTF-8")
+    KLMigration.timer_fn := _KLMig_RecordTimer
+    _KLMigTimers := []
+    KLMigration.paused := true
+    try {
+        AssertTrue(KL_Mig_RecordNewLedgerPosture(),
+            "a paused boot must keep its new ledger usable instead of aborting startup")
+        AssertEqual("", KL_Mig_ReadMarker(),
+            "a paused boot must not write the marker")
+        AssertEqual("off", KLMigration.pendingMarker,
+            "the posture must be retained for the resume")
+        KLMigration.paused := false
+        AssertTrue(KL_Mig_RetryMarker(),
+            "the retained retry must publish the marker once the pause ends")
+        AssertEqual("off", KL_Mig_ReadMarker(),
+            "the resumed retry must commit the posture of the new ledger")
+        ; The boot's posture sync is refused the same way while paused; KL_Init
+        ; must keep it for the resume instead of rolling keystats back.
+        AssertTrue(RegExMatch(_DriverFuncBody("KL_Init"),
+            "KL_Mig_RequestPostureSync\([^)]*\)\s*&&\s*!KLMigration\.paused"),
+            "KL_Init must accept a posture sync retained by a paused boot")
+    } finally {
+        KL_Mig_Cancel()
+        KLMigration.paused := false
+        KLMigration.timer_fn := oldTimer
+    }
+}
+
+Test("KL_Mig lifecycle: a new ledger created while paused defers its marker to resume",
+    _KLMig_PausedNewLedgerDefersItsMarker)
 
 _KLMig_DriverLifecycleOwnsSuspendAndResume() {
     enter := _DriverFuncBody("Ergopti_OnSuspendEnter")

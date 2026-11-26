@@ -19,8 +19,8 @@ local CAPTURE = "capture-1"
 --- Runs a callback against a fresh policy instance.
 --- @param callback function Receives the module.
 local function with_mode(callback)
-	helpers.with_fresh_modules({ MODULE, "infra.logger" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.with_fresh_modules({ MODULE, "core.logger.engine.logger" }, function()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		callback(require(MODULE))
 	end)
 end

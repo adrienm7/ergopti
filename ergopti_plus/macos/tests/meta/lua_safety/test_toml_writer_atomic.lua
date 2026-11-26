@@ -4,7 +4,7 @@
 --- MODULE: TOML Writer Atomic Write Meta Test
 --- DESCRIPTION:
 --- Static source guard for the "toml-non-atomic-write" audit finding in
---- _shared/lua/toml_codec/writer.lua.
+--- _shared/core/text/engine/toml_codec/writer.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- M.write() opened the target config file with io.open(path, "w"), which
@@ -45,10 +45,10 @@ end
 -- ===========================================================================
 -- ===========================================================================
 
-helpers.describe("_shared/lua/toml_codec/writer.lua: atomic write (toml-non-atomic-write)", function()
+helpers.describe("_shared/core/text/engine/toml_codec/writer.lua: atomic write (toml-non-atomic-write)", function()
 
 	helpers.it("M.write writes to a .tmp file before renaming", function()
-		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
+		local src = strip_comments(read_source(helpers.shared("core/text/engine/toml_codec/writer.lua")))
 		helpers.assert_true(
 			src:find('path%s*%.%.%s*"%.tmp"') ~= nil
 			or src:find("path%.%.\"%.tmp\"") ~= nil,
@@ -56,14 +56,14 @@ helpers.describe("_shared/lua/toml_codec/writer.lua: atomic write (toml-non-atom
 	end)
 
 	helpers.it("M.write calls os.rename to atomically replace the target", function()
-		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
+		local src = strip_comments(read_source(helpers.shared("core/text/engine/toml_codec/writer.lua")))
 		helpers.assert_true(
 			src:find("pcall%s*%(%s*os%.rename") ~= nil,
 			"writer.lua must protected-call os.rename for atomic replacement (toml-non-atomic-write)")
 	end)
 
 	helpers.it("M.write does NOT open the target path directly with 'w' mode", function()
-		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
+		local src = strip_comments(read_source(helpers.shared("core/text/engine/toml_codec/writer.lua")))
 		-- The direct truncating open on the live path must be gone; only the
 		-- .tmp open should remain.  We verify the pattern io.open(path, "w")
 		-- is absent (the tmp open uses tmp_path or tmp_w, not bare path).
@@ -73,7 +73,7 @@ helpers.describe("_shared/lua/toml_codec/writer.lua: atomic write (toml-non-atom
 	end)
 
 	helpers.it("M.batch_write also uses .tmp + os.rename", function()
-		local src = strip_comments(read_source(helpers.shared("lua/toml_codec/writer.lua")))
+		local src = strip_comments(read_source(helpers.shared("core/text/engine/toml_codec/writer.lua")))
 		-- batch_write has its own write path — both must be atomic
 		helpers.assert_true(
 			src:find("os%.rename") ~= nil,

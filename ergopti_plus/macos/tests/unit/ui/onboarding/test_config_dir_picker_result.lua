@@ -68,7 +68,7 @@ helpers.describe("config folder picker native refusal", function()
 			local private_error = "{ NSAppleScriptErrorMessage = PRIVATE_NATIVE_" .. phase .. "; }"
 			local MenuPaths = with_osascript(false, nil, private_error)
 			local errors = {}
-			package.loaded["infra.logger"].error = function(_, message)
+			package.loaded["core.logger.engine.logger"].error = function(_, message)
 				errors[#errors + 1] = message
 			end
 			helpers.assert_nil(MenuPaths.pick_config_dir("/Users/me/", "Prompt"),

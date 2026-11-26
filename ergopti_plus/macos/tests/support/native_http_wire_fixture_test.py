@@ -14,6 +14,13 @@ wire = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wire)
 
 
+def client_context(cafile=None):
+    """A verifying client context that refuses TLS 1.0 and 1.1, like the drivers."""
+    context = ssl.create_default_context(cafile=None if cafile is None else str(cafile))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
 class RealPeerControls(unittest.TestCase):
     def setUp(self):
         self.fixture = wire.WireFixture(native=False)
@@ -58,7 +65,7 @@ class RealPeerControls(unittest.TestCase):
         return connection
 
     def testActualTLSProxyRecipientBinaryBodyAndFetchedLiteralPAC(self):
-        context = ssl.create_default_context(cafile=str(self.fixture.ca))
+        context = client_context(self.fixture.ca)
         for route, path in [
             ("first", "/alpha?case=one"),
             ("second", "/beta?case=two"),
@@ -142,7 +149,7 @@ class RealPeerControls(unittest.TestCase):
         # origin's accept loop for ten seconds, past a receiving deadline.
         stalled, _ = self.connect("second")
         self.addCleanup(stalled.close)
-        context = ssl.create_default_context(cafile=str(self.fixture.ca))
+        context = client_context(self.fixture.ca)
         raw, head = self.connect("first")
         self.assertIn(b"200 Connection Established", head)
         with context.wrap_socket(raw, server_hostname=self.fixture.host) as tls:
@@ -161,7 +168,7 @@ class RealPeerControls(unittest.TestCase):
         raw, _ = self.connect("first")
         try:
             with self.assertRaises(ssl.SSLCertVerificationError):
-                ssl.create_default_context().wrap_socket(raw, server_hostname=self.fixture.host)
+                client_context().wrap_socket(raw, server_hostname=self.fixture.host)
         finally:
             raw.close()
         snapshot = self.fixture.stats()

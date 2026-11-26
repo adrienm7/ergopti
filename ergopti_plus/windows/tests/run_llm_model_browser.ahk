@@ -16,9 +16,11 @@ SetWorkingDir(A_ScriptDir)
 
 #Include test_framework.ahk
 #Include ../vendor/Promise.ahk
-#Include ../infra/webview_script.ahk
+#Include ../core/ui/engine/webview/script.ahk
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
-#Include ../infra/json.ahk
+#Include ../core/text/engine/json.ahk
+#Include ../core/events/timer_scheduler.ahk
+#Include ../platform/focus/window_manager.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")
@@ -80,8 +82,8 @@ LLM_Menu_SetBackend(Id) {
 	_MBW_BackendSets.Push(Id)
 	return false
 }
-; No managed runtime is published under this folder name on a test runner.
-AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
+; No managed runtime is published under this folder on a test runner.
+AppFoldersManagedOllamaRoot() => A_Temp . "\ErgoptiModelBrowserRunnerNoManagedOllama"
 _LLM_Menu_ModelDisplayText() => ""
 _LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_owned_port" ? 11435 : Default)
 _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
@@ -92,16 +94,19 @@ LLM_GetBackendBrands() => Map(
 	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
 	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
-; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
-; the (never-called here) ShowWeb path loads. The tests never create a webview.
+; Minimal WebView2 stand-in so the class reference in the (never-called here)
+; ShowWeb path loads. The tests never create a webview.
 class WebView2 {
 	static create(args*) {
 		return { CoreWebView2: {} }
 	}
 }
 
-#Include ../infra/external_url_policy.ahk
-#Include ../ui/model_browser/init.ahk
+#Include ../core/network/engine/external_url_policy.ahk
+; The page asks the uninstall owner whether the managed runtime is published;
+; the real lookup runs here against the stubbed empty managed root above.
+#Include ../ai/engine/ollama/runtime_uninstall.ahk
+#Include ../ai/ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
 _LlmMbWatchdog(*) {
@@ -109,6 +114,12 @@ _LlmMbWatchdog(*) {
 	ExitApp(2)
 }
 SetTimer(_LlmMbWatchdog, -60000)
+
+; The scheduler's suspended re-queue and the browser's own delays read the real
+; shared timing registry; _SharedDir above is a stub folder for the catalogue.
+#Include ../core/text/engine/toml/helpers.ahk
+#Include ../core/timing/engine/config.ahk
+TimingsLoadShared(A_ScriptDir . "\..\..\_shared")
 
 
 
@@ -134,7 +145,7 @@ _MBNum_NonNumber() {
 Test("LLM_MBW_Num: non-number defaults to 0", _MBNum_NonNumber)
 
 ; The page's own string helper is gone: every string goes through the shared
-; JsonStringLiteral (infra/json.ahk), defined once.
+; JsonStringLiteral (core/text/engine/json.ahk), defined once.
 
 class _MBSessionFakeWebView {
 	Executed := []
@@ -307,7 +318,7 @@ _MBW_BridgeRoutesRealMessages(Message, Expected) {
 	global _TestIndex, _MBW_SelectedModels, _LLM_MBW_SessionEpoch
 	SavedIndex := _TestIndex, SavedSelections := _MBW_SelectedModels
 	SavedEpoch := _LLM_MBW_SessionEpoch
-	PreviousCritical := Critical("Off")
+	PreviousCritical := Critical("On")
 	Fence := {Done: false}
 	MarkFence := (*) => Fence.Done := true
 	try {
@@ -316,6 +327,8 @@ _MBW_BridgeRoutesRealMessages(Message, Expected) {
 		_LLM_MBW_SessionEpoch += 1
 		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
 		AssertEqual(0, _MBW_SelectedModels.Length, "the actual COM callback must defer model application")
+		; Admit timers only after checking that the COM callback did no inline work.
+		Critical("Off")
 		SetTimer(MarkFence, -50)
 		Started := A_TickCount
 		while !Fence.Done && A_TickCount - Started < 2000

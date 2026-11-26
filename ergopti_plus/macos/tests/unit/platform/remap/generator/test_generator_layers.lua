@@ -24,6 +24,7 @@
 local helpers = require("tests.helpers")
 package.loaded["tests.support.platform.remap.generator.generator_fixture"] = nil
 local Fixture = require("tests.support.platform.remap.generator.generator_fixture")
+local Sequence = require("tests.support.script_chord_sequence")
 local Generator = Fixture.Generator
 local NONE_ACTION = Fixture.NONE_ACTION
 local TEST_LEASE_TOKEN = Fixture.TEST_LEASE_TOKEN
@@ -102,7 +103,7 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 	end
 
 	-- Mirrors the reported configuration: left Command taps Backspace and holds
-	-- the navigation layer (_shared/tap_hold/defaults.toml).
+	-- the navigation layer (_shared/tap_hold/data/defaults.toml).
 	local function build()
 		local state = make_state({
 			tap_hold_config = { left_command = { tap = "backspace", hold = "layer" } },
@@ -150,6 +151,36 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 				"the sentinel must be the first key the activation emits")
 			helpers.assert_true(first_key < activation,
 				"Hammerspoon must receive the sentinel before any layer key is remapped")
+		end
+	end)
+
+	helpers.it("(layer-repeat-count-macos) entering the layer resets the count only when the layer binds one", function()
+		local function build_with(nav_layer)
+			local state = make_state({
+				tap_hold_config = { left_command = { tap = "backspace", hold = "layer" } }, nav_layer = nav_layer,
+			})
+			return Generator.build_karabiner_json(state,
+				{ NONE_ACTION, BACKSPACE_ACTION, LAYER_ACTION }, { LCMD_KEY_DEF }, {}, nil, "/fake/data_dir/")
+		end
+		local registry = { keys = { Digit3 = { kind = "key", group = "alphanumeric", karabiner = { key_code = "3" } } } }
+		local counted = build_with({ bindings = { Digit3 = { kind = "repeat_count", count = 3 } }, registry = registry })
+		local activations = layer_activations(counted.profiles[1].complex_modifications.rules, {})
+		helpers.assert_true(#activations > 0)
+		local count_name = "ergopti_nav_repeat_count_" .. TEST_LEASE_TOKEN
+		for _, events in ipairs(activations) do
+			local reset, activation = nil, nil
+			for index, event in ipairs(events) do
+				local variable = event.set_variable
+				if type(variable) == "table" and variable.name == count_name and variable.value == 1 then reset = index end
+				if type(variable) == "table" and variable.value == 1
+					and tostring(variable.name):find("layer_active", 1, true) then activation = index end
+			end
+			helpers.assert_not_nil(reset, "entering the layer puts this lease's count back to 1")
+			helpers.assert_true(reset < activation, "layer_active stays the last event Karabiner holds")
+		end
+		for _, events in ipairs(layer_activations(build().profiles[1].complex_modifications.rules, {})) do
+			helpers.assert_true(not tostring(_G.hs.json.encode(events)):find("nav_repeat_count", 1, true),
+				"a layer without a count keeps the activation it had")
 		end
 	end)
 
@@ -344,7 +375,8 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		local rules = build()
 		local on_layer = first_match(rules, "left_command", variables(rules, true))
 		helpers.assert_not_nil(on_layer, "on the layer, left Command must not reach macOS as Command")
-		for _, event in ipairs(on_layer.to or {}) do
+		-- Like every key-down, it ends a script chord sequence.
+		for _, event in ipairs(Sequence.without_sequence(on_layer.to)) do
 			helpers.assert_nil(event.key_code, "it posts no key")
 			helpers.assert_nil(event.set_variable, "nor holds the layer or anything else")
 		end
@@ -361,8 +393,9 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		local rules = build()
 		local on_layer, rule = first_match(rules, "spacebar", variables(rules, true))
 		helpers.assert_not_nil(on_layer, "on the layer, Space matches the layer's mapping")
-		helpers.assert_eq(on_layer.to[1].key_code, "spacebar")
-		helpers.assert_eq(on_layer.to[1].modifiers, { "command" }, "the layer sends Spotlight, not a plain Space")
+		local sent = Sequence.without_sequence(on_layer.to)[1]
+		helpers.assert_eq(sent.key_code, "spacebar")
+		helpers.assert_eq(sent.modifiers, { "command" }, "the layer sends Spotlight, not a plain Space")
 		helpers.assert_true(tostring(rule.description):find("Navigation layer", 1, true) ~= nil,
 			"the layer's rule, not Space's own tap/hold")
 		local alone = first_match(rules, "spacebar", variables(rules, false))

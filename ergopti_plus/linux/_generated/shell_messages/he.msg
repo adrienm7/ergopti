@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/he.msg
-# AUTO-GENERATED from _shared/data/locales/he.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/he.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=מודול הרשת של LuaJIT נבנה מקוד המקור.
 build_luv.recipe_required=הבנייה המקורית של luv דורשת את מתכון המקור שלה.
 install.already_installed={1} — כבר מותקן
 install.archive_digest_unavailable=עדכונים עם מתאר שמור דורשים סביבת OpenSSL3 אמיתית; היכולת נשארת לא זמינה.
+install.bytecode_skipped=לא ניתן היה ליצור את המודולים המהודרים מראש — Ergopti מופעל מקוד המקור, מעט לאט יותר.
 install.capability_verified={1} — היכולת אומתה
 install.command_still_missing={1} הותקן, אבל '{2}' עדיין לא נמצא.
 install.daemon_manual=כדי להפעיל את השירות ידנית:
 install.daemon_running=השירות פועל ברקע. כדי לבדוק את מצבו:
+install.focus_integration_enabled=שילוב המיקוד של {1} הופעל
+install.focus_integration_failed=לא ניתן להפעיל את שילוב המיקוד של {1} — כללים לפי יישום נשארים לא פעילים בשולחן עבודה זה.
+install.focus_integration_next_login=שילוב המיקוד של {1} הותקן (ייכנס לתוקף בכניסה הבאה)
+install.focus_integration_updated=שילוב המיקוד של {1} עודכן
 install.gnome_extension_active=הרחבת GNOME AppIndicator — כבר פעילה
 install.gnome_extension_enabled=הרחבת GNOME AppIndicator הופעלה
 install.gnome_extension_failed=לא ניתן להפעיל את הרחבת AppIndicator — בלעדיה GNOME לא מציג את הסמל.
 install.gnome_extension_missing=הרחבת GNOME AppIndicator חסרה — מתקין את {1}…
 install.gnome_extension_next_login=הרחבת GNOME AppIndicator הופעלה (בתוקף מההתחברות הבאה)
+install.gnome_extension_not_installed=אף חבילה בהפצה זו אינה כוללת את הרחבת GNOME AppIndicator: התקינו את AppIndicator and KStatusNotifierItem Support מ־{1}, ואז התנתקו והתחברו מחדש — בלעדיה GNOME אינו מציג את הסמל.
 install.gnome_without_extensions=GNOME ללא gnome-extensions — הפעילו הרחבת AppIndicator כדי לראות את הסמל.
 install.help_help=מציג את הודעת העזרה הזו
 install.help_no_deps=לא מתקין אף תלות (באחריותכם)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — בדיקת תלויות
 install.section_deps_skipped=התלויות דולגו (‎--no-deps)
 install.section_done=ההתקנה הושלמה
 install.section_files=התקנת קבצים
+install.section_focus=היישום הפעיל תחת Wayland ‏(GNOME,‏ KDE)
 install.section_lua_deps=תלויות Lua אופציונליות (לולאת אירועים, טיימרים, תצוגות אינטרנט, אותות)
 install.section_permissions=הרשאות קלט (נדרש sudo)
 install.section_services=יצירת שירותי המשתמש של systemd
@@ -63,6 +70,7 @@ install.section_tray=סמל במגש המערכת וחלונות
 install.security_warning_body=חברות בקבוצה 'input' מאפשרת לקרוא כל הקשה בהפעלה, כולל סיסמאות שמוקלדות בכל יישום. זה בדיוק מה שמנוע hotstrings צריך, וכך פועלים גם keyd ו-xremap.
 install.security_warning_title=אזהרת אבטחה
 install.service_started=השירות ergopti-hotstrings הופעל והתחיל לפעול
+install.session_without_graphical_target=הפעלה זו אף פעם אינה מפעילה את graphical-session.target של systemd (i3, Openbox, Xfce, sway ללא מנהל הפעלות), ולכן יחידת המשתמש לעולם לא תרוץ: Ergopti+ יופעל במקום זאת מרשומת ההפעלה האוטומטית של XDG בכניסה הבאה. מנהל חלונות שמתעלם מהפעלה אוטומטית של XDG (i3, sway) צריך את השורה exec {1} בהגדרות שלו.
 install.source_toolchain_unavailable=המהדר המותקן אינו יכול לבנות את מנוע הארכיונים המקורי.
 install.startup_choice_unreadable=לא ניתן היה לקרוא את בחירת ההפעלה.
 install.summary_config=הגדרות: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=הפעלה אוטומטית של XDG: {1}
 launch.already_running=Ergopti+ כבר פועל בהפעלה זו ({1} תפוס); ניסיון ההפעלה הנוסף נדחה.
 launch.authorization_failed=הרשאת הגישה לקלט בוטלה או נכשלה.
 launch.groups_unavailable=ההפעלה לא הצליחה לקבל את קבוצות הקלט שהוגדרו לה.
+launch.restarting=Ergopti+ כבר פועל בהפעלה זו; הוא מתבקש להיסגר ולאחר מכן מופעל מחדש.
+launch.session_lock_invalid=תיקיית נעילת ההפעלה חייבת להיות נתיב מוחלט.
 launcher.dependencies_installed=התלויות הותקנו.
 launcher.driver_missing=שגיאה: תיקיית מנהל ההתקן של Linux לא נמצאה: {1}
 launcher.install_deps_hint=הריצו: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=נתיב ההתקנה עובר דרך קישור סמ�
 uninstall.system_prefix=קידומת התקנת מערכת נדחתה.
 uninstall.unsafe_path=נתיב בעלות לא בטוח.
 uninstall.unsupported_argument=ארגומנט הסרה לא נתמך: {1}
+xkb_helpers.not_found=קובצי ההתקנה של פריסות המקלדת לא נמצאו ליד {1} וגם לא ב-{2}: בלעדיהם אי אפשר להתקין אף פריסה.

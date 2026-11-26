@@ -916,6 +916,263 @@
 					}
 				}
 			}
+		},
+		{
+			"id": "unpublished_scalar_backspace_keeps_prefix",
+			"description": "An explicit zero/false erasure counts the physical correction without removing admitted text; absent or nonzero/string flags retain ordinary erasure.",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100,
+						"meta": {
+							"erase": 0
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"a[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			},
+			"expected_bs_total": 1,
+			"expected_cur_word": "a",
+			"expected_word_error": false
+		},
+		{
+			"id": "unpublished_then_real_backspace_erases_prefix",
+			"description": "An explicit zero/false erasure counts the physical correction without removing admitted text; absent or nonzero/string flags retain ordinary erasure.",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100,
+						"meta": {
+							"erase": 0
+						}
+					},
+					{
+						"char": "[BS]",
+						"delay": 100
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"a": {
+						"c": 1,
+						"e": 1
+					},
+					"[BS]": {
+						"c": 2,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"a[BS]": {
+						"c": 1,
+						"e": 0
+					},
+					"[BS][BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {
+					"a[BS][BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			},
+			"expected_bs_total": 2,
+			"expected_cur_word": "",
+			"expected_word_error": true
+		},
+		{
+			"id": "string_erase_override_remains_ordinary",
+			"description": "An explicit zero/false erasure counts the physical correction without removing admitted text; absent or nonzero/string flags retain ordinary erasure.",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100,
+						"meta": {
+							"erase": "0"
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"a": {
+						"c": 1,
+						"e": 1
+					},
+					"[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"a[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			},
+			"expected_bs_total": 1,
+			"expected_cur_word": "",
+			"expected_word_error": true
+		},
+		{
+			"id": "false_erase_override_keeps_prefix",
+			"description": "An explicit zero/false erasure counts the physical correction without removing admitted text; absent or nonzero/string flags retain ordinary erasure.",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100,
+						"meta": {
+							"erase": false
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_bigrams": {
+					"a[BS]": {
+						"c": 1,
+						"e": 0
+					}
+				},
+				"ngram_trigrams": {},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			},
+			"expected_bs_total": 1,
+			"expected_cur_word": "a",
+			"expected_word_error": false
+		},
+		{
+			"id": "synthetic_unpublished_scalar_keeps_manual_prefix",
+			"description": "A synthetic correction of an unpublished unit cannot claim or erase the preceding manual trigger.",
+			"flushes": [
+				[
+					{
+						"char": "a",
+						"delay": 100
+					}
+				],
+				[
+					{
+						"char": "[BS]",
+						"delay": 100,
+						"meta": {
+							"erase": 0,
+							"s": 1,
+							"st": "hotstring"
+						}
+					}
+				]
+			],
+			"expected": {
+				"ngram_chars": {
+					"a": {
+						"c": 1,
+						"e": 0
+					},
+					"[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_bigrams": {
+					"a[BS]": {
+						"c": 1,
+						"e": 0,
+						"esrc": {
+							"hotstring": 1
+						}
+					}
+				},
+				"ngram_trigrams": {},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			},
+			"expected_bs_total": 0,
+			"expected_cur_word": "a",
+			"expected_word_error": false,
+			"expected_hs_input_chars": 0
 		}
 	]
 }

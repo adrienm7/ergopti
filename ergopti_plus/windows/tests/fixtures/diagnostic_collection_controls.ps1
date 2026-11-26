@@ -5,7 +5,7 @@ $ErrorActionPreference='Stop'
 $taskRoot=(Join-Path ([IO.Path]::GetTempPath()) 'ergopti-collector-controls-')+[Guid]::NewGuid().ToString('N')
 [IO.Directory]::CreateDirectory($taskRoot)|Out-Null
 $taskWorker=Join-Path $Checkout 'static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1'
-$taskContract=Join-Path $Checkout 'static/ergopti_plus/_shared/modules/diagnostics/collection.json'
+$taskContract=Join-Path $Checkout 'static/ergopti_plus/_shared/diagnostics/data/collection.json'
 $taskPowerShell=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
 $taskProofs=New-Object Collections.Generic.List[object]
 $taskSentinel='sk-'+('A'*32)

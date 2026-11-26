@@ -176,6 +176,8 @@ SIHO_HasActive() {
 ; EndChars stops synchronously before buffering: every ordinary unit and low
 ; surrogate ends capture, while a high is retained for its matching low.
 ; Boot warms this immutable table before configured capture hotkeys can fire.
+; The table is every unit from 1 to 0xFFFF but the high surrogates, with "{"
+; and "}" written as the {{} and {}} key names, in ascending order.
 _SIHO_ScalarEndKeys() {
 	static Cached := 0
 	if Cached is String
@@ -183,18 +185,14 @@ _SIHO_ScalarEndKeys() {
 	Units := 0xFFFF - 0x400 + 4
 	Bytes := Buffer((Units + 1) * 2, 0)
 	Offset := 0
-	loop 0xFFFF {
-		Unit := A_Index
-		if Unit >= 0xD800 && Unit <= 0xDBFF
-			continue
-		if Unit == 0x7B || Unit == 0x7D {
-			NumPut("UShort", 0x7B, "UShort", Unit, "UShort", 0x7D, Bytes, Offset)
-			Offset += 6
-		} else {
-			NumPut("UShort", Unit, Bytes, Offset)
-			Offset += 2
-		}
-	}
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x01, 0x7A)
+	NumPut("UShort", 0x7B, "UShort", 0x7B, "UShort", 0x7D, Bytes, Offset)
+	Offset += 6
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x7C, 0x7C)
+	NumPut("UShort", 0x7B, "UShort", 0x7D, "UShort", 0x7D, Bytes, Offset)
+	Offset += 6
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x7E, 0xD7FF)
+	_SIHO_FillUnitRun(Bytes, &Offset, 0xDC00, 0xFFFF)
 	if Offset != Units * 2
 		throw Error("The scalar capture table did not fill its exact buffer.")
 	Candidate := StrGet(Bytes, Units, "UTF-16")
@@ -204,6 +202,29 @@ _SIHO_ScalarEndKeys() {
 	; No registry globals are available at the earlier boot prewarm position.
 	Cached := Candidate
 	return Cached
+}
+
+; Writes the code units First..Last in ascending order at Offset. Four units go
+; in one Int64 store whose lanes each grow by four per step and never carry, as
+; no unit exceeds 0xFFFF: one store per unit made the boot warm-up of the table
+; above cost 140-290 ms on a loaded PC, about ten times this.
+_SIHO_FillUnitRun(Bytes, &Offset, First, Last) {
+	Unit := First
+	Groups := (Last - First + 1) // 4
+	if Groups > 0 {
+		Word := Unit | (Unit + 1) << 16 | (Unit + 2) << 32 | (Unit + 3) << 48
+		loop Groups {
+			NumPut("Int64", Word, Bytes, Offset)
+			Word += 0x0004000400040004
+			Offset += 8
+		}
+		Unit += Groups * 4
+	}
+	while Unit <= Last {
+		NumPut("UShort", Unit, Bytes, Offset)
+		Offset += 2
+		Unit++
+	}
 }
 
 ; Named controls are explicit native EndKeys, never literal text. The only
@@ -246,4 +267,84 @@ _SIHO_ReadScalar(Hook, NamedKeys) {
 			Result.Kind := "text", Result.Text := Text . EndKey, Result.Reason := ""
 	}
 	return Result
+}
+
+; Custom AltGr is not in InputHook.EndMods. Its notifications precede the
+; terminating OnEnd in the native queue; no later Up is collected after EndKey.
+_SIHO_CustomModifierCapture(Hook, KeyName, SendKey) {
+	if SendKey == ""
+		return 0
+	Vk := GetKeyVK(SendKey), Sc := GetKeySC(KeyName)
+	if !Vk || !Sc
+		return 0
+	Receipt := {hook: Hook, key_name: KeyName, send_key: SendKey, vk: Vk, sc: Sc,
+		active: true, down: !!GetKeyState(SendKey), ended: false, held: false}
+	try {
+		Hook.OnKeyDown := _SIHO_CustomModifierKey.Bind(Receipt, true)
+		Hook.OnKeyUp := _SIHO_CustomModifierKey.Bind(Receipt, false)
+		Hook.OnEnd := _SIHO_CustomModifierEnd.Bind(Receipt)
+		; V as well as N: on a Kana-family layout (Ergopti's own KLC) VK_OEM_8 is
+		; also a dead key, so a hook without V swallowed the AltGr keydown and
+		; Windows never entered its level; the sticky modifiers already pass it.
+		Hook.KeyOpt("{" . KeyName . "}{" . SendKey . "}", "+NV")
+		return Receipt
+	} catch {
+		_SIHO_CustomModifierRelease(Receipt, Hook)
+		throw
+	}
+}
+
+_SIHO_CustomModifierKey(Receipt, Down, Hook, Vk, Sc) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook
+			&& (Vk == Receipt.vk || Sc == Receipt.sc)
+			Receipt.down := Down
+	} finally Critical(PreviousCritical)
+}
+
+_SIHO_CustomModifierEnd(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook {
+			Receipt.held := Receipt.down
+			Receipt.ended := true
+		}
+	} finally Critical(PreviousCritical)
+}
+
+; Wait reports native termination, not necessarily delivery of its queued End
+; callback. Keep the same suppressive owner until that exact receipt settles.
+_SIHO_CustomModifierSettle(Receipt, Hook, OwnerToken) {
+	PreviousCritical := Critical("Off")
+	try {
+		Started := A_TickCount
+		while !Receipt.ended {
+			if A_IsSuspended || !SIHO_IsOwned(OwnerToken, Hook) || A_TickCount - Started >= 100
+				return false
+			Sleep(-1)
+			if !Receipt.ended
+				Sleep(TimingsGet("ui", "custom_modifier_settle_poll_ms"))
+		}
+		return !A_IsSuspended && SIHO_IsOwned(OwnerToken, Hook)
+	} finally Critical(PreviousCritical)
+}
+
+_SIHO_CustomModifierRelease(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try Receipt.active := false, Receipt.hook := 0
+	finally Critical(PreviousCritical)
+	Hook.OnKeyDown := ""
+	Hook.OnKeyUp := ""
+	Hook.OnEnd := ""
+}
+
+; The terminating receipt owns the original modifier, while the current tuple
+; proves that no different layout key was substituted before replay.
+_SIHO_CustomModifierReplay(Receipt, KeyName, SendKey, &Restore) {
+	Restore := false
+	if !Receipt.ended || Receipt.key_name != KeyName || Receipt.send_key != SendKey
+		return false
+	Restore := Receipt.held && !GetKeyState(Receipt.send_key)
+	return true
 }

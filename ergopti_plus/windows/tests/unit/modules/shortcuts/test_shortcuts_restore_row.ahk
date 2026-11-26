@@ -2,9 +2,9 @@
 
 ; shortcuts-restore-row. The Windows Shortcuts submenu had no « Restaurer les
 ; valeurs conseillées » row: the driver registered the scope command, but the
-; shared menu declaration drew no row for it. The declaration has one now, for
-; Windows and Linux (macOS keeps its key combinations in the Karabiner settings,
-; which only the Configuration restore composes so far). The Layout submenu had
+; shared menu declaration drew no row for it. The declaration has one now, on
+; every platform (macOS composes its key combinations, kept for Karabiner, with
+; the shortcut preferences since 2026-11-20). The Layout submenu had
 ; the same gap and gets the same row, for Windows and macOS. Both gained the
 ; « Tout effacer » row beside it on 2026-09-30 (menu-first-group).
 
@@ -52,13 +52,13 @@ Test("shortcuts-restore-row: the Shortcuts submenu declares the restore row",
 Test("shortcuts-restore-row: the drawn Shortcuts row restores the recommended scope",
 	_ScopeShortcutsCase.Bind("recommended", true))
 Test("shortcuts-restore-row: the Layout submenu declares the restore row",
-	_SRR_DeclaredRestoreRow.Bind("_MI_StageLayout", "layout_menu", "_LAY_ScopeCommands"))
+	_SRR_DeclaredRestoreRow.Bind("_LAY_BuildLayoutMenu", "layout_menu", "_LAY_ScopeCommands"))
 Test("menu-first-group: the Shortcuts submenu declares the clear row",
 	_SRR_DeclaredRestoreRow.Bind("_BuildShortcutsSubmenu", "shortcuts_menu", "_SC_ScopeCommands", "scope_clear"))
 Test("menu-first-group: the drawn Shortcuts clear row clears the scope",
 	_ScopeShortcutsCase.Bind("clear", true))
 Test("menu-first-group: the Layout submenu declares the clear row",
-	_SRR_DeclaredRestoreRow.Bind("_MI_StageLayout", "layout_menu", "_LAY_ScopeCommands", "scope_clear"))
+	_SRR_DeclaredRestoreRow.Bind("_LAY_BuildLayoutMenu", "layout_menu", "_LAY_ScopeCommands", "scope_clear"))
 
 ; The maintainer's request of 2026-09-30: « Taper un symbole encadre la
 ; sélection » (no AltGr: the symbols need not be there) and « Symboles

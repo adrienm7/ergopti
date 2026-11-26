@@ -41,7 +41,7 @@ _UpdaterTest_VersionVectorParity() {
 	; cross-driver vector table (also driven by the JS and macOS suites) so the
 	; three hand-ported semver impls cannot drift. The fail-closed non-semver
 	; fallback (expect 0) is the case that had drifted before D-1.
-	VectorsPath := A_ScriptDir . "\..\..\_shared\modules\updater\version_vectors.json"
+	VectorsPath := A_ScriptDir . "\..\..\_shared\updater\data\version_vectors.json"
 	AssertTrue(FileExist(VectorsPath) != "", "version vectors must exist at: " . VectorsPath)
 	Data := JsonParse(FileRead(VectorsPath, "UTF-8"))
 	Vectors := Data["vectors"]
@@ -196,7 +196,12 @@ _UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
 		"javascript:alert(1)",
 		"audit-canary://noop",
 		"https://example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		RepoRoot . "/../other", RepoRoot . "/%2e%2e/other", RepoRoot . "/%2e%2e%2fother",
+		RepoRoot . "/%5c../other", RepoRoot . "/%00other",
 		RepoRoot . ".invalid/releases",
+		RepoRoot . "/../../attacker/repo",
+		RepoRoot . "/%2e%2e/%2E%2e/attacker/repo",
+		RepoRoot . "\..\..\attacker\repo",
 		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
 	] {
 		AssertFalse(_Updater_IsAllowedManualUrl(Url),
@@ -449,14 +454,12 @@ _UpdaterTest_JsonStringZeroHasTypedTransportSemantics() {
 	SavedCache := _UpdaterFetchCache
 	try {
 		_UpdaterFetchCache := Map()
-		AssertEqual("0", _Updater_InterpretResponse(
+		; A body that opens no JSON is no list (UPD-1): the String "0" is none, so it
+		; answers none and never enters the cache.
+		AssertEqual("", _Updater_InterpretResponse(
 			200, "0", "typed-etag", "typed-zero", "test://typed-zero"),
-			'the fresh JSON String "0" must survive response interpretation')
-		AssertEqual("0", _UpdaterFetchCache["typed-zero"].Json,
-			'the fresh JSON String "0" must remain cacheable')
-		AssertEqual("0", _Updater_InterpretResponse(
-			304, "", "", "typed-zero", "test://typed-zero"),
-			'the cached JSON String "0" must survive a 304 response')
+			'a 200 whose body is "0" opens no JSON and answers no list')
+		AssertFalse(_UpdaterFetchCache.Has("typed-zero"), "a body that is no list is never cached")
 	} finally {
 		_UpdaterFetchCache := SavedCache
 	}
@@ -466,8 +469,7 @@ _UpdaterTest_JsonStringZeroHasTypedTransportSemantics() {
 		"Updater_ParseBody",
 		"_Updater_HandleBackgroundResult",
 		"_Updater_ShowAvailableUpdateCallback",
-		"_Updater_OneClickUpdateCallback",
-		"_Updater_BuildChangelogGui"
+		"_Updater_OneClickUpdateCallback"
 	] {
 		Body := _DriverFuncBody(FunctionName)
 		Assert(InStr(Body, "_Updater_JsonPayloadIsFailure(Json)") > 0,
@@ -603,6 +605,24 @@ _UpdaterTest_RateLimitDetail() {
 }
 Test("Updater: an exhausted GitHub rate limit names its reset time (#95)", _UpdaterTest_RateLimitDetail)
 
+; UPD-1 (decided by the maintainer on 2026-11-11): a 200 whose body opens no JSON
+; array, a captive portal's page, is no release list. It answers none, so the
+; check reads the Atom feed and, when that fails too, says « no connection »
+; rather than « parse failed ».
+_UpdaterTest_HtmlOkIsNoList() {
+	global _UpdaterFetchCache
+	SavedCache := _UpdaterFetchCache
+	try {
+		_UpdaterFetchCache := Map()
+		AssertEqual("", _Updater_InterpretResponse(200, "<!doctype html><html><body>Portal</body></html>",
+			'"portal-etag"', "main", "test://portal"), "an HTML 200 answers no release list")
+		AssertFalse(_UpdaterFetchCache.Has("main"), "the portal page never enters the response cache")
+	} finally {
+		_UpdaterFetchCache := SavedCache
+	}
+}
+Test("Updater: an HTML 200 is no release list, so the feed is read (UPD-1)", _UpdaterTest_HtmlOkIsNoList)
+
 
 ; Simulates a driver restart: the in-memory cache and the load memo are fresh.
 _UpdaterTest_ListCacheRestart() {
@@ -679,3 +699,5 @@ Test("Updater: the release list and its ETag survive a restart (#95)", _UpdaterT
 #Include test_updater_latest_json_utf8.ahk
 #Include test_updater_latest_async_json_utf8.ahk
 #Include test_updater_list_async_json_utf8.ahk
+
+#Include test_updater_list_cache_stage_custody.ahk

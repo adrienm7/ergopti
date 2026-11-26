@@ -1,0 +1,352 @@
+{
+	"_description": "The sources of the count tables under static/corpus/frequency (format ergopti-count-table): one entry per table, read by tools/build/import-count-tables.cjs, which downloads url (or takes the archive from --archive-dir), refuses it unless its SHA-256 is sha256, reads member from it, counts it with the analysis engine's own rules and writes output. kind: leipzig_sentences (a Leipzig Corpora Collection sentence file, « number<TAB>sentence » per line, counted as text, so bigrams and trigrams cross words) comere_tei_posts (a CoMeRe TEI file of Ortolang, each <post> one line with its anonymisation placeholders left out, counted as text) or lexique_words (Lexique's TSV, each distinct word of word_column weighted by the sum of its rows' frequency_column per million, times scale, counted by the word-list rule, so its n-grams stay inside words and at their edges). The licence, attribution, status and prune_ratio of each table are in static/corpus/register.json, their one source: prune_ratio drops, from each table, the n-grams rarer than that share of its total, the table records the counts it kept from (pruned_below), and the importer refuses a table whose pruning changes a metric of its check layouts by more than its PRUNE_TOLERANCE (the table records the largest change, prune_check).",
+	"schema_version": 1,
+	"tables": [
+		{
+			"output": "frequency/leipzig/fr_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_wikipedia_2021_1M.tar.gz",
+			"sha256": "73eadebaa2fe3600ebf4e41bac5241e821d7baa4c9906afc11969fb6c8aaec86",
+			"member": "fra_wikipedia_2021_1M/fra_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/en_wikipedia_2016_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_wikipedia_2016_1M.tar.gz",
+			"sha256": "42cc4e689b93a320151fa4378572db9d6c5a5eee6e13c966fdefe77954d6596d",
+			"member": "eng_wikipedia_2016_1M/eng_wikipedia_2016_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/fr_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_news_2024_1M.tar.gz",
+			"sha256": "907eed297ab7b5fbe0ea87105084899158f660890e87f121b2a24eb9853a6467",
+			"member": "fra_news_2024_1M/fra_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/lexique/fr_lexique_4_10.json",
+			"kind": "lexique_words",
+			"url": "https://www.lexique.org/databases/Lexique410/Lexique4.1.zip",
+			"sha256": "d6d7b99801e1f0aeab90ed1623a83ba45b8333b6a646ee33f524a6c047ff4b23",
+			"member": "Lexique4.1/Lexique4.1.tsv",
+			"word_column": "1_Mot",
+			"frequency_column": "10_FreqMot",
+			"scale": 1000
+		},
+		{
+			"output": "frequency/leipzig/de_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_wikipedia_2021_1M.tar.gz",
+			"sha256": "d5eb95fe71010a88d69ba408a4016f67a3a219e1a63cade652593abf33010aba",
+			"member": "deu_wikipedia_2021_1M/deu_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/es_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_wikipedia_2021_1M.tar.gz",
+			"sha256": "d4fc33f8cb079a3a2dc9edaec8cdd062b9fba5a36f7fa5af9488a945a8f629c8",
+			"member": "spa_wikipedia_2021_1M/spa_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/it_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_wikipedia_2021_1M.tar.gz",
+			"sha256": "e934b9ad62a4d79a9d48e3d903b5c32d8d279ac8f67938acc17aadb0782c2104",
+			"member": "ita_wikipedia_2021_1M/ita_wikipedia_2021_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/de_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/deu_news_2024_1M.tar.gz",
+			"sha256": "203d98de187f6d87e7f97c1f516a64a9d19016d0dc81c935a72e769ef184fa64",
+			"member": "deu_news_2024_1M/deu_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/es_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/spa_news_2024_1M.tar.gz",
+			"sha256": "4666b54caad54cd46cdfea80e7cb727663b220c2ead871b4ccf6285df0599090",
+			"member": "spa_news_2024_1M/spa_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/it_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/ita_news_2024_1M.tar.gz",
+			"sha256": "90ed9f839c50de9a58a7f1772516891d6721c92f4b863560bd26a480d7717e30",
+			"member": "ita_news_2024_1M/ita_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/leipzig/en_news_2024_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_news_2024_1M.tar.gz",
+			"sha256": "8f1d4d07b9771f8a7fc219ad587d5382eabf5009ef563f1bc4c12a467a8e3a97",
+			"member": "eng_news_2024_1M/eng_news_2024_1M-sentences.txt"
+		},
+		{
+			"output": "frequency/google_books/fr_1grams_2020.json",
+			"kind": "google_books_1grams",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"shards": [
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00000-of-00006.gz",
+					"sha256": "c09240100c1d51c479faaf7ecd87163d2460f7f6d8c0244112b2727d96cae8e1"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00001-of-00006.gz",
+					"sha256": "9dcda2040ee9e63333fc515db51dad958725afb9a71b70a707105564ed64eb3b"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00002-of-00006.gz",
+					"sha256": "389f4b15e40a73e1ad57ae807eaec7f0a56725e8897dde533ed77f1dc30140ea"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00003-of-00006.gz",
+					"sha256": "c6a38bbcfb00bdc4ac8cc8e22936d0835bfbb07f798e36dcf21a024dbddf3acd"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00004-of-00006.gz",
+					"sha256": "978359563dceae0dbbe06457c07079eb0209471bef50f64fde2aa3b95534124c"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/fre/1-00005-of-00006.gz",
+					"sha256": "2ccc18b4e6f0bebe62fa2d251265b663e09990eef3827620f445d32cceded64e"
+				}
+			],
+			"years": [1950, 2019],
+			"min_count": 100
+		},
+		{
+			"output": "frequency/google_books/en_1grams_2020.json",
+			"kind": "google_books_1grams",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"shards": [
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00000-of-00024.gz",
+					"sha256": "d2568b44db1bf33e02b76373aa2861517332c84137ba3a8cee657441496c4b45"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00001-of-00024.gz",
+					"sha256": "ea4828275463479b5acdb055e5f5bea9f9cd518f9613dc3a2ebd84c5d3061e3c"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00002-of-00024.gz",
+					"sha256": "1ab1dba104d181b0aa883b0d7831cde48060c1e432204be19bb995c8efa34c1b"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00003-of-00024.gz",
+					"sha256": "c4a1d91fb7f29089e247450c768ac7f76b91b5225713ca36ab48fcd1da3e4e06"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00004-of-00024.gz",
+					"sha256": "799f6e9514c988b7655c9601a8f3abb912bf10741d4ab238a198231b664bd154"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00005-of-00024.gz",
+					"sha256": "e59cb5e596ba2a929dbf95fc1a44cb6d8559fc4c857a30e46ed8112ad6205b03"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00006-of-00024.gz",
+					"sha256": "e0d13c8664bf917a4cf40805a5191125f31275dc2a3d7f106dc132493b94753a"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00007-of-00024.gz",
+					"sha256": "1b9371bccc875ca5cb2ef48cd32e9b86bfe5270f4d3f83257a5d0b98a64c3bb8"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00008-of-00024.gz",
+					"sha256": "684d05885d5e00e60bc85cf03fe857fa4938d1f8e967b037677c5f28384214be"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00009-of-00024.gz",
+					"sha256": "b473a861daa57500f40b4b222b9fc58f9d2f1f64cba34525c28266b0265b22b2"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00010-of-00024.gz",
+					"sha256": "1815a46f1fa2d01c6cffc02a4590ab7601171e7762e668af17140df3c16eca58"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00011-of-00024.gz",
+					"sha256": "6438a13d25af6208ad628db5b0fe89a6705fb09960673f90fd8111fd174f1c6d"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00012-of-00024.gz",
+					"sha256": "39c80b9d2e2dc51d8dfc4f7870141d0b3a0082fdead87ae55f495a3bc79f2e1d"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00013-of-00024.gz",
+					"sha256": "7d4b084f854870d3776f5c9ba253c5690b0ad5f74b992a6e323c4676680d7c44"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00014-of-00024.gz",
+					"sha256": "6267febda571239df3aa1ecd20bfa0bb6126e6dbf78cb35e94a55e1a4a21df82"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00015-of-00024.gz",
+					"sha256": "48781c66f2211f3ad36c8785195c4b4c7926a1813c60b93e79807ce79ab0a7a7"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00016-of-00024.gz",
+					"sha256": "6c6af5ae894951e040b9c5f3417fc4765a92d0f28925d635eab25421a45b1410"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00017-of-00024.gz",
+					"sha256": "e3febf59da2f720cea6c633d7bbd5b96120b36ad205b5f58ace487e8920c6875"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00018-of-00024.gz",
+					"sha256": "7f2715ec65466efdba2ce2e399dff741268b58dfec4f1ab4b4820367cac65ae9"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00019-of-00024.gz",
+					"sha256": "98b48b4ca15846a5908d51f199fa6a80d5b937ed3d0edd7b4d09eda8b3bb7cdf"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00020-of-00024.gz",
+					"sha256": "e6ef1b0f26f1519cc3b9cc9d6aa3ea018b82e868785029aa581e3ff32f3a2092"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00021-of-00024.gz",
+					"sha256": "ebe0439514fc965ededccdeaf71c8ce8486855418a3e635c82aa5e31f9998804"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00022-of-00024.gz",
+					"sha256": "db63aa244891dc2fd00cb996341c7b3268a22fe7bc44d22e2e1805c3e162f85b"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/eng/1-00023-of-00024.gz",
+					"sha256": "76fb6a9a9301d8dc3ef4083602e0dea6f5a5f0457100f224fb6c3867ad98865d"
+				}
+			],
+			"years": [1950, 2019],
+			"min_count": 100
+		},
+		{
+			"output": "frequency/google_books/de_1grams_2020.json",
+			"kind": "google_books_1grams",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"shards": [
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00000-of-00008.gz",
+					"sha256": "c881e4bddb9da66995bb0d2181b6414279a16f46cea608c7a98d3946b9e76277"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00001-of-00008.gz",
+					"sha256": "837a33f83cc12c8d131b3af8c9b986be3484f693a8139eed7c01b3830be9f61e"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00002-of-00008.gz",
+					"sha256": "788c550260fe1492af5e463356f077034f5acf218b2dc84492782ff0ede02738"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00003-of-00008.gz",
+					"sha256": "5df06003559927d3693246f10081bdd17b8059d4b0caf2b4f9b8472526c4e37f"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00004-of-00008.gz",
+					"sha256": "9ecf85adb2c0f300b2e6d742660cc75a45379079a8b392a0c55ea60a6ebd7d11"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00005-of-00008.gz",
+					"sha256": "301915f102d239b581c5ec7378d72261e0b83d563ba44546d189964616c6fe57"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00006-of-00008.gz",
+					"sha256": "b9665900834aa086c674ff0749033b663fc645b1fc9985715b53317043d2d189"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ger/1-00007-of-00008.gz",
+					"sha256": "ff9d53b0762887214b371365d070724f20d45c8fafc92853d8bc8d2375dfcb10"
+				}
+			],
+			"years": [1950, 2019],
+			"min_count": 100
+		},
+		{
+			"output": "frequency/google_books/es_1grams_2020.json",
+			"kind": "google_books_1grams",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"shards": [
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/spa/1-00000-of-00003.gz",
+					"sha256": "c28dfa7f433317baf75429a57b1dab1d6ec016ad325feef0f30ab4f79d63f386"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/spa/1-00001-of-00003.gz",
+					"sha256": "b6396078773aa299ea010d6cfdef437a97055532df7d65c0a90914141e7ef0f6"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/spa/1-00002-of-00003.gz",
+					"sha256": "720b00fde16df0854dd8ccf1a37dcc021d37a568a9c71f063cd995124d001e3e"
+				}
+			],
+			"years": [1950, 2019],
+			"min_count": 100
+		},
+		{
+			"output": "frequency/google_books/it_1grams_2020.json",
+			"kind": "google_books_1grams",
+			"url": "https://storage.googleapis.com/books/ngrams/books/datasetsv3.html",
+			"shards": [
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ita/1-00000-of-00002.gz",
+					"sha256": "d95f5e9bd37eaea9d143d416ad5e224886e3fec8a2fb062014100cced017055b"
+				},
+				{
+					"url": "https://storage.googleapis.com/books/ngrams/books/20200217/ita/1-00001-of-00002.gz",
+					"sha256": "e51c87a6bb8a43dc2554c7f2bbe06fc97c7b5ded8c11d51afd1eb57f5a61ebe1"
+				}
+			],
+			"years": [1950, 2019],
+			"min_count": 100
+		},
+		{
+			"output": "frequency/tatoeba/fr_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/fra/fra_sentences.tsv.bz2",
+			"sha256": "c9e91cc5a0640db7bfc4423fadf3985db42df08dafce4983d4c6b8c2cf7a4d3d"
+		},
+		{
+			"output": "frequency/tatoeba/en_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2",
+			"sha256": "0c4d3b18152bd6507bbf77ab690532b25de1e60da950f68705b3c88935c01fb4"
+		},
+		{
+			"output": "frequency/tatoeba/de_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/deu/deu_sentences.tsv.bz2",
+			"sha256": "e16c57e695bfeccccb455c305d262c5cbe2aa74a5c1e1edb725d53cf907309ac"
+		},
+		{
+			"output": "frequency/tatoeba/es_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/spa/spa_sentences.tsv.bz2",
+			"sha256": "7872d2e66debfd8e73e96cc9bca9560a32cc914aee9c820649d7d3d5e7353f48"
+		},
+		{
+			"output": "frequency/tatoeba/it_sentences_2026_11_21.json",
+			"kind": "tatoeba_sentences",
+			"url": "https://downloads.tatoeba.org/exports/per_language/ita/ita_sentences.tsv.bz2",
+			"sha256": "20dc0feb2a4340daf69d42fd4bfb51e4d04c899e2a5bce3692169de9fe1a11fe"
+		},
+		{
+			"output": "frequency/norvig/en_count_1w.json",
+			"kind": "word_counts",
+			"url": "https://norvig.com/ngrams/count_1w.txt",
+			"sha256": "51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690"
+		},
+		{
+			"output": "frequency/taskmaster/en_tm1_self_dialogs.json",
+			"kind": "taskmaster_dialogs",
+			"url": "https://raw.githubusercontent.com/google-research-datasets/Taskmaster/335324ca7afee220b6114e72d90f994e07a888c4/TM-1-2019/self-dialogs.json",
+			"sha256": "1e590ed0ccee279e40c2fb9e083d3b9417477c6bfe35ce5b2277167698dd858d"
+		},
+		{
+			"output": "frequency/comere/fr_88milsms.json",
+			"kind": "comere_tei_posts",
+			"url": "https://repository.ortolang.fr/api/content/comere/v3.3/cmr-88milsms/cmr-88milsms-tei-v1.zip",
+			"sha256": "762127bb35fd266c8725d92baff537b9415859ba4ff764d192e4ff92a27c6ccd",
+			"member": "cmr-88milsms-tei-v1.xml"
+		}
+	]
+}

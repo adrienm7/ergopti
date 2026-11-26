@@ -18,7 +18,7 @@
 		{
 			"id": "CONF-LINUX-POSIX-FILE-MODE",
 			"driver": "linux",
-			"subject": "modules/llm/api_entries.lua — the API key file created with mode 0600",
+			"subject": "ai/engine/settings/api_entries.lua — the API key file created with mode 0600",
 			"status": "environment",
 			"reason": "The key file is created by open(2) with mode 0600 through LuaJIT's FFI, and the test reads the bits back with stat(1). A Windows checkout has no POSIX permission bits: only there is the mode test deferred, while every entry test runs on a primitive that creates the file without a mode. On Linux, CI included, a missing FFI or stat(1) fails the test.",
 			"tracked": "none"
@@ -26,7 +26,7 @@
 		{
 			"id": "CONF-LINUX-SECRET-TOOL",
 			"driver": "linux",
-			"subject": "modules/llm/api_token_store.lua — the API key handed to secret-tool",
+			"subject": "ai/engine/settings/api_token_store.lua — the API key handed to secret-tool",
 			"status": "environment",
 			"reason": "The tests run a stand-in secret-tool written as a POSIX shell script. A Windows checkout has neither secret-tool nor sh: only there are they deferred, while every other token store test runs on the in-memory service. On Linux, CI included, a failing stand-in fails the test.",
 			"tracked": "none"
@@ -37,6 +37,14 @@
 			"subject": "modules/updater/restarter.lua — the detached relay that restarts the daemon",
 			"status": "environment",
 			"reason": "The live test detaches the relay with setsid(1), which Git for Windows does not ship, and waits on a real process through kill -0 and /proc/<pid>/stat. Only a Windows host defers it; the relay command itself is tested everywhere. On Linux, CI included, a missing setsid fails the test.",
+			"tracked": "none"
+		},
+		{
+			"id": "CONF-LINUX-RELOAD-CLI",
+			"driver": "linux",
+			"subject": "tools/control/request_driver_reload.sh — Linux client locking, native signals and deadline admission",
+			"status": "environment",
+			"reason": "The integration fixtures exercise Linux flock ownership, SIGUSR1 delivery, FIFO admission and /proc/self/fd against real processes. A Windows host cannot reproduce those Linux kernel semantics, so only that host defers the fixtures. On Linux, missing required utilities or a failed fixture fail the test; dash and bash are also checked when available.",
 			"tracked": "none"
 		},
 		{

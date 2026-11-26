@@ -3,10 +3,11 @@
 #
 # Records only files supplied by the installer, never pre-existing user files.
 # SHA-256 lets uninstall retain a shipped file that the user later modified.
-# The optional fourth and fifth arguments name a tree the installer copied from
-# outside the driver source and where it landed below the installation root: the
-# layout registry of a checkout install (install/layout_registry.sh). Its files
-# are the installer's too. The helper and its canonical schema travel together:
+# Each optional pair of arguments after the third names a tree the installer
+# copied from outside the driver source and where it landed below the
+# installation root: the layout registry (install/layout_registry.sh) and the
+# XKB helpers (install/xkb_helpers.sh) of a checkout install. Their files are
+# the installer's too. The helper and its canonical schema travel together:
 # the updater runs the previous installation's owner against a new payload.
 
 set -euo pipefail
@@ -36,38 +37,43 @@ valid_owned_relative() {
 	esac
 	return 1
 }
-[ "$#" -eq 3 ] || [ "$#" -eq 5 ] || {
+[ "$#" -ge 3 ] && [ $(( ($# - 3) % 2 )) -eq 0 ] || {
 	ownership_refuse usage 64
 }
 DRIVER_SOURCE="$1"
 SHARED_SOURCE="$2"
 INSTALL_ROOT="$3"
-EXTRA_SOURCE="${4:-}"
-EXTRA_PREFIX="${5:-}"
+shift 3
+EXTRA_SOURCES=()
+EXTRA_PREFIXES=()
 [ -f "$DRIVER_SOURCE/$OWNERSHIP_DRIVER_SENTINEL" ] && [ -f "$SHARED_SOURCE/$OWNERSHIP_SHARED_SENTINEL" ] \
 	&& [ -d "$INSTALL_ROOT" ] || ownership_refuse invalid_source 1
-if [ "$#" -eq 5 ]; then
+while [ "$#" -gt 0 ]; do
 	# Only below the driver tree, which is all uninstall.sh accepts, and never
 	# outside it.
-	case "/$EXTRA_PREFIX/" in
+	case "/$2/" in
 		/"$OWNERSHIP_DRIVER_TREE"/*/) ;;
 		*) ownership_refuse invalid_extra_path 1 ;;
 	esac
-	case "/$EXTRA_PREFIX/" in
+	case "/$2/" in
 		*/../*|*/./*|*//*|*\\*) ownership_refuse invalid_extra_path 1 ;;
 	esac
-	[ -d "$EXTRA_SOURCE" ] || ownership_refuse invalid_extra_source 1
+	[ -d "$1" ] || ownership_refuse invalid_extra_source 1
+	EXTRA_SOURCES+=("$1")
+	EXTRA_PREFIXES+=("$2")
+	shift 2
+done
+target="$INSTALL_ROOT/$OWNERSHIP_MANIFEST"
+if [ -L "$target" ] || { [ -e "$target" ] && [ ! -f "$target" ]; }; then
+	ownership_refuse invalid_destination 1
 fi
 manifest="$(mktemp "$INSTALL_ROOT/$OWNERSHIP_MANIFEST.XXXXXX")"
 trap 'rm -f -- "$manifest"' EXIT
-trees=("$OWNERSHIP_DRIVER_TREE" "$OWNERSHIP_SHARED_TREE")
-if [ -n "$EXTRA_PREFIX" ]; then trees+=(extra); fi
-for tree in "${trees[@]}"; do
-	case "$tree" in
-		"$OWNERSHIP_DRIVER_TREE") source="$DRIVER_SOURCE"; prefix="$OWNERSHIP_DRIVER_TREE" ;;
-		"$OWNERSHIP_SHARED_TREE") source="$SHARED_SOURCE"; prefix="$OWNERSHIP_SHARED_TREE" ;;
-		extra) source="$EXTRA_SOURCE"; prefix="$EXTRA_PREFIX" ;;
-	esac
+sources=("$DRIVER_SOURCE" "$SHARED_SOURCE" "${EXTRA_SOURCES[@]}")
+prefixes=("$OWNERSHIP_DRIVER_TREE" "$OWNERSHIP_SHARED_TREE" "${EXTRA_PREFIXES[@]}")
+for index in "${!sources[@]}"; do
+	source="${sources[$index]}"
+	prefix="${prefixes[$index]}"
 	# Keep source paths as native bytes; checksum filename escaping must never
 	# become either a digest marker or part of the installed relative name.
 	find "$source" -type f -print0 | while IFS= read -r -d '' file; do
@@ -94,4 +100,4 @@ if [ -f "$launcher" ]; then
 	digest="$(sha256sum < "$launcher")"
 	printf '%s\t%s\n' "${digest%% *}" "$OWNERSHIP_LAUNCHER" >> "$manifest"
 fi
-mv -- "$manifest" "$INSTALL_ROOT/$OWNERSHIP_MANIFEST"
+mv -T -- "$manifest" "$target"

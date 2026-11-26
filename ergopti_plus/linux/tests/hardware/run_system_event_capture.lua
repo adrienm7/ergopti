@@ -7,22 +7,31 @@
 --- ==============================================================================
 
 local root, receipt = assert(arg[1]), assert(arg[2])
-local shared = root .. "/../_shared/lua"
+local shared = root .. "/../_shared"
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Consent = require("tests.support.metrics_consent_fixture")
-local Shell = require("adapters.shell_runner")
-local Clock = require("infra.monotonic")
+local Shell = require("core.process.adapters.shell_runner")
+local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
-local System = require("modules.keystats.system_metrics")
+local System = require("modules.keystats.system.system_metrics")
 local original_has, original_line = Shell.has_command, Shell.exec_line
 local original_capture, original_now = Calendar.capture, Clock.now_ms
 -- Keep the actual Calendar coordinate contract: raw clock fractions can lose a
 -- millisecond when an exact observation gap reaches SQLite integer persistence.
-local wall, mono = os.time() * 1000, original_capture().mono_ms
+-- The scenarios advance the wall clock by several sample gaps (minutes). Started
+-- in the last minutes before local midnight, a gap crossed the day cut and the
+-- day read back held only its share of the sleep (86000 of 120000 ms on a run at
+-- 23:59:26). The wall origin is therefore held at 23:00 today at the latest: the
+-- same date, never in the future. ERGOPTI_FIXTURE_WALL_S replaces the real now
+-- for the regression case that starts just before midnight.
+local real_now_s = tonumber(os.getenv("ERGOPTI_FIXTURE_WALL_S") or "") or os.time()
+local today = os.date("*t", real_now_s)
+local latest_origin_s = os.time({ year = today.year, month = today.month, day = today.day, hour = 23, min = 0, sec = 0 })
+local wall, mono = math.min(real_now_s, latest_origin_s) * 1000, original_capture().mono_ms
 local elapsed, network, locked = 0, "allowed-initial-network", false
 local calls = { network = 0, lock = 0, mute = 0 }
 -- Existing documented sensor command boundaries return controlled software data.
@@ -30,8 +39,10 @@ Shell.has_command = function(name, ...)
 	if name == "nmcli" or name == "loginctl" or name == "pactl" then return true end
 	return original_has(name, ...)
 end
+-- The network read is matched by program and fields, not its whole spelling:
+-- the sampler's flags (--colors no) once moved and left every wifi change unseen.
 Shell.exec_line = function(command)
-	if command:find("nmcli -t -f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
+	if command:find("nmcli", 1, true) and command:find("-f active,ssid", 1, true) then calls.network = calls.network + 1; return "yes:" .. network end
 	if command:find("loginctl show-session", 1, true) then calls.lock = calls.lock + 1; return locked and "yes" or "no" end
 	if command:find("pactl get-sink-mute", 1, true) then calls.mute = calls.mute + 1; return "Mute: no" end
 	return original_line(command)
@@ -66,6 +77,8 @@ local ok, failure = xpcall(function()
 	}) do
 		elapsed, network, locked = 0, "allowed-initial-network", false
 		System._reset()
+		-- The host's /proc would add system_load rows; this fixture admits transitions.
+		System._set_proc_paths("/nonexistent/ergopti-stat", "/nonexistent/ergopti-meminfo")
 		Preferences.with(function()
 			Fixture.with(function(k)
 				local database = own_database(case.name)
@@ -101,7 +114,7 @@ local ok, failure = xpcall(function()
 				if case.allowed_prefix then transition_sample() end
 				k.on_keydown("a", Clock.now_ms(), "privacy-probe")
 				Fixture.flush(k)
-				local rows = assert(writer.query_rows("SELECT action,COALESCE(json_extract(metadata_json,'$.asleep_ms'),'') FROM events_system ORDER BY action;"))
+				local rows = assert(writer.query_rows("SELECT action,COALESCE(json_extract(metadata_json,'$.asleep_ms'),'') FROM events_system WHERE action IN ('lock','unlock','wake','wifi_change') ORDER BY action;"))
 				local text = assert(writer.query_rows("SELECT text FROM events_typing ORDER BY id;"))
 				assert(#text == 1 and text[1] == "a", "privacy must reject the forbidden key and preserve permitted input")
 				local metadata = assert(writer.query_rows("SELECT COUNT(*) FROM events_system WHERE json_extract(metadata_json,'$.asleep_ms')=" .. tostring(System._sample_interval_ms() * 4) .. ";"))
@@ -128,6 +141,7 @@ local ok, failure = xpcall(function()
 	-- A stopped collector refuses reinitialization and cannot reauthorize samples.
 	elapsed, network, locked = 0, "failed-open-initial", false
 	System._reset()
+	System._set_proc_paths("/nonexistent/ergopti-stat", "/nonexistent/ergopti-meminfo")
 	Preferences.with(function()
 		Fixture.with(function(k)
 			k.init({ sqlite_path = directory, log_dir = directory .. "/logs" })

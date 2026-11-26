@@ -20,6 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 
 
 
@@ -158,8 +160,142 @@ _KLT_VectorsCase() {
 				Failures.Push(Vector["id"] . " sent [" . Sent . "] instead of [" . Vector["sends"] . "]")
 		}
 	}
-	AssertEqual(2, Layouts.Count, "the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
+	; Further layouts (Ergopti+) may join; both conventions must stay covered.
+	Assert(Layouts.Has("ergol") && Layouts.Has("ergopti"),
+		"the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
 	Assert(Presses >= 25 && Shortcuts >= 4, "both vector kinds must be replayed")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("keylayout emulation: the shared [layout] options vectors decide as the Lua emulation does (layout-registry-emulation)",
+	() => _KLT_WithEmulation(_KLT_OptionsVectorsCase))
+
+; Modifier word of an options-vector press -> the hotkey prefix of its chord.
+_KLT_ChordPrefix(Mods) => Mods.Has("ctrl") ? "^" : (Mods.Has("alt") ? "!" : "#")
+
+; Decides one press of emulation_vectors.json the way the registered hotkeys
+; do, through the production criteria and handlers' own functions: the
+; criterion of the hotkey that would catch the press, then the same output
+; call as its handler (_KLE_OnKey, _KLE_OnAltGr, _KLE_OnShortcut, the reset
+; keys). The vectors name the OS layout's character (native=), where the
+; handler reads the machine's, so the completion goes through
+; KeylayoutEmulation_ComposeNative.
+; @param Press {String} "[mods] SCnnn [native=text]".
+; @returns {Map} "decides" (pass, type, type_pass or shortcut) and "text".
+_KLT_OptionsDecide(Press) {
+	global KLE_KeyCodes, KLE_DEAD_RESET_KEYS, KLE_NATIVE_CHORD_KEYS
+	Mods := Map()
+	Sc := ""
+	NativeText := ""
+	for Word in StrSplit(Press, " ") {
+		if SubStr(Word, 1, 7) == "native="
+			NativeText := SubStr(Word, 8)
+		else if RegExMatch(Word, "^SC[0-9A-F]{3}$")
+			Sc := Word
+		else
+			Mods[Word] := true
+	}
+	Assert(Sc != "", "a vector press names a scan code: " . Press)
+	Pass := Map("decides", "pass", "text", "")
+	for Key in KLE_DEAD_RESET_KEYS {
+		if Key == Sc {
+			KeylayoutEmulation_ResetDeadKey()
+			return Pass
+		}
+	}
+	; No hotkey exists for a key the layout table does not hold.
+	if !KLE_KeyCodes.Has(Sc)
+		return Pass
+	; Ctrl+AltGr+key: the AltGr hotkey catches the press, and _KLE_OnAltGr sends
+	; Ctrl and the logical key when a real Ctrl is held (ILD-2).
+	if Mods.Has("altgr") && Mods.Has("ctrl") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, _KLE_AltGrShortcutMods(true, Mods.Has("shift")))
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
+	if Mods.Has("ctrl") || Mods.Has("alt") || Mods.Has("win") {
+		Prefix := _KLT_ChordPrefix(Mods)
+		if KLE_NATIVE_CHORD_KEYS.Has(Sc) || !_KLE_ShortcutCriterion(Prefix . Sc)
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, Prefix)
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
+	Shift := Mods.Has("shift")
+	Caps := Mods.Has("caps")
+	if Mods.Has("altgr") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, true))
+	}
+	if !_KLE_BaseCriterion(Sc, Shift)
+		return Pass
+	if LayoutRowIsEmulated(Sc) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift)
+		return Map("decides", "type", "text", KeylayoutEmulation_Press(Sc, Shift, Caps, false))
+	Step := KeylayoutEmulation_ComposeNative({Count: StrLen(NativeText) > 0 ? 1 : 0, Text: NativeText})
+	return Map("decides", Step["Native"] ? "type_pass" : "type", "text", Step["Output"])
+}
+
+; The vectors that order the number row (digits or symbols first) with the row
+; emulated: the ordering in effect is the foreground OS layout's, which a unit
+; test cannot fix, so the Lua drivers replay them and AHK pins them by name
+; (number_row_levels.json and the number-row suites own the AHK side).
+_KLT_OptionsVectorIsOsDependent(Vector) {
+	Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+	return Settings.Get("number_row", "native") != "native" && Settings.Get("emulate_number_row", true) ? true : false
+}
+
+_KLT_OptionsVectorsCase() {
+	global Features, CategoryEnabled, LayerEnabled
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\emulation_vectors.json", "UTF-8"))["vectors"]
+	Assert(Vectors.Length >= 12, "the options corpus holds its vectors")
+	Failures := []
+	Skipped := []
+	Replayed := 0
+	try {
+		for Vector in Vectors {
+			if _KLT_OptionsVectorIsOsDependent(Vector) {
+				Skipped.Push(Vector["id"])
+				continue
+			}
+			Settings := Vector.Has("settings") ? Vector["settings"] : Map()
+			Layout := Map("emulated_layout", Vector["layout"], "ergopti_variant", "none",
+				"ergopti_base", Settings.Get("base", true) ? true : false,
+				"ergopti_alt_gr", Settings.Get("alt_gr", true) ? true : false,
+				"direct_access_digits", "native")
+			for Row in ["number_row", "top_row", "home_row", "bottom_row"]
+				Layout["emulate_" . Row] := Settings.Get("emulate_" . Row, true) ? true : false
+			Features := Map("layout", Layout)
+			CategoryEnabled := Map("Layout", true)
+			LayerEnabled := false
+			State["initialized"] := false
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+			_KLT_Load(Vector["layout"])
+			KeylayoutEmulation_ResetDeadKey()
+			Replayed += 1
+			for Position, Step in Vector["steps"] {
+				Label := Vector["id"] . " #" . Position . " (" . Step["press"] . ")"
+				Got := _KLT_OptionsDecide(Step["press"])
+				if Got["decides"] != Step["decides"]
+					Failures.Push(Label . " decided " . Got["decides"] . " instead of " . Step["decides"])
+				else if Step.Has("text") && Step["text"] !== Got["text"]
+					Failures.Push(Label . " gave [" . Got["text"] . "] instead of [" . Step["text"] . "]")
+			}
+		}
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+	}
+	AssertEqual(5, Skipped.Length, "only the OS-dependent number-row orderings stay with the Lua replay: " . _KLT_Join(Skipped))
+	AssertEqual(Vectors.Length - 5, Replayed, "every other options vector is replayed")
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 
@@ -514,87 +650,98 @@ _KLT_IndependentLayersCase() {
 	}
 }
 
-Test("magic key: the configured key wins over the layout's declaration and the OS layout (layout-magic-key)",
-	_KLT_MagicKeySourceOrderCase)
+Test("keylayout emulation: a pending dead key completes with the OS character on a row switched off (layout-row-pending-dead-key)",
+	() => _KLT_WithEmulation(_KLT_PendingDisabledRowCase))
 
-; The resolution order of LayoutRegistry_MagicKeySource, with a detection that
-; records whether it was consulted at all.
-_KLT_MagicKeySourceOrderCase() {
-	Probe := { Calls: 0, Answer: "SC024" }
-	Shipped := { Calls: 0 }
-	Resolve(Changes) {
-		Inputs := Map("chosen", false, "configured", "auto", "declared", "", "emulated", false,
-			"keycodes", LayoutRegistry_Keycodes(), "detect", () => (Probe.Calls += 1, Probe.Answer),
-			"shipped", () => (Shipped.Calls += 1, "KeyC"))
-		for Key, Value in Changes
-			Inputs[Key] := Value
-		return LayoutRegistry_MagicKeySource(Inputs)
+; DKW-001. Ergopti+'s home-row SC02B is the circumflex dead key and its top-row
+; SC012 types o. With the global base on and only the top row switched off, the
+; pending accent must compose the OS layout's character on SC012 (e -> ê), not
+; the selected layout's (o -> ô). The original registered callbacks are driven.
+_KLT_PendingDisabledRowCase() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, KLE_State, KLE_Compositions
+	global KEYLAYOUT_NEUTRAL_STATE, _Stub_RecordedSends, _HotstringRegistrar, _SendHook
+	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	State := MasterGateState()
+	; The suite runs with the recorder hooks installed: later cases read their
+	; sends from them, so this case hands back the hooks it found.
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
+		_KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture,
+		_KLE_ResetObserverGeneration, _HotstringRegistrar, _SendHook]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergopti_plus", "ergopti_base", true,
+			"ergopti_alt_gr", true, "ergopti_variant", "none", "direct_access_digits", "native",
+			"emulate_number_row", true, "emulate_top_row", false, "emulate_home_row", true,
+			"emulate_bottom_row", true))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergopti_plus")
+		KLE_Registered := false
+		Callbacks := Map()
+		Criteria := Map()
+		Current := {Criterion: 0}
+		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
+			(Name, Callback, *) => (Callbacks[Name] := Callback, Criteria[Name] := Current.Criterion),
+			(Args*) => Current.Criterion := Args.Length ? Args[1] : 0, 0,
+			(Scan, Callback, Criterion) => 0)
+		AssertTrue(KeylayoutEmulation_LayerIsActive("ergopti_base"), "the global base layer stays on")
+		AssertFalse(LayoutRowIsEmulated("SC012"), "the top row is switched off")
+		AssertTrue(LayoutRowIsEmulated("SC02B"), "the home row stays emulated")
+		Hkl := GetForegroundKeyboardLayout()
+		Plain := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, false, false)
+		Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, true, false)
+		TestRequireHostCapability(TestSc012NotOReceipt.Bind(Plain))
+		Assert(Plain.Count == 1 && Plain.Text != "o", "the proof needs an OS layout whose SC012 is not o")
+		Circumflex := KLE_Compositions["s1_circumflex"]
+		Assert(Circumflex.Has(Plain.Text) && Circumflex.Has(Shifted.Text),
+			"Ergopti+ composes the circumflex over the OS character " . Plain.Text)
+		if Plain.Text == "e"
+			AssertEqual(Chr(0xEA), Circumflex["e"]["Output"], "the installed US letter e composes to ê")
+		AssertFalse(Criteria["SC012"].Call(), "neutral: the switched-off top row stays with the OS")
+		InstallHotstringHooks()
+		; Plain continuation on the switched-off row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertEqual("s1_circumflex", KLE_State, "the home-row dead key arms its accent")
+		AssertTrue(Criteria["SC012"].Call(), "the pending accent owns the native continuation")
+		Callbacks["SC012"].Call("SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length, "the continuation sends one result")
+		AssertEqual(Circumflex[Plain.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"the OS character completes the accent, not the selected layout's o")
+		AssertEqual(KEYLAYOUT_NEUTRAL_STATE, KLE_State, "the accent is settled")
+		; Shift continuation on the same row.
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		AssertTrue(Criteria["+SC012"].Call(), "the pending accent owns the Shift continuation")
+		Callbacks["+SC012"].Call("+SC012")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Circumflex[Shifted.Text]["Output"], _Stub_RecordedSends[1].args[1],
+			"Shift composes the OS uppercase character")
+		; Enabled-row control: a home-row continuation keeps the selected layout.
+		KLE_State := "s1_circumflex"
+		Selected := KeylayoutEmulation_Press("SC01E", false, KS_CapsLockToggleState(), false)
+		_Stub_RecordedSends := []
+		Callbacks["SC02B"].Call("SC02B")
+		Callbacks["SC01E"].Call("SC01E")
+		AssertEqual(1, _Stub_RecordedSends.Length)
+		AssertEqual(Selected, _Stub_RecordedSends[1].args[1], "an emulated row composes the selected layout's key")
+	} finally {
+		_HotstringRegistrar := Saved[10]
+		_SendHook := Saved[11]
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+		_KLE_ResetObserverRegistering := Saved[6]
+		_KLE_ResetObserverCohort := Saved[7]
+		_KLE_ResetObserverCapture := Saved[8]
+		_KLE_ResetObserverGeneration := Saved[9]
 	}
-	; [hotstrings] magic_key_source names the key by its KeyboardEvent.code, the
-	; spelling every driver shares: KeyN is SC031 on Windows.
-	Chosen := Resolve(Map("chosen", true, "configured", "KeyN", "declared", "KeyC"))
-	AssertEqual("SC031", Chosen["scan"], "the user's key wins over the layout's declaration")
-	AssertEqual("user", Chosen["origin"])
-	AssertFalse(Chosen["follows_os_layout"])
-	AssertTrue(Chosen["overrides_emulation"], "a chosen key is the magic key on any layout")
-	AssertEqual(0, Probe.Calls, "a configured key is never replaced by a detection")
-	AssertEqual(0, Shipped.Calls, "nor read from the shipped layout")
-	Declared := Resolve(Map("declared", "Semicolon", "emulated", true))
-	AssertEqual("SC027", Declared["scan"], "the declared KeyboardEvent.code reaches its scan code")
-	AssertEqual("layout", Declared["origin"])
-	AssertTrue(Declared["overrides_emulation"], "the declaring layout yields its key to the magic key")
-	AssertEqual(0, Probe.Calls)
-	Emulated := Resolve(Map("emulated", true))
-	AssertEqual("SC02E", Emulated["scan"], "an emulated layout without declaration keeps the shipped key")
-	AssertEqual(1, Shipped.Calls, "the shipped key is read only when nothing else names one")
-	AssertFalse(Emulated["follows_os_layout"], "and never follows the OS layout it replaces")
-	AssertFalse(Emulated["overrides_emulation"], "a layout declaring no magic key keeps its own character")
-	AssertEqual(0, Probe.Calls, "the OS layout an emulation replaces is never probed")
-	Detected := Resolve(Map())
-	AssertEqual("SC024", Detected["scan"], "the user's own layout is probed for the source character")
-	AssertEqual("detected", Detected["origin"])
-	AssertTrue(Detected["follows_os_layout"])
-	Probe.Answer := ""
-	Missing := Resolve(Map())
-	AssertEqual("SC02E", Missing["scan"], "a character on no key keeps the shipped key")
-	AssertTrue(Missing["follows_os_layout"], "another OS layout may still carry the character")
-	AssertThrows(() => Resolve(Map("declared", "MouseLeft")), "a code no layout key has is refused")
-	AssertEqual("KeyC", LayoutRegistry_ShippedMagicKey(),
-		"the last-resort key is the one the shipped Ergopti layout declares: SC02E, the former default")
 }
-
-Test("magic key: the active layout's declaration comes from its extension (layout-magic-key)",
-	_KLT_MagicKeyDeclarationCase)
-
-_KLT_MagicKeyDeclarationCase() {
-	Bundled := LayoutRegistry_BundledDir()
-	AssertEqual("KeyC", LayoutRegistry_DeclaredMagicKey("ergopti", [], Bundled),
-		"the shipped Ergopti extension declares the key its layout turns into the magic key")
-	AssertEqual("Semicolon", LayoutRegistry_DeclaredMagicKey("ergopti", [{ id: "ergopti", magic_key: "Semicolon" }],
-		Bundled), "an installed or user copy of the extension wins over the shipped one")
-	AssertEqual("", LayoutRegistry_DeclaredMagicKey("ergol", [{ id: "ergol", magic_key: "" }], Bundled))
-	AssertEqual("", LayoutRegistry_DeclaredMagicKey("", [], Bundled), "no active layout declares nothing")
-	AssertThrows(() => LayoutRegistry_DeclaredMagicKey("missing_extension", [], Bundled),
-		"an extension with no manifest is a broken install, not an undeclared key")
-	Record := Map("ergol", Map("id", "ergol", "extension", Map("id", "ergol")))
-	AssertEqual("ergol", LayoutRegistry_ActiveLayoutExtension("ergol", true, "ergopti", () => Record),
-		"the emulated registry layout wins over the built-in Ergopti emulation")
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("bepo", true, "ergopti", () => Record),
-		"a layout not installed yet declares nothing")
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", false, "ergopti", () => Record),
-		"a layout left selected with the base layer off types nothing: the OS layout is probed")
-	AssertEqual("ergopti", LayoutRegistry_ActiveLayoutExtension("", true, "ergopti", () => Record))
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("", false, "ergopti", () => Record),
-		"the user's own OS layout declares nothing")
-	Failing() {
-		throw Error("damaged record")
-	}
-	AssertEqual("", LayoutRegistry_ActiveLayoutExtension("ergol", true, "ergopti", Failing),
-		"a damaged record is logged and declares nothing")
-}
-
-Test("magic key: only a declared or chosen key takes an emulated layout's unshifted level (layout-magic-key)",
-	() => _KLT_WithEmulation(_KLT_MagicKeyYieldCase))
 
 ; Evaluates the actual registered criterion with a modeled physical press.
 ; Host input is never injected; the physical-state port is restored on refusal.
@@ -612,59 +759,6 @@ _KLT_AltGrRowOnKanaFamily(Criterion, Pressed := true) {
 		_ALTGR_PHYSICAL_STATE_QUERY := Saved.Query
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
-	}
-}
-
-_KLT_MagicKeyYieldCase() {
-	global Features, CategoryEnabled, LayerEnabled, KLE_Registered, ScriptInformation
-	State := MasterGateState()
-	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone(),
-		ScriptInformation["MagicKeySourceScan"], ScriptInformation["MagicKeySourceOverridesEmulation"]]
-	try {
-		Replace := Map("enabled", true)
-		Features := Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true,
-			"ergopti_alt_gr", true, "ergopti_variant", "ergopti", "direct_access_digits", "native"),
-			"hotstrings", Map("magic_key", Map("replace", Replace)))
-		CategoryEnabled := Map("Layout", true)
-		LayerEnabled := false
-		State["initialized"] := false
-		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
-		_KLT_Load("ergol")
-		KLE_Registered := false
-		Capture := { Criterion: 0, Rows: Map() }
-		KeylayoutEmulation_Register(LayoutRegistry_Keycodes(),
-			(Name, *) => Capture.Rows[Name] := Capture.Criterion,
-			(Args*) => Capture.Criterion := Args.Length ? Args[1] : 0, 0,
-			(Scan, Callback, Criterion) => Capture.Rows["#" . Scan] := Criterion)
-		ScriptInformation["MagicKeySourceScan"] := "SC02E"
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := false
-		AssertTrue(Capture.Rows["SC02E"].Call(), "Ergo-L declares no magic key: its '-' stays on that key")
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := true
-		AssertFalse(Capture.Rows["SC02E"].Call(), "a declared or chosen key's unshifted level is the remap's")
-		AssertTrue(Capture.Rows["+SC02E"].Call(), "Shift keeps the emulated layout's character")
-		AssertTrue(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"]),
-			"AltGr keeps the emulated layout's character")
-		AssertFalse(_KLT_AltGrRowOnKanaFamily(Capture.Rows["SC138 & SC02E"], false),
-			"released AltGr leaves the magic-key suffix to its current owner")
-		AssertTrue(Capture.Rows["SC010"].Call(), "every other key stays with the emulation")
-		ScriptInformation["MagicKeySourceScan"] := "SC027"
-		AssertTrue(Capture.Rows["SC02E"].Call(), "the yield follows the chosen key, not a fixed position")
-		AssertFalse(Capture.Rows["SC027"].Call())
-		Replace["enabled"] := false
-		AssertTrue(Capture.Rows["SC027"].Call(), "without the remap the emulation keeps the key")
-		Replace["enabled"] := true
-		KeylayoutEmulation_Press("SC010", true, false, true)
-		AssertTrue(Capture.Rows["SC027"].Call(), "a pending dead key still owns its continuation")
-	} finally {
-		Features := Saved[1]
-		CategoryEnabled := Saved[2]
-		LayerEnabled := Saved[3]
-		KLE_Registered := Saved[4]
-		State.Clear()
-		for Key, Value in Saved[5]
-			State[Key] := Value
-		ScriptInformation["MagicKeySourceScan"] := Saved[6]
-		ScriptInformation["MagicKeySourceOverridesEmulation"] := Saved[7]
 	}
 }
 
@@ -721,7 +815,7 @@ Test("master gates: a selected registry layout supersedes the Ergopti emulation 
 _KLT_SupersedeCase() {
 	global Features, TapHold
 	Selected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
-		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "ergol")
+		"direct_access_digits", "digits", "emulate_bottom_row", true, "emulated_layout", "ergol")
 	_KLT_WithLayoutFeatures(Selected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertFalse(Features["layout"]["ergopti_base"], "the Ergopti base layer stands down"),
@@ -729,11 +823,11 @@ _KLT_SupersedeCase() {
 		AssertFalse(ErgoptiLayout_PlusIsActive(Features), "the Ergopti+ changes stand down"),
 		AssertTrue(Features["layout"]["direct_access_digits"], "the independent digit override keeps its choice"),
 		AssertEqual("digits", Features["layout"]["direct_access_digits"], "the typed intent remains digits rather than a truthy native/symbols string"),
-		AssertTrue(Features["layout"]["ctrl_magic_save"], "a feature that works on any layout is kept"),
+		AssertTrue(Features["layout"]["emulate_bottom_row"], "a feature that works on any layout is kept"),
 		AssertEqual("ergol", Features["layout"]["emulated_layout"], "the selection itself is kept")
 	))
 	NoneSelected := Map("ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "ergopti_plus",
-		"direct_access_digits", "digits", "ctrl_magic_save", true, "emulated_layout", "")
+		"direct_access_digits", "digits", "emulate_bottom_row", true, "emulated_layout", "")
 	_KLT_WithLayoutFeatures(NoneSelected, () => (
 		ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated),
 		AssertTrue(Features["layout"]["ergopti_base"], "without a registry layout the Ergopti emulation stays"),
@@ -759,7 +853,44 @@ _KLT_ReadNothing(Id, LocalDir) {
 	throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
 }
 
-Test("keylayout emulation: boot registers first, then loads the local copy or downloads it (layout-registry-emulation)",
+Test("keylayout emulation: an emulated Ergopti layout sends the letters chosen for its accented keys (accented-emulated)",
+	() => _KLT_WithEmulation(_KLT_AccentedCase))
+
+; The built-in base reads the four choices (ErgoptiBaseMapping); an Ergopti
+; layout emulated from the registry took the Command level's z for Ctrl+è.
+_KLT_AccentedCase() {
+	global Features, KLE_Ergopti
+	Had := Features.Has("shortcuts")
+	SavedShortcuts := Had ? Features["shortcuts"] : 0
+	Features["shortcuts"] := Map("e_grave", Map("enabled", true, "letter", "k"))
+	try {
+		Boot(Id) {
+			KeylayoutEmulation_Unload()
+			_KLT_WithLayoutFeatures(_KLT_BootLayout(Id), () =>
+				AssertTrue(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadRepoLocal, (*) => 0))))
+		}
+		Boot("ergopti")
+		AssertTrue(KLE_Ergopti, "the Ergopti family reads the choices")
+		AssertEqual("k", KeylayoutEmulation_ShortcutChar("SC010", "^"), "Ctrl+è sends the letter chosen for è")
+		AssertEqual("k", KeylayoutEmulation_ShortcutChar("SC010", "#"))
+		Features["shortcuts"]["e_grave"]["enabled"] := false
+		AssertEqual("è", KeylayoutEmulation_ShortcutChar("SC010", "^"), "switched off, the chord keeps è")
+		Features["shortcuts"]["e_grave"]["enabled"] := true
+		Boot("ergol")
+		AssertFalse(KLE_Ergopti)
+		AssertFalse(KeylayoutEmulation_ShortcutChar("SC010", "^") == "k", "another family keeps its Command level")
+		_KLT_Load("ergopti")
+		AssertFalse(KLE_Ergopti, "a load without the boot's entry reads no choice")
+	} finally {
+		KeylayoutEmulation_Unload()
+		if Had
+			Features["shortcuts"] := SavedShortcuts
+		else
+			Features.Delete("shortcuts")
+	}
+}
+
+Test("keylayout emulation: boot registers first, then loads the local copy and never downloads it (layout-registry-emulation)",
 	() => _KLT_WithEmulation(_KLT_BootCase))
 
 _KLT_BootCase() {
@@ -779,34 +910,28 @@ _KLT_BootCase() {
 	AssertEqual("register", _KLT_Join(Log), "a local copy is loaded without a download")
 	AssertEqual("ergol", KLE_Id)
 
-	; Missing locally: the hotkeys are still registered at boot, the layout
-	; arrives when the download reports success.
+	; Missing locally (an uninstalled layout, then the reload): the hotkeys are
+	; still registered, the layout stays chosen, and the boot never downloads it
+	; (decided on 2026-11-12, as macOS and Linux); the menu names it as failed.
 	KeylayoutEmulation_Unload()
 	Log := []
-	; An object, not a captured local: the download callback flips it.
-	Store := {Downloaded: false}
-	ReadAfterDownload := (Id, LocalDir) => Store.Downloaded ? _KLT_ReadRepoLocal(Id, LocalDir) : _KLT_ReadNothing(Id, LocalDir)
-	Fetch := (Id, LocalDir, OnDone, *) => (Log.Push("fetch " . Id . " into " . LocalDir),
-		Store.Downloaded := true, OnDone.Call(true, _KLT_Entry(Id)))
+	Fetch := (*) => Log.Push("fetch")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, ReadAfterDownload, Fetch)),
-			"the layout is not emulated yet when boot returns"))
-	AssertEqual("register; fetch ergol into C:\cfg\" . LayoutRegistry_Settings()["local_folder"] . "\", _KLT_Join(Log))
-	AssertEqual("ergol", KLE_Id, "the downloaded layout is loaded once the download succeeds")
-
-	; A failed download leaves the emulation inert.
-	KeylayoutEmulation_Unload()
-	Failing := (Id, LocalDir, OnDone, *) => OnDone.Call(false, "HTTP 404")
+		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, _KLT_ReadNothing, Fetch)),
+			"an uninstalled layout is not emulated"))
+	AssertEqual("register", _KLT_Join(Log), "an uninstall then a reload never reinstalls the layout")
+	AssertFalse(IsObject(KLE_Model), "nothing is emulated")
+	AssertEqual("ergol", KeylayoutEmulation_FailedId(), "the menu is told the chosen layout is not emulated")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadNothing, Failing)))
-	AssertFalse(IsObject(KLE_Model), "nothing is emulated after a failed download")
+		AssertTrue(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadRepoLocal, Fetch))))
+	AssertEqual("", KeylayoutEmulation_FailedId(), "installed again, the layout resumes and the failure clears")
 }
 
 ; Capture the actual registration boundary, including names built by concatenation.
 ; Resolve expectations independently from the shared physical-key registry.
 _KLT_ResetKeyCase(Code) {
 	global CategoryEnabled, LayerEnabled, KLE_Registered
-	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	static Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Record := Registry["keys"][Code]
 	Saved := [CategoryEnabled, LayerEnabled, KLE_Registered]
 	try {
@@ -853,3 +978,42 @@ for Code in ["Backspace", "Escape", "Enter", "Tab", "Delete", "ArrowLeft", "Arro
 	"ArrowDown", "Home", "End", "PageUp", "PageDown"]
 	Test("keylayout emulation: " . Code . " cancels pending accents by physical identity (keylayout-dead-reset-identity)",
 		_KLT_WithEmulation.Bind(_KLT_ResetKeyCase.Bind(Code)))
+
+; ILD-2: only a Ctrl other than AltGr's own turns an AltGr press into a Ctrl
+; chord; the fake LCtrl of a standard AltGr layout never does.
+_KLT_RealCtrlHeldCase() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	SavedKana := _ALTGR_KANA_FIXUP, SavedProbe := _ALTGR_LAYOUT_PROBE.Clone()
+	try {
+		_ALTGR_KANA_FIXUP := false
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := true
+		Down(Keys) => (Name) => InStr(" " . Keys . " ", " " . Name . " ") > 0
+		AssertTrue(_KLE_RealCtrlHeld(Down("RCtrl"), (Name) => 0), "a right Ctrl is a real Ctrl")
+		AssertFalse(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "AltGr's fake LCtrl is not")
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 1), "a left Ctrl the ledger knows as real is")
+		AssertFalse(_KLE_RealCtrlHeld(Down(""), (Name) => 1), "no Ctrl held, no chord")
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := false
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "without a fake LCtrl, a left Ctrl is real")
+		AssertEqual("^", _KLE_AltGrShortcutMods(true, false))
+		AssertEqual("^+", _KLE_AltGrShortcutMods(true, true))
+		AssertEqual("", _KLE_AltGrShortcutMods(false, true), "AltGr alone types its level")
+	} finally {
+		_ALTGR_KANA_FIXUP := SavedKana
+		_ALTGR_LAYOUT_PROBE := SavedProbe
+	}
+}
+Test("keylayout emulation: Ctrl+AltGr sends Ctrl and the logical key only with a real Ctrl (ILD-2)",
+	_KLT_RealCtrlHeldCase)
+
+; SCD-3: a Ctrl slot of the logical key fires for Ctrl+AltGr+key; with none
+; assigned, or set to none, the chord goes on as Ctrl and the key (ILD-2).
+_KLT_AltGrCtrlSlotCase() {
+	Slots := Map("primary_b", "select_line", "primary_shift_v", "paste_plain", "primary_x", "none")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("b", "^", Slots), "Ctrl+AltGr+b runs the ctrl_b slot")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("B", "^", Slots), "the slot follows the letter, whatever its case")
+	AssertEqual("primary_shift_v", _KLE_AltGrSlotFor("v", "^+", Slots), "with Shift, the Ctrl+Shift slot")
+	AssertEqual("", _KLE_AltGrSlotFor("x", "^", Slots), "a slot set to none sends the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("c", "^", Slots), "no slot, the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("", "^", Slots), "no logical key, no slot")
+}
+Test("keylayout emulation: a Ctrl slot fires for Ctrl+AltGr+key (SCD-3)", _KLT_AltGrCtrlSlotCase)

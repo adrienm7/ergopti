@@ -15,4 +15,4 @@ local handle = assert(io.open(corpus_path, "r"), "cannot open corpus at " .. cor
 local text = handle:read("*a")
 handle:close()
 
-require("test.hotpath_nesting_replay").register(helpers, { driver = "macos", corpus = text })
+require("tests.lua.core.hotpath_nesting_replay").register(helpers, { driver = "macos", corpus = text })

@@ -26,7 +26,7 @@ helpers.describe("Changelog Bridge Contract", function()
 		with_changelog(function(changelog, state, post)
 			helpers.assert_true(changelog.open())
 			local logged = {}
-			local Logger = package.loaded["infra.logger"]
+			local Logger = package.loaded["core.logger.engine.logger"]
 			local original_warn = Logger.warn
 			Logger.warn = function(_, fmt, ...) logged[#logged + 1] = string.format(fmt, ...) end
 			for _, refused in ipairs({
@@ -41,6 +41,9 @@ helpers.describe("Changelog Bridge Contract", function()
 				"https://github.com/adrienm7/ergopti-evil/releases",
 				"https://github.com/someone-else/ergopti/releases",
 				"https://github.com.evil.test/adrienm7/ergopti",
+				"https://github.com/adrienm7/ergopti/../other",
+				"https://github.com/adrienm7/ergopti/%2e%2e/other",
+				"https://github.com/adrienm7/ergopti/%2e%2e%2fother",
 			}) do
 				local before = #state.urls
 				post({ action = "open_url", url = refused })
@@ -50,7 +53,7 @@ helpers.describe("Changelog Bridge Contract", function()
 			post({ action = "open_url", url = 42 })
 			Logger.warn = original_warn
 			helpers.assert_eq(#state.urls, 0, "nothing outside the repository reaches the system handler")
-			helpers.assert_eq(#logged, 13, "each refusal is logged")
+			helpers.assert_eq(#logged, 16, "each refusal is logged")
 		end)
 	end)
 

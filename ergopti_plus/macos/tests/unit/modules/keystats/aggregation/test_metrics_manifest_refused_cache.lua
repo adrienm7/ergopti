@@ -6,14 +6,15 @@
 --- Compose the real SQLite reader and incremental projection around a transient
 --- row-query refusal. A successful fingerprint must not certify the incomplete
 --- manifest that another statement produced, including during midnight extension.
---- Apps must also preserve its accepted cache until a complete retry succeeds.
+--- Apps must also preserve its accepted cache until a complete retry succeeds,
+--- while it shows the partial read flagged incomplete (MET-11).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 local OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
+	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 local PAST, TODAY, TOMORROW = "2026-10-17", "2026-10-18", "2026-10-19"
 
@@ -34,7 +35,7 @@ local function fixture()
 	logger.error = function(_, message, ...)
 		state.errors[#state.errors + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local sqlite = { OK = 0 }
 	function sqlite.open()
 		local db = {}
@@ -71,7 +72,9 @@ local function fixture()
 		end
 		return db
 	end
+	helpers.provide_timings() -- the reader resolves its busy-wait from the registry
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+	reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 	local original_read = reader.read_manifest
 	reader.read_manifest = function(path, first, last, pacer)
 		local manifest, complete = original_read(path, first, last, pacer)
@@ -137,11 +140,11 @@ helpers.describe("metrics-manifest-refused-cache", function()
 end)
 
 local APP_OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
-	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
-	"infra.paths", "infra.i18n", "infra.dialog_util", "infra.deferred_work", "infra.config_paths",
-	"adapters.file_system", "adapters.timer_scheduler", "adapters.webview_result",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
+	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
+	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "core.ui.ui.builder",
+	"core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "settings.engine.paths",
+	"core.fs.adapters.file_system", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 }
 
@@ -150,7 +153,7 @@ local APP_OWNERS = {
 --- @param callback function Receives dashboard, Reader observations and refresh controls.
 local function with_apps(callback)
 	helpers.with_stub_scope(APP_OWNERS, function()
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/virtual/" end }
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/virtual/" end }
 		require("tests.support.metrics_delivery_fixture")(true,
 			function(dashboard, _, evaluations, _, _, pending)
 				_G.hs.application.find = function() return nil end
@@ -186,7 +189,7 @@ local function with_apps(callback)
 end
 
 helpers.describe("metrics-apps-manifest-refused-cache", function()
-	helpers.it("retries an incomplete cold read without publishing or certifying its revision", function()
+	helpers.it("retries an incomplete cold read, shown flagged, without saving or certifying its revision", function()
 		with_apps(function(dashboard, state, refresh, observed)
 			local saves, evaluations = observed()
 			local prior_revision = dashboard._manifest_rev
@@ -197,14 +200,14 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_cache, nil)
 			helpers.assert_eq(dashboard._manifest_rev, prior_revision)
 			helpers.assert_eq(select(1, observed()), saves, "an incomplete read cannot replace the disk snapshot")
-			helpers.assert_eq(select(2, observed()), evaluations, "an incomplete read cannot submit fresh WebKit data")
+			helpers.assert_eq(select(2, observed()), evaluations + 1, "the partial read is shown, flagged incomplete")
 			state.refuse = false
 			refresh()
 			helpers.assert_eq(state.reads[2].complete, true)
 			helpers.assert_eq(dashboard._manifest_rev, 1)
 			helpers.assert_eq(dashboard._manifest_cache[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves + 1)
-			helpers.assert_eq(select(2, observed()), evaluations + 1)
+			helpers.assert_eq(select(2, observed()), evaluations + 2)
 		end)
 	end)
 
@@ -221,7 +224,7 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_rev, 1)
 			helpers.assert_eq(prior[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves)
-			helpers.assert_eq(select(2, observed()), evaluations)
+			helpers.assert_eq(select(2, observed()), evaluations + 1, "the partial read is shown, flagged incomplete")
 			state.refuse = false
 			refresh(2)
 			helpers.assert_eq(#state.reads, 3, "a failed revision must not suppress its recovery read")
@@ -229,7 +232,7 @@ helpers.describe("metrics-apps-manifest-refused-cache", function()
 			helpers.assert_eq(dashboard._manifest_rev, 2)
 			helpers.assert_eq(dashboard._manifest_cache[PAST].Editor.bs_total, 3)
 			helpers.assert_eq(select(1, observed()), saves + 1)
-			helpers.assert_eq(select(2, observed()), evaluations + 1)
+			helpers.assert_eq(select(2, observed()), evaluations + 2)
 		end)
 	end)
 

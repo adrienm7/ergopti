@@ -70,23 +70,23 @@ local function is_sticky(action)
 end
 
 helpers.with_fresh_modules({
-	"adapters.file_system",
-	"infra.config_paths",
-	"infra.keycodes",
-	"infra.logger",
-	"infra.toml.codec",
+	"core.fs.adapters.file_system",
+	"settings.engine.paths",
+	"platform.input.keycodes",
+	"core.logger.engine.logger",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
-	"modules.keymap.control_sentinels",
-	"adapters.synthetic_input",
+	"core.text.engine.toml_codec",
+	"hotstrings.engine.expander.control_sentinels",
+	"platform.input.synthetic_input",
 }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.config_paths"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,
@@ -97,8 +97,8 @@ helpers.with_fresh_modules({
 	-- The native TOML codec is absent from the headless runner; the catalogues
 	-- read here are JSON and the shared defaults use the pure-Lua reader.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
 	-- Every build re-reads the three static rule files, and the adapter's safe
 	-- read cost more than the rest of a build: serve each file's real content,
 	-- read once.
@@ -107,7 +107,7 @@ helpers.with_fresh_modules({
 		if file_cache[path] == nil then file_cache[path] = SourceFile.read(path) end
 		return file_cache[path]
 	end
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = read_once,
 		read_with_status = function(path) return read_once(path), "ok" end,
 	}
@@ -124,14 +124,14 @@ helpers.with_fresh_modules({
 	-- The application receives only events not consumed by the actual keymap
 	-- owner. Its diagnostic scheduler is inert unless a real listener fails.
 	local diagnostics = {}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(reason, callback)
 			diagnostics[#diagnostics + 1] = { reason = reason, callback = callback }
 			return true
 		end,
 	}
-	local ControlOwner = require("modules.keymap.control_sentinels")
-	local NativeKeycodes = require("keycodes")
+	local ControlOwner = require("hotstrings.engine.expander.control_sentinels")
+	local NativeKeycodes = require("platform.input.keycodes.core")
 	local control_codes = {
 		key_90 = NativeKeycodes.F20_LAYER_NAV_ENTERED,
 		key_80 = NativeKeycodes.F19_LAYER_NAV_EXITED,
@@ -283,6 +283,21 @@ helpers.with_fresh_modules({
 		return posted
 	end
 
+	--- The keys a combo typed: every posted key but the navigation layer's own
+	--- F19 / F20 sentinels, which a pair tap under the layer its first key
+	--- holds sends around its action (THD-1 of 2026-11-21, tap_out_of_layer).
+	--- @param engine table Model engine.
+	--- @return table key_codes In posting order.
+	local function keys_typed(engine)
+		local typed = {}
+		for _, emission in ipairs(engine:emissions()) do
+			local key = emission.key_code
+			local layer_signal = key == "key_80" or (key == "key_90" and emission.event.modifiers == nil)
+			if key ~= nil and not layer_signal then typed[#typed + 1] = key end
+		end
+		return typed
+	end
+
 	--- Gives every tap-hold key the same two slots.
 	--- @param slots table { tap, hold }.
 	--- @return table tap_holds Key id → slots.
@@ -352,6 +367,8 @@ helpers.with_fresh_modules({
 						key_code .. " must preserve its Windows-equivalent down behavior")
 					helpers.assert_true(engine:held()[held_key] == true,
 						key_code .. " must retain its exact native modifier or repeating tap")
+					-- A quick release, held for the tap minimum a bounce falls short of.
+					engine:advance(KarabinerModel.TAP_MS)
 					engine:up(key_code, within_timeout)
 					local expected = held_key
 					if native_tap_only[key_code] and within_timeout then expected = expected .. ",delete_forward" end
@@ -435,12 +452,12 @@ helpers.with_fresh_modules({
 						-- CapsWord's AltGr+CapsLock rule runs before every combo by design.
 						if is_combo_rule(engine:down(second), first) then
 							if within_timeout then covered = covered + 1 end
-							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+							helpers.assert_eq(table.concat(keys_typed(engine), ","), "delete_forward",
 								combo_def.id .. ": a combo with no hold must type its tap when its second key goes down")
 							helpers.assert_true(engine:held().delete_forward == true,
 								combo_def.id .. ": a combo with no hold must keep its tap down while held, so it auto-repeats")
 							engine:up(second, within_timeout)
-							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+							helpers.assert_eq(table.concat(keys_typed(engine), ","), "delete_forward",
 								combo_def.id .. ": a combo with no hold must type nothing more on release")
 						end
 					end
@@ -463,7 +480,7 @@ helpers.with_fresh_modules({
 						engine:down("a")
 						engine:up(second, true)
 						engine:up("a", true)
-						helpers.assert_eq(keys_posted(engine)[1], "delete_forward",
+						helpers.assert_eq(keys_typed(engine)[1], "delete_forward",
 							combo_def.id .. ": a combo tap followed by an overlapping key must still be typed")
 					end
 				end
@@ -977,6 +994,7 @@ helpers.with_fresh_modules({
 											context .. ": the hold must keep " .. held .. " (pressed: "
 												.. names(engine:pressed()) .. ")")
 									end
+									engine:advance(KarabinerModel.TAP_MS)
 									engine:up(key_code, true)
 									helpers.assert_eq(table.concat(triggers_posted(engine), "|"), expected_flags(action, state),
 										context .. ": the tap must send the trigger with its own modifiers only")
@@ -1058,6 +1076,85 @@ helpers.with_fresh_modules({
 			engine:tap("tab")
 			helpers.assert_eq(table.concat(triggers_posted(engine), "|"), "",
 				"Shift+F17 is alt_tab_windows: the held Shift must not reach the trigger")
+		end)
+	end)
+
+	helpers.describe("Left Command's one-shot Shift with no hold (lalt-one-shot-held-shift)", function()
+		local rules = build({ left_command = { tap = "sticky_shift", hold = "none" } })
+		--- Whether the one-shot Shift was armed (its control sentinel was sent).
+		local function armed(engine)
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "key_90" and emission.flags.left_control == true
+					and emission.flags.left_option == true then return true end
+			end
+			return false
+		end
+
+		helpers.it("arms the one-shot and holds Shift while the key is down, as lalt.ahk 4.1", function()
+			local engine = engine_for(rules)
+			engine:down("left_command")
+			helpers.assert_true(armed(engine), "the one-shot is armed at key-down")
+			helpers.assert_true(engine:pressed().left_shift == true, "Shift is held while the key is down")
+			engine:up("left_command")
+			helpers.assert_true(engine:pressed().left_shift ~= true, "Shift is let go with the key")
+		end)
+
+		for _, blocker in ipairs({ "right_option", "caps_lock", "left_shift", "fn" }) do
+			helpers.it("stands down under a held " .. blocker .. ", as Windows under RCtrl, CapsLock, LShift or LCtrl", function()
+				local engine = engine_for(rules)
+				engine:down(blocker)
+				engine:clear()
+				local before = engine:pressed().left_shift == true
+				engine:down("left_command")
+				helpers.assert_true(not armed(engine), "no one-shot under " .. blocker)
+				helpers.assert_eq(engine:pressed().left_shift == true, before, "no Shift of its own under " .. blocker)
+				engine:up("left_command")
+			end)
+		end
+	end)
+
+	helpers.describe("a pair takes the first key held earliest (pair-first-key-press-order)", function()
+		-- caps_tab comes before lshift_tab in mod_combos.json: rule order alone
+		-- would give CapsLock the Tab whichever key was held first.
+		local rules = build(nil, {
+			caps_tab = { combo = "none", tap = "arrow_left", hold = "none" },
+			lshift_tab = { combo = "none", tap = "arrow_right", hold = "none" },
+		})
+		--- The arrow a Tab press typed after the given keys were held in order.
+		local function arrow_after(order)
+			local engine = engine_for(rules)
+			for _, key in ipairs(order) do engine:down(key); engine:advance(400) end
+			engine:clear()
+			engine:down("tab")
+			local typed = {}
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then
+					typed[#typed + 1] = emission.key_code
+				end
+			end
+			engine:up("tab")
+			for index = #order, 1, -1 do engine:up(order[index]) end
+			return table.concat(typed, ",")
+		end
+
+		helpers.it("Shift held before CapsLock gives Shift's pair, as Windows and Linux choose", function()
+			helpers.assert_eq(arrow_after({ "left_shift", "caps_lock" }), "right_arrow")
+		end)
+		helpers.it("CapsLock held before Shift gives CapsLock's pair", function()
+			helpers.assert_eq(arrow_after({ "caps_lock", "left_shift" }), "left_arrow")
+		end)
+		helpers.it("a released earlier key leaves the pair to the key still held", function()
+			local engine = engine_for(rules)
+			engine:down("left_shift"); engine:advance(400)
+			engine:down("caps_lock"); engine:advance(400)
+			engine:up("left_shift")
+			engine:clear()
+			engine:down("tab")
+			local typed = nil
+			for _, emission in ipairs(engine:emissions()) do
+				if emission.key_code == "left_arrow" or emission.key_code == "right_arrow" then typed = emission.key_code end
+			end
+			helpers.assert_eq(typed, "left_arrow")
 		end)
 	end)
 end)

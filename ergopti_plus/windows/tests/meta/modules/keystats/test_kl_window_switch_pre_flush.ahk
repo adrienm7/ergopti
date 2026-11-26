@@ -62,34 +62,25 @@ _KLWSP_TitleChangeBlock(FuncBody) {
 ; ================================================
 
 _KLWSP_FlushBeforeWindowSwitch() {
-	Src := _KLWSP_ReadSource("keystats_hook.ahk")
-
-	FuncBody := _DriverFuncBody("KL_Hook_RefreshContext")
-	Assert(FuncBody != "",
-		"KL_Hook_RefreshContext must exist in keystats_hook.ahk")
-
-	TitleBlock := _KLWSP_TitleChangeBlock(FuncBody)
-	Assert(TitleBlock != "",
-		"KL_Hook_RefreshContext must contain the title-change branch "
-		. "'if (NewTitle != KLHook.prev_title)' — sentinel line not found")
-
-	FlushPos  := InStr(TitleBlock, "KL_FlushBuffer(")
-	SwitchPos := InStr(TitleBlock, "KL_LogWindowSwitch(")
-
-	Assert(FlushPos > 0,
-		"KL_Hook_RefreshContext title-change block must call KL_FlushBuffer() "
-		. "to drain the typing buffer before attributing it to the new window context")
-
-	Assert(SwitchPos > 0,
-		"KL_Hook_RefreshContext title-change block must call KL_LogWindowSwitch() "
-		. "to record the context transition")
-
-	Assert(FlushPos < SwitchPos,
-		"KL_Hook_RefreshContext: KL_FlushBuffer() must appear BEFORE "
-		. "KL_LogWindowSwitch() in the title-change branch so that buffered "
-		. "keystrokes are attributed to the previous window, not the new one "
-		. "(found FlushBuffer at offset " . FlushPos . ", LogWindowSwitch at offset "
-		. SwitchPos . " within the title-change section)")
+	Drain := _DriverFuncBody("_KL_ContextDrain")
+	Prepare := _DriverFuncBody("_KL_ContextPrepare")
+	Publish := _DriverFuncBody("_KL_ContextPublishClock")
+	PreparePos := InStr(Drain, "_KL_ContextPrepare(")
+	PublishPos := InStr(Drain, "_KL_ContextPublishClock(")
+	Assert(PreparePos > 0 && PublishPos > PreparePos,
+		"Every app/title frame must finish its genuine buffer preparation before publishing either switch")
+	FlushPos := InStr(Prepare, "KL_FlushBuffer(")
+	DetachPos := InStr(Prepare, "_KL_DetachBufferSnapshot()")
+	QueuePos := InStr(Prepare, "Keystats._retry_snapshots.Push(Snapshot)")
+	ProjectPos := InStr(Prepare, "Keystats.session_app := Frame.NewApp")
+	PreparedPos := InStr(Prepare, "Frame.Prepared := true")
+	Assert(DetachPos > 0 && QueuePos > DetachPos && ProjectPos > QueuePos
+		&& FlushPos > ProjectPos && PreparedPos > FlushPos,
+		"Outgoing typing must be detached before the fresh destination is named; clock preparation still requires the real flush return")
+	Assert(InStr(Prepare, "Frame.App.Required || Frame.Title.Required") > 0,
+		"Title-only changes must require the same real typing drain as app changes")
+	Assert(InStr(Publish, "KL_LogWindowSwitch(Frame.OldApp, Frame.OldTitle,") > 0,
+		"The prepared frame must actually call the public window producer with its outgoing identities")
 }
 
 Test("keystats_hook: KL_FlushBuffer called before KL_LogWindowSwitch on title change",

@@ -26,5 +26,19 @@
 
 #Include shortcuts/utils.ahk
 #Include shortcuts/win.ahk
+#Include shortcuts/auto_click_matcher.ahk
+#Include shortcuts/auto_click_policy.ahk
+#Include shortcuts/keep_awake_presets.ahk
+#Include shortcuts/auto_click_session.ahk
+#Include shortcuts/ocr_capture.ahk
+#Include shortcuts/ocr_capture_action.ahk
+#Include shortcuts/keep_awake_library_window.ahk
+#Include shortcuts/auto_click.ahk
+#Include shortcuts/workflows/model.ahk
+#Include shortcuts/workflows/interpreter.ahk
+#Include shortcuts/workflows/runner.ahk
+#Include shortcuts/workflows/screen.ahk
+#Include shortcuts/workflows/effects.ahk
+#Include shortcuts/workflows/editor_host.ahk
 #Include shortcuts/capsword_auto_off.ahk
 #Include shortcuts/capsword.ahk

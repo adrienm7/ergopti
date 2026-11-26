@@ -6,8 +6,9 @@ The Ollama daemon Ergopti starts reads only HTTPS_PROXY and NO_PROXY, and its
 blob downloads leave the registry for another host. This harness installs the
 driver as the packages lay it out, runs the shipped proxy stage on the module
 path the launcher wrapper exports, from an unrelated working directory, and
-answers its GIO lookups with a real PAC evaluated by the real glib-pacrunner on
-a private D-Bus. Each PAC sends the registry and the blob host a different way.
+answers its lookups with a real desktop PAC (GNOME settings on a private
+D-Bus), which the lookup child downloads and evaluates in the system Duktape
+engine. Each PAC sends the registry and the blob host a different way.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pathlib import Path
 import select
 import shutil
 import signal
+import socket
 import subprocess
 import tempfile
 import threading
@@ -30,7 +32,7 @@ DRIVER = HERE.parent.parent
 SHARED = DRIVER.parent / "_shared"
 WRAPPER = DRIVER / "bin" / "ergopti-hotstrings"
 CONTROL = HERE / "run_managed_ollama_route_plan.lua"
-INVENTORY = json.loads((SHARED / "modules/network/route_origins.json").read_text())
+INVENTORY = json.loads((SHARED / "core/network/data/route_origins.json").read_text())
 REGISTRY_HOST = INVENTORY["clients"]["ollama"][0].removeprefix("https://")
 BLOB_HOST = INVENTORY["clients"]["ollama"][1].removeprefix("https://")
 RELAY_A = "127.0.0.1:3901"
@@ -80,18 +82,32 @@ class PacHandler(http.server.BaseHTTPRequestHandler):
 
 
 def wrapper_lua_path(root):
-    """Evaluate the wrapper's own LUA_PATH export for an installed root."""
-    lines = [
-        line for line in WRAPPER.read_text().splitlines() if line.startswith("export LUA_PATH=")
+    """Evaluate the wrapper's own LUA_PATH block for an installed root.
+
+    The wrapper chooses between a search path and the literal-root mode in one
+    `case`, from the `unset ERGOPTI_LITERAL_…` line to its `esac`; the block is
+    run as written, so a root with no `;` or `?` must take the search path.
+    """
+    lines = WRAPPER.read_text().splitlines()
+    starts = [
+        i for i, line in enumerate(lines) if line.startswith("unset ERGOPTI_LITERAL_DRIVER_ROOT ")
     ]
-    if len(lines) != 1:
-        raise RuntimeError("The launcher wrapper must export LUA_PATH exactly once")
+    if len(starts) != 1:
+        raise RuntimeError("The launcher wrapper must build LUA_PATH in exactly one block")
+    ends = [i for i in range(starts[0], len(lines)) if lines[i] == "esac"]
+    if not ends:
+        raise RuntimeError("The launcher wrapper's LUA_PATH block has no esac")
+    block = "\n".join(lines[starts[0] : ends[0] + 1])
     script = (
-        f'DRIVER_ROOT="{root}/linux"; SHARED_LUA="{root}/_shared/lua"\n'
-        + lines[0]
+        f'DRIVER_ROOT="{root}/linux"; SHARED_LUA="{root}/_shared"\n'
+        + block
+        + '\n[ -z "${ERGOPTI_LITERAL_DRIVER_ROOT+x}" ] || exit 3'
         + '\nprintf %s "$LUA_PATH"'
     )
-    return subprocess.run(["bash", "-c", script], check=True, capture_output=True, text=True).stdout
+    path = subprocess.run(["bash", "-c", script], check=True, capture_output=True, text=True).stdout
+    if not path.startswith(f"{root}/linux/?.lua;"):
+        raise RuntimeError(f"The launcher wrapper built an unexpected LUA_PATH: {path!r}")
+    return path
 
 
 class InstalledRoutePlan(unittest.TestCase):
@@ -207,6 +223,13 @@ class InstalledRoutePlan(unittest.TestCase):
         self.assertEqual(result["environment"]["no_proxy"], BLOB_HOST)
 
     def test_same_relay_for_both_hosts_exports_it_once(self):
+        # The blob host's "PROXY A; DIRECT" is walked: a reachable A is kept.
+        host, port = RELAY_A.split(":")
+        live = socket.socket()
+        live.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        live.bind((host, int(port)))
+        live.listen(16)
+        self.addCleanup(live.close)
         result = self.run_stage("same")
         self.assertTrue(result["ok"], result)
         self.assertEqual(result["environment"], {"HTTPS_PROXY": f"http://{RELAY_A}"})

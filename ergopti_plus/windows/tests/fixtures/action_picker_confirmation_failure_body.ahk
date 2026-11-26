@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; The public picker, native GUI, actual confirmation and central logger execute
 ; unchanged. Caller callbacks provide controlled failure values, while browser
-; effects remain passive. Every refused callback must reach the ERROR queue.
+; effects remain passive. Every failed callback must reach the ERROR queue, and
+; a refused or failed one leaves the picker open for another pick (PCK-15).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -20,12 +21,14 @@ _APCF_Require(Condition, Message) {
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []
 LLM_Translate_ShippedChoices() => []
 GestureClearPickedParameter() => 0
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
@@ -70,6 +73,8 @@ class _APCF_Controller {
 	Close() {
 		this.Closed += 1
 		_APCF_CloseBoundary(this)
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -117,6 +122,8 @@ _APCF_Confirm(Which, Id) {
 		throw "Controlled scalar assignment refusal"
 	if _APCF.Mode == "map-error"
 		throw Map("controlled", true)
+	if _APCF.Mode == "refused"
+		return false
 }
 
 ; An asynchronous exception cannot cross the suspended Main try/catch. Suppress
@@ -166,15 +173,23 @@ _APCF_Main() {
 		_APCF_Require(_APCF.Controllers.Length == 1 && _ActPickWeb_Gui == _APCF.Windows[1], "The real public picker must publish before any confirmation.")
 		Returned := _ActPickWeb_Confirm("none")
 		ErrorLines := _APCF_ErrorLines()
-		_APCF_Require(_APCF.OldConfirmed == 1 && !_ActPickWeb_Confirming && _ActPickWeb_ResetDone
-			&& !IsObject(_ActPickWeb_Gui) && _APCF.Controllers[1].Closed == 1,
-			"The actual confirmation must invoke its caller once and complete real native teardown.")
+		_APCF_Require(_APCF.OldConfirmed == 1 && !_ActPickWeb_Confirming,
+			"The actual confirmation must invoke its caller once.")
+		if _APCF.Mode == "current"
+			_APCF_Require(_ActPickWeb_ResetDone && !IsObject(_ActPickWeb_Gui) && _APCF.Controllers[1].Closed == 1,
+				"An accepted pick must complete real native teardown.")
+		else
+			_APCF_Require(!_ActPickWeb_ResetDone && _ActPickWeb_Gui == _APCF.Windows[1] && _APCF.Controllers[1].Closed == 0,
+				"A refused or failed assignment must keep the picker open for another pick, as on macOS and Linux (pck-15).")
 		if _APCF.Mode == "current"
 			_APCF_Require(Returned is Integer && Returned == 1 && ErrorLines.Length == 0 && _LOGGER_PENDING_ERRORS.Length == 0, "A healthy caller must still succeed without an error diagnostic.")
+		else if _APCF.Mode == "refused"
+			_APCF_Require(Returned is Integer && Returned == 0 && ErrorLines.Length == 0,
+				"A refused assignment is the caller's answer, not an error (pck-15).")
 		else
 			_APCF_Require(Returned is Integer && Returned == 0 && ErrorLines.Length == 1 && _LOGGER_PENDING_ERRORS.Length == 1,
 				"A failed actual assignment callback must reach the real central ERROR ring and pending error queue instead of disappearing after the picker closed.")
-		if _APCF.Mode != "current" {
+		if _APCF.Mode != "current" && _APCF.Mode != "refused" {
 			_APCF_Require(InStr(ErrorLines[1], "Action picker confirmation failed"), "The central logger must identify the failed operation.")
 			if _APCF.Mode == "error"
 				_APCF_Require(InStr(ErrorLines[1], "Controlled caller assignment refusal"), "The actual Error message must survive central formatting.")

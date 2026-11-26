@@ -89,7 +89,7 @@ local function load_subject(controls)
 		return keyboard.start(candidate)
 	end
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = keyboard
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		resume_after_cleanup = function() return true end,
 		force_cleanup = function() return true end,
 	}
@@ -99,11 +99,11 @@ local function load_subject(controls)
 		stop = function() return true end,
 		is_paused = function() return false end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		set_delivery_guard = function() return true end,
 	}
-	package.loaded["infra.startup_transaction"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.lifecycle.engine.startup_transaction"] = nil
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts"] = nil
 	package.loaded["modules.shortcuts.init"] = nil
 	return require("modules.shortcuts"), state

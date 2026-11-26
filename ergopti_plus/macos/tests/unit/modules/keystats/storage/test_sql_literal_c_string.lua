@@ -115,7 +115,7 @@ helpers.describe("keystats SQL literals survive the sqlite3_exec C string (sql-l
 	end)
 
 	helpers.it("encodes aggregate, outbox and reader literals the same way", function()
-		local Literal = require("sqlite.literal")
+		local Literal = require("core.fs.engine.sqlite.literal")
 		local escaped = "'" .. Literal.escape(SENTINEL) .. "'"
 		helpers.assert_eq(evaluate_literal(escaped), SENTINEL)
 		-- The whole keystats tree, not a list of helper names: a named list went
@@ -137,6 +137,6 @@ helpers.describe("keystats SQL literals survive the sqlite3_exec C string (sql-l
 		end
 		pipe:close()
 		helpers.assert_true(scanned >= 20, "the scan must reach the keystats tree, saw " .. scanned)
-		helpers.assert_eq(#offenders, 0, "quote SQL text through sqlite.literal:\n" .. table.concat(offenders, "\n"))
+		helpers.assert_eq(#offenders, 0, "quote SQL text through core.fs.engine.sqlite.literal:\n" .. table.concat(offenders, "\n"))
 	end)
 end)

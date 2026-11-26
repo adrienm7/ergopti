@@ -7,9 +7,9 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Private
@@ -37,7 +37,7 @@ end
 -- A terminal close-refusal vector owns a separate process: the exact refused
 -- descriptor remains live until process exit and never earns a shutdown ACK.
 if arg[2] == "close-refusal" then
-	Private = require("infra.private_sqlite_file")
+	Private = require("core.fs.engine.private_sqlite_file")
 	require("tests.support.metrics_preferences_fixture").with(function()
 		local writer = require("modules.keystats.sqlite_writer")
 		local collector = require("modules.keystats.keystats")
@@ -74,8 +74,8 @@ local ok, failure = xpcall(function()
 			local writer = require("modules.keystats.sqlite_writer")
 			assert(writer.is_available())
 			assert(uv.fs_stat(database).mode % 4096 == 384, "new SQLite database must be private under ambient umask")
-			Private = require("infra.private_sqlite_file")
-			k.on_keydown(token, math.floor(require("infra.monotonic").now_ms()), "private-app")
+			Private = require("core.fs.engine.private_sqlite_file")
+			k.on_keydown(token, math.floor(require("core.logger.engine.monotonic").now_ms()), "private-app")
 			Fixture.flush(k)
 			assert(writer.query_rows("SELECT text FROM events_typing;")[1] == token)
 			local original = read(database)
@@ -113,7 +113,7 @@ local ok, failure = xpcall(function()
 			-- Observe real companion creation while the native CLI transaction is
 			-- still open; the canonical command boundary owns its original umask.
 			local Command = require("modules.keystats.sqlite_command")
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local function sql_output(sql)
 				local command = assert(Command.build(database, sql, { capture_stderr = true, capture_exit = true }))
 				local pipe = assert(io.popen(command, "r"))

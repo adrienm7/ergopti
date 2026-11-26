@@ -51,10 +51,17 @@ _TWSA_AtomicWrite() {
 	Assert(InStr(Body, ".tmp") > 0,
 		"_WS_Save must stage the write to a .tmp file before moving it over the target (atomic write)")
 
-	WritePos := InStr(Body, "FSWriteDurable(StagePath, Content)")
+	; The owned native route holds its stage and admits the exact source at the
+	; replacement itself; the injected-adapter route stages, authorizes, then moves.
+	NativeAdmissionPos := InStr(Body, "FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)")
+	NativePos := InStr(Body, "if !FSWriteReplaceOwned(BoundPath, Content, StageSuffix,", true, Max(1, NativeAdmissionPos))
+	NativeGatePos := InStr(Body, "BeforePublish, FinalAdmission,", true, Max(1, NativePos))
+	Assert(NativeAdmissionPos > 0 && NativePos > NativeAdmissionPos && NativeGatePos > NativePos,
+		"_WS_Save's native route must publish through the owned writer behind its final source admission")
+	WritePos := InStr(Body, "FSWriteDurable(StagePath, Content)", true, Max(1, NativeGatePos))
 	AuthorizePos := InStr(Body,
-		"_WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)")
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, BoundPath)")
+		"_WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)", true, Max(1, WritePos))
+	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, BoundPath,", true, Max(1, AuthorizePos))
 	Assert(WritePos > 0 && AuthorizePos > WritePos && ReplacePos > AuthorizePos,
 		"_WS_Save must durably stage, revalidate the exact owner, then publish through the atomic adapter")
 	Assert(InStr(Body, "FileMove(") == 0,

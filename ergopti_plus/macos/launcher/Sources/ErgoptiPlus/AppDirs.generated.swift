@@ -1,5 +1,5 @@
 // Sources/ErgoptiPlus/AppDirs.generated.swift
-// AUTO-GENERATED from _shared/modules/paths/app_dirs.toml.
+// AUTO-GENERATED from _shared/core/fs/data/paths/app_dirs.toml.
 // DO NOT EDIT BY HAND -- run `npm run codegen:app-dirs` to refresh.
 
 // ==============================================================================
@@ -11,8 +11,8 @@
 // keeps the native side from becoming a second source for any of them.
 // ==============================================================================
 
-/// Folder named after the application, on every OS.
-let kAppFolderName = "ergopti_plus"
+/// Folder named after the application on macOS (and Windows).
+let kAppFolderName = "Ergopti"
 
 /// Daily unified log: <prefix>yyyy-MM-dd<extension>.
 let kLogUnifiedPrefix = "ErgoptiPlus_"
@@ -20,14 +20,28 @@ let kLogUnifiedPrefix = "ErgoptiPlus_"
 /// Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.
 let kLogErrorsPrefix = "ErgoptiPlus_errors_"
 
-/// Topical sub-files: <prefix><name><extension>.
-let kLogTopicalPrefix = "ErgoptiPlus_"
-
 /// Extension of every log file.
 let kLogFileExtension = ".log"
 
+/// Exact names the retention sweep deletes: the retired topical sub-files.
+let kRetiredTopicalLogNames: Set<String> = [
+	"ErgoptiPlus_gestures.log",
+	"ErgoptiPlus_ollama.log",
+	"ErgoptiPlus_llm.log",
+	"ErgoptiPlus_hotstrings.log",
+	"ErgoptiPlus_keystats.log",
+	"ErgoptiPlus_menu.log",
+	"ErgoptiPlus_notify.log",
+	"ErgoptiPlus_boot.log",
+	"ErgoptiPlus_layout.log",
+	"ErgoptiPlus_dispatch.log",
+	"ErgoptiPlus_tray.log",
+	"ErgoptiPlus_mlx.log",
+	"ErgoptiPlus_karabiner.log",
+]
+
 /// Default logs folder, relative to the home folder.
-let kMacOSLogsHomeRelativePath = "Library/Logs/ergopti_plus"
+let kMacOSLogsHomeRelativePath = "Library/Logs/Ergopti"
 
 /// Launcher diagnostic log, always in the default logs folder.
 let kLauncherLogFileName = "launcher.log"
@@ -36,4 +50,13 @@ let kLauncherLogFileName = "launcher.log"
 let kFatalReportFileName = "hammerspoon-fatal.txt"
 
 /// The paths.toml that may move the configuration folder, relative to the home folder.
-let kMacOSPathsFileHomeRelativePath = "Library/Application Support/ErgoptiPlus/paths.toml"
+let kMacOSPathsFileHomeRelativePath = "Library/Application Support/Ergopti/paths.toml"
+
+/// The Ergopti root (managed runtimes, locks, control), relative to the home folder.
+let kMacOSSupportHomeRelativePath = "Library/Application Support/Ergopti"
+
+/// The cache folder, relative to the home folder.
+let kMacOSCacheHomeRelativePath = "Library/Caches/Ergopti"
+
+/// Folder name the owned Karabiner runtime is compiled with, kept until its rebuild.
+let kMacOSOwnedRuntimeFolderName = "ErgoptiPlus"

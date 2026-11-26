@@ -97,10 +97,23 @@ helpers.describe("release_installer: the authenticated asset", function()
 	end)
 
 	helpers.it("names the declared macOS archive from the shared defaults", function()
-		local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
-		local defaults = require("json").decode(handle:read("*a"))
+		local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
+		local defaults = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		helpers.assert_eq(defaults.release_assets.macos_bundle, IDS.asset)
+	end)
+end)
+
+-- The Versions session holds a release whose quit was refused for exactly the
+-- swap worker's own wait; a second copy of that bound would drift (MUR-001).
+helpers.describe("release_installer: the held-install wait (release-restart-pending)", function()
+	helpers.it("reads the launcher wait from the swap script it emits", function()
+		local Installer = fresh_installer()
+		helpers.assert_eq(Installer.SWAP_WAIT_SECONDS, Installer.SWAP_WAIT_TICKS / 10)
+		helpers.assert_true(Installer.SWAP_WAIT_SECONDS >= 60, "the worker waits at least a minute")
+		helpers.assert_true(Installer.SWAP_SCRIPT:find('[ "$waited" -gt ' .. Installer.SWAP_WAIT_TICKS .. ' ]', 1, true) ~= nil,
+			"the emitted loop counts the same ticks")
+		helpers.assert_true(Installer.SWAP_SCRIPT:find("/bin/sleep 0.1", 1, true) ~= nil, "each tick sleeps 0.1 s")
 	end)
 end)
 
@@ -134,16 +147,77 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[5], DIGEST)
 		helpers.assert_eq(call.args[7], "0.0.0-dev.139")
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
-		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
-		call.on_done(0, "READY /private/tmp/user/x/app/ErgoptiPlus.app\n", "")
-		call.on_done(10, "", "curl: (6) Could not resolve host")
+		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d%-%d+$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
+		call.on_done(0, "READY " .. call.args[6] .. "/app/ErgoptiPlus.app\n", "")
+		call.on_done(10, "FAILED native:offline\n", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
 		call.on_done(27, "", "code object is not signed")
-		helpers.assert_eq(results[1][1], "/private/tmp/user/x/app/ErgoptiPlus.app")
+		helpers.assert_eq(results[1][1], call.args[6] .. "/app/ErgoptiPlus.app")
 		helpers.assert_eq(results[2][2], "download")
+		-- UPD-11: the download failure keeps its receipt for the Versions window
+		helpers.assert_eq(results[2][4].network_status, "disconnected", "upd-11: the failure receipt is handed on")
 		helpers.assert_eq(results[3][2], "verify")
-		helpers.assert_eq(results[4][2], "verify")
+		helpers.assert_nil(results[3][4], "a check failure is no network failure")
+		-- UPD-10: a refused code signature is its own stage
+		helpers.assert_eq(results[4][2], "signature")
 		helpers.assert_nil(results[4][1])
+	end)
+
+	helpers.it("refuses a stage receipt naming a different application", function()
+		local callback, result
+		Installer._spawn = function(_, _, on_done)
+			callback = on_done
+			return { start = function() return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		helpers.assert_true(Installer.stage(asset, function(...) result = { ... } end))
+		callback(0, "READY /private/tmp/foreign/app/ErgoptiPlus.app\n", "")
+		helpers.assert_nil(result[1], "a foreign receipt must not reach the swap owner")
+		helpers.assert_eq(result[2], "verify")
+	end)
+
+	helpers.it("uses distinct stages for retries started in the same second", function()
+		local paths = {}
+		Installer._spawn = function(_, args)
+			paths[#paths + 1] = args[6]
+			return { start = function() return true end }
+		end
+		local old_date = os.date
+		os.date = function() return "20261104-120000" end
+		local ok, err = xpcall(function()
+			local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_true(paths[1] ~= paths[2], "a retry must not reuse the first stage")
+		end, debug.traceback)
+		os.date = old_date
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("requires system curl only for an explicit proxy route", function()
+		local previous = package.loaded["core.network.adapters.system_curl"]
+		local checks, starts, child_environment, curl_available = 0, 0, nil, false
+		package.loaded["core.network.adapters.system_curl"] = { check = function() checks = checks + 1; return curl_available end }
+		Installer._spawn = function(_, _, _, _, environment)
+			child_environment = environment
+			return { start = function() starts = starts + 1; return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }
+		local ok, err = pcall(function()
+			helpers.assert_true(Installer.stage(asset, function() end), "native stage does not run curl")
+			helpers.assert_eq(checks, 0)
+			helpers.assert_eq(child_environment.https_proxy, "", "the child receives the admitted proxy snapshot")
+			env.https_proxy = "http://proxy.example:3128"
+			helpers.assert_eq(Installer.stage(asset, function() end), false, "the explicit proxy uses curl")
+			helpers.assert_eq(checks, 1)
+			helpers.assert_eq(starts, 1)
+			curl_available = true
+			helpers.assert_true(Installer.stage(asset, function() end))
+			helpers.assert_eq(child_environment.https_proxy, env.https_proxy)
+		end)
+		env.https_proxy = nil
+		package.loaded["core.network.adapters.system_curl"] = previous
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("arms the replacement detached, with the previous app kept aside", function()
@@ -209,17 +283,42 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 			script = script:gsub("/bin/rm", function() return rm end)
 		end
 		if opts.parent_readonly then assert(sh("chmod 500 " .. quote(dir)) == 0) end
-		local status, output = sh("sh -c " .. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
+		-- The archive bounds the installer reads from the shared updater defaults.
+		local status, output = sh("ERGOPTI_RELEASE_STAGE_TIMEOUT_MS=1200000 ERGOPTI_RELEASE_STAGE_IDLE_MS=600000 sh -c "
+			.. quote(script) .. " stage " .. quote(URL) .. " " .. quote(digest)
 			.. " " .. quote(dir .. "/stage") .. " 0.0.0-dev.139 /Applications/ErgoptiPlus.app "
 			.. quote(opts.format or "zip") .. " " .. quote(opts.bundle or "ErgoptiPlus.app"))
 		if opts.parent_readonly then assert(sh("chmod 700 " .. quote(dir)) == 0) end
 		local called = read(calls) or ""
 		local retained_archive = read(dir .. "/stage/release." .. (opts.format or "zip"))
+		local _, stage_exists = sh("[ -e " .. quote(dir .. "/stage") .. " ] && echo yes || echo no")
 		local _, permissions = sh("if [ -d " .. quote(dir .. "/stage") .. " ]; then python3 -c "
 			.. quote("import os,stat,sys; print(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))") .. " " .. quote(dir .. "/stage") .. "; fi")
 		sh("rm -rf " .. quote(dir))
-		return status, output, called, retained_archive, permissions
+		return status, output, called, retained_archive, permissions, stage_exists == "yes\n"
 	end
+
+	-- UPD-11: a failed stage left its .ergopti-release-install- folder beside
+	-- the app, and its download failure printed nothing a receipt could carry.
+	helpers.it("upd-11: a failed download prints its closed fact and removes its stage", function()
+		local status, output, called, _, _, exists = stage({ curl_fails = true })
+		helpers.assert_eq(status, Installer.EXIT_DOWNLOAD, output)
+		helpers.assert_eq(called, "curl\n")
+		helpers.assert_eq(output, "FAILED curl:22\n")
+		helpers.assert_eq(exists, false, "the failed stage is removed")
+	end)
+
+	helpers.it("upd-11: every refused check removes its stage, a READY one keeps it", function()
+		for _, options in ipairs({ { digest = string.rep("0", 64) }, { version = "0.0.0-dev.138" },
+			{ unsigned = true }, { format = "tar.xz", extract_fails = true } }) do
+			local status, _, _, _, _, exists = stage(options)
+			helpers.assert_true(status ~= 0)
+			helpers.assert_eq(exists, false, "a refused stage is removed (exit " .. tostring(status) .. ")")
+		end
+		local status, _, _, _, _, exists = stage({})
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(exists, true, "the verified app stays for the swap")
+	end)
 
 	helpers.it("retires only the verified owned archive before READY and refuses failed retirement", function()
 		local status, output, _, archive, permissions = stage({})
@@ -307,6 +406,34 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 	end)
 end)
 
+helpers.describe("release_installer: the download failure receipt (upd-11)", function()
+	local Installer = fresh_installer()
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local function contract()
+		local handle = assert(io.open(Paths.shared("core/network/data/managed_network.json"), "rb"))
+		local text = handle:read("*a")
+		handle:close()
+		return require("core.network.engine.failure").new(Json.decode(text))
+	end
+
+	helpers.it("upd-11: names the cause each closed fact proves, and no more", function()
+		local failure = contract()
+		for _, case in ipairs({
+			{ "FAILED native:offline\n", "offline" }, { "FAILED native:certificate\n", "certificate" },
+			{ "FAILED native:proxy\n", "proxy" }, { "FAILED native:file_write\n", "unknown" },
+			{ "FAILED native:connect\n", "unknown" }, { "FAILED curl:5\n", "proxy" },
+			{ "FAILED curl:60\n", "certificate" }, { "FAILED curl:22\n", "unknown" },
+			{ "FAILED native:forged\n", "unknown" }, { "", "unknown" }, { "READY /x\n", "unknown" },
+		}) do
+			local receipt = Installer.failure_receipt(case[1])
+			local report = failure.classify(receipt, {})
+			helpers.assert_eq(report.cause, case[2], case[1])
+			helpers.assert_true(report.evidence ~= "invalid_receipt", "a well-formed receipt: " .. case[1])
+		end
+	end)
+end)
+
 helpers.describe("release_installer: the replacement script under /bin/sh", function()
 	local Installer = fresh_installer()
 
@@ -316,11 +443,41 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		assert(sh("mkdir -p " .. quote(app) .. " " .. quote(staged)) == 0)
 		write(app .. "/marker", "installed")
 		write(staged .. "/marker", "chosen")
-		if opts.previous then assert(sh("mkdir -p " .. quote(previous)) == 0) end
+		if opts.previous == "directory" then
+			assert(sh("mkdir -p " .. quote(previous)) == 0)
+			write(previous .. "/marker", "user backup")
+		elseif opts.previous == "file" then
+			write(previous, "user backup")
+		elseif opts.previous == "symlink" then
+			assert(sh("ln -s missing " .. quote(previous)) == 0)
+		end
 
+		if opts.ready_capable then
+			local capability = staged .. Installer.BOOT_READY_CAPABILITY
+			assert(sh("mkdir -p " .. quote(capability:match("^(.*)/[^/]+$"))) == 0)
+			write(capability, "-- boot reporter\n")
+		end
+		-- The fake open records each launch; opened with a boot-ready token it
+		-- plays the successor: it reports the pid in successor_pid, or nothing.
 		local opened = dir .. "/opened"
-		local open = fake(dir, "open", 'echo "$2" >> ' .. quote(opened))
-		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
+		local reported = dir .. "/successor_pid"
+		if opts.successor_pid then write(reported, opts.successor_pid) end
+		if opts.quit_later then write(dir .. "/quit_later", "") end
+		local open = fake(dir, "open", table.concat({
+			'if [ "$1" = --env ]; then',
+			'	echo "ready $4" >> ' .. quote(opened),
+			'	token=${2#ERGOPTI_UPDATER_BOOT_READY=}',
+			'	if [ -f ' .. quote(reported) .. ' ]; then cp ' .. quote(reported) .. ' "$token.tmp" && mv "$token.tmp" "$token"; fi',
+			-- A Quit during the probation: the boot rewrites its token with quit.
+			'	if [ -f ' .. quote(dir .. "/quit_later") .. ' ]; then (sleep 0.2; echo quit > "$token.tmp" && mv "$token.tmp" "$token") & fi',
+			'else',
+			'	echo "$2" >> ' .. quote(opened),
+			'fi',
+		}, "\n"))
+		local no_processes = fake(dir, "ps", "exit 0")
+		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open):gsub("/bin/ps ", no_processes .. " ")
+		-- A wait of a few ticks keeps the silent successor case short.
+		script = script:gsub('%[ "%$ready_ticks" %-gt %d+ %]', '[ "$ready_ticks" -gt 3 ]')
 		script = require("tests.support.release_swap_ports").observe(script, dir)
 		if opts.publication_refused then
 			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
@@ -331,11 +488,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
 			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
 			.. " 3>" .. quote(acknowledgement))
-		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
+		helpers.assert_eq(read(acknowledgement), opts.previous and "" or "ARMED\n",
+			"an occupied backup must refuse before the driver quits")
 		local result = {
 			status = status, output = output,
 			app = read(app .. "/marker"), previous = read(previous .. "/marker"), opened = read(opened) or "",
+			previous_file = read(previous), previous_link = sh("test -L " .. quote(previous)) == 0,
 			app_path = app,
+			failed = read(app .. ".failed-" .. (output:match("new one is at .-%.failed%-(%d+)") or "none") .. "/marker"),
 		}
 		sh("rm -rf " .. quote(dir))
 		return result
@@ -347,7 +507,7 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local completed, result = pcall(function()
 			local sleeper = producer:read("*l")
 			assert(sleeper and sleeper:match("^[1-9]%d*$"), "The retained sleeper must publish its exact PID")
-			return swap({ pid = sleeper, previous = true })
+			return swap({ pid = sleeper })
 		end)
 		-- Close this exact producer even if PID admission or swap failed. All
 		-- original result assertions run only after the parent has been reaped.
@@ -357,6 +517,94 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		helpers.assert_eq(result.status, 0, result.output)
 		helpers.assert_eq(result.app, "chosen")
 		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, result.app_path .. "\n")
+	end)
+
+	helpers.it("preserves a pre-existing backup and refuses before arming", function()
+		for _, kind in ipairs({ "directory", "file", "symlink" }) do
+			local result = swap({ previous = kind })
+			helpers.assert_eq(result.status, 1)
+			helpers.assert_eq(result.app, "installed")
+			helpers.assert_eq(result.opened, "")
+			if kind == "directory" then helpers.assert_eq(result.previous, "user backup") end
+			if kind == "file" then helpers.assert_eq(result.previous_file, "user backup") end
+			if kind == "symlink" then helpers.assert_true(result.previous_link) end
+			helpers.assert_true(result.output:find("Move the existing backup", 1, true) ~= nil)
+		end
+	end)
+
+	--- Runs one swap whose launcher has already quit and whose successor is the given process.
+	--- @param opts table swap() options.
+	--- @return table result
+	local function swap_with_live_pid(opts)
+		local producer = assert(io.popen([[sleep 3 >/dev/null 2>&1 & sleeper=$!; printf '%s\n' "$sleeper"; wait "$sleeper"]]))
+		local sleeper = producer:read("*l")
+		assert(sleeper and sleeper:match("^[1-9]%d*$"), "The successor double must publish its exact PID")
+		opts.successor_pid = opts.successor_pid or sleeper
+		local completed, result = pcall(swap, opts)
+		sh("kill " .. sleeper)
+		producer:close()
+		if not completed then error(result, 0) end
+		return result
+	end
+
+	-- The Windows swap keeps a new build only once it signals boot-ready and
+	-- survives its probation; the macOS swap only renamed and opened.
+	helpers.it("keeps the chosen app once its boot reports ready and survives the probation", function()
+		local result = swap_with_live_pid({ ready_capable = true })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen")
+		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "opened once, with the boot-ready token")
+		helpers.assert_contains(result.output, "reported a healthy start")
+	end)
+
+	helpers.it("puts the previous app back when the chosen one never reports its boot", function()
+		local result = swap({ ready_capable = true })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed", "the previous app is back in place")
+		helpers.assert_eq(result.failed, "chosen", "the build that did not start is kept aside, not deleted")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n" .. result.app_path .. "\n",
+			"the chosen app was opened with its token, then the previous one")
+		helpers.assert_contains(result.output, "did not start (no boot report)")
+	end)
+
+	helpers.it("puts the previous app back when the chosen one quits during the probation", function()
+		local result = swap({ ready_capable = true, successor_pid = "999999999" })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed")
+		helpers.assert_eq(result.failed, "chosen")
+		helpers.assert_contains(result.output, "quit during the probation")
+	end)
+
+	helpers.it("(update-quit-kept) keeps the chosen app and opens nothing when it is quit before its report", function()
+		local result = swap({ ready_capable = true, successor_pid = "quit" })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "the update stays installed")
+		helpers.assert_eq(result.previous, "installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "the previous app is not opened")
+		helpers.assert_contains(result.output, "quit before it reported ready")
+	end)
+
+	helpers.it("(update-quit-kept) keeps the chosen app when it is quit during the probation", function()
+		local result = swap({ ready_capable = true, successor_pid = "999999999", quit_later = true })
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "the update stays installed")
+		helpers.assert_eq(result.opened, "ready " .. result.app_path .. "\n", "the previous app is not opened")
+		helpers.assert_contains(result.output, "quit during its probation")
+	end)
+
+	helpers.it("refuses an invalid boot report like a missing one", function()
+		local result = swap({ ready_capable = true, successor_pid = "12x" })
+		helpers.assert_eq(result.status, 9, result.output)
+		helpers.assert_eq(result.app, "installed")
+		helpers.assert_contains(result.output, "an invalid boot report")
+	end)
+
+	helpers.it("only opens a chosen release that predates the boot report", function()
+		local result = swap({})
+		helpers.assert_eq(result.status, 0, result.output)
+		helpers.assert_eq(result.app, "chosen", "an older build cannot report and is kept as before")
 		helpers.assert_eq(result.opened, result.app_path .. "\n")
 	end)
 
@@ -371,10 +619,10 @@ end)
 
 helpers.describe("release_installer: declared archive preference and historical compatibility", function()
 	local Installer = fresh_installer()
-	local Archives = require("updater.release_assets")
+	local Archives = require("updater.engine.release_assets")
 
 	helpers.it("uses actual shared declarations against independent exact release records", function()
-		local corpus = require("json").decode(assert(read(helpers.shared("tests/corpus/updater/release_archives.json"))))
+		local corpus = require("core.text.engine.json").decode(assert(read(helpers.shared("tests/corpus/updater/release_archives.json"))))
 		helpers.assert_eq(#corpus.cases, 14, "the independent refusal corpus is complete")
 		for _, case in ipairs(corpus.cases) do
 			local selected = Installer.find_asset(case.release)
@@ -386,7 +634,7 @@ helpers.describe("release_installer: declared archive preference and historical 
 	end)
 
 	helpers.it("preserves other platform assets and requires declared format-key bindings", function()
-		local defaults = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+		local defaults = require("core.text.engine.json").decode(assert(read(helpers.shared("updater/data/defaults.json"))))
 		helpers.assert_eq(defaults.release_assets.linux_bundle, "ergopti-plus-linux.tar.gz")
 		helpers.assert_eq(defaults.release_assets.macos_bundle, "ErgoptiPlus.app.zip", "current producers retain ZIP")
 		local identity = assert(Archives.resolve(defaults))
@@ -399,10 +647,14 @@ helpers.describe("release_installer: declared archive preference and historical 
 			function(value) value.release_install.macos_archives[1].asset_key = "missing" end,
 			function(value) value.release_install.macos_archives[1].format = "zip" end,
 			function(value) value.release_install.macos_archives[2] = value.release_install.macos_archives[1] end,
+			function(value)
+				value.release_assets.extra_zip = "Other.app.zip"
+				value.release_install.macos_archives[1] = { asset_key = "extra_zip", format = "zip" }
+			end,
 			function(value) value.release_install.macos_archives.future = {} end,
 			function(value) value.github.owner = "../foreign" end,
 		}) do
-			local changed = require("json").decode(assert(read(helpers.shared("modules/updater/defaults.json"))))
+			local changed = require("core.text.engine.json").decode(assert(read(helpers.shared("updater/data/defaults.json"))))
 			mutate(changed)
 			helpers.assert_nil(Archives.resolve(changed), "malformed policy never selects a fallback")
 		end
@@ -452,19 +704,25 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_nil(captured.on_chunk)
 		local raw = captured.environment.ERGOPTI_RELEASE_STAGE_REQUEST
 		helpers.assert_true(type(raw) == "string" and #raw < 65536)
-		local request = require("adapters.json_codec").decode(raw)
+		local request = require("core.fs.adapters.json_codec").decode(raw)
 		helpers.assert_eq(request.version, 1)
 		helpers.assert_eq(request.url, URL)
 		helpers.assert_eq(request.sha256, DIGEST)
 		helpers.assert_eq(request.output, captured.args[6] .. "/release.tar.xz")
-		helpers.assert_eq(request.timeout_ms, 900000)
+		-- (release-archive-budget) the shared bounds, aligned on Windows.
+		local limits = require("updater.engine.transfer_budget").archive_limits(require("core.fs.adapters.json_codec").decode(
+			assert(io.open(require("core.fs.engine.paths").shared("updater/data/defaults.json"), "rb")):read("*a")))
+		helpers.assert_eq(request.timeout_ms, limits.absolute_ms)
+		helpers.assert_eq(request.idle_timeout_ms, limits.idle_ms)
+		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS, string.format("%d", limits.absolute_ms))
+		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_IDLE_MS, string.format("%d", limits.idle_ms))
 		local count = 0
 		for _ in pairs(request) do count = count + 1 end
-		helpers.assert_eq(count, 5)
+		helpers.assert_eq(count, 6)
 		helpers.assert_eq(asset.format, "tar.xz")
 	end)
 	helpers.it("refuses failed or oversized serialization before native acquisition", function()
-		local Codec = require("adapters.json_codec")
+		local Codec = require("core.fs.adapters.json_codec")
 		local original = Codec.encode
 		local calls = 0
 		Installer._spawn = function() calls = calls + 1; return nil end
@@ -494,7 +752,7 @@ helpers.describe("release_installer: filesystem publication admission", function
 			write(source, assert(helpers.read_driver_unit("M.SWAP_SCRIPT = table.concat({")))
 			local status, output = sh("python3 -B " .. quote(probe) .. " controls " .. quote(source) .. " " .. quote(dir .. "/controls"))
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(#receipt.parser_refusals, 25, "the literal parser must refuse every malformed authority")
 			helpers.assert_eq(#receipt.cases, 8, "all independent physical refusals and healthy controls execute")
 			local emitted, program = sh("python3 -B " .. quote(probe) .. " emit " .. quote(source))
@@ -514,7 +772,7 @@ helpers.describe("release_installer: concurrent filesystem publication", functio
 			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root()) .. " " .. quote(dir))
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(#receipt.cases, 4, "all three native boundaries and the two-installer transaction execute")
 			local names = {}
 			for _, case in ipairs(receipt.cases) do names[#names + 1] = case.name end
@@ -594,7 +852,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 				.. " " .. quote(helpers.driver_root()) .. " " .. quote(dir)
 			local status, output = sh(command .. " --emission-source strict-source")
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(receipt.emission_source, "strict-source")
 			helpers.assert_eq(receipt.execution_scope, "script-only/source-parser")
 			helpers.assert_eq(#receipt.cases, 4, "the explicit observer must still execute every physical boundary")
@@ -613,7 +871,7 @@ helpers.describe("release_installer: explicit native script observation", functi
 			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root())
 				.. " " .. quote(dir) .. " --emission-controls")
 			helpers.assert_eq(status, 0, output)
-			local receipt = assert(require("json").decode(output))
+			local receipt = assert(require("core.text.engine.json").decode(output))
 			helpers.assert_eq(receipt.emission_source, "actual-lua-compared-with-strict-source")
 			helpers.assert_eq(#receipt.commands, 3, "each complete argv and both scripts must match real Lua")
 			helpers.assert_eq(#receipt.parser_refusals, 10, "every malformed detach authority must refuse")
@@ -626,5 +884,16 @@ helpers.describe("release_installer: explicit native script observation", functi
 		end, debug.traceback)
 		assert(sh("rm -rf " .. quote(dir)) == 0)
 		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("updater version comparison parity", function()
+	helpers.it("replays the shared version vectors, including malformed suffixes", function()
+		local raw = assert(read(helpers.shared("updater/data/version_vectors.json")))
+		local vectors = require("core.text.engine.json").decode(raw).vectors
+		local version = require("updater.engine.version_core")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(version.compare_versions(vector.a, vector.b), vector.expect, vector.id)
+		end
 	end)
 end)

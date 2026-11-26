@@ -21,7 +21,18 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "modules",
 	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "adapters",
-	helpers.shared("lua"),
+	DRIVER_ROOT .. "core",
+	DRIVER_ROOT .. "platform",
+	DRIVER_ROOT .. "settings",
+	DRIVER_ROOT .. "menu",
+	DRIVER_ROOT .. "tray",
+	DRIVER_ROOT .. "ai",
+	DRIVER_ROOT .. "apps",
+	DRIVER_ROOT .. "clipboard",
+	DRIVER_ROOT .. "diagnostics",
+	DRIVER_ROOT .. "gestures",
+	DRIVER_ROOT .. "hotstrings",
+	helpers.shared(""),
 }
 local ROW_ITERATOR = "^%s*for%s.-%sin%s+[%w_%.]*db:[nu]?rows%("
 

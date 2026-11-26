@@ -11,12 +11,12 @@
 --- @return number typed_ms
 local typing_origin_ms
 local function typed_at(offset_ms)
-	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	typing_origin_ms = typing_origin_ms or math.floor(require("core.logger.engine.monotonic").now_ms()) - 10000
 	return typing_origin_ms + offset_ms
 end
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-layouts-seen-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -28,8 +28,8 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local R = require("modules.keystats.sqlite_reader")
-local Hook = require("adapters.keyboard_hook")
-local Json = require("json")
+local Hook = require("platform.input.keyboard_hook")
+local Json = require("core.text.engine.json")
 local path, day = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
 local checks, failures = 0, 0
 local function check(name, body)

@@ -6,6 +6,8 @@
 # the attribution in NOTICE next to this file.
 
 name = "bépo"
+# The physical board this layout is made for (iso or ansi).
+geometry = "iso"
 family = "bepo"
 # The registry compares x.y.z versions; upstream names this, its only 1.1
 # macOS release, 1.1rc2.

@@ -4,7 +4,7 @@
 --- MODULE: Navigation Layer Rule (Karabiner)
 --- DESCRIPTION:
 --- Turns the navigation layer's bindings — the user's layers.toml, resolved for
---- macOS by the shared loader (_shared/lua/keymap/layers.lua) — into the
+--- macOS by the shared loader (_shared/layouts/engine/layers/layers.lua) — into the
 --- Karabiner rule the generator deploys, in place of the hand-written
 --- data/layer_keys.json it used to append verbatim. That file survives as
 --- data/legacy_layer_keys.json, the anchor that proves and removes the blocks
@@ -23,8 +23,12 @@
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
 --- 4. Driver-native handlers ([call_handlers].macos in layer_actions.toml) and
----    the `none` action have Karabiner forms of their own; a repeat count has
----    none on macOS and raises.
+---    the `none` action have Karabiner forms of their own. A repeat count is
+---    the Karabiner variable nav_repeat_count, Windows' NumberOfRepetitions: a
+---    repeat_count:<N> key sets it, a repeatable action has one variant per
+---    count the layer sets that sends its last chord that many times, every
+---    keystroke resets it to 1, and so does entering the layer (generator.lua
+---    prepend_nav_layer_sentinel).
 --- 5. No binding, no rule: Karabiner refuses a rule without manipulators, and
 ---    an absent layers.toml means the keys behave natively.
 --- 6. The wheel stays out of the Karabiner rule, which cannot take wheel input:
@@ -40,19 +44,19 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
 local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner.nav_layer"
 
 -- Configured input observations originate in the same acknowledged load. They
 -- reserve mapping inputs only; no Karabiner installation or lease is admitted.
-local Json = require("json")
-local TomlCodec = require("toml_codec")
-local Layers = require("keymap.layers")
-local Writer = require("toml_codec.writer")
-local TableUtil = require("table_util")
+local Json = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Layers = require("layouts.engine.layers.layers")
+local Writer = require("core.text.engine.toml_codec.writer")
+local TableUtil = require("core.text.engine.table_util")
 local original_read, original_json, original_toml = Writer.read_classified, Json.decode, TomlCodec.decode
 local source_records = setmetatable({}, { __mode = "k" })
 local layer_ports = {}
@@ -65,16 +69,16 @@ local function source_ports_current()
 	if package.loaded["platform.remap.nav_layer"] ~= M or getmetatable(M) ~= nil
 		or M.load ~= original_load or M.build_rule ~= original_build or M.wheel_slots ~= original_wheel
 		or M.capture_configured_inputs ~= original_capture
-		or package.loaded["json"] ~= Json or getmetatable(Json) ~= nil or Json.decode ~= original_json
-		or package.loaded["toml_codec"] ~= TomlCodec or getmetatable(TomlCodec) ~= nil or TomlCodec.decode ~= original_toml
-		or package.loaded["toml_codec.writer"] ~= Writer or getmetatable(Writer) ~= nil or Writer.read_classified ~= original_read
-		or package.loaded["keymap.layers"] ~= Layers or getmetatable(Layers) ~= nil then return false end
+		or package.loaded["core.text.engine.json"] ~= Json or getmetatable(Json) ~= nil or Json.decode ~= original_json
+		or package.loaded["core.text.engine.toml_codec"] ~= TomlCodec or getmetatable(TomlCodec) ~= nil or TomlCodec.decode ~= original_toml
+		or package.loaded["core.text.engine.toml_codec.writer"] ~= Writer or getmetatable(Writer) ~= nil or Writer.read_classified ~= original_read
+		or package.loaded["layouts.engine.layers.layers"] ~= Layers or getmetatable(Layers) ~= nil then return false end
 	for name, port in pairs(layer_ports) do if type(port) ~= "function" or Layers[name] ~= port then return false end end
 	return true
 end
 
 -- The layer a tap-hold key's hold_layer "nav" enters
--- (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
+-- (_shared/tap_hold/data/defaults.toml [tap_hold.hold_picker].layers).
 M.NAV_LAYER_ID = "nav"
 
 -- The tap-hold hold action (data/actions.json) that sets layer_active, the
@@ -101,6 +105,13 @@ M.KEYBOARD_FORM = KEYBOARD_FORM
 -- The Karabiner variable the hold actions set while the layer is held.
 local LAYER_ACTIVE_VAR_NAME = "layer_active"
 local LAYER_ACTIVE_ON_VALUE = 1
+
+-- The Karabiner variable holding the repeat count (lease-scoped like
+-- layer_active, platform/remap/lease_contract.lua), and its resting value.
+local REPEAT_COUNT_VAR_NAME = "nav_repeat_count"
+local REPEAT_COUNT_RESET_VALUE = 1
+M.REPEAT_COUNT_VAR_NAME = REPEAT_COUNT_VAR_NAME
+M.REPEAT_COUNT_RESET_VALUE = REPEAT_COUNT_RESET_VALUE
 
 -- Karabiner's mirror of "Use F1, F2, etc. keys as standard function keys".
 local FKEYS_STANDARD_VAR_NAME = "system.use_fkeys_as_standard_function_keys"
@@ -150,7 +161,7 @@ local function karabiner_event(code, registry)
 	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table"
 		and entry["macos_" .. KEYBOARD_FORM].karabiner
 	if type(override) == "table" then source = override end
-	-- json.lua decodes a JSON null to a sentinel table, so check for a real field.
+	-- core/text/engine/json.lua decodes a JSON null to a sentinel table, so check for a real field.
 	if type(source) == "table" then
 		for _, field in ipairs(EVENT_FIELDS) do
 			if type(source[field]) == "string" then return { [field] = source[field] } end
@@ -208,9 +219,9 @@ end
 -- =========================================
 -- =========================================
 
--- [call_handlers].macos in _shared/keymap/layer_actions.toml; each fills the
+-- [call_handlers].macos in _shared/layouts/data/layer_actions.toml; each fills the
 -- manipulator's outputs.
-local Brightness = require("brightness_actions").load()
+local Brightness = require("shortcuts.engine.brightness_actions").load()
 local CALL_HANDLERS = {
 	brightness_up = function(manipulator)
 		manipulator.to = { { consumer_key_code = Brightness.actions.brightness_up.karabiner_consumer } }
@@ -243,13 +254,19 @@ local function base_manipulator(code, registry, description, extra_condition)
 	local from = karabiner_event(code, registry)
 	from.modifiers = { optional = { "any" } }
 	local conditions = { { type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE } }
-	if extra_condition then conditions[#conditions + 1] = extra_condition end
+	-- Copied: the generator rewrites runtime variable names in place.
+	if extra_condition then
+		local condition = {}
+		for key, value in pairs(extra_condition) do condition[key] = value end
+		conditions[#conditions + 1] = condition
+	end
 	return { type = "basic", description = description, conditions = conditions, from = from }
 end
 
 --- What a resolution is called in a manipulator's description.
 local function resolution_label(resolution)
 	if resolution.action then return resolution.action end
+	if resolution.kind == "repeat_count" then return "repeat_count:" .. tostring(resolution.count) end
 	local parts = {}
 	for _, chord in ipairs(resolution.chords or {}) do
 		local tokens = {}
@@ -260,23 +277,66 @@ local function resolution_label(resolution)
 	return table.concat(parts, ", ")
 end
 
+--- The chords of a repeatable resolution sent `times` times: every chord
+--- once, then the last one again until it has been sent `times` times.
+local function counted_chords(chords, times)
+	local out = {}
+	for _, chord in ipairs(chords) do out[#out + 1] = chord end
+	for _ = 2, times do out[#out + 1] = chords[#chords] end
+	return out
+end
+
+--- The set_variable event that puts the repeat count back to rest.
+local function repeat_reset_event()
+	return { set_variable = { name = REPEAT_COUNT_VAR_NAME, value = REPEAT_COUNT_RESET_VALUE } }
+end
+
+--- The keystroke manipulators of one top-row variant: a counted one per count
+--- the layer sets (first: Karabiner runs the first manipulator that matches),
+--- then the plain one. With no count in the layer, the plain one alone, as
+--- before repeat counts existed.
+local function keystroke_variants(code, resolution, registry, product, label, add_fn, condition, counts)
+	local manipulators = {}
+	if resolution.repeatable then
+		for _, times in ipairs(counts) do
+			local counted = base_manipulator(code, registry, label .. " (×" .. times .. ")", condition)
+			counted.conditions[#counted.conditions + 1] = { type = "variable_if", name = REPEAT_COUNT_VAR_NAME, value = times }
+			counted.to = keystroke_events(counted_chords(resolution.chords, times), registry, add_fn, product)
+			counted.to[#counted.to + 1] = repeat_reset_event()
+			manipulators[#manipulators + 1] = counted
+		end
+	end
+	local plain = base_manipulator(code, registry, label, condition)
+	plain.to = keystroke_events(resolution.chords, registry, add_fn, product)
+	if counts.any then plain.to[#plain.to + 1] = repeat_reset_event() end
+	manipulators[#manipulators + 1] = plain
+	return manipulators
+end
+
 --- The manipulators of one bound key.
+--- @param counts table The counts above 1 the layer's repeat_count keys set,
+---   ascending, with `any` true when the layer binds a repeat_count at all.
 --- @return table manipulators
-local function manipulators_for(code, resolution, registry, product)
+local function manipulators_for(code, resolution, registry, product, counts)
 	local label = "Navigation layer: " .. code .. " — " .. resolution_label(resolution)
 	if resolution.kind == "keystroke" then
 		if not sends_function_key(resolution.chords, registry) then
-			local manipulator = base_manipulator(code, registry, label)
-			manipulator.to = keystroke_events(resolution.chords, registry, false, product)
-			return { manipulator }
+			return keystroke_variants(code, resolution, registry, product, label, false, nil, counts)
 		end
-		local media = base_manipulator(code, registry, label .. " (Fn added: the top row is media keys)",
-			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		media.to = keystroke_events(resolution.chords, registry, true, product)
-		local standard = base_manipulator(code, registry, label .. " (the top row is standard function keys)",
-			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		standard.to = keystroke_events(resolution.chords, registry, false, product)
-		return { media, standard }
+		local manipulators = keystroke_variants(code, resolution, registry, product,
+			label .. " (Fn added: the top row is media keys)", true,
+			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true }, counts)
+		for _, standard in ipairs(keystroke_variants(code, resolution, registry, product,
+			label .. " (the top row is standard function keys)", false,
+			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true }, counts)) do
+			manipulators[#manipulators + 1] = standard
+		end
+		return manipulators
+	end
+	if resolution.kind == "repeat_count" then
+		local manipulator = base_manipulator(code, registry, label)
+		manipulator.to = { { set_variable = { name = REPEAT_COUNT_VAR_NAME, value = resolution.count } } }
+		return { manipulator }
 	end
 	if resolution.kind == "none" then
 		local manipulator = base_manipulator(code, registry, label)
@@ -291,6 +351,17 @@ local function manipulators_for(code, resolution, registry, product)
 		return { manipulator }
 	end
 	error("nav_layer: Karabiner has no " .. tostring(resolution.kind) .. " resolution", 3)
+end
+
+--- Whether a layer binds a repeat_count key, and so needs the count reset
+--- when it is entered (generator.lua prepend_nav_layer_sentinel).
+--- @param bindings table|nil Key code -> resolution, resolved for macOS.
+--- @return boolean
+function M.binds_repeat_count(bindings)
+	for _, resolution in pairs(bindings or {}) do
+		if type(resolution) == "table" and resolution.kind == "repeat_count" then return true end
+	end
+	return false
 end
 
 --- Builds the Karabiner rule of the navigation layer.
@@ -316,9 +387,23 @@ function M.build_rule(bindings, registry, product)
 	-- Sorted: Lua tables have no order, and a stable rule keeps the deployed
 	-- karabiner.json identical from one regeneration to the next.
 	table.sort(codes)
+	-- The counts the layer's repeat_count keys set: a count of 1 is the resting
+	-- value, which the plain manipulator already sends.
+	local counts, seen = { any = false }, {}
+	for _, code in ipairs(codes) do
+		local resolution = bindings[code]
+		if resolution.kind == "repeat_count" then
+			counts.any = true
+			if resolution.count > REPEAT_COUNT_RESET_VALUE and not seen[resolution.count] then
+				seen[resolution.count] = true
+				counts[#counts + 1] = resolution.count
+			end
+		end
+	end
+	table.sort(counts)
 	local manipulators = {}
 	for _, code in ipairs(codes) do
-		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product)) do
+		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product, counts)) do
 			manipulators[#manipulators + 1] = manipulator
 		end
 	end
@@ -411,7 +496,7 @@ end
 --- Reads the user's layer file: only genuine absence is nil; failed read or
 --- close acknowledgement must not lend its bytes to the navigation loader.
 local function read_user_file(path, remember, reader)
-	local content, status, detail = (reader or require("toml_codec.writer").read_classified)(path)
+	local content, status, detail = (reader or require("core.text.engine.toml_codec.writer").read_classified)(path)
 	if remember then remember(path, content, status) end
 	if status == "ok" and type(content) == "string" then return content end
 	if status == "absent" and content == nil then return nil end
@@ -528,8 +613,8 @@ function M.load(opts)
 		sources[#sources + 1] = { path = path, content = content, status = status }
 	end
 	opts = opts or {}
-	local shared_root = opts.shared_root or require("infra.paths").shared_root()
-	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
+	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
+	local config_dir = opts.config_dir or require("settings.engine.paths").get_config_dir()
 	if type(shared_root) ~= "string" then error("nav_layer: the _shared tree is unreachable", 2) end
 	if type(config_dir) ~= "string" then error("nav_layer: the configuration folder is unknown", 2) end
 	-- The shipped registry and vocabulary first: a broken copy raises before this
@@ -570,8 +655,8 @@ function M.load(opts)
 	local layer = { bindings = bindings, registry = ctx.registry, wheel = wheel }
 	local observation
 	if eligible and source_ports_current() and #sources == 3
-		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/data/keycodes/physical_keys.json"
-		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/keymap/layer_actions.toml"
+		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/layouts/data/keycodes/physical_keys.json"
+		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/layouts/data/layer_actions.toml"
 		and sources[3].path == result.path then
 		local complete = sources[1].status == "ok" and sources[2].status == "ok"
 		for _, source in ipairs(sources) do
@@ -656,15 +741,15 @@ end
 --- @return table|nil failed Private refused-import cleanup record.
 function M.import_recommended(opts)
 	opts = opts or {}
-	local shared_root = opts.shared_root or require("infra.paths").shared_root()
-	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
-	local LayerPreset = require("keymap.layer_preset")
+	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
+	local config_dir = opts.config_dir or require("settings.engine.paths").get_config_dir()
+	local LayerPreset = require("layouts.engine.layers.preset")
 	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
 	local ok, import, err, failed = pcall(LayerPreset.import_if_absent, {
 		shared_root  = shared_root,
 		config_dir   = config_dir,
-		toml_decode  = require("toml_codec").decode,
-		file_adapter = opts.file_adapter or require("adapters.file_system"),
+		toml_decode  = require("core.text.engine.toml_codec").decode,
+		file_adapter = opts.file_adapter or require("core.fs.adapters.file_system"),
 	})
 	if not ok then import, err = nil, tostring(import) end
 	if not import then
@@ -685,7 +770,7 @@ end
 --- @param file_adapter table|nil The adapter it wrote through; the driver's own by default.
 --- @return boolean undone
 function M.undo_import(import, file_adapter)
-	local undone, err = require("keymap.layer_preset").undo(import, file_adapter or require("adapters.file_system"))
+	local undone, err = require("layouts.engine.layers.preset").undo(import, file_adapter or require("core.fs.adapters.file_system"))
 	if undone ~= true then
 		Logger.error(LOG, "The navigation layer '%s' could not be removed again: %s.",
 			tostring(import and import.path), tostring(err))
@@ -698,12 +783,49 @@ end
 --- @param label string For the logs.
 function M.reconcile_wheel(label)
 	local reconciled, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
+		return require("modules.shortcuts.layer_wheel").reconcile()
 	end)
 	if not reconciled or committed ~= true then
-		Logger.warn(LOG, "%s: the layer's wheel bindings apply with the next Shortcuts start (%s).",
-			tostring(label), tostring(reconciled and "a start is in progress" or committed))
+		Logger.warn(LOG, "%s: the scroll wheel takes the layer's wheel bindings at the next save or resume (%s).",
+			tostring(label), tostring(reconciled and "its owner refused them" or committed))
 	end
+end
+
+-- A refused publication or undo can retain the exact writer capability. Keep
+-- it until cleanup settles before allowing another hold mutation to proceed.
+local pending_hold_cleanups = {}
+local hold_cleanup_running = false
+
+local function settle_hold_cleanup()
+	if #pending_hold_cleanups == 0 then return true end
+	if hold_cleanup_running then return false end
+	hold_cleanup_running = true
+	while #pending_hold_cleanups > 0 do
+		local record = pending_hold_cleanups[1]
+		local called, settled = pcall(M.undo_import, record)
+		if not called or settled ~= true then
+			hold_cleanup_running = false
+			Logger.error(LOG, "Navigation layer cleanup remains pending; hold change refused.")
+			return false
+		end
+		table.remove(pending_hold_cleanups, 1)
+	end
+	hold_cleanup_running = false
+	return true
+end
+
+--- Retains the exact cleanup owner until its undo succeeds.
+function M.undo_owned(record)
+	if record ~= nil then pending_hold_cleanups[#pending_hold_cleanups + 1] = record end
+	return settle_hold_cleanup()
+end
+
+--- Imports a wizard layer while retaining failed publication cleanup.
+function M.import_owned(opts)
+	if not settle_hold_cleanup() then return nil, "navigation layer cleanup remains pending" end
+	local imported, err, failed = M.import_recommended(opts)
+	if not imported and failed then M.undo_owned(failed) end
+	return imported, err
 end
 
 --- Runs a hold setter with the layer its action enters. A hold on the
@@ -717,10 +839,14 @@ end
 --- @param commit function Saves the hold; returns true once it is committed.
 --- @return boolean committed
 function M.commit_hold(label, action_id, commit)
+	if not settle_hold_cleanup() then return false end
 	local layer = nil
 	if action_id == M.HOLD_ACTION_ID then
-		local import, layer_err = M.import_recommended()
+		local import, layer_err, failed = M.import_recommended()
 		if not import then
+			if failed then
+				M.undo_owned(failed)
+			end
 			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
 				tostring(label), tostring(layer_err))
 			return false
@@ -729,10 +855,12 @@ function M.commit_hold(label, action_id, commit)
 	end
 	local committed = commit()
 	if committed ~= true then
-		M.undo_import(layer)
+		if layer then
+			M.undo_owned(layer)
+		end
 		return committed
 	end
-	if layer and layer.status == require("keymap.layer_preset").IMPORTED then
+	if layer and layer.status == require("layouts.engine.layers.preset").IMPORTED then
 		M.reconcile_wheel(label)
 	end
 	return committed

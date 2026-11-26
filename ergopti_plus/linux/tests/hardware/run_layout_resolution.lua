@@ -373,8 +373,8 @@ do
 	local keymap = compile("fr")
 	if keymap and load_through_driver(keymap) then
 		local Capture = require("adapters.xkb_capture")
-		local Codes = require("infra.evdev_codes")
-		local injector = require("modules.hotstrings.injector")
+		local Codes = require("platform.input.evdev_codes")
+		local injector = require("hotstrings.engine.injector")
 		local received = {}
 		injector._set_uinput({
 			is_open = function() return true end,

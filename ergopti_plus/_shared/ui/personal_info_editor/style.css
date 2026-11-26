@@ -51,23 +51,39 @@ h1 {
 /* ================================ */
 /* ================================ */
 
+/* The field group keeps no frame of its own. */
+#rows {
+	border: 0;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
 .row {
-	margin-bottom: 11px;
+	margin: 0 0 11px;
+}
+
+/* The group holds its rows' margins (no collapse through it): the last one
+   leaves the space above the buttons to them. */
+.row:last-child {
+	margin-bottom: 0;
 }
 
 label {
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	display: block;
 	font-size: 12px;
 	font-weight: 500;
 	margin-bottom: 4px;
 }
 
-input {
+input,
+textarea {
 	background: var(--theme-white);
 	border: 1px solid var(--theme-grey-ccc);
 	border-radius: 6px;
 	color: var(--theme-label);
+	font-family: inherit;
 	font-size: 14px;
 	outline: none;
 	padding: 7px 10px;
@@ -77,7 +93,8 @@ input {
 	width: 100%;
 }
 
-input:focus {
+input:focus,
+textarea:focus {
 	border-color: var(--theme-blue);
 	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
@@ -123,6 +140,6 @@ button:hover {
 }
 
 .save {
-	background: var(--theme-blue);
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }

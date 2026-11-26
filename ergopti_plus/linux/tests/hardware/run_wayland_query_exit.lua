@@ -8,11 +8,11 @@
 
 local root, selected = assert(arg[1]), assert(arg[2])
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
-local Display = require("infra.display_server")
+local Shell = require("core.process.adapters.shell_runner")
+local Display = require("core.ui.engine.display_server")
 local FAILURE_STATUS = 73
 local cases = {
 	{ name = "sway", binary = "swaymsg", arguments = "-t get_tree",
@@ -66,7 +66,7 @@ local ok, failure = xpcall(function()
 	assert(uv.os_setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=" .. directory .. "/no-session-bus"))
 	assert(uv.os_setenv("AT_SPI_BUS_ADDRESS", "unix:path=" .. directory .. "/no-accessibility-bus"))
 	assert(Display.refresh() == Display.WAYLAND)
-	local window = require("adapters.window_info")
+	local window = require("platform.focus.window_info")
 	local command = case.binary .. " " .. case.arguments
 	write_client(case, case.payload, 0)
 	local status = os.execute(command .. " >/dev/null 2>&1")

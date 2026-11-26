@@ -1,0 +1,111 @@
+{
+	"_comment": "Typing vectors of a layout's own repeat and magic keys in the layout source emulation (docs/design/magic-and-repeat-keys.md). Each case replays steps on a fresh session of context_emulation.json, the table the source compiler writes for context_source.toml per platform, as emulation_vectors.json does; a press carries « before », the text typed so far that the driver passes (its last typed text). The repeat key is on the ISO key left of Z, the skip-repeat key on its Shift level, the magic key (« after e types d », « after d types e », « after ce types s ») on the key right of L; the letters are native. The web emulation (source_emulation.js), the Lua engine of macOS and Linux (layouts/engine/composer/source_emulation.lua) and the AutoHotkey engine of Windows (modules/keymap/keylayout/source_emulation.ahk) replay them.",
+	"source": "context_source.toml",
+	"table": "context_emulation.json",
+	"platforms": ["macos", "linux", "windows"],
+	"cases": [
+		{
+			"name": "the repeat key types the last character typed",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"before": "book",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "k" }]
+				},
+				{ "release": "IntlBackslash", "at": 10, "consumed": false, "actions": [] }
+			]
+		},
+		{
+			"name": "the repeat key types nothing before any text, and is still taken",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"before": "",
+					"consumed": true,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the repeat key repeats a character outside the basic plane whole",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"before": "x😀",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "😀" }]
+				}
+			]
+		},
+		{
+			"name": "Shift and the repeat key type the character before the last one",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": ["shift"],
+					"at": 0,
+					"before": "ed",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "e" }]
+				},
+				{
+					"press": "IntlBackslash",
+					"held": ["shift"],
+					"at": 10,
+					"before": "d",
+					"consumed": true,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "the magic key types d after e, e after d, nothing after another character",
+			"steps": [
+				{
+					"press": "Quote",
+					"held": [],
+					"at": 0,
+					"before": "the",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "d" }]
+				},
+				{
+					"press": "Quote",
+					"held": [],
+					"at": 10,
+					"before": "the d",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "e" }]
+				},
+				{ "press": "Quote", "held": [], "at": 20, "before": "ax", "consumed": true, "actions": [] }
+			]
+		},
+		{
+			"name": "the magic key takes the rule with the longest context",
+			"steps": [
+				{
+					"press": "Quote",
+					"held": [],
+					"at": 0,
+					"before": "ace",
+					"consumed": true,
+					"actions": [{ "type": "text", "text": "s" }]
+				}
+			]
+		},
+		{
+			"name": "a native letter is left to the layout",
+			"steps": [
+				{ "press": "KeyE", "held": [], "at": 0, "before": "", "consumed": false, "actions": [] },
+				{ "release": "KeyE", "at": 10, "consumed": false, "actions": [] }
+			]
+		}
+	]
+}

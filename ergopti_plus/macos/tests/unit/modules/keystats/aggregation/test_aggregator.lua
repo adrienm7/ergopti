@@ -29,8 +29,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must be resolved first so downstream requires can find it.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- export is required by aggregator.flush(); stub it so we never touch SQLite.
 package.loaded["modules.keystats.export"] = {
@@ -49,7 +49,7 @@ package.loaded["modules.keystats.sqlite_writer"] = {
 -- crash when aggregator.lua initialises its module-level timing constants.
 -- Inject a complete stub before the load so the real TOML path is never hit
 -- and the module loads cleanly in CI regardless of test ordering.
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function(_section, _key) return 1000 end,
 	sec = function(_section, _key) return 1.0  end,
 }

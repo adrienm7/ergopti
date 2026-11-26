@@ -4,7 +4,7 @@
 --- MODULE: Karabiner Defaults
 --- DESCRIPTION:
 --- Single source of truth for all user-configurable karabiner defaults, loaded
---- from the cross-driver shared file _shared/tap_hold/defaults.toml (sections
+--- from the cross-driver shared file _shared/tap_hold/data/defaults.toml (sections
 --- [hs_timeouts], [hs_tap_hold], [hs_combos]) at require-time.
 ---
 --- The values previously lived inline in this file as a Lua table; they now live
@@ -20,8 +20,8 @@
 --- there is no driver-side fallback table (would mask a broken install).
 --- ==============================================================================
 
-local TomlReader = require("infra.toml.reader")
-local NativePath = require("native_path")
+local TomlReader = require("core.text.engine.toml.reader")
+local NativePath = require("core.fs.engine.native_path")
 
 local D = {}
 
@@ -39,7 +39,7 @@ local READER_ARTIFACT_KEYS = { description = true, entries = true }
 -- =====================================
 -- =====================================
 
---- Resolves _shared/tap_hold/defaults.toml.
+--- Resolves _shared/tap_hold/data/defaults.toml.
 ---
 --- Asks infra.paths first — the resolver that exists precisely so the shared
 --- root lives in one place and survives the symlinked and packaged layouts,
@@ -59,9 +59,9 @@ local READER_ARTIFACT_KEYS = { description = true, entries = true }
 --- module on the same un-pcall'd load path this comment is about.
 --- @return string Absolute path to the shared tap-hold defaults TOML.
 local function shared_defaults_path()
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths and type(Paths) == "table" and type(Paths.shared) == "function" then
-		local resolved = Paths.shared("tap_hold/defaults.toml")
+		local resolved = Paths.shared("tap_hold/data/defaults.toml")
 		if type(resolved) == "string" and resolved ~= "" then return resolved end
 	end
 
@@ -72,7 +72,7 @@ local function shared_defaults_path()
 	dir = NativePath.dirname(dir) or dir                    -- → macos/platform
 	dir = NativePath.dirname(dir) or dir                    -- → macos
 	local ergopti_plus = NativePath.dirname(dir) or dir     -- → ergopti_plus
-	return ergopti_plus .. "/_shared/tap_hold/defaults.toml"
+	return ergopti_plus .. "/_shared/tap_hold/data/defaults.toml"
 end
 
 --- Returns the parsed sections table, erroring if the file is unreadable.
@@ -81,7 +81,7 @@ local function load_sections()
 	local path = shared_defaults_path()
 	local parsed = TomlReader.parse(path)
 	if type(parsed) ~= "table" or type(parsed.sections) ~= "table" then
-		error("[karabiner/defaults] _shared/tap_hold/defaults.toml not readable: " .. tostring(path))
+		error("[karabiner/defaults] _shared/tap_hold/data/defaults.toml not readable: " .. tostring(path))
 	end
 	return parsed.sections
 end
@@ -110,18 +110,24 @@ end
 
 local sections = load_sections()
 
-D.rollover_keys = require("tap_hold.key_catalog").load_rollover(shared_defaults_path(), "hs")
+D.rollover_keys = require("tap_hold.engine.key_catalog").load_rollover(shared_defaults_path(), "hs")
 
 -- ----- Timeouts + flags ([hs_timeouts]) -----
 local timeouts = require_section(sections, "hs_timeouts")
 -- Global tap/hold delay (KE basic.to_if_alone_timeout_milliseconds) of every key
 -- that has no delay of its own: the timing registry's tap_hold.default_activation_ms,
 -- the one declaration Windows and Linux read too (PAR-15). No key ships a delay.
-D.tap_hold_timeout_ms        = require("infra.timings").ms("tap_hold", "default_activation_ms")
+D.tap_hold_timeout_ms        = require("core.timing.engine.timings").ms("tap_hold", "default_activation_ms")
+-- The longest delay, the global one or a key's own (SCHEMA.md's 10 s bound).
+D.tap_hold_max_timeout_ms    = require("core.timing.engine.timings").ms("tap_hold", "max_activation_ms")
 -- One-shot modifier auto-cancel delay: the cross-driver timing registry's value
 -- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
 -- three drivers cancel a one-shot Shift after the same time (PAR-15).
-D.sticky_timeout_ms          = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+D.sticky_timeout_ms          = require("core.timing.engine.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
+-- Minimum tap duration: a release sooner than this is a bounce, not a tap. The
+-- timing registry's tap_hold.tap_min_duration_ms, which Windows and Linux read
+-- too; the generator gates every release-judged tap with it.
+D.tap_min_duration_ms        = require("core.timing.engine.timings").ms("tap_hold", "tap_min_duration_ms")
 D.simultaneous_threshold_ms  = timeouts.simultaneous_threshold_ms  -- Combo activation window
 D.combo_symmetric            = timeouts.combo_symmetric            -- A+B == B+A for the chord slot
 

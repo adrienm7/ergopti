@@ -17,29 +17,29 @@ local helpers = require("tests.helpers")
 local M = {}
 
 local MODULE_NAMES = {
-	"adapters.file_system",
-	"infra.deferred_work",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
-	"infra.paths",
-	"infra.text_utils",
-	"infra.toml.codec",
-	"infra.toml.writer",
-	"infra.config_paths",
-	"infra.termination_coordinator",
+	"core.fs.adapters.file_system",
+	"core.timing.engine.deferred_work",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.fs.engine.paths",
+	"core.text.engine.utils",
+	"core.text.engine.toml.codec",
+	"core.text.engine.toml.writer",
+	"settings.engine.paths",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"platform.remap",
 	"platform.remap.defaults",
 	"platform.remap.nav_layer",
-	"ui.menu.menu_paths",
+	"settings.ui.menu.paths",
 	"ui.onboarding",
-	"onboarding_publication",
-	"config_file_inverse",
+	"onboarding.engine.publication",
+	"settings.engine.migration.file_inverse",
 }
 
 -- Where the doubled path resolver puts the remap settings.
-M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/config_karabiner.toml"
+M.KARABINER_CONFIG_PATH = "/virtual/hammerspoon/tap_hold.toml"
 -- The configuration folder it resolves, which holds layers.toml.
 M.CONFIG_DIR = "/virtual/"
 
@@ -63,13 +63,13 @@ end
 --- @param scenario function
 --- @return any result
 function M.with_migration_reader(scenario)
-	local saved_migration = package.loaded["config_migrate"]
-	local saved_writer = package.loaded["toml_codec.writer"]
+	local saved_migration = package.loaded["settings.engine.migration.migrate"]
+	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
 	local migration, boot
 	local ok, result = xpcall(function()
-		package.loaded["config_migrate"] = nil
-		package.loaded["toml_codec.writer"] = nil
-		migration = require("config_migrate")
+		package.loaded["settings.engine.migration.migrate"] = nil
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		migration = require("settings.engine.migration.migrate")
 		boot = migration.boot
 		migration.boot = function(options)
 			local controlled = {}
@@ -83,8 +83,8 @@ function M.with_migration_reader(scenario)
 		return scenario()
 	end, debug.traceback)
 	if migration then migration.boot = boot end
-	package.loaded["config_migrate"] = saved_migration
-	package.loaded["toml_codec.writer"] = saved_writer
+	package.loaded["settings.engine.migration.migrate"] = saved_migration
+	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	if not ok then error(result, 0) end
 	return result
 end
@@ -94,13 +94,13 @@ end
 --- @param scenario function Actual host Finish replay.
 --- @return any result
 local function with_native_configuration_context(scenario)
-	local saved_migration = package.loaded["config_migrate"]
-	local saved_writer = package.loaded["toml_codec.writer"]
-	package.loaded["config_migrate"] = nil
-	package.loaded["toml_codec.writer"] = nil
+	local saved_migration = package.loaded["settings.engine.migration.migrate"]
+	local saved_writer = package.loaded["core.text.engine.toml_codec.writer"]
+	package.loaded["settings.engine.migration.migrate"] = nil
+	package.loaded["core.text.engine.toml_codec.writer"] = nil
 	local called, result = xpcall(scenario, debug.traceback)
-	package.loaded["config_migrate"] = saved_migration
-	package.loaded["toml_codec.writer"] = saved_writer
+	package.loaded["settings.engine.migration.migrate"] = saved_migration
+	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	if not called then error(result, 0) end
 	return result
 end
@@ -114,6 +114,8 @@ end
 ---   native provider with real scratch bytes and unchanged boot),
 ---   remap = { initialized, running, hold_import, import_ok, save_ok, report }|nil,
 ---   reload = "accepted"|"refused"|nil, menu_paths = table|nil,
+---   config_dir = function()|nil (the resolved folder ConfigPaths reports),
+---   active_locale = string|nil (the language before Finish, "en" by default),
 ---   layer = "fail"|nil }`. The navigation layer file is recorded in
 ---   state.layer_imports (config folders) and state.layer_undos, never written. A held
 ---   import leaves its callback in state.import_callbacks for the scenario to
@@ -144,10 +146,11 @@ function M.with_finish(opts, scenario)
 	local RealNavLayer = require("platform.remap.nav_layer")
 	state.layer_imports, state.layer_undos = {}, {}
 	package.loaded["platform.remap.defaults"] = RealDefaults
-	package.loaded["platform.remap.nav_layer"] = setmetatable({
+	local nav_stub = setmetatable({
 		import_recommended = function(options)
 			state.layer_imports[#state.layer_imports + 1] = options.config_dir
 			if opts.layer == "fail" then return nil, "disk full" end
+			if opts.layer == "cleanup" then return nil, "disk full", { status = "imported", path = "failed" } end
 			return { status = "imported", path = options.config_dir .. "layers.toml" }
 		end,
 		undo_import = function(import)
@@ -155,19 +158,26 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}, { __index = RealNavLayer })
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.paths"] = { shared = opts.canonical_files and helpers.shared
+	nav_stub.undo_owned = nav_stub.undo_import
+	nav_stub.import_owned = function(options)
+		local imported, err, failed = nav_stub.import_recommended(options)
+		if failed then nav_stub.undo_owned(failed) end
+		return imported, err
+	end
+	package.loaded["platform.remap.nav_layer"] = nav_stub
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.fs.engine.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
-	package.loaded["infra.text_utils"] = { applescript_format = string.format }
-	package.loaded["infra.toml.codec"] = { decode = function() return {} end }
-	package.loaded["adapters.file_system"] = opts.canonical_files or {
+	package.loaded["core.text.engine.utils"] = { applescript_format = string.format }
+	package.loaded["core.text.engine.toml.codec"] = { decode = function() return {} end }
+	package.loaded["core.fs.adapters.file_system"] = opts.canonical_files or {
 		read_with_status = opts.read or function() return nil, "absent" end,
 	}
 	-- Additional actual inverse ports let receipt tests drive the shared writer.
 	for name, method in pairs(opts.native_files or {}) do
-		package.loaded["adapters.file_system"][name] = method
+		package.loaded["core.fs.adapters.file_system"][name] = method
 	end
-	package.loaded["infra.toml.writer"] = {
+	package.loaded["core.text.engine.toml.writer"] = {
 		batch_write = function(path, rows, expected_source)
 			state.writes[#state.writes + 1] = { path = path, rows = rows }
 			if type(opts.native_writer) == "function" then return opts.native_writer(path, rows, expected_source) end
@@ -178,10 +188,10 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1; return true end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, fn, label)
 			state.deferred = state.deferred + 1
 			state.pending[#state.pending + 1] = { delay = delay, fn = fn, label = label }
@@ -189,14 +199,14 @@ function M.with_finish(opts, scenario)
 		end,
 	}
 	-- The owned reload: it records the request and its abort callback.
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		is_initialized = function() return true end,
 		request_reload_owned = function(reason, on_aborted)
 			state.reloads[#state.reloads + 1] = { reason = reason, on_aborted = on_aborted }
 			return opts.reload ~= "refused"
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, body, button)
 			state.alerts[#state.alerts + 1] = { title = title, body = body, button = button }
 			return true
@@ -235,22 +245,31 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key)
-			assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+			assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 			return M.KARABINER_CONFIG_PATH
 		end,
-		get_config_dir = function() return M.CONFIG_DIR end,
+		get_config_dir = function()
+			if type(opts.config_dir) == "function" then return opts.config_dir() end
+			return M.CONFIG_DIR
+		end,
 	}
-	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
-	package.loaded["infra.i18n"] = {
+	if opts.menu_paths then package.loaded["settings.ui.menu.paths"] = opts.menu_paths end
+	state.active_locale = opts.active_locale or "en"
+	state.persisted_locales, state.switched_locales = {}, {}
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
-		set_locale_no_reload = function()
+		get_locale = function() return state.active_locale end,
+		set_locale_no_reload = function(code)
 			state.locale_switches = state.locale_switches + 1
+			state.switched_locales[#state.switched_locales + 1] = code
+			state.active_locale = code
 			return true
 		end,
-		persist_locale = function()
+		persist_locale = function(code)
 			state.locale_persists = state.locale_persists + 1
+			state.persisted_locales[#state.persisted_locales + 1] = code
 			local mode = opts.locale or "true"
 			if mode == "throw" then error("injected locale persistence failure") end
 			if mode == "nil" then return nil end
@@ -262,17 +281,17 @@ function M.with_finish(opts, scenario)
 		if opts.canonical_files then
 			assert(opts.prepare_destination == nil, "native Finish must keep its actual boot preparation")
 			if opts.fresh_writer_after_inverse then
-				state.previous_shared_writer = require("toml_codec.writer")
-				state.retained_inverse_module = require("config_file_inverse")
-				package.loaded["toml_codec.writer"] = nil
-				state.current_shared_writer = require("toml_codec.writer")
+				state.previous_shared_writer = require("core.text.engine.toml_codec.writer")
+				state.retained_inverse_module = require("settings.engine.migration.file_inverse")
+				package.loaded["core.text.engine.toml_codec.writer"] = nil
+				state.current_shared_writer = require("core.text.engine.toml_codec.writer")
 				helpers.assert_true(not rawequal(state.previous_shared_writer, state.current_shared_writer),
 					"the canonical host must use a genuinely reloaded shared writer")
-				helpers.assert_eq(package.loaded["config_file_inverse"], state.retained_inverse_module,
+				helpers.assert_eq(package.loaded["settings.engine.migration.file_inverse"], state.retained_inverse_module,
 					"the genuine inverse module remains cached from the prior helper cohort")
 			end
-			package.loaded["infra.toml.writer"] = nil
-			require("infra.toml.writer")
+			package.loaded["core.text.engine.toml.writer"] = nil
+			require("core.text.engine.toml.writer")
 		end
 		local onboarding = require("ui.onboarding")
 		if not opts.canonical_files then require("tests.support.onboarding_shared_data").install() end

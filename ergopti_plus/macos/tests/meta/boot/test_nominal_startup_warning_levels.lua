@@ -39,7 +39,7 @@ end
 
 helpers.describe("meta: nominal startup diagnostics stay warning-free", function()
 	helpers.it("unavailable optional primer event names are debug-only", function()
-		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
+		local source = read_source("local function schedule_emergency_recycle") -- gestures/engine/init.lua
 		helpers.assert_true(source:find("primer event type '%%s' is unavailable", 1, false) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"  primer event type", 1, true) ~= nil)
 	end)
@@ -56,7 +56,7 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("the normal dynamic-hotstring boot order is debug-only", function()
-		local source = read_source("local function register_prefix_entries") -- modules/dynamic_hotstrings/rules_engine.lua
+		local source = read_source("local function register_prefix_entries") -- hotstrings/engine/dynamic/rules_engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"Personal data received before keymap wiring", 1, true) ~= nil)
 		helpers.assert_true(source:find("personal data present but keymap not wired yet", 1, true) == nil)
 	end)
@@ -68,18 +68,18 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 	end)
 
 	helpers.it("automatic gesture recovery stays debug-only", function()
-		local source = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
+		local source = read_source("local function schedule_emergency_recycle") -- gestures/engine/init.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"schedule_emergency_recycle: SCHEDULED", 1, true) ~= nil)
 		helpers.assert_true(source:find("Logger.debug(LOG, \"EMERGENCY RECYCLE executing now", 1, true) ~= nil)
 	end)
 
 	helpers.it("gesture lift-off drift rejection stays debug-only", function()
-		local source = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
+		local source = read_source("local function triggerLiveAxisIfNeeded") -- gestures/engine/engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"commitGesture: dir=%s does not match gesture lockedDir", 1, true) ~= nil)
 	end)
 
 	helpers.it("passive mouse-tap recovery does not pollute warnings", function()
-		local source = read_source("local function invalidate_observed_context") -- modules/keymap/init.lua
+		local source = read_source("local function invalidate_observed_context") -- hotstrings/engine/expander/init.lua
 		helpers.assert_true(source:find("name == \"mouse\" and Logger.debug or Logger.warn", 1, true) ~= nil)
 	end)
 end)

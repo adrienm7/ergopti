@@ -18,12 +18,12 @@ local function with_config_fixture(callback)
 			"platform.remap.config",
 			"platform.remap.defaults",
 			"modules.keymap.layout",
-			"modules.gestures.actions",
-			"adapters.file_system",
-			"infra.i18n",
-			"infra.logger",
-			"infra.paths",
-			"infra.toml.codec",
+			"gestures.engine.actions",
+			"core.fs.adapters.file_system",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.fs.engine.paths",
+			"core.text.engine.toml.codec",
 			"hs",
 			"tests.stubs.hs",
 		}, function()
@@ -68,20 +68,21 @@ local function with_config_fixture(callback)
 				default_virtual_keyboard_product = function() return "ansi" end,
 				key_code_for_char = function(char) return char end,
 			}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.actions"] = {
 				karabiner_aliases = function() return {} end,
 			}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
+				has = function() return false end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = {
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.fs.engine.paths"] = {
 				shared = function() return "/fixture/modifier-chords.json" end,
 			}
-			package.loaded["infra.toml.codec"] = {
+			package.loaded["core.text.engine.toml.codec"] = {
 				decode = function() return {} end,
 				encode = function() return "" end,
 			}

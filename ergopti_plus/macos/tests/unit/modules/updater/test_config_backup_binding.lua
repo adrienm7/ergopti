@@ -12,10 +12,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("core.fs.engine.app_dirs")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local DEFAULTS = helpers.shared("modules/updater/defaults.json")
+local DEFAULTS = helpers.shared("updater/data/defaults.json")
 
 --- Loads the binding over stubbed file ports.
 --- @param tree table path -> "file" | "dir" | "link_file" | "link_dir"
@@ -23,15 +24,18 @@ local DEFAULTS = helpers.shared("modules/updater/defaults.json")
 local function with_binding(tree, body)
 	helpers.with_fresh_modules({
 		"modules.updater.config_backup",
-		"adapters.file_system",
-		"infra.fs_dir",
-		"infra.config_paths",
-		"infra.paths",
+		"core.fs.adapters.file_system",
+		"core.fs.engine.dir",
+		"settings.engine.paths",
+		"core.fs.engine.paths",
 	}, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local kind = tree[path]
 				if not kind then return "absent" end
+				if kind == "unreadable" then return "error", "permission denied" end
+				if kind == "invalid_attributes" then return "present", nil end
+				if kind == "invalid_mode" then return "present", {} end
 				local mode = kind:find("^link_") and "link" or (kind == "dir" and "directory" or (kind == "fifo" and "named pipe" or "file"))
 				return "present", { mode = mode }
 			end,
@@ -57,7 +61,7 @@ local function with_binding(tree, body)
 				return text
 			end,
 		}
-		package.loaded["infra.fs_dir"] = {
+		package.loaded["core.fs.engine.dir"] = {
 			try_entries = function(dir)
 				local names = {}
 				for path in pairs(tree) do
@@ -69,13 +73,13 @@ local function with_binding(tree, body)
 				return names, true
 			end,
 		}
-		package.loaded["infra.config_paths"] = {
-			get_config_dir = function() return "/Users/me/.config/ergopti_plus/" end,
+		package.loaded["settings.engine.paths"] = {
+			get_config_dir = function() return "/Users/me/" .. AppDirs.config.macos_relative .. "/" end,
 			ensure_dir = function() return true end,
 		}
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative)
-				if relative == "modules/updater/defaults.json" then return DEFAULTS end
+				if relative == "updater/data/defaults.json" then return DEFAULTS end
 				return nil
 			end,
 		}
@@ -84,10 +88,25 @@ local function with_binding(tree, body)
 end
 
 helpers.describe("config_backup binding (macOS)", function()
+	helpers.it("refuses a listing when an entry cannot be classified", function()
+		for _, kind in ipairs({ "unreadable", "invalid_attributes", "invalid_mode" }) do
+			with_binding({ ["/cfg"] = "dir", ["/cfg/settings.toml"] = kind }, function(Binding)
+				local entries, reason = Binding._list("/cfg")
+				helpers.assert_nil(entries, "unknown entries must not disappear from a backup")
+				helpers.assert_true(type(reason) == "string" and reason ~= "")
+				Binding._overrides = { roots = { { id = "config", dir = "/cfg" } },
+					clock = function() return { stamp = "20261104-120000", iso = "2026-11-04T12:00:00Z" } end }
+				local owner = assert(Binding.owner())
+				local backup, detail = owner.create("pre_install", { tag = "v1.0.0" })
+				helpers.assert_nil(backup, "an incomplete snapshot must not publish a backup")
+				helpers.assert_true(type(detail) == "string" and detail:find("cannot classify", 1, true) ~= nil)
+			end)
+		end
+	end)
 	helpers.it("backs up the configuration folder under the shared rules", function()
 		with_binding({}, function(Binding)
 			local owner = assert(Binding.owner())
-			helpers.assert_eq(owner.folder, "/Users/me/.config/ergopti_plus/backups")
+			helpers.assert_eq(owner.folder, "/Users/me/" .. AppDirs.config.macos_relative .. "/backups")
 		end)
 	end)
 end)
@@ -106,4 +125,4 @@ local handle = assert(io.open(DEFAULTS, "rb"))
 local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must decode")
 handle:close()
 
-require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = stub_listing })
+require("tests.lua.settings.backup_binding_contract").register(helpers, { defaults = defaults, listing = stub_listing })

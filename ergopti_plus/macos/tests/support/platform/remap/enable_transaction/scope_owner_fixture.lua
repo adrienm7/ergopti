@@ -12,7 +12,10 @@ local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.remap_transaction_fixture")
 
 local KEY, COMBO = "left_shift", "left_shift+right_shift"
-local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+local SOURCE = '[tap_hold]\nenabled = false\n[future]\nkeep = true\n'
+-- The configuration folder of this fixture's private disk, without layers.toml.
+local CONFIG_DIR = "/remap"
+local LAYERS = CONFIG_DIR .. "/layers.toml"
 
 --- Loads an enabled remap whose persistence and backup file are observable.
 --- @param fixture table remap_transaction_fixture constructors.
@@ -20,7 +23,7 @@ local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
 local function scoped_remap(fixture)
 	local remap, calls = fixture.load_enabled_remap()
 	local Config = package.loaded["platform.remap.config"]
-	local disk = { files = { ["/remap/config_karabiner.toml"] = SOURCE }, expected = {}, regenerations = 0 }
+	local disk = { files = { ["/remap/tap_hold.toml"] = SOURCE }, expected = {}, regenerations = 0 }
 	local neutral_combo = { tap = "none", hold = "none", combo = "none" }
 	Config.build_default_state = function()
 		return { tap_holds_enabled = false, tap_hold_config = { [KEY] = { tap = "none", hold = "none" } },
@@ -37,11 +40,12 @@ local function scoped_remap(fixture)
 		disk.expected[#disk.expected + 1] = expected or false
 		return save(state, path, overwrite, expected)
 	end
-	package.loaded["infra.config_paths"].get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-		return "/remap/config_karabiner.toml"
+	package.loaded["settings.engine.paths"].get = function(key)
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/tap_hold.toml"
 	end
-	local files = require("adapters.file_system")
+	package.loaded["settings.engine.paths"].get_config_dir = function() return CONFIG_DIR end
+	local files = require("core.fs.adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil
 		return true
@@ -85,17 +89,15 @@ local function request(remap, scope, mode, backup_path)
 end
 
 
-local LAYERS = "tests/unit/platform/remap/no-layers-toml/layers.toml"
-
 local function preset()
-	local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
+	local fh = assert(io.open(helpers.shared("layouts/data/layers.recommended.toml"), "rb"))
 	local text = fh:read("*a")
 	fh:close()
 	return text
 end
 
 local function removable(disk)
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	disk.removal_calls = {}
 	disk.removals = {}
 	files.remove_exact = function() error("layer compensation must use conditional removal") end
@@ -121,9 +123,9 @@ local function assert_layer_removal(disk)
 end
 
 local function with_wheel_owner(body)
-	helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
+	helpers.with_fresh_modules({ "modules.shortcuts.layer_wheel" }, function()
 		local owner = { reconciles = 0 }
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+		package.loaded["modules.shortcuts.layer_wheel"] = { reconcile = function()
 			owner.reconciles = owner.reconciles + 1
 			return true
 		end }
@@ -134,7 +136,7 @@ end
 local function cohort_remap(fixture)
 	local remap, calls, disk = scoped_remap(fixture)
 	disk.layer_reads, disk.layer_writes, disk.removals, disk.layer_at_regeneration = 0, 0, 0, {}
-	local files, read = require("adapters.file_system"), require("adapters.file_system").read_with_status
+	local files, read = require("core.fs.adapters.file_system"), require("core.fs.adapters.file_system").read_with_status
 	files.read_with_status = function(path)
 		if path == LAYERS then
 			disk.layer_reads = disk.layer_reads + 1
@@ -179,7 +181,7 @@ local function global_cohort(remap, refuse)
 	local observed = { deferred = {}, refreshes = {} }
 	local late = { apply = function() return not refuse end, revert = function() return true end,
 		release = function() end, pending = function() return false end, retry_restore = function() return true end }
-	local global = require("ui.menu.global_scope").new({
+	local global = require("menu.ui.transactions.global_scope").new({
 		owners = { llm = function() return late end }, remap = remap,
 		backup_path = function(scope) return "/remap/global-cohort-" .. scope end,
 		defer = function(fn) observed.deferred[#observed.deferred + 1] = fn; return true end,

@@ -92,7 +92,7 @@ end)
 
 helpers.describe("linux-ngram-source-policy", function()
 	helpers.it("linux-ngram-source-policy: shared other-source membership excludes dedicated and nonlabel keys", function()
-		local Utils = require("keystats.utils")
+		local Utils = require("metrics.engine.utils")
 		local cases = {
 			{ label = "other", expected = true },
 			{ label = "case-transform", expected = true },

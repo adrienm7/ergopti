@@ -38,6 +38,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include keystats_virtual_desktop.ahk
 
 
 
@@ -137,12 +138,19 @@ class KLTopo {
 KL_Topo_Tick() {
 		if !Keystats.initialized
 				return
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Desktop_Reset()
 				return
+		}
 		filtered := false
 		try filtered := MF_ShouldFilter()
-		if filtered
+		if filtered {
+				KL_Desktop_Reset()
 				return
+		}
+		; Real desktop changes feed the shared space-change KPI; the focus
+		; heuristic below only records raw topology events.
+		KL_Desktop_Observe(KL_Desktop_ReadCurrent(), KL_AppendLog, KL_NowTimestamp)
 
 		hwnd := 0
 		try hwnd := WinExist("A")
@@ -451,5 +459,6 @@ KL_Topo_Stop(TimerFn := SetTimer) {
 		KLTopo.seen_hwnds.Clear()
 		KLTopo.prev_hwnd := 0
 		KL_Topo_ResetObservation()
+		KL_Desktop_Reset()
 		return TimersStopped
 }

@@ -275,8 +275,10 @@ _UpdaterTest_PreparationThrowAtEveryPhaseRetiresOwner() {
 Test("Updater AHK-31: every preparation phase failure retires exact owner (updater-owner-before-preparation)",
 	_UpdaterTest_PreparationThrowAtEveryPhaseRetiresOwner)
 
+; A pause cancels a background check; a manual one runs through it (UPD-2,
+; below), so the cancellation is driven with a background request.
 _UpdaterTest_CancellationDuringOwnedPreparationWins() {
-	global UPDATER_REQUEST_ORIGIN_MANUAL, UPDATER_CANCEL_REASON_SUSPEND
+	global UPDATER_REQUEST_ORIGIN_BACKGROUND, UPDATER_CANCEL_REASON_SUSPEND
 	global _UpdaterAsyncRequests
 	RegisterOwner := _UpdaterTest_ResolveFunction(
 		"_Updater_RegisterAsyncRequestOwner")
@@ -289,7 +291,7 @@ _UpdaterTest_CancellationDuringOwnedPreparationWins() {
 			Polls: 0, Terminals: 0, Json: "not-called",
 			CompletedRequest: 0, Terminal: 0 }
 		Request := _Updater_NewRequestContext(
-			UPDATER_REQUEST_ORIGIN_MANUAL, false)
+			UPDATER_REQUEST_ORIGIN_BACKGROUND, false)
 		Owner := RegisterOwner.Call(
 			0, "main",
 			_UpdaterTest_CaptureOwnedPreparationTerminal.Bind(State),
@@ -326,6 +328,44 @@ _UpdaterTest_CancellationDuringOwnedPreparationWins() {
 }
 Test("Updater AHK-31: cancellation during owned preparation wins (updater-owner-before-preparation)",
 	_UpdaterTest_CancellationDuringOwnedPreparationWins)
+
+; UPD-2: a pause during a manual check's owned preparation keeps the check: it
+; still sends, owns its record and answers.
+_UpdaterTest_PauseDuringManualPreparationKeepsCheck() {
+	global UPDATER_REQUEST_ORIGIN_MANUAL, _UpdaterAsyncRequests
+	RegisterOwner := _UpdaterTest_ResolveFunction(
+		"_Updater_RegisterAsyncRequestOwner")
+	SendOwned := _UpdaterTest_ResolveFunction("_Updater_SendOwnedAsyncRequest")
+	RequestOwned := _UpdaterTest_ResolveFunction("_Updater_AsyncRequestOwned")
+	Saved := _UpdaterTest_SaveRequestState()
+	try {
+		_UpdaterTest_ResetRequestState()
+		State := { OwnedDuringCancel: false, Sends: 0, Aborts: 0,
+			Polls: 0, Terminals: 0, Json: "not-called",
+			CompletedRequest: 0, Terminal: 0 }
+		Request := _Updater_NewRequestContext(
+			UPDATER_REQUEST_ORIGIN_MANUAL, false)
+		Owner := RegisterOwner.Call(
+			0, "main",
+			_UpdaterTest_CaptureOwnedPreparationTerminal.Bind(State),
+			"test://pause-during-manual-preparation", Request)
+		PrepareFn := _UpdaterTest_CancelDuringOwnedPreparation.Bind(
+			State, RequestOwned)
+		PollFn := (Id) => (State.Polls += 1, true)
+
+		AssertEqual(true, SendOwned.Call(
+			Owner, PollFn, "test pause during manual preparation", PrepareFn),
+			"a pause during a manual check's preparation keeps the check (UPD-2)")
+		AssertEqual(1, State.Sends, "the manual check still sends")
+		AssertEqual(0, State.Terminals, "the pause delivers no cancellation to a manual check")
+		AssertEqual(true, RequestOwned.Call(Owner), "the manual check keeps its exact owner")
+		AssertEqual(1, _UpdaterAsyncRequests.Count, "its record survives the pause boundary")
+	} finally {
+		_UpdaterTest_RestoreRequestState(Saved)
+	}
+}
+Test("Updater UPD-2: a pause during a manual check's preparation keeps the check (upd-2-manual-check-while-paused)",
+	_UpdaterTest_PauseDuringManualPreparationKeepsCheck)
 
 _UpdaterTest_SendThrowRetiresExactOwner() {
 	global UPDATER_REQUEST_ORIGIN_MANUAL, _UpdaterAsyncRequests

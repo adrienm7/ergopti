@@ -268,6 +268,30 @@ _LiveConfirm(Seen, Hwnd) {
 }
 
 /**
+ * Clicks a row that must open a message box of this process, reports its
+ * caption and every text it shows, and presses its first button. No dialog is
+ * an error. Arguments: the caption pattern, then the row's path.
+ */
+LiveCmdClickReadDialog(Args) {
+	Pattern := Args[1]
+	Path := Args.Clone()
+	Path.RemoveAt(1)
+	Row := LiveRowByPath(Path)
+	Seen := {Title: "", Text: ""}
+	State := LiveDriveWindow(() => LiveDialogMatching(Pattern), _LiveReadDialog.Bind(Seen), 15000)
+	LiveClickRow(Row)
+	LiveAwaitDrive(State, "the dialog of '" . Row.Caption . "'")
+	LivePump(300)
+	return "title=" . LiveOneLine(Seen.Title) . " text=" . LiveOneLine(Seen.Text)
+}
+
+_LiveReadDialog(Seen, Hwnd) {
+	Seen.Title := WinGetTitle("ahk_id " . Hwnd)
+	Seen.Text := WinGetText("ahk_id " . Hwnd)
+	LiveClickDialogButton("Button1", Hwnd)
+}
+
+/**
  * Opens the unused-settings window and the API endpoint dialog for real and
  * reports the caption the operating system holds for each.
  */
@@ -354,6 +378,29 @@ LiveCmdHotstringBuffer(Args) {
 	return "buffer=" . HSE_Buffer
 }
 
+/**
+ * What the hotstring preview offers for the text typed so far, as JSON: the
+ * engine buffer, the rows the preview computes now (one per completion key, the
+ * end character and the magic key) and the rows the bubble last painted.
+ */
+LiveCmdPreviewState(Args) {
+	global HSE_Buffer, _PrefixVisibleFireDecisions
+	Computed := ""
+	for Candidate in _PrefixCollectCandidates()
+		Computed .= (Computed == "" ? "" : ",") . _LivePreviewRow(Candidate.Completion, Candidate.Output)
+	Visible := ""
+	for Decision in _PrefixVisibleFireDecisions
+		Visible .= (Visible == "" ? "" : ",") . _LivePreviewRow(
+			Decision.HasOwnProp("Completion") ? Decision.Completion : "", _PrefixDecisionDisplayText(Decision))
+	return '{"buffer":' . JsonStringLiteral(HSE_Buffer) . ',"computed":[' . Computed
+		. '],"visible":[' . Visible . ']}'
+}
+
+_LivePreviewRow(Completion, Output) {
+	return '{"completion":' . JsonStringLiteral(String(Completion)) . ',"output":'
+		. JsonStringLiteral(String(Output)) . '}'
+}
+
 /** Turns CapsWord on or off as its trigger does, and reports whether it is on. */
 LiveCmdCapsWordToggle(Args) {
 	ToggleCapsWord()
@@ -391,6 +438,92 @@ LiveCmdEditClose(Args) {
 	return "closed"
 }
 
+global _LiveApp := 0
+
+/**
+ * Opens a real application the driver treats as its own kind of output host and
+ * gives it the foreground: "notepad" opens Notepad on the new private file Path,
+ * "console" a conhost window whose prompt writes the entered line to Path. The
+ * window and its process are this session's own; a running Notepad is refused,
+ * since its windows could share the process this one is closed with.
+ */
+LiveCmdAppOpen(Args) {
+	global _LiveApp
+	if IsObject(_LiveApp)
+		throw Error("an application target is already open")
+	Kind := Args[1], Path := Args[2]
+	if FileExist(Path)
+		throw Error("the application target's file must be new")
+	if Kind == "notepad" {
+		if ProcessExist("notepad.exe")
+			throw Error("a Notepad is already running: close it first")
+		FileAppend("", Path, "UTF-8-RAW")
+		SplitPath(Path, &Name)
+		Run('notepad.exe "' . Path . '"')
+		Hwnd := WinWait(Name . " ahk_exe notepad.exe", , 20)
+	} else if Kind == "console" {
+		Title := "Ergopti live console " . A_TickCount
+		Script := "$Host.UI.RawUI.WindowTitle = '" . Title . "'; $line = Read-Host 'line';"
+			. " [IO.File]::WriteAllText('" . Path . "', $line)"
+		; conhost itself, never the default terminal application.
+		Run('conhost.exe powershell.exe -NoProfile -NoLogo -Command "' . Script . '"')
+		Hwnd := WinWait(Title, , 20)
+	} else
+		throw Error("unknown application target " . Kind)
+	if !Hwnd
+		throw Error("the " . Kind . " window did not appear")
+	_LiveApp := {Kind: Kind, Hwnd: Hwnd, Pid: WinGetPID("ahk_id " . Hwnd), Path: Path}
+	WinActivate("ahk_id " . Hwnd)
+	if !WinWaitActive("ahk_id " . Hwnd, , 5)
+		throw Error("the " . Kind . " window did not take the foreground")
+	LivePump(1500)
+	return "hwnd=" . Hwnd . " exe=" . WinGetProcessName("ahk_id " . Hwnd)
+}
+
+/** The text of the application target: Notepad's document, or the console's entered line. */
+LiveCmdAppValue(Args) {
+	global _LiveApp
+	if !IsObject(_LiveApp)
+		throw Error("no application target is open")
+	Text := ""
+	if _LiveApp.Kind == "console" {
+		if FileExist(_LiveApp.Path)
+			Text := FileRead(_LiveApp.Path, "UTF-8")
+	} else {
+		for Control in WinGetControlsHwnd("ahk_id " . _LiveApp.Hwnd) {
+			if RegExMatch(WinGetClass("ahk_id " . Control), "i)^(?:Edit|RichEdit.*)$") {
+				Text := ControlGetText(Control)
+				break
+			}
+		}
+	}
+	return "value=" . StrReplace(StrReplace(Text, "`r", ""), "`n", "\n")
+}
+
+/**
+ * Closes the application target. Notepad saves its document and closes the tab,
+ * so no unsaved tab of this session is restored at its next start.
+ */
+LiveCmdAppClose(Args) {
+	global _LiveApp
+	if !IsObject(_LiveApp)
+		return "closed"
+	App := _LiveApp
+	_LiveApp := 0
+	if App.Kind == "notepad" && WinExist("ahk_id " . App.Hwnd) {
+		WinActivate("ahk_id " . App.Hwnd)
+		if WinWaitActive("ahk_id " . App.Hwnd, , 5) {
+			Send("^s")
+			LivePump(800)
+			Send("^w")
+			WinWaitClose("ahk_id " . App.Hwnd, , 5)
+		}
+	}
+	if WinExist("ahk_id " . App.Hwnd)
+		ProcessClose(App.Pid)
+	return "closed"
+}
+
 
 
 
@@ -409,9 +542,10 @@ LiveCmdEditClose(Args) {
  */
 LiveCmdVersionsTabs(Args) {
 	global _CLW_WebView
-	; Under memory pressure the driver opens its lighter native window instead.
-	if !_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()
-		throw Error("native fallback: the driver would open its native Versions window (WebView2 missing or free memory too low)")
+	; Without WebView2 the driver refuses the window; there is no page to read.
+	Reason := WebView_UnavailableReason()
+	if (Reason != "")
+		throw Error("WebView2 unavailable: the driver would refuse the Versions window (" . Reason . ")")
 	Changelog_Open(Args.Length >= 1 ? Args[1] : "stable")
 	LiveWaitFor(() => IsSet(_CLW_WebView) && IsObject(_CLW_WebView), "the Versions window", 30000)
 	Count := () => _LiveScript("document.querySelectorAll('#release-list .release-item').length")
@@ -666,6 +800,21 @@ LiveCmdLayoutRow(Args) {
 	return Text
 }
 
+/**
+ * What keys type at the base level on the foreground layout, from the system's
+ * own table: the expectation for a key the driver leaves to the system.
+ * Arguments: the scan codes in hexadecimal. A dead key is reported as "dead".
+ */
+LiveCmdForegroundChars(Args) {
+	Hkl := GetForegroundKeyboardLayout()
+	Text := ""
+	for Code in Args {
+		Char := _LiveLayoutChar(Integer("0x" . Code), false, Hkl, &Dead)
+		Text .= (A_Index > 1 ? " " : "") . (Dead ? "dead" : Char == "" ? "none" : Char)
+	}
+	return "hkl=" . Format("{:X}", Hkl) . " chars=" . Text
+}
+
 /** The delay a hotstring family resolves to. Arguments: the category, the section ("" for none). */
 LiveCmdHotstringDelay(Args) {
 	Resolved := HotstringsResolve(Args[1], Args.Length >= 2 ? Args[2] : "")
@@ -698,6 +847,7 @@ LiveRegister("add_delimiter", LiveCmdAddDelimiter)
 LiveRegister("keyboard_layouts", LiveCmdKeyboardLayouts)
 LiveRegister("edit_layout", LiveCmdEditLayout)
 LiveRegister("layout_row", LiveCmdLayoutRow)
+LiveRegister("foreground_chars", LiveCmdForegroundChars)
 LiveRegister("hold_log_flush", LiveCmdHoldLogFlush)
 LiveRegister("info", LiveCmdInfo)
 LiveRegister("tree", LiveCmdTree)
@@ -706,6 +856,7 @@ LiveRegister("click", LiveCmdClick)
 LiveRegister("rowinfo", LiveCmdRowInfo)
 LiveRegister("click_repeat", LiveCmdClickRepeat)
 LiveRegister("click_confirming", LiveCmdClickConfirming)
+LiveRegister("click_read_dialog", LiveCmdClickReadDialog)
 LiveRegister("reload_request_during_reload", LiveCmdReloadRequestDuringReload)
 LiveRegister("pump", LiveCmdPump)
 LiveRegister("answer_inputbox", LiveCmdAnswerInputBox)
@@ -716,9 +867,13 @@ LiveRegister("edit_clear", LiveCmdEditClear)
 LiveRegister("edit_select", LiveCmdEditSelect)
 LiveRegister("hse_buffer", LiveCmdHotstringBuffer)
 LiveRegister("hse_reset", LiveCmdHotstringReset)
+LiveRegister("preview_state", LiveCmdPreviewState)
 LiveRegister("capsword_toggle", LiveCmdCapsWordToggle)
 LiveRegister("capsword_state", LiveCmdCapsWordState)
 LiveRegister("edit_close", LiveCmdEditClose)
+LiveRegister("app_open", LiveCmdAppOpen)
+LiveRegister("app_value", LiveCmdAppValue)
+LiveRegister("app_close", LiveCmdAppClose)
 LiveRegister("versions_tabs", LiveCmdVersionsTabs)
 LiveRegister("lease_hold", LiveCmdLeaseHold)
 LiveRegister("lease_release", LiveCmdLeaseRelease)

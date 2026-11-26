@@ -10,23 +10,22 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local ParameterLabel = require("action_parameter_label")
-local RowDialect = require("menu.row_dialect")
-local Logger = require("logger.shim")
-local Extensions = require("hotstrings.extensions")
-local MagicKey = require("modules.hotstrings.magic_key")
-local TextPrompt = require("ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
+local RowDialect = require("menu.engine.row_dialect")
+local Logger = require("core.logger.engine.shim")
+local Extensions = require("hotstrings.engine.extensions")
+local TextPrompt = require("core.ui.ui.text_prompt")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
-local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
-local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
+local _fill = require("menu.ui.builder.dialogs")._fill
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local assign_parameterized_action = require("menu.ui.builder.dialogs").assign_parameterized_action
+local open_action_picker = require("menu.ui.builder.dialogs").open_action_picker
+local slot_binding_rows = require("menu.ui.builder.dialogs").slot_binding_rows
 
 local LOG = "ui.menu.menu_shortcuts"
 
@@ -62,8 +61,8 @@ end
 local function _extension_shortcut_rows()
 	local rows = {}
 
-	local ok_paths, Paths = pcall(require, "infra.paths")
-	local ok_loader, Loader = pcall(require, "modules.hotstrings.loader")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
+	local ok_loader, Loader = pcall(require, "hotstrings.engine.loader")
 	if not ok_paths or not ok_loader or type(Paths.extension_roots) ~= "function" then return rows end
 
 	-- The same io functions hotstrings_config.extension_packs() injects. The
@@ -123,6 +122,155 @@ local function _extension_shortcut_rows()
 	return rows
 end
 
+--- Exactly one Unicode scalar, or nil: a wrap symbol is one character.
+--- @param raw any
+--- @return string|nil
+local function single_symbol(raw)
+	if type(raw) ~= "string" or raw == "" then return nil end
+	local ok, length = pcall(require("core.lifecycle.engine.compat.utf8").len, raw)
+	return ok and length == 1 and raw or nil
+end
+
+--- Asks for one wrap symbol until the user types exactly one character.
+--- @param title_key string
+--- @param prompt_key string
+--- @param allow_empty boolean Whether an empty answer is accepted ("").
+--- @return string|nil symbol, nil when the dialog was cancelled.
+local function ask_symbol(title_key, prompt_key, allow_empty)
+	while true do
+		local raw = prompt_text(i18n_safe(title_key), i18n_safe(prompt_key), "")
+		if raw == nil then return nil end
+		if allow_empty and raw == "" then return "" end
+		local symbol = single_symbol(raw)
+		if symbol then return symbol end
+		show_error(i18n_safe("dialog.shortcuts.wrap_symbol_invalid"), i18n_safe(title_key))
+	end
+end
+
+--- The rows of the wrap-symbol submenu.
+--- @param ctx table Menu context (paused, on_menu_changed).
+--- @param sc table The shortcuts manager.
+--- @return table rows
+local function wrap_symbol_rows(ctx, sc)
+	if not ManifestMenu then return {} end
+	if type(sc.get_wrap_choices) ~= "function" or type(sc.commit_wrap_choices) ~= "function"
+		or type(sc.get_wrap_groups) ~= "function" then
+		-- A shortcuts owner without wrap choices: the controls are drawn greyed.
+		Logger.error(LOG, "The shortcuts owner has no wrap-symbol choices; the wrap controls are unavailable.")
+	end
+	local choices = type(sc.get_wrap_choices) == "function" and sc.get_wrap_choices() or nil
+	-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+	local ready = choices ~= nil
+	local states = choices and choices.states or {}
+	local custom = choices and choices.custom or {}
+	local COMMAND = require("settings.engine.keys").COMMAND
+	local function mutate(change)
+		if not ready then return false end
+		local committed = sc.commit_wrap_choices(change)
+		if committed ~= true then return false end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+	local function set_all(lefts, enabled)
+		return mutate(function(candidate)
+			for _, left in ipairs(lefts) do candidate.wrap_symbol_states[left] = enabled end
+			return true
+		end)
+	end
+	local all_lefts = {}
+	for _, pair in ipairs(sc.get_wrap_pair_list()) do all_lefts[#all_lefts + 1] = pair.left end
+	local getters = { wrap_symbols_ready = function() return ready end }
+	local rows = ManifestMenu.template_rows("wrap_symbols_global_controls", {
+		[COMMAND.WRAP_SYMBOLS_ENABLE_ALL] = function() return set_all(all_lefts, true) end,
+		[COMMAND.WRAP_SYMBOLS_DISABLE_ALL] = function() return set_all(all_lefts, false) end,
+		[COMMAND.WRAP_SYMBOLS_RESTORE] = function()
+			return mutate(function(candidate)
+				candidate.wrap_symbol_states, candidate.custom_wrap_symbols = {}, {}
+				return true
+			end)
+		end,
+	}, getters)
+	if not rows then return {} end
+
+	for _, group in ipairs(type(sc.get_wrap_groups) == "function" and sc.get_wrap_groups() or {}) do
+		local lefts, all_on = {}, true
+		for _, pair in ipairs(group.pairs) do
+			lefts[#lefts + 1] = pair.left
+			if states[pair.left] == false then all_on = false end
+		end
+		local items = ManifestMenu.template_rows("wrap_symbols_group_controls", {
+			[COMMAND.WRAP_SYMBOLS_ENABLE_GROUP] = function() return set_all(lefts, true) end,
+			[COMMAND.WRAP_SYMBOLS_DISABLE_GROUP] = function() return set_all(lefts, false) end,
+		}, getters)
+		if not items then return {} end
+		for _, pair in ipairs(group.pairs) do
+			local left = pair.left
+			items[#items + 1] = {
+				label = pair.left == pair.right and pair.left or (pair.left .. " … " .. pair.right),
+				checked = states[left] ~= false,
+				disabled = not ready or nil,
+				action = ready and function()
+					return mutate(function(candidate)
+						candidate.wrap_symbol_states[left] = candidate.wrap_symbol_states[left] == false
+						return true
+					end)
+				end or nil,
+			}
+		end
+		rows[#rows + 1] = {
+			label = i18n_safe(group.i18n or "menu.shortcuts.wrap_symbols_title"),
+			items = items,
+			checked = all_on,
+		}
+	end
+
+	if #custom > 0 then
+		local separator = ManifestMenu.template_rows("wrap_symbols_custom_separator", {}, getters)
+		if not separator then return {} end
+		for _, row in ipairs(separator) do rows[#rows + 1] = row end
+		for index, pair in ipairs(custom) do
+			local left, right = pair.left, pair.right
+			local controls = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
+				[COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = function()
+					return mutate(function(candidate)
+						local current = candidate.custom_wrap_symbols[index]
+						-- The list may have changed since this menu was drawn.
+						if not current or current.left ~= left or current.right ~= right then return false end
+						table.remove(candidate.custom_wrap_symbols, index)
+						return true
+					end)
+				end,
+			}, getters)
+			if not controls then return {} end
+			local label = left == right and left or (left .. " … " .. right)
+			rows[#rows + 1] = {
+				label = string.format("%s (%s)", label, i18n_safe("menu.shortcuts.wrap_symbols_custom_label")),
+				items = controls,
+			}
+		end
+	end
+
+	local add = ManifestMenu.template_rows("wrap_symbols_add_controls", {
+		[COMMAND.WRAP_SYMBOLS_ADD_CUSTOM] = function()
+			if not ready then return false end
+			local left = ask_symbol("dialog.shortcuts.wrap_symbol_title", "dialog.shortcuts.wrap_symbol_prompt", false)
+			if left == nil then return false end
+			local right = ask_symbol("dialog.shortcuts.wrap_symbol_close_title",
+				"dialog.shortcuts.wrap_symbol_close_prompt", true)
+			if right == nil then return false end
+			if right == "" then right = left end
+			return mutate(function(candidate)
+				candidate.custom_wrap_symbols[#candidate.custom_wrap_symbols + 1] = { left = left, right = right }
+				return true
+			end)
+		end,
+	}, getters)
+	if not add then return {} end
+	for _, row in ipairs(add) do rows[#rows + 1] = row end
+	return rows
+end
+
+
 --- Builds the shortcuts submenu: this driver's own rows, then the manifest's.
 ---
 --- Hand-rolled until 2026-08-05, which is what kept `extensions_shortcuts`
@@ -164,11 +312,11 @@ local function _build_shortcuts(ctx)
 			and type(sc.is_caps_word_active()) == "boolean"
 	end
 	local selection_rows = {}
-	local caps_row = ManifestMenu.check_row("selection_caps_word_control", require("config_keys").COMMAND.SELECTION_CAPS_WORD, {
-		[require("config_keys").COMMAND.SELECTION_CAPS_WORD] = function()
+	local caps_row = ManifestMenu.check_row("selection_caps_word_control", require("settings.engine.keys").COMMAND.SELECTION_CAPS_WORD, {
+		[require("settings.engine.keys").COMMAND.SELECTION_CAPS_WORD] = function()
 			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-			require("ui.menu.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,
@@ -211,9 +359,9 @@ local function _build_shortcuts(ctx)
 	if not helper_boundary then return {} end
 	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
 	local helper_methods = {
-		[require("config_keys").COMMAND.SELECTION_SELECT_WORD] = "select_word",
-		[require("config_keys").COMMAND.SELECTION_SELECT_LINE] = "select_line",
-		[require("config_keys").COMMAND.SELECTION_PASTE_PLAIN] = "paste_plain",
+		[require("settings.engine.keys").COMMAND.SELECTION_SELECT_WORD] = "select_word",
+		[require("settings.engine.keys").COMMAND.SELECTION_SELECT_LINE] = "select_line",
+		[require("settings.engine.keys").COMMAND.SELECTION_PASTE_PLAIN] = "paste_plain",
 	}
 	local helper_getters = {
 		selection_select_word_ready = function() return case_ready(helper_methods.selection_select_word) end,
@@ -232,26 +380,11 @@ local function _build_shortcuts(ctx)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
 
-	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
-	-- `pairs` would give the user a different order on every rebuild.
-	local wrap_items = {}
-	local opening = {}
-	for ch, pair in pairs(sc.get_wrap_pairs()) do
-		-- Only the opening character: each pair is stored under both of its ends.
-		if ch == pair.left then opening[#opening + 1] = { ch = ch, pair = pair } end
-	end
-	table.sort(opening, function(a, b) return a.ch < b.ch end)
-	for _, entry in ipairs(opening) do
-		local pair = entry.pair
-		-- The pair around an ellipsis, and nothing else. This used to append a
-		-- second illustration, "(«texte»)", whose only content was a French word —
-		-- so the row was a translated label followed by an untranslated one, and
-		-- the ellipsis had already said the same thing in every language.
-		wrap_items[#wrap_items + 1] = {
-			label  = string.format("%s … %s", entry.ch, pair.right),
-			action = function() sc.wrap_selection(pair.left, pair.right) end,
-		}
-	end
+	-- Wrap symbols submenu: which catalogue pairs wrap a selection and the pairs
+	-- the user added, managed as on Windows and macOS (one group per catalogue
+	-- family with its own check/uncheck all, restore, add and delete). The
+	-- choices live in config.toml's shortcuts.wrap_symbols, macOS's store.
+	local wrap_items = wrap_symbol_rows(ctx, sc)
 
 	local handlers = {}
 
@@ -264,7 +397,7 @@ local function _build_shortcuts(ctx)
 	local providers = {}
 	providers["keyboard_slots"] = function()
 		local ok_kbd, Keyboard = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_kbd or not ok_gestures then
 			Logger.error(LOG, "Keyboard slots unavailable — the shortcuts submenu loses its bindings.")
 			return {}
@@ -293,18 +426,17 @@ local function _build_shortcuts(ctx)
 		-- and without a question, like every scope row.
 		local function group_scope_rows(prefix)
 			local function apply_group_scope(mode)
-				if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-				local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "keyboard_group:" .. prefix)
+				-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+				local committed = require("infra.shortcuts_scope").apply(mode, "keyboard_group:" .. prefix)
 				if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
 			local rows = ManifestMenu.template_rows("keyboard_group_scope_controls", {
-				[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_group_scope("recommended") end,
-				[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_group_scope("clear") end,
+				[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_group_scope("recommended") end,
+				[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_group_scope("clear") end,
 			}, {
-				["keyboard_group_ready"] = function()
-					return ctx.paused ~= true and type(ctx.is_paused) == "function" and ctx.is_paused() == false
-				end,
+				-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+				["keyboard_group_ready"] = function() return true end,
 			}, {})
 			-- A withdrawn declaration withdraws both rows: no half-declared group.
 			if type(rows) ~= "table" or #rows ~= 3 then
@@ -318,9 +450,9 @@ local function _build_shortcuts(ctx)
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
 				local reason
-				if slot == require("shortcuts.magic_editor").SLOT_ID then
+				if slot == require("shortcuts.engine.star_slot_core").slot("linux").id then
 					local gate = ctx.input_capture_gate
-					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+					reason = Keyboard.star_slot_decision({ master = enabled == true,
 						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
 						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
 				end
@@ -357,16 +489,13 @@ local function _build_shortcuts(ctx)
 	-- under the loaded XKB keymap, then its action; the submenu opens the picker.
 	providers["tap_keys"] = function()
 		local ok_tap, TapKeys = pcall(require, "modules.shortcuts.tap_keys")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_tap or not ok_gestures then
 			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
 			return {}
 		end
 		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
 		local labels = { get = i18n_safe }
-		-- An action on the key chosen as the physical magic key takes its press;
-		-- the row says so, and so does the log when the assignment is made.
-		local Source = type(ctx.magic_key_source) == "table" and ctx.magic_key_source or nil
 		local rows = {}
 		for _, key in ipairs(TapKeys.keys()) do
 			local bound = TapKeys.get_action(key.id)
@@ -374,19 +503,13 @@ local function _build_shortcuts(ctx)
 			local function assign(option, picked)
 				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
 					option, function() return TapKeys.set_action(key.id, option) end, picked)
-				if assigned and Source and Source.tap_override_reason(key.linux, option) ~= nil then
-					Logger.warn(LOG, "Tap key '%s' → '%s' takes the physical magic key %s: that key no longer types "
-						.. "the magic key.", key.id, tostring(option), tostring(Source.get()))
-				end
 				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return assigned
 			end
-			local override = Source and Source.tap_override_reason(key.linux, bound) or nil
 			rows[#rows + 1] = {
 				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
-					or i18n_safe("menu.shortcuts.tap_keys.unassigned"))
-					.. (override and (" — " .. i18n_safe(override)) or ""),
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}
 		end
@@ -403,7 +526,7 @@ local function _build_shortcuts(ctx)
 	group_builders["key_combinations"] = function()
 		return require("ui.menu.key_combinations").build(ctx, {
 			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
-				return require("keycodes.key_names").label(entry.key, "linux", i18n_safe)
+				return require("platform.input.keycodes.key_names").label(entry.key, "linux", i18n_safe)
 			end,
 			action_label = function(action, gestures) return gestures.get_action_label(action) end,
 			open_picker = open_action_picker, error = show_error,
@@ -433,21 +556,21 @@ local function _build_shortcuts(ctx)
 				end
 				if spec == "program" then return nil end
 				if spec == "app" then
-					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+					return require("apps.ui.chooser").pick(require("core.process.adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
 				end
 				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
 				if require("ui.user_action_editor").KINDS[spec] then
 					return require("ui.user_action_editor").ask(spec, title, gestures.get_action_parameter_prompt(action), prior)
 				end
 				-- A backend is picked from a list, as on the action picker page.
-				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
+				if spec == "llm_vision" then return require("ai.ui.vision_parameter_prompt").ask(title, prior) end
 				return prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 			end,
 		})
 	end
-	group_builders[require("config_keys").LEAF.SCRIPT_CONTROL] = function()
+	group_builders[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_chords or not ok_gestures then
 			Logger.error(LOG, "Script chords unavailable — the shortcuts submenu loses them.")
 			return nil
@@ -474,8 +597,7 @@ local function _build_shortcuts(ctx)
 			return rows
 		end
 		local function apply_chords_scope(mode)
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-			local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "script_chords")
+			local committed = require("infra.shortcuts_scope").apply(mode, "script_chords")
 			if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return committed
 		end
@@ -483,7 +605,7 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx) do chords_ctx[key] = value end
 		chords_ctx.commands = {}
 		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
-		chords_ctx.commands[require("config_keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
+		chords_ctx.commands[require("settings.engine.keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
 			local read, current = false, nil
 			if type(Chords.chords_enabled) == "function" then read, current = pcall(Chords.chords_enabled) end
 			local called, committed = false, false
@@ -495,12 +617,12 @@ local function _build_shortcuts(ctx)
 				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
-			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("notify.script_control"), not current)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
-		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_chords_scope("recommended") end
-		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_chords_scope("clear") end
+		chords_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_chords_scope("clear") end
 		chords_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
 		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
@@ -515,7 +637,7 @@ local function _build_shortcuts(ctx)
 	-- applies to the CapsWord running now from its next event.
 	group_builders["caps_word_auto_off"] = function()
 		local ok_settings, AutoOff = pcall(require, "modules.shortcuts.caps_word_auto_off")
-		local ok_policy, Policy = pcall(require, "caps_word.auto_off")
+		local ok_policy, Policy = pcall(require, "keyboard.engine.caps_word_auto_off")
 		if not ok_settings or not ok_policy then
 			Logger.error(LOG, "CapsWord auto-off settings unavailable — the shortcuts submenu loses them.")
 			return nil
@@ -543,7 +665,9 @@ local function _build_shortcuts(ctx)
 				else
 					local key = row.key
 					rows[#rows + 1] = {
-						label = (i18n_safe(row.label_key):gsub("★", MagicKey.get())),
+						-- The star delimiter is the literal built-in ★ on every OS, as the
+						-- policy reads it: the caption never takes a renamed magic key (CWS-002).
+						label = i18n_safe(row.label_key),
 						checked = checked[key] == true,
 						action = function() return changed(AutoOff.set_terminator(key, not checked[key])) end,
 					}
@@ -557,10 +681,10 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx.commands or {}) do cw_ctx.commands[key] = value end
 		cw_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do cw_ctx.state_getters[key] = value end
-		cw_ctx.commands[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds)
+		cw_ctx.commands[require("settings.engine.keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds)
 			return changed(AutoOff.set_idle_timeout_seconds(seconds))
 		end
-		cw_ctx.state_getters[require("config_keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
+		cw_ctx.state_getters[require("settings.engine.keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
 			return settings.idle_timeout_seconds
 		end
 		-- One checkbox per kind the manifest declares, in its order; a kind
@@ -615,14 +739,13 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	local function apply_shortcuts_scope(mode)
-		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
+		local committed = require("infra.shortcuts_scope").apply(mode)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_shortcuts_scope("recommended") end
-	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_shortcuts_scope("clear") end
-	sc_ctx.commands[require("config_keys").COMMAND.SHORTCUTS_TOGGLE] = function()
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_shortcuts_scope("recommended") end
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_shortcuts_scope("clear") end
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUTS_TOGGLE] = function()
 		local read, current = false, nil
 		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
 		local called, committed = false, false
@@ -634,11 +757,11 @@ local function _build_shortcuts(ctx)
 			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
-		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
+		require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
-	sc_ctx.commands[require("config_keys").COMMAND.EDIT_CHATGPT_URL] = function()
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_CHATGPT_URL] = function()
 		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
 		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
 			or type(ChatGPT.set_url) ~= "function" then
@@ -650,27 +773,39 @@ local function _build_shortcuts(ctx)
 			i18n_safe("dialog.shortcuts.chatgpt_prompt"),
 			ChatGPT.get_url())
 		if value == nil then return end
-		if type(ChatGPT.is_valid) ~= "function" or not ChatGPT.is_valid(value) then
-			show_error(i18n_safe("dialog.gestures.param_err_url"))
+		-- The shared value check names what a web address needs; the module's
+		-- setter checks the same declaration again at its boundary.
+		local ValueCheck = require("settings.engine.value_check")
+		local key = ValueCheck.KEY.SHORTCUTS_CHATGPT_URL
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), value)
+		if not typed.ok then
+			Logger.warn(LOG, "Typed ChatGPT URL refused (%s).", typed.reason)
+			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 			return
 		end
-		if ChatGPT.set_url(value) and type(ctx.on_menu_changed) == "function" then
+		if ChatGPT.set_url(typed.value) and type(ctx.on_menu_changed) == "function" then
 			ctx.on_menu_changed()
 		end
 	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
-	local physical_editor = require("shortcuts.physical_editor_menu").new({
-		paused = function()
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
-			return ctx.is_paused()
-		end,
-		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+	local physical_editor = require("shortcuts.engine.physical_editor_menu").new({
+		scope = function() return require("infra.shortcuts_scope").editor_owner() end,
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
 	})
-	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	-- The user's workflows open in their shared window (ui/user_workflows_bridge).
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.USER_WORKFLOWS_EDITOR] = function()
+		return require("ui.user_workflows_bridge").open()
+	end
+	-- The editor's honest cause while physical delivery is unqualified.
+	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
+		local ok, host = pcall(require, "ui.physical_shortcuts.bridge")
+		return not (ok and type(host) == "table" and type(host.physical_delivery_available) == "function"
+			and host.physical_delivery_available() == true)
+	end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
 		return require("modules.shortcuts.key_combinations").is_enabled() == true
@@ -691,15 +826,15 @@ local function _build_shortcuts(ctx)
 			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
 	end
 	if type(sc.is_wrap_on_type_enabled) == "function" then
-		sc_ctx.feature_rows[require("config_keys").KEY.SHORTCUTS_WRAP_TEXT_IF_SELECTED] = function()
+		sc_ctx.feature_rows[require("settings.engine.keys").KEY.SHORTCUTS_WRAP_TEXT_IF_SELECTED] = function()
 			local on = sc.is_wrap_on_type_enabled()
 			local rows = ManifestMenu.template_rows("shortcut_wrap_live_control", {
-				[require("config_keys").COMMAND.SHORTCUT_WRAP_ON_TYPE] = function()
+				[require("settings.engine.keys").COMMAND.SHORTCUT_WRAP_ON_TYPE] = function()
 					if not wrap_on_type_ready() then return false end
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
 					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,

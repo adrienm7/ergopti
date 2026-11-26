@@ -2,7 +2,7 @@
 
 --- Explicit dormant capture wiring; installed runtime authority remains caller-owned.
 local M = {}
-local Coordinator = require("keystats.physical_history_coordinator")
+local Coordinator = require("metrics.engine.capture.physical_history_coordinator")
 local Context = require("adapters.physical_history_context")
 local Clock = require("adapters.physical_observation_clock")
 local Capture = require("modules.keystats.physical_capture")
@@ -10,7 +10,7 @@ local Keystats = require("modules.keystats")
 local Tracker = require("modules.keystats.context_tracker")
 local Watchers = require("modules.keystats.watchers")
 local ScriptControl = require("modules.shortcuts.script_control")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 local Identity = require("modules.keystats.physical_key_identity")
 local LogManager = require("modules.keystats.log_manager")
 local initialized, initializing = false, false
@@ -293,9 +293,9 @@ end
 
 --- Creates a dormant once-init manager; all successor leases use fresh closures.
 local function new_manager(capacity, on_refused, native_ports)
-	local Policy = require("keystats.physical_lease_policy")
+	local Policy = require("metrics.engine.capture.physical_lease_policy")
 	local policy_new = port(Policy, "new")
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local managed_bind = rawget(Capture, "bind_managed_source")
 	if type(managed_bind) ~= "function" then return nil, "physical_history_managed_unavailable" end
 	local owner, manager = {}, {}
@@ -648,7 +648,7 @@ local function legacy_forwarder(session, handlers, native_ports, on_refused)
 		requested = true
 		if observer and not observing then
 			observing = true
-			events = event_owner(require("adapters.timer_scheduler"), continuation, signal, refuse)
+			events = event_owner(require("core.events.timer_scheduler"), continuation, signal, refuse)
 			frames = frames + 1
 			local ok, accepted = pcall(handlers.retirement_hint, signal)
 			frames = frames - 1

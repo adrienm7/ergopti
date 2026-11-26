@@ -56,13 +56,14 @@ helpers.describe("loader currency after the last construction callback",function
   Manager._reset_for_test()
   local Loader=require("platform.remap.tap_hold_loader")
   local original=Loader.load_document
-  local original_names=require("modules.gestures.manager").get_executable_action_names
+  local original_names=require("gestures.engine.manager").get_executable_action_names
   local change=false
   Manager.init({keyboard_hook=hook,execute_action=function()end,on_text_injected=function()end,
    action_names=function()
     if change then change=false;Loader.load_document=function(...)return original(...)end end
     return original_names()
-   end,defaults_path=DEFAULTS,user_path=user_path})
+   end,defaults_path=DEFAULTS,user_path=user_path,
+   config_path=require("tests.support.tap_hold_fixture").config_path(user_path)})
   local running,calls=hook.engine,hook.calls
   change=true
   local ok,failure=pcall(function()
@@ -89,13 +90,13 @@ helpers.describe("complete original-issuer combination binding publication", fun
 		local saved, undo = {}, {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
 		local previous_open = io.open
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local previous_route = paths.config
 		local user_path, config_path, Manager
 		local owned_paths, cleanup = {}, {}
 		local function defer(callback) undo[#undo + 1] = callback end
 		local source = [[[_meta]
-schema_version = 14
+schema_version = 24
 [category_enabled]
 key_combinations = false
 [gesture_parameters]
@@ -126,18 +127,19 @@ keep = true
 		local okay, primary = xpcall(function()
 			user_path = os.tmpname(); owned_paths[#owned_paths + 1] = user_path
 			config_path = os.tmpname(); owned_paths[#owned_paths + 1] = config_path
+			-- The combinations' config.toml holds no [tap_holds]: the switch is off.
 			stream(user_path, "wb", require("tests.support.tap_hold_fixture").with_preset("[tap_hold]\nenabled = false\n"))
 			stream(config_path, "wb", source)
 			paths.config = function() return config_path end
 			package.loaded[combination_name], package.loaded[owner_name] = nil, nil
 			local Combinations = require(combination_name)
 			Manager = require(owner_name)
-			local Gestures = helpers.load_module("modules.gestures.manager")
+			local Gestures = helpers.load_module("gestures.engine.manager")
 			local hook = fake_hook()
 			local function start()
 				return Manager.init({ keyboard_hook = hook, execute_action = Gestures.execute_action,
 					action_names = Gestures.get_executable_action_names, on_text_injected = function() end,
-					defaults_path = DEFAULTS, user_path = user_path })
+					defaults_path = DEFAULTS, user_path = user_path, config_path = config_path })
 			end
 			if not delayed then helpers.assert_eq(start(), true) end
 			body(Manager, Combinations, Gestures, hook, config_path, source, read, defer, start)
@@ -223,7 +225,7 @@ keep = true
 			local load = Loader.load
 			local Engine = require("platform.remap.tap_hold_engine")
 			local key_code = Engine.KEY_CODES.tab
-			local PairPolicy = require("tap_hold.key_combinations")
+			local PairPolicy = require("tap_hold.engine.key_combinations")
 			local pair = PairPolicy.pair
 			local caption = snapshot.loaded.catalog[1].key
 			local key = snapshot.loaded.keys.caps_lock
@@ -323,9 +325,9 @@ keep = true
 			helpers.assert_eq(Gestures.get_action_parameter("combination__removed_then_tab", "open_url"), "")
 			helpers.assert_eq(Gestures.get_action_parameter("tap_hold__future_unjudged", "open_url"), "https://unjudged.example")
 			local marks = {}
-			local outdated = require("config_outdated")
+			local outdated = require("settings.engine.migration.outdated")
 			local reports = outdated.collect_reports(function()
-				Gestures.mark_config_reads(require("toml_codec").decode(source), function(...)
+				Gestures.mark_config_reads(require("core.text.engine.toml_codec").decode(source), function(...)
 					marks[table.concat({ ... }, ".")] = true
 				end)
 			end)
@@ -396,15 +398,15 @@ end)
 helpers.describe("ordinary tap actions retain their Manager owner through logging", function()
 	for _, transition in ipairs({ "pause", "disable", "reload", "pause/resume", "benign" }) do
 		helpers.it("revalidates an actual Shift tap across a " .. transition .. " logging callback", function()
-			local names = { "logger", "logger.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
+			local names = { "core.logger.engine", "core.logger.engine.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local Manager, path, Logger
 			local ok, err = pcall(function()
 				-- A fresh genuine logger preserves another test's sink and level.
-				Logger = helpers.load_module("logger")
+				Logger = helpers.load_module("core.logger.engine")
 				Logger.set_level("DEBUG")
-				package.loaded["logger.shim"] = Logger
+				package.loaded["core.logger.engine.shim"] = Logger
 				local hook, actions
 				Manager, hook, actions, path = manager()
 				local engine, dispatch = hook.engine, hook.on_tap

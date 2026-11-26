@@ -21,7 +21,7 @@ helpers.describe("typing metrics JavaScript delivery", function()
 				cancel = function() return true end,
 			})
 			local errors, calls = {}, 0
-			package.loaded["infra.logger"].error = function(_, template, ...)
+			package.loaded["core.logger.engine.logger"].error = function(_, template, ...)
 				errors[#errors + 1] = string.format(template, ...)
 			end
 			context.webview.evaluateJavaScript = function(self, code, callback)
@@ -52,7 +52,7 @@ helpers.describe("typing metrics callback ownership", function()
 				cancel = function() return true end,
 			})
 			local errors, calls = 0, 0
-			package.loaded["infra.logger"].error = function() errors = errors + 1 end
+			package.loaded["core.logger.engine.logger"].error = function() errors = errors + 1 end
 			context.webview.evaluateJavaScript = function(self, _, callback)
 				calls = calls + 1
 				completion = callback
@@ -85,7 +85,7 @@ helpers.describe("typing metrics scalar native JSON boundary", function()
 	}) do
 		Scope.it("(hs-scalar-json-metrics) native table-only encoder accepts request " .. tostring(request.request_id or request.reset_id), function()
 			with_delivery(function(_, context, timers, errors, _, evaluations)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local req = Json.encode(request)
 				local native = package.loaded["hs.json"]
 				local encoded_tables = 0
@@ -113,7 +113,7 @@ helpers.describe("typing metrics scalar native JSON boundary", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		Scope.it("(hs-scalar-json-metrics) canonical quotation refusal " .. mode .. " remains private", function()
 			with_delivery(function(_, context, _, errors, _, evaluations)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				Json.quote = function()
 					if mode == "throw" then error("PRIVATE_MAILBOX_BYTES") end
 					if mode == "false" then return false end
@@ -128,7 +128,7 @@ helpers.describe("typing metrics scalar native JSON boundary", function()
 	end
 	Scope.it("(hs-scalar-json-metrics) quotation reentry cannot reset a retired window", function()
 		with_delivery(function(_, context, _, errors, _, evaluations)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local original = Json.quote
 			Json.quote = function(value)
 				context.on_close()

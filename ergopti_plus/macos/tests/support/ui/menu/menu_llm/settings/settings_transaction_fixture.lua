@@ -11,39 +11,39 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"modules.llm.backend_detector",
-	"infra.manifest_reader",
-	"adapters.storage",
-	"ui.menu.menu_llm",
-	"ui.menu.menu_llm.settings_manager",
-	"ui.menu.menu_llm.trigger_panel",
-	"ui.menu.menu_llm.streaming_panel",
-	"ui.menu.menu_llm.temperature_panel",
-	"ui.menu.menu_llm.models_manager",
-	"ui.menu.menu_llm.profiles_manager",
-	"ui.menu.menu_llm.profile_label",
-	"modules.llm.profiles",
-	"ui.menu.menu_llm.warmup_controller",
-	"ui.menu.menu_llm.backend_panel",
-	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.model_selector_page",
-	"ui.menu.menu_llm.custom_models",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.startup_controller",
-	"ui.menu.menu_llm.trigger_orchestrator",
-	"ui.menu.menu_llm.menu_layout",
-	"modules.llm",
-	"modules.llm.api_mlx",
-	"modules.llm.mlx_deps_checker",
-	"modules.llm.ollama_deps_checker",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.dialog_util",
+	"ai.engine.api.backend_detector",
+	"menu.engine.manifest_reader",
+	"core.fs.adapters.storage",
+	"ai.ui.menu",
+	"ai.ui.menu.settings_manager",
+	"ai.ui.menu.panels.trigger_panel",
+	"ai.ui.menu.panels.streaming_panel",
+	"ai.ui.menu.panels.temperature_panel",
+	"ai.ui.menu.models.manager",
+	"ai.ui.menu.profiles_manager",
+	"ai.ui.menu.profile_label",
+	"ai.engine.settings.profiles",
+	"ai.ui.menu.warmup_controller",
+	"ai.ui.menu.panels.backend_panel",
+	"ai.ui.menu.panels.api_panel",
+	"ai.ui.menu.models.selector_page",
+	"ai.ui.menu.models.custom_models",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.startup_controller",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.layout",
+	"ai.engine",
+	"ai.engine.api.mlx",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.ollama.deps_checker",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.ui.engine.dialog_util",
 	"ui.menu.shortcut_utils",
-	"infra.app_picker",
-	"infra.manifest_menu",
-	"infra.preferences",
+	"apps.engine.picker",
+	"menu.engine.manifest_menu",
+	"settings.engine.preferences.preferences",
 }
 
 local DEFAULT_STATE = {
@@ -120,8 +120,8 @@ end
 
 local function with_fixture(options, callback)
 	options = options or {}
-	require("infra.paths").shared_root()
-	local preferences_owner = options.preferences or require("infra.preferences")
+	require("core.fs.engine.paths").shared_root()
+	local preferences_owner = options.preferences or require("settings.engine.preferences.preferences")
 	local saved_modules = {}
 	for _, name in ipairs(MODULES) do
 		saved_modules[name] = package.loaded[name]
@@ -130,7 +130,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local mlx_loaded_dependencies = {}
 	local profile_loaded_dependencies = {}
-	local mlx_previous_json_codec = package.loaded["adapters.json_codec"]
+	local mlx_previous_json_codec = package.loaded["core.fs.adapters.json_codec"]
 
 	local state = {
 		llm_enabled = true,
@@ -178,7 +178,7 @@ local function with_fixture(options, callback)
 	local display_generation = 0
 	local persisted = clone_value(state)
 	local publication_id = 0
-	package.loaded["infra.preferences"] = options.preferences or {
+	package.loaded["settings.engine.preferences.preferences"] = options.preferences or {
 		flat_key_for = preferences_owner.flat_key_for,
 		state_value_for = preferences_owner.state_value_for,
 		current_view = function() return clone_value(persisted), {status = "ok", content = "owned fixture"} end,
@@ -292,7 +292,7 @@ local function with_fixture(options, callback)
 		},
 	}
 
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = clone_value(DEFAULT_STATE),
 		streaming_snapshot = function()
 			return { owner = runtime, generation = display_generation,
@@ -308,18 +308,18 @@ local function with_fixture(options, callback)
 		is_backend_load_failed = function() return false end,
 		load_api_entries = function() end,
 	}
-	package.loaded["infra.logger"] = Logger
-	package.loaded["infra.notifications"] = {notify = function() end}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.ui.engine.notifications"] = {notify = function() end}
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 		return options.translate and options.translate(key) or require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 	end
-	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
+	package.loaded["core.i18n.engine.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function()
 			return "button.ok", prompt_value
 		end,
@@ -329,17 +329,17 @@ local function with_fixture(options, callback)
 		prompt_shortcut = function() return true end,
 	}
 	local app_change = nil
-	package.loaded["infra.app_picker"] = {
+	package.loaded["apps.engine.picker"] = {
 		build_menu = function(_, on_change)
 			app_change = on_change
 			return {}
 		end,
 	}
-	local display_renderer = assert(require("menu.renderer").new({
+	local display_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.parent_id then
 				for index, row in ipairs(root.llm_menu) do
 					if row.id == options.parent_id then
@@ -389,7 +389,7 @@ local function with_fixture(options, callback)
 		i18n = { get = fixture_caption, section = fixture_caption },
 		logger = Logger,
 	}))
-	package.loaded["infra.manifest_menu"] = display_renderer
+	package.loaded["menu.engine.manifest_menu"] = display_renderer
 
 	local keymap = {}
 	keymap.set_llm_model = function() return true end
@@ -433,11 +433,11 @@ local function with_fixture(options, callback)
 
 	local owned_save
 	if options.preference_source then
-		owned_save = require("ui.menu.preferences_transaction").bind(options.preferences, {
+		owned_save = require("settings.ui.menu.preferences_transaction").bind(options.preferences, {
 			path = options.preference_source, state = state, hotfiles = {}, core_modules = {},
 			initial_state = state, initial_preferences = state,
 			restore_runtime = function(snapshot)
-				return require("ui.menu.preferences_transaction").restore_table(runtime, snapshot)
+				return require("settings.ui.menu.preferences_transaction").restore_table(runtime, snapshot)
 			end,
 		})
 	end
@@ -474,10 +474,10 @@ local function with_fixture(options, callback)
 		for index = #errors, 1, -1 do errors[index] = nil end
 	end
 
-	local Settings = require("ui.menu.menu_llm.settings_manager")
-	local TriggerPanel = require("ui.menu.menu_llm.trigger_panel")
-	local StreamingPanel = require("ui.menu.menu_llm.streaming_panel")
-	local TemperaturePanel = require("ui.menu.menu_llm.temperature_panel")
+	local Settings = require("ai.ui.menu.settings_manager")
+	local TriggerPanel = require("ai.ui.menu.panels.trigger_panel")
+	local StreamingPanel = require("ai.ui.menu.panels.streaming_panel")
+	local TemperaturePanel = require("ai.ui.menu.panels.temperature_panel")
 	if options.corrupt_trigger_child then
 		local real_build = TriggerPanel.build
 		local detached = {}; for key, value in pairs(TriggerPanel) do detached[key] = value end
@@ -488,7 +488,7 @@ local function with_fixture(options, callback)
 			elseif options.corrupt_trigger_child == "cycle" then children[1].menu = children end
 			return children
 		end
-		package.loaded["ui.menu.menu_llm.trigger_panel"] = detached
+		package.loaded["ai.ui.menu.panels.trigger_panel"] = detached
 	end
 	local manager = Settings.new({
 		state = state,
@@ -512,13 +512,13 @@ local function with_fixture(options, callback)
 			models.get_installed_models = function() return {} end
 			models.is_model_installed = function() return false end
 		end
-		package.loaded["ui.menu.menu_llm.models_manager"] = {
+		package.loaded["ai.ui.menu.models.manager"] = {
 			new = function() return models end,
 		}
 		local prior_dependencies = {}
 		for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
-		local core = package.loaded["modules.llm"]
-		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		local core = package.loaded["ai.engine"]
+		core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
 		local profile_constructor_sync = {}
 		core.set_user_profiles = function()
 			profile_constructor_sync[#profile_constructor_sync + 1] = "users"
@@ -528,23 +528,23 @@ local function with_fixture(options, callback)
 			profile_constructor_sync[#profile_constructor_sync + 1] = "active"
 			return true
 		end
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		require("ui.menu.menu_llm.profiles_manager")
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		require("ai.ui.menu.profiles_manager")
 		for name, value in pairs(package.loaded) do
 			if not rawequal(value, rawget(prior_dependencies, name)) then
 				profile_loaded_dependencies[name] = { value = rawget(prior_dependencies, name) }
 			end
 		end
-		package.loaded["ui.menu.menu_llm.warmup_controller"] = {warmup = noop}
-		package.loaded["ui.menu.menu_llm.backend_panel"] = {
+		package.loaded["ai.ui.menu.warmup_controller"] = {warmup = noop}
+		package.loaded["ai.ui.menu.panels.backend_panel"] = {
 			is_apple_silicon = function() return false end,
 			build = function() return "backend", {} end,
 		}
-		package.loaded["ui.menu.menu_llm.api_panel"] = {
+		package.loaded["ai.ui.menu.panels.api_panel"] = {
 			build = function() return nil, nil end,
 			active_entry_caption_text = function() return nil end,
 		}
-		package.loaded["ui.menu.menu_llm.model_switcher"] = {
+		package.loaded["ai.ui.menu.models.switcher"] = {
 			new = function()
 				return {
 					switch_model = noop,
@@ -560,9 +560,9 @@ local function with_fixture(options, callback)
 		if options.native_mlx_port then
 			local prior_dependencies = {}
 			for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
-			package.loaded["adapters.json_codec"] = nil
-			package.loaded["modules.llm.api_mlx"] = nil
-			package.loaded["modules.llm.api_mlx"] = require("modules.llm.api_mlx")
+			package.loaded["core.fs.adapters.json_codec"] = nil
+			package.loaded["ai.engine.api.mlx"] = nil
+			package.loaded["ai.engine.api.mlx"] = require("ai.engine.api.mlx")
 			-- Restore only actual dependency entries changed by this genuine API, including false.
 			for name, value in pairs(package.loaded) do
 				if not rawequal(value, rawget(prior_dependencies, name)) then
@@ -570,12 +570,12 @@ local function with_fixture(options, callback)
 				end
 			end
 		else
-			package.loaded["modules.llm.api_mlx"] = {}
+			package.loaded["ai.engine.api.mlx"] = {}
 		end
-		package.loaded["ui.menu.menu_llm.startup_controller"] = {
+		package.loaded["ai.ui.menu.startup_controller"] = {
 			new = function() return noop end,
 		}
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = {
 			new = function()
 				return {
 					bind_hotkey = noop,
@@ -585,17 +585,17 @@ local function with_fixture(options, callback)
 				}
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.menu_layout"] = nil
+		package.loaded["ai.ui.menu.layout"] = nil
 
-		package.loaded["modules.llm.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
+		package.loaded["ai.engine.local_servers.mlx_deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
 		})
-		package.loaded["modules.llm.ollama_deps_checker"] = require("tests.support.runtime_checker_stub")({
+		package.loaded["ai.engine.ollama.deps_checker"] = require("tests.support.runtime_checker_stub")({
 			check_and_install_deps = noop,
 		})
 
-		package.loaded["ui.menu.menu_llm"] = nil
-		local MenuLLM = require("ui.menu.menu_llm")
+		package.loaded["ai.ui.menu"] = nil
+		local MenuLLM = require("ai.ui.menu")
 		local handler = MenuLLM.create({
 			state = state,
 			keymap = keymap,
@@ -660,11 +660,11 @@ local function with_fixture(options, callback)
 				settings_mgr = manager,
 			}, rows)
 			if generation_ctx then
-				return package.loaded["infra.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+				return package.loaded["menu.engine.manifest_menu"].build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
 					["llm_generation_values"] = function() return rows end,
 				})
 			end
-			return package.loaded["infra.manifest_menu"].render_rows(rows)
+			return package.loaded["menu.engine.manifest_menu"].render_rows(rows)
 		end,
 		top_level_callbacks = build_top_level_callbacks,
 		trigger_menu = function()
@@ -685,7 +685,7 @@ local function with_fixture(options, callback)
 	_G.hs = saved_hs
 	for name, prior in pairs(mlx_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
 	for name, prior in pairs(profile_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
-	if options.native_mlx_port then package.loaded["adapters.json_codec"] = mlx_previous_json_codec end
+	if options.native_mlx_port then package.loaded["core.fs.adapters.json_codec"] = mlx_previous_json_codec end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 	if not ok then error(err, 0) end
 end
@@ -825,21 +825,23 @@ local function info_bar_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/info_bar_control.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	-- Lossless: the « unknown pause » vector's null must stay a value, as Windows'
+	-- JSON_NULL keeps it, not fall back to the base's paused = false.
+	return assert(require("core.text.engine.json").decode_lossless(raw))
 end
 
 local function token_streaming_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 local function privacy_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/privacy_trigger_controls.json", "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 return {

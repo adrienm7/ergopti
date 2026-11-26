@@ -209,3 +209,16 @@ _AOM_LoneRAltIsMaskedWhileDown() {
 }
 Test("altgr owners: a lone RAlt passed through is masked while it is down (altgr-tap-only-passthrough-2026-09-26)",
 	_AOM_LoneRAltIsMaskedWhileDown)
+
+; An AltGr tap bound to caps_word toggles CapsWord. The owner used to clear it
+; before dispatching, so the second accepted tap found it off and turned it on
+; again (CWW-002); the dispatcher alone decides, by the key the tap types.
+_AOM_TapDoesNotPreClearCapsWord() {
+	Owner := _StripFullLineComments(_DriverFuncBody("_AltGrHandleHold"))
+	AssertTrue(Owner != "", "the AltGr owner must be found")
+	AssertTrue(InStr(Owner, "DisableCapsWord") == 0,
+		"the AltGr owner must not clear CapsWord before dispatching its tap")
+	AssertTrue(InStr(Owner, "AltGrTapHoldDispatchV2()") > 0, "the owner still dispatches the accepted tap")
+}
+Test("altgr owners: an AltGr tap bound to caps_word toggles it instead of finding it pre-cleared (CWW-002)",
+	_AOM_TapDoesNotPreClearCapsWord)

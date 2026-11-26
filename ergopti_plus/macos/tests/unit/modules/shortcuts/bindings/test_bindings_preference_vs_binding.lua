@@ -24,7 +24,7 @@ local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 -- Preference and binding asserted against every listed shortcut. The fixture
 -- index refuses an empty registry, so none of these loops can pass vacuously.
-local DISABLED_ID = "cmd_star"
+local DISABLED_ID = "wrap_text_if_selected"
 
 --- Asserts the user preference of every listed shortcut.
 --- @param bindings table Real Bindings module.
@@ -141,21 +141,21 @@ helpers.describe("shortcut bindings: a refused enable keeps the preference (shor
 	helpers.it("keeps a disabled preference disabled", function()
 		Fixture.with_recommended_bindings(function(bindings, ctx)
 			helpers.assert_eq(bindings.start(), true)
-			helpers.assert_eq(bindings.disable("cmd_star"), true)
-			ctx.refuse.cmd_star = true
-			helpers.assert_eq(bindings.enable("cmd_star"), false)
-			helpers.assert_eq(bindings.is_enabled("cmd_star"), false)
-			helpers.assert_eq(bindings.is_bound("cmd_star"), false)
+			helpers.assert_eq(bindings.disable("wrap_text_if_selected"), true)
+			ctx.refuse.wrap_text_if_selected = true
+			helpers.assert_eq(bindings.enable("wrap_text_if_selected"), false)
+			helpers.assert_eq(bindings.is_enabled("wrap_text_if_selected"), false)
+			helpers.assert_eq(bindings.is_bound("wrap_text_if_selected"), false)
 		end)
 	end)
 
 	helpers.it("keeps an enabled preference enabled", function()
 		Fixture.with_recommended_bindings(function(bindings, ctx)
-			ctx.refuse.cmd_star = true
-			helpers.assert_eq(bindings.enable("cmd_star"), false)
-			helpers.assert_eq(bindings.is_enabled("cmd_star"), true,
+			ctx.refuse.wrap_text_if_selected = true
+			helpers.assert_eq(bindings.enable("wrap_text_if_selected"), false)
+			helpers.assert_eq(bindings.is_enabled("wrap_text_if_selected"), true,
 				"a factory refusal must not rewrite the user's saved preference")
-			helpers.assert_eq(bindings.is_bound("cmd_star"), false)
+			helpers.assert_eq(bindings.is_bound("wrap_text_if_selected"), false)
 		end)
 	end)
 

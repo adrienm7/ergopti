@@ -1,0 +1,46 @@
+{
+	"version": 1,
+	"scope": "Windows internal tuple identity; literal persisted token encoding stays unchanged",
+	"vectors": [
+		{
+			"id": "ordinary",
+			"fields": ["2026-01-01", "A", "token"],
+			"encoded_utf8_hex": "323032362D30312D3031014101746F6B656E"
+		},
+		{
+			"id": "nul-token",
+			"fields": ["2026-01-01", "A", "a\u0000b"],
+			"encoded_utf8_hex": "323032362D30312D303101410161023062"
+		},
+		{
+			"id": "separator-in-app",
+			"fields": ["2026-01-01", "A\u0001B", "C"],
+			"encoded_utf8_hex": "323032362D30312D303101410231420143"
+		},
+		{
+			"id": "separator-in-token",
+			"fields": ["2026-01-01", "A", "B\u0001C"],
+			"encoded_utf8_hex": "323032362D30312D303101410142023143"
+		},
+		{
+			"id": "literal-nul-escape",
+			"fields": ["2026-01-01", "A", "a\u00020b"],
+			"encoded_utf8_hex": "323032362D30312D30310141016102323062"
+		},
+		{
+			"id": "literal-separator-escape",
+			"fields": ["2026-01-01", "A\u00021B", "C"],
+			"encoded_utf8_hex": "323032362D30312D30310141023231420143"
+		},
+		{
+			"id": "empty-fields",
+			"fields": ["", "", ""],
+			"encoded_utf8_hex": "0101"
+		},
+		{
+			"id": "unicode",
+			"fields": ["2026-01-01", "\u00e9\ud83d\ude00", "x\u0000\u0001\u0002y"],
+			"encoded_utf8_hex": "323032362D30312D303101C3A9F09F9880017802300231023279"
+		}
+	]
+}

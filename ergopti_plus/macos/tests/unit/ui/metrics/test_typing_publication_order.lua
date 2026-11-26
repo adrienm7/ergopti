@@ -34,8 +34,8 @@ helpers.describe("typing publication ordering", function()
 				if first then first = false; return nil end
 				return native(self, code, done)
 			end
-			local capture = package.loaded["infra.logger"].error
-			package.loaded["infra.logger"].error = function(...)
+			local capture = package.loaded["core.logger.engine.logger"].error
+			package.loaded["core.logger.engine.logger"].error = function(...)
 				capture(...)
 				dashboard.push_live_update(); timers[#timers]()
 			end
@@ -89,7 +89,7 @@ helpers.describe("typing publication ordering", function()
 		helpers.it("(typing-publication-order) acknowledges " .. outcome .. " truthfully", function()
 			with_delivery(function(_, context, timers, errors, successes, evaluations)
 				local discarded = 0
-				package.loaded["infra.logger"].debug = function(_, template)
+				package.loaded["core.logger.engine.logger"].debug = function(_, template)
 					if template:find("stale publication", 1, true) then discarded = discarded + 1 end
 				end
 				-- evaluations[1] probes the loading notice painted before the projection

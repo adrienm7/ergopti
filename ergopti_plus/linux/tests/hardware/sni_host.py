@@ -11,20 +11,25 @@
 # properties and its com.canonical.dbusmenu menu. This script does exactly
 # that and nothing else, so "the icon appears" becomes a checkable fact on a
 # machine with no panel: an item registered, it carries an icon, and its menu
-# holds the rows the daemon built.
+# holds the rows the daemon built. Like a panel, it reads a submenu's rows
+# only after opening it (Event "opened", then AboutToShow): the tray builds a
+# submenu's rows when it is opened, not before.
 #
 # Usage:
 #   sni_host.py --ready-file F --timeout S [--expect-label TEXT]...
-#               [--expect-icon-file] [--exit-after-check]
+#               [--expect-icon-file] [--exit-after-check] [--hold]
 # Writes F once the watcher owns its name (so the caller starts the app only
-# then), and prints one JSON report on stdout. Exit 0 = every expectation held,
+# then), and prints one JSON report on stdout; with --hold, only once SIGTERM
+# ends the session it keeps hosting. Exit 0 = every expectation held,
 # 1 = an expectation failed, 2 = the environment could not host the test.
 
 import argparse
 import json
 import os
 import re
+import signal
 import sys
+import time
 
 try:
     from gi.repository import Gio, GLib
@@ -93,6 +98,15 @@ def main():
     parser.add_argument("--expect-submenu", action="append", default=[])
     parser.add_argument("--rebuild-label")
     parser.add_argument("--expect-rebuilt-label")
+    # A row the root layout must not hold before any submenu is opened: the
+    # proof that submenu rows are built on open.
+    parser.add_argument("--expect-lazy", action="append", default=[])
+    # A check row whose click must flip its toggle-state in place: every row
+    # keeps its dbusmenu id, so the tray updated that row, not the whole menu.
+    parser.add_argument("--toggle-label")
+    # Stays the session's watcher after the check, as a panel does, and
+    # prints the report on SIGTERM.
+    parser.add_argument("--hold", action="store_true")
     args = parser.parse_args()
 
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -101,6 +115,9 @@ def main():
     loop = GLib.MainLoop()
     report = {"registered": [], "failures": []}
     rebuilt = False
+    # An item can register more than once; only the first inspection sees
+    # submenus nobody has opened yet.
+    lazy_checked = False
 
     def on_call(conn, sender, path, iface, method, params, invocation):
         if method == "RegisterStatusNotifierItem":
@@ -144,8 +161,69 @@ def main():
         )
         return reply.unpack()[0]
 
+    def menu_call(name, menu, method, signature, values, reply=None):
+        return bus.call_sync(
+            name,
+            menu,
+            "com.canonical.dbusmenu",
+            method,
+            GLib.Variant(signature, values),
+            GLib.VariantType(reply) if reply else None,
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
+        )
+
+    def layout_of(name, menu, parent=0):
+        return menu_call(
+            name, menu, "GetLayout", "(iias)", (parent, -1, []), "(u(ia{sv}av))"
+        ).unpack()[1]
+
+    def open_submenus(name, menu):
+        """Opens every submenu once, parents first, as a user browsing the panel does."""
+        opened, pending = set(), [0]
+        while pending:
+            parent = pending.pop()
+            for row_id, properties, _ in menu_nodes(layout_of(name, menu, parent)):
+                if properties.get("children-display") != "submenu" or row_id in opened:
+                    continue
+                opened.add(row_id)
+                menu_call(
+                    name, menu, "Event", "(isvu)", (row_id, "opened", GLib.Variant("i", 0), 0)
+                )
+                menu_call(name, menu, "AboutToShow", "(i)", (row_id,), "(b)")
+                pending.append(row_id)
+        return len(opened)
+
+    def labelled_ids(tree):
+        return {label: row_id for row_id, label in menu_rows(tree)}
+
+    def check_toggle(name, menu, item):
+        before_tree = layout_of(name, menu)
+        before = labelled_ids(before_tree)
+        target = before.get(args.toggle_label)
+        if target is None:
+            report["failures"].append(f"no row labelled {args.toggle_label!r} to toggle")
+            return
+        state = {node[0]: node[1].get("toggle-state") for node in menu_nodes(before_tree)}
+        menu_call(name, menu, "Event", "(isvu)", (target, "clicked", GLib.Variant("i", 0), 0))
+        time.sleep(0.5)
+        after_tree = layout_of(name, menu)
+        after_state = {node[0]: node[1].get("toggle-state") for node in menu_nodes(after_tree)}
+        if after_state.get(target) == state.get(target):
+            report["failures"].append(
+                f"{args.toggle_label!r} kept its toggle-state {state.get(target)!r}"
+            )
+        if labelled_ids(after_tree) != before:
+            report["failures"].append("a toggle rebuilt the menu: dbusmenu row ids changed")
+        item["toggled"] = {
+            "label": args.toggle_label,
+            "from": state.get(target),
+            "to": after_state.get(target),
+        }
+
     def inspect():
-        nonlocal rebuilt
+        nonlocal rebuilt, lazy_checked
         name, path = items[-1]
         item = {"service": name, "path": path}
         try:
@@ -157,6 +235,14 @@ def main():
                     item.setdefault("errors", []).append(f"{prop}: {err.message}")
             labels = []
             if item.get("Menu"):
+                root_labels = [label for _, label in menu_rows(layout_of(name, item["Menu"]))]
+                for lazy in args.expect_lazy if not lazy_checked else []:
+                    if lazy in root_labels:
+                        report["failures"].append(
+                            f"{lazy!r} was built before its submenu was opened"
+                        )
+                lazy_checked = True
+                item["opened_submenus"] = open_submenus(name, item["Menu"])
                 layout = bus.call_sync(
                     name,
                     item["Menu"],
@@ -299,6 +385,8 @@ def main():
                             None,
                         )
                         item["clicked"] = args.click_label
+                if args.toggle_label and not rebuilt:
+                    check_toggle(name, item["Menu"], item)
             item["labels"] = labels
         except GLib.Error as err:
             report["failures"].append(f"inspecting {name}{path}: {err.message}")
@@ -379,13 +467,36 @@ def main():
         bus, "org.kde.StatusNotifierWatcher", Gio.BusNameOwnerFlags.NONE, on_acquired, on_lost
     )
 
+    timed_out = []
+
     def on_timeout():
+        timed_out.append(True)
         report["failures"].append(f"no tray item registered within {args.timeout:.0f} s")
         loop.quit()
         return False
 
-    GLib.timeout_add(int(args.timeout * 1000), on_timeout)
+    timeout_source = GLib.timeout_add(int(args.timeout * 1000), on_timeout)
+    # A real panel outlives its first look at the menu. With --hold the watcher
+    # name stays owned until SIGTERM, so the daemon's later tray host check
+    # (TRAY-03) still finds a host; the report waits for that end.
+    held = GLib.MainLoop()
+    terminated = []
+
+    def on_term():
+        if loop.is_running():
+            report["failures"].append("stopped before the tray was inspected")
+            loop.quit()
+        terminated.append(True)
+        held.quit()
+        return False
+
+    if args.hold:
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, on_term)
     loop.run()
+    if args.hold and not terminated:
+        if not timed_out:
+            GLib.source_remove(timeout_source)
+        held.run()
     print(json.dumps(report, indent=2, ensure_ascii=False, default=str))
     sys.exit(1 if report["failures"] else 0)
 

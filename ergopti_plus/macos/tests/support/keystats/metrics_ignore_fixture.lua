@@ -3,12 +3,12 @@
 --- Physical public-init fixture; SQLite unavailability explicitly selects JSONL-only mode.
 local Helpers = require("tests.helpers")
 local Lfs = require("lfs")
-local Json = require("json")
-local Quote = require("text_utils").shell_quote
+local Json = require("core.text.engine.json")
+local Quote = require("core.text.engine.utils_core").shell_quote
 local M = {}
 local OWNERS = {
-	"tests.stubs.hs", "infra.logger", "infra.fs_dir", "adapters.file_system", "adapters.ledger_append",
-	"adapters.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"tests.stubs.hs", "core.logger.engine.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "core.fs.adapters.ledger_append",
+	"core.events.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator", "modules.keystats.export",
 	"hs.fs", "hs.timer", "hs.json", "hs.sqlite3",
 }
@@ -66,8 +66,8 @@ function M.run(callback)
 			for _, name in ipairs({ "timer", "fs", "json", "sqlite3" }) do package.loaded["hs." .. name] = hs[name] end
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, format, ...) context.errors[#context.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
-			context.files = require("adapters.file_system")
+			package.loaded["core.logger.engine.logger"] = logger
+			context.files = require("core.fs.adapters.file_system")
 			package.loaded["modules.keystats.sqlite_writer"] = { init = function(options)
 				context.cache_path = options.paths.sqlite_path
 				assert(context.cache_path:sub(1, #root + 7) == root .. "/cache/", "cache escaped the owned cache root")
@@ -75,7 +75,7 @@ function M.run(callback)
 				get_db = function() return nil end, close_db = function() return true end }
 			package.loaded["modules.keystats.aggregator"] = { init = function() end }
 			package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end }
-			package.loaded["adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
+			package.loaded["core.fs.adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
 			local manager = require("modules.keystats.log_manager")
 			context.init = function(metrics) return manager.init({ LOG_DIR = metrics or context.metrics, CACHE_DIR = root .. "/cache" }) end
 			local actual_open, actual_getenv, opened = io.open, os.getenv, {}

@@ -1,0 +1,97 @@
+{
+	"description": "Replayed by the three drivers and the hotstring editor against _shared/hotstrings/data/magic_key.json (Lua: _shared/tests/lua/hotstrings/magic_key_contract.lua; AutoHotkey: windows/tests/unit/hotstrings/test_magic_key_rules.ahk; JavaScript: tools/test/test-magic-key-rules.cjs). layout_default: the base-level text of each probed key (an absent key types nothing) and the default it gives, the manifest default being fallback. display: the configured character and what a text written with the marker shows.",
+	"fallback": "★",
+	"layout_default": [
+		{
+			"id": "french-azerty",
+			"base": { "KeyQ": "a", "KeyW": "z", "KeyA": "q", "KeyY": "y", "Semicolon": "m" },
+			"expected": "ù",
+			"family": "azerty"
+		},
+		{
+			"id": "belgian-azerty",
+			"base": { "KeyQ": "a", "KeyW": "z", "KeyA": "q", "KeyY": "y" },
+			"expected": "ù",
+			"family": "azerty"
+		},
+		{
+			"id": "us-qwerty",
+			"base": { "KeyQ": "q", "KeyW": "w", "KeyA": "a", "KeyY": "y", "Semicolon": ";" },
+			"expected": ";",
+			"family": "qwerty"
+		},
+		{
+			"id": "uk-qwerty",
+			"base": { "KeyQ": "q", "KeyW": "w", "KeyA": "a", "KeyY": "y" },
+			"expected": ";",
+			"family": "qwerty"
+		},
+		{
+			"id": "german-qwertz",
+			"base": { "KeyQ": "q", "KeyW": "w", "KeyA": "a", "KeyY": "z" },
+			"expected": "★",
+			"family": null
+		},
+		{
+			"id": "bepo",
+			"base": { "KeyQ": "b", "KeyW": "é", "KeyA": "a", "KeyY": "!" },
+			"expected": "★",
+			"family": null
+		},
+		{
+			"id": "ergopti",
+			"base": { "KeyQ": "è", "KeyW": "y", "KeyA": "a", "KeyY": "v" },
+			"expected": "★",
+			"family": null
+		},
+		{
+			"id": "dvorak",
+			"base": { "KeyQ": "'", "KeyW": ",", "KeyA": "a", "KeyY": "f" },
+			"expected": "★",
+			"family": null
+		},
+		{ "id": "unreadable-layout", "base": {}, "expected": "★", "family": null }
+	],
+	"display": [
+		{
+			"id": "marker-shows-itself",
+			"char": "★",
+			"text": "Touche ★ et expansion de texte",
+			"expected": "Touche ★ et expansion de texte"
+		},
+		{
+			"id": "azerty-char",
+			"char": "ù",
+			"text": "Touche ★ et expansion de texte",
+			"expected": "Touche ★ (ù) et expansion de texte"
+		},
+		{
+			"id": "qwerty-char",
+			"char": ";",
+			"text": "c★ = c'est, gt★ = j'étais",
+			"expected": "c★ (;) = c'est, gt★ (;) = j'étais"
+		},
+		{ "id": "char-alone", "char": "ù", "text": "★", "expected": "★ (ù)" },
+		{ "id": "percent-char", "char": "%", "text": "Aperçu ★", "expected": "Aperçu ★ (%)" },
+		{
+			"id": "no-marker",
+			"char": "ù",
+			"text": "Rétablir la touche par défaut",
+			"expected": "Rétablir la touche par défaut"
+		},
+		{
+			"id": "literal-key-keeps-star",
+			"char": "ù",
+			"key": "sg_actions.caps_word",
+			"text": "⇪★ CapsWord",
+			"expected": "⇪★ CapsWord"
+		},
+		{
+			"id": "literal-star-key-row",
+			"char": ";",
+			"key": "menu.shortcuts.keyboard.meta_star",
+			"text": "Win + ★",
+			"expected": "Win + ★"
+		}
+	]
+}

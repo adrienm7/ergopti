@@ -5,9 +5,8 @@
 global _SharedDir := A_Args[3], _LRCZ_Sc := A_Args[5], _LRCZ_Mode := A_Args[6]
 global _LRCZ_Emits := [], _LRCZ_Exes := Map("word", "WINWORD.EXE", "excel", "EXCEL.EXE", "other", "notepad.exe")
 global Features := Map("layout", Map("ergopti_base", true,
-	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC02E", "MagicKeySourceChosen", false)
+	"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 
 OutputHostResolve() {
 	global _LRCZ_Mode, _LRCZ_Exes
@@ -48,6 +47,7 @@ _LRCZ_Choose(Name) {
 _LRCZ_Emit(Name, Kind, Text, NativeScan := "") {
 	global _LRCZ_Emits
 	_LRCZ_Emits := []
+	NativeAdmitted := false
 	Chosen := _LRCZ_Choose(Name)
 	WasCritical := Critical("Off")
 	try {
@@ -56,8 +56,14 @@ _LRCZ_Emit(Name, Kind, Text, NativeScan := "") {
 		else if NativeScan != "" {
 			_LRCZ_Require(_LayoutRowPassthroughCriterion(NativeScan, Name), "the genuine native-row owner must remain eligible")
 			_LayoutRowPassthrough(NativeScan)
+			NativeAdmitted := true
 		}
 	} finally Critical(WasCritical)
+	if Kind == "native" {
+		_LRCZ_Require(NativeAdmitted && _LRCZ_Emits.Length == 0,
+			"a disabled row must admit its original host event without replaying zoom or a key")
+		return
+	}
 	if Kind == "" {
 		_LRCZ_Require(_LRCZ_Emits.Length == 0, "a disabled layout must emit no zoom or paste")
 		return
@@ -87,7 +93,7 @@ _LRCZ_Check() {
 	_LRCZ_Emit(Name, "final", OtherZoom)
 	_LRCZ_Mode := OriginalMode
 	Features["layout"]["emulate_number_row"] := false
-	_LRCZ_Emit(Name, "event", "{Blind}{" . _LRCZ_Sc . "}", _LRCZ_Sc)
+	_LRCZ_Emit(Name, "native", _LRCZ_Sc, _LRCZ_Sc)
 	Features["layout"]["emulate_number_row"] := true
 	_LRCZ_Emit(Name, "final", Zoom)
 	Features["layout"]["ergopti_base"] := false

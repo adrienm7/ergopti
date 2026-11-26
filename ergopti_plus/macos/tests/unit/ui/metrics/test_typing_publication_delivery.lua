@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
 local PAYLOAD = '{"manifest":{},"app_icons":{},"initial_data":null,"kc_layout":{}}'
-local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
+local SNAPSHOT = "ERGOPTI_TYPING_METRICS_SNAPSHOT 3 1700000000 " .. #PAYLOAD .. "\n" .. PAYLOAD
 
 --- Returns the index of the last readiness probe for one page capability.
 local function last_probe(evaluations, capability)
@@ -113,7 +113,7 @@ helpers.describe("typing request response delivery", function()
 	end
 	helpers.it("(typing-publication-delivery) reopen logging reentry cannot evaluate retired window", function()
 		with_delivery(function(dashboard, context, _, _, _, evaluations)
-			package.loaded["infra.logger"].debug = function(_, template)
+			package.loaded["core.logger.engine.logger"].debug = function(_, template)
 				if template:find("already open", 1, true) then context.on_close() end
 			end
 			helpers.assert_eq(dashboard.show(), false)

@@ -11,9 +11,9 @@ local function main()
 	local root, temporary = assert(arg[3]), assert(arg[2])
 	local driver = root .. "/static/ergopti_plus/macos"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	local Json = require("json")
+		.. root .. "/static/ergopti_plus/_shared/?.lua;"
+		.. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+	local Json = require("core.text.engine.json")
 	local Helpers = require("tests.helpers")
 	local Lfs = require("lfs")
 	local phase = assert(os.getenv("ERGOPTI_COLD_NGRAM_PHASE"))
@@ -25,7 +25,7 @@ local function main()
 	local journal = temporary .. "/metrics/by_device/device/today.log"
 	local cache = temporary .. "/ergopti_metrics/device/db.sqlite"
 	local timers, native_streams = {}, {}
-	local errors, warnings, sqlite_live = {}, {}, false
+	local errors, warnings, sqlite_live = {}, {}, 0
 	local result, manager, writer, rotation, scheduler = nil, nil, nil, nil, nil
 
 	local function read_file(path)
@@ -49,10 +49,11 @@ local function main()
 	end
 
 	local function open_database(path)
-		assert(path == cache, "SQLite escaped the owned disposable cache")
+		-- The aggregate rebuild also opens an in-memory snapshot ("").
+		assert(path == cache or path == "", "SQLite escaped the owned disposable cache")
 		local identity = request({ op = "open", path = path })
-		sqlite_live = true
-		local database = { last_error = "" }
+		sqlite_live = sqlite_live + 1
+		local database = { last_error = "", _bridge_id = identity, closed = false }
 		function database:exec(sql)
 			local response = rpc({ op = "exec", connection = identity, sql = sql })
 			self.last_error = response.error or ""
@@ -86,10 +87,11 @@ local function main()
 			return statement
 		end
 		function database:errmsg() return self.last_error end
-		function database:isopen() return sqlite_live end
+		function database:isopen() return not self.closed end
 		function database:close()
 			local status = request({ op = "close", connection = identity })
-			sqlite_live = false
+			self.closed = true
+			sqlite_live = sqlite_live - 1
 			return status
 		end
 		return database
@@ -136,7 +138,7 @@ local function main()
 		for _, timer in ipairs(timers) do
 			if timer:running() then outcomes.timers_retired = false end
 		end
-		outcomes.sqlite_retired = not sqlite_live
+		outcomes.sqlite_retired = sqlite_live == 0
 		assert(outcomes.manager_stop_call_ok and outcomes.manager_stop)
 		assert(outcomes.scheduler_cancel_call_ok and outcomes.scheduler_cancel)
 		assert(outcomes.timers_retired and outcomes.sqlite_retired)
@@ -171,7 +173,8 @@ local function main()
 				fs = {attributes = Lfs.attributes, dir = Lfs.dir, mkdir = Lfs.mkdir,
 					rmdir = Lfs.rmdir, symlinkAttributes = Lfs.symlinkattributes},
 				json = {encode = Json.encode, decode = Json.decode_lossless},
-				sqlite3 = {OK = 0, ERROR = 1, DONE = 101, ROW = 100, open = open_database},
+				sqlite3 = {OK = 0, ERROR = 1, DONE = 101, ROW = 100, open = open_database,
+					backup_init = require("tests.support.keystats.rebuild_sqlite_bridge").backup_init(rpc)},
 				execute = function(command)
 					-- A shell fork on the Hammerspoon main thread is what L18 removes
 					-- for directories that already exist; count every one.
@@ -185,11 +188,11 @@ local function main()
 				timer = {new = new_timer, absoluteTime = function() return 1000000000 end,
 					secondsSinceEpoch = function() return 1792497600 end},
 			})
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			os.date = function(format, epoch)
 				if format == "%Y-%m-%d" and epoch == nil then return active_day end
 				return real_date(format, epoch)
@@ -204,7 +207,7 @@ local function main()
 			manager = require("modules.keystats.log_manager")
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			assert(require("modules.keystats.text_cipher").is_enabled() == false,
 				"regression requires native default unencrypted typing rows")
 			local before_ingest

@@ -4,11 +4,11 @@
 --- MODULE: HotstringMatcher — Domain Spec Coverage (Hammerspoon)
 --- DESCRIPTION:
 --- Validates the Hammerspoon hotstring matching logic against the cross-driver
---- contract vectors defined in _shared/core/domain/HotstringMatcher.spec.js.
+--- contract vectors defined in _shared/core/text/data/domain/HotstringMatcher.spec.js.
 ---
 --- The canonical matching algorithm is specified in HotstringMatcher.spec.js.
---- The HS implementation is split between modules/keymap/registry.lua
---- (tail-char bucketing, longest-first sort) and modules/keymap/expander.lua
+--- The HS implementation is split between hotstrings/engine/expander/registry.lua
+--- (tail-char bucketing, longest-first sort) and hotstrings/engine/expander/expander.lua
 --- (word-boundary check, backspace count, consume_terminator flag).
 ---
 --- COVERAGE:
@@ -35,9 +35,9 @@ local helpers = require("tests.helpers")
 --- @param specs table Array of {trigger, repl, group, is_word, is_case_sensitive}.
 --- @return table Registry module with mappings loaded.
 local function make_registry(specs)
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
-	local R = helpers.load_with_stubs("modules.keymap.registry")
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
+	local R = helpers.load_with_stubs("hotstrings.engine.expander.registry")
 	R.init({
 		magic_key               = "\xe2\x98\x85",  -- UTF-8 for ★
 		mappings                = {},

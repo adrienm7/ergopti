@@ -11,8 +11,12 @@
 WindowTitle(Label := "") {
 	Prefix := "ErgoptiPlus"
 	Separator := " — "
+	; Whole window titles shown without the prefix.
+	ProductNames := Map("Ergopti Studio", true)
 	if Label == ""
 		return Prefix
+	if ProductNames.Has(Label)
+		return Label
 	if Prefix == ""
 		return Label
 	return Prefix . Separator . Label

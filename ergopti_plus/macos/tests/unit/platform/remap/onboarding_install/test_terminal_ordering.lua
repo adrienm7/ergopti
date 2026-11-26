@@ -41,7 +41,7 @@ helpers.describe("HS-011 onboarding terminal ordering", function()
 					order[#order + 1] = { kind = "installer", ok = ok }
 				end)
 				local construction_count = #calls.tasks
-				package.loaded["infra.dialog_util"] = {
+				package.loaded["core.ui.engine.dialog_util"] = {
 					block_alert = function()
 						return "karabiner.onboarding.btn_open_settings"
 					end,

@@ -7,7 +7,7 @@
 local Transfer = require("modules.updater.archive_transfer")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
-local function fixture(signature, without_url)
+local function fixture(signature, without_url, required, progress)
  local h = { now = 0.25, active = true, children = {}, archives = 0, adoptions = 0,
   callbacks = {}, reservations = 0, bound = 0 }
  local artifact, target = {}, {}
@@ -36,9 +36,11 @@ local function fixture(signature, without_url)
    return h.active
   end,
   defaults = { archive_transfer = { schema_version = 1,
-   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 } } },
+   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 },
+   archive_idle_timeout_ms = 60000 } },
   headers = { Accept = "application/octet-stream" },
   signature = signature,
+  on_progress = progress,
   parse_checksum = function(body) assert(body == "literal-checksum-record"); return string.rep("a", 64) end,
   http = {
    get_owned = function(url, _, options, done)
@@ -54,6 +56,7 @@ local function fixture(signature, without_url)
    download_output_owned = function(url, _, output, options, done)
     assert(url == "https://release.invalid/archive" and rawequal(output, target) and options.authorized() == true)
     assert(options.absolute_deadline_ms == 300000.25)
+    h.download_progress = options.on_progress
     h.archives = h.archives + 1
     return child("archive", done)
    end,
@@ -81,7 +84,8 @@ local function fixture(signature, without_url)
  local factory = assert(Transfer.new(ports))
  h.operation = assert(factory:start({ tag = "v1.2.3", download_url = "https://release.invalid/archive",
   checksum_url = "https://release.invalid/checksum",
-  signature_url = signature and not without_url and "https://release.invalid/signature" or nil }, function(...)
+  signature_url = signature and not without_url and "https://release.invalid/signature" or nil,
+  signature_required = required }, function(...)
   h.callbacks[#h.callbacks + 1] = { ... }
  end))
  assert(h.operation.started == true and h.reservations == 1)
@@ -98,15 +102,15 @@ end
 
 local function gate(verdict)
  local g = { max_body_bytes = 4096, calls = {} }
- function g.decide(asset, text, fetch_error)
-  g.calls[#g.calls + 1] = { asset = asset, text = text, fetch_error = fetch_error }
+ function g.decide(asset, text, fetch_error, required)
+  g.calls[#g.calls + 1] = { asset = asset, text = text, fetch_error = fetch_error, required = required }
   if verdict == true then return true end
   return false, "update signature refused: the signature does not match the downloaded bundle"
  end
  return g
 end
-local function run(g, signature_reply)
- local h = fixture(g)
+local function run(g, signature_reply, required)
+ local h = fixture(g, nil, required)
  h.children.checksum:reply({ ok = true, body = "literal-checksum-record" }); h.children.checksum:ack()
  assert(h.signature_fetches == 1 and h.archives == 0, "the archive waits for the signature fetch")
  h.children.signature:reply(signature_reply); h.children.signature:ack()
@@ -121,18 +125,18 @@ test("a good signature releases the archive with its sealed size and digest", fu
  assert(g.calls[1].asset.size == 4096 and g.calls[1].asset.sha256 == string.rep("a", 64))
  assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only" and h.cancelled ~= true)
 end)
-test("a bad signature refuses the archive in words", function()
+test("upd-10: a bad signature refuses the archive in words, at its own stage", function()
  local g = gate(false)
  local h = run(g, { ok = true, body = "c2ln" })
  assert(#g.calls == 1 and h.cancelled == true)
  assert(#h.callbacks == 1 and h.callbacks[1][1] == nil)
- assert(h.callbacks[1][2]:find("signature does not match", 1, true) and h.callbacks[1][3] == "verify")
+ assert(h.callbacks[1][2]:find("signature does not match", 1, true) and h.callbacks[1][3] == "signature")
 end)
-test("a missing signature download reaches the gate as a fetch error", function()
+test("upd-10: a missing signature download reaches the gate as a fetch error", function()
  local g = gate(false)
  local h = run(g, { ok = false, error = "HTTP 404" })
  assert(#g.calls == 1 and g.calls[1].text == nil and g.calls[1].fetch_error == "HTTP 404")
- assert(h.callbacks[1][1] == nil and h.callbacks[1][3] == "verify")
+ assert(h.callbacks[1][1] == nil and h.callbacks[1][3] == "signature")
 end)
 test("a release without a signature asset still reaches the gate", function()
  local g = gate(false)
@@ -150,7 +154,56 @@ test("without a signature port the flow is unchanged", function()
  h:complete()
  assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only")
 end)
-assert(#tests == 5, "signature transfer case floor")
+test("a release read from the public feed asks the gate to require the signature", function()
+ local g = gate(true)
+ local h = run(g, { ok = true, body = "c2ln" }, true)
+ assert(#g.calls == 1 and g.calls[1].required == true and g.calls[1].text == "c2ln")
+ assert(#h.callbacks == 1 and h.callbacks[1][1] == "display-information-only")
+ local plain = gate(true)
+ run(plain, { ok = true, body = "c2ln" })
+ assert(plain.calls[1].required == false, "an API release keeps the policy's enforcement")
+end)
+test("a feed release without the gate or the signature URL does not start", function()
+ for _, case in ipairs({ { nil, false }, { gate(true), true } }) do
+  local ok, message = pcall(fixture, case[1], case[2], true)
+  assert(not ok and tostring(message):find("assertion failed", 1, true), tostring(message))
+ end
+ local ok = pcall(fixture, gate(true), false, "yes")
+ assert(not ok, "only a literal true marks a feed release")
+end)
+test("upd-10: each stage names its own reason, a feed release its signature", function()
+ local ReleaseInstall = require("updater.engine.release_install")
+ local R = ReleaseInstall.REASON
+ for _, case in ipairs({
+  { "signature", false, R.signature }, { "signature", true, R.feed_signature },
+  { "verify", false, R.verify }, { "verify", true, R.feed_signature },
+  { "download", false, R.download }, { "download", true, R.download }, { nil, false, R.download },
+ }) do
+  assert(ReleaseInstall.download_reason(case[1], case[2]) == case[3], tostring(case[1]) .. " " .. tostring(case[2]))
+ end
+ assert(R.signature == "changelog_window.install_error_signature")
+ local I18n = require("core.i18n.engine.i18n")
+ assert(I18n.get(R.signature) ~= R.signature, "the refused signature has its localized line")
+end)
+test("upd-07: the archive download carries the progress observer", function()
+ local told = {}
+ local h = fixture(nil, nil, nil, function(bytes) told[#told + 1] = bytes end)
+ h.children.checksum:reply({ ok = true, body = "literal-checksum-record" }); h.children.checksum:ack()
+ assert(h.archives == 1 and type(h.download_progress) == "function", "the transport is told who observes its bytes")
+ h.download_progress(2048)
+ assert(#told == 1 and told[1] == 2048)
+ local refused = pcall(fixture, nil, nil, nil, "not a function")
+ assert(not refused, "a progress observer that is not a function is refused")
+end)
+test("upd-07: the declared asset size feeds the progress, never a forged one", function()
+ local Parser = require("updater.engine.release_parser")
+ local body = '{"assets":[{"name":"other","size":1},{"name":"bundle.tar.gz","size":4096}]}'
+ assert(Parser.parse_asset_size(body, "bundle.tar.gz") == 4096)
+ assert(Parser.parse_asset_size('{"assets":[{"name":"bundle.tar.gz","size":-1}]}', "bundle.tar.gz") == nil)
+ assert(Parser.parse_asset_size('{"assets":[{"name":"bundle.tar.gz","size":"4096"}]}', "bundle.tar.gz") == nil)
+ assert(Parser.parse_asset_size(body, "missing") == nil)
+end)
+assert(#tests == 10, "signature transfer case floor")
 
 local helpers = require("tests.helpers")
 helpers.describe("Archive Transfer Signature", function()

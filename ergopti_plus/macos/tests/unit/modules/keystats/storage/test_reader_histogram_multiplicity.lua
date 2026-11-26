@@ -4,10 +4,12 @@
 local helpers = require("tests.helpers")
 
 local function with_reader(body)
-	helpers.with_stub_scope({ "modules.keystats.sqlite_reader", "infra.logger" }, function()
-		package.loaded["infra.logger"] = {
+	helpers.with_stub_scope({ "modules.keystats.sqlite_reader", "core.logger.engine.logger" }, function()
+		package.loaded["core.logger.engine.logger"] = {
+			debug = function() end,
 			error = function(_, message) error(message) end,
 		}
+		helpers.provide_timings() -- the reader resolves its busy-wait from the registry
 		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", {
 			sqlite3 = {
 				open = function()

@@ -14,15 +14,16 @@
 local hs = hs
 
 local Bindings          = require("modules.shortcuts.bindings")
+local LayerWheel        = require("modules.shortcuts.layer_wheel")
 local ScriptControl     = require("modules.shortcuts.script_control")
 local KeyboardShortcuts = require("modules.shortcuts.keyboard_shortcuts")
-local GestureActions    = require("modules.gestures.actions")
-local HotkeyRegistrar   = require("adapters.hotkey_registrar")
-local StartupTransaction = require("infra.startup_transaction")
-local Logger             = require("infra.logger")
-local Manifest           = require("infra.manifest_reader")
+local GestureActions    = require("gestures.engine.actions")
+local HotkeyRegistrar   = require("platform.input.hotkey_registrar")
+local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
+local Logger             = require("core.logger.engine.logger")
+local Manifest           = require("menu.engine.manifest_reader")
 local ChordCatalogue     = require("infra.script_chord_catalogue")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local M = {}
 
@@ -32,6 +33,8 @@ local DEFAULT_BINDING_PAUSE_CLAIM = "feature_toggle"
 local REBIND_RECOVERY_CLAIM = "layout_rebind_recovery"
 local binding_pause_claims = {}
 local binding_lifecycle_epoch = 0
+-- The user switched the layer ON during a ScriptControl pause: resume starts it.
+local binding_resume_intent = false
 local binding_start_attempt = nil
 
 --- Invalidates every in-flight aggregate start/resume transaction.
@@ -135,6 +138,13 @@ M.is_enabled             = Bindings.is_enabled
 M.is_bound               = Bindings.is_bound
 M.set_wrap_pairs_getter  = Bindings.set_wrap_pairs_getter
 M.set_chatgpt_url        = Bindings.set_chatgpt_url
+M.get_chatgpt_url        = Bindings.get_chatgpt_url
+
+-- The navigation layer's wheel is no shortcut: the Shortcuts switch
+-- (pause_bindings) leaves it bound, ScriptControl pauses it as its own step.
+M.pause_layer_wheel      = LayerWheel.pause
+M.resume_layer_wheel     = LayerWheel.resume
+M.is_layer_wheel_bound   = LayerWheel.is_bound
 
 -- Proxy Script Control Methods
 M.ACTIONS               = ScriptControl.ACTIONS
@@ -147,10 +157,12 @@ M.get_pause_epoch       = ScriptControl.get_pause_epoch
 M.register_pause_owner  = ScriptControl.register_pause_owner
 M.PAUSE_OWNER_IDS       = ScriptControl.PAUSE_OWNER_IDS
 M.set_shortcut_action   = ScriptControl.set_shortcut_action
+M.get_shortcut_actions  = ScriptControl.get_shortcut_actions
 M.set_script_chords_enabled = ScriptControl.set_chords_enabled
 M.script_chords_enabled = ScriptControl.chords_enabled
 M.script_chord_slots    = ScriptControl.slots
 M.script_chord_runs     = ScriptControl.slot_runs
+M.script_chord_hint_slot = ScriptControl.hint_slot
 M.karabiner_script_chords = ScriptControl.karabiner_chords
 M.SCRIPT_BINDING_PREFIX = ScriptControl.BINDING_PREFIX
 M.set_on_pause_change   = ScriptControl.set_on_pause_change
@@ -171,8 +183,7 @@ M.get_keyboard_group_modifiers_label = KeyboardShortcuts.get_keyboard_group_modi
 M.available_keyboard_slots = KeyboardShortcuts.available_slots
 M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
 M.keyboard_binding_id      = KeyboardShortcuts.binding_id
-M.configure_magic_editor   = KeyboardShortcuts.configure_magic_editor
-M.refresh_magic_editor     = KeyboardShortcuts.refresh_magic_editor
+M.configure_star_slot      = KeyboardShortcuts.configure_star_slot
 
 --- Stops independent shortcut children without letting one refusal hide its sibling.
 --- @param steps table[] Ordered `{name, stop}` descriptors.
@@ -291,8 +302,9 @@ end
 --- — both manage KeyboardShortcuts, so the initial start must too (otherwise the
 --- configurable Cmd/Ctrl/Option shortcuts stay dead until the first pause/resume).
 --- ScriptControl has its own dedicated start/stop (start_script_control) so its
---- pause/quit/reload tap survives a bindings toggle.
---- @return boolean committed True only when both child starts committed.
+--- pause/quit/reload tap survives a bindings toggle. The navigation layer's
+--- wheel starts here too, but no Shortcuts switch pauses it afterwards.
+--- @return boolean committed True only when every child start committed.
 function M.start()
 	if binding_external_pause_claimed() then return false end
 	local recovering_rebind = release_rebind_recovery_claim()
@@ -305,6 +317,8 @@ function M.start()
 		{name = "keyboard_shortcuts", start = function(attempt_is_current)
 			return start_after_aggregate_shutdown(KeyboardShortcuts, attempt_is_current)
 		end, stop = KeyboardShortcuts.stop},
+		{name = "layer_wheel", start = function() return LayerWheel.start() end,
+			stop = LayerWheel.stop},
 	})
 	if committed ~= true and recovering_rebind then
 		add_binding_pause_claim(REBIND_RECOVERY_CLAIM)
@@ -321,6 +335,7 @@ function M.stop()
 		{name = "bindings", stop = Bindings.stop},
 		{name = "script_control", stop = ScriptControl.stop},
 		{name = "keyboard_shortcuts", stop = KeyboardShortcuts.stop},
+		{name = "layer_wheel", stop = LayerWheel.stop},
 	})
 	return settled
 end
@@ -328,7 +343,9 @@ end
 --- Stops only the user-facing bindings and keyboard shortcuts, leaving the
 --- script-control eventtap alive so AltGr+Enter/Escape/Backspace can still
 --- un-pause the script. Called by pause_all() in script_control.lua instead
---- of stop() which would also kill the script-control tap itself.
+--- of stop() which would also kill the script-control tap itself. The
+--- navigation layer's wheel is no shortcut and stays bound: ScriptControl pauses
+--- it through pause_layer_wheel().
 --- @return boolean settled True only when both user-facing children stopped.
 function M.pause_bindings(parent)
 	add_binding_pause_claim(binding_pause_claim(parent))
@@ -353,6 +370,47 @@ function M.release_bindings_pause_claim(parent)
 		invalidate_binding_lifecycle()
 	end
 	return true
+end
+
+--- Records the feature switch while another owner (the ScriptControl pause)
+--- fences the layer. A pause stops typing, not configuration (EDD-1): OFF
+--- publishes the feature claim, ON drops it and records the intent that
+--- resume_bindings_after_pause() starts the layer; nothing binds under the fence.
+--- @param enabled boolean Requested feature posture.
+--- @return boolean committed
+function M.set_feature_intent_under_pause(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut switch under pause refused: the posture must be a boolean.")
+		return false
+	end
+	local fenced = false
+	for claim in pairs(binding_pause_claims) do
+		if claim ~= REBIND_RECOVERY_CLAIM and claim ~= DEFAULT_BINDING_PAUSE_CLAIM then fenced = true end
+	end
+	if not fenced then
+		Logger.error(LOG, "Shortcut switch under pause refused: no pause fences the layer.")
+		return false
+	end
+	if enabled then
+		binding_resume_intent = true
+		return M.release_bindings_pause_claim(DEFAULT_BINDING_PAUSE_CLAIM)
+	end
+	binding_resume_intent = false
+	return M.pause_bindings(DEFAULT_BINDING_PAUSE_CLAIM)
+end
+
+--- ScriptControl's resume inverse when its PAUSE snapshot found the layer OFF:
+--- releases the parent's claim, and starts the layer only when the user
+--- switched it ON during the pause and no feature claim came back since.
+--- @param parent string|nil Stable pause parent.
+--- @return boolean committed
+function M.resume_bindings_after_pause(parent)
+	local intent = binding_resume_intent
+	binding_resume_intent = false
+	if intent and binding_pause_claims[DEFAULT_BINDING_PAUSE_CLAIM] ~= true then
+		return M.resume_bindings(parent)
+	end
+	return M.release_bindings_pause_claim(parent)
 end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().

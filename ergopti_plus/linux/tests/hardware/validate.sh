@@ -227,7 +227,7 @@ section "Automated kernel + keymap checks"
 # matters: a question a person answers once is a question that stops being
 # answered, while a script that fails is a script somebody fixes.
 LUA_BIN="$(command -v luajit || command -v lua5.4 || command -v lua || true)"
-HW_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+HW_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
 if [ -z "$LUA_BIN" ]; then
 	skip "no Lua interpreter — cannot run the kernel and keymap harnesses"

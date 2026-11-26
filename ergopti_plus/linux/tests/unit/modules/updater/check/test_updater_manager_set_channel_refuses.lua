@@ -27,8 +27,8 @@ helpers.describe("modules.updater.manager", function()
 
 	local function release(tag, prerelease)
 		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_ASSET_NAME .. '"},'
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_CHECKSUM_ASSET_NAME .. '"}]}',
 			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
 	end
 
@@ -71,10 +71,10 @@ helpers.describe("modules.updater.manager", function()
 	end)
 
 	helpers.it("keeps the durable channel and interval when persistence fails", function()
-		local previous_storage = package.loaded["adapters.storage"]
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		local storage = Fakes.storage({ writes_fail = true })
-		package.loaded["adapters.storage"] = storage
+		package.loaded["core.fs.adapters.storage"] = storage
 		package.loaded["modules.updater.manager"] = nil
 		local failing = require("modules.updater.manager")
 		-- A config.toml whose directory does not exist: the writer must refuse.
@@ -89,7 +89,7 @@ helpers.describe("modules.updater.manager", function()
 		local interval = failing.get_check_interval()
 		failing.stop_background_checks()
 
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(channel_changed, false)
 		helpers.assert_eq(interval_changed, false)
@@ -127,7 +127,7 @@ helpers.describe("modules.updater.manager", function()
 	-- never have caught that, and neither can it catch i18n.get echoing the raw
 	-- key back on a miss.
 	helpers.it("the idle label comes from the shared catalogue", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
 		-- The registry channel is displayed on its own checked row.
@@ -143,7 +143,7 @@ helpers.describe("modules.updater.manager", function()
 	-- only got another check, next to the "Download and install <tag>" row that
 	-- really installs it.
 	helpers.it("the check row still names a check while a release is available", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
 		local label = M.get_menu_label()
 		local expected = i18n.get("menu.about.check_for_updates")
@@ -162,9 +162,9 @@ helpers.describe("modules.updater.manager", function()
 	end)
 
 	helpers.it("reports unavailable background scheduling instead of silently dropping checks", function()
-		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_timer = package.loaded["core.events.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			HAS_ASYNC = false,
 			cancel = function() end,
 		}
@@ -172,14 +172,14 @@ helpers.describe("modules.updater.manager", function()
 		local unavailable = require("modules.updater.manager")
 		local started = unavailable.start_background_checks(nil, 60)
 
-		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["core.events.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(started, false,
 			"missing luv must be a truthful unavailable capability, not a green schedule")
 	end)
 
 	helpers.it("reports a schedule whose timer was not armed", function()
-		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_timer = package.loaded["core.events.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		local timer = { HAS_ASYNC = true }
 		function timer.after() return { id = "refused", armed = false, fired = true } end
@@ -187,13 +187,13 @@ helpers.describe("modules.updater.manager", function()
 			handle.armed = false
 			return true
 		end
-		package.loaded["adapters.timer_scheduler"] = timer
+		package.loaded["core.events.timer_scheduler"] = timer
 		package.loaded["modules.updater.manager"] = nil
 		local refused = require("modules.updater.manager")
 		refused.current_version = function() return "1.0.0" end
 		local started = refused.start_background_checks()
 
-		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["core.events.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(started, false, "a refused timer must not read as a running schedule")
 	end)
@@ -237,12 +237,12 @@ helpers.describe("modules.updater.manager", function()
 
 	for _, mode in ipairs({ "transport", "conditional-transport", "conditional-false", "conditional-number", "conditional-table", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
 		helpers.it("linux-updater-etag: " .. mode .. " forces a fresh page after an unknown native validator", function()
-			local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
-			local real_fs = require("adapters.file_system")
-			package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+			local previous_fs, previous_manager = package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"]
+			local real_fs = require("core.fs.adapters.file_system")
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
 			package.loaded["modules.updater.manager"] = nil
 			local loaded, fresh = pcall(require, "modules.updater.manager")
-			package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+			package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
 			helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
 			local old = '[{"tag_name":"v1.0.0"}]'
 			local new = '[{"tag_name":"v2.0.0"}]'

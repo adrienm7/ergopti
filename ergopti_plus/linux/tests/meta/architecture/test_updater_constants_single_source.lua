@@ -4,7 +4,7 @@
 --- MODULE: Updater Constants Single-Source Test (Linux driver)
 --- DESCRIPTION:
 --- Drift/parity guard asserting that the Linux updater manager resolves its
---- owner/repo/timing scalars from _shared/modules/updater/defaults.json instead
+--- owner/repo/timing scalars from _shared/updater/data/defaults.json instead
 --- of re-declaring them inline. Mirrors the macOS test of the same name and the
 --- JS gate tools/test/test-updater-constants-single-source.cjs. Reads the shared
 --- JSON at test time and compares it to the module's exported constants, so both
@@ -12,13 +12,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json    = require("json")
+local Json    = require("core.text.engine.json")
 
 helpers.describe("updater constants single source (Linux)", function()
 	-- Read the canonical shared defaults independently of the module under test,
 	-- reusing the sibling-of-driver path the corpus test relies on
 	local shared_root   = helpers.driver_root() .. "/../_shared"
-	local defaults_path = shared_root .. "/modules/updater/defaults.json"
+	local defaults_path = shared_root .. "/updater/data/defaults.json"
 	local fh = io.open(defaults_path, "r")
 	helpers.assert_not_nil(fh, "defaults.json must be readable at " .. defaults_path)
 	local raw = fh:read("*a")

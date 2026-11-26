@@ -99,8 +99,65 @@ _KCST_Observe(Phase) {
 			"hook", Map("app", Keystats.session_app, "title", Keystats.session_title))) . "`n", "*", "UTF-8-RAW")
 }
 
+; Exercise the actual paste producer during the already-established focus lag.
+; This does not inject keyboard input or read or mutate the system clipboard.
+_KCST_PasteDuringLag() {
+	global _KCST, _KL_CLIP_FILTER_PROBE
+	_KCST_Require(_KL_CLIP_FILTER_PROBE == 0 && !KLPasswordCache.focus_tracking_active
+		&& !CB_IsDriverPasteActive() && KLClip.paste_ticks.Length == 0,
+		"The genuine privacy, clipboard and burst owners must begin idle")
+	Keystats.initialized := true
+	MetricsFilters.private_browsing := true
+	MetricsFilters.disabled_apps := _KCST.Mode == "paste-excluded-lag" ? Map(_KCST.A.App, true) : Map()
+	_KCST.SnapshotA := _KCST_Publish(_KCST.A, true)
+	_KCST.SourceFiltered := MF_ShouldFilterFor(_KCST.A.App, _KCST.A.Title)
+	_KCST.AppOnlyFiltered := MF_ShouldFilterFor(_KCST.A.App, "")
+	Refused := _KCST.Mode != "paste-public-lag"
+	_KCST_Require(_KCST.SourceFiltered == Refused
+		&& _KCST.AppOnlyFiltered == (_KCST.Mode == "paste-excluded-lag"),
+		"The real source policy and title-free app control must classify A independently")
+	if _KCST.Mode != "paste-private-live" {
+		_KCST.SnapshotC := _KCST_Publish(_KCST.C, false)
+		_KCST.HookLag := MF_GetFocusSnapshot() == _KCST.SnapshotC
+			&& _KCST.SnapshotC != _KCST.SnapshotA && Keystats.session_app == _KCST.A.App
+			&& Keystats.session_title == _KCST.A.Title
+		_KCST_Require(_KCST.HookLag, "Public C must be current while the real hook still owns source A")
+	}
+	_KCST.LiveFiltered := MF_ShouldFilter()
+	_KCST_Require(_KCST.LiveFiltered == (_KCST.Mode == "paste-private-live"),
+		"Only the live-private control may be rejected by the real live policy")
+	Loop KLClipConst.PASTE_BURST_THRESHOLD
+		KL_Clip_OnPaste()
+	Pastes := _KCST_Rows("clipboard_paste"), Bursts := _KCST_Rows("paste_burst")
+	_KCST_Observe("after-lag-pastes")
+	FileAppend("OBSERVATION paste-title mode=" . _KCST.Mode . " paste_rows=" . Pastes.Length
+		. " burst_rows=" . Bursts.Length . " burst_ring=" . KLClip.paste_ticks.Length
+		. " source_private=" . _KCST.SourceFiltered . " app_only=" . _KCST.AppOnlyFiltered
+		. " live_private=" . _KCST.LiveFiltered . " hook_lag=" . _KCST.HookLag
+		. " diagnostics=" . _KCST.Diagnostics . "`n", "*", "UTF-8-RAW")
+	_KCST_Require(_KCST.Diagnostics == 0 && !IsObject(_KCST.Failure),
+		"No dependency failure can impersonate a privacy refusal")
+	if Refused {
+		_KCST_Require(Pastes.Length == 0 && Bursts.Length == 0 && KLClip.paste_ticks.Length == 0,
+			"An excluded captured source may not publish paste or burst rows or advance the burst ring")
+	} else {
+		_KCST_Require(Pastes.Length == KLClipConst.PASTE_BURST_THRESHOLD && Bursts.Length == 1
+			&& KLClip.paste_ticks.Length == 0, "Public lag must retain the real paste and burst behaviour")
+		for Entry in Pastes
+			_KCST_Require(Entry["app"] == _KCST.A.App && Entry["source_app"] == ""
+				&& Entry["char_count"] == 0 && Entry["copy_lag_ms"] == -1 && Entry["_event_id"] > 0,
+				"Every accepted public row retains exact app and unknown-copy provenance")
+		_KCST_Require(Bursts[1]["app"] == _KCST.A.App && Bursts[1]["count"] == KLClipConst.PASTE_BURST_THRESHOLD,
+			"The genuine accepted burst belongs to the captured public app")
+	}
+}
+
 _KCST_Exercise() {
 	global _KCST, _KL_CLIP_FILTER_PROBE
+	if InStr(_KCST.Mode, "paste-") == 1 {
+		_KCST_PasteDuringLag()
+		return
+	}
 	_KCST_Require(_KL_CLIP_FILTER_PROBE == 0 && !KLPasswordCache.focus_tracking_active,
 		"The real MF/central privacy path must run without invented focus-hook permission.")
 	Keystats.initialized := true
@@ -188,7 +245,8 @@ _KCST_Main() {
 		ExitApp(2)
 	Mode := A_Args[1]
 	_KCST := {Mode: Mode, A: {Hwnd: 711, App: "msedge.exe",
-		Title: (Mode == "private-title-lag" || Mode == "private-title-live") ? "Private A - InPrivate" : "Public A"},
+		Title: (Mode == "private-title-lag" || Mode == "private-title-live"
+			|| Mode == "paste-private-lag" || Mode == "paste-private-live") ? "Private A - InPrivate" : "Public A"},
 		C: {Hwnd: 713, App: "public-c.exe", Title: "Public C"}, Frame: 0,
 		Failure: 0, Diagnostics: 0, Acquisitions: 0, FocusReads: 0, CheapReads: 0,
 		SourceFiltered: false, AppOnlyFiltered: false, LiveFiltered: false, HookLag: false,

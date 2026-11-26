@@ -11,7 +11,7 @@
 local ffi = require("ffi")
 local Capture = require("adapters.xkb_capture")
 local Probe = require("adapters.xkb_source_probe")
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 
 ffi.cdef([[
 	struct _XDisplay;

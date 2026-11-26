@@ -22,15 +22,16 @@
 local M = {}
 
 local hs         = hs
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local i18n       = require("infra.i18n")
-local Paths      = require("infra.paths")
-local Json       = require("json")
-local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local i18n       = require("core.i18n.engine.i18n")
+local Paths      = require("core.fs.engine.paths")
+local Json       = require("core.text.engine.json")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local ControllerPool = require("core.ui.ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
-local ProgramProviderPicker = require("program_provider_picker")
+local ProgramProviderPicker = require("apps.engine.program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
 local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
 local PresentationFieldsOwner = rawget(ui_builder, "presentation_fields")
@@ -134,7 +135,7 @@ function M.open(opts, on_confirm)
 			return getmetatable(opts) == nil and rawget(opts, "presentation_id") == presentation_id
 				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
 				and rawget(opts, "presentation_suffix") == presentation_suffix
-				and getmetatable(ui_builder) == nil and rawget(package.loaded, "ui.ui_builder") == ui_builder
+				and getmetatable(ui_builder) == nil and rawget(package.loaded, "core.ui.ui.builder") == ui_builder
 				and rawget(ui_builder, "prepare_app_presentation") == PresentationPrepareOwner
 				and (presentation_suffix == nil or (type(PresentationContextPrepareOwner) == "function"
 					and rawget(ui_builder, "prepare_app_contextual_title") == PresentationContextPrepareOwner))
@@ -202,7 +203,7 @@ function M.open(opts, on_confirm)
 	}
 	_active_session = session
 	_usercontent = uc
-	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	local adapter_ok, adapter = pcall(require, "core.process.adapters.program_providers")
 	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
 	if _active_session ~= session then
 		ProgramProviderPicker.close(session.providers)
@@ -256,9 +257,23 @@ function M.open(opts, on_confirm)
 			if _active_session == session then close_session(session) end
 			return
 		end
-		if ok_enc and js then
-			pcall(function() session.webview:evaluateJavaScript("init(" .. js .. ")") end)
+		-- Fixed metadata only: the catalogue and native errors can echo user data.
+		-- One report per failure kind and page, like the editor siblings.
+		local function report(kind)
+			if session.retired or session.webview ~= target then return end
+			session.init_failures = session.init_failures or {}
+			if session.init_failures[kind] then return end
+			session.init_failures[kind] = true
+			Logger.error(LOG, "Action picker initialization %s; the page stays without its catalogue.", kind)
 		end
+		if not ok_enc or type(js) ~= "string" then return report("could not be encoded") end
+		local submitted, result = pcall(function()
+			return target:evaluateJavaScript("init(" .. js .. ")", function(_, script_error)
+				if WebviewResult.is_error(script_error) then report("failed in the page") end
+			end)
+		end)
+		if not submitted then return report("submission raised") end
+		if result ~= target then report("submission was refused") end
 	end
 
 	local bound, bind_error = ControllerPool.bind(controller_lease, function(msg)
@@ -276,8 +291,14 @@ function M.open(opts, on_confirm)
 				return
 			end
 			if session.settling then return end
+			-- A confirmation that names no action is a page defect, refused on the
+			-- three drivers with the picker left open: it never means "none"
+			if type(body.id) ~= "string" or body.id == "" then
+				Logger.warn(LOG, "Refused a confirmation that names no action; the picker stays open.")
+				return
+			end
 			session.settling = true
-			local id = type(body.id) == "string" and body.id or "none"
+			local id = body.id
 			-- A value the page's editor collected travels with the pick.
 			local admitted, parameter = ProgramProviderPicker.confirm(session.providers, id, body)
 			if _active_session ~= session then
@@ -346,7 +367,7 @@ function M.open(opts, on_confirm)
 	local native_options = {
 		delete_on_close = true,
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
-		style_masks   = { "titled", "closable", "utility" },
+		style_masks   = { "titled", "closable", "resizable", "utility" },
 		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
 		on_navigation = function(action)

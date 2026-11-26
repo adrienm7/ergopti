@@ -23,15 +23,15 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local Logger = require("core.logger.engine.logger")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "shortcuts.ai_actions"
 
 -- Prefix shared by every AI action id in the shared catalogue.
 local AI_ACTION_PREFIX = "llm_"
 
-local ENGINE_MODULE = "modules.llm.prediction_engine"
+local ENGINE_MODULE = "ai.engine.prediction.engine"
 
 -- name -> function(): the layers told when the AI switch is committed.
 local _listeners = {}

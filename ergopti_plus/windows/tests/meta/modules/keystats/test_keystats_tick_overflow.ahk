@@ -279,9 +279,9 @@ _KLTO_HookContextAtWrapSafe() {
 	Assert(!InStr(Src, "(A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS"),
 		"keystats_hook.ahk must not use bare (A_TickCount - KLHook.context_at) without & 0xFFFFFFFF mask (tickcount-wrap)")
 
-	; Positive: masked form must be present
-	Assert(InStr(Src, "(KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS") > 0,
-		"keystats_hook.ahk must mask context_at TTL comparison with & 0xFFFFFFFF (tickcount-wrap)")
+	; Positive: the shared wrap-safe elapsed helper measures the TTL.
+	Assert(InStr(Src, "TickElapsed64(KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS") > 0,
+		"keystats_hook.ahk must measure the context_at TTL with the wrap-safe TickElapsed64 (tickcount-wrap)")
 }
 Test("keystats: keystats_hook.ahk context_at TTL uses & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_HookContextAtWrapSafe)
 

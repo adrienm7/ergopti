@@ -11,7 +11,22 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
--- Inject the _shared/lua root into package.path so that infra/ shims for
+-- A boot that fails above the guarded post-onboarding section must still be
+-- logged and reported to the launcher (core/lifecycle/engine/boot_guard.lua):
+-- this file runs itself once more under that guard. Loaded by path, since the
+-- shared tree is not on package.path yet.
+local boot_guard_argument = ...
+do
+	local entry = debug.getinfo(1, "S").source:gsub("^@", "")
+	local BootGuard = assert(loadfile((entry:match("^(.*)/[^/]+$") or ".")
+		.. "/core/lifecycle/engine/boot_guard.lua"))()
+	if not BootGuard.is_guarded(boot_guard_argument) then
+		BootGuard.run(entry)
+		return
+	end
+end
+
+-- Inject the _shared root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 local logger_shared_root
@@ -26,7 +41,7 @@ do
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
 	logger_shared_root = _ergopti_plus .. "/_shared"
-	local _shared       = logger_shared_root .. "/lua"
+	local _shared       = logger_shared_root .. ""
 	if not package.path:find(_shared, 1, true) then
 		package.path = _shared .. "/?.lua;" .. _shared .. "/?/init.lua;" .. package.path
 	end
@@ -56,13 +71,13 @@ do
 		end)
 	end
 
-	-- A developer app (infra/dev_source.lua) runs this clone, which holds no
+	-- A developer app (core/lifecycle/engine/dev_source.lua) runs this clone, which holds no
 	-- LuaSocket: the build stages it into the app payload only. A root that does
 	-- not name this driver is left to the instance admission below, which
 	-- refuses the process.
-	local dev_ok, dev_root = pcall(function() return require("infra.dev_source").root() end)
+	local dev_ok, dev_root = pcall(function() return require("core.lifecycle.engine.dev_source").root() end)
 	if dev_ok and dev_root and searchers then
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		local payload = DevSource.payload_driver_dir(hs.processInfo and hs.processInfo.bundlePath)
 		table.insert(searchers, 2, DevSource.payload_searcher(payload, loadfile, package.loadlib))
 	end
@@ -70,7 +85,7 @@ end
 
 -- Before the first module load: every later `require`, lazy ones included, then
 -- skips Hammerspoon's wrapper, which costs 300 us per call on the main thread.
-local direct_require_installed = require("infra.direct_require").install(_G)
+local direct_require_installed = require("core.lifecycle.engine.direct_require").install(_G)
 
 
 
@@ -95,32 +110,32 @@ do
 	end
 end
 
-local Logger             = require("infra.logger")
+local Logger             = require("core.logger.engine.logger")
 -- Admit canonical privacy before any dependency can publish an error or path.
 do
 	local admitted = pcall(function()
-		local raw = require("adapters.boot_journal").read_privacy_policy(logger_shared_root)
+		local raw = require("core.logger.adapters.boot_journal").read_privacy_policy(logger_shared_root)
 		Logger.initialize_privacy(raw)
 	end)
 	if not admitted then
 		pcall(function()
-			require("adapters.boot_fatal").report("logger_privacy", "Canonical log privacy admission refused.", nil)
+			require("diagnostics.adapters.boot_fatal").report("logger_privacy", "Canonical log privacy admission refused.", nil)
 		end)
 		pcall(print, "[logger] Privacy initialization refused; bootstrap not continued.")
 		os.exit(1)
 		return
 	end
 end
-local Storage            = require("adapters.storage")
+local Storage            = require("core.fs.adapters.storage")
 if not direct_require_installed then
 	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
 end
 
 -- Instance admission comes before every settings write, timer, watcher and
 -- path resolution: a process that may not run the driver must leave no trace
--- beyond its refusal line (see infra/instance_admission.lua).
+-- beyond its refusal line (see core/lifecycle/engine/reload/instance_admission.lua).
 do
-	local InstanceAdmission = require("infra.instance_admission")
+	local InstanceAdmission = require("core.lifecycle.engine.reload.instance_admission")
 	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
 	local admission_mode = Logger.classify_async_sink_boot_environment()
 	-- An unanswerable identity is treated as foreign: refusing never quits a process
@@ -133,7 +148,7 @@ do
 	local decision = InstanceAdmission.decide(admission_mode, packaged_runtime)
 	if decision ~= InstanceAdmission.ADMIT then
 		local launcher_ok, launcher_app = pcall(function()
-			return require("adapters.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
+			return require("platform.focus.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
 		end)
 		local identity = InstanceAdmission.describe({
 			pid = process_info.processID,
@@ -141,14 +156,14 @@ do
 			bundle_path = process_info.bundlePath,
 			launcher_running = launcher_ok and launcher_app ~= nil or "unknown",
 		})
-		local timers_ok, timers_err = pcall(function() require("adapters.timer_scheduler").cancelAll() end)
+		local timers_ok, timers_err = pcall(function() require("core.events.timer_scheduler").cancelAll() end)
 		if not timers_ok then
 			Logger.error("init", "Refused instance could not cancel its timers: %s.", tostring(timers_err))
 		end
 		if InstanceAdmission.may_exit_process(decision) then
 			Logger.warn("init", "Refusing a second Ergopti runtime started without the launcher (%s); "
 				.. "exiting before any module starts.", identity)
-			require("adapters.boot_journal").append("WARNING",
+			require("core.logger.adapters.boot_journal").append("WARNING",
 				"Stray Ergopti runtime refused before boot: " .. identity .. ".")
 			os.exit(0)
 			return
@@ -157,8 +172,8 @@ do
 			.. "it keeps running without the driver.", identity, tostring(admission_mode))
 		if InstanceAdmission.shows_dialog(decision) then
 			local shown_ok, shown_err = pcall(function()
-				local i18n_boot = require("infra.i18n")
-				i18n_boot.set_locale_injector(function(code) require("infra.locale").set_locale(code) end)
+				local i18n_boot = require("core.i18n.engine.i18n")
+				i18n_boot.set_locale_injector(function(code) require("core.i18n.engine.locale").set_locale(code) end)
 				i18n_boot.init()
 				hs.dialog.blockAlert(i18n_boot.get("launcher.fatal.title"),
 					i18n_boot.get("startup.native_logger_unavailable"), i18n_boot.get("common.ok"))
@@ -170,11 +185,16 @@ do
 		return
 	end
 end
-local TimerScheduler     = require("adapters.timer_scheduler")
+-- The builds before the single folder name kept paths.toml and the default
+-- configuration folder elsewhere; they move once, here: after the instance
+-- admission, so a refused process leaves every folder as it found it, and
+-- before the breadcrumb, the logs and config_paths read them.
+require("core.fs.adapters.legacy_folder_migration").run(Logger)
+local TimerScheduler     = require("core.events.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end
-local SyntheticInput     = require("adapters.synthetic_input")
+local SyntheticInput     = require("platform.input.synthetic_input")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local AccessibilityWait       = require("infra.accessibility_wait")
 local LOG                = "init"
@@ -200,19 +220,20 @@ end
 -- boot start and flipped to true only once init has fully completed.
 Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
--- Restore persisted log level from settings, or default to DEBUG
+-- Restore the persisted log level through the manifest declaration: any of its
+-- eight names, else its default (INFO) with a warning, as on Windows and Linux
+-- (logger parity audit LOG-01; this block used to accept four names and boot at
+-- DEBUG otherwise).
 do
-	local saved_level = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
-	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
-	if type(saved_level) == "string" and valid[saved_level] then
-		Logger.set_level(saved_level)
-	else
-		Logger.set_level("DEBUG")  -- Default: show all logs
-	end
+	local Keys = require("settings.engine.keys")
+	local entry = require("menu.engine.manifest_reader").find_entry_by_path(Keys.KEY.SCRIPT_LOG_LEVEL)
+	Logger.apply_level_setting(Storage.get(Keys.LEAF.LOG_LEVEL), entry)
 end
 
 -- Global user-notification logging bridge.
--- Any module using hs.notify.new() will now be traced in Logger.info.
+-- Any module using hs.notify.new() is traced in Logger.info, by shape only: a
+-- notification's text can quote a command's stderr meant for the user alone
+-- (NUI-004).
 do
 	if hs.notify and type(hs.notify.new) == "function" and hs.notify.__ergopti_info_wrapped ~= true then
 		local _orig_notify_new = hs.notify.new
@@ -221,8 +242,7 @@ do
 				local t = tostring(opts.title or "")
 				local b = tostring(opts.informativeText or "")
 				if t ~= "" or b ~= "" then
-					local payload = (t ~= "" and t or "(sans titre)") .. (b ~= "" and (" | " .. b) or "")
-					Logger.info("notify", "Notification utilisateur: %s", payload)
+					Logger.info("notify", "User notification created: title %d byte(s), body %d byte(s).", #t, #b)
 				end
 			end
 			return _orig_notify_new(opts, ...)
@@ -234,9 +254,9 @@ end
 -- Boot-phase profiler — ported from the AHK driver. Begin timing as early as the
 -- logger is ready so every subsequent Boot.mark() reports its delta + running
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
-local Boot               = require("infra.boot_profiler")
-local BootJournal        = require("adapters.boot_journal")
-local ReloadBreadcrumb   = require("adapters.reload_breadcrumb")
+local Boot               = require("core.logger.engine.boot_profiler")
+local BootJournal        = require("core.logger.adapters.boot_journal")
+local ReloadBreadcrumb   = require("diagnostics.adapters.reload_breadcrumb")
 -- A controlled reload's trail ends with this line when a boot followed it
 -- (field run 2026-10-30 21:06: the reload lost the app and no boot followed).
 ReloadBreadcrumb.record_boot()
@@ -260,22 +280,22 @@ local function boot_note(fmt, ...)
 end
 
 do
-	local present, missing = require("infra.launcher_environment").presence()
+	local present, missing = require("core.lifecycle.engine.launcher_environment").presence()
 	boot_note("Launcher environment keys present: %s; missing: %s.",
 		#present > 0 and table.concat(present, ", ") or "none",
 		#missing > 0 and table.concat(missing, ", ") or "none")
 end
 Boot.stage("Core module requires")
 
-local i18n               = require("infra.i18n")
-local locale_mod         = require("infra.locale")
-local crash_reporter     = require("modules.diagnostics.crash_reporter")
-local reload_guard       = require("infra.reload_guard")
-local EmergencyExit      = require("infra.emergency_exit")
-local TerminationCoordinator = require("infra.termination_coordinator")
-local TeardownTransaction = require("infra.teardown_transaction")
-local StartupTransaction = require("infra.startup_transaction")
-local BootFatal          = require("adapters.boot_fatal")
+local i18n               = require("core.i18n.engine.i18n")
+local locale_mod         = require("core.i18n.engine.locale")
+local crash_reporter     = require("diagnostics.engine.reports.crash_reporter")
+local reload_guard       = require("core.lifecycle.engine.reload.guard")
+local EmergencyExit      = require("core.lifecycle.engine.shutdown.emergency_exit")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
+local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
+local StartupTransaction = require("core.lifecycle.engine.startup_transaction")
+local BootFatal          = require("diagnostics.adapters.boot_fatal")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
@@ -356,7 +376,7 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	os.exit(1)
 end
 
-local config_paths       = require("infra.config_paths")
+local config_paths       = require("settings.engine.paths")
 Boot.mark("Core module requires")
 Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 
@@ -371,11 +391,11 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 
-local base_dir = require("native_path").directory_prefix(script_path) or "./"
+local base_dir = require("core.fs.engine.native_path").directory_prefix(script_path) or "./"
 
 -- Boot initialises the RESOLVER, not the path editor: every consumer below
 -- resolves through it, and none of them draws a UI. The editor's reload
--- callback is wired later by ui/menu/init.lua, which is the only caller that
+-- callback is wired later by menu/ui/init.lua, which is the only caller that
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
@@ -386,27 +406,29 @@ end
 -- saved values at start, as on Windows. i18n started above from the saved
 -- locale, before the config path existed, so it adopts the configured one now,
 -- before any menu is built.
-require("infra.script_scope").adopt_configured()
+require("settings.engine.scope.script_scope").adopt_configured()
 i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
-local gestures           = require("modules.gestures")
-local keymap             = require("modules.keymap")
-local ManifestReader     = require("infra.manifest_reader")
--- Wire keymap → locale so trigger-character substitutions (★) use the live char.
+local gestures           = require("gestures.engine")
+local keymap             = require("hotstrings.engine.expander")
+local ManifestReader     = require("menu.engine.manifest_reader")
+-- Wire keymap → locale so every ★ of a translated string shows the live magic
+-- key as « ★ (ù) », the shared display rule (hotstrings/engine/magic_key_display.lua).
 -- Read from the manifest rather than from the `magic_key` local: that one is
 -- declared ~500 lines below, so naming it here would capture the GLOBAL of the
 -- same name — nil — and every ★ substitution would silently render empty. Same
 -- trap as project-lua-closure-before-local-nil-global.
-locale_mod.set_trigger_provider(function()
-	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+locale_mod.set_display_provider(function(text, key)
+	local trigger = keymap.get_trigger_char and keymap.get_trigger_char()
+		or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+	return require("hotstrings.engine.magic_key_display").display_text(text, trigger, key)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
--- having to type out require("modules.keymap") each time.
+-- having to type out require("hotstrings.engine.expander") each time.
 _G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
-local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+local dynamic_hotstrings = require("hotstrings.engine.dynamic")
 
 boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),
 	BootJournal.describe_path(config_paths.get_config_dir()))
@@ -414,7 +436,7 @@ Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Boot.stage("Path: log file open (retention purge deferred)")
 
 -- Re-point the logger to the logs folder (LogsDirPath, or
--- ~/Library/Logs/ergopti_plus/) now that paths.toml is read. Earlier boot lines
+-- ~/Library/Logs/Ergopti/) now that paths.toml is read. Earlier boot lines
 -- went to the fallback file in the default folder.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
 do
@@ -463,6 +485,21 @@ end
 BootJournal.set_user_log_ready(true)
 boot_note("Native logger handshake committed: the launcher worker owns %s.", Logger.logs_dir())
 
+-- The Karabiner lease, the uninstaller and automatic startup accept only the
+-- launcher whose exported path equals the one derived from this Lua tree. Its
+-- outcome is logged before onboarding can defer boot, so an install location
+-- that breaks the exact-path proof (a translocated or symlinked application
+-- folder) is named at the first launch instead of at the first lease.
+do
+	local helper_path, helper_error = require("platform.remap.lease_helper").resolve()
+	if helper_path then
+		boot_note("Launcher helper resolved: %s.", helper_path)
+	else
+		Logger.warn(LOG, "Launcher helper refused: %s.", tostring(helper_error))
+		BootJournal.append("WARNING", "Launcher helper refused: " .. tostring(helper_error) .. ".")
+	end
+end
+
 -- Arm repeat collapsing (logger SPEC § 4.2) now that its summaries have a
 -- durable destination, and before any periodic source starts. Its flush tick is
 -- a TimerScheduler timer, so teardown cancels it with every other one; a refusal
@@ -491,7 +528,7 @@ Boot.stage("Factory-reset recovery reconciled")
 -- controlled reload handoff. Reconcile its durable decision before onboarding,
 -- overrides, preferences, or any default seeding can observe those paths.
 local reset_recovery_ok, reset_recovery_result = xpcall(function()
-	local FactoryResetJournal = require("infra.factory_reset_journal")
+	local FactoryResetJournal = require("settings.engine.factory_reset_journal")
 	local config_path = config_paths.get("ConfigTomlPath")
 	local journal_path = FactoryResetJournal.path_for(config_path)
 	local owner, owner_detail = FactoryResetJournal.create(journal_path)
@@ -531,14 +568,14 @@ local TOML_CACHE_DIR = nil
 do
 	local home = os.getenv("HOME")
 	if type(home) == "string" and home ~= "" then
-		TOML_CACHE_DIR = home .. "/Library/Caches/" .. require("app_dirs").folder_name .. "/toml_hotstrings"
+		TOML_CACHE_DIR = home .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative .. "/toml_hotstrings"
 	end
 end
 do
-	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	local ok_cache, toml_cache = pcall(require, "core.fs.adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init(TOML_CACHE_DIR)
-		local ok_reader, toml_reader = pcall(require, "infra.toml.reader")
+		local ok_reader, toml_reader = pcall(require, "core.text.engine.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
 		end
@@ -670,7 +707,7 @@ end
 
 -- The once-only quit step that applies the pause layout (ui.menu.quit_layout).
 local quit_layout_step = require("ui.menu.quit_layout").create({
-	resolve_menu = function() return package.loaded["ui.menu"] end,
+	resolve_menu = function() return package.loaded["menu.ui"] end,
 	logger = Logger,
 })
 
@@ -807,7 +844,7 @@ local function await_teardown_owner(owner, on_teardown_ready)
 	local record = _awaited_teardown_owners[owner.key]
 	if record.settled then return true end
 	if record.pending then return true, "pending" end
-	local module = package.loaded["ui.menu.menu_llm"]
+	local module = package.loaded["ai.ui.menu"]
 	if module == nil then
 		record.settled = true
 		return true
@@ -962,7 +999,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		{
 			name = "vscode-bridge",
 			run = function()
-				local module = package.loaded["infra.vscode_bridge"]
+				local module = package.loaded["core.network.engine.vscode_bridge"]
 				if module == nil then return true end
 				if type(module) ~= "table" or type(module.stop_server) ~= "function" then
 					error("infra.vscode_bridge.stop_server is unavailable")
@@ -973,7 +1010,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		{
 			name = "llm-helper-processes",
 			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
+				local module = package.loaded["ai.ui.menu"]
 				if module == nil then return true end
 				if type(module.terminate_helper_processes) ~= "function" then
 					error("terminate_helper_processes is unavailable")
@@ -986,7 +1023,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		steps[#steps + 1] = {
 			name = "orphan-mlx-server",
 			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
+				local module = package.loaded["ai.ui.menu"]
 				if module == nil then return true end
 				if type(module.terminate_orphan_mlx_server) ~= "function" then
 					error("terminate_orphan_mlx_server is unavailable")
@@ -1007,7 +1044,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "driver-control",
 		run = function()
-			local module = package.loaded["infra.driver_control"]
+			local module = package.loaded["core.lifecycle.engine.driver_control"]
 			if module == nil then return true end
 			return module.stop()
 		end,
@@ -1015,7 +1052,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "field-run",
 		run = function()
-			local module = package.loaded["infra.field_run"]
+			local module = package.loaded["diagnostics.engine.field_run.field_run"]
 			if module == nil then return true end
 			-- A run this teardown cuts short is closed with what cut it short
 			return module.stop({ kind = TerminationCoordinator.pending_kind(),
@@ -1025,7 +1062,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
-			local module = package.loaded["ui.menu"]
+			local module = package.loaded["menu.ui"]
 			if module == nil then return true end
 			if type(module) ~= "table" or type(module.stop_watchers) ~= "function" then
 				error("ui.menu.stop_watchers is unavailable")
@@ -1103,6 +1140,16 @@ local function shutdown_all_resources()
 	local is_reload = false
 	pcall(function() is_reload = reload_guard.is_reloading() == true end)
 	local lease_reason = is_reload and "hammerspoon_reload" or "hammerspoon_quit"
+	-- Quitting the launcher or Hammerspoon outside the menu is a Quit too: a
+	-- release swap waiting for this boot keeps the update (infra/updater_boot_ready.lua).
+	if not is_reload then
+		local reported, report_err = pcall(function()
+			return require("infra.updater_boot_ready").report_quit("hammerspoon_quit")
+		end)
+		if not reported then
+			Logger.error(LOG, "The release swap could not be told of the quit: %s", tostring(report_err))
+		end
+	end
 	local accepted = request_exact_lease_revoke(lease_reason, function(fenced, detail)
 		if fenced then
 			Logger.info(LOG, "Shutdown exact Ergopti lease fence completed: %s", tostring(detail))
@@ -1190,7 +1237,7 @@ local function emergency_exit_after_launcher_loss(reason)
 end
 
 do
-	local guard_ok, loaded_guard = pcall(require, "infra.launcher_guard")
+	local guard_ok, loaded_guard = pcall(require, "core.lifecycle.engine.launcher_guard")
 	LauncherGuard = guard_ok and loaded_guard or nil
 	if not guard_ok or type(LauncherGuard) ~= "table" or type(LauncherGuard.init) ~= "function" then
 		Logger.error(LOG, "Swift launcher liveness guard failed to load — managed launch is fail-closed: %s",
@@ -1218,8 +1265,8 @@ end
 -- The native map is immutable for this VM; every key event supplies its own
 -- model identifier. Behind Karabiner that model does not decide the ISO pair:
 -- the virtual keyboard form the bridge deploys does (registered below).
-require("adapters.keyboard_geometry").initialize()
-local file_system        = require("adapters.file_system")
+require("platform.input.keyboard_geometry").initialize()
+local file_system        = require("core.fs.adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
 -- This require sits above the menubar, the panic-button eventtap and every other
@@ -1233,22 +1280,22 @@ if not ok_karabiner then
 	karabiner = nil
 else
 	local bridge = karabiner
-	require("adapters.keyboard_geometry").set_virtual_form_source(function()
+	require("platform.input.keyboard_geometry").set_virtual_form_source(function()
 		return bridge.virtual_keyboard_form()
 	end)
 end
-local menu               = require("ui.menu")
-local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
-local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
-local backend_detector    = require("modules.llm.backend_detector")
-local ErrorDialog         = require("ui.error_dialog")
-local ui_restore         = require("infra.ui_restore")
+local menu               = require("menu.ui")
+local mlx_deps_checker    = require("ai.engine.local_servers.mlx_deps_checker")
+local ollama_deps_checker = require("ai.engine.ollama.deps_checker")
+local backend_detector    = require("ai.engine.api.backend_detector")
+local ErrorDialog         = require("diagnostics.ui.error_dialog")
+local ui_restore         = require("menu.engine.ui_restore")
 
 do
 	local init_ok, initialized_or_err = xpcall(function()
 		return TerminationCoordinator.init({
 			capture_publication_admission = function()
-				return require("modules.hotstrings.hotstrings_config").capture_terminal_admission()
+				return require("hotstrings.engine.catalogue.config").capture_terminal_admission()
 			end,
 			request_lease = request_exact_lease_revoke,
 			drain_input = function(callback)
@@ -1266,9 +1313,12 @@ do
 			schedule = function(delay, callback)
 				return hs.timer.doAfter(delay, callback)
 			end,
-			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
-			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
+			user_exit_deadline_seconds = require("core.timing.engine.timings").sec("ui", "user_quit_deadline_ms"),
+			reload_deadline_seconds = require("core.timing.engine.timings").sec("ui", "reload_deadline_ms"),
 			record_stage = ReloadBreadcrumb.record,
+			report_update_quit = function(reason)
+				return require("infra.updater_boot_ready").report_quit(reason)
+			end,
 			mark_reload = function()
 				reload_guard.mark_started(TimerScheduler.now() * 1000)
 				reload_guard.mark_reload()
@@ -1289,6 +1339,17 @@ do
 	end
 end
 
+-- A quit the launcher receives from outside (Sparkle's relaunch, a logout,
+-- osascript) runs the same controlled exit as the menu's Quit (MLC-002).
+if LauncherGuard and type(LauncherGuard.watch_quit_request) == "function" then
+	local registered, detail = LauncherGuard.watch_quit_request(function()
+		return TerminationCoordinator.request_user_exit("launcher_quit")
+	end)
+	if registered ~= true then
+		Logger.error(LOG, "Launcher quit requests are not handled: %s.", tostring(detail))
+	end
+end
+
 -- The transport may discover queue exhaustion, repeated ACK loss, or a native
 -- NACK only after boot. Route every such failure through the same bounded exact
 -- lease fence used for launcher loss; an unresponsive coordinator still reaches
@@ -1304,7 +1365,7 @@ do
 	end
 end
 
--- Wire Logger.error → the error window (ui/error_dialog), so an ERROR reaches
+-- Wire Logger.error → the error window (diagnostics/ui), so an ERROR reaches
 -- the user without any module calling it directly: the shared policy decides
 -- which ERROR opens it, and it opens later, on a timer, without the keyboard.
 -- It replaces the system notification every ERROR used to raise. Registered
@@ -1321,36 +1382,66 @@ Boot.stage("Config schema migration")
 -- migrated file, and a file the wizard creates carries this build's version. A
 -- file this build cannot version (a newer schema, a failed migration) stays
 -- untouched and every write to it is refused for the session
--- (_shared/lua/config_migrate.lua, docs/adr/009-config-versioning.md).
+-- (_shared/settings/engine/migration/migrate.lua, docs/adr/009-config-versioning.md).
 do
-	local ConfigMigrate = require("config_migrate")
-	require("toml_codec.writer").set_sparse_defaults(
-		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
-	require("toml_codec.writer").set_case_twin_reporter(function(message)
-		local sent, notice_error = require("infra.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
+	local ConfigMigrate = require("settings.engine.migration.migrate")
+	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
+		config_paths.get("ConfigTomlPath"), require("menu.engine.manifest_reader"))
+	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message)
+		local sent, notice_error = require("core.ui.engine.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
 		if not sent then error(tostring(notice_error)) end
 	end)
 	local catalogue_ok, action_catalogue = pcall(require, "_generated.action_catalogue")
 	local context, context_error
 	if catalogue_ok then
 		context, context_error = ConfigMigrate.load_context(
-			require("infra.paths").shared("modules/actions/modifier_chords.json"), action_catalogue, file_system)
+			require("core.fs.engine.paths").shared("shortcuts/data/actions/modifier_chords.json"), action_catalogue, file_system)
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
+	end
+	-- The tap-hold rows of the manifest live in config.toml since its v22 step,
+	-- which moves them out of tap_hold.toml. An old config_karabiner.toml is
+	-- carried over into tap_hold.toml first, so a 1.0.9 configuration moves in
+	-- this one boot (_shared/tap_hold/data/migrations.toml [legacy_imports.hs]).
+	local tap_hold_path = config_paths.get("TapHoldConfigPath")
+	-- platform/remap/config.lua reads the rows from the config.toml beside it.
+	local TapHoldFile = require("platform.remap.tap_hold_file")
+	if TapHoldFile.config_toml_path_for(tap_hold_path) ~= config_paths.get("ConfigTomlPath") then
+		Logger.error(LOG, "tap_hold.toml '%s' is not beside config.toml '%s': the remap settings cannot find their rows.",
+			tap_hold_path, config_paths.get("ConfigTomlPath"))
+	end
+	local imported, import_outcome = TapHoldFile.import_legacy(tap_hold_path, file_system)
+	if not imported then
+		Logger.error(LOG, "The old remap settings could not be carried over before the config migration (%s).",
+			tostring(import_outcome))
+	end
+	-- The registry's typed parse cache skips its 30 ms decode on an unchanged
+	-- build; validation still runs on a hit (settings/engine/registry_cache.lua).
+	local RegistryCache = require("settings.engine.registry_cache")
+	local home = os.getenv("HOME")
+	local registry_loader = nil
+	if type(home) == "string" and home ~= "" then
+		RegistryCache.init({ cache_path = home .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative
+			.. "/config_registry/migrations.cache" })
+		registry_loader = RegistryCache.load_registry
+	else
+		Logger.warn(LOG, "HOME is unset: the migration registry is parsed without its cache.")
 	end
 	local migration = ConfigMigrate.boot({
 		context       = context,
 		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
 		driver        = "hs",
-		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		registry_path = require("core.fs.engine.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		registry_loader = registry_loader,
 		file_adapter  = file_system,
+		companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] = tap_hold_path },
 	})
 	-- A file saved by a newer build stays untouched and read-only for the
 	-- session: say so, or every change the user makes silently fails to stick.
 	local notice = ConfigMigrate.read_only_notice_key(migration)
 	if notice then
-		local sent, notice_error = require("infra.notifications").notify(i18n.get(notice), nil, "warning")
+		local sent, notice_error = require("core.ui.engine.notifications").notify(i18n.get(notice), nil, "warning")
 		if not sent then
 			Logger.error(LOG, "The newer-configuration notice was not shown: %s.", tostring(notice_error))
 		end
@@ -1399,6 +1490,8 @@ do
 		boot_note("config.toml is absent at %s: opening the first-run wizard; the full boot follows it.",
 			tostring(cfg_path))
 		onboarding_mod.run(cfg_path)
+		-- The boot now waits for the user: a release swap keeps this build.
+		require("infra.updater_boot_ready").report("onboarding")
 		Boot.mark("First-launch guard (onboarding check)")
 		return
 	end
@@ -1413,20 +1506,21 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
---- Opens the native dialog that names the exact switch to turn on. It used to
---- be a one-line banner along the Dock; the dialog has steps and buttons and
---- the wait closes it when the grant arrives. Loaded here, not at the top, so a
---- UI failure can never stop the boot; guide_accessibility itself never raises.
---- @return function close Closes the dialog.
-local function show_accessibility_guidance()
-	local ok, close = xpcall(function()
-		return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Accessibility dialog unavailable: %s.", tostring(close))
-		return function() end
+local ACCESSIBILITY_RESET_STORAGE_KEY = "accessibility_reset_install_v1"
+
+--- The install the Accessibility wait remembers its one stale-entry reset by:
+--- the launcher's version and the device and inode of its executable, which a
+--- reinstall or rebuild changes and a reload or relaunch keeps.
+--- @return string|nil identity Nil when the launcher exported no identity.
+--- @return string|nil detail Exact reason when identity is nil.
+local function accessibility_install_identity()
+	local parts = {}
+	for _, name in ipairs({ "ERGOPTI_LAUNCHER_VERSION", "ERGOPTI_LAUNCHER_DEVICE", "ERGOPTI_LAUNCHER_INODE" }) do
+		local value = os.getenv(name)
+		if type(value) ~= "string" or value == "" then return nil, name .. " is not exported" end
+		parts[#parts + 1] = value
 	end
-	return close
+	return table.concat(parts, ":")
 end
 
 --- Calls on_reopen each time the user opens ErgoptiPlus again during the wait.
@@ -1471,8 +1565,10 @@ Boot.stage_once("Accessibility permission")
 -- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
 -- Each ad hoc signed build also invalidates the previous grant while System
 -- Settings still shows it checked, so exiting with instructions left users
--- stuck. The wait clears that stale entry, prompts, opens the pane, and runs
--- this boot again once macOS trusts the process.
+-- stuck. The wait clears that stale entry once per install, unless another copy
+-- signed differently can hold the switch (it then names that copy), shows
+-- macOS's own prompt, opens the pane, shows the steps that add and turn on
+-- ErgoptiPlus.app, and runs this boot again once macOS trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
 if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
@@ -1481,14 +1577,28 @@ if accessibility_trusted == nil then
 	return
 end
 if accessibility_trusted ~= true then
-	local close_guidance = function() end
+	local install_identity, identity_err = accessibility_install_identity()
+	if install_identity == nil then
+		emergency_exit_after_runtime_failure("accessibility",
+			"Accessibility wait has no install identity: " .. tostring(identity_err),
+			"startup.accessibility_required")
+		return
+	end
 	local waiting, wait_err = AccessibilityWait.start({
 		permission = AccessibilityPermission,
 		every = TimerScheduler.every,
 		cancel = TimerScheduler.cancel,
-		show_guidance = function() close_guidance = show_accessibility_guidance() end,
-		close_guidance = function() close_guidance() end,
 		watch_reopen = watch_launcher_reopen,
+		-- The steps name the app to add with + at its install path; another copy
+		-- signed differently can hold the one switch, so its paths are named too.
+		show_guide = function(copies)
+			return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission, copies)
+		end,
+		install_identity = install_identity,
+		reset_memory = {
+			get = function() return Storage.get(ACCESSIBILITY_RESET_STORAGE_KEY) end,
+			set = function(identity) return Storage.set(ACCESSIBILITY_RESET_STORAGE_KEY, identity) end,
+		},
 		-- Same guard as the first run below: a raise ends in the named exit.
 		on_trusted = function()
 			local resumed_ok, resumed_error = xpcall(finish_boot_after_onboarding, debug.traceback)
@@ -1506,7 +1616,10 @@ if accessibility_trusted ~= true then
 		emergency_exit_after_runtime_failure("accessibility",
 			"Accessibility wait could not start: " .. tostring(wait_err),
 			"startup.accessibility_required")
+		return
 	end
+	-- A new signature waits for the user's grant: a release swap keeps this build.
+	require("infra.updater_boot_ready").report("waiting for Accessibility")
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
@@ -1558,7 +1671,7 @@ end
 -- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
 -- and the llm.enabled read below sits beside it: the two readers of one
 -- setting must not sit on opposite sides of the layer that populates it.
-local config_overrides = require("infra.config_overrides")
+local config_overrides = require("settings.engine.overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
 -- The boot's one answer to "is the AI on": the native value, else config.toml,
@@ -1566,10 +1679,10 @@ config_overrides.apply(config_paths.get("ConfigTomlPath"))
 -- AI warmup, so it reads this same value. It used to read the native value
 -- alone: a config.toml that turned the AI on, with no native value yet, started
 -- the AI bootstrap and skipped the cleanup.
-local Preferences = require("infra.preferences")
-local ok_core_llm, core_llm = pcall(require, "modules.llm")
+local Preferences = require("settings.engine.preferences.preferences")
+local ok_core_llm, core_llm = pcall(require, "ai.engine")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
+local boot_llm_enabled = config_overrides.read_native_value(require("settings.engine.keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1609,7 +1722,7 @@ end
 -- seconds instead of a 45-90 s cold reload. Killing it unconditionally (the old
 -- behaviour) is exactly what made every boot/reload pay a cold start.
 --
--- The MLX port is the single source of truth from api_mlx (_shared/modules/llm/mlx_server.json).
+-- The MLX port is the single source of truth from api_mlx (_shared/ai/data/mlx_server.json).
 -- Decision is spare-all-or-nuke-all: under SO_REUSEPORT the listening PID is
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs.
@@ -1618,7 +1731,7 @@ end
 -- The exact terminal callback opens the bootstrap gate, preserving the required
 -- port-settlement ordering without parking input eventtaps (HS-195).
 if mlx_cleanup_enabled then
-	local cleanup_started = require("modules.llm.boot_cleanup")
+	local cleanup_started = require("ai.engine.bootstrap.boot_cleanup")
 		.run_selective_cleanup(settle_mlx_cleanup)
 	if cleanup_started ~= true and not mlx_cleanup_settled then
 		settle_mlx_cleanup(false)
@@ -1656,11 +1769,9 @@ Boot.stage("LLM backend bootstrap")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = Storage.get(require("config_keys").LEAF.LOG_LEVEL)
-	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
-	if type(lvl) == "string" and valid_levels[lvl:upper()] then
-		Logger.set_level(lvl:upper())
-	end
+	local Keys = require("settings.engine.keys")
+	local entry = require("menu.engine.manifest_reader").find_entry_by_path(Keys.KEY.SCRIPT_LOG_LEVEL)
+	Logger.apply_level_setting(Storage.get(Keys.LEAF.LOG_LEVEL), entry)
 end
 
 local function start_llm_bootstrap()
@@ -1681,7 +1792,7 @@ local function start_llm_bootstrap()
 	end
 	if selected_checker then
 		local notice_ok, notice_err = xpcall(function()
-			return require("ui.menu.menu_llm.runtime_install_offer").notify_if_missing(active_backend)
+			return require("ai.ui.menu.runtime_install_offer").notify_if_missing(active_backend)
 		end, debug.traceback)
 		if not notice_ok then
 			Logger.error(LOG, "Missing AI runtime notice failed: %s", tostring(notice_err))
@@ -1713,7 +1824,7 @@ Boot.mark("LLM backend bootstrap")
 Boot.stage("TOML discovery + ordering")
 
 local configured_hotstrings_dir = config_paths.get("HotstringsDirPath")
-local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
+local bundled_hotstrings_dir    = base_dir .. "../_shared/hotstrings/data/catalogue/"
 local hotstrings_dir            = configured_hotstrings_dir
 
 local HOTSTRINGS_EXCLUDED_STEMS = {
@@ -1728,7 +1839,7 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 -- applies too. This scan kept its own copy that skipped only "_"-prefixed files,
 -- so defaults.toml (the resolver's fallback delays and colours) loaded as an
 -- empty group and the common hotstrings menu showed « defaults (0) ».
-local HotstringCatalogueFiles = require("hotstrings.catalogue_files")
+local HotstringCatalogueFiles = require("hotstrings.engine.catalogue.files")
 
 --- Stem of a hotstring category file, or nil for anything else in the directory.
 --- @param fname string File name.
@@ -1743,7 +1854,7 @@ end
 -- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is honoured in exactly one place across the driver; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("infra.fs_dir").entries
+local safe_dir_entries = require("core.fs.engine.dir").entries
 
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
@@ -1766,7 +1877,7 @@ end
 -- Language packs declared by the shared index ([languages]); each category file
 -- lives at <language>/<stem>.toml and loads as the group "<language>_<stem>".
 -- Declared here, above the resolver closure below that reads them.
-local HotstringLanguages = require("hotstrings.languages")
+local HotstringLanguages = require("hotstrings.engine.languages")
 local language_packs  = {}
 
 --- Absolute path of one language pack's category file. The configured directory
@@ -1799,7 +1910,7 @@ end
 -- the override resolver, the loader and the menu read them, so all three
 -- describe the same packs. A pack, root or installed-layouts record that cannot
 -- be read is logged and left out: one optional folder never costs the keymap.
-local ExtensionPacks = require("infra.extension_packs")
+local ExtensionPacks = require("hotstrings.engine.catalogue.extension_packs")
 ExtensionPacks.discover()
 
 -- Initialise the hotstrings_config module so per-group delays and tooltip
@@ -1807,13 +1918,13 @@ ExtensionPacks.discover()
 -- file. The resolver routes the personal category through the (possibly
 -- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
 do
-	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+	local hotstrings_config = require("hotstrings.engine.catalogue.config")
 	local override_path = config_paths.get_config_dir()
-	override_path = require("native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
+	override_path = require("core.fs.engine.native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
 		current_override_path = function()
-			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
+			return require("core.fs.engine.native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
 		-- The base expansion delay the overrides are offsets of is the keymap's,
@@ -1835,7 +1946,7 @@ do
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
 			end
-			local personal_components = require("hotstrings.personal_files").components(category)
+			local personal_components = require("hotstrings.engine.catalogue.personal_files").components(category)
 			if personal_components then
 				return (config_paths.get("PersonalHotstringsDir"):gsub("/+$", "")
 					.. "/" .. table.concat(personal_components, "/"))
@@ -1869,7 +1980,7 @@ do
 	keymap.on_base_delay_change(hotstrings_config.refresh_delays)
 
 	-- Wire the config window so it can discover personal + extension files.
-	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
+	local ok_cw, cw = pcall(require, "hotstrings.ui.hotstrings_config_window")
 	if ok_cw and cw and type(cw.setup) == "function" then
 		local extensions_dir = base_dir .. "../extensions"
 		cw.setup({
@@ -1894,7 +2005,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+local magic_key = ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -1919,7 +2030,7 @@ do
 	-- Use the shared toml_codec instead of a hand-rolled parser so _index.toml
 	-- gains full TOML support (multi-line strings, nested inline tables, etc.)
 	-- without maintaining a second parser that can drift from the codec.
-	local TomlCodec = require("toml_codec.codec")
+	local TomlCodec = require("core.text.engine.toml_codec.codec")
 
 	local fh = io.open(hotstrings_dir .. "_index.toml", "r")
 	if fh then
@@ -2028,7 +2139,7 @@ Boot.stage("Hotstring groups registered (personal + dynamic + common)")
 -- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-personal_files = require("infra.personal_hotstrings").load({
+personal_files = require("hotstrings.engine.catalogue.personal_hotstrings").load({
 	bundled_hotstrings_dir = bundled_hotstrings_dir,
 	saved_preferences = boot_saved_prefs,
 })
@@ -2081,7 +2192,7 @@ Boot.sub("dynamic hotstrings")
 -- file: the bound rules keep the category and its common tier.
 Logger.debug(LOG, "Loading common TOML hotstring files…")
 local _toml_load_t0 = hs.timer.secondsSinceEpoch()
-local CommonHotstringsBoot = require("infra.common_hotstrings_boot")
+local CommonHotstringsBoot = require("hotstrings.engine.common_hotstrings_boot")
 local common_file_count = 0
 local carried_categories = {}
 -- Whether every bundled source loaded, and which categories list the build's own
@@ -2146,9 +2257,9 @@ end
 -- build shipped, once every bundled source loaded. A personal file, an extension
 -- pack or a dynamic group is never judged: its absence may be temporary.
 if bundled_complete then
-	local PersonalHotstrings = require("infra.personal_hotstrings")
-	local Extensions = require("hotstrings.extensions")
-	local published = require("infra.hotstring_choice_catalogue").publish(function(id)
+	local PersonalHotstrings = require("hotstrings.engine.catalogue.personal_hotstrings")
+	local Extensions = require("hotstrings.engine.extensions")
+	local published = require("hotstrings.engine.matcher.choice_catalogue").publish(function(id)
 		if PersonalHotstrings.is_personal_group(id) or Extensions.parse_category_key(id) ~= nil
 			or id == "dynamichotstrings" then
 			return { unjudged = true }
@@ -2170,7 +2281,7 @@ Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language
 -- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
 -- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".
 do
-	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
+	local ok_cache, toml_cache = pcall(require, "core.fs.adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.stats) == "function" then
 		local s = toml_cache.stats()
 		Logger.info(LOG, string.format("TOML snapshot cache: %d hit(s), %d miss(es), %d write(s) (enabled=%s).",
@@ -2179,6 +2290,11 @@ do
 end
 Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
+-- Read each category's TOML metadata on run-loop turns from now on, so the
+-- first preview of a category reads memory instead of its file on the keystroke
+if require("hotstrings.engine.catalogue.config").prewarm_meta(keymap.list_toml_groups()) ~= true then
+	Logger.error(LOG, "The hotstring category metadata is read on each category's first preview this session.")
+end
 Boot.stage("Final mapping sort + tail-index rebuild")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
@@ -2190,11 +2306,18 @@ Boot.mark("Final mapping sort + tail-index rebuild")
 Boot.stage("Keymap engine started")
 
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
--- This call was previously auto-invoked at the end of modules/keymap/init.lua
+-- This call was previously auto-invoked at the end of hotstrings/engine/expander/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
+if keymap.migrate_legacy_section_settings() ~= true then
+	error("legacy hotstring section settings could not be migrated before eventtap startup")
+end
 if keymap.apply_hotstring_preferences(boot_saved_prefs) ~= true then
 	error("canonical hotstring preferences did not commit before eventtap startup")
 end
+-- The layout emulation the keymap tap types through. A layout it cannot read
+-- is an ERROR of its owner and the system layout keeps typing; only a broken
+-- owner (a raise) stops the boot.
+keymap.start_layout_emulation()
 local keymap_started = keymap.start()
 if keymap_started ~= true then
 	error("keymap.start did not commit")
@@ -2229,7 +2352,7 @@ end
 -- the one the next deploy writes. An unreadable file refuses the deploy instead
 -- of guessing a product.
 do
-	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
+	local virtual_keyboard_default = require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
 		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
 		local flat, _, reason, key_path = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
@@ -2324,21 +2447,21 @@ ui_restore.restore()
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
 -- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-local file_watchers_committed = require("infra.file_watchers").start({
+local file_watchers_committed = require("core.fs.engine.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = require("native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
+	personal_hotstrings_dir = require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
 	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as
 	-- external edits: every save_prefs — every menu toggle — reloaded the whole
-	-- driver, and every layout change regenerated config_karabiner.toml and did
+	-- driver, and every layout change regenerated tap_hold.toml and did
 	-- it again. Resolved from menu_paths so the watcher and the writers cannot
 	-- disagree about where these files are.
 	self_written_files      = {
 		config_paths.get("ConfigTomlPath"),
-		config_paths.get("KarabinerConfigPath"),
+		config_paths.get("TapHoldConfigPath"),
 	},
 	-- Runtime store, not source: the TOML snapshot cache writes .lua files, so
 	-- wherever a watched tree contains it every cache refresh would trigger a
@@ -2347,10 +2470,10 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
-	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil,
+	shared_source_dir       = require("core.lifecycle.engine.dev_source").is_active() and (logger_shared_root .. "") or nil,
 	git_roots               = {
 		base_dir,
-		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
+		require("core.fs.engine.native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
 	},
 })
 if file_watchers_committed ~= true then
@@ -2375,17 +2498,17 @@ Boot.stage("Boot complete (post-init deferrals scheduled)")
 -- Warm up macOS WebKit in the background so the first dashboard open is
 -- not penalised by the framework load (~1-2 s).  Deferred so it never
 -- blocks the boot critical path.
-hs.timer.doAfter(require("infra.timings").sec("ui", "webkit_warmup_delay_ms"), function()
-	pcall(function() require("ui.ui_builder").warmup_webkit() end)
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "webkit_warmup_delay_ms"), function()
+	pcall(function() require("core.ui.ui.builder").warmup_webkit() end)
 end)
 
 -- Name once each config.toml entry no reader of this build uses, as the
 -- Windows loader does at startup: the warning behind what « Nettoyer
 -- config.toml » offers. Off the boot critical path; a failure is logged with
 -- its traceback, never lost in the timer's dispatch.
-hs.timer.doAfter(require("infra.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
 	local listed, list_err = xpcall(function()
-		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
+		require("settings.ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
 	end, debug.traceback)
 	if not listed then
 		Logger.error(LOG, "Unused configuration entries could not be listed: %s", tostring(list_err))
@@ -2398,7 +2521,7 @@ end)
 -- asked to use it) or logged as still off.
 local PendingLayoutActivation = require("modules.keymap.pending_layout_activation")
 PendingLayoutActivation.init(PendingLayoutActivation.production_deps())
-hs.timer.doAfter(require("infra.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
+hs.timer.doAfter(require("core.timing.engine.timings").sec("ui", "pending_layout_activation_delay_ms"), function()
 	local reported, report_err = xpcall(require("modules.keymap.layout_install").report_duplicate_bundles, debug.traceback)
 	if not reported then
 		Logger.error(LOG, "The duplicate keyboard-layout bundles could not be listed: %s", tostring(report_err))
@@ -2411,12 +2534,14 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- A release swap that opened this build keeps it only once it reports ready.
+require("infra.updater_boot_ready").report("boot complete")
 -- The reload this boot follows, from its reload call to this boot's end.
 if _reload_started_epoch_ms then
 	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms
 	Logger.info(LOG, "Reload completed in %.0f ms (reload call to boot complete).", reload_ms)
-	require("perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
-		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
+	require("core.logger.engine.perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
+		function() return require("core.timing.engine.timings").ms("budgets", "driver_reload_ms") end)
 end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
 -- child processes): one summary line per family every interval, never at boot.
@@ -2428,17 +2553,22 @@ Storage.set(HS_BOOT_READY_SETTING_KEY, true)
 -- The local reload command, once boot is complete: a reload it requested is
 -- completed here by this reloaded state. Optional, so a control that cannot
 -- start is logged and the driver runs on.
-require("infra.driver_control").start({
+require("core.lifecycle.engine.driver_control").start({
 	pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	request_reload = function(reason, on_aborted)
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
--- The developer field run (tools/dev/collect-macos-field-report.sh): only a
--- developer app runs it, so a packaged runtime never even loads the module.
-if require("infra.dev_source").is_active() then
-	require("infra.field_run").start({
-		root = require("infra.dev_source").root(),
+-- The field run (tools/dev/collect-macos-field-report.sh): a developer app
+-- runs it for its clone, and an installed signed app only when the collector
+-- opened it with that clone (the launcher admits ERGOPTI_FIELD_RUN_ROOT only
+-- for a folder of this user holding the declaration); otherwise a packaged
+-- runtime never even loads the module.
+local field_run_root = require("core.lifecycle.engine.dev_source").is_active() and require("core.lifecycle.engine.dev_source").root()
+	or os.getenv(require("core.text.engine.identifiers").field_report.environment)
+if type(field_run_root) == "string" and field_run_root ~= "" then
+	require("diagnostics.engine.field_run.field_run").start({
+		root = field_run_root,
 		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
 	})
 end

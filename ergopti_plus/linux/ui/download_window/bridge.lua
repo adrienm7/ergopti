@@ -11,8 +11,8 @@
 local M = {}
 M.bridge_name = "dl_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 
 local APP_NAME = "download_window"
 local LOG = "bridge.download_window"
@@ -23,16 +23,20 @@ local _failure_serial = 0
 local _contract = nil
 
 -- The page's kinds (_shared/ui/download_window/script.js) a Linux producer
--- uses: its heading and layout
-local KINDS = { ollama_model = true, app_update = true }
+-- uses: its heading and layout, and the line a cancel leaves in the window
+-- (UPD-02: an app update cancelled read « Ollama download cancelled »)
+local KINDS = {
+	ollama_model = { cancelled = "ollama.download_cancelled" },
+	app_update   = { cancelled = "updater.download_cancelled" },
+}
 
 local function manager()
-	local ok, module = pcall(require, "ui.webview_manager")
+	local ok, module = pcall(require, "core.ui.ui.webview_manager")
 	return ok and type(module) == "table" and module or nil
 end
 
 local function translated(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
@@ -74,12 +78,10 @@ end
 --- Loads the one canonical policy through the driver's native file owner.
 local function contract()
 	if not _contract then
-		local path = require("infra.paths").shared("modules/network/managed_network.json")
-		local file = assert(io.open(path, "rb"), "managed network policy unavailable")
-		local ok, source = pcall(file.read, file, "*a")
-		local closed = file:close()
-		assert(ok and closed, "managed network policy read or close refused")
-		_contract = require("network.failure").new(Json.decode(source))
+		local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
+		local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+		assert(status == "ok", "managed network policy read or close refused")
+		_contract = require("core.network.engine.failure").new(Json.decode(source))
 	end
 	return _contract
 end
@@ -149,7 +151,7 @@ local function cancel_from_presentation(session, document_owner, state)
 	end
 	local completed, visible = pcall(function()
 		session.cancelled = true
-		M.complete(session.id, false, translated("ollama.download_cancelled"))
+		M.complete(session.id, false, translated(KINDS[session.kind].cancelled))
 		return presentation_current(session, document_owner)
 	end)
 	session.cancelling = false -- Finally, including presentation/translation refusal.
@@ -244,7 +246,18 @@ function M.show(opts)
 		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
 		return nil
 	end
-	if _session then invalidate_failure(_session); _session.retired = true; host.hide(APP_NAME) end
+	if _session then
+		local previous = _session
+		local epoch = previous.page_epoch
+		local closed = epoch == nil or host.hide(APP_NAME, epoch) == true
+		if _session ~= previous then return nil end
+		if not closed then
+			Logger.warn(LOG, "The previous download window could not close; its session is retained.")
+			return nil
+		end
+		invalidate_failure(previous)
+		previous.retired = true
+	end
 	contract()
 
 	_serial = _serial + 1
@@ -275,10 +288,11 @@ function M.show(opts)
 	}
 	_session = session
 	if host.show(APP_NAME) ~= true then
-		_session = nil
+		if _session == session then _session = nil end
 		Logger.error(LOG, "Download progress native window could not be opened.")
 		return nil
 	end
+	if _session ~= session then return nil end
 	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
 	return session.id
 end
@@ -341,15 +355,21 @@ function M.focus(session_id)
 	local session = _session
 	if not session or session.id ~= session_id or session.retired then return false end
 	local host = manager()
-	if not host or type(host.show) ~= "function" then return false end
+	if not host or host ~= session.host or type(host.show) ~= "function" then return false end
 	if type(host.is_visible) == "function" and host.is_visible(APP_NAME) == true then
-		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
-		session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or type(host.bring_to_front) ~= "function"
+			or host.bring_to_front(APP_NAME) ~= true then return false end
+		local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or manager() ~= host then return false end
+		session.page_epoch = epoch
 		return true
 	end
+	if _session ~= session or session.retired or manager() ~= host then return false end
 	session.ready = false
 	if host.show(APP_NAME) ~= true then return false end
-	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	if _session ~= session or session.retired or manager() ~= host then return false end
+	session.page_epoch = epoch
 	return true
 end
 
@@ -461,17 +481,6 @@ function M.on_message(payload, state, context)
 	if payload.action == "expand" then return { expanded = true } end
 	Logger.debug(LOG, "Unknown download action refused.")
 	return nil
-end
-
---- Fresh native admission for the same app-update operation document.
---- No document owner/descriptor is exported; a missing initialization ACK refuses.
-function M.install_admission_current(session_id)
-	local session = _session
-	if not session or session.id ~= session_id or session.kind ~= "app_update"
-		or session.terminal or session.retired or session.cancelled then return false end
-	local observed, admitted = pcall(owner_current, session)
-	return observed and admitted == true and _session == session and session.id == session_id
-		and not session.terminal and not session.retired and not session.cancelled
 end
 
 function M.session_id()

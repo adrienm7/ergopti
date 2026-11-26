@@ -4,7 +4,7 @@
 do
 --- Independent before-code subscription hint controls: hints never acknowledge native retirement.
 local helpers = require("tests.helpers")
-local Lifetime = require("keystats.physical_subscription_lifetime")
+local Lifetime = require("metrics.engine.capture.physical_subscription_lifetime")
 local function source()
  local owner, token = {}, {}
  local life = Lifetime.new(owner, token)
@@ -349,7 +349,7 @@ do
 local helpers = require("tests.helpers")
 helpers.describe("bounded physical lease policy", function()
  local function fixture()
-  local Policy = require("keystats.physical_lease_policy")
+  local Policy = require("metrics.engine.capture.physical_lease_policy")
   local owner, native = {}, {}
   local facts = { current = true, retired = false, queries = 0, native = native }
   local p = Policy.new(owner, {
@@ -409,7 +409,7 @@ helpers.describe("bounded physical lease policy", function()
   helpers.assert_eq(p.begin(owner), nil); helpers.assert_eq(facts.queries, before)
  end)
  helpers.it("denies foreign identity and source revocation during actual retirement callback", function()
-  local Policy = require("keystats.physical_lease_policy")
+  local Policy = require("metrics.engine.capture.physical_lease_policy")
   local owner, native, current, calls, p = {}, {}, true, 0, nil
   p = Policy.new(owner, { current = function() return current end,
    lease_identity = function() return native end,
@@ -428,7 +428,7 @@ do
 --- Independent bounded normalization policy; explicit software ports, no native authority.
 local helpers = require("tests.helpers")
 local function fixture()
- local Policy = require("keystats.physical_lease_policy")
+ local Policy = require("metrics.engine.capture.physical_lease_policy")
  local owner = {}; local c = { current_value = true, native = {}, retired_value = true,
   calls = { current = 0, identity = 0, retired = 0 } }
  local ports = {
@@ -587,7 +587,7 @@ do
 local helpers = require("tests.helpers")
 helpers.describe("independent policy retirement frame", function()
  helpers.it("retains its real retirement query frame through detach and terminal hint", function()
-  local Policy = require("keystats.physical_lease_policy")
+  local Policy = require("metrics.engine.capture.physical_lease_policy")
   local owner, native = {}, {}
   local policy, cap, token, hints, inside_query, inside_hint, detached = nil, nil, nil, 0, nil, nil, nil
   policy = Policy.new(owner, {

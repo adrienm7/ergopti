@@ -27,7 +27,7 @@ local function descriptor_count()
 end
 local descriptors_before = descriptor_count()
 if backend == "ffi" then package.loaded.luv = {} else assert(require("luv")) end
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 if kind == "metadata-refusal" then
 	if backend == "luv" then
 		local uv = require("luv")
@@ -139,7 +139,7 @@ def main():
                 env = dict(os.environ)
                 env.update(
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                     ERGOPTI_WRITE_SOURCE=str(source),
                     ERGOPTI_WRITE_METHOD=method,
                     ERGOPTI_WRITE_KIND=kind,

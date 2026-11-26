@@ -9,12 +9,12 @@
 
 local M = {}
 local hs     = hs
-local dialog = require("infra.dialog_util")
-local i18n   = require("infra.i18n")
-local Logger = require("infra.logger")
-local SendInput = require("send_input")
-local NativePresentation = require("infra.native_presentation")
-local TextUtils = require("text_utils")
+local dialog = require("core.ui.engine.dialog_util")
+local i18n   = require("core.i18n.engine.i18n")
+local Logger = require("core.logger.engine.logger")
+local SendInput = require("platform.input.send_input")
+local NativePresentation = require("menu.engine.native_presentation")
+local TextUtils = require("core.text.engine.utils_core")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
@@ -36,7 +36,7 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
+local MOD_BEFORE = require("menu.engine.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
 	table.sort(mods, MOD_BEFORE)
@@ -99,15 +99,38 @@ function M.parse_shortcut_input(raw, default_mods)
 	if normalized == "" then return nil end
 
 	local parts = {}
-	for part in normalized:gmatch("[^+]+") do
+	for part in (normalized .. "+"):gmatch("(.-)%+") do
+		part = TextUtils.trim(part)
+		if part == "" then return nil end
 		table.insert(parts, part)
 	end
 	if #parts < 1 then return nil end
 
 	local key = parts[#parts]
 	local mods = {}
-	for i = 1, #parts - 1 do table.insert(mods, parts[i]) end
+	for i = 1, #parts - 1 do
+		local mod = parts[i]
+		if mod ~= "option" and mod ~= "control" and not VALID_MODS[mod] then return nil end
+		table.insert(mods, mod)
+	end
 	return M.normalize_shortcut(mods, key, default_mods)
+end
+
+--- Copies a dense modifier list before formatting untrusted saved shortcuts.
+--- @param mods any Persisted modifier array, or nil.
+--- @return table|nil copy Nil when the saved array is malformed.
+local function formatting_modifiers(mods)
+	if mods == nil then return {} end
+	if type(mods) ~= "table" then return nil end
+	local count, length, copy = 0, #mods, {}
+	for index, value in pairs(mods) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
+			or type(value) ~= "string" then return nil end
+		count = count + 1
+		copy[index] = value
+	end
+	if count ~= length then return nil end
+	return copy
 end
 
 --- Converts a shortcut table to a config-friendly string.
@@ -115,7 +138,9 @@ end
 --- @return string String representation for input fields.
 function M.shortcut_to_config_string(sc)
 	if type(sc) ~= "table" then return "" end
-	local mods = type(sc.mods) == "table" and table.concat(sc.mods, "+") or ""
+	local values = formatting_modifiers(sc.mods)
+	if not values then return "" end
+	local mods = table.concat(values, "+")
 	local key = type(sc.key) == "string" and sc.key or ""
 	if mods ~= "" and key ~= "" then return mods .. "+" .. key end
 	if key ~= "" then return key end
@@ -129,11 +154,11 @@ end
 function M.shortcut_to_label(sc, none_label)
 	-- `common.none`, not a French word written here: this is a menu label, and the
 	-- other two drivers already read that key for the same row (Windows in
-	-- menu_settings.ahk, Linux in ui/menu/builder.lua). A literal is a translation of
+	-- menu_settings.ahk, Linux in menu/ui/builder/builder.lua). A literal is a translation of
 	-- exactly one of the twenty-one languages the menu is drawn in.
 	if type(sc) ~= "table" then return none_label or i18n.get("common.none") end
-	local ordered_mods = {}
-	for _, m in ipairs(sc.mods or {}) do table.insert(ordered_mods, m) end
+	local ordered_mods = formatting_modifiers(sc.mods)
+	if not ordered_mods or type(sc.key) ~= "string" then return none_label or i18n.get("common.none") end
 	sort_modifiers(ordered_mods)
 
 	local mods_cap = {}
@@ -180,7 +205,7 @@ end
 --- @return string|nil reason Existing translated native-runner availability reason.
 function M.program_assignment_reason(value)
 	local checked, reserved = pcall(function()
-		local parsed = require("program_parameter").parse(value, "posix")
+		local parsed = require("settings.engine.program_parameter").parse(value, "posix")
 		if not parsed then return false end
 		local Native = require("adapters.apple_shortcuts_native")
 		return Native.is_chosen_program(parsed.executable, parsed.arguments)
@@ -295,7 +320,7 @@ end
 --- @param prior string The value shown first.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_vision_parameter(gestures, title, prior)
-	local Vision = require("llm.vision")
+	local Vision = require("ai.engine.prediction.vision")
 	local choices = gestures.llm_vision_choices()
 	local parsed = type(prior) == "string" and Vision.parse(prior) or nil
 	local labels, ordered = {}, {}
@@ -353,7 +378,7 @@ local OUTPUT_OPTIONS = {
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled.
 function M.ask_command_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.actions.user_action_parameter")
 	local stored = UserActionParameter.parse("command", prior) or {}
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt, title, gestures.parameter_prompt(action),
@@ -381,7 +406,7 @@ end
 --- @param prior string The stored value.
 --- @return string|nil value Nil when the user cancelled or nothing can be listed.
 function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
-	local UserActionParameter = require("user_action_parameter")
+	local UserActionParameter = require("shortcuts.engine.actions.user_action_parameter")
 	local stored = UserActionParameter.parse("apple_shortcut", prior) or {}
 	local rows, reason = require("adapters.apple_shortcuts_cli").list_blocking()
 	if not rows or #rows == 0 then
@@ -410,10 +435,38 @@ function M.ask_apple_shortcut_parameter(gestures, action, title, prior)
 	return UserActionParameter.encode("apple_shortcut", fields) or UserActionParameter.spell("apple_shortcut", fields)
 end
 
+--- Asks for a run_workflow value: one of the user's workflows, by name.
+--- @param gestures table The gestures facade (parameter_prompt).
+--- @param action string The action being configured.
+--- @param title string The prompt's title.
+--- @param prior string|nil The stored workflow id.
+--- @param workflows table|nil The workflow owner (tests).
+--- @return string|nil value The workflow id; nil when cancelled or none exists.
+function M.ask_workflow_parameter(gestures, action, title, prior, workflows)
+	workflows = workflows or require("modules.shortcuts.workflows")
+	local choices = workflows.choices()
+	if choices == nil then return nil end
+	if #choices == 0 then
+		Logger.info(LOG, "No workflow to assign: the user has none yet.")
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"), i18n.get("workflows.none_defined"),
+			i18n.get("button.ok"), nil, "informational")
+		return nil
+	end
+	local ordered, labels = {}, {}
+	for _, choice in ipairs(choices) do
+		if choice.value == prior then table.insert(ordered, 1, choice) else ordered[#ordered + 1] = choice end
+	end
+	for index, choice in ipairs(ordered) do labels[index] = choice.label end
+	local picked = dialog.choose(title, gestures.parameter_prompt(action), labels,
+		i18n.get("button.cancel"), i18n.get("button.save"))
+	if not picked then return nil end
+	return ordered[picked].value
+end
+
 --- Asks for one parameter value the way its kind is chosen: an application is
 --- picked in the /Applications chooser, a vision backend in a list, every other
 --- kind is typed.
---- run_command, open_path and run_apple_shortcut have their own editors.
+--- run_command, open_path, run_apple_shortcut and run_workflow have their own editors.
 --- @param gestures table The gestures facade.
 --- @param action string The action being configured.
 --- @param spec string Its parameter kind.
@@ -429,6 +482,7 @@ function M.ask_parameter_value(gestures, action, spec, title, prior)
 	if spec == "path" then return dialog.choose_path(prompt, title) end
 	if spec == "command" then return M.ask_command_parameter(gestures, action, title, prior) end
 	if spec == "apple_shortcut" then return M.ask_apple_shortcut_parameter(gestures, action, title, prior) end
+	if spec == "workflow" then return M.ask_workflow_parameter(gestures, action, title, prior) end
 	local save_btn = i18n.get("button.save")
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))
@@ -518,7 +572,7 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked, muta
 end
 
 --- Greys the picker rows whose catalogue requirement is proven absent: an
---- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
+--- action that needs the AI ("ai:on" in _shared/shortcuts/data/actions/actions.toml,
 --- the agent's manual actions) stays visible and greyed, with the AI-off hint
 --- (dialog.action_picker.requires_ai) as its reason, while the AI is switched
 --- off. Read at each open, so switching the AI on offers them again without a
@@ -575,7 +629,7 @@ function M.picker_parameter_fields(gestures, items, binding)
 		if kind then
 			if kind == "program" then
 				local ready_ok, ready = pcall(function()
-					return require("modules.gestures.actions_aux_owner").program_available() == true
+					return require("gestures.engine.actions_aux_owner").program_available() == true
 						and type(gestures.program_admission_available) == "function"
 						and gestures.program_admission_available() == true
 						and type(gestures.program_binding_supported) == "function"

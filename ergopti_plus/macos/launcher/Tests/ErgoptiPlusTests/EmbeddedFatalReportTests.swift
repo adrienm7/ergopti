@@ -3,7 +3,7 @@
 // ==============================================================================
 // MODULE: Embedded Fatal Report Tests
 // DESCRIPTION:
-// Proves the launcher reads exactly what adapters/boot_fatal.lua writes and turns
+// Proves the launcher reads exactly what diagnostics/adapters/boot_fatal.lua writes and turns
 // it into an alert that names the failed stage and the log to read.
 //
 // FEATURES & RATIONALE:
@@ -161,7 +161,7 @@ final class EmbeddedFatalReportTests: XCTestCase {
 
 	private static let localesDirectory = URL(fileURLWithPath: #filePath)
 		.deletingLastPathComponent()
-		.appendingPathComponent("../../../../_shared/data/locales")
+		.appendingPathComponent("../../../../_shared/core/i18n/data/locales")
 		.standardizedFileURL.path
 
 	func testStoreReadsWhatItWasGivenAndClearsIt() throws {

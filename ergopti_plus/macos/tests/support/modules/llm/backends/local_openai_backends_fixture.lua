@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 -- The servers these tests drive. Every other catalogue server is stopped in
 -- the fake scan (with_backend), so a longer catalogue changes no scenario.
@@ -62,12 +62,12 @@ end
 --- probe, inference and agent HTTP clients faked.
 --- @param scenario function Receives (api, LocalServers, world).
 local function with_backend(scenario)
-	helpers.with_fresh_modules({ "modules.llm.local_servers", "modules.llm.api_remote" }, function()
-		local api = helpers.load_with_stubs("modules.llm.api_remote")
+	helpers.with_fresh_modules({ "ai.engine.local_servers.local_servers", "ai.engine.api.remote" }, function()
+		local api = helpers.load_with_stubs("ai.engine.api.remote")
 		-- A test changes where the fake scan finds a server through world.scan_overrides
 		local scan_overrides = {}
 		local scans = require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
-		local LocalServers = require("modules.llm.local_servers")
+		local LocalServers = require("ai.engine.local_servers.local_servers")
 		for _, id in ipairs(LocalServers.ORDER) do
 			if not DRIVEN[id] then scan_overrides[id] = { running = false, pids = {}, detail = "no running process" } end
 		end
@@ -121,8 +121,8 @@ end
 
 local function with_panel(scenario)
 	local owned = {
-		"ui.menu.menu_llm.local_server_panel", "ui.menu.menu_llm.api_panel", "modules.llm",
-		"infra.dialog_util", "infra.notifications", "infra.deferred_work",
+		"ai.ui.menu.panels.local_server_panel", "ai.ui.menu.panels.api_panel", "ai.engine",
+		"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
 	}
 	with_backend(function(api, LocalServers, world)
 		helpers.with_fresh_modules(owned, function()
@@ -131,33 +131,33 @@ local function with_panel(scenario)
 			-- Deferred work runs at once unless a scenario holds it to model the
 			-- menu build that has not returned yet.
 			world.deferred, world.hold_deferred = {}, false
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(delay, callback, label)
 					world.deferred[#world.deferred + 1] = { delay = delay, label = label, callback = callback }
 					if not world.hold_deferred then callback() end
 					return true
 				end,
 			}
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine"] = {
 				api_remote = api,
 				persist_api_entries = function(callback)
 					world.persists = world.persists + 1
 					callback(true, nil, true)
 				end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				text_prompt = function(_, _, default, ok_label, cancel_label)
 					world.last_default = default
 					return world.dialog_answer[1] == "OK" and ok_label or cancel_label, world.dialog_answer[2]
 				end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind, on_click)
 					world.notices[#world.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 					return true
 				end,
 			}
-			local Panel = require("ui.menu.menu_llm.local_server_panel")
+			local Panel = require("ai.ui.menu.panels.local_server_panel")
 			local ctx = {
 				state = { llm_backend = "ollama", llm_model = "", llm_enabled = true },
 				paused = false,

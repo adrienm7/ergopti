@@ -164,12 +164,15 @@ fi
 echo "${E2E_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${E2E_USER}"
 chmod 0440 "/etc/sudoers.d/${E2E_USER}"
 E2E_HOME="$(getent passwd "${E2E_USER}" | cut -d: -f6)"
-# Only what the installer reads from a checkout: the product tree, the layout
+# Only what the installer reads from a checkout: the product tree, the XKB
+# helpers it stages beside the driver (install/xkb_helpers.sh), the layout
 # registry it installs beside the driver and the version source. The whole
 # repository would drag node_modules along.
 rm -rf "${E2E_HOME}/ergopti"
-mkdir -p "${E2E_HOME}/ergopti/static/layouts"
+mkdir -p "${E2E_HOME}/ergopti/static/layouts" "${E2E_HOME}/ergopti/static/ergopti/linux"
 cp -r "${SRC}/static/ergopti_plus" "${E2E_HOME}/ergopti/static/"
+cp -r "${SRC}/static/ergopti/linux/xkb_generation" "${SRC}/static/ergopti/linux/xkb_installation" \
+	"${E2E_HOME}/ergopti/static/ergopti/linux/"
 cp -r "${SRC}/static/layouts/registry" "${E2E_HOME}/ergopti/static/layouts/"
 cp "${SRC}/package.json" "${E2E_HOME}/ergopti/"
 # Source installs require the reviewed canonical builder, not a host binary.
@@ -204,7 +207,7 @@ if as_user "${LAUNCHER} --help" >/dev/null 2>&1; then
 else
 	fail "the launcher does not run: $(as_user "${LAUNCHER} --help" 2>&1 | tail -3)"
 fi
-if as_user "luajit ${LIB_ROOT}/linux/platform/network/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
+if as_user "luajit ${LIB_ROOT}/linux/core/network/adapters/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
 	ok "installed networking admits actual LuaJIT luv, GIO and resolver/schema prerequisites"
 else
 	fail "installed native networking prerequisites are unavailable"
@@ -212,7 +215,7 @@ fi
 
 # The installed wrapper's own LUA_PATH, replayed rather than re-typed, so a
 # check here cannot pass against a path the launcher does not set.
-INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/lua/?.lua;${LIB_ROOT}/_shared/lua/?/init.lua;;"
+INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/?.lua;${LIB_ROOT}/_shared/?/init.lua;;"
 
 
 section "Runtime dependencies"

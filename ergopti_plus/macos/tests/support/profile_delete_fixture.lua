@@ -9,49 +9,51 @@
 
 local helpers = require("tests.helpers")
 -- Pure shared owners are captured before native fixture dependencies are replaced.
-local ManifestRenderer = require("menu.renderer")
-local json = require("json")
+local ManifestRenderer = require("menu.engine.renderer")
+local json = require("core.text.engine.json")
 
 local MODULES = {
-	"diagnostics.operation_reporter",
-	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"diagnostics.engine.operation_reporter",
+	"platform.input.hotkey_registrar",
+	"core.events.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	-- The timer scheduler admits delays through this pure owner.
-	"number_policy",
-	"chord",
-	"infra.app_picker",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.manifest_menu",
-	"infra.notifications",
-	"json",
-	"logger.shim",
-	"menu.renderer",
-	"llm.tone",
+	"core.text.engine.number_policy",
+	"keyboard.engine.chord",
+	"apps.engine.picker",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_menu",
+	"core.ui.engine.notifications",
+	"core.text.engine.json",
+	"core.logger.engine.shim",
+	"menu.engine.renderer",
+	"ai.engine.prediction.tone",
 	-- The real profiles manager keeps per-application overrides through these
 	-- shared owners (56e8569a); the codec encodes them through compat.base64.
-	"llm.app_identity",
-	"llm.app_profile_overrides",
-	"compat.base64",
+	"ai.engine.policy.app_identity",
+	"ai.engine.policy.app_profile_overrides",
+	"core.lifecycle.engine.compat.base64",
 	-- The overrides owner copies tables through this shared owner.
-	"table_util",
+	"core.text.engine.table_util",
+	-- The trigger orchestrator trims shortcut modifiers through this re-export (ea1da6c3).
+	"core.text.engine.utils",
 	-- The real JSON codec and text helpers decode UTF-8 through this owner.
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	-- The application identity owner normalizes names through these helpers.
-	"text_utils",
-	"modules.llm",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.profiles_manager",
-	"ui.menu.menu_llm.trigger_orchestrator",
-	"ui.menu.menu_llm.trigger_panel",
+	"core.text.engine.utils_core",
+	"ai.engine",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.profiles_manager",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.panels.trigger_panel",
 	"ui.menu.shortcut_utils",
-	"ui.menu.preferences_transaction",
-	"ui.prompt_editor",
+	"settings.ui.menu.preferences_transaction",
+	"ai.ui.prompt_editor",
 }
 
 --- Clones plain state so durable snapshots never alias the live candidate.
@@ -233,19 +235,19 @@ local function with_trigger_fixture(options, body)
 		local set_profiles_calls = {}
 
 		if options.real_registrar then
-			package.loaded["adapters.hotkey_registrar"] = nil
-			package.loaded["chord"] = nil
+			package.loaded["platform.input.hotkey_registrar"] = nil
+			package.loaded["keyboard.engine.chord"] = nil
 		else
-			package.loaded["adapters.hotkey_registrar"] = backend.registrar
-			package.loaded["chord"] = {
+			package.loaded["platform.input.hotkey_registrar"] = backend.registrar
+			package.loaded["keyboard.engine.chord"] = {
 				format = function(mods, key)
 					if type(mods) ~= "table" or type(key) ~= "string" then return nil, "invalid" end
 					return table.concat(mods, "+") .. "+" .. key
 				end,
 			}
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.llm"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
@@ -307,6 +309,7 @@ local function with_trigger_fixture(options, body)
 			-- Profile hotkeys bind only with the AI on
 			llm_enabled = options.llm_enabled ~= false,
 			llm_active_profile = options.active_profile or "basic",
+			llm_auto_profile_for_model = options.auto_profile ~= false,
 			llm_profile_shortcuts = clone(options.profile_shortcuts or {}),
 			llm_user_profiles = runtime_profiles,
 			llm_num_predictions = 1,
@@ -361,8 +364,8 @@ local function with_trigger_fixture(options, body)
 			return true
 		end
 
-		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = nil
-		local orchestrator = require("ui.menu.menu_llm.trigger_orchestrator").new({
+		package.loaded["ai.ui.menu.trigger_orchestrator"] = nil
+		local orchestrator = require("ai.ui.menu.trigger_orchestrator").new({
 			state = state,
 			keymap = keymap,
 			save_prefs = save_prefs,
@@ -421,35 +424,35 @@ local function with_delete_fixture(options, body)
 		profile_shortcuts = {user_p = {mods = {"ctrl"}, key = "p"}},
 	}, function(fixture)
 		local recommendation_dialog_count = 0
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function(_, _, confirm_label)
 				if confirm_label == "button.delete" then return "button.delete" end
 				recommendation_dialog_count = recommendation_dialog_count + 1
 				return "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
 		local renderer = assert(ManifestRenderer.new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 			get_array = renderer.get_array,
 		}
-		package.loaded["infra.notifications"] = {notify = function() return true end}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
-		package.loaded["ui.prompt_editor"] = {open = function() return true end}
+		package.loaded["ai.ui.prompt_editor"] = {open = function() return true end}
 
 		fixture.state.llm_backend = options.pending_model and "mlx" or "ollama"
 		fixture.state.llm_enabled = true
@@ -494,8 +497,8 @@ local function with_delete_fixture(options, body)
 		}
 		local switcher = nil
 		if options.real_switcher then
-			package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-			switcher = require("ui.menu.menu_llm.model_switcher").new({
+			package.loaded["ai.ui.menu.models.switcher"] = nil
+			switcher = require("ai.ui.menu.models.switcher").new({
 				state = fixture.state,
 				models_mgr = models_mgr,
 				keymap = {
@@ -525,8 +528,8 @@ local function with_delete_fixture(options, body)
 
 		-- The trigger fixture exposes its save through the orchestrator only for
 		-- this real multi-owner transaction; production receives the same closure
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		local profile_rows = manager.get_menu_item().menu
 		local custom = find_row(profile_rows, "Profile P")
 		local advanced = find_row(profile_rows, "Advanced")

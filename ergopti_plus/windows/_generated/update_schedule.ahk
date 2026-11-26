@@ -1,5 +1,5 @@
 ﻿; _generated/update_schedule.ahk
-; AUTO-GENERATED from _shared/modules/updater/defaults.json.
+; AUTO-GENERATED from _shared/updater/data/defaults.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:update-schedule` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -34,4 +34,12 @@ UpdateScheduleData() {
 		"failure_backoff_sec", [300, 900, 3600],
 		"reevaluate_sec", 300,
 		"state_storage_key", "updater.check_state")
+}
+
+; The release download bounds of archive_transfer, shared with macOS and Linux:
+; the receive timeout between two reads and the absolute archive deadline.
+UpdateArchiveTransferData() {
+	return Map(
+		"archive_idle_timeout_ms", 600000,
+		"archive_phase_timeout_ms", 1200000)
 }

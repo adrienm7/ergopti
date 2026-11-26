@@ -11,18 +11,18 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.manifest_menu",
-	"infra.notifications",
-	"modules.llm",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.profiles_manager",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_menu",
+	"core.ui.engine.notifications",
+	"ai.engine",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.profiles_manager",
 	"ui.menu.shortcut_utils",
-	"ui.prompt_editor",
+	"ai.ui.prompt_editor",
 }
 
 local function find_row(rows, label)
@@ -48,17 +48,17 @@ local function with_profiles_fixture(options, body)
 		local error_count = 0
 		local editor_calls = 0
 		local timers = {}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
 		local logger = helpers.make_logger_stub()
 		logger.error = function() error_count = error_count + 1 end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback, timer = {} }
 				timers[#timers + 1] = handle
@@ -67,25 +67,25 @@ local function with_profiles_fixture(options, body)
 			onSettled = function(handle, callback) handle.on_settled = callback; return true end,
 			cancel = function(handle) handle.timer = nil; if handle.on_settled then handle.on_settled() end; return true end,
 		}
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
-				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
-			json_decode = require("json").decode,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			json_decode = require("core.text.engine.json").decode,
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {notify = function()
+		package.loaded["core.ui.engine.notifications"] = {notify = function()
 			notification_count = notification_count + 1
 			return true
 		end}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
@@ -118,11 +118,11 @@ local function with_profiles_fixture(options, body)
 			end,
 			get_active_profile = function() return {id = runtime_profile} end,
 		}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {prompt_shortcut = function() end}
-		package.loaded["ui.prompt_editor"] = {
+		package.loaded["ai.ui.prompt_editor"] = {
 			open = function(profile, callback)
 				editor_calls = editor_calls + 1
 				if profile == nil then
@@ -141,6 +141,7 @@ local function with_profiles_fixture(options, body)
 			llm_backend = "ollama",
 			llm_enabled = true,
 			llm_active_profile = options.active_profile or "basic",
+			llm_auto_profile_for_model = options.auto_profile ~= false,
 			llm_model = options.model ~= nil and options.model or "A",
 			llm_model_power = 1,
 			llm_model_ollama = options.model ~= nil and options.model or "A",
@@ -234,8 +235,8 @@ local function with_profiles_fixture(options, body)
 			check_requirements = function() return false end,
 		}
 		if options.real_recommendation then
-			package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-			local switcher = require("ui.menu.menu_llm.model_switcher").new({
+			package.loaded["ai.ui.menu.models.switcher"] = nil
+			local switcher = require("ai.ui.menu.models.switcher").new({
 				state = state,
 				models_mgr = models_mgr,
 				keymap = {},
@@ -247,8 +248,8 @@ local function with_profiles_fixture(options, body)
 			end
 		end
 
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		body({
 			dispatch = function(row)
 				local result = row.action()

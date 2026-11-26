@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 
 helpers.describe("Linux keyboard slots: unknown ids (unknown-slot-report)", function()
 	helpers.it("(unknown-slot-report) names an unowned id and keeps an owned id quiet", function()

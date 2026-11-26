@@ -9,8 +9,9 @@
 # every step and that the daemon it restarts reports the new version.
 #
 # Needs network access to GitHub, luajit, lua-luv, tar, sha256sum and curl.
-# Run from anywhere. Exit 0 = updated and restarted; 1 = a failure;
-# 2 = no environment.
+# Run from anywhere. Exit 0 = updated and restarted, or, while the newest
+# release predates the structure move, its designed refusal proved
+# (phase=transition); 1 = a failure; 2 = no environment.
 
 set -u
 WORK=""
@@ -74,9 +75,6 @@ ERGOPTI_BUILD_VERSION=0.0.0-dev.1 bash "${REPO}/tools/build/build-linux-driver.s
 export HOME="${WORK}/home"
 export XDG_CONFIG_HOME="${HOME}/.config" XDG_DATA_HOME="${HOME}/.local/share" XDG_CACHE_HOME="${HOME}/.cache"
 export XDG_STATE_HOME="${HOME}/.local/state"
-# Where the daemon writes its logs: state, not data (infra/config_paths.lua).
-# The check read the data folder, which only builds before v0.0.0-dev.140 used.
-LOGS="${XDG_STATE_HOME}/ergopti_plus/logs"
 PHASE=install
 ( cd "${WORK}/unpacked" && bash install.sh --no-deps --no-service ) > "${WORK}/install.log" 2>&1 \
 	|| { CAUSE_STATUS=$?; tail -20 "${WORK}/install.log"; echo "FAIL install.sh failed"; exit 1; }
@@ -84,7 +82,7 @@ PHASE=install
 # The installed tree, as its launcher loads it; the restart relay is this
 # checkout's, as it is the running daemon's own code that restarts it.
 LIB="${HOME}/.local/lib/ergopti"
-export LUA_PATH="${LIB}/linux/?.lua;${LIB}/linux/?/init.lua;${LIB}/_shared/lua/?.lua;${LIB}/_shared/lua/?/init.lua;;"
+export LUA_PATH="${LIB}/linux/?.lua;${LIB}/linux/?/init.lua;${LIB}/_shared/?.lua;${LIB}/_shared/?/init.lua;;"
 PHASE=updater
 if [ -n "${EVIDENCE_DIR}" ]; then
 	mkdir -p "${EVIDENCE_DIR}" || echo "Updater evidence directory could not be created." >&2
@@ -101,12 +99,23 @@ CAUSE_STATUS=${STATUS}
 exec 3>&- 4>&-
 wait "${STDOUT_PID}" || echo "Updater stdout evidence could not be copied." >&2
 wait "${STDERR_PID}" || echo "Updater stderr evidence could not be copied." >&2
+if [ "${STATUS}" -eq 3 ]; then
+	PHASE=transition
+	echo "  ok   the newest release predates the structure move: its refusal is proved, not an install"
+	exit 0
+fi
 [ "${STATUS}" -eq 0 ] || exit 1
 
 # The restarted daemon: started by the relay once the updater's process exited,
 # from the installed launcher, it must report the version just installed.
 PHASE=restart
 NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
+# Where that daemon writes its logs: state, not data (settings/engine/paths.lua),
+# in the folder its own installed registry names. It is the newest published
+# release, which may predate this checkout's folder name, so the name is read
+# from the installed _shared/core/fs/engine/app_dirs.lua (LUA_PATH above), not spelled.
+LOGS="${XDG_STATE_HOME}/$(luajit -e 'io.write(require("core.fs.engine.app_dirs").linux.relative)')" \
+	|| { CAUSE_STATUS=$?; echo "FAIL the installed logs folder could not be read"; exit 1; }
 for _ in $(seq 1 40); do
 	grep -qs "daemon starting (version ${NEW}," "${LOGS}/"*.log && break
 	sleep 0.5

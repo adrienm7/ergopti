@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migrations/op_import_companion/companion_tap_hold.toml
+# The companion the driver hands: only what the ops name moves.
+
+[tap_hold]
+enabled = true
+time_activation_seconds = 0.25
+
+[tap_hold.keys.caps_lock]
+tap_action = "backspace"
+
+[mod_combos]
+simultaneous_threshold_ms = 80
+symmetric = true
+
+[mod_combos.config.escape_then_tab]
+combo = "copy"

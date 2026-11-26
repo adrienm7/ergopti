@@ -889,6 +889,9 @@ class RealNativeClientReceiving(unittest.TestCase):
             [str(item.url) for item in response.history],
             [self.url("/redirect?case=five")],
         )
+        # HTTPX read the followed redirect's own complete body before its
+        # successor; the managed transport keeps that native stream.
+        self.assertEqual(response.history[0].content, wire.REDIRECT_BODY)
         with self.assertRaises(self.httpx.HTTPError):
             client.get(self.url("/auth?case=four"))
         with self.assertRaises(self.httpx.UnsupportedProtocol):
@@ -927,10 +930,10 @@ class RealNativeClientReceiving(unittest.TestCase):
         )
         # CFNetwork drains a redirect's declared body before it reports the
         # redirect at all (hosted runs 39115677563 and 39118499487), so no
-        # NSURLSession client can close at the 3xx headers; the origin retires
-        # the held body at its own bound. The guarantee kept is the order: no
-        # redirect body reaches HTTPX and the successor only starts after the
-        # redirect connection is retired.
+        # NSURLSession client can close at the 3xx headers. The fixture sends
+        # that body whole: one that never arrives is a truncated response
+        # (run 42324293416). The guarantee kept is the order: the successor
+        # only starts after the redirect connection is retired.
         successor = next(
             index
             for index, row in enumerate(records)

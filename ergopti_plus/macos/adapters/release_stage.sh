@@ -4,7 +4,10 @@
 # Downloads and verifies one declared release archive inside its owned stage.
 # The caller supplies URL, SHA-256, stage, version, running app, format and
 # bundle basename as arguments. Native verification precedes READY; this script
-# never swaps or launches an application.
+# never swaps or launches an application. A failed download prints one closed
+# fact, « FAILED curl:<exit> » or « FAILED native:<reason> », for the caller's
+# failure receipt, and every failure removes the stage this script created
+# (UPD-11).
 
 set -u
 [ "$#" -eq 7 ] || exit 20
@@ -21,15 +24,28 @@ case "$bundle" in
 	*) exit 20 ;;
 esac
 umask 077
+# The archive's absolute and idle bounds, in milliseconds, from the shared
+# updater defaults the caller read (modules/updater/release_installer.lua).
+timeout_ms=${ERGOPTI_RELEASE_STAGE_TIMEOUT_MS:-}
+idle_ms=${ERGOPTI_RELEASE_STAGE_IDLE_MS:-}
+case "$timeout_ms:$idle_ms" in
+	*[!0-9:]*|:*|*:) exit 20 ;;
+esac
+[ "$idle_ms" -ge 1000 ] && [ "$timeout_ms" -ge "$idle_ms" ] || exit 20
 # A timestamp collision must not reuse an earlier archive or app.
 /bin/mkdir "$dir" || exit 10
+# Only the stage created above is removed, and only when no app is READY.
+ready=0
+retire_stage() { [ "$ready" = 1 ] || /bin/rm -rf -- "$dir"; }
+trap retire_stage EXIT
 archive="$dir/release.$format"
 # Preserve curl's explicit environment route, including its bypass semantics.
 # A production request without an explicit route uses the bundled native owner.
 explicit_route="${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}"
 if [ -n "$explicit_route" ] || [ "${ERGOPTI_RELEASE_STAGE_REQUEST+present}" != present ]; then
 	/usr/bin/curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' \
-		--max-time 900 --output "$archive" "$url" || exit 10
+		--max-time "$((timeout_ms / 1000))" --speed-limit 1 --speed-time "$((idle_ms / 1000))" \
+		--output "$archive" "$url" || { curl_status=$?; printf 'FAILED curl:%s\n' "$curl_status"; exit 10; }
 else
 	launcher="${ERGOPTI_LAUNCHER_EXECUTABLE:-}"
 	expected="${ERGOPTI_LAUNCHER_DEVICE:-}:${ERGOPTI_LAUNCHER_INODE:-}"
@@ -60,11 +76,13 @@ else
 	field=$(/usr/bin/plutil -extract output raw -o - "$request_file") || exit 10
 	[ "$field" = "$archive" ] || exit 10
 	field=$(/usr/bin/plutil -extract timeout_ms raw -o - "$request_file") || exit 10
-	[ "$field" = 900000 ] || exit 10
+	[ "$field" = "$timeout_ms" ] || exit 10
+	field=$(/usr/bin/plutil -extract idle_timeout_ms raw -o - "$request_file") || exit 10
+	[ "$field" = "$idle_ms" ] || exit 10
 	receipt_file="$dir/download-receipt.json"
 	# Foreground execution retains the original shell task's completion behavior.
-	# The CLI owns its single 900-second budget, EOF, network and spool closure.
-	"$launcher" --managed-bootstrap-download 900000 < "$request_file" > "$receipt_file"
+	# The CLI owns the request's budget, EOF, network and spool closure.
+	"$launcher" --managed-bootstrap-download "$timeout_ms" < "$request_file" > "$receipt_file"
 	native_status=$?
 	launcher_current || exit 10
 	[ -d "$dir" ] && [ ! -L "$dir" ] || exit 10
@@ -93,7 +111,8 @@ else
 	case "$native_status:$accepted_reason" in
 		0:complete) ;;
 		74:verify) exit 21 ;;
-		75:deadline|74:protocol|74:cancelled|74:offline|74:certificate|74:connect|74:unavailable|74:proxy|74:content_encoding|74:http|74:file_create|74:file_write|74:file_publish|74:cleanup) exit 10 ;;
+		75:deadline|74:protocol|74:cancelled|74:offline|74:certificate|74:connect|74:unavailable|74:proxy|74:content_encoding|74:http|74:file_create|74:file_write|74:file_publish|74:cleanup)
+			printf 'FAILED native:%s\n' "$accepted_reason"; exit 10 ;;
 		*) exit 10 ;;
 	esac
 fi
@@ -131,4 +150,5 @@ esac
 # The verified app is the only payload the swap needs. Retire this exact owned
 # archive before a parent-filesystem stage can become a persistent large cache.
 /bin/rm -f -- "$archive" || { echo "The verified release archive could not be retired." >&2; exit 28; }
+ready=1
 printf 'READY %s\n' "$app"

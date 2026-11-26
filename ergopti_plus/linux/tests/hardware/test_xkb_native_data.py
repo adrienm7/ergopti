@@ -26,7 +26,7 @@ xkb_keymap {
 PROBE = r"""
 local root, path = arg[1], arg[2]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
-  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
+  .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 assert(require('ffi').os == 'Linux' and jit ~= nil)
 local file = assert(io.open(path))
 local text = file:read('*a')
@@ -45,7 +45,7 @@ for index = 0, tonumber(lib.xkb_context_num_include_paths(context)) - 1 do
   paths[#paths + 1] = ffi.string(lib.xkb_context_include_path_get(context, index))
 end
 lib.xkb_context_unref(context)
-print(require('json').encode({
+print(require('core.text.engine.json').encode({
   ok=ok,reason=reason or '',ready=capture.is_ready(),
   text=capture.is_ready() and capture.peek_text(30) or '',include_paths=paths,
 }))
@@ -56,21 +56,21 @@ capture.clear()
 ISOLATED_PROBE = r"""
 local root, path = arg[1], arg[2]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
-  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
+  .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 assert(require('ffi').os == 'Linux' and jit ~= nil)
 local file = assert(io.open(path))
 local text = file:read('*a')
 assert(file:close())
 local capture = require('adapters.xkb_capture')
 local ok, reason = capture.load(text, 'C.UTF-8')
-print(require('json').encode({ok=ok,reason=reason or '',ready=capture.is_ready()}))
+print(require('core.text.engine.json').encode({ok=ok,reason=reason or '',ready=capture.is_ready()}))
 capture.clear()
 """
 
 CONTEXT_PROBE = r"""
 local root = arg[1]
 package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
-  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
+  .. root .. '/../_shared/?.lua;' .. root .. '/../_shared/?/init.lua;' .. package.path
 local ffi = require('ffi')
 ffi.cdef[[
   struct xkb_context;
@@ -85,7 +85,7 @@ if context ~= nil then
   paths = tonumber(lib.xkb_context_num_include_paths(context))
   lib.xkb_context_unref(context)
 end
-print(require('json').encode({context = context ~= nil, include_paths = paths}))
+print(require('core.text.engine.json').encode({context = context ~= nil, include_paths = paths}))
 """
 
 

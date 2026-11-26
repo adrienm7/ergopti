@@ -16,6 +16,9 @@ class KeystatsConst {
     ; the ingest to the next tick so the main thread never blocks while the
     ; user is typing.
     static INGEST_IDLE_MS           := 500
+    ; Upper bound of forced ingest passes a dashboard Export or Purge runs to
+    ; read today.log to its end before acting (INGEST_BATCH_LINES per pass).
+    static MAINTENANCE_INGEST_PASSES := 64
     ; Min keyboard-idle window before the heavy dashboard rebuild (KLWV_NotifyIngest
     ; "live" mode, 150-300 ms) is allowed to run on the ingest timer. A typing burst
     ; within this window defers the rebuild to the next ingest tick so the rebuild

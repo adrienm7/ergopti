@@ -17,7 +17,7 @@ local function with_editor(test)
 		errors = {}, notifications = 0,
 	}
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)
@@ -25,23 +25,24 @@ local function with_editor(test)
 			end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["infra.paths"] = { shared = function(path) return "/virtual/" .. path end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = { notify = function()
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function()
 			state.notifications = state.notifications + 1
 		end }
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
-		package.loaded["infra.toml.reader"] = {
-			parse = function() return { sections_order = {}, sections = {} }, true end,
+		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
+		package.loaded["core.text.engine.toml.reader"] = {
+			parse = function() return state.parsed or { sections_order = {}, sections = {} }, true end,
 		}
-		package.loaded["infra.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
+		package.loaded["core.text.engine.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
 			state.last_written = document
 			state.last_snapshot = snapshot
 			state.writes = state.writes + 1
 			if state.on_write then state.on_write() end
 			return true, nil, "source"
 		end }
-		_G.hs = { json = { encode = function()
+		_G.hs = { json = { encode = function(value)
+			state.encoded = value
 			if state.on_encode then state.on_encode() end
 			if state.encode_mode == "throw" then error("private content") end
 			if state.encode_mode == "nil" then return nil end
@@ -54,7 +55,7 @@ local function with_editor(test)
 				end }
 			end },
 		} }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end, force_focus = function() end,
 			show_webview = function(options)
@@ -80,12 +81,15 @@ local function with_editor(test)
 				return view
 			end,
 		}
-		package.loaded["ui.hotstring_editor"] = nil
-		local editor = require("ui.hotstring_editor")
+		package.loaded["hotstrings.ui.hotstring_editor"] = nil
+		local editor = require("hotstrings.ui.hotstring_editor")
 		editor.init("/virtual/source.toml", { reload_toml = function()
 			state.reloads = state.reloads + 1
 			return true
-		end })
+		end }, nil, nil, {
+			actions = function() return { { value = "select_all", label = "Select all" } } end,
+			workflows = function() return { { value = "wf_1", label = "Morning" } } end,
+		})
 		test(editor, state)
 	end, debug.traceback)
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end

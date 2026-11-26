@@ -118,10 +118,11 @@ _AltGrHandleHold(Passthrough) {
 		Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
 			_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"),
 			,,,,,, Passthrough ? KS_AltGrKeyName() : false)
-	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
-		DisableCapsWord()
+	; No CapsWord clear here: the dispatcher ends it for a tap that types a
+	; checked delimiter, and a tap bound to caps_word must toggle it, not find it
+	; already off.
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr"))
 		AltGrTapHoldDispatchV2()
-	}
 }
 
 ; RAlt alone passed through, where right Alt is a plain Alt. Its release with

@@ -10,10 +10,11 @@
 
 local M = {}
 local State = require("modules.keymap.one_shot_shift")
-local Keycodes = require("keycodes")
-local Timer = require("adapters.timer_scheduler")
-local SyntheticInput = require("adapters.synthetic_input")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local Keycodes = require("platform.input.keycodes.core")
+local Timer = require("core.events.timer_scheduler")
+local SyntheticInput = require("platform.input.synthetic_input")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
+local CapsWordOutput = require("infra.capsword_output")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",
 	[Keycodes.RETURN] = "enter", [Keycodes.ENTER] = "enter",
@@ -26,9 +27,9 @@ local CONTROL = {
 function M.new(deps)
 	local data = deps.data
 	if data == nil then
-		local path = require("infra.paths").shared("tap_hold/one_shot_shift.json")
-		local raw = assert(require("adapters.file_system").read(path), "one-shot Shift results are unreadable")
-		data = assert(require("adapters.json_codec").decode(raw), "one-shot Shift results are malformed")
+		local path = require("core.fs.engine.paths").shared("tap_hold/data/one_shot_shift.json")
+		local raw = assert(require("core.fs.adapters.file_system").read(path), "one-shot Shift results are unreadable")
+		data = assert(require("core.fs.adapters.json_codec").decode(raw), "one-shot Shift results are malformed")
 	end
 	local owner = State.new(data)
 	local event_api = deps.event or hs.eventtap.event
@@ -109,11 +110,11 @@ function M.new(deps)
 		local raw_flags = event:rawFlags()
 		local kind, result = owner:take(code, control, text, now(), deps.magic(), function(title)
 			return translated(code, raw_flags) == text
-				and translated(code, event_api.rawFlagMasks.shift) == title
+				and translated(code, raw_flags | event_api.rawFlagMasks.shift) == title
 		end)
 		if kind == "text" then
 			assert(emit(result), "one-shot Shift text emission was refused")
-			pending = { key = code, kind = kind }
+			pending = { key = code, kind = kind, emitted = result }
 			return true
 		elseif kind == "shift" or kind == "shift-held" then
 			pending = { key = code, kind = kind, event = event, raw = raw_flags, text = event:getCharacters(false) }
@@ -130,6 +131,11 @@ function M.new(deps)
 		if not current then return end
 		if accepted then
 			if current.kind ~= "shift-held" then owner:commit(current.key, current.kind) end
+			-- The serialized result goes out as returned events the CapsWord
+			-- watcher's tap never sees: its delimiters end CapsWord as typed
+			-- output, as the text sender reports its own (" :" ends a space-only
+			-- CapsWord although the physical "." does not).
+			if current.kind == "text" then CapsWordOutput.report(current.emitted) end
 		elseif current.event then
 			current.event:rawFlags(current.raw)
 			current.event:setUnicodeString(current.text)

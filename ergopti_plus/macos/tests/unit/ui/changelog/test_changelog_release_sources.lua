@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 local FEED_PATH = helpers.shared("tests/corpus/updater/releases_feed.atom")

@@ -11,17 +11,17 @@
 local helpers = require("tests.helpers")
 
 local MODULE_NAMES = {
-	"adapters.http_client",
-	"adapters.json_codec",
-	"adapters.shell_runner",
-	"adapters.timer_scheduler",
-	"infra.logger",
-	"infra.notifications",
-	"modules.llm.api_mlx",
-	"modules.llm.api_mlx_discovery",
-	"modules.llm.api_mlx_fetch",
-	"modules.llm.api_mlx_inference",
-	"modules.llm.warmup_controller",
+	"core.network.adapters.http_client",
+	"core.fs.adapters.json_codec",
+	"core.process.adapters.shell_runner",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"ai.engine.api.mlx",
+	"ai.engine.api.mlx_discovery",
+	"ai.engine.api.mlx_fetch",
+	"ai.engine.api.mlx_inference",
+	"ai.engine.local_servers.warmup_controller",
 	"modules.shortcuts.script_control",
 }
 
@@ -197,8 +197,8 @@ local function with_real_mlx_stack(fn)
 		http_requests = {},
 		tasks = {},
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return state.script_paused end,
 		get_pause_epoch = function() return state.pause_epoch end,
@@ -207,12 +207,12 @@ local function with_real_mlx_stack(fn)
 	local api
 	local discovery
 	local ok, err = xpcall(function()
-		api = helpers.load_with_stubs("modules.llm.api_mlx", {
+		api = helpers.load_with_stubs("ai.engine.api.mlx", {
 			timer = make_timer_stub(state),
 			http = make_http_stub(state),
 			task = make_task_stub(state),
 		})
-		discovery = package.loaded["modules.llm.api_mlx_discovery"]
+		discovery = package.loaded["ai.engine.api.mlx_discovery"]
 		helpers.assert_not_nil(discovery,
 			"positive control must load the real MLX discovery module")
 		fn({ api = api, discovery = discovery, state = state })
@@ -238,14 +238,14 @@ end
 local function install_script_control_dependencies(options)
 	options = options or {}
 	local function settled() return true end
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["adapters.event_provenance"] = {}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["diagnostics.adapters.event_provenance"] = {}
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	local fence
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			fence = { active = true }
@@ -258,7 +258,7 @@ local function install_script_control_dependencies(options)
 			return true
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,
@@ -266,29 +266,29 @@ local function install_script_control_dependencies(options)
 		RETURN = 36,
 		ESCAPE = 53,
 	}
-	package.loaded["modules.gestures.engine"] = {}
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = {}
+	package.loaded["gestures.engine.actions"] = {
 		get_label = function(name) return name end,
 		execute_single = settled,
 		SG_NAMES = { "none", "script_pause_toggle" },
 		AX_NAMES = {},
 	}
-	package.loaded["modules.llm.warmup_controller"] = options.warmup_controller or {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = options.warmup_controller or {
 		pause_warmup = settled,
 		resume_warmup = options.warmup_controller_resume or settled,
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		pause_warmup = settled,
 		resume_warmup = settled,
 	}
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.remote"] = {
 		pause_warmup = settled,
 		resume_warmup = settled,
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = settled }
-	package.loaded["ui.tooltip"] = { hide_forced = settled }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = settled }
 	package.loaded["modules.keystats"] = { resync_context = settled }
 end
 
@@ -299,8 +299,8 @@ end
 --- @param env table Real MLX harness environment.
 --- @return table controller Initialised WarmupController module.
 local function init_idle_real_warmup_controller(env)
-	package.loaded["modules.llm.warmup_controller"] = nil
-	local controller = require("modules.llm.warmup_controller")
+	package.loaded["ai.engine.local_servers.warmup_controller"] = nil
+	local controller = require("ai.engine.local_servers.warmup_controller")
 	helpers.assert_true(controller.init({
 		core_llm = {
 			is_backend_ready = env.api.is_ready,

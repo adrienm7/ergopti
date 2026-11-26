@@ -1,0 +1,16 @@
+{
+	"_comment": "The Ergopti keyboard layout Windows installs as a system layout, the single source for the code generator (tools/codegen/codegen-windows-keyboard-layout.cjs writes the keyboard DLL sources from the registry layout named here), the DLL builder (tools/build/build_windows_keyboard_layout.ps1), the elevated installer (windows/vendor/keyboard_layout/install_keyboard_layout.ps1) and the driver (windows/modules/keymap/system_layout_install.ahk), which never runs the installer: it opens the download of release_asset, the stand-alone package build_windows_keyboard_layout.ps1 -PackagePath writes and every release publishes (.github/workflows/ci-release.yml, pinned by tools/test/test-release-notes-assets-are-uploaded.cjs). registry_id is the layout of static/layouts/registry the DLL is generated from; dll_name the DLL's file name without extension (eight characters at most, the MSKLC convention), copied to System32 and, on a 64-bit Windows, its WOW64 build to SysWOW64. language_id is the four-digit language the layout is registered under: the installer registers it as the first free KLID A0nn<language_id> (the high word an MSKLC layout uses), or reuses the KLID already naming dll_name. locale_name is the Windows language tag the driver adds the layout to in the user's language list. layout_text and layout_description are what Windows shows in its layout lists; architectures the processor architectures (PROCESSOR_ARCHITECTURE) the builder compiles for, each with the System32 build and, when it has one, the 32-bit build that goes to SysWOW64.",
+	"registry_id": "ergopti",
+	"dll_name": "kbdergop",
+	"release_asset": "Ergopti_windows_layout.zip",
+	"language_id": "040C",
+	"locale_name": "fr-FR",
+	"language_name": "French (France)",
+	"layout_text": "Ergopti",
+	"layout_description": "Ergopti keyboard layout",
+	"architectures": {
+		"AMD64": { "system32": "amd64", "syswow64": "wow64" },
+		"ARM64": { "system32": "arm64", "syswow64": "wow64" },
+		"x86": { "system32": "x86" }
+	}
+}

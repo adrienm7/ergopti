@@ -112,6 +112,8 @@ class _HCPO_Controller {
 		this.Closed += 1
 		_HCPO_Require(this.Closed == 1, "An exact private controller must retire only once.")
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}

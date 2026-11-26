@@ -6,7 +6,7 @@
 --- Replays _shared/tests/corpus/logger/behaviour_vectors.json against the shared
 --- Lua logger core, which is the logger this driver actually runs: every Linux
 --- module reaches it through logger.shim. The sibling corpus
---- (_shared/modules/logger/test_vectors.json) pins the LINE FORMAT; this one pins
+--- (_shared/core/logger/data/test_vectors.json) pins the LINE FORMAT; this one pins
 --- the parts that decide whether a line exists at all — severity filtering and
 --- the ring buffer.
 ---
@@ -38,7 +38,7 @@ local corpus_path = driver_root .. "/../_shared/tests/corpus/logger/behaviour_ve
 
 describe("Logger capacity ownership", function()
 	it("publishes before a reentrant sink (logger-repeat-atomic)", function()
-		local fresh = dofile(driver_root .. "/../_shared/lua/logger/init.lua")
+		local fresh = dofile(driver_root .. "/../_shared/core/logger/engine/init.lua")
 		dofile(driver_root .. "/../_shared/tests/corpus/logger/capacity_reentry.lua")(fresh)
 	end)
 end)
@@ -61,14 +61,14 @@ local function read_corpus()
   assert(f, "logger behaviour corpus not found at " .. corpus_path)
   local raw = f:read("*a")
   f:close()
-  local json = require("json")
+  local json = require("core.text.engine.json")
   local decoded = json.decode(raw)
   assert(type(decoded) == "table", "logger behaviour corpus did not decode into a table")
   return decoded
 end
 
 local CORPUS = read_corpus()
-local Logger = require("logger")
+local Logger = require("core.logger.engine")
 
 -- Corpus variant name → the core function that emits it. Explicit rather than
 -- derived, so a renamed variant fails here instead of quietly testing seven of

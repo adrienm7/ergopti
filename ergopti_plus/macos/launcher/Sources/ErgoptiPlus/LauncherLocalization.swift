@@ -8,7 +8,7 @@
  launcher's fatal alert speaks the user's language.
 
  FEATURES & RATIONALE:
- 1. One source of truth: the same _shared/data/locales/<code>.json files the
+ 1. One source of truth: the same _shared/core/i18n/data/locales/<code>.json files the
     Lua driver uses; the launcher never carries its own copy of a string.
  2. Same language choice as the driver: the locale the driver persisted in its
     preferences domain, then the macOS preferred languages, then English.
@@ -30,13 +30,13 @@ struct LauncherLocalization {
 
 	/// Loads the first readable catalog among the candidate locales.
 	/// - Parameters:
-	///   - localesDirectory: Bundled `_shared/data/locales` folder.
+	///   - localesDirectory: Bundled `_shared/core/i18n/data/locales` folder.
 	///   - storedLocale: Locale the driver persisted, if any.
 	///   - preferredLanguages: macOS preferred languages, most preferred first.
 	/// - Returns: The catalog, or nil when no candidate file can be parsed.
 	static func load(
 		localesDirectory: String = Bundle.main.bundlePath
-			+ "/Contents/Resources/static/ergopti_plus/_shared/data/locales",
+			+ "/Contents/Resources/static/ergopti_plus/_shared/core/i18n/data/locales",
 		storedLocale: String? = storedDriverLocale(),
 		preferredLanguages: [String] = Locale.preferredLanguages
 	) -> LauncherLocalization? {

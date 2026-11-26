@@ -435,6 +435,158 @@
 			}
 		},
 		{
+			"id": "case_pair_strict_upper_half_rejects_lower",
+			"description": "Two literal triggers that differ only in case and carry two outputs are a case PAIR: only strict comparison keeps them apart, so the UPPER half must not fire on the lower casing. The Ergopti circumflex dead key writes each key as such a pair: \"êé\" = \"œ\" and \"êÉ\" = \"Œ\". Registered as folding literals, the first-written UPPER half answered both casings, so the roll ê then é typed \"cŒur\" for \"cœur\" on macOS and Linux (field report, 2026-11-25); Windows registers the pair with the \"C\" flag and never had it.",
+			"trigger": "êÉ",
+			"replacement": "Œ",
+			"is_word": false,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
+			"buffer": "êé",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
+			"id": "case_pair_strict_upper_half_fires_on_its_casing",
+			"description": "The positive control: the UPPER half of a strict case pair fires on the casing it is written in.",
+			"trigger": "êÉ",
+			"replacement": "Œ",
+			"is_word": false,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
+			"buffer": "êÉ",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "Œ",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "case_pair_strict_lower_half_fires_lowercase",
+			"description": "The lower half of a strict case pair types the lowercase ligature for the lowercase roll.",
+			"trigger": "êé",
+			"replacement": "œ",
+			"is_word": false,
+			"auto_expand": true,
+			"is_case_sensitive": true,
+			"is_case_sensitive_strict": true,
+			"buffer": "cêé",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "œ",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "roll_conform_upper_buffer",
+			"description": "The same-finger roll é then ê is a cased family: the UPPER roll types the UPPER output, the lower roll the lower one.",
+			"trigger": "éê",
+			"replacement": "eo",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "ÉÊ",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "EO",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "roll_conform_reverse_upper_buffer",
+			"description": "The reverse roll ê then é in UPPER case: no dead-key pair is written for \"ÊÉ\", so the roll's own family answers.",
+			"trigger": "êé",
+			"replacement": "oe",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "ÊÉ",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "OE",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "case_conform_ligature_lower",
+			"description": "A lowercase word keeps the lowercase ligature its correction writes: \"coeur\" types \"cœur\", never \"cŒur\".",
+			"trigger": "coeur",
+			"replacement": "cœur",
+			"is_word": true,
+			"auto_expand": true,
+			"buffer": "coeur",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "cœur",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "case_conform_ligature_title",
+			"description": "A Title-cased word capitalises the first letter only; the ligature inside stays lowercase.",
+			"trigger": "coeur",
+			"replacement": "cœur",
+			"is_word": true,
+			"auto_expand": true,
+			"buffer": "Coeur",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "Cœur",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "case_conform_ligature_upper",
+			"description": "An all-caps word upper-cases the ligature with the rest: \"COEUR\" types \"CŒUR\".",
+			"trigger": "coeur",
+			"replacement": "cœur",
+			"is_word": true,
+			"auto_expand": true,
+			"buffer": "COEUR",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "CŒUR",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "case_conform_leading_ligature_title",
+			"description": "A ligature that opens the word takes the Title case: \"Oeuvre\" types \"Œuvre\".",
+			"trigger": "oeuvre",
+			"replacement": "œuvre",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "Oeuvre",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "Œuvre",
+				"backspace_count": 6
+			}
+		},
+		{
+			"id": "case_conform_leading_ligature_mixed_rejected",
+			"description": "\"OEuvre\" is neither lower, Title nor UPPER, so the shared rule fires nothing rather than invent a casing (see case_conform_rejects_mixed): the word stays as typed.",
+			"trigger": "oeuvre",
+			"replacement": "œuvre",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "OEuvre",
+			"terminator": " ",
+			"expected": {
+				"matched": false
+			}
+		},
+		{
 			"id": "case_insensitive_word_boundary_still_applies",
 			"description": "Case folding does not bypass the word-boundary rule: a mid-word occurrence stays blocked even when the case differs from the trigger. Declares is_case_sensitive because its replacement is not lower-case: the cased FAMILY conforms the output to the typed trigger, and the lower variant is the LOWER-CASED replacement on Windows — so a family registration would silently discard the casing this vector is written with. Literal registration is what a real entry with an upper-case output uses, and it keeps the vector about the rule it names.",
 			"trigger": "the",

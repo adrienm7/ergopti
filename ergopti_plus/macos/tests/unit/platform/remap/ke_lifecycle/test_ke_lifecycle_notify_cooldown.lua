@@ -32,14 +32,14 @@ local function load_lifecycle()
 	for _, level in ipairs({ "debug", "info", "warn", "error", "start", "success", "done" }) do
 		logger[level] = function() end
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function()
 			ctx.notifications = ctx.notifications + 1
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CORE_SERVICE = "/stock/Karabiner-Core-Service",
 		GRABBER = "/stock/karabiner_grabber",

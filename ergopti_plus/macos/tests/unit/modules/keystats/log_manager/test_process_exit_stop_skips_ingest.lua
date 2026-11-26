@@ -33,6 +33,12 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 local function load_log_manager()
 	local sqlite = { open = false, open_calls = 0 }
 	local spies = { tail_reads = 0, foreign_syncs = 0 }
+	-- Match the writer's identity contract: one handle for the open session.
+	local db = {
+		nrows = function() return function() return nil end end,
+		exec = function() return 0 end,
+		errmsg = function() return "" end,
+	}
 
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() end, is_initialized = function() return true end,
@@ -59,11 +65,7 @@ local function load_log_manager()
 		-- errmsg); nrows yields nothing so the restore loops are empty no-ops.
 		get_db                = function()
 			if not sqlite.open then return nil end
-			return {
-				nrows  = function() return function() return nil end end,
-				exec   = function() return 0 end,
-				errmsg = function() return "" end,
-			}
+			return db
 		end,
 		build_inserts         = function() return {} end,
 		get_next_event_id     = function() return 0 end,
@@ -94,10 +96,10 @@ local function load_log_manager()
 		_last_complete_batch_offset = 0,
 	}
 
-	package.loaded["infra.i18n"]    = { t = function(key) return key end }
-	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	package.loaded["core.i18n.engine.i18n"]    = { t = function(key) return key end }
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -108,7 +110,7 @@ package.loaded["adapters.file_system"] = {
 		fs      = { attributes = function() return nil end, dir = function() return function() return nil end end },
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	lm.init({
 		LOG_DIR = "/tmp/test_process_exit_stop",
 		CACHE_DIR = "/tmp/test_process_exit_stop/cache",

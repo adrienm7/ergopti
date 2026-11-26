@@ -66,3 +66,22 @@ _DKSG_AssertDeadKeyRechecksSuspendAfterWait() {
 		"DeadKey post-Wait A_IsSuspended re-check must precede the first post-Wait SendNewResult emit (deadkey-inputhook-post-wait-suspend-leak)")
 }
 Test("layout: DeadKey re-checks A_IsSuspended after ih.Wait() (deadkey-inputhook-post-wait-suspend-leak)", _DKSG_AssertDeadKeyRechecksSuspendAfterWait)
+
+; A registry layout's pending dead key is a plain KLE_State string, which no
+; InputHook teardown reaches: it survived pause and resume, so the first key
+; typed after resuming composed with a dead key pressed before the pause.
+; Pausing cancels it like the legacy transaction (maintainer decision,
+; dead-key lifecycle), from the suspend entry, after the hooks stop.
+_DKSG_AssertSuspendCancelsRegistryDeadKey() {
+	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
+	Assert(Body != "", "Ergopti_OnSuspendEnter() must exist")
+	Hooks := InStr(Body, '"suppressive-input-hooks"', true)
+	Reset := InStr(Body, "KeylayoutEmulation_ResetDeadKey()", true)
+	Assert(Hooks > 0 && Reset > Hooks,
+		"pausing must cancel the registry layout's pending dead key after stopping the capture hooks (dead-key lifecycle)")
+	Assert(InStr(Body, '"keylayout-dead-key"', true) > 0,
+		"the registry dead-key reset must be a named lifecycle step so a failure is logged (dead-key lifecycle)")
+	Assert(_DriverFuncBody("KeylayoutEmulation_ResetDeadKey") != "",
+		"KeylayoutEmulation_ResetDeadKey() must exist, or the IsSet guard skips the reset silently")
+}
+Test("lifecycle: pausing cancels the registry layout's pending dead key (dead-key lifecycle)", _DKSG_AssertSuspendCancelsRegistryDeadKey)

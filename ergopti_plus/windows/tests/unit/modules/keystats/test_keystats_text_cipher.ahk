@@ -17,6 +17,7 @@
 ; 3. Each row gets its own IV: identical text in two rows must not produce
 ;    identical envelopes, or the storage would leak which rows share a prefix.
 ; 4. Disabled means untouched, and failure never yields plaintext.
+; 5. Raw typed text is sealed even when it already looks like an envelope.
 ; ==============================================================================
 
 
@@ -89,15 +90,64 @@ _KLEnc_PerRowIv() {
 }
 Test("KL_Enc: each row gets its own IV", _KLEnc_PerRowIv)
 
-_KLEnc_NoDoubleWrap() {
+; Raw typed text is never trusted as a stored envelope, whatever its bytes look
+; like (WCR-001). Not double-wrapping STORED envelopes is the migration's rule,
+; pinned by test_keystats_text_migration.ahk.
+_KLEnc_SealsRawEnvelopeLookalike(Kind) {
 	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 	KL_Enc_SetEnabled(true)
-	once := KL_Enc_Encrypt("dev", 7, "text")
-	twice := KL_Enc_Encrypt("dev", 7, once)
-	AssertEqual(once, twice, "re-encrypting an envelope would make it undecryptable in one pass")
-	KL_Enc_SetEnabled(false)
+	try {
+		canary := "SENTINEL-PRIVATE-CONTENT"
+		switch Kind {
+			case "malformed":
+				literal := KL_ENC_MARKER . KL_ENC_SEPARATOR . canary
+			case "shaped":
+				literal := KL_ENC_MARKER . KL_ENC_SEPARATOR . "00000000000000000000000000000000"
+					. KL_ENC_SEPARATOR . canary
+			case "genuine":
+				literal := KL_Enc_Encrypt("dev", 70, canary)
+			default:
+				literal := KL_ENC_MARKER . KL_ENC_SEPARATOR . "'`n" . Chr(0xE9) . canary
+		}
+		stored := KL_Enc_Encrypt("dev", 7, literal)
+		AssertTrue(stored !== literal, "raw text resembling an envelope must still be sealed")
+		AssertTrue(KL_Enc_IsEncrypted(stored), "the sealed value must be an envelope")
+		AssertTrue(!InStr(stored, canary), "the protected canary must not survive in the stored value")
+		AssertEqual(literal, KL_Enc_Decrypt(stored), "decrypt must recover the literal typed text")
+	} finally {
+		KL_Enc_SetEnabled(false)
+	}
 }
-Test("KL_Enc: does not double-wrap an already-encrypted value", _KLEnc_NoDoubleWrap)
+Test("cipher-raw-ingress: seals a malformed marker prefix", _KLEnc_SealsRawEnvelopeLookalike.Bind("malformed"))
+Test("cipher-raw-ingress: seals a valid-IV envelope lookalike", _KLEnc_SealsRawEnvelopeLookalike.Bind("shaped"))
+Test("cipher-raw-ingress: seals a byte copy of a genuine envelope", _KLEnc_SealsRawEnvelopeLookalike.Bind("genuine"))
+Test("cipher-raw-ingress: seals quotes, newline and non-ASCII after the marker",
+	_KLEnc_SealsRawEnvelopeLookalike.Bind("mixed"))
+
+; The actual typing SQL builder must not carry a marker-prefixed literal in clear.
+_KLEnc_WriterSealsMarkerPrefixedText() {
+	Keystats.next_event_id := 1
+	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
+	KL_Enc_SetEnabled(true)
+	try {
+		literal := KL_ENC_MARKER . KL_ENC_SEPARATOR . "SENTINEL-PRIVATE-CONTENT"
+		entry := Map("type", "typing", "timestamp", "2026-07-02 10:00:00.000", "app", "TestApp", "text", literal)
+		rows := KL_BuildInserts(entry)
+		AssertEqual(1, rows.Length, "an encryptable typing row must still be written")
+		AssertTrue(!InStr(rows[1], "SENTINEL-PRIVATE-CONTENT"), "the literal must not appear in the INSERT")
+		recovered := false
+		pos := 1
+		while (pos := RegExMatch(rows[1], "ergopti-enc-v1:[0-9a-f]{32}:[A-Za-z0-9+/=]+", &found, pos)) {
+			if (KL_Enc_Decrypt(found[0]) == literal)
+				recovered := true
+			pos += found.Len
+		}
+		AssertTrue(recovered, "one stored envelope must decrypt to the literal typed text")
+	} finally {
+		KL_Enc_SetEnabled(false)
+	}
+}
+Test("cipher-raw-ingress: KL_BuildInserts seals marker-prefixed typed text", _KLEnc_WriterSealsMarkerPrefixedText)
 
 
 

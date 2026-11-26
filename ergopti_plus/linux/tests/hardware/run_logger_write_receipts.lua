@@ -10,6 +10,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local ffi = require("ffi")
 local RLIMIT_FSIZE = 1 -- Linux resource ABI; only this fixture's soft limit changes.
 local SIG_IGN, SIG_ERR = 1, -1 -- POSIX signal handler sentinels.
@@ -24,8 +27,8 @@ local root = assert(uv.fs_mkdtemp("/tmp/ergopti-logger-receipts-XXXXXX"))
 local previous_config, previous_state = os.getenv("XDG_CONFIG_HOME"), os.getenv("XDG_STATE_HOME")
 assert(uv.os_setenv("XDG_CONFIG_HOME", root .. "/config"))
 assert(uv.os_setenv("XDG_STATE_HOME", root .. "/state"))
-local Logger = require("logger.shim")
-local Sink = require("infra.logger_sink")
+local Logger = require("core.logger.engine.shim")
+local Sink = require("core.logger.engine.sink")
 local checks, failures = 0, 0
 local directories = {}
 local restricted_directories = {}
@@ -61,7 +64,7 @@ local function write(path, content)
 end
 
 local function paths(path)
-	local dirs = require("app_dirs")
+	local dirs = require("core.fs.engine.app_dirs")
 	local date = os.date("%Y-%m-%d")
 	return path .. "/" .. dirs.files.unified_prefix .. date .. dirs.files.extension,
 		path .. "/" .. dirs.files.errors_prefix .. date .. dirs.files.extension
@@ -77,10 +80,10 @@ end
 
 local function configured_directory(name)
 	local state = directory(name)
-	directory(name .. "/ergopti_plus")
-	local dir = directory(name .. "/ergopti_plus/logs")
+	directory(name .. "/" .. FOLDER)
+	local dir = directory(name .. "/" .. FOLDER .. "/logs")
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
-	assert(require("infra.config_paths").get_logs_dir() == dir)
+	assert(require("settings.engine.paths").get_logs_dir() == dir)
 	return dir
 end
 
@@ -186,9 +189,9 @@ end
 check("repoint repairs a retired main channel in the same directory", function()
 	local state = directory("repaired")
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
-	directory("repaired/ergopti_plus")
-	local dir = directory("repaired/ergopti_plus/logs")
-	assert(require("infra.config_paths").get_logs_dir() == dir, "repair must use the actual configured target")
+	directory("repaired/" .. FOLDER)
+	local dir = directory("repaired/" .. FOLDER .. "/logs")
+	assert(require("settings.engine.paths").get_logs_dir() == dir, "repair must use the actual configured target")
 	local main = paths(dir)
 	local message = "Force a buffered native EFBIG before repair."
 	local limit = message_limit(#message)
@@ -327,12 +330,12 @@ for _, operation in ipairs({ "install", "repoint" }) do
 			local main, errors = paths(target)
 			local expected = "Unrelated refused mirror bytes.\n"
 			if refusal == "directory" then
-				directory(name .. "/ergopti_plus/logs/" .. errors:match("([^/]+)$"))
+				directory(name .. "/" .. FOLDER .. "/logs/" .. errors:match("([^/]+)$"))
 			else
 				write(errors, expected)
 				assert(uv.fs_chmod(errors, 256))
 			end
-			local refused, _, code = require("infra.regular_file_writer").open(errors, "a")
+			local refused, _, code = require("core.fs.engine.regular_file_writer").open(errors, "a")
 			assert(refused == nil and code == (refusal == "directory" and "EISDIR" or "EACCES"),
 				"fixture did not establish the actual native open refusal")
 			local diagnostics = capture_diagnostics(function()
@@ -363,8 +366,8 @@ for _, operation in ipairs({ "install", "prepare", "repoint" }) do
 			assert(Sink.install(Logger, { log_dir = directory("probe-original") }))
 			local state = directory("probe-state")
 			assert(uv.os_setenv("XDG_STATE_HOME", state))
-			directory("probe-state/ergopti_plus")
-			dir = directory("probe-state/ergopti_plus/logs")
+			directory("probe-state/" .. FOLDER)
+			dir = directory("probe-state/" .. FOLDER .. "/logs")
 		else dir = directory("probe-" .. operation) end
 		local path, content = dir .. "/.write_probe", "Pre-existing user-owned bytes.\n"
 		write(path, content)

@@ -9,7 +9,6 @@
 --- ==============================================================================
 
 local M = {}
-local _sequence = 0
 
 --- Selects the declared families through the current preference owner.
 --- @param manager table Dynamic hotstrings owner.
@@ -25,15 +24,19 @@ end
 --- @return function restore Removes the file and restores production routing.
 --- @return string path The private configuration file.
 function M.route()
-	local Preferences = require("infra.hotstring_preferences")
-	_sequence = _sequence + 1
-	local path = string.format("%s/ergopti_dynamic_families_%d_%d_%d.toml",
-		(os.getenv("TMPDIR") or "/tmp"):gsub("/+$", ""), os.time(), math.random(100000, 999999), _sequence)
-	assert(Preferences._set_file_for_test(path), "the preference owner must accept a private file")
+	local Preferences = require("hotstrings.engine.matcher.preferences")
+	local uv = require("luv")
+	local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-dynamic-families-XXXXXX"))
+	local path = dir .. "/config.toml"
+	if not Preferences._set_file_for_test(path) then
+		assert(uv.fs_rmdir(dir))
+		error("the preference owner must accept a private file")
+	end
 	return function()
 		Preferences._set_file_for_test(nil)
 		os.remove(path)
 		os.remove(path .. ".tmp")
+		assert(uv.fs_rmdir(dir))
 	end, path
 end
 
@@ -44,8 +47,8 @@ end
 function M.install()
 	local restore = M.route()
 	local ok, detail = pcall(function()
-		local Preferences = require("infra.hotstring_preferences")
-		for _, family in ipairs(require("modules.dynamic_hotstrings.manager").RULE_FAMILIES) do
+		local Preferences = require("hotstrings.engine.matcher.preferences")
+		for _, family in ipairs(require("hotstrings.engine.dynamic.manager").RULE_FAMILIES) do
 			if family.id then
 				assert(Preferences.set("hotstrings.dynamic." .. family.id .. ".enabled", true),
 					"fixture family must persist: " .. family.id)
@@ -67,7 +70,7 @@ function M.trigger(manager, buffer, trigger, start_is_boundary)
 	local fired, event
 	require("tests.support.text_owner_fixture").with(function(guard)
 		fired, event = manager.on_trigger(buffer, trigger, start_is_boundary,
-			assert(guard.capture_text_owner()))
+			assert(guard.capture_text_owner()), function() return true end)
 	end)
 	return fired, event
 end

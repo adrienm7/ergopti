@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"_comment": "Cross-driver logger BEHAVIOUR corpus, replayed by all three driver suites. The sibling corpus _shared/modules/logger/test_vectors.json pins the LINE FORMAT (spec § 3); this one pins the parts that decide whether a line exists at all — severity filtering (§ 4) and the ring buffer (§ 5). Those are the parts the drivers had actually drifted on, and the parts that must be proved equivalent before any driver is re-pointed at the shared core.",
+	"_comment": "Cross-driver logger BEHAVIOUR corpus, replayed by all three driver suites. The sibling corpus _shared/core/logger/data/test_vectors.json pins the LINE FORMAT (spec § 3); this one pins the parts that decide whether a line exists at all — severity filtering (§ 4) and the ring buffer (§ 5). Those are the parts the drivers had actually drifted on, and the parts that must be proved equivalent before any driver is re-pointed at the shared core.",
 	"_why_variants_not_numbers": "The filtering cases name VARIANTS and a threshold by name, never a raw integer, because that is the behaviour the spec defines and the only thing all three drivers can answer identically. The numbering below is asserted separately, by the drivers that expose it.",
 
 	"numbering": {

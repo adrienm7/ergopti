@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the parameters of send_text (kind text), send_key (kind key) and send_shortcut (kind shortcut): what a stored value types or presses. Replayed by the macOS, Linux and Windows suites against the vocabulary _shared/modules/actions/send_keys.json. A vector with `repeat` stands for its value repeated that many times.",
+	"description": "Golden vectors for the parameters of send_text (kind text), send_key (kind key) and send_shortcut (kind shortcut): what a stored value types or presses. Replayed by the macOS, Linux and Windows suites against the vocabulary _shared/shortcuts/data/actions/send_keys.json. A vector with `repeat` stands for its value repeated that many times.",
 	"rule": {
 		"text": "Valid when it holds between 1 and text_max_code_points code points and no control character (U+0000 to U+001F, U+007F to U+009F). It is typed exactly as stored: nothing is trimmed.",
 		"key": "The value is trimmed of ASCII whitespace. It names a key when, with A to Z lowered, it equals the id or an alias of a send_keys.json key; the canonical form is that id. Otherwise it is valid when it is exactly one code point that is not a control character, which is pressed as that character, case kept. Anything else, including an empty value, is invalid.",

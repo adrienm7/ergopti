@@ -124,10 +124,31 @@ _LCC_ReportContract() {
 		Threw := true
 	AssertTrue(Threw, "an unknown state is a bug")
 	Text := ComposerCheck_Text(Report, (Key) => Key == "common.label_value" ? "{1} = {2}" : "<" . Key . ">")
-	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> = fresh`n"
-		. "[-] <field_check.step.c> = kept`n[X] <field_check.step.d> = redacted", Text, "one line per step, joined the locale's way")
+	AssertEqual("<field_check.verdict_fail>`n`n[OK] <field_check.step.a>`n[i] <field_check.step.b> = <field_check.value.fresh>`n"
+		. "[-] <field_check.step.c> = <field_check.value.kept>`n[X] <field_check.step.d> = <field_check.value.redacted>", Text,
+		"one line per step, its value spelled by the locale")
 }
 Test("composer check: the record and the window text list every step once (composer-check)", _LCC_ReportContract)
+
+; The field report of 2026-11-25 read « Composition installée : kept » and
+; « Réglages proxy : none »: each value now goes through field_check.value.*.
+_LCC_ValuesTranslated() {
+	Translate := (Key) => Key == "common.label_value" ? "{1}: {2}"
+		: Key == "field_check.value.registry" ? "registre" : Key == "field_check.value.direct" ? "direct"
+		: Key == "field_check.value.blob" ? "fichiers" : Key == "field_check.value.kept" ? "conservée"
+		: Key == "field_check.value.http_n" ? "HTTP {1}" : Key == "field_check.value.other" ? "code {1}" : Key
+	AssertEqual("conservée", ComposerCheck_DisplayValue("kept", Translate), "a closed code is spelled out")
+	AssertEqual("registre: direct, fichiers: direct", ComposerCheck_DisplayValue("registry:direct+blob:direct", Translate),
+		"pairs and alternatives are spelled part by part")
+	AssertEqual("HTTP 200", ComposerCheck_DisplayValue("http_200", Translate), "a status family fills its number")
+	AssertEqual("12", ComposerCheck_DisplayValue("12", Translate), "a count is shown as it is")
+	AssertEqual("code xyz_stage", ComposerCheck_DisplayValue("xyz_stage", Translate), "an open code is named as a code")
+	for Value in ["existing", "kept", "unreadable", "no_copy", "none", "no_pac", "selected_direct", "trusted", "get_only"] {
+		Key := "field_check.value." . Value
+		AssertTrue(t(Key) != Key, "the catalogue spells " . Value)
+	}
+}
+Test("composer check: step values are shown in the user's language (composer-check)", _LCC_ValuesTranslated)
 
 
 
@@ -370,6 +391,46 @@ _LCC_HostRaisingIsAFailedStep() {
 }
 Test("composer check: a host that raises is recorded and the check stays usable (composer-check)",
 	_LCC_HostRaisingIsAFailedStep)
+
+; The field run of 2026-11-25 (Arch Linux): a finding about the user's
+; composition was logged at ERROR, which opened the error window. Every finding
+; is the verdict's failed step and a WARNING; the logger hands only an ERROR to
+; the error window (core/logger/engine/logger.ahk).
+_LCC_ErrorLines(Deps) {
+	global COMPOSER_CHECK_TAG
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try Report := _LCC_Run(Deps)
+	finally LoggerClearTestSink()
+	Started := false, Errors := ""
+	for Line in Lines {
+		if InStr(Line, "[START] [" . COMPOSER_CHECK_TAG . "]")
+			Started := true
+		if InStr(Line, "[ERROR] [" . COMPOSER_CHECK_TAG . "]")
+			Errors .= Line . "`n"
+	}
+	AssertTrue(Started, "the sink saw the check's own lines")
+	AssertFalse(ComposerCheck_Passed(Report), "the finding fails the verdict: " . _LCC_Steps(Report))
+	return Errors
+}
+
+_LCC_FindingsAreWarnings() {
+	Dir := _LCC_TempDir()
+	try {
+		; The layout in use with no installed copy: the Arch tester's state.
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, 0, "composed")), "a missing copy is no ERROR")
+		Fixture := ComposerCheck_ReadFixture()
+		Broken := Map("fixture", () => Map("declaration", Fixture["declaration"],
+			"keylayout", StrReplace(Fixture["keylayout"], "Composer Check", "Other")))
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, Broken)), "a refused install is no ERROR")
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir, Map("ready", _LCC_Refuse))), "an emulation refusal is no ERROR")
+		_LCC_InstallComposition(Dir)
+		FileAppend(" ", LayoutRegistry_LocalDir(Dir) . "composed.keylayout", "UTF-8-RAW")
+		AssertEqual("", _LCC_ErrorLines(_LCC_Deps(Dir)), "a copy that fails its record is no ERROR")
+	} finally DirDelete(Dir, true)
+}
+Test("composer check: a finding is a warning and never opens the error window (composer-finding-level)",
+	_LCC_FindingsAreWarnings)
 
 
 

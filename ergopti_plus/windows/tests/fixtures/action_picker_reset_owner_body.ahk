@@ -20,7 +20,7 @@ _APRC_Require(Condition, Message) {
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []
@@ -28,6 +28,8 @@ LLM_Translate_ShippedChoices() => []
 GestureClearPickedParameter() => 0
 LoggerSuccess(*) => 0
 LoggerError(*) => 0
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
@@ -72,6 +74,8 @@ class _APRC_Controller {
 	Close() {
 		this.Closed += 1
 		_APRC_CloseBoundary(this)
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1

@@ -400,7 +400,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a
@@ -443,7 +443,7 @@ helpers.describe("GC retention: EVERY native task site in the driver is pinned",
 				local code = src:gsub("%-%-[^\n]*", "")
 				-- TaskLifecycle owns construction only; its callers own the handle and
 				-- pin before start. Judge each caller launch, not the adapter's return.
-				local sites = helpers.module_name_of(rel) == "adapters.task_lifecycle" and {}
+				local sites = helpers.module_name_of(rel) == "core.process.adapters.task_lifecycle" and {}
 					or scan_unpinned_sites(src)
 				if code:find("hs%.task%.new%s*%(")
 						or code:find("pcall%s*%(%s*hs%.task%.new")
@@ -491,15 +491,15 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- _active_tasks table so the task survives until its callback fires.
 
 	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
-		assert_gc_pinned("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
+		assert_gc_pinned("local function get_ollama_path") -- ai/ui/menu/models/manager_ollama.lua
 	end)
 
 	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
-		assert_gc_pinned("--- MODULE: MLX Models Manager\n") -- ui/menu/menu_llm/models_manager_mlx.lua
+		assert_gc_pinned("--- MODULE: MLX Models Manager\n") -- ai/ui/menu/models/manager_mlx.lua
 	end)
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
-		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ui/menu/menu_llm/models_manager_mlx_server.lua
+		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ai/ui/menu/models/manager_mlx_server.lua
 	end)
 
 	-- F-MED-20: these 2 of the 6 files split out of the old
@@ -509,11 +509,11 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- substring check did not recognize. New unpinned hs.task.new() calls in
 	-- these files could previously ship with the suite still green.
 	helpers.it("models_manager_mlx_download: pull/tail tasks are pinned (F-MED-20)", function()
-		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ui/menu/menu_llm/models_manager_mlx_download.lua
+		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ai/ui/menu/models/manager_mlx_download.lua
 	end)
 
 	helpers.it("models_manager_mlx_hf: hf_login task is pinned (F-MED-20)", function()
-		assert_gc_pinned("local HF_TOKEN_FILE") -- ui/menu/menu_llm/models_manager_mlx_hf.lua
+		assert_gc_pinned("local HF_TOKEN_FILE") -- ai/ui/menu/models/manager_mlx_hf.lua
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
@@ -521,11 +521,11 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("menu_apps: open task is pinned", function()
-		assert_gc_pinned("local function discover_bundled_apps") -- ui/menu/menu_apps.lua
+		assert_gc_pinned("local function discover_bundled_apps") -- apps/ui/menu/apps.lua
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
-		local src = read_source("local function focus_hammerspoon") -- infra/dialog_util.lua
+		local src = read_source("local function focus_hammerspoon") -- core/ui/engine/dialog_util.lua
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
 		assert(not src:find("hs%.task%.new", 1, false),
@@ -533,7 +533,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("shell_runner: canonical GC-root table is present", function()
-		local src = read_source("local function invoke_guarded") -- adapters/shell_runner.lua
+		local src = read_source("local function invoke_guarded") -- core/process/adapters/shell_runner.lua
 		assert(src, "shell_runner.lua must exist")
 		assert(src:find("_active_tasks", 1, false),
 			"shell_runner: must maintain M._active_tasks as GC root for all spawned tasks")

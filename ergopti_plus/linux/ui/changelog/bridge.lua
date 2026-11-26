@@ -8,7 +8,7 @@
 --- The page never reaches the network on Linux: this handler fetches the
 --- release list through the shared curl adapter (bounded, proxy variables
 --- honoured by curl), trying the GitHub API first and the public Atom feed
---- second (_shared/lua/updater/release_sources.lua), then pushes the result or
+--- second (_shared/updater/engine/release_sources.lua), then pushes the result or
 --- a translated error key back through window.__hostBridgeResponse.
 ---
 --- The page's subscription banner posts set_channel; the updater manager, the
@@ -17,35 +17,39 @@
 --- pushed to an open page the same way.
 ---
 --- A release's « Install this version » button posts install_release: the
---- shared sequence (_shared/lua/updater/release_install.lua) backs the
+--- shared sequence (_shared/updater/engine/release_install.lua) backs the
 --- configuration up (modules/updater/config_backup.lua), finds the release in
 --- the list this bridge last fetched from the GitHub API, then downloads,
 --- verifies and installs it through the updater manager's update path and
---- restarts the daemon on it. Each phase is pushed as install_progress. The
+--- restarts the daemon on it. A feed-only list (API unavailable) installs only
+--- the channel's newest release, under its conventional asset names, once its
+--- detached signature verifies against the pinned key; with no key provisioned,
+--- or for an older row, it is refused. Each phase is pushed as install_progress. The
 --- restore banner posts restore_backup; the daemon restarts on the restored
---- configuration.
+--- configuration. An installed release whose daemon restart is refused waits
+--- (restart_pending): the page and the About menu offer to restart on it.
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "changelog_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.changelog"
 
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
-local Installation = require("infra.installation")
-local Shell = require("adapters.shell_runner")
-local Json = require("json")
-local Base64 = require("compat.base64")
-local ReleaseSources = require("updater.release_sources")
-local RepositoryUrl = require("updater.repository_url")
-local Parser = require("updater.release_parser")
-local ReleaseInstall = require("updater.release_install")
-local VersionOrder = require("updater.version")
-local NetworkFailure = require("network.failure")
-local Paths = require("infra.paths")
-local FileSystem = require("adapters.file_system")
+local Installation = require("core.lifecycle.engine.installation")
+local Shell = require("core.process.adapters.shell_runner")
+local Json = require("core.text.engine.json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local ReleaseSources = require("updater.engine.release_sources")
+local RepositoryUrl = require("updater.engine.repository_url")
+local Parser = require("updater.engine.release_parser")
+local ReleaseInstall = require("updater.engine.release_install")
+local VersionOrder = require("updater.engine.version_core")
+local NetworkFailure = require("core.network.engine.failure")
+local Paths = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
 
 -- The owner and the repository come from the shared updater defaults, their
 -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
@@ -54,7 +58,7 @@ local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
-local MAX_CHANGELOG_BYTES = require("infra.timings").count("limits", "changelog_source_bytes")
+local MAX_CHANGELOG_BYTES = require("core.timing.engine.timings").count("limits", "changelog_source_bytes")
 
 local _fetch_generation = 0
 local _sources = nil
@@ -63,6 +67,8 @@ local _sources = nil
 local _last_list = nil
 -- The one install session of this window (created on the first request).
 local _install_session = nil
+-- The tray menu's redraw, told when a release starts or stops waiting for its restart.
+local _pending_observer = nil
 local _failure_contract = nil
 local _daemon_state = nil
 local _page_epoch, _page_document = nil, nil
@@ -177,13 +183,11 @@ end
 --- @return string|nil error
 load_sources = function()
 	if _sources then return _sources, nil end
-	local ok_paths, Paths = pcall(require, "infra.paths")
-	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
+	local path = ok_paths and Paths.shared("updater/data/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local handle = io.open(path, "rb")
-	if not handle then return nil, "shared updater defaults are unreadable" end
-	local raw = handle:read("*a")
-	handle:close()
+	local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
 	local sources, err = ReleaseSources.resolve(decoded)
@@ -199,8 +203,14 @@ end
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err.
 local function default_http_get(url, headers, timeout_ms, callback)
-	local HttpClient = require("adapters.http_client")
-	HttpClient.get(url, headers, {
+	local HttpClient = require("core.network.adapters.http_client")
+	local completed = false
+	local function finish(status, body, err)
+		if completed then return end
+		completed = true
+		callback(status, body, err)
+	end
+	local started = HttpClient.get(url, headers, {
 		owner = HTTP_OWNER,
 		timeout_ms = timeout_ms,
 		max_body_bytes = MAX_CHANGELOG_BYTES,
@@ -208,15 +218,16 @@ local function default_http_get(url, headers, timeout_ms, callback)
 		https_only = true,
 	}, function(result)
 		result = type(result) == "table" and result or {}
-		callback(result.status, result.body, result.ok == true and nil or result.error)
+		finish(result.status, result.body, result.ok == true and nil or result.error)
 	end)
+	if started == false then finish(nil, nil, "HTTP request refused") end
 end
 
 --- Default page channel: the host->page response hook of the shared UI.
 --- @param payload table
 --- @return boolean pushed
 local function default_push(payload, document_owner)
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_manager or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push releases: webview_manager.eval_js is unavailable.")
 		return false
@@ -239,7 +250,7 @@ M._push = default_push
 --- @param channel string Registry channel id.
 --- @return number generation
 function M.start_fetch(channel)
-	local loaded, host = pcall(require, "ui.webview_manager")
+	local loaded, host = pcall(require, "core.ui.ui.webview_manager")
 	local document, epoch = _page_document, _page_epoch
 	_fetch_generation = _fetch_generation + 1
 	local generation = _fetch_generation
@@ -249,7 +260,7 @@ function M.start_fetch(channel)
 			or type(host.document_owner_retained) ~= "function" then return false end
 		local function identity()
 			return generation == _fetch_generation and document == _page_document and epoch == _page_epoch
-				and package.loaded["ui.webview_manager"] == host
+				and package.loaded["core.ui.ui.webview_manager"] == host
 		end
 		if not identity() then return false end
 		local ok, current = pcall(host.document_owner_current, document)
@@ -260,6 +271,7 @@ function M.start_fetch(channel)
 		return M._push(payload, document)
 	end
 	if not fetch_current() then return generation end
+	_last_list = nil
 	if not registry_channel(channel) then
 		Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
 		push({ action = "releases_error", error_key = "changelog_window.error_network" })
@@ -369,8 +381,8 @@ end
 --- @return string|nil key Locale key the page shows.
 local function install_blocked(manager)
 	if Installation.is_source_run() then return "changelog_window.install_blocked_source" end
-	if manager and type(manager.installation_kind) == "function" and manager.installation_kind() == "package" then
-		return "changelog_window.install_blocked_package"
+	if manager and type(manager.installation_kind) == "function" then
+		return require("modules.updater.install_origin").update_blocked_key(manager.installation_kind())
 	end
 	return nil
 end
@@ -393,25 +405,62 @@ function M._install_context()
 		installed = Version.VERSION,
 		blocked_key = blocked or "",
 		backup = restorable_backup(),
+		-- An installed release whose daemon restart was refused, for a window opened later.
+		pending = _install_session and _install_session.pending() or nil,
 	}
+end
+
+--- Finds the release of a feed-only list that may install: the newest release
+--- of the channel on screen, when the shared offer rule offers it, as macOS
+--- hands that one release to Sparkle (modules/updater/feed_handoff.lua).
+--- @param manager table|nil The updater manager.
+--- @param tag string Posted tag.
+--- @param channel string|nil Channel on screen, posted by the page.
+--- @return string|nil chunk The feed row's release object JSON.
+--- @return string|nil reason Locale key when it may not install.
+local function find_feed_release(manager, tag, channel)
+	-- The Atom feed carries no asset list and no checksum: only a detached
+	-- signature of the pinned key authenticates a release read from it, so
+	-- without a provisioned key every feed row keeps the no-details refusal.
+	if not manager or type(manager.feed_install_available) ~= "function"
+		or manager.feed_install_available() ~= true then
+		return nil, ReleaseInstall.REASON.no_details
+	end
+	local registry = manager.CHANNELS
+	if type(channel) ~= "string" or not registry.channel_for_tag(tag) then
+		return nil, ReleaseInstall.REASON.unknown_release
+	end
+	local repo = manager.repo_info()
+	local list = ReleaseSources.feed_release_list(_last_list.body, repo.owner, repo.repo)
+	if not list then return nil, ReleaseInstall.REASON.unknown_release end
+	local chunks, tags = Parser.split_releases_array(list), {}
+	for index, chunk in ipairs(chunks) do tags[index] = Parser.parse_tag(chunk) end
+	local best = registry.pick_latest(tags, channel)
+	local newest = best and tags[best] or nil
+	local wanted = VersionOrder.normalize_tag(tag)
+	if not newest or VersionOrder.normalize_tag(newest) ~= wanted
+		or not registry.should_offer(newest, manager.current_version(), channel, manager.installed_channel()) then
+		for _, listed in ipairs(tags) do
+			if VersionOrder.normalize_tag(listed) == wanted then
+				return nil, ReleaseInstall.REASON.feed_not_newest
+			end
+		end
+		return nil, ReleaseInstall.REASON.unknown_release
+	end
+	Logger.info(LOG, "Release %s is the newest of channel %s in the public feed: it installs only once "
+		.. "its detached signature verifies.", newest, channel)
+	return chunks[best], nil
 end
 
 --- Finds a release in the list the page shows.
 --- @param tag string
+--- @param channel string|nil Channel on screen, posted by the page.
 --- @return string|nil chunk Raw release object JSON.
 --- @return string|nil reason Locale key when it is not there.
-local function find_release(tag)
+local function find_release(tag, channel)
 	local manager = updater()
 	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
-	if _last_list.kind ~= "json" then
-		-- The Atom feed carries no asset list and no checksum. Unlike macOS
-		-- (Sparkle verifies the appcast's EdDSA signature), Linux has no path that
-		-- verifies a release without the API list: the bundle is a tarball with no
-		-- signed update metadata (no AppImage zsync), and its .sha256 is only an
-		-- asset that list names. So no feed release installs, and the page keeps
-		-- the no-details warning (no __feed_install_handoff seed).
-		return nil, ReleaseInstall.REASON.no_details
-	end
+	if _last_list.kind ~= "json" then return find_feed_release(manager, tag, channel) end
 	if not manager or not manager.CHANNELS.channel_for_tag(tag) then
 		return nil, ReleaseInstall.REASON.unknown_release
 	end
@@ -426,7 +475,7 @@ end
 --- @return table session
 local function trusted_page_epoch(context)
 	if type(context) ~= "table" or context.app_name ~= APP_NAME or type(context.epoch) ~= "number" then return nil end
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	if not ok or type(host.current_epoch) ~= "function" or type(host.is_visible) ~= "function" then return nil end
 	if context.document_owner == nil or type(host.document_owner_current) ~= "function"
 		or host.document_owner_current(context.document_owner) ~= true then return nil end
@@ -435,7 +484,7 @@ end
 
 local function failure_contract()
 	if _failure_contract then return _failure_contract end
-	local path = Paths.shared("modules/network/managed_network.json")
+	local path = Paths.shared("core/network/data/managed_network.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
 	_failure_contract = NetworkFailure.new(Json.decode(raw))
@@ -444,7 +493,7 @@ end
 
 --- Captures actual admitted document and pause owners, privately.
 local function failure_owner()
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	local state, epoch, document = _daemon_state, _page_epoch, _page_document
 	if not ok or type(state) ~= "table" then return nil end
 	return { list = _last_list, generation = _fetch_generation, state = state, epoch = epoch,
@@ -462,7 +511,7 @@ local function failure_current(owner)
 		local state, epoch = host.get_daemon_state(), host.current_epoch(APP_NAME)
 		local visible = host.is_visible(APP_NAME)
 		return state == owner.state and epoch == owner.epoch and visible == true
-			and package.loaded["ui.webview_manager"] == host and owner.document == _page_document
+			and package.loaded["core.ui.ui.webview_manager"] == host and owner.document == _page_document
 			and owner.list ~= nil and owner.list == _last_list and owner.generation == _fetch_generation
 			and owner.state == _daemon_state and owner.state.is_paused == owner.pause
 	end
@@ -482,7 +531,7 @@ local function install_session()
 		if not accepted or not rawequal(accepted.release, release) then return false end
 		local manager = updater()
 		return rawequal(manager, accepted.manager) and accepted_owners[owner] == accepted
-			and rawget(manager, "release_record") == accepted.resolve
+			and rawget(manager, accepted.resolver) == accepted.resolve
 			and rawequal(_daemon_state, accepted.state) and rawget(accepted.state, "restart_after_update") == accepted.restart
 	end
 	local function selected_current(accepted, record, owner, release)
@@ -506,13 +555,17 @@ local function install_session()
 			local tag = Parser.parse_tag(release)
 			local manager, state = updater(), owner.state
 			local restart = rawget(state, "restart_after_update")
-			local resolve = manager and rawget(manager, "release_record")
+			-- A release of a feed-only list names no assets: its record is the
+			-- conventional one whose signature the transfer requires.
+			local feed = type(owner.list) == "table" and owner.list.kind == "feed"
+			local resolver = feed and "feed_release_record" or "release_record"
+			local resolve = manager and rawget(manager, resolver)
 			if tag == "" or type(resolve) ~= "function" or type(restart) ~= "function" then return false end
 			-- Capture execution lineage now; resolve its asset only after the
 			-- shared caller has completed the required configuration backup.
-			if updater() ~= manager or rawget(manager, "release_record") ~= resolve or not failure_current(owner) then return false end
-			accepted_owners[owner] = { release = release, tag = tag, resolve = resolve,
-				manager = manager, state = state, restart = restart }
+			if updater() ~= manager or rawget(manager, resolver) ~= resolve or not failure_current(owner) then return false end
+			accepted_owners[owner] = { release = release, tag = tag, resolve = resolve, resolver = resolver,
+				feed = feed, manager = manager, state = state, restart = restart }
 			if not accepted_current(owner, release) or not failure_current(owner) then
 				accepted_owners[owner] = nil
 				return false
@@ -522,7 +575,7 @@ local function install_session()
 		failure_owner = failure_owner,
 		failure_current = failure_current,
 		blocked = function() return install_blocked(updater()) end,
-		find_release = function(tag) return find_release(tag) end,
+		find_release = function(tag, channel) return find_release(tag, channel) end,
 		backup = function(chunk)
 			local owner, err = backup_owner()
 			if not owner then return nil, err end
@@ -532,12 +585,16 @@ local function install_session()
 			local accepted = accepted_owners[retained_owner]
 			if not accepted or accepted.asset_resolved or not accepted_current(retained_owner, chunk) then return nil end
 			accepted.asset_resolved = true -- Reserve the single post-backup resolver call.
-			local resolved, record = pcall(accepted.resolve, chunk)
+			local resolved, record = pcall(accepted.resolve, accepted.feed and accepted.tag or chunk)
 			if not resolved or not accepted_current(retained_owner, chunk) or type(record) ~= "table"
 				or rawget(record, "tag") ~= accepted.tag or type(rawget(record, "download_url")) ~= "string"
-				or type(rawget(record, "checksum_url")) ~= "string" then return nil end
+				or type(rawget(record, "checksum_url")) ~= "string"
+				or (accepted.feed and rawget(record, "signature_required") ~= true) then return nil end
 			local selected = {}
-			for _, key in ipairs({ "tag", "download_url", "checksum_url", "notes", "published_at", "prerelease" }) do
+			-- The signature fields travel too: without them the transfer neither
+			-- fetches the detached signature nor requires it for a feed release.
+			for _, key in ipairs({ "tag", "download_url", "checksum_url", "signature_url", "signature_required",
+				"notes", "published_at", "prerelease" }) do
 				selected[key] = rawget(record, key)
 			end
 			if not accepted_current(retained_owner, chunk) then return nil end
@@ -552,9 +609,11 @@ local function install_session()
 			local manager = accepted.manager
 			local download = rawget(manager, "download_release")
 			if type(download) ~= "function" or not selected_current(accepted, record, retained_owner, release) then return false end
+			-- A feed release that fails verification failed its signature, the only
+			-- authentication it has: the page says so instead of a bare integrity error.
+			local feed = accepted.feed == true
 			return download(record, function(path, err, stage, failure_receipt)
-				done(path, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download, err,
-					failure_receipt)
+				done(path, ReleaseInstall.download_reason(stage, feed), err, failure_receipt)
 			end, function()
 				return rawget(manager, "download_release") == download
 					and selected_current(accepted, record, retained_owner, release)
@@ -593,6 +652,9 @@ local function install_session()
 			end
 			return restart(accepted and accepted.tag or Parser.parse_tag(chunk)) == true
 		end,
+		pending_changed = function()
+			if _pending_observer then _pending_observer() end
+		end,
 		report = function(message, retained_owner)
 			local payload = { action = "install_progress" }
 			for key, value in pairs(message) do payload[key] = value end
@@ -625,11 +687,39 @@ local function restore(id)
 		return { action = "restore_progress", phase = "failed", reason_key = key,
 			backup_path = pre and pre.path or nil }
 	end
+	local backup_path = pre and pre.path or nil
 	local restart = type(_daemon_state) == "table" and _daemon_state.restart or nil
-	if type(restart) ~= "function" or restart("configuration restored") ~= true then
-		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it.")
+	local called, accepted = false, nil
+	if type(restart) == "function" then called, accepted = pcall(restart, "configuration restored") end
+	if not called or accepted ~= true then
+		-- The disk stays restored, but the old daemon keeps running: only an
+		-- accepted restart may promise one. Same failure report as Windows/macOS.
+		Logger.error(LOG, "The configuration is restored but the daemon could not restart on it: %s.",
+			tostring(accepted))
+		return { action = "restore_progress", phase = "failed", backup_path = backup_path,
+			reason_key = "changelog_window.restore_error_unexpected" }
 	end
-	return { action = "restore_progress", phase = "restored", backup_path = pre and pre.path or nil }
+	return { action = "restore_progress", phase = "restored", backup_path = backup_path }
+end
+
+--- The installed release that waits for a daemon restart that was refused.
+--- @return table|nil { tag, backup_path }
+function M.pending_install()
+	return _install_session and _install_session.pending() or nil
+end
+
+--- Asks again for the restart that completes the held release (the tray row).
+--- @return boolean accepted
+function M.complete_pending_install()
+	return _install_session ~= nil and _install_session.complete_restart() == true
+end
+
+--- Names the tray menu's redraw, so its completing row appears and goes away
+--- with the held release. A later menu build replaces the previous redraw.
+--- @param observer function
+function M.set_pending_install_observer(observer)
+	assert(type(observer) == "function", "the held-install observer must be a function")
+	_pending_observer = observer
 end
 
 --- Clears cached state; used by tests.
@@ -638,6 +728,7 @@ function M._reset()
 	_sources = nil
 	_last_list = nil
 	_install_session = nil
+	_pending_observer = nil
 	_daemon_state = nil
 	_page_epoch, _page_document = nil, nil
 	M._config_backup = nil
@@ -705,7 +796,19 @@ function M.on_message(payload, state, context)
 
 	-- Only this click installs a chosen release: nothing else calls the session.
 	if action == "install_release" then
+		if _last_list == nil then
+			local reason = _install_session and _install_session.busy() and ReleaseInstall.REASON.busy
+				or ReleaseInstall.REASON.unknown_release
+			return { action = "install_progress", tag = payload.tag, phase = "failed",
+				reason_key = reason }
+		end
 		install_session().install(payload.tag, payload.channel)
+		return nil
+	end
+
+	-- « Restart now » of an installed release whose daemon restart was refused.
+	if action == "complete_install_restart" then
+		if _install_session then _install_session.complete_restart() end
 		return nil
 	end
 

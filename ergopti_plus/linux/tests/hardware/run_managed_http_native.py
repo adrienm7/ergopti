@@ -98,6 +98,8 @@ class PacHandler(http.server.BaseHTTPRequestHandler):
             time.sleep(3)
         if self.path == "/direct.pac":
             selection = "DIRECT"
+        elif self.path == "/dead_direct.pac":
+            selection = f"PROXY 127.0.0.1:{self.server.refused_port}; DIRECT"
         elif self.path == "/relay.pac":
             selection = f"PROXY 127.0.0.1:{self.server.refused_port}; PROXY 127.0.0.1:{self.server.proxy_port}; DIRECT"
         else:
@@ -228,6 +230,49 @@ class PrivateBus:
                 )
 
 
+def _orphan_zombies(exclude):
+    """Zombie children of this subreaper other than its own Popen children."""
+    found = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit() or int(entry) in exclude:
+            continue
+        try:
+            with open(f"/proc/{entry}/stat", "rb") as handle:
+                fields = handle.read().rsplit(b")", 1)[1].split()
+        except OSError:
+            continue
+        if fields[0] == b"Z" and int(fields[1]) == os.getpid():
+            found.append(int(entry))
+    return found
+
+
+@contextlib.contextmanager
+def reaping_orphans(*owned):
+    """Reap descendants orphaned to this subreaper while one control runs.
+
+    A cancelled lookup child's own PAC download is killed with its group and
+    reparented here; a session's systemd user manager reaps such an orphan at
+    once, and the control proves its group is gone. Only zombies are reaped and
+    never one of this fixture's own Popen children (the control, its private
+    bus), so a live leak still fails the teardown check.
+    """
+    stop = threading.Event()
+
+    def reap():
+        while not stop.wait(0.01):
+            for pid in _orphan_zombies(set(owned)):
+                with contextlib.suppress(ChildProcessError):
+                    os.waitpid(pid, os.WNOHANG)
+
+    reaper = threading.Thread(target=reap, daemon=True)
+    reaper.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        reaper.join(2)
+
+
 def stage_tree(temp):
     """Copy exact immutable dependencies and one manifest-bound producer."""
     manifest = COMPOSITION / "FINAL-SOURCE-MANIFEST.json"
@@ -292,7 +337,9 @@ def stage_tree(temp):
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
     if (
-        hashlib.sha256((base / "linux/adapters/curl_http_client.lua").read_bytes()).hexdigest()
+        hashlib.sha256(
+            (base / "linux/core/network/adapters/curl_http_client.lua").read_bytes()
+        ).hexdigest()
         != EXPECTED_NATIVE_SHA256
     ):
         raise RuntimeError("Sole reviewed native engine is required")
@@ -472,7 +519,8 @@ class NativePublicControls(unittest.TestCase):
                 parent_fd = os.pidfd_open(process.pid)
                 try:
                     try:
-                        process.communicate(json.dumps(request), timeout=8)
+                        with reaping_orphans(process.pid, bus.process.pid if bus else None):
+                            process.communicate(json.dumps(request), timeout=8)
                     except (subprocess.TimeoutExpired, KeyboardInterrupt) as interruption:
                         type(self).retain_fixture = True
                         # Signal only the kernel-pinned actual Lua child. Its
@@ -734,8 +782,21 @@ class NativePublicControls(unittest.TestCase):
             "Actual paired-image/stat metric admission is unavailable",
         )
 
+    def test_actual_pac_dead_relay_then_direct_reaches_origin(self):
+        # GIO and libproxy 0.5 drop the DIRECT of this answer; the lookup child
+        # evaluates the PAC itself, so the failover reaches the origin direct.
+        receipt, _ = self.invoke(
+            mode="auto",
+            pac_name="dead_direct",
+            url=f"http://{self.origin_address}:{self.origin.server_port}/private",
+        )
+        self.assertTrue(receipt["ok"], receipt)
+        self.assertEqual(receipt["status"], 200)
+        self.assertEqual(receipt["process_count"], 3)
+        self.assertIn("/dead_direct.pac", self.pac.paths)
 
-# Additive actual fixture only. All preceding18 original method bodies remain exact.
+
+# Additive actual fixture only. All preceding 19 method bodies remain exact.
 import ssl
 
 HEADERS = {
@@ -1219,9 +1280,10 @@ class PerHopControls(unittest.TestCase):
                             "Parent-proof admission refused; exact pre-input child retired"
                         ) from None
                     try:
-                        process.communicate(
-                            json.dumps(request), timeout=min(30, timeout / 1000 + 6)
-                        )
+                        with reaping_orphans(process.pid, bus.process.pid if bus else None):
+                            process.communicate(
+                                json.dumps(request), timeout=min(30, timeout / 1000 + 6)
+                            )
                     except (subprocess.TimeoutExpired, KeyboardInterrupt) as interruption:
                         type(self).retain_fixture = True
                         signal.pidfd_send_signal(parent_fd, signal.SIGUSR1)

@@ -19,6 +19,31 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
 }
 
+/**
+ * Reads a system KPI the host may be unable to measure. A count from any device
+ * shows as is; a zero this host cannot measure shows « — » and the reason the
+ * host gave (driver_meta.unmeasured), never a zero that reads as measured.
+ * @param {number} count Aggregated count across devices.
+ * @param {string|undefined} reason i18n key naming why this host cannot measure it.
+ * @param {string} measuredDetail i18n key shown under a nonzero count.
+ * @returns {{value: string, detail: string}} The card's value and detail lines.
+ */
+function systemKpiReading(count, reason, measuredDetail) {
+	if (count > 0) return { value: String(count), detail: _t(measuredDetail) };
+	if (reason) return { value: '—', detail: _t(reason) };
+	return { value: '0', detail: '—' };
+}
+
+/**
+ * Resolves labels on each render so a language change reaches the charts.
+ * @returns {string[]} Weekday labels, starting with Monday.
+ */
+function metricWeekdayLabels() {
+	return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) =>
+		_t(`ui_typing.heatmap_day_${day}`)
+	);
+}
+
 let manifestData = window.ManifestData || {};
 let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
@@ -71,7 +96,7 @@ function $id(id) {
 // ===================================
 
 // Map macOS LSApplicationCategoryType (English) → stable i18n id matching
-// _shared/data/locales/<code>.json app_category.* keys.
+// _shared/core/i18n/data/locales/<code>.json app_category.* keys.
 const CATEGORY_ID_MAP = {
 	Productivity: 'productivity',
 	'Social networking': 'social',
@@ -336,7 +361,19 @@ function formatDuration(ms) {
 
 function formatDurationDecimal(ms) {
 	if (!ms) return 0;
-	return Number((ms / 3600000).toFixed(2));
+	return ms / 3600000;
+}
+
+/**
+ * Keeps the previous whole-CPM tooltip while retaining precision in the plot.
+ * @param {ChartTooltipItem} context - The active Chart.js tooltip item.
+ * @returns {string} The default label with the rounded CPM value.
+ */
+function formatCpmTooltip(context) {
+	return Chart.defaults.plugins.tooltip.callbacks.label({
+		...context,
+		formattedValue: Math.round(context.parsed.y).toLocaleString(context.chart?.options?.locale)
+	});
 }
 
 function formatDisplayDate(dateStr) {
@@ -345,6 +382,40 @@ function formatDisplayDate(dateStr) {
 	const d = new Date(ts);
 	return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
+
+/**
+ * The text alternative of every Chart.js canvas: role img, named by its
+ * figure's heading and its data, so the values a pointer reads in the hover
+ * tooltips reach the keyboard and assistive technology too (WCAG 1.1.1,
+ * 1.4.13). Up to 24 non-zero points per series keep the name readable.
+ */
+const CHART_TEXT_ALTERNATIVE = {
+	id: 'ergoptiTextAlternative',
+	afterUpdate(chart) {
+		const canvas = chart.canvas;
+		const holder = canvas.closest('figure, section');
+		const heading = holder ? holder.querySelector('h3') : null;
+		const labels = chart.data.labels || [];
+		const value = (point) => (point && typeof point === 'object' ? point.y : point);
+		const series = (chart.data.datasets || []).map((dataset) => {
+			const points = (dataset.data || [])
+				.map((point, index) => [labels[index], value(point)])
+				.filter(([, v]) => typeof v === 'number' && v !== 0)
+				.slice(0, 24)
+				.map(
+					([label, v]) =>
+						`${label} ${Number(v.toFixed(1)).toLocaleString(window._i18n_locale || undefined)}`
+				);
+			return `${dataset.label ? dataset.label + ': ' : ''}${points.join(', ')}`;
+		});
+		canvas.setAttribute('role', 'img');
+		canvas.setAttribute(
+			'aria-label',
+			[heading ? heading.textContent.trim() : '', ...series].filter(Boolean).join('. ')
+		);
+	}
+};
+if (typeof Chart !== 'undefined') Chart.register(CHART_TEXT_ALTERNATIVE);
 
 // ===================================
 // ===================================

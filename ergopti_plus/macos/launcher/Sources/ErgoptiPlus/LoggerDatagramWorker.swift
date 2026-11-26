@@ -16,8 +16,10 @@
 // 3. Descriptor-relative sinks: the configured directory is resolved once to a
 //    user-owned folder (OwnedLogDirectory), files are validated without
 //    following their final path components, and all writes happen off AppKit.
-// 4. Native rotation/purge: daily and topical maintenance cannot block a Lua
-//    timer or eventtap callback.
+// 4. Native rotation/purge: daily maintenance cannot block a Lua timer or
+//    eventtap callback. Every line goes to the daily log (and WARNING/ERROR to
+//    the errors mirror) only; a record naming a topical file is refused, and the
+//    purge deletes the retired topical sub-files by exact name.
 // 5. Latency: the Lua transport treats a long silence as a dead worker, so the
 //    worker runs at user-initiated QoS, keeps each validated file descriptor
 //    open between records (revalidated by inode before every append) instead
@@ -46,7 +48,7 @@ let kLoggerDatagramPortEnvironment = "ERGOPTI_LOG_PORT"
 let kLoggerDatagramTokenEnvironment = "ERGOPTI_LOG_TOKEN"
 
 /// A datagram or retention pass slower than this is reported to launcher.log.
-/// Registry: _shared/modules/timings/constants.toml [logger] native_slow_batch_ms,
+/// Registry: _shared/core/timing/data/constants.toml [logger] native_slow_batch_ms,
 /// pinned by tools/test/test-logger-scalars-single-source.cjs.
 let kLoggerSlowBatchThresholdMilliseconds = 500
 
@@ -84,8 +86,6 @@ struct LoggerSinkStatistics: Equatable {
 /// Serial file authority used only from LoggerDatagramProcessor's private queue.
 final class LoggerRecordSink {
 	static let maximumLineBytes = 48 * 1_024
-	private static let maximumTopicCount = 16
-	private static let maximumTopicNameBytes = 96
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
 	private static let lockRetryMicroseconds = LauncherTimings.fileLockRetry.microseconds
 
@@ -95,9 +95,9 @@ final class LoggerRecordSink {
 	private(set) var ownedCloseError: Int32 = 0
 	private let closeOperation: (Int32) -> Int32
 	private var retentionDays = 14
-	private var topicalWriteDate: String?
-	private var forceTopicalResetForObservedTransition = false
-	private var initializedTopicalFiles: Set<String> = []
+	// Calendar date of the last appended record; a new date reopens every kept
+	// descriptor because the dated file names change.
+	private var writeDate: String?
 	private var pendingRecord: PendingRecord?
 	private var pendingWriteRollback: PendingWriteRollback?
 	private var purgePending = false
@@ -220,13 +220,6 @@ final class LoggerRecordSink {
 			closeOwnedDescriptor(descriptor)
 			return false
 		}
-		var previousAttributes = stat()
-		let preservesTopicalState = self.directoryPath == normalizedPath
-			&& directoryDescriptor >= 0
-			&& Darwin.fstat(directoryDescriptor, &previousAttributes) == 0
-			&& previousAttributes.st_dev == attributes.st_dev
-			&& previousAttributes.st_ino == attributes.st_ino
-
 		// Kept descriptors belong to the previous directory descriptor, even at
 		// the same pathname: a replaced folder must never receive them.
 		closeOpenFiles()
@@ -239,11 +232,6 @@ final class LoggerRecordSink {
 		resolvedDirectoryPath = resolvedPath
 		self.directoryPath = normalizedPath
 		self.retentionDays = retentionDays
-		if !preservesTopicalState {
-			topicalWriteDate = nil
-			forceTopicalResetForObservedTransition = false
-			initializedTopicalFiles.removeAll()
-		}
 		pendingRecord = nil
 		purgePending = true
 		return true
@@ -319,39 +307,22 @@ final class LoggerRecordSink {
 			pendingRecord = requested
 		}
 
-		if topicalWriteDate != calendarDate {
-			forceTopicalResetForObservedTransition = topicalWriteDate != nil
-			topicalWriteDate = calendarDate
-			initializedTopicalFiles.removeAll()
-			// Day rotation: the dated names change and the undated topical views
-			// may be truncated, so every kept descriptor is reopened.
+		if writeDate != calendarDate {
+			writeDate = calendarDate
+			// Day rotation: the dated names change, so every kept descriptor is reopened.
 			closeOpenFiles()
 		}
 		guard ownedCloseError == 0, let bytes = (persistedLine + "\n").data(using: .utf8) else { return false }
 		let unifiedName = kLogUnifiedPrefix + calendarDate + kLogFileExtension
-		var targets = [(name: unifiedName, topical: false)]
+		var targets = [unifiedName]
 		if variant == "warn" || variant == "error" {
-			let errorsName = kLogErrorsPrefix + calendarDate + kLogFileExtension
-			targets.append((name: errorsName, topical: false))
-		}
-		for topic in topics {
-			targets.append((name: topic, topical: true))
+			targets.append(kLogErrorsPrefix + calendarDate + kLogFileExtension)
 		}
 
 		for target in targets {
-			if pendingRecord?.completedFiles.contains(target.name) == true { continue }
-			let firstTopicalWrite = target.topical
-				&& !initializedTopicalFiles.contains(target.name)
-			guard write(
-				bytes,
-				fileName: target.name,
-				resetUnlessDate: firstTopicalWrite ? calendarDate : nil,
-				forceReset: firstTopicalWrite && forceTopicalResetForObservedTransition
-			) else {
-				return false
-			}
-			pendingRecord?.completedFiles.insert(target.name)
-			if target.topical { initializedTopicalFiles.insert(target.name) }
+			if pendingRecord?.completedFiles.contains(target) == true { continue }
+			guard write(bytes, fileName: target) else { return false }
+			pendingRecord?.completedFiles.insert(target)
 		}
 		pendingRecord = nil
 		statistics.appends += 1
@@ -417,28 +388,11 @@ final class LoggerRecordSink {
 		return calendarDate(date) == value
 	}
 
+	/// A record never names a topical file any more: one daily log is the only
+	/// log, so a record that still carries topics comes from a stale runtime and
+	/// is refused rather than half-written.
 	private static func areValidTopics(_ topics: [String]) -> Bool {
-		guard topics.count <= maximumTopicCount,
-			Set(topics).count == topics.count
-		else { return false }
-		return topics.allSatisfy { name in
-			guard name.utf8.count <= maximumTopicNameBytes,
-				kLoggerTopicalFileNames.contains(name),
-				name.hasPrefix(kLogTopicalPrefix),
-				name.hasSuffix(kLogFileExtension),
-				datedLogDate(name) == nil,
-				!name.hasPrefix(kLogErrorsPrefix)
-			else { return false }
-			let stem = name.dropFirst(kLogTopicalPrefix.count).dropLast(kLogFileExtension.count)
-			guard !stem.isEmpty else { return false }
-			return stem.utf8.allSatisfy { byte in
-				(byte >= 48 && byte <= 57)
-					|| (byte >= 65 && byte <= 90)
-					|| (byte >= 97 && byte <= 122)
-					|| byte == 45
-					|| byte == 95
-			}
-		}
+		return topics.isEmpty
 	}
 
 	/// Returns the kept descriptor of one sink when its directory entry still
@@ -492,12 +446,7 @@ final class LoggerRecordSink {
 	/// Validates one exact sink under its lock before performing a bounded append.
 	/// A descriptor is kept only after a complete append; every failure closes
 	/// it, so the retry revalidates from the directory entry.
-	private func write(
-		_ data: Data,
-		fileName: String,
-		resetUnlessDate: String? = nil,
-		forceReset: Bool = false
-	) -> Bool {
+	private func write(_ data: Data, fileName: String) -> Bool {
 		guard let file = openFile(fileName) else { return false }
 		let descriptor = file.descriptor
 		var keepOpen = false
@@ -517,10 +466,8 @@ final class LoggerRecordSink {
 		guard lockAcquired else { return false }
 		locked = true
 
-		// Rotation is decided from the inode metadata observed while holding the
-		// same exclusive lock as the write. A snapshot taken before flock can be
-		// stale after waiting behind a writer and must never authorize truncation.
-		// The inode must also still be the one validated at open and still linked.
+		// The inode must still be the one validated at open and still linked,
+		// observed while holding the same exclusive lock as the write.
 		var lockedAttributes = stat()
 		guard Darwin.fstat(descriptor, &lockedAttributes) == 0,
 			(lockedAttributes.st_mode & S_IFMT) == S_IFREG,
@@ -529,16 +476,6 @@ final class LoggerRecordSink {
 			lockedAttributes.st_dev == file.device,
 			lockedAttributes.st_ino == file.inode
 		else { return false }
-		if let resetUnlessDate {
-			let inodeDate = Self.calendarDate(Date(
-				timeIntervalSince1970: Double(lockedAttributes.st_mtimespec.tv_sec)
-			))
-			if (forceReset || inodeDate != resetUnlessDate)
-				&& Darwin.ftruncate(descriptor, 0) != 0 {
-				return false
-			}
-		}
-
 		var appendAttributes = stat()
 		guard Darwin.fstat(descriptor, &appendAttributes) == 0 else { return false }
 		let originalSize = appendAttributes.st_size
@@ -609,7 +546,7 @@ final class LoggerRecordSink {
 		}
 	}
 
-	/// Purges dated archives by filename and undated topical views by mtime.
+	/// Purges dated archives by filename and the retired topical sub-files by exact name.
 	private func purgeOldLogs() {
 		guard directoryDescriptor >= 0 else { return }
 		let scanDescriptor = ".".withCString { currentDirectory in
@@ -626,15 +563,13 @@ final class LoggerRecordSink {
 		defer { Darwin.closedir(directory) }
 
 		let currentDate = now()
-		let today = Self.calendarDate(currentDate)
-		let cutoff = currentDate.addingTimeInterval(-Double(retentionDays) * 86_400)
 		while let entry = Darwin.readdir(directory) {
 			let name = withUnsafePointer(to: &entry.pointee.d_name) { tuplePointer in
 				tuplePointer.withMemoryRebound(to: CChar.self, capacity: Int(NAME_MAX) + 1) {
 					String(cString: $0)
 				}
 			}
-			guard name != ".", name != "..", shouldPurge(name, today: today, cutoff: cutoff)
+			guard name != ".", name != "..", shouldPurge(name, now: currentDate)
 			else { continue }
 
 			var attributes = stat()
@@ -657,23 +592,31 @@ final class LoggerRecordSink {
 		}
 	}
 
-	private func shouldPurge(_ name: String, today: String, cutoff: Date) -> Bool {
-		if let fileDate = Self.datedLogDate(name), fileDate < cutoff { return true }
-		guard Self.isTopicalName(name) else { return false }
-		var attributes = stat()
-		let inspected = name.withCString { candidate in
-			Darwin.fstatat(
-				directoryDescriptor,
-				candidate,
-				&attributes,
-				AT_SYMLINK_NOFOLLOW
-			)
+	private func shouldPurge(_ name: String, now: Date) -> Bool {
+		if let fileDate = Self.datedLogDate(name) {
+			return Self.datedLogExpired(fileDay: Self.calendarDate(fileDate), now: now, retentionDays: retentionDays)
 		}
-		guard inspected == 0 else { return false }
-		return Self.calendarDate(Date(
-			timeIntervalSince1970: Double(attributes.st_mtimespec.tv_sec)
-		))
-			!= today
+		// The retired topical sub-files hold only copies of daily-log lines and
+		// nothing writes them any more; purgeOldLogs still unlinks only a regular,
+		// owned, single-link file directly in the folder.
+		return kRetiredTopicalLogNames.contains(name)
+	}
+
+	/// Whether a dated archive of `fileDay` (YYYY-MM-DD) is past retention on the
+	/// calendar day of `now`: older than `now` minus `retentionDays` days, compared
+	/// as calendar days. It used to compare the file's noon with `now` minus
+	/// N x 86,400 s, which purged the N-days-old archive after noon only, where
+	/// Windows and Linux keep it all day (logger parity audit LOG-03).
+	/// - Parameters:
+	///   - fileDay: The archive's date, from its name.
+	///   - now: The current instant.
+	///   - retentionDays: Days of archives kept.
+	/// - Returns: True when the archive must be purged.
+	static func datedLogExpired(fileDay: String, now: Date, retentionDays: Int) -> Bool {
+		guard let cutoff = gregorianCalendar().date(byAdding: .day, value: -retentionDays, to: now) else {
+			return false
+		}
+		return fileDay < calendarDate(cutoff)
 	}
 
 	private static func datedLogDate(_ name: String) -> Date? {
@@ -701,13 +644,6 @@ final class LoggerRecordSink {
 			hour: 12
 		)), calendarDate(date) == dateText else { return nil }
 		return date
-	}
-
-	private static func isTopicalName(_ name: String) -> Bool {
-		guard name.hasPrefix(kLogTopicalPrefix), name.hasSuffix(kLogFileExtension),
-			datedLogDate(name) == nil
-		else { return false }
-		return areValidTopics([name])
 	}
 
 	private static func calendarDate(_ date: Date) -> String {
@@ -1111,7 +1047,7 @@ final class LoggerDatagramProcessor {
 		if let topics = value as? [String] { return topics }
 		if let emptyTable = value as? [String: Any], emptyTable.isEmpty {
 			// hs.json cannot infer array intent from an empty Lua table, so `{}` is
-			// its canonical wire form for a record with no topical destinations.
+			// its canonical wire form for a record with no topics.
 			return []
 		}
 		return nil

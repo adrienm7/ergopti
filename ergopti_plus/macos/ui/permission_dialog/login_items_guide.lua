@@ -29,16 +29,16 @@
 
 local M = {}
 
-local Logger           = require("infra.logger")
-local i18n             = require("infra.i18n")
+local Logger           = require("core.logger.engine.logger")
+local i18n             = require("core.i18n.engine.i18n")
 local PermissionDialog = require("ui.permission_dialog")
-local TimerScheduler   = require("adapters.timer_scheduler")
+local TimerScheduler   = require("core.events.timer_scheduler")
 
 local LOG = "login_items_guide"
 
 -- The dialog kinds this guide shows, and the one it must wait behind.
 local KIND = "login_items"
-local ACCESSIBILITY = "accessibility"
+local ACCESSIBILITY = "accessibility_copies"
 
 -- Guardian states read from platform.remap.guardian_state(): the one the steps
 -- are for, and the one a failed or superseded probe leaves while it lasts.
@@ -96,7 +96,7 @@ local function settings_opener(remap)
 		return remap.open_login_items(function(opened, detail)
 			if opened == true then return end
 			Logger.warn(LOG, "Login Items settings did not open from the steps: %s.", tostring(detail))
-			local ok, sent_or_err = pcall(require("infra.notifications").notify,
+			local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 				i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
 			if not ok or sent_or_err ~= true then
 				Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))

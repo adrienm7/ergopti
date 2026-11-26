@@ -10,15 +10,15 @@
 
 local M = {}
 local helpers = require("tests.helpers")
-local Focus = require("adapters.atspi_focus")
-local Json = require("json")
+local Focus = require("platform.focus.atspi_focus")
+local Json = require("core.text.engine.json")
 
 --- Builds the original worker closures with separately controlled native events.
 --- @param source string|nil Worker source; absent selects the actual driver file.
 --- @return table state Native observations and callable original worker bodies.
 function M.new(source)
 	if source == nil then
-		local file = assert(io.open(helpers.driver_root() .. "/adapters/atspi_focus_watch_worker.lua", "r"))
+		local file = assert(io.open(helpers.driver_root() .. "/platform/focus/atspi_focus_watch_worker.lua", "r"))
 		source = file:read("*a"); file:close()
 	end
 	local emit = assert(source:match('(\tlocal function emit%(kind, snapshot%).-)\n\tlocal handles = nil'), "worker emit body missing")

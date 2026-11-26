@@ -26,12 +26,14 @@
 ; =================================================
 
 ; id -> array of canonical disabled_when state keys. AHK-relevant subset only
-; — metrics_menu items restricted to platforms=["hs"] (wpm_menubar,
-; menubar_colors, encryption) are never rendered on AHK and are covered by
+; — metrics_menu items restricted to platforms=["hs"] (encryption) are never
+; rendered on AHK and are covered by
 ; the manifest-only assertions in 2/ instead.
 ; The two windows are `readable_when_off` instead: they read stored history only.
 _MMDW_Canonical() {
 	return Map(
+		"wpm_menubar",       ["keystats_enabled"],
+		"menubar_colors",     ["keystats_enabled", "wpm_menubar_visible"],
 		"wpm_widget",        ["keystats_enabled"],
 		"widget_colors",      ["keystats_enabled", "wpm_widget_visible"],
 		"include_realtime",   ["keystats_enabled", "wpm_widget_visible"],
@@ -46,7 +48,7 @@ _MMDW_Canonical() {
 _MMDW_ManifestPath() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	return EpDir . "\_shared\modules\menu\menu_manifest.json"
+	return EpDir . "\_shared\menu\data\menu_manifest.json"
 }
 
 _MMDW_LoadMetricsMenu() {
@@ -244,7 +246,7 @@ Test("menu-metrics-disabled-when: the manifest metrics switch reaches Windows (F
 _MMDW_ManifestTomlSourceReachesAhk() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	TomlPath := EpDir . "\_shared\modules\menu\menu.toml"
+	TomlPath := EpDir . "\_shared\menu\data\menu.toml"
 	Toml := ""
 	try Toml := FileRead(TomlPath, "UTF-8")
 	Assert(Toml != "", "menu.toml must be readable")

@@ -21,7 +21,7 @@
 
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
-local saved_file_system = package.loaded["adapters.file_system"]
+local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 
 
 
@@ -33,16 +33,16 @@ local saved_file_system = package.loaded["adapters.file_system"]
 -- =====================================
 
 -- Must be registered BEFORE load_with_stubs so downstream requires resolve them.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t = function(key) return key end,
 }
 
 -- Every harness below models a fresh install. Identity publication is a
 -- prerequisite owned by the filesystem adapter, not the behavior under test.
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -103,7 +103,7 @@ package.loaded["modules.keystats.export"] = {
 local _TIMINGS_MS = {
 	keystats = { max_keystroke_delay_ms = 5000 },
 }
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function(section, key)
 		return (_TIMINGS_MS[section] or {})[key] or 1000
 	end,
@@ -406,7 +406,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 			for k, v in pairs(extra_state) do state[k] = v end
 		end
 		lm.init(state)
-		return lm
+		return lm, state
 	end
 
 	helpers.it("empty buffer produces no appended entry", function()
@@ -414,6 +414,20 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 		lm.flush_buffer()
 		lm.ingest_once()
 		helpers.assert_eq(#_appended_entries, 0)
+	end)
+
+	helpers.it("flushes mouse travel alone under the originating application", function()
+		local lm, state = make_lm_with_buffer({}, {mouse_distance_px = 450, buffer_text = ""})
+		helpers.assert_eq(lm.flush_buffer(), true)
+		helpers.assert_eq(state.mouse_distance_px, 0, "the detached travel cannot leak into the next application")
+		state.session_app_name = "NextApp"
+		lm.ingest_once()
+		helpers.assert_eq(#_appended_entries, 1)
+		helpers.assert_eq(_appended_entries[1].app, "TestApp")
+		helpers.assert_eq(_appended_entries[1].mouse_distance_px, 450)
+		lm.flush_buffer()
+		lm.ingest_once()
+		helpers.assert_eq(#_appended_entries, 1, "the same distance is not published twice")
 	end)
 
 	helpers.it("non-empty buffer produces exactly one typing entry", function()
@@ -723,4 +737,4 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 	end)
 end)
 
-package.loaded["adapters.file_system"] = saved_file_system
+package.loaded["core.fs.adapters.file_system"] = saved_file_system

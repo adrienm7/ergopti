@@ -71,7 +71,7 @@ _NLHM_EveryLayerHotkeyFiresUnderAHeldModifier() {
 	; recommended file actually registers. The source alone now has only two.
 	SharedDir := A_ScriptDir . "\..\..\_shared"
 	Ctx := KeymapLayers_LoadContext(SharedDir)
-	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\keymap\layers.recommended.toml", "UTF-8"))
+	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\layouts\data\layers.recommended.toml", "UTF-8"))
 	Assert(Result["ok"], "the recommended navigation layer must resolve")
 	Src .= "`n#HotIf LayerEnabled`n"
 	for Row in NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx)

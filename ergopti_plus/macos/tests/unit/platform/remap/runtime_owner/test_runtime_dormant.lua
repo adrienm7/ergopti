@@ -1,12 +1,12 @@
 --- tests/unit/platform/remap/runtime_owner/test_runtime_dormant.lua
 
 --- ==============================================================================
---- MODULE: Owned Runtime Stays Dormant By Default
+--- MODULE: Owned Runtime Selection
 --- DESCRIPTION:
---- Proves that nothing about the owned Karabiner runtime (ADR 011) changes
---- today's behaviour unless `[karabiner] runtime = "owned"` is written by hand:
---- the command line tool stays the shared one, the selection is made once, and
---- the remap bridge's source reaches the owner only behind that opt-in.
+--- Proves how the remap bridge selects the owned Karabiner runtime (ADR 011),
+--- the default since the release after 1.0.9: the command line tool follows
+--- the selection, which is made once, and the bridge's source reaches the owner
+--- only behind it, so a hand-kept `runtime = "shared"` never loads the owner.
 ---
 --- ROOT CAUSE ENCODED: the bridge's init.lua cannot be loaded by the unit
 --- suite, so a dormant guarantee that lived only in its control flow would be
@@ -15,7 +15,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SourceFile = require("tests.support.source_file")
 
 local SHARED_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -95,7 +94,7 @@ end)
 --- Reads the remap bridge source.
 --- @return string source
 local function init_source()
-	return assert(SourceFile.read(helpers.driver_root() .. "platform/remap/init.lua"))
+	return assert(helpers.read_module_source("platform.remap"))
 end
 
 helpers.describe("the remap bridge reaches the owned runtime only after an opt-in", function()
@@ -157,12 +156,12 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find("M._owned.teardown_reason = reason", revoke, true) ~= nil)
 	end)
 
-	helpers.it("selects the shared runtime when the preference is absent", function()
+	helpers.it("selects Ergopti's own runtime when the preference is absent, from the one default", function()
 		local source = init_source()
-		helpers.assert_true(source:find("user_cfg.runtime or M._owned.paths.RUNTIME_SHARED", 1, true) ~= nil)
+		helpers.assert_true(source:find("user_cfg.runtime or Config.RUNTIME_DEFAULT", 1, true) ~= nil)
 		package.loaded["platform.remap.ke_paths"] = nil
 		helpers.assert_eq(require("platform.remap.config") ~= nil, true)
-		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "shared")
+		helpers.assert_eq(require("platform.remap.config").RUNTIME_DEFAULT, "owned")
 	end)
 
 	helpers.it("generates nothing for an owned boot until the owner admitted the runtime", function()
@@ -196,6 +195,19 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(text:find('remove_managed_rules("Owned runtime migration", shared)', 1, true) ~= nil,
 			"the marker-exact byte-span removal owner does the cleaning")
 		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
+	end)
+
+	helpers.it("stops the lease recovery instead of exhausting it while ours is not admitted", function()
+		-- Issue #106: three refused regenerations ended in "auto-recovery
+		-- exhausted", an error that hid the owner's named reason.
+		local source = init_source()
+		local attempt = source:find("local function finish_attempt(ok, reason)", 1, true)
+		local stop = source:find('if reason == "owned-runtime-not-admitted" then', attempt, true)
+		local cancel = source:find('cancel_lease_recovery("owned-runtime-not-admitted")', stop, true)
+		local failed = source:find('"Karabiner lease auto-recovery attempt %d failed: %s."', attempt, true)
+		helpers.assert_true(attempt ~= nil and stop ~= nil and cancel ~= nil and failed ~= nil
+			and stop < cancel and cancel < failed,
+			"the refusal before admission cancels the series before it counts as a failed attempt")
 	end)
 
 	helpers.it("saves a bulk edit for the admission instead of reverting it while ours is not admitted", function()

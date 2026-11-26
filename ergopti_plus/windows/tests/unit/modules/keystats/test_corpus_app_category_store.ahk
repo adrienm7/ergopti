@@ -49,8 +49,14 @@ _KACS_Replay(Vector) {
 _KACS_ScoreRangeIsShared() {
 	Corpus := _KACS_Corpus()
 	AssertEqual(13, Corpus["decode"].Length, "app_category_store_vectors.json changed: review the decode replay")
-	AssertEqual(-2, KLAppCatConst.MIN_SCORE)
-	AssertEqual(2, KLAppCatConst.MAX_SCORE)
+	; The shared value schema owns the range (value-validation).
+	Declared := ValueCheckEntryFor("metrics_apps.*.score")
+	AssertEqual(-2, Declared["min"])
+	AssertEqual(2, Declared["max"])
+	AssertTrue(_KL_AppCat_ScoreValid(2) && _KL_AppCat_ScoreValid(-2), "the declared bounds")
+	AssertFalse(_KL_AppCat_ScoreValid(2.01), "past the declared maximum")
+	AssertFalse(_KL_AppCat_ScoreValid("1"), "a string")
+	AssertFalse(_KL_AppCat_ScoreValid(Abs(-1e308 * 10)), "an infinity")
 	AssertEqual("ergopti.app_categories", KLAppCatConst.STORE_SCHEMA)
 }
 Test("app category store corpus: the schema and the score range are the shared ones", _KACS_ScoreRangeIsShared)

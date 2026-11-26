@@ -12,7 +12,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The logger is not included: its file sink would write the maintainer's
-;    %LOCALAPPDATA%\ergopti_plus logs, which a test must never touch. Warnings go
+;    %LOCALAPPDATA%\Ergopti logs, which a test must never touch. Warnings go
 ;    to the result instead, so a refused receipt still names its cause.
 ; ==============================================================================
 
@@ -30,13 +30,13 @@ LoggerInfo(*) => 0
 LoggerDebug(*) => 0
 LoggerError(Tag, Message, Values*) => _RelayOwnerErrors.Push(Tag . ": " . Message)
 
-#Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\proxy_override.ahk
-#Include ..\..\modules\llm\ollama_runtime_owner.ahk
+#Include ..\..\core\text\engine\json.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
+#Include ..\..\core\network\adapters\proxy_override.ahk
+#Include ..\..\ai\engine\ollama\runtime_owner.ahk
 
 _RelayOwnerMain(A_Args[1])
 

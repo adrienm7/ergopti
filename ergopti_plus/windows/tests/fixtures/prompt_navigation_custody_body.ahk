@@ -72,6 +72,8 @@ class _PNAV_Controller {
 	Close() {
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}
@@ -83,13 +85,10 @@ class _PNAV_Environment {
 	}
 }
 
-_PNAV_Input(*) {
-	throw Error("A genuine admitted prompt opening must not reach the native fallback.")
-}
-
 _PNAV_Open(Index) {
 	global _PNAV, _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_OpeningSource
-	LLM_Menu_PromptEditProfile(_PNAV.Profiles[Index], Map("input", _PNAV_Input))
+	_PNAV_Require(LLM_Menu_PromptEditProfile(_PNAV.Profiles[Index]),
+		"A genuine admitted prompt opening must not be refused.")
 	_PNAV_Require(_PromptEdWeb_Gui is Gui && IsSet(_PromptEdWeb_Controller)
 		&& _PromptEdWeb_OpeningSource is Map && _LLM_Menu_ProfileSourceBound(_PromptEdWeb_OpeningSource),
 		"The genuine public editor must retain its real admitted configuration and native host.")
@@ -160,7 +159,14 @@ _PNAV_Main() {
 		Boot := ConfigMigrateBoot(ConfigurationFile)
 		_PNAV_Require(Boot["status"] == "current" && Boot["read_only"] == 0 && ConfigFullStateCanPersist(),
 			"The actual migration owner must admit this private source before the public editor opens.")
-		_LLM_Menu := Map("user_profiles", _PNAV.Profiles, "profile_id", "user_private_a", "enabled", false)
+		_LLM_Menu["user_profiles"] := _PNAV.Profiles
+		_LLM_Menu["profile_id"] := "user_private_a"
+		_LLM_Menu["enabled"] := false
+		_LLM_Menu["ollama_port"] := 11435
+		_PNAV_Require(TOML_ConfigBatchWrite(ConfigurationFile,
+			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
+			"The actual native writer must align the complete private LLM source before opening.")
+		Source := FSConfigReadUtf8Exact(ConfigurationFile)
 		First := _PNAV_Open(1)
 		_PNAV_Require(_PNAV.Controllers.Length == 1 && First.Closed == 0 && First.Fills == 1)
 		if Mode == "current" {

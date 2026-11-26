@@ -27,6 +27,18 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || null;
 }
 
+/**
+ * Reads a label the page cannot show without: a missing key is logged and
+ * gives null, so its caller hides the figure rather than show a raw key.
+ * @param {string} key - Locale key.
+ * @returns {string|null}
+ */
+function label(key) {
+	const text = _t(key);
+	if (!text) console.error('Missing i18n key: ' + key);
+	return text;
+}
+
 const postBridgeMessage = makeHostBridge('dl_bridge');
 let bridgeSession;
 
@@ -132,11 +144,10 @@ function setProgress(pct) {
 	const fill = document.getElementById('bootstrap-bar-fill');
 	if (!fill) return;
 	if (pct === null || pct === undefined) {
-		fill.style.width = '0%';
+		fill.value = 0;
 		return;
 	}
-	const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
-	fill.style.width = clamped + '%';
+	fill.value = Math.max(0, Math.min(100, Number(pct) || 0));
 }
 
 /**
@@ -202,7 +213,7 @@ function resetUI() {
 	globalErrorKind = null;
 
 	const barFill = document.getElementById('bar-fill');
-	barFill.style.width = '0%';
+	barFill.value = 0;
 	barFill.classList.remove('error');
 
 	const pctEl = document.getElementById('pct');
@@ -261,15 +272,13 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	if (globalDoneState) return; // Cap at 99% during download: 100% is reserved exclusively for done()
 
 	const cappedPercentage = Math.min(Math.max(0, parseInt(percentage) || 0), 99);
-	document.getElementById('bar-fill').style.width = cappedPercentage + '%';
+	document.getElementById('bar-fill').value = cappedPercentage;
 	document.getElementById('pct').textContent = cappedPercentage + ' %'; // Line 1: Fichiers (next to percentage, pushed right by CSS)
 
 	const fileCountEl = document.getElementById('file-count');
-	if (fileCount) {
-		fileCountEl.textContent = (_t('download_window.file_count') || '📁 Files: %s').replace(
-			'%s',
-			fileCount
-		);
+	const fileCountLabel = fileCount ? label('download_window.file_count') : null;
+	if (fileCountLabel) {
+		fileCountEl.textContent = fileCountLabel.replace('%s', fileCount);
 		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
@@ -278,16 +287,17 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
-	if (downloadedSize)
-		detailsParts.push(
-			(_t('download_window.size_label') || '📦 Size: ') + `<b>${downloadedSize}</b>`
-		);
-	if (speed)
-		detailsParts.push((_t('download_window.speed_label') || '⚡ Speed: ') + `<b>${speed}</b>`);
+	// A missing key hides its figure, never an English label in a page of
+	// another language (UPD-12)
+	const sizeLabel = downloadedSize ? label('download_window.size_label') : null;
+	if (sizeLabel) detailsParts.push(sizeLabel + `<b>${downloadedSize}</b>`);
+	const speedLabel = speed ? label('download_window.speed_label') : null;
+	if (speedLabel) detailsParts.push(speedLabel + `<b>${speed}</b>`);
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(
-			'<span class="gap"></span>—<span class="gap"></span>'
+			// An em space each side of the dash: the gap the stats always had.
+			' — '
 		);
 		statsDetails.style.display = 'block';
 		document.getElementById('stats-fallback').style.display = 'none';
@@ -355,12 +365,12 @@ function done(isSuccess, message, errorKind) {
 
 	const progressBar = document.getElementById('bar-fill');
 	if (isSuccess) {
-		progressBar.style.width = '100%';
+		progressBar.value = 100;
 		progressBar.classList.remove('error');
 		document.getElementById('pct').textContent = '100 %';
 	} else {
 		progressBar.classList.add('error');
-		progressBar.style.width = '100%';
+		progressBar.value = 100;
 		document.getElementById('pct').textContent = '❌';
 		document.getElementById('pct').style.color = ThemeTokens.color('red-dark');
 	} // Hide specific stats, files count and ETA to make room for the final message

@@ -223,8 +223,13 @@ KL_Clip_OnChange(data_type) {
 	catch {
 		try LoggerWarn("Keystats", "Clipboard source privacy classification failed closed.")
 	}
-	if SourceFiltered
+	; The clipboard rows carry no title, so the central sink cannot repeat
+	; this title-aware verdict: the refusal is the outgoing-payload privacy
+	; policy and counts as its privacy hit, as the sink's own refusal does.
+	if SourceFiltered {
+		KL_RecordPrivacyHit()
 		return
+	}
 
 	Now := A_TickCount
 	RejectedBySuspend := false
@@ -309,11 +314,25 @@ KL_Clip_OnPaste() {
 	if _KL_Clip_ShouldFilter()
 		return
 
+	; The captured hook context can lag current focus; classify its source too.
+	SourceFiltered := true
+	try SourceFiltered := MF_ShouldFilterFor(Context.app, Context.title)
+	catch {
+		try LoggerWarn("Keystats", "Clipboard paste source privacy classification failed closed.")
+	}
+	; The clipboard rows carry no title, so the central sink cannot repeat
+	; this title-aware verdict: the refusal is the outgoing-payload privacy
+	; policy and counts as its privacy hit, as the sink's own refusal does.
+	if SourceFiltered {
+		KL_RecordPrivacyHit()
+		return
+	}
+
 	Now := A_TickCount
-	CopyLag := (CopyTick > 0) ? ((Now - CopyTick) & 0xFFFFFFFF) : -1
+	CopyLag := (CopyTick > 0) ? TickElapsed64(CopyTick, Now) : -1
 	Fresh := []
 	for PasteTick in PreviousTicks {
-		if (((Now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
+		if (TickElapsed64(PasteTick, Now) <= KLClipConst.PASTE_BURST_WINDOW_MS)
 			Fresh.Push(PasteTick)
 	}
 	Fresh.Push(Now)

@@ -10,19 +10,19 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
-	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
-	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
-	"llm.prompt_builder", "llm.rewrite", "modules.keystats",
-	"adapters.json_codec", "adapters.storage", "compat.utf8", "infra.toml.reader", "json",
-	"llm.parser", "logger", "logger.shim", "text_utils", "toml_codec.basic_string",
-	"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
-	"adapters.managed_ollama_daemon", "adapters.owned_program_runner", "app_dirs", "config_defaults",
-	"core.llm.managed_ollama_daemon_receipt", "core.llm.ollama_runtime_choice", "hotstrings.personal_files",
-	"infra.manifest_reader", "llm.local_model_policy", "llm.profile_selector", "modules.llm.network_env",
-	"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.opaque_network_admission",
-	"modules.llm.profiles", "modules.llm.progressive_reveal", "platform.remap.lease_helper",
+	"ai.engine.api.mlx_inference", "ai.engine.api.ollama", "ai.engine.api.common",
+	"ai.engine.local_servers.mlx_stream_retirement", "ai.engine.ollama.endpoint", "ai.engine.api.parser",
+	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "core.timing.engine.timings", "core.text.engine.utils",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
+	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml.reader", "core.text.engine.json",
+	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
+	"ai.adapters.managed_ollama_daemon", "core.process.adapters.owned_program_runner", "core.fs.engine.app_dirs", "settings.engine.publication.defaults",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.ollama_runtime_choice", "hotstrings.engine.catalogue.personal_files",
+	"menu.engine.manifest_reader", "ai.engine.ollama.local_model_policy", "ai.engine.settings.profile_selector", "ai.engine.api.network_env",
+	"ai.engine.ollama.binary", "ai.engine.ollama.server_command", "ai.engine.api.opaque_network_admission",
+	"ai.engine.settings.profiles", "ai.engine.prediction.progressive_reveal", "platform.remap.lease_helper",
 }
 
 local function upvalue(fn, target)
@@ -39,7 +39,7 @@ local function with_stream(backend, callback)
 		-- Transport, scheduling, metrics and diagnostic boundaries are irrelevant
 		-- until the real request path admits its payload. Keep those ports local.
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.file_system"] = { exists = function(path)
+		package.loaded["core.fs.adapters.file_system"] = { exists = function(path)
 			local file = io.open(path, "rb"); if not file then return false end
 			assert(file:close()); return true
 		end, read = function(path)
@@ -47,13 +47,13 @@ local function with_stream(backend, callback)
 			if not file then return nil, err end
 			local content = file:read("*a"); assert(file:close()); return content
 		end }
-		package.loaded["adapters.shell_runner"] = {}
-		package.loaded["adapters.timer_scheduler"] = { now = function() return 0 end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {}
+		package.loaded["core.events.timer_scheduler"] = { now = function() return 0 end }
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end, done = function() end,
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}
-		local module = helpers.load_with_stubs(backend == "mlx" and "modules.llm.api_mlx_inference" or "modules.llm.api_ollama")
+		local module = helpers.load_with_stubs(backend == "mlx" and "ai.engine.api.mlx_inference" or "ai.engine.api.ollama")
 		local stream = backend == "mlx" and module.post_and_parse_streaming or upvalue(module.fetch_batch, "post_and_parse_streaming")
 		if backend == "mlx" then
 			module.init({ stream = { generation = 0 }, cancel_streaming = function() return true end,
@@ -80,7 +80,7 @@ local function with_stream(backend, callback)
 			h.removed[path] = true
 			return remove(path)
 		end
-		local filesystem = package.loaded["adapters.file_system"]
+		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.remove_exact = function(path)
 			local removed, detail = os.remove(path)
 			return removed == true, detail
@@ -91,12 +91,21 @@ local function with_stream(backend, callback)
 			if code == 2 then return nil, "absent" end
 			return nil, "error", detail
 		end
+		filesystem.remove_if_unchanged = function(path, expected, _, admission)
+			local file = assert(open(path, "rb"))
+			local content = assert(file:read("*a"))
+			assert(file:close())
+			if content ~= expected.content or not admission() then return false end
+			return filesystem.remove_exact(path)
+		end
 		filesystem.create_secure_temp_file = function()
 			if h.allocation_refusal then return h.allocation_result, "CONTROLLED_ALLOCATION_FAILURE" end
 			local path = os.tmpname()
 			h.paths[#h.paths] = path
 			h.writable_paths[path] = true
-			return path
+			if h.missing_identity then return path end
+			local identity = assert(require("lfs").symlinkattributes(path))
+			return path, nil, { dev = identity.dev, ino = identity.ino }
 		end
 		io.open = function(path, mode)
 			if not h.writable_paths[path] or mode ~= "w" then return open(path, mode) end
@@ -172,12 +181,12 @@ local function assert_private_payload(backend)
 	with_stream(backend, function(h)
 		local function inspect(path)
 			local CommandLines = require("tests.support.command_lines")
-			local quote = require("text_utils").shell_quote
+			local quote = require("core.text.engine.utils_core").shell_quote
 			local program = "import json,os,stat,sys; s=os.lstat(sys.argv[1]); "
 				.. "print(json.dumps({'permissions':stat.S_IMODE(s.st_mode),'regular':stat.S_ISREG(s.st_mode),"
 				.. "'device':str(s.st_dev),'inode':str(s.st_ino)}))"
 			local lines = CommandLines.read("python3 -c " .. quote(program) .. " " .. quote(path) .. " 2>&1")
-			return assert(require("json").decode(table.concat(lines, "\n")))
+			return assert(require("core.text.engine.json").decode(table.concat(lines, "\n")))
 		end
 		h.on_allocation = function(path) allocated = inspect(path) end
 		h.on_payload = function(path) observed = inspect(path) end

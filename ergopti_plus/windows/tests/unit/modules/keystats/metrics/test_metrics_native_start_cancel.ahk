@@ -54,7 +54,8 @@ _MNSC_CancelDuringCreation(Range) {
 			? KLPF_RequestRange("typing", Root, Map("apps", [], "start_date", "2026-01-01",
 				"end_date", "2026-01-01"), 91, Terminal)
 			: KLPF_RequestBuild("typing", Root, "full", 91, Terminal)
-		AssertTrue(StartingObserved, "cancellation must exercise native creation, not a fake handle")
+		AssertTrue(StartingObserved, "cancellation must exercise native creation, not a fake handle"
+			. (Range ? "" : "; build refusal: " . KLPF_LastBuildRefusal()))
 		AssertFalse(CancelResult)
 		AssertFalse(Started)
 		AssertEqual(SRTOW_WAIT_OBJECT_0, _SRTOW_ExactProcessWait(Observation),

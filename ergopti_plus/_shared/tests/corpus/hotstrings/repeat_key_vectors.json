@@ -4,7 +4,7 @@
 	"field_semantics": {
 		"buffer": "The typed buffer INCLUDING the magic key just typed, which is the last character of the buffer. The buffer starts at a word boundary unless start_is_word_boundary says otherwise.",
 		"start_is_word_boundary": "Optional, true when absent: whether the buffer's own start abuts a word boundary. When false the buffer's first character may be the middle of an older word.",
-		"word_character": "One rule on the three drivers, _shared/lua/text_utils is_hotstring_word_char: every non-ASCII character, @, letters, digits and underscore are word characters; a space, newline, punctuation, quote, parenthesis or hyphen is not.",
+		"word_character": "One rule on the three drivers, _shared/core/text/engine is_hotstring_word_char: every non-ASCII character, @, letters, digits and underscore are word characters; a space, newline, punctuation, quote, parenthesis or hyphen is not.",
 		"magic_key": "The magic key in effect.",
 		"fires": "Whether the repeat fires.",
 		"replacement": "When it fires: the character that is doubled, so the buffer afterwards is the buffer without the magic key plus this character."

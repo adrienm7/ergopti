@@ -19,13 +19,14 @@ _WPMZ_ObserveToken(Source, Token, Replacement) {
 
 ; The framework's ordinary body cache deliberately handles block definitions.
 ; Retain the actual unique arrow line too, without copying its arithmetic.
-_WPMZ_DeltaSource(Source) {
+_WPMZ_DeltaSource(Source, Name := "_WPMWidget_TickDelta") {
+	AssertTrue(RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$") > 0)
 	Masked := _DriverMaskNonCode(&Source)
-	Pattern := "im)^_WPMWidget_TickDelta\([^`r`n)]*\)[ `t`r`n]*(=>|\{)"
+	Pattern := "im)^" . Name . "\([^`r`n)]*\)[ `t`r`n]*(=>|\{)"
 	AssertTrue(RegExMatch(Masked, Pattern, &Definition) > 0, "The real delta definition must exist")
 	AssertEqual(0, RegExMatch(Masked, Pattern, , Definition.Pos + Definition.Len), "The real delta definition must be unique")
 	if Definition[1] == "{" {
-		Body := _DriverExtractFunctionBody(&Source, "_WPMWidget_TickDelta")
+		Body := _DriverExtractFunctionBody(&Source, Name)
 		AssertTrue(Body != "", "The actual block definition must be extracted")
 		return Body
 	}
@@ -37,7 +38,7 @@ _WPMZ_DeltaSource(Source) {
 	return SubStr(Source, Definition.Pos, LineEnd - Definition.Pos)
 }
 
-_WPMZ_ChildSource(Canon) {
+_WPMZ_ChildSource(Canon, Recovery := false) {
 	global _DriverDir
 	Owner := _DriverProductionFileForSymbol("WPMWidget_Tick", _DriverDir)
 	AssertTrue(Owner != "", "The real WPM display owner must resolve")
@@ -51,9 +52,26 @@ _WPMZ_ChildSource(Canon) {
 		AssertEqual(0, RegExMatch(Source, Pattern, , State.Pos + State.Len), "The actual state class is unique")
 		Code .= State[0] . "`n"
 	}
-	for Symbol in ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
+	Symbols := ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
+		"_WPMWidget_Collecting",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
-		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"] {
+		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex",
+		"WPMWidget_BurstEnded", "WPMWidget_PointerEndsBurst", "WPMWidget_ShouldShow", "_WPMWidget_NameForReaders"]
+	; The tick names its surface for a running screen reader. Some programs set
+	; the system's screen-reader flag on a desktop without one: these vectors
+	; prove the hold, so the flag reads as off here, whatever the host says.
+	Code .= "A11ySystem_ScreenReaderOn() => false`n"
+	if Recovery {
+		for Symbol in ["_WPMWidget_DiscardSurface", "_WPMWidget_RebuildSurface", "_WPMWidget_ApplySurfaceGeometry",
+			"WPMWidget_ShowPos", "WPMWidget_ResolveGraphColor", "WPMWidget_BuildCompact", "WPMWidget_BuildGraph",
+			"_WPMWidget_ApplyRoundedRegion", "WPMWidget_DragStart", "WPMWidget_DragEnd", "WPMWidget_Close"]
+			Symbols.Push(Symbol)
+		WindowOwner := _DriverProductionFileForSymbol("WMHandleOwnedByThisProcess", _DriverDir)
+		AssertTrue(WindowOwner != "", "The real native window ownership adapter must resolve")
+		Code .= "#Include " . WindowOwner . "`n"
+		Code .= _WPMZ_DeltaSource(_DriverFileSource("wpm_config.ahk"), "_WPMWidget_IsAutoPosition") . "`n"
+	}
+	for Symbol in Symbols {
 		Body := Symbol == "_WPMWidget_TickDelta" ? _WPMZ_DeltaSource(Source) : _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "Each reached genuine function must exist: " . Symbol)
 		for FunctionName, Phase in Map("WPMWidget_Push", "push", "WPMWidget_Calc", "calc", "WPMWidget_Tick", "tick") {
@@ -61,10 +79,15 @@ _WPMZ_ChildSource(Canon) {
 				Body := _WPMZ_ObserveToken(Body, "A_TickCount", "_WPMZ_Now(" . Chr(34) . Phase . Chr(34) . ")")
 		}
 		if Symbol == "WPMWidget_Tick" {
-			; Both delegates return their actual native properties unchanged. The
-			; pair used by the real comparison is a prerequisite, never fabricated.
+			; Empty-source vectors observe native idle properties unchanged;
+			; recovery vectors bind an explicit eligible idle pair instead.
 			Body := _WPMZ_ObserveToken(Body, "A_TimeIdleMouse", "_WPMZ_MouseIdle()")
 			Body := _WPMZ_ObserveToken(Body, "A_TimeIdleKeyboard", "_WPMZ_KeyboardIdle()")
+		}
+		if Recovery && Symbol == "_WPMWidget_RebuildSurface" {
+			Body := _WPMZ_ObserveToken(Body, "WPMWidget_BuildCompact", "_WPMR_BuildCompact")
+			Body := _WPMZ_ObserveToken(Body, "WPMWidget_BuildGraph", "_WPMR_BuildGraph")
+			Body := _WPMZ_ObserveToken(Body, "_WPMWidget_ApplySurfaceGeometry", "_WPMR_ApplyGeometry")
 		}
 		Code .= Body . "`n"
 	}
@@ -78,13 +101,14 @@ _WPMZ_ChildSource(Canon) {
 		}
 		Code .= "WPMWidgetConst." . Field . " := " . Literal . "`n"
 	}
-	return Code . "#Include " . _DriverDir . "\tests\fixtures\wpm_empty_source_hold_owner_body.ahk`n"
+	return Code . "#Include " . _DriverDir . "\tests\fixtures\"
+		. (Recovery ? "wpm_recovery_owner_body.ahk" : "wpm_empty_source_hold_owner_body.ahk") . "`n"
 }
 
 _WPMZ_Canon() {
 	global _SharedDir, _TimingsCache, _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
-	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING, LOGGER_SUB_FILES
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError
 	AssertFalse(_LOGGER_FLUSH_ACTIVE, "An active foreign logger flush cannot be parked")
 	LoggerState := _TLOG_CaptureLoggerState()
@@ -94,14 +118,13 @@ _WPMZ_Canon() {
 		HadWarn: IsSet(_HealthCheckWarnCount), Warn: IsSet(_HealthCheckWarnCount) ? _HealthCheckWarnCount : 0,
 		HadErrors: IsSet(_HealthCheckErrCount), Errors: IsSet(_HealthCheckErrCount) ? _HealthCheckErrCount : 0,
 		HadLast: IsSet(_HealthCheckLastError), Last: IsSet(_HealthCheckLastError) ? _HealthCheckLastError : 0}
-	Path := _SharedDir . "\modules\timings\constants.toml"
+	Path := _SharedDir . "\core\timing\data\constants.toml"
 	Raw := FSReadBytesStrict(Path)
-	VisualPath := _SharedDir . "\modules\wpm_widget\constants.toml"
+	VisualPath := _SharedDir . "\metrics\data\wpm_widget\constants.toml"
 	VisualRaw := FSReadBytesStrict(VisualPath)
 	try {
 		_ResetLogger()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
-		_LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map(), LOGGER_SUB_FILES := []
 		_ParseTomlCache := Map(), _TomlReadFailures := Map(), _TomlUnreadableFiles := Map()
 		TimingsLoadShared(_SharedDir)
 		WindowMs := TimingsGet("keystats", "wpm_window_ms")
@@ -113,17 +136,25 @@ _WPMZ_Canon() {
 		AssertTrue(Visual is Map && Visual.Has("colors") && Visual.Has("transparency") && Visual.Has("graph"))
 		Values := Map(
 			"WINDOW_MS", WindowMs, "WPM_MIN_DURATION_MS", MinimumMs,
+			"IDLE_RESET_MS", TimingsGet("keystats", "wpm_idle_reset_ms"),
 			"COLOR_HOLD_MS", TimingsGet("ui", "wpm_color_hold_ms"),
 			"IDLE_HIDE_MS", TimingsGet("ui", "wpm_widget_idle_hide_ms"),
 			"GRAPH_HISTORY", Integer(Visual["graph"]["history_samples"]),
 			"ALPHA_ACTIVE", Integer(Visual["transparency"]["alpha_active"]),
 			"UNIT_DARKEN", Float(Visual["compact"]["unit_strip_darken_factor"]))
 		for Field, Key in Map("COLOR_BG_AI", "bg_ai", "COLOR_BG_MANUAL", "bg_manual",
-			"COLOR_BG_IDLE", "bg_idle", "COLOR_TXT_ACTIVE", "text_active") {
+			"COLOR_BG_IDLE", "bg_idle", "COLOR_TXT_ACTIVE", "text_active", "COLOR_TXT_IDLE", "text_idle") {
 			Color := Visual["colors"][Key]
 			AssertTrue(RegExMatch(Color, "^#[0-9a-fA-F]{6}$") > 0, "Actual canon colors must be literal RGB data")
 			Values[Field] := SubStr(Color, 2)
 		}
+		for Field, Key in Map("W", "width", "H", "height", "H_NUMBER", "height_number", "H_GAP", "height_gap",
+			"H_UNIT", "height_unit", "NUMBER_FONT_SIZE", "number_font_size", "UNIT_FONT_SIZE", "unit_font_size",
+			"CORNER_R", "corner_radius")
+			Values[Field] := Integer(Visual["compact"][Key])
+		Values["GRAPH_W"] := Integer(Visual["graph"]["width"])
+		Values["GRAPH_H"] := Integer(Visual["graph"]["height"])
+
 		AssertTrue(Values["COLOR_HOLD_MS"] >= 2 && Values["COLOR_HOLD_MS"] < WindowMs
 			&& Values["GRAPH_HISTORY"] > 0 && Values["ALPHA_ACTIVE"] > 0 && Values["ALPHA_ACTIVE"] <= 255)
 		VisualDigest := CryptoSha256Bytes(VisualRaw)
@@ -155,7 +186,7 @@ _WPMZ_Complete(State, Code, Output, ErrorText) {
 	State.Calls += 1
 }
 
-_WPMZ_Case(Mode) {
+_WPMZ_Case(Mode, Recovery := false) {
 	global _DriverDir
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unretired WPM child cannot be replaced")
@@ -166,10 +197,11 @@ _WPMZ_Case(Mode) {
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0, PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WPMZ_ChildSource(Canon)) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WPMZ_ChildSource(Canon, Recovery)) != 0)
 		_TestPrint("# wpm-empty-source-hold-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)) . " timings=" . Canon.Digest . " visual=" . Canon.VisualDigest
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\wpm_empty_source_hold_owner_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\"
+				. (Recovery ? "wpm_recovery_owner_body.ahk" : "wpm_empty_source_hold_owner_body.ahk"))))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _WPMZ_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private WPM child must start")
@@ -214,7 +246,7 @@ _WPMZ_Case(Mode) {
 	; The adapter merges native stdout/stderr; ErrorText is a completion diagnostic.
 	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
 	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
-	AssertContains(AtDeadline.Output, "PASS wpm-empty-source-hold-owner " . Mode)
+	AssertContains(AtDeadline.Output, "PASS " . (Recovery ? "wpm-recovery-owner " : "wpm-empty-source-hold-owner ") . Mode)
 	if IsObject(ExportFailure)
 		throw ExportFailure
 }
@@ -222,3 +254,6 @@ _WPMZ_Case(Mode) {
 
 for _WPMZ_Mode in ["ordinary-empty", "second-era-empty"]
 	Test("WPM display: " . _WPMZ_Mode . " stays hidden until an admitted source (wpm-empty-source-hold-owner)", _WPMZ_Case.Bind(_WPMZ_Mode))
+
+for _WPMR_Mode in ["compact-build", "graph-build", "compact-geometry", "graph-geometry", "compact-successor", "graph-successor"]
+	Test("WPM display: " . _WPMR_Mode . " retries a missing surface without losing samples (wpm-recovery-owner)", _WPMZ_Case.Bind(_WPMR_Mode, true))

@@ -28,16 +28,16 @@ local STUBBED_MODULES = {
 	"modules.keystats.aggregator",
 	"modules.keystats.rotation",
 	"modules.keystats.export",
-	"keystats.metrics",
-	"adapters.file_system",
-	"adapters.ledger_append",
-	"adapters.timer_scheduler",
+	"metrics.engine.metrics",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.ledger_append",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"modules.keystats.physical_wire",
-	"keystats.physical_release",
-	"infra.logger",
+	"metrics.engine.capture.physical_release",
+	"core.logger.engine.logger",
 }
 
 local function fake_writer(on_write, on_close, initial_bytes)
@@ -117,36 +117,44 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		streams[#streams + 1] = stream
 		return stream
 	end
-	local function outbox_rows()
+	-- The cache already holds the current aggregate revision and no settled
+	-- receipt, so the checked reset settles the retained context once.
+	local meta = { local_data_sql_outbox = "", aggregate_cache_revision = "6", ngram_ctx_json = "{}" }
+	local reads = {
+		["SELECT value FROM meta WHERE key='local_data_sql_outbox'"] = "local_data_sql_outbox",
+		["SELECT value FROM meta WHERE key='rollover_settlement_receipt';"] = "rollover_settlement_receipt",
+		["SELECT value FROM meta WHERE key='aggregate_cache_revision'"] = "aggregate_cache_revision",
+		["SELECT value FROM meta WHERE key='ngram_ctx_json';"] = "ngram_ctx_json",
+	}
+	local function meta_rows(key)
 		local emitted = false
 		return function()
-			if emitted then return nil end
+			if emitted or meta[key] == nil then return nil end
 			emitted = true
-			return { value = "" }
+			return { value = meta[key] }
 		end
 	end
+	local receipt_insert = "INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',"
 	local transaction
 	local db = {
 		nrows = function(_, sql)
-			assert(sql == "SELECT value FROM meta WHERE key='local_data_sql_outbox'")
+			local key = reads[sql]
+			assert(key ~= nil, "unexpected rollover read: " .. tostring(sql))
 			if transaction then transaction[#transaction + 1] = sql end
-			return outbox_rows()
+			return meta_rows(key)
 		end,
 		exec = function(_, sql)
 			if sql == "BEGIN TRANSACTION;" then
 				assert(transaction == nil); transaction = { sql }
 			elseif sql == "COMMIT;" then
-				assert(transaction and #transaction == 5)
+				assert(transaction ~= nil)
 				transaction[#transaction + 1] = sql
 				observed.reset_transactions[#observed.reset_transactions + 1] = transaction
 				transaction = nil
 			else
-				local expected = {
-					[3] = "UPDATE meta SET value='0' WHERE key='today_log_offset';",
-					[4] = "UPDATE meta SET value='" .. attempt.date .. "' WHERE key='today_log_date';",
-					[5] = "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';",
-				}
-				assert(transaction and sql == expected[#transaction + 1], "unexpected reset SQL")
+				assert(transaction ~= nil, "reset SQL outside its transaction")
+				-- The receipt row carries the exact terminal identity; keep its shape.
+				if sql:sub(1, #receipt_insert) == receipt_insert then sql = receipt_insert end
 				transaction[#transaction + 1] = sql
 			end
 			return 0 -- hs.sqlite3.OK is numeric; nil is never a commit acknowledgement.
@@ -157,8 +165,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		for _, name in ipairs(STUBBED_MODULES) do package.loaded[name] = nil end
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				assert(delay == 0 and type(callback) == "function" and scheduled == nil)
 				scheduled = { timer = {}, committed = true, callback = callback }
@@ -172,7 +180,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			now = os.time,
 		}
 		-- A typed unit owner, not a second implementation of the disk protocol.
-		package.loaded["adapters.ledger_append"] = {
+		package.loaded["core.fs.adapters.ledger_append"] = {
 			recover = function(...)
 				assert(select("#", ...) == 3)
 				local ledger, batch, journal = ...
@@ -197,7 +205,10 @@ local function run_rollover_case(failure_mode, exercise_resume)
 				assert(type(next_date) == "string" and next_date:match("^%d%d%d%d%-%d%d%-%d%d$"))
 				assert(type(reset) == "function" and type(origin) == "function")
 				if not attempt then
-					attempt = { date = next_date, completion = {} }
+					-- The real ledger owner hands the reset its settled terminal receipt;
+					-- this ledger is a writer double, so its identity is synthetic.
+					attempt = { date = next_date, completion = { version = 1, path = ledger, resolved = ledger,
+						dev = 1, ino = 1, offset = 0, batch = "", phase = "settled" } }
 					observed.owner_preparations = observed.owner_preparations + 1
 				else assert(not attempt.settled and attempt.date == next_date) end
 				local removed, ack = pcall(os.remove, journal)
@@ -246,6 +257,12 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		package.loaded["modules.keystats.aggregator"] = {
 			init = function() end,
 			reset_ngram_ctx = function() observed.reset_calls = observed.reset_calls + 1 end,
+			has_pending_batch = function() return false end,
+			get_ngram_ctx = function() return {} end,
+			set_ngram_ctx = function() end,
+			settle_contexts = function() return true end,
+			flush = function() return true end,
+			reset_batch = function() end,
 		}
 		package.loaded["modules.keystats.export"] = {
 			cleanup = function() return true end,
@@ -256,8 +273,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			get_db_rev = function() return 0 end,
 			sync_foreign_data_sql = function() return {} end,
 		}
-		package.loaded["keystats.metrics"] = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["metrics.engine.metrics"] = {}
+		package.loaded["core.fs.adapters.file_system"] = {
 			-- This non-IO scenario begins with an existing user metrics ignore.
 			path_status = function(path)
 				assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -268,7 +285,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			read = function() return nil end,
 		}
 		require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-			package.loaded["adapters.file_system"], false)
+			package.loaded["core.fs.adapters.file_system"], false)
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 		manager = helpers.load_with_stubs("modules.keystats.log_manager", {
 			execute = function(command)
@@ -323,6 +340,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			result.queued_writes, result.resumed_opens = #observed.journal_writes, observed.journal_opens
 			result.queued_entry = assert(require("hs.json").decode(observed.journal_writes[1]))
 			result.preparations, result.reset_transactions = observed.owner_preparations, observed.reset_transactions
+			result.reset_date = attempt and attempt.date
 			result.resumed_resets, result.resumed_markers = observed.reset_calls, observed.marker_writes
 		end
 		return result
@@ -341,7 +359,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		cleanup(function() if handle.running then handle:stop() end; assert(handle.running == false) end)
 	end
 	cleanup(function()
-		if scheduled then assert(package.loaded["adapters.timer_scheduler"].cancel(scheduled) == true) end
+		if scheduled then assert(package.loaded["core.events.timer_scheduler"].cancel(scheduled) == true) end
 		assert(scheduled == nil and active_db == nil and transaction == nil)
 	end)
 	io.open, os.remove, _G.hs = real_open, real_remove, real_hs
@@ -444,8 +462,18 @@ helpers.describe("keystats rollover requires committed EOF", function()
 		helpers.assert_eq(result.resumed_markers, 1, "one settled rollover must publish one marker")
 		helpers.assert_eq(result.resumed_resets, 1, "aggregate context must reset once after settlement")
 		helpers.assert_eq(#result.reset_transactions, 1, "only one checked reset transaction may commit")
-		helpers.assert_eq(result.reset_transactions[1][1], "BEGIN TRANSACTION;")
-		helpers.assert_eq(result.reset_transactions[1][5], "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';")
-		helpers.assert_eq(result.reset_transactions[1][6], "COMMIT;")
+		helpers.assert_eq(result.reset_transactions[1], {
+			"BEGIN TRANSACTION;",
+			"SELECT value FROM meta WHERE key='local_data_sql_outbox'",
+			"SELECT value FROM meta WHERE key='rollover_settlement_receipt';",
+			"SELECT value FROM meta WHERE key='aggregate_cache_revision'",
+			"SELECT value FROM meta WHERE key='ngram_ctx_json';",
+			require("metrics.engine.queries").render("meta.rev_bump", "native"),
+			"INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',",
+			"UPDATE meta SET value='0' WHERE key='today_log_offset';",
+			"UPDATE meta SET value='" .. result.reset_date .. "' WHERE key='today_log_date';",
+			"UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';",
+			"COMMIT;",
+		}, "the checked reset settles the context, records its receipt and resets the cursor in one transaction")
 	end)
 end)

@@ -16,7 +16,7 @@
 --- @return number typed_ms
 local typing_origin_ms
 local function typed_at(offset_ms)
-	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	typing_origin_ms = typing_origin_ms or math.floor(require("core.logger.engine.monotonic").now_ms()) - 10000
 	return typing_origin_ms + offset_ms
 end
 
@@ -26,24 +26,28 @@ end
 if arg[1] == "--no-luv" then
 	package.loaded.luv = nil
 	package.preload.luv = function() error("deliberately absent native dependency") end
-	require("compat.utf8").install()
+	require("core.lifecycle.engine.compat.utf8").install()
 	local K = require("modules.keystats.keystats")
 	local W = require("modules.keystats.sqlite_writer")
-	assert(K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" }) ~= false)
+	local initialized = K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" })
 	if not rawget(_G, "jit") then
 		-- Stock Lua has neither luv nor an FFI descriptor API, so the private
 		-- file admission (run_sqlite_private_no_luv.lua) must refuse plaintext
-		-- storage. The collector still retains RAM and never claims a save.
+		-- storage. A refused store blocks capture (keystats may_record): init
+		-- reports it, and no keystroke is held in RAM that could never be saved.
+		assert(initialized == false, "a refused private store must be reported by init")
 		assert(K.is_enabled() and not W.is_available() and not W.flush_transport_available(),
 			"stock Lua without a descriptor API must not admit the SQLite store")
 		K.on_keydown("a", typed_at(1000), "minimal")
 		assert(K.flush() == false and not K.has_flush_debt())
-		assert(K._pending_buffer_count_for_test() == 1)
-		assert(K.get_range_payload().today.minimal.c.a.c == 1)
-		assert(K.stop() == true and K._pending_buffer_count_for_test() == 1)
-		print("PASS native dependency absent on stock Lua: private storage refused, RAM retained, no saved ACK")
+		assert(K._pending_buffer_count_for_test() == 0, "blocked capture must hold no keystroke")
+		local today = K.get_range_payload().today
+		assert(not (today and today.minimal), "blocked capture must report no keystroke")
+		assert(K.stop() == true and K._pending_buffer_count_for_test() == 0)
+		print("PASS native dependency absent on stock Lua: private storage refused, capture blocked, no saved ACK")
 		os.exit(0)
 	end
+	assert(initialized ~= false, "LuaJIT's descriptor API admits the store without luv")
 	assert(K.is_enabled() and W.is_available() and not W.flush_transport_available())
 	local revision = W.get_revision()
 	K.on_keydown("a", typed_at(1000), "minimal")
@@ -62,11 +66,11 @@ if arg[1] == "--no-luv" then
 	assert(#assert(W.query_rows("SELECT id FROM events_typing;")) == 0)
 	assert(W.get_revision() == revision, "unavailable flush must not advance the durable watermark")
 	local stored = assert(require("modules.keystats.app_category_file").load())
-	assert(edited == (require("keystats.app_category_store").projection(stored).minimal ~= nil),
+	assert(edited == (require("metrics.engine.apps.category_store").projection(stored).minimal ~= nil),
 		"the edit result must match what the category file holds")
 	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not fall back to SQLite")
 	local warnings = 0
-	for _, line in ipairs(require("logger").ring_buffer_snapshot()) do
+	for _, line in ipairs(require("core.logger.engine").ring_buffer_snapshot()) do
 		if line:find("SQLite flush transport unavailable", 1, true) then warnings = warnings + 1 end
 	end
 	assert(warnings == 1)
@@ -77,11 +81,11 @@ end
 
 local uv = require("luv")
 if arg[1] == "--stale-clock" then
-	local timeout = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+	local timeout = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local cached = uv.now()
 	uv.sleep(timeout + 50) -- Deliberately leave libuv's cached loop time stale.
 	assert(uv.now() == cached, "fixture must not refresh the loop before dispatch")
-	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/clock.sqlite", "SELECT 1;",
+	local request = assert(require("core.fs.engine.sqlite_batch_process").start(arg[2] .. "/clock.sqlite", "SELECT 1;",
 		{ owner = "native-sqlite-stale-clock", timeout_ms = timeout }))
 	local result
 	repeat uv.run("nowait"); result = request:poll(); if not result then uv.sleep(1) end until result
@@ -97,9 +101,9 @@ if arg[1] == "--parent-death" then
 		child_pid = pid
 		return handle, pid
 	end
-	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
+	local request = assert(require("core.fs.engine.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
 		"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT sum(x) FROM n;",
-		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
+		{ owner = "native-sqlite-parent-death", timeout_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	assert(child_pid)
 	io.stdout:write(string.format("READY %d %d\n", uv.os_getpid(), child_pid)); io.stdout:flush()
 	uv.run()
@@ -107,7 +111,7 @@ if arg[1] == "--parent-death" then
 	os.exit(0)
 end
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-owned-flush-XXXXXX"))
 for _, key in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. key .. "_HOME", root .. "/" .. key:lower()))
@@ -118,9 +122,9 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled=true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
-local Process = require("infra.sqlite_batch_process")
+local Process = require("core.fs.engine.sqlite_batch_process")
 local Drain = require("tests.support.sqlite_flush_native")
-local Logger = require("logger")
+local Logger = require("core.logger.engine")
 assert(K.init({ sqlite_path = root .. "/metrics.sqlite", log_dir = root .. "/logs" }) ~= false)
 assert(K.is_enabled() and W.is_available())
 local checks = 0

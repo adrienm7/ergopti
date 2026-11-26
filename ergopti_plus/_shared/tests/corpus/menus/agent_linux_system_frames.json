@@ -518,7 +518,7 @@
 		"zh": "71fabbdeb68f12c2aa0119b96ba29601b1e1c9bfd39907bc3123caff935e12cc"
 	},
 	"windows_encoding_provenance": {
-		"owner": "windows/infra/manifest_menu.ahk",
+		"owner": "windows/menu/engine/manifest_menu.ahk",
 		"preexisting_literal_rule": "Label := StrReplace(Label, \"&\", \"&&\")",
 		"owner_sha256": "309382c1f94664704b49ca265ae99dfb0d3e2f6d7a4aad57c52d0724dd1c35ae",
 		"source": "Original frozen physical-caption corpus, encoded by the unchanged preexisting native menu metasyntax rule; no candidate formatter used."

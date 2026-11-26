@@ -4,7 +4,7 @@
 --- factory/installer join requires its own composite runtime qualification.
 --- No filesystem descriptor/path is opened or treated as authority here.
 local M = {}
-local Budget = require("updater.transfer_budget")
+local Budget = require("updater.engine.transfer_budget")
 
 local function method(object, name)
  return type(object) == "table" and rawget(object, name) or nil
@@ -27,13 +27,17 @@ function M.new(ports)
  if type(get) ~= "function" or type(download) ~= "function" or type(reserve) ~= "function"
   or type(bind_checksum) ~= "function" or type(adopt) ~= "function" or type(retire) ~= "function"
   or type(artifact_settled) ~= "function" or type(artifact_observe) ~= "function" then return nil end
- -- Optional detached-signature check: { decide = function(asset, signature_text) -> ok, message,
- -- max_body_bytes }. Without it, or without a published .sig, the transfer is the
- -- checksum-only transfer it always was; the gate decides what a missing one means.
+ -- Optional detached-signature check: { decide = function(asset, signature_text, fetch_error,
+ -- required) -> ok, message, max_body_bytes }. Without it, or without a published .sig, the
+ -- transfer is the checksum-only transfer it always was; the gate decides what a missing one
+ -- means. A release marked signature_required (read from the public feed) needs both.
  local signature = type(ports.signature) == "table" and ports.signature or nil
  if signature and (type(signature.decide) ~= "function" or type(signature.max_body_bytes) ~= "number") then return nil end
  local sealed_size = method(ports.artifact, "sealed_size")
  if signature and type(sealed_size) ~= "function" then return nil end
+ -- Optional: told the archive bytes received so far, for the window's progress (UPD-07)
+ local on_progress = ports.on_progress
+ if on_progress ~= nil and type(on_progress) ~= "function" then return nil end
  local clock, source, parse = ports.clock, ports.current, ports.parse_checksum
  local owner, max_archive, max_checksum = ports.owner, ports.max_download_bytes, ports.max_checksum_bytes
  local headers = {}
@@ -55,10 +59,17 @@ function M.new(ports)
    if type(signature_url) ~= "string" or signature_url == "" or signature_url:find("\0", 1, true) then return nil end
    selected.signature_url = signature_url
   end
+  -- A release read from the public feed is authenticated by its signature
+  -- alone: without the gate or the signature's URL it cannot start.
+  local signature_required = rawget(release, "signature_required")
+  if signature_required ~= nil and signature_required ~= true then return nil end
+  if signature_required and (not signature or not selected.signature_url) then return nil end
+  selected.signature_required = signature_required == true
   local txn = { token = {}, phase = nil, cancelled = false, requests = {}, constructing = 0, finished = false, listeners = {} }
   local operation = { started = false }
   active = txn -- Reserve before native clock, source or artifact construction.
   local budget
+  local archive_idle_ms
   local function current()
    if active ~= txn or txn.cancelled or txn.finished then return false end
    local called, accepted = pcall(source, txn.token)
@@ -212,7 +223,10 @@ function M.new(ports)
 
   local timed, now = pcall(clock)
   budget = timed and Budget.capture(ports.defaults, now) or nil
-  local checksum_deadline = budget and enter("checksum") or nil
+  -- The archive's idle bound comes from the same shared declaration as its cap.
+  local limits = Budget.archive_limits(ports.defaults)
+  archive_idle_ms = limits and limits.idle_ms or nil
+  local checksum_deadline = budget and limits and enter("checksum") or nil
   if not checksum_deadline then txn.unknown = false; fail("update transfer admission refused", "download"); return operation end
   txn.constructing = txn.constructing + 1
   local published_metadata = { tag = selected.tag, download_url = selected.download_url, checksum_url = selected.checksum_url }
@@ -260,7 +274,9 @@ function M.new(ports)
      return download(selected.download_url, headers, target, { owner = owner,
       authorized = current, absolute_deadline_ms = archive_deadline,
       timeout_ms = math.max(1, math.floor(archive_deadline - clock())),
-      max_download_bytes = max_archive, follow_redirects = true, https_only = true }, done)
+      receive_idle_timeout_ms = archive_idle_ms,
+      max_download_bytes = max_archive, follow_redirects = true, https_only = true,
+      on_progress = on_progress }, done)
     end, function(downloaded, completion)
      if type(downloaded) ~= "table" or downloaded.ok ~= true or type(completion) ~= "table" then
       fail(type(downloaded) == "table" and downloaded.error or "archive request failed", "download",
@@ -290,8 +306,9 @@ function M.new(ports)
       if signature then
        local sized, size = pcall(sealed_size, artifact)
        local accepted, message = signature.decide({ size = sized and size or nil, sha256 = expected },
-        txn.signature_text, txn.signature_fetch_error)
-       if accepted ~= true then fail(message or "update signature refused", "verify"); return end
+        txn.signature_text, txn.signature_fetch_error, selected.signature_required)
+       -- Its own stage: a refused signature is named, not read as a digest (UPD-10)
+       if accepted ~= true then fail(message or "update signature refused", "signature"); return end
       end
       txn.finished = true; active = nil; Budget.retire(budget)
       pcall(callback, adopted.path, nil, nil, nil, artifact)

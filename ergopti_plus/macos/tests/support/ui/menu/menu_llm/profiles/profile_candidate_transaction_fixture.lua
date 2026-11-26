@@ -11,19 +11,19 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.manifest_menu",
-	"infra.notifications",
-	"modules.llm",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.profiles_manager",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_menu",
+	"core.ui.engine.notifications",
+	"ai.engine",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.profiles_manager",
 	"ui.menu.shortcut_utils",
-	"ui.menu.preferences_transaction",
-	"ui.prompt_editor",
+	"settings.ui.menu.preferences_transaction",
+	"ai.ui.prompt_editor",
 }
 
 --- Clones plain state so durable and rendered snapshots cannot alias live tables.
@@ -135,24 +135,24 @@ local function with_fixture(options, body)
 			return builtins[1]
 		end
 
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				delete_dialog_count = delete_dialog_count + 1
 				return options.delete_choice or "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local renderer = assert(require("menu.renderer").new({
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
-				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
 			json_decode = function(text)
-				local manifest = require("json").decode(text)
+				local manifest = require("core.text.engine.json").decode(text)
 				if options.create_label_key then
 					manifest.llm_profile_commands[1].i18n = options.create_label_key
 				end
@@ -163,21 +163,21 @@ local function with_fixture(options, body)
 				end
 				return manifest
 			end,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function()
 				notification_count = notification_count + 1
 				return true
 			end,
 		}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			BUILTIN_PROFILES = builtins,
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			get_active_profile = get_runtime_profile,
@@ -206,7 +206,7 @@ local function with_fixture(options, body)
 				return true
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {
@@ -219,7 +219,7 @@ local function with_fixture(options, body)
 				return false
 			end,
 		}
-		package.loaded["ui.prompt_editor"] = {
+		package.loaded["ai.ui.prompt_editor"] = {
 			scope_idle = function() return options.editor_busy ~= true end,
 			open = function(profile, callback)
 				editor_open_count = editor_open_count + 1
@@ -311,8 +311,8 @@ local function with_fixture(options, body)
 			get_model_info = function() return {params = 1} end,
 			get_presets = function() return {} end,
 		}
-		package.loaded["ui.menu.preferences_transaction"] = nil
-		local PreferencesTransaction = require("ui.menu.preferences_transaction")
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
+		local PreferencesTransaction = require("settings.ui.menu.preferences_transaction")
 		local preferences = {
 			save = function()
 				save_count = save_count + 1
@@ -358,8 +358,8 @@ local function with_fixture(options, body)
 			end,
 		}
 
-		package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-		local switcher = require("ui.menu.menu_llm.model_switcher").new({
+		package.loaded["ai.ui.menu.models.switcher"] = nil
+		local switcher = require("ai.ui.menu.models.switcher").new({
 			state = state,
 			models_mgr = models_mgr,
 			keymap = {
@@ -398,9 +398,9 @@ local function with_fixture(options, body)
 		deps.set_llm_profile = switcher.set_llm_profile
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 
-		package.loaded["adapters.timer_scheduler"] = nil
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["core.events.timer_scheduler"] = nil
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		runtime_calls = {}
 		set_profiles_calls = {}
 

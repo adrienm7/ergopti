@@ -80,13 +80,23 @@ Test("tap-hold transaction meta: global owner precedes detached snapshot "
 _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
 	Body := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Body != "", "_TH_WriteTapHoldToml must remain source-visible")
-	StagePos := InStr(Body, "FSWriteDurable(StagePath, Content)")
-	AuthorizePos := InStr(Body, "_TH_AuthorizeTapHoldCommit(OwnerToken")
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, BoundPath)")
-	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
-	Assert(StagePos > 0 && AuthorizePos > StagePos
-		&& ReplacePos > AuthorizePos && PublishPos > ReplacePos,
-		"a complete durable stage must be re-authorized, atomically replaced, then published live in order")
+	NativePos := InStr(Body, "if NativeAdapters {")
+	StagePos := InStr(Body, "FSWriteReplaceOwned(BoundPath, Content, StageSuffix", true, NativePos)
+	LegacyPos := InStr(Body, "FSWriteDurable(StagePath, Content)", true, StagePos)
+	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, BoundPath,", true, LegacyPos)
+	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken", true, ReplacePos)
+	Assert(NativePos > 0 && StagePos > NativePos && LegacyPos > StagePos
+		&& ReplacePos > LegacyPos && PublishPos > ReplacePos,
+		"owned native or explicitly injected legacy publication must finish before live publication")
+	Assert(InStr(Body, "BeforePublish := _TH_BeforeHeldPublication.Bind(") > 0
+		&& InStr(Body, "FinalAdmission := _TH_FinalHeldAdmission.Bind(") > 0,
+		"owned publication must bind source preflight and final RAM admission")
+	Before := _DriverFuncBody("_TH_BeforeHeldPublication")
+	Final := _DriverFuncBody("_TH_FinalHeldAdmission")
+	Assert(InStr(Before, "_TH_AuthorizeTapHoldCommit(") > 0 && InStr(Before, "_TH_DurationSourceMatches(") > 0,
+		"held publication preflight must check authorization and exact source")
+	Assert(InStr(Final, "_TH_AuthorizeTapHoldCommit(") > 0 && InStr(Final, "_TH_DurationContextMatches(") > 0,
+		"final admission must recheck current RAM and duration ownership")
 	Assert(InStr(Body, "A_ScriptHwnd") > 0
 		&& InStr(Body, "LocalSequence") > 0,
 		"the same-directory stage must be unique to the process and transaction")

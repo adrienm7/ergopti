@@ -28,12 +28,12 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("infra.logger")
-local NativePath = require("native_path")
-local Timings = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
-local TableUtil = require("table_util")
+local Logger  = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
+local Timings = require("core.timing.engine.timings")
+local TimerScheduler = require("core.events.timer_scheduler")
+local TextUtils = require("core.text.engine.utils_core")
+local TableUtil = require("core.text.engine.table_util")
 local LOG     = "keystats.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
@@ -41,7 +41,7 @@ local LOG     = "keystats.kc_bridge"
 -- Resolved via the central menu_paths module — no local fallback.
 local KC_LOG_PATH
 do
-	local mp = require("infra.config_paths")
+	local mp = require("settings.engine.paths")
 	KC_LOG_PATH = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
 end
 
@@ -473,6 +473,31 @@ local function resync_cursor_to_eof()
 	return true, eof_or_err
 end
 
+--- Creates the hand-off log and its folder before anything opens them.
+--- Karabiner appends through a plain `echo >>`, which creates the file but never
+--- its folder, and this bridge drains the log from module load whether Metrics
+--- is on or not, before LogManager creates <config_dir>/metrics/. The folder is
+--- therefore the bridge's to create: without it a fresh configuration loses every
+--- physical press and the cold-start EOF proof is refused.
+--- @return boolean ready True when the folder and the file exist.
+--- @return string|nil failure The step and cause of a refusal.
+local function ensure_log_file()
+	-- The bridge arms from keystats module construction: a raising port must
+	-- become this refusal, named in the caller's warning, or the half-built
+	-- keystats module would refuse its own reload.
+	local called, folder_ready, folder_err = pcall(function()
+		return require("core.fs.adapters.file_system").prepare_parent_for_create(KC_LOG_PATH)
+	end)
+	if not called then folder_ready, folder_err = false, folder_ready end
+	if not folder_ready then
+		return false, string.format("cannot create the folder of '%s': %s", KC_LOG_PATH, tostring(folder_err))
+	end
+	local handle, open_err = io.open(KC_LOG_PATH, "a")
+	if not handle then return false, string.format("cannot create '%s': %s", KC_LOG_PATH, tostring(open_err)) end
+	handle:close()
+	return true
+end
+
 local function _arm_watchers()
 	if not require_state("_arm_watchers") then return false end
 	if _watchers_active then return true end
@@ -485,9 +510,9 @@ local function _arm_watchers()
 
 	-- Touch: hs.pathwatcher binds to an inode; the file must exist before
 	-- watcher:start() or creation events may be missed on some macOS versions.
-	local fh_touch = io.open(KC_LOG_PATH, "a")
-	if fh_touch then fh_touch:close()
-	else Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
+	local log_ready, log_failure = ensure_log_file()
+	if not log_ready then
+		Logger.warn(LOG, "Karabiner hand-off log unavailable — bridge may not receive KE events: %s.", log_failure)
 	end
 
 	local watcher_ok, watcher_candidate = xpcall(function()
@@ -577,6 +602,13 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions, may
 		build_managed_output_set(tap_hold_config, available_actions)
 	else
 		Logger.debug(LOG, "Tap/hold configuration is deferred; suppression set starts empty.")
+	end
+
+	-- The EOF proof below opens the log for reading: create it first, or a fresh
+	-- configuration refuses the proof at every cold start.
+	local log_ready, log_failure = ensure_log_file()
+	if not log_ready then
+		Logger.warn(LOG, "Karabiner hand-off log unavailable at cold start: %s.", log_failure)
 	end
 
 	-- Set _file_offset to current end so we ignore stale lines from a prior session

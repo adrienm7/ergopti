@@ -18,26 +18,33 @@
 ---    overwrites the cache once ready.
 --- 4. Format-stable: emits the legacy manifest shape so the frontend JS
 ---    keeps working without rewrite.
+--- 5. Incomplete reads are shown, never cached. A failed SQLite query, or a
+---    store that does not exist, still publishes what was read with
+---    `manifest_incomplete`, so the page says the history is incomplete, as
+---    Windows and Linux do; neither the manifest cache nor the disk snapshot
+---    keeps it (MET-11). The refusal it replaces left the disk snapshot, or an
+---    empty page, on screen without a notice.
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
-local RunningApplication = require("adapters.running_application")
-local OwnWindow = require("adapters.own_window")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local RunningApplication = require("platform.focus.running_application")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
-local Json       = require("json")
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local dialog     = require("infra.dialog_util")
-local i18n       = require("infra.i18n")
-local FileSystem = require("adapters.file_system")
-local ConfigPaths = require("infra.config_paths")
-local TimerScheduler = require("adapters.timer_scheduler")
-local CategoryStore = require("keystats.app_category_store")
+local Json       = require("core.text.engine.json")
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local dialog     = require("core.ui.engine.dialog_util")
+local i18n       = require("core.i18n.engine.i18n")
+local FileSystem = require("core.fs.adapters.file_system")
+local ConfigPaths = require("settings.engine.paths")
+local TimerScheduler = require("core.events.timer_scheduler")
+local CategoryStore = require("metrics.engine.apps.category_store")
 
 local LOG = "metrics_apps"
 
@@ -67,6 +74,9 @@ local _closing_webview = nil
 local _focus_owner = nil
 local _usercontent = nil
 local _releasing_controller = false
+-- True while the last published manifest came from an incomplete read; pairs
+-- the warning with the recovery log.
+local _incomplete_reported = false
 
 --- Releases the exact native script callback before its controller is forgotten.
 --- @param controller userdata|table|nil Exact callback owner to release.
@@ -459,7 +469,7 @@ end
 
 --- On-disk snapshot of the last successful render (instant pre-fill).
 local UI_TMP_DIR    = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
-local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache.json"
+local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache_v3.json"
 
 
 
@@ -501,13 +511,14 @@ end
 -- ==========================================
 
 local function load_categories()
-	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, categories_file())
+	local path = categories_file()
+	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, path)
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "App categories read did not commit; edit refused — %s.",
 			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent" } end
+	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent", path = path } end
 	if read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
 			tostring(read_status))
@@ -522,11 +533,11 @@ local function load_categories()
 	-- A store in the previous flat layout is rewritten in the shared one by the
 	-- next save: the categories it holds are kept.
 	if model.legacy then Logger.info(LOG, "App categories read from the previous layout; the next save upgrades it.") end
-	return model, "ok", { status = "ok", content = content }
+	return model, "ok", { status = "ok", content = content, path = path }
 end
 
 local function save_categories(data, source_snapshot)
-	if type(source_snapshot) ~= "table" then
+	if type(source_snapshot) ~= "table" or source_snapshot.path ~= categories_file() then
 		Logger.error(LOG, "App categories save refused without an exact source snapshot.")
 		return false
 	end
@@ -538,7 +549,7 @@ local function save_categories(data, source_snapshot)
 
 	local write_ok, committed = pcall(
 		FileSystem.write_if_unchanged,
-		categories_file(),
+		source_snapshot.path,
 		encoded,
 		source_snapshot
 	)
@@ -570,7 +581,7 @@ local function push_categories_to_ui(generation, webview)
 end
 
 local function list_existing_categories()
-	local cats = load_categories()
+	local cats, _, source_snapshot = load_categories()
 	if not cats then return nil end
 	local general = i18n.get("metrics_apps.general_category")
 	local seen = { [general] = true }
@@ -583,10 +594,17 @@ local function list_existing_categories()
 		end
 	end
 	table.sort(result, function(a, b) return a:lower() < b:lower() end)
-	return result
+	return result, cats, source_snapshot
 end
 
-local function prompt_score_then_save(app_name, chosen_cat, default_score, generation, webview)
+local function category_source_current(expected)
+	if expected.path ~= categories_file() then return false end
+	local _, _, current = load_categories()
+	return current ~= nil and current.path == expected.path and current.status == expected.status
+		and current.content == expected.content
+end
+
+local function prompt_score_then_save(app_name, chosen_cat, default_score, generation, webview, cats, source_snapshot)
 	if not owner_is_current(generation, webview) then return false end
 	local btn, score_str = dialog.text_prompt(
 		i18n.get("metrics_apps.score_title"),
@@ -594,13 +612,17 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 		tostring(default_score or 0), i18n.get("button.ok"), i18n.get("common.cancel"))
 	if not owner_is_current(generation, webview) then return false end
 	if btn ~= i18n.get("button.ok") then return end
-	local score = tonumber(score_str)
-	if not score or not CategoryStore.score_valid(score) then
-		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
+	-- The shared value schema owns the range and its localized refusal.
+	local score, refusal = CategoryStore.parse_score_entry(score_str, i18n.get)
+	if score == nil then
+		Logger.warn(LOG, "Typed score '%s' for '%s' refused.", tostring(score_str), tostring(app_name))
+		dialog.block_alert(i18n.get("dialog.value_check.title"), refusal, i18n.get("button.ok"))
 		return
 	end
-	local cats, _, source_snapshot = load_categories()
-	if not cats then return false end
+	if not category_source_current(source_snapshot) then
+		Logger.warn(LOG, "App categories changed while the editor was open; edit refused.")
+		return false
+	end
 	local stored, reason = CategoryStore.set(cats, app_name, chosen_cat, score)
 	if not stored then
 		Logger.error(LOG, "App category refused: %s.", tostring(reason))
@@ -617,7 +639,7 @@ end
 
 function M.prompt_category(app_name, default_cat, default_score, generation, webview)
 	if not owner_is_current(generation, webview) then return false end
-	local existing = list_existing_categories()
+	local existing, cats, source_snapshot = list_existing_categories()
 	if not existing then return false end
 	local choices  = {}
 
@@ -632,14 +654,14 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 		if not owner_is_current(generation, webview) then return end
 		if not choice then return end
 		if choice._kind == "pick" then
-			prompt_score_then_save(app_name, choice._value, default_score, generation, webview)
+			prompt_score_then_save(app_name, choice._value, default_score, generation, webview, cats, source_snapshot)
 		elseif choice._kind == "new" then
 			local btn, new_cat = dialog.text_prompt(i18n.get("metrics_apps.new_category_title"),
 				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name),
 				"", i18n.get("button.ok"), i18n.get("common.cancel"))
 			if not owner_is_current(generation, webview) then return end
 			if btn == i18n.get("button.ok") and new_cat and new_cat ~= "" then
-				prompt_score_then_save(app_name, new_cat, default_score, generation, webview)
+				prompt_score_then_save(app_name, new_cat, default_score, generation, webview, cats, source_snapshot)
 			end
 		elseif choice._kind == "rename" then
 			local rename_choices = {}
@@ -654,8 +676,10 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 					c2.text, i18n.get("button.ok"), i18n.get("common.cancel"))
 				if not owner_is_current(generation, webview) then return end
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
-					local cats, _, source_snapshot = load_categories()
-					if not cats then return end
+					if not category_source_current(source_snapshot) then
+						Logger.warn(LOG, "App categories changed while the editor was open; rename refused.")
+						return
+					end
 					local renamed, reason = CategoryStore.rename_category(cats, c2.text, new_name)
 					if not renamed then
 						Logger.error(LOG, "Category rename refused: %s.", tostring(reason))
@@ -682,7 +706,7 @@ end
 
 local function prompt_pick_app(generation, webview)
 	if not is_current_window(generation, webview) then return false end
-	local ok_mod, app_picker = pcall(require, "infra.app_picker")
+	local ok_mod, app_picker = pcall(require, "apps.engine.picker")
 	if not ok_mod then
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return
@@ -706,7 +730,7 @@ local function prompt_pick_app(generation, webview)
 			if not choice then return end
 			local cats    = load_categories()
 			if not cats then return end
-			local current = cats.apps[choice.text] or { type = default_app_category(), score = 0 }
+			local current = cats.apps[choice.text] or { type = default_app_category(), score = CategoryStore.UNEDITED_SCORE }
 			M.prompt_category(choice.text, current.type, current.score, generation, webview)
 		end, function(chooser)
 			chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
@@ -820,6 +844,8 @@ end
 local function with_live_active_app_duration(manifest)
 	local ok_tracker, tracker = pcall(require, "modules.keystats.context_tracker")
 	if not ok_tracker or type(tracker.get_active_app_snapshot) ~= "function" then return manifest end
+	-- Metrics off: keystats never started the tracker, so no interval is open
+	if tracker.is_initialized() ~= true then return manifest end
 	local ok_snapshot, snapshot = pcall(tracker.get_active_app_snapshot)
 	if not ok_snapshot or type(snapshot) ~= "table"
 		or type(snapshot.app) ~= "string" or type(snapshot.duration_ms) ~= "number"
@@ -836,11 +862,12 @@ local function with_live_active_app_duration(manifest)
 	for app_name, app_data in pairs(original_day) do day_copy[app_name] = app_data end
 	projected[date_str] = day_copy
 
-	local original_app = original_day[snapshot.app] or {}
+	local app_key = ManifestKeys.encode(snapshot.app)
+	local original_app = original_day[app_key] or {}
 	local app_copy = {}
 	for key, value in pairs(original_app) do app_copy[key] = value end
 	app_copy.app_time_ms = (tonumber(app_copy.app_time_ms) or 0) + snapshot.duration_ms
-	day_copy[snapshot.app] = app_copy
+	day_copy[app_key] = app_copy
 	return projected
 end
 
@@ -893,7 +920,7 @@ end
 --- @param categories_revision integer Captured category revision.
 --- @return boolean submitted Initial probe admission.
 local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label,
-	manifest_revision, categories_revision)
+	manifest_revision, categories_revision, manifest_incomplete)
 	local function retry()
 		if remaining <= 0 then
 			Logger.error(LOG, "Apps dashboard JavaScript readiness exhausted (%s).", label)
@@ -901,7 +928,7 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 		end
 		if not schedule_continuation(delay, generation, webview, function()
 			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label,
-				manifest_revision, categories_revision)
+				manifest_revision, categories_revision, manifest_incomplete)
 		end, "Apps dashboard bootstrap retry") then
 			close_window_generation(generation, webview, true, "bootstrap retry refusal")
 		end
@@ -909,8 +936,9 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 	local function publish()
 		-- Application names are data keys: JavaScript object literals treat
 		-- __proto__ specially, while JSON.parse preserves the exact own key.
-		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d});",
-			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision)
+		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d%s});",
+			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision,
+			manifest_incomplete == true and ",manifest_incomplete:true" or "")
 		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
 			if applied then
 				Logger.success(LOG, "Apps dashboard %s injected.", label)
@@ -940,27 +968,32 @@ local function load_and_inject(generation, webview)
 	local log_manager   = require("modules.keystats.log_manager")
 	local sqlite_reader = require("modules.keystats.sqlite_reader")
 	local sqlite_path   = log_manager.get_sqlite_path()
+	local manifest, complete = {}, false
 	if not sqlite_path or not fs.attributes(sqlite_path) then
-		Logger.warn(LOG, "db.sqlite not available — dashboard will display empty.")
-		return false
-	end
-
-	local rev = log_manager.get_db_rev()
-	local manifest
-	if M._manifest_cache and M._manifest_rev == rev then
-		Logger.done(LOG, "Manifest cache hit (rev %d).", rev)
-		manifest = M._manifest_cache
+		-- Nothing certifies that no rows exist: an empty history flagged incomplete
+		Logger.debug(LOG, "db.sqlite not available — publishing an empty history flagged incomplete.")
 	else
-		Logger.trace(LOG, "Manifest cache miss (rev %d) — querying SQLite…", rev)
-		local complete
-		manifest, complete = sqlite_reader.read_manifest(sqlite_path)
-		if complete ~= true then
-			Logger.warn(LOG, "Apps dashboard refresh refused because the SQLite projection is incomplete.")
-			return false
+		local rev = log_manager.get_db_rev()
+		if M._manifest_cache and M._manifest_rev == rev then
+			Logger.done(LOG, "Manifest cache hit (rev %d).", rev)
+			manifest, complete = M._manifest_cache, true
+		else
+			Logger.trace(LOG, "Manifest cache miss (rev %d) — querying SQLite…", rev)
+			manifest, complete = sqlite_reader.read_manifest(sqlite_path)
+			complete = complete == true
+			if complete then
+				M._manifest_cache = manifest
+				M._manifest_rev   = rev
+				Logger.done(LOG, "Manifest cached (rev %d).", rev)
+			end
 		end
-		M._manifest_cache = manifest
-		M._manifest_rev   = rev
-		Logger.done(LOG, "Manifest cached (rev %d).", rev)
+	end
+	if not complete and not _incomplete_reported then
+		_incomplete_reported = true
+		Logger.warn(LOG, "Apps dashboard history read incomplete; partial counts shown with a notice, not cached.")
+	elseif complete and _incomplete_reported then
+		_incomplete_reported = false
+		Logger.info(LOG, "Apps dashboard history read complete again; caching resumed.")
 	end
 	if not is_current_window(generation, webview) then return false end
 
@@ -989,8 +1022,9 @@ local function load_and_inject(generation, webview)
 		local icon_lookups = 0
 		local seen_apps    = {}
 		for _, day_data in pairs(manifest) do
-			for app_name, _ in pairs(day_data) do
-				if not seen_apps[app_name] then
+			for app_key, _ in pairs(day_data) do
+				local app_name = ManifestKeys.decode(app_key)
+				if app_key ~= "_system" and app_key ~= "_sys" and not seen_apps[app_name] then
 					seen_apps[app_name] = true
 					local cached = M._app_icon_cache[app_name]
 					if cached ~= nil then
@@ -1013,8 +1047,10 @@ local function load_and_inject(generation, webview)
 
 			inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
 				MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision,
-				categories_revision)
+				categories_revision, not complete)
 
+			-- Only a complete read may become the snapshot the next open paints
+			if not complete then return end
 			continue_load("Apps dashboard disk cache save", function()
 				save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json,
 					app_icons = app_icons_json })

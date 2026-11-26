@@ -150,10 +150,15 @@ _WSU_SaveRefusesWhileLatched() {
 	_WS_Save()
 	AfterBlocked := FileRead(Path, "UTF-8")
 
-	; Control: with the latch clear, the same call MUST rewrite the file. Without
-	; this the assertion above would also pass if _WS_Save were broken outright.
+	; A clear latch alone cannot issue source ownership. First admit the real
+	; readable source, exercise the direct compatibility save, then perform an
+	; actual explicit public reset to prove that an admitted empty write works.
 	_WSU_SetLatch(false)
-	_WS_Save()
+	_WS_Load()
+	AssertFalse(_WSU_Latch())
+	AssertTrue(_WS_Save(), "an actual loaded source admits the direct compatibility writer")
+	AssertTrue(_WS_Disabled.Has("("), "the compatibility save preserves the admitted disabled symbol")
+	AssertTrue(WrapSymbols_Reset(), "an explicit reset may clear the genuinely admitted source")
 	AfterAllowed := FileRead(Path, "UTF-8")
 
 	_WS_Config_Path := PrevPath
@@ -165,7 +170,7 @@ _WSU_SaveRefusesWhileLatched() {
 	Assert(AfterBlocked == Before,
 		"_WS_Save must not rewrite wrap_symbols.toml while the load-failed latch is set — what it would write is the empty state the failed read left behind, and that erases every disabled built-in and every custom pair")
 	Assert(AfterAllowed != Before,
-		"control: with the latch clear the same call must actually rewrite the file. If it does not, the assertion above proves nothing about the latch")
+		"control: after actual source admission the explicit reset must rewrite the file, proving the writer is functional")
 	Assert(InStr(AfterAllowed, "disabled") == 0,
 		"control: the rewrite really did serialize the empty state — which is exactly the data loss the latch exists to prevent")
 }

@@ -9,28 +9,29 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.json_codec",
+	"core.fs.adapters.json_codec",
+	"core.fs.adapters.file_system",
 	"hs",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
-	"modules.llm",
-	"modules.llm.network_env",
-	"modules.llm.opaque_network_admission",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"ai.engine",
+	"ai.engine.api.network_env",
+	"ai.engine.api.opaque_network_admission",
 	"ui.download_window",
 	"ui.download_window.javascript",
-	"ui.ui_builder",
-	"infra.paths",
-	"infra.deferred_work",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.models_manager_mlx_download",
-	"ui.menu.menu_llm.models_manager_mlx_repo",
-	"ui.menu.menu_llm.profile_label",
+	"core.ui.ui.builder",
+	"core.fs.engine.paths",
+	"core.timing.engine.deferred_work",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.models.manager_mlx_download",
+	"ai.ui.menu.models.manager_mlx_repo",
+	"ai.ui.menu.profile_label",
 }
 
 local function result_value(mode, fallback)
@@ -77,6 +78,40 @@ local function with_fixture(plan, callback)
 				exit_code = nil,
 				files = {},
 				tasks = {launcher = {}, tail = {}},
+			}
+
+			package.loaded["core.fs.adapters.file_system"] = {
+				classify_no_follow = function(path)
+					if plan.session_classify_failure then return nil, "error" end
+					if controls.files[path] == nil then return nil, "absent" end
+					return { mode = "file" }, "ok"
+				end,
+				read_with_status = function(path)
+					local value = controls.files[path]
+					if value == nil then return nil, "absent" end
+					return value, "ok"
+				end,
+				remove_if_unchanged = function(path, expected)
+					if controls.files[path] ~= expected.content then return false end
+					if plan.session_remove_failure then
+						if plan.session_release_failure then
+							return false, "removal and release refused", { removed = false }, function()
+								records.session_at_release_retry = controls.files[path]
+								return not plan.session_release_failure
+							end
+						end
+						return false
+					end
+					records.session_removed_content = controls.files[path]
+					local removed = os.remove(path)
+					if plan.session_release_failure then
+						return false, "release refused", { removed = true }, function()
+							records.session_at_release_retry = controls.files[path]
+							return not plan.session_release_failure
+						end
+					end
+					return removed
+				end,
 			}
 
 			local function reenter_pause(kind, record_key)
@@ -257,6 +292,7 @@ local function with_fixture(plan, callback)
 							exit_path = raw:match('"exit_path":"([^"]+)"'),
 							script_path = raw:match('"script_path":"([^"]+)"'),
 							repo = raw:match('"repo":"([^"]+)"'),
+							pid = tonumber(raw:match('"pid":(%d+)')),
 						}
 					end,
 					encode = function(value)
@@ -441,15 +477,15 @@ local function with_fixture(plan, callback)
 				local ok, rendered = pcall(string.format, tostring(message), ...)
 				records.errors[#records.errors + 1] = ok and rendered or tostring(message)
 			end
-			package.loaded["infra.logger"] = logger_stub
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.logger.engine.logger"] = logger_stub
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				block_alert = function() return "button.cancel" end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(...)
 					records.notifications[#records.notifications + 1] = table.pack(...)
 					return true
@@ -479,11 +515,11 @@ local function with_fixture(plan, callback)
 			}
 			if plan.real_window then
 				_G.hs.timer.secondsSinceEpoch = function() return 100 end
-				package.loaded["infra.paths"] = { shared = function()
+				package.loaded["core.fs.engine.paths"] = { shared = function()
 					return helpers.driver_root() .. "../_shared"
 				end }
-				package.loaded["infra.deferred_work"] = { after = function() return true end }
-				package.loaded["ui.ui_builder"] = {
+				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+				package.loaded["core.ui.ui.builder"] = {
 					get_app_geometry = function() return { width = 460, height = 380 } end,
 					show_webview = function(options)
 						local native = { options = options }
@@ -507,19 +543,19 @@ local function with_fixture(plan, callback)
 			end
 			-- The download script exports the system network settings first; the
 			-- fixture's file system has no shared policy file to source.
-			if plan.network_admission then package.loaded["modules.llm.opaque_network_admission"] = plan.network_admission end
-			package.loaded["modules.llm.network_env"] = plan.network_env or {
-				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
+			if plan.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = plan.network_admission end
+			package.loaded["ai.engine.api.network_env"] = plan.network_env or {
+				policy_path = function() return "/fixture/ai/engine/network-retry.sh" end,
 				prelude = function() return "", nil end,
 				opaque_prelude = function() return "", nil end,
 				managed_http_prelude = function() return "", nil end,
 				uses_managed_transport = function() return true, nil end,
 			}
-			package.loaded["modules.llm"] = {
+			package.loaded["ai.engine"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
 				set_active_profile = function() return true end,
 			}
-			package.loaded["ui.menu.menu_llm.profile_label"] = {
+			package.loaded["ai.ui.menu.profile_label"] = {
 				format = function(label) return label end,
 			}
 
@@ -571,7 +607,7 @@ local function with_fixture(plan, callback)
 				elseif plan.server_sync == "failure" then on_cancel("server_failed") end
 				return result_value(plan.server_mode, true)
 			end
-			local mixin = require("ui.menu.menu_llm.models_manager_mlx_download")
+			local mixin = require("ai.ui.menu.models.manager_mlx_download")
 			mixin.install({
 				obj = obj,
 				deps = deps,
@@ -597,8 +633,8 @@ local function with_fixture(plan, callback)
 
 			local switcher
 			if plan.real_switcher then
-				package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-				switcher = require("ui.menu.menu_llm.model_switcher").new({
+				package.loaded["ai.ui.menu.models.switcher"] = nil
+				switcher = require("ai.ui.menu.models.switcher").new({
 					state = state,
 					models_mgr = obj,
 					keymap = deps.keymap,

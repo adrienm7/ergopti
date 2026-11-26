@@ -37,7 +37,10 @@ function M.decode(text)
 	end
 	local devices = text:match("\nndevices:%s*(%d+)")
 	if devices ~= "1" then return nil, "a record must hold exactly one device" end
-	local trace = { name = text:match("\n%s+name:%s*\"([^\"]*)\""), events = {}, expected = {} }
+	-- Either YAML quote: libinput writes double quotes, the repository's
+	-- formatter rewrites a kept trace with single ones.
+	local name = text:match("\n%s+name:%s*\"([^\"\n]*)\"") or text:match("\n%s+name:%s*'([^'\n]*)'")
+	local trace = { name = name, events = {}, expected = {} }
 	local in_events = false
 	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
 		local expect = line:match("^%s*#%s*ergopti%-expect:%s*(.-)%s*$")

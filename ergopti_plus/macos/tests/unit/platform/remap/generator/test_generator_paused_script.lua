@@ -430,7 +430,7 @@ end)
 -- This fixture is intentionally local to generator snapshots. Release it once
 -- those tests have run so test discovery order cannot make later modules read
 -- from the synthetic in-memory filesystem.
-package.loaded["adapters.file_system"] = nil
+package.loaded["core.fs.adapters.file_system"] = nil
 
 helpers.describe("the deployed virtual keyboard passes physical keys through (iso-key-99)", function()
 	-- What each virtual product makes of a HID usage (IOHIDFamily; Karabiner's
@@ -445,8 +445,8 @@ helpers.describe("the deployed virtual keyboard passes physical keys through (is
 	-- right. The registry's physical-key data says the same: an ISO keyboard
 	-- reports the key left of 1 as non_us_backslash and natively types keycode 10.
 	local function physical(code, form)
-		local source = assert(io.open(helpers.shared("data/keycodes/physical_keys.json"), "rb"))
-		local registry = require("json").decode(source:read("*a")); source:close()
+		local source = assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json"), "rb"))
+		local registry = require("core.text.engine.json").decode(source:read("*a")); source:close()
 		local entry = assert(registry.keys[code], code)
 		local record = form == "iso" and entry.macos_iso or entry
 		return record.karabiner.key_code, record.hs

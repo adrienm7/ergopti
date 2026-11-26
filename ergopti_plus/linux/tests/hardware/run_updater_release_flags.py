@@ -10,6 +10,15 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import tomllib
+
+# The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
+# boot creates it and the updater only sends conditional requests when it exists.
+FOLDER = tomllib.loads(
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
+)["app"]["linux_folder_name"]
 
 
 def main():
@@ -17,7 +26,7 @@ def main():
     os.umask(0o077)
     with tempfile.TemporaryDirectory(prefix="ergopti-updater-release-flags-") as folder:
         root = pathlib.Path(folder)
-        (root / ".cache").mkdir()
+        (root / "cache" / FOLDER).mkdir(parents=True)
         cert, key = root / "cert.pem", root / "key.pem"
         subprocess.run(
             [
@@ -51,16 +60,26 @@ def main():
         origin = "https://127.0.0.1:" + str(listener.getsockname()[1])
         responses = []
         for index in range(1, 9):
-            assets = [
-                {
-                    "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
-                },
-                {
-                    "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
-                },
-            ]
+
+            def assets_for(tag):
+                # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
+                return [
+                    {
+                        "name": "ergopti-plus-linux.tar.gz",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz",
+                    },
+                    {
+                        "name": "ergopti-plus-linux.tar.gz.sha256",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz.sha256",
+                    },
+                ]
+
             channel = "dev" if index in (2, 3) else "main"
             tag = "v0.0.0-dev.2" if channel == "dev" else "v1.2.0"
             release = {}
@@ -73,7 +92,7 @@ def main():
                     "draft": False,
                     "prerelease": channel == "dev",
                     "published_at": "2026-10-01T00:00:00Z",
-                    "assets": assets,
+                    "assets": assets_for(tag),
                 }
             )
             if index == 5:

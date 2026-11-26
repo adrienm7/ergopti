@@ -43,7 +43,7 @@ local function register_guide(remap)
 	}
 	local polls = {}
 	local clock = 0
-	local scheduler = package.loaded["adapters.timer_scheduler"]
+	local scheduler = package.loaded["core.events.timer_scheduler"]
 	scheduler.awake_time = function() return clock end
 	-- The fixture's cancel settles any handle that still holds a native timer.
 	scheduler.every = function(seconds, fn)

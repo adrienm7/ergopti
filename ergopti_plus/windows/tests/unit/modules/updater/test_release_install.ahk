@@ -27,7 +27,7 @@ _RIT_Deps(Opts := 0) {
 	return Map(
 		"busy", () => Opts.Get("busy", false),
 		"blocked", () => Opts.Get("blocked", ""),
-		"find", (Tag) => _RIT_Find(Opts, Tag),
+		"find", (Tag, Channel) => _RIT_Find(Opts, Tag),
 		"backup", (Release) => _RIT_Backup(Opts, Release),
 		"asset", (Release) => _RIT_Asset(Opts, Release),
 		"install", (Release, Observer) => _RIT_Install(Opts, Release, Observer),
@@ -53,6 +53,8 @@ _RIT_Backup(Opts, Release) {
 _RIT_Asset(Opts, Release) {
 	global _RIT_Events
 	_RIT_Events.Push("asset")
+	if Opts.Get("asset_throws", false)
+		throw Error("asset resolver unavailable")
 	return Opts.Get("asset", true) ? {Url: "u", Digest: "d"} : 0
 }
 
@@ -129,6 +131,15 @@ _RIT_RefusesMissingAsset() {
 Test("Release install: a release without the Windows asset is refused after the backup (release-install-no-asset)",
 	_RIT_RefusesMissingAsset)
 
+_RIT_AssetErrorReleasesOwner() {
+	_RIT_Reset()
+	AssertFalse(ReleaseInstall_Start("v0.0.0-dev.139", "dev", _RIT_Deps(Map("asset_throws", true))))
+	AssertFalse(ReleaseInstall_Busy(), "a resolver failure frees the installation owner")
+	AssertEqual("failed", _RIT_Last()["phase"])
+	AssertEqual("changelog_window.install_error_unexpected", _RIT_Last()["reason_key"])
+}
+Test("Release install: an asset resolver error releases ownership", _RIT_AssetErrorReleasesOwner)
+
 _RIT_VerificationFailureReportedOnce() {
 	_RIT_Reset()
 	AssertFalse(ReleaseInstall_Start("v0.0.0-dev.139", "dev", _RIT_Deps(Map("install", "observer_fail"))))
@@ -202,6 +213,60 @@ _RIT_FeedOnlyRefusalIsAWarning() {
 Test("Release install: a feed-only list refuses with a warning, not an error (install-no-details-warning-99)",
 	_RIT_FeedOnlyRefusalIsAWarning)
 
+; Decided 2026-11-06 (align on macOS): a feed-only list installs the channel's
+; newest release, through its detached signature; an older row is refused, and
+; every row while the signing policy holds no key.
+_RIT_FeedListOffersTheNewestOnly() {
+	global _CLW_LastList, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Saved := IsSet(_CLW_LastList) ? _CLW_LastList : 0
+	Entry(Tag) => '<entry><updated>2026-11-01T10:00:00Z</updated><link rel="alternate" href="https://github.com/'
+		. UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases/tag/" . Tag . '"/><title>' . Tag . "</title></entry>"
+	Feed := '<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">'
+		. Entry("v99.0.1") . Entry("v99.0.0") . "</feed>"
+	_CLW_LastList := Map("kind", "feed", "json", Feed, "request_epoch", 0)
+	try {
+		Found := _CLW_FindFeedRelease("v99.0.1", "main", () => true)
+		Assert(Found.Has("release"), "the channel's newest feed release may install")
+		Release := Found["release"]
+		AssertEqual("v99.0.1", Release.Tag)
+		AssertTrue(Release.FeedOnly, "it is marked for the signature path")
+		Asset := _CLW_ReleaseAsset(Release)
+		AssertEqual(AssetSignature_FeedAssetUrl(BUNDLE_RELEASE_ASSET, "v99.0.1"), Asset.Url,
+			"its asset is the conventional one, with no digest from the feed")
+		AssertFalse(Asset.HasProp("Digest"))
+		AssertEqual("changelog_window.install_error_feed_not_newest",
+			_CLW_FindFeedRelease("v99.0.0", "main", () => true)["reason"], "an older row is refused")
+		AssertEqual("changelog_window.install_error_unknown_release",
+			_CLW_FindFeedRelease("v98.0.0", "main", () => true)["reason"], "a tag the feed does not name")
+		AssertEqual("changelog_window.install_error_no_details",
+			_CLW_FindFeedRelease("v99.0.1", "main", () => false)["reason"], "no key: the refusal stays")
+	} finally {
+		_CLW_LastList := Saved
+	}
+}
+Test("Release install: a feed-only list offers its channel's newest release only (feed-only-install)",
+	_RIT_FeedListOffersTheNewestOnly)
+
+_RIT_FeedNotNewestIsAWarning() {
+	_RIT_Reset()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		AssertFalse(ReleaseInstall_Start("v1.0.6", "main", _RIT_Deps(Map("found", false,
+			"reason", "changelog_window.install_error_feed_not_newest"))))
+	} finally {
+		LoggerClearTestSink()
+		_RIT_Reset()
+	}
+	Line := ""
+	for Each in Captured
+		if InStr(Each, "v1.0.6")
+			Line := Each
+	Assert(InStr(Line, "[WARNING]") > 0 && InStr(Line, "newest") > 0,
+		"an older feed row refuses with a warning. Got: " . Line)
+}
+Test("Release install: an older feed row refuses with a warning (feed-only-install)", _RIT_FeedNotNewestIsAWarning)
+
 _RIT_FailuresReachTheObserver() {
 	global _UpdaterInstallObserver
 	Seen := []
@@ -217,6 +282,23 @@ _RIT_FailuresReachTheObserver() {
 }
 Test("Release install: the update path's failures reach the Versions window (release-install-observer)",
 	_RIT_FailuresReachTheObserver)
+
+; UPD-01: an update from the Updates window has no Versions window following it,
+; so its refused digest reached the modal box as « Failed to download the update
+; package. Check your internet connection », the text of a failed transfer.
+_RIT_UnfollowedVerifyNamesTheIntegrityCheck() {
+	Verify := _Updater_StagingFailureNotice(Map("reason", "verify"), "v9.9.9")
+	AssertEqual(StrReplace(t("changelog_window.install_error_verify"), "{tag}", "v9.9.9"), Verify,
+		"a refused digest names the integrity check of the release")
+	AssertTrue(InStr(Verify, "v9.9.9") > 0, "the integrity notice names the release. Got: " . Verify)
+	AssertTrue(Verify != t("updater.install_error_download"),
+		"a refused digest is not reported as a failed download")
+	AssertEqual(t("updater.install_error_download"),
+		_Updater_StagingFailureNotice(Map("reason", "download"), "v9.9.9"),
+		"a failed transfer keeps the download notice")
+}
+Test("Release install: an unfollowed refused digest names the integrity check (upd-01)",
+	_RIT_UnfollowedVerifyNamesTheIntegrityCheck)
 
 ; Capture the real central logger without replacing its state or file sinks.
 _RIT_WithLifecycleLogs(Body) {
@@ -281,6 +363,13 @@ Test("Release install: observer failure logs one failure terminal",
 ; ===================================
 ; ===================================
 
+_RIT_BackupPreservesDriveRoot() {
+	AssertEqual("C:\", _ConfigBackup_Root("C:\"))
+	AssertEqual("D:\", _ConfigBackup_Root("D:/"))
+	AssertEqual("C:\config", _ConfigBackup_Root("C:\config\"))
+}
+Test("Config backup: preserves the absolute drive root", _RIT_BackupPreservesDriveRoot)
+
 _RIT_WriteFile(Path, Text) {
 	SplitPath(Path, , &Dir)
 	DirCreate(Dir)
@@ -325,6 +414,49 @@ _RIT_BackupAndRestoreRealFiles() {
 }
 Test("Config backup: backs up and restores the configuration's exact bytes (config-backup-real-files)",
 	_RIT_BackupAndRestoreRealFiles)
+
+_RIT_BackupManifestReadback() {
+	Root := A_Temp . "\ergopti_rit_manifest_readback_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Path := Root . "\backup.json"
+	try {
+		_RIT_WriteFile(Path, '{"tag":"é"}')
+		_ConfigBackup_RequireManifest(Path, '{"tag":"é"}')
+		for Expected in ['{"tag":"different"}', '{"tag":"É"}'] {
+			Rejected := false
+			try _ConfigBackup_RequireManifest(Path, Expected)
+			catch
+				Rejected := true
+			AssertTrue(Rejected, "a changed manifest must refuse the backup")
+		}
+		FileDelete(Path)
+		Rejected := false
+		try _ConfigBackup_RequireManifest(Path, '{"tag":"é"}')
+		catch
+			Rejected := true
+		AssertTrue(Rejected, "a missing manifest must refuse the backup")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: verifies its published manifest exactly", _RIT_BackupManifestReadback)
+
+_RIT_BackupSkipsMissingCopy() {
+	Root := A_Temp . "\ergopti_rit_missing_copy_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		First := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Second := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Healthy := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, First)
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Second)
+		FileDelete(Damaged["path"] . "\config\config.toml")
+		AssertEqual(Healthy["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: selects an older backup when the newest copy is missing", _RIT_BackupSkipsMissingCopy)
 
 
 ; A damaged manifest must not make the complete backup picker throw or replace
@@ -681,6 +813,56 @@ _R7BS_ManifestSchema(Token, Accepted) {
 for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], ['"1"', false], ["false", false], ["0", false]]
 	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
 		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
+
+_RIT_DuplicateBackupManifestRefused() {
+	Root := A_Temp . "\ergopti_backup_duplicate_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "original`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Backup := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Manifest := Backup["path"] . "\" . Rules["manifest"]
+		Text := FSReadUtf8Exact(Manifest)
+		Item := '{"root":"config","path":"config.toml"}'
+		Duplicate := '{"root":"config","path":"CONFIG.toml"}'
+		Text := StrReplace(Text, Item, Item . "," . Duplicate, , &Changed)
+		AssertEqual(1, Changed)
+		AssertTrue(FSWriteDurable(Manifest, Text))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "current`n"))
+		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Clock)
+		AssertFalse(Result["ok"], "duplicate destination must not be restored")
+		AssertEqual("missing", Result["reason"])
+		AssertEqual("current`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup refuses duplicate destinations", _RIT_DuplicateBackupManifestRefused)
+
+_RIT_MalformedBackupTimestampRefused() {
+	Root := A_Temp . "\ergopti_backup_time_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "content`n")
+		Rules := ConfigBackup_Rules()
+		First := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Second := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Healthy := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, First)
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Second)
+		Manifest := Damaged["path"] . "\" . Rules["manifest"]
+		Text := StrReplace(FSReadUtf8Exact(Manifest), '"2026-09-30T11:15:00Z"', '"zzz"', , &Changed)
+		AssertEqual(1, Changed)
+		AssertTrue(FSWriteDurable(Manifest, Text))
+		AssertEqual(Healthy["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+		AssertFalse(ConfigBackup_Restore(Cfg, Damaged["id"], Rules, Second)["ok"])
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup refuses malformed timestamps", _RIT_MalformedBackupTimestampRefused)
 
 
 ; A fixed stage basename is not authority over an existing private sidecar.

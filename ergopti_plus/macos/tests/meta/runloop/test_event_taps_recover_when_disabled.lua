@@ -69,8 +69,10 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 		helpers.assert_contains(source,
 			"Logger.pcall(LOG, tap_watchdog, candidate, generation)")
 		helpers.assert_contains(source, "_watchdog_timer ~= timer")
-		helpers.assert_contains(source, "not eventtap_is_enabled(name, t)")
-		helpers.assert_contains(source, "start_eventtap(name, t)")
+		-- A tap already reported down is probed and restarted quietly: its outage
+		-- is logged once, not each second (tap-outage-reported)
+		helpers.assert_contains(source, "if eventtap_is_enabled(name, t, was_down) then")
+		helpers.assert_contains(source, "local started, detail = start_eventtap(name, t, true)")
 	end)
 
 	helpers.it("retains keystats hook-state polling and restart", function()

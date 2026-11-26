@@ -16,6 +16,7 @@
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes), python_helper (boot, then the
 --- display-mirror shortcut, a helper that runs Python).
+--- gesture_conflict records the real engine's system-conflict state.
 --- type_for_wpm boots Metrics, types physical keys and observes its floating canvas.
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines (the lease workers started, the final lease phase
@@ -35,7 +36,7 @@ local SHARED = RESOURCES .. "/_shared"
 -- modules (the hs stub and this harness) come from the repository.
 package.path = table.concat({
 	DRIVER .. "/?.lua", DRIVER .. "/?/init.lua",
-	SHARED .. "/lua/?.lua", SHARED .. "/lua/?/init.lua",
+	SHARED .. "/?.lua", SHARED .. "/?/init.lua",
 	package.path,
 }, ";")
 table.insert(package.searchers, 2, function(name)
@@ -118,7 +119,7 @@ World.record("FACT", "pointer_taps=" .. pointer_taps)
 if ACTION == "restore_recommended" then
 	-- The user's click on Configuration › « Restore recommended values », the
 	-- row that restores every category at once.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.configuration.title"), i18n.get("common.restore_recommended") }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" then
@@ -130,7 +131,7 @@ if ACTION == "restore_recommended" then
 	end
 elseif ACTION == "select_layout_natively" then
 	-- A real menu click must leave ABC even when setLayout declines the name.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.layout.title"), "French" }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" or row.disabled then
@@ -161,7 +162,7 @@ elseif ACTION == "select_layout_natively" then
 elseif ACTION == "open_windows" then
 	-- Every window and file the menu, a gesture or a shortcut can open through
 	-- the action catalogue: each must find its data outside the bundle.
-	local Actions = require("modules.gestures.actions")
+	local Actions = require("gestures.engine.actions")
 	for _, name in ipairs({
 		"open_metrics_typing", "open_metrics_apps", "open_hotstrings_editor", "open_paths_editor",
 		"open_config", "open_personal_info", "open_personal_hotstrings", "open_personal_shortcuts",
@@ -178,13 +179,16 @@ elseif ACTION == "open_windows" then
 	end
 elseif ACTION == "python_helper" then
 	-- As a keyboard shortcut slot runs it; its Python answers "single_screen".
-	local Actions = require("modules.gestures.actions")
+	local Actions = require("gestures.engine.actions")
 	local ran, result = xpcall(function() return Actions.execute_single("display_mirror_toggle", "keyboard__e2e") end,
 		debug.traceback)
 	if not ran or result ~= true then
 		World.record("SCENARIO_FAILED", "display_mirror_toggle did not run: " .. tostring(result))
 	end
 	idle(5)
+elseif ACTION == "gesture_conflict" then
+	local gestures = require("gestures.engine")
+	World.record("FACT", "system_tap_3_state=" .. tostring(gestures.system_slot_state("tap_3")))
 elseif ACTION == "type_for_wpm" then
 	-- A user types after the configured application's real menu started Metrics
 	-- and the floating widget. No keystats, model or widget method is stubbed.
@@ -197,8 +201,8 @@ elseif ACTION == "type_for_wpm" then
 	local stats = require("modules.keystats").get_live_stats()
 	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
 	local visible, recovered = 0, false
-	local config = require("toml_codec").decode(require("tests.support.source_file").read(
-		SHARED .. "/modules/wpm_widget/constants.toml"))
+	local config = require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
+		SHARED .. "/metrics/data/wpm_widget/constants.toml"))
 	local compact = config.compact
 	local screen = hs.screen.mainScreen():fullFrame()
 	for _, canvas in ipairs(hs.canvas.__instances) do

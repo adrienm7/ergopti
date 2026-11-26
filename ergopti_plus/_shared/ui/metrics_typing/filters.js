@@ -70,12 +70,14 @@ function apply_quick_date_range() {
 	const now = new Date();
 	const today = formatMetricsDateKey(metricsLocalDayOrdinal(now));
 	let start = today;
+	let end = today;
 	app_state.hour_window = null;
 
 	if (val === 'last_hour') {
 		// The two coarse hours can belong to different local dates.
 		app_state.hour_window = createMetricsHourWindow(now);
 		start = app_state.hour_window.start_date;
+		end = app_state.hour_window.end_date;
 	} else if (val === 'today') {
 		start = today;
 	} else {
@@ -99,7 +101,7 @@ function apply_quick_date_range() {
 	}
 
 	document.getElementById('date_start').value = start;
-	document.getElementById('date_end').value = today;
+	document.getElementById('date_end').value = end;
 	sel.value = '';
 
 	apply_date_app_filters();

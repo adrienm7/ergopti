@@ -33,12 +33,17 @@
 ; 3. Publication is atomic: the image is written to a private temp database and
 ;    renamed over the previous one, so an interrupted save can never leave a
 ;    half-written cache for the next worker to trust.
-; 4. A refresh recomputes whole affected days, never just the appended rows. The
-;    walker is stateful and its context is not persisted with the cache, so
-;    folding in a tail alone cannot reproduce cross-event statistics.
+; 4. A refresh recomputes whole affected app-days, never just the appended
+;    rows. The walker is stateful and its context is not persisted with the
+;    cache, so folding in a tail alone cannot reproduce cross-event statistics;
+;    its state is keyed by app, so an app the tail left alone keeps its rows
+;    (KLR_ReplayScopeBegin), and a tail touching the system sweep rebuilds the
+;    whole day.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+
+#Include ../../core/text/engine/number.ahk
 
 ; Bump whenever the cache's tables or the provenance required for reuse change.
 ; An older image is discarded rather than migrated: it can always
@@ -54,7 +59,12 @@
 ; Version 14 preserves literal synthetic-source labels across walker flushes.
 ; Version 15 qualifies batch framing through the forward SQLite lexer index.
 ; Version 16 rebuilds every n-gram key from data.sql in token encoding 2.
-global KLR_CACHE_FORMAT_VERSION := "16"
+; Version 17 preserves the first duplicate within a forward-executed rebuild span.
+; Version 18 rebuilds tuples previously merged by literal NUL or separator keys.
+; Version 19 rebuilds title keystrokes from their accepted typing owner.
+; Version 20 rebuilds Wi-Fi mobility from canonical network_change rows.
+; Version 21 rebuilds per-event manual thinking pauses into numeric projections.
+global KLR_CACHE_FORMAT_VERSION := "21"
 ; The last image in the old keys is kept once, renamed, not discarded: the
 ; ledgers stay the source, and this keeps what the dashboard showed until now.
 global KLR_PRE_ENCODING_FORMAT_VERSION := "15"
@@ -84,6 +94,22 @@ KLR_CacheDir(md) {
 
 KLR_CachePath(md) {
 	return KLR_CacheDir(md) . "reader.sqlite"
+}
+
+; Creates the cache folder with its ignore rule: everything in it is derived
+; from data.sql and never synced.
+; @param md {String} Metrics directory, trailing separator included.
+; @returns {Boolean} Whether the folder exists.
+KLR_CacheEnsureDir(md) {
+	Dir := KLR_CacheDir(md)
+	try DirCreate(Dir)
+	catch
+		return false
+	Ignore := Dir . ".gitignore"
+	if !FSExists(Ignore)
+		try FSWriteCreateDurable(Ignore,
+			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
+	return true
 }
 
 ; The cache's own bookkeeping lives inside the cached database, so an image and
@@ -384,15 +410,33 @@ KLR_CacheDiscard(md, logPath, Observed) {
 	return 0
 }
 
+; Retires the durable reader image for an explicit full reset. The publication
+; guard excludes a peer save, and the verified delete accepts any complete image
+; because the caller asked to forget it, not to preserve its history.
+; @param md {String} Metrics directory.
+; @returns {Boolean} True when no image remains; false when it is held elsewhere.
+KLR_CacheRetire(md) {
+	Path := KLR_CachePath(md)
+	if !FSExists(Path)
+		return true
+	Guard := FSOpenExclusiveGuard(Path . ".publish.lock")
+	if !Guard
+		return false
+	try Retired := FSDeleteVerified(Path, (*) => true)
+	finally FSCloseExclusiveGuard(Guard)
+	return Retired ? true : false
+}
+
 ; A killed worker cannot execute CacheSave's finally block. Only recognize
 ; completed Ergopti images whose hidden producer window no longer exists.
 ; Unknown/truncated files and SQLite recovery companions need separate review.
 KLR_CacheReapStages(md, logPath) {
 	Loop Files KLR_CachePath(md) . ".stage.*", "F" {
-		if !RegExMatch(A_LoopFileName, "^reader\.sqlite\.stage\.([1-9]\d{0,9})\.(\d{1,10})$", &Owner)
+		if !RegExMatch(A_LoopFileName, "^reader\.sqlite\.stage\.([1-9]\d{0,9})\.(\d{1,19})$", &Owner)
 			continue
 		Hwnd := Integer(Owner[1])
-		if Hwnd > 0xFFFFFFFF || Integer(Owner[2]) > 0xFFFFFFFF
+		; The writer names stages with native 64-bit ticks; HWND remains a DWORD.
+		if Hwnd > 0xFFFFFFFF || !NumberTryParseSignedInteger(Owner[2], &StageTick)
 				|| DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
 			continue
 		try {
@@ -418,7 +462,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = KLR_PRE_ENCODING_FORMAT_VERSION || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = "16" || Version = "17" || Version = "18" || Version = "19" || Version = "20" || Version = KLR_PRE_ENCODING_FORMAT_VERSION || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 
@@ -447,17 +491,11 @@ _KLR_CacheStageIsOwned(Path) {
 KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
-	Dir := KLR_CacheDir(md)
-	try DirCreate(Dir)
-	catch {
+	; The guard is derived state too; install the cache ignore rule before it.
+	if !KLR_CacheEnsureDir(md) {
 		KLR_PrefetchDebug(logPath, "KLR cache save failed: cache directory")
 		return 0
 	}
-	; The guard is derived state too; install the cache ignore rule before it.
-	Ignore := Dir . ".gitignore"
-	if !FSExists(Ignore)
-		try FSWriteCreateDurable(Ignore,
-			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
 	Guard := FSOpenExclusiveGuard(KLR_CachePath(md) . ".publish.lock")
 	if !Guard {
 		KLR_PrefetchDebug(logPath, "KLR cache save skipped: publication guard unavailable")

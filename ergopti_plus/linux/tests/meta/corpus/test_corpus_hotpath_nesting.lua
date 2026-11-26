@@ -4,7 +4,7 @@
 --- MODULE: Hot-path Nesting Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json
---- through the shared nesting tracker that infra/perf_counters.lua drives. The
+--- through the shared nesting tracker that core/logger/engine/perf_counters.lua drives. The
 --- macOS suite replays the same vectors.
 --- ==============================================================================
 
@@ -15,4 +15,4 @@ local handle = assert(io.open(corpus_path, "r"), "cannot open corpus at " .. cor
 local text = handle:read("*a")
 handle:close()
 
-require("test.hotpath_nesting_replay").register(helpers, { driver = "linux", corpus = text })
+require("tests.lua.core.hotpath_nesting_replay").register(helpers, { driver = "linux", corpus = text })

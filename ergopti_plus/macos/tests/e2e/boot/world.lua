@@ -422,7 +422,7 @@ local function keyboard_source_answer(args, layout)
 		local dead = type(value) == "table" and value.dead == true or false
 		levels[#levels+1] = {code=code, text=text, dead=dead, direct=not dead and text ~= ""}
 	end
-	return {code=0, stdout=require("json").encode({version=1, source_id=layout.source_id,
+	return {code=0, stdout=require("core.text.engine.json").encode({version=1, source_id=layout.source_id,
 		keyboard_type=40, levels=levels}) .. "\n"}
 end
 M.keyboard_source_answer = keyboard_source_answer
@@ -433,6 +433,8 @@ M.keyboard_source_answer = keyboard_source_answer
 --- RESUME, while its answer is still due.
 M.MACHINES = {
 	standard = { layout = "abc", worker = { ready_after = 0, answer_after = 0 } },
+	gesture_conflict = { layout = "abc", system_gesture_conflict = true,
+		worker = { ready_after = 0, answer_after = 0 } },
 	-- Both sources are enabled, but Hammerspoon declines the localized names:
 	-- the real menu must reach the isolated native selection command.
 	native_layout_selection = { layout = "abc", enabled_layouts = { "abc", "french" },
@@ -457,6 +459,28 @@ M.MACHINES = {
 local _machine = nil
 local _selected_layout = nil
 local _selected_layout_key = nil
+
+--- Models only the four system gesture preference reads the driver uses.
+--- The standard test Mac has its conflicting Trackpad gestures disabled; the
+--- conflicting variant enables Look up so the real conflict policy remains testable.
+--- @param args table defaults arguments.
+--- @param conflicting boolean Whether Look up is enabled.
+--- @return table|nil answer
+function M.gesture_preferences_answer(args, conflicting)
+	local domain = nil
+	if #args == 2 and args[1] == "read" then domain = args[2]
+	elseif #args == 3 and args[1] == "-currentHost" and args[2] == "read" then domain = args[3] end
+	if domain == "com.apple.dock" then
+		return { code = 0, stdout = "{ showMissionControlGestureEnabled = 0; showAppExposeGestureEnabled = 0; }" }
+	end
+	if domain ~= "com.apple.AppleMultitouchTrackpad"
+		and domain ~= "com.apple.driver.AppleBluetoothMultitouch.trackpad"
+		and domain ~= "-globalDomain" then return nil end
+	return { code = 0, stdout = "{ TrackpadThreeFingerTapGesture = " .. (conflicting and "1" or "0")
+		.. "; TrackpadThreeFingerDrag = 0; TrackpadThreeFingerHorizSwipeGesture = 0;"
+		.. " TrackpadThreeFingerVertSwipeGesture = 0; TrackpadFourFingerHorizSwipeGesture = 0;"
+		.. " TrackpadFourFingerVertSwipeGesture = 0; }" }
+end
 M.lease_workers_started = 0
 M.native_reloads = 0
 M.layout_attempts = 0
@@ -560,6 +584,24 @@ local function lease_worker(api)
 	end
 end
 
+--- Whether every path a command names is inside Ergopti's own runtime folder.
+--- @param args table Arguments of /bin/rm or /bin/mkdir.
+--- @return boolean inside
+local function owned_artifact_paths(args)
+	local paths = 0
+	for _, arg in ipairs(args) do
+		if tostring(arg):sub(1, 1) ~= "-" then
+			-- The owned folder's name comes from app_dirs (one Ergopti folder per OS).
+			local artifact_home = require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME:gsub("^~", "")
+			if not tostring(arg):find(artifact_home .. "/", 1, true) then
+				return false
+			end
+			paths = paths + 1
+		end
+	end
+	return paths > 0
+end
+
 --- Answers one command of the set-up Mac.
 --- @param path string Executable.
 --- @param args table Arguments.
@@ -621,6 +663,10 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 	if path == "/usr/bin/defaults" and args[1] == "read" and args[3] == "AppleEnabledInputSources" then
 		return { code = 0, stdout = enabled_input_sources() }
 	end
+	if path == "/usr/bin/defaults" then
+		local answer = M.gesture_preferences_answer(args, _machine.system_gesture_conflict == true)
+		if answer then return answer end
+	end
 	if path:match("/python[%d.]*$") and args[1] == "-c" then
 		local source = tostring(args[2])
 		-- The active-layout probe of releases before hardening-h, and the
@@ -636,12 +682,28 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		and args[1] == "-l" and args[2] == "1" and args[3] == "-n" and args[4] == "0" then
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
+	-- A remap download runs curl behind the system network prelude
+	-- (platform/remap/network_download.lua): /bin/sh -c '<prelude>exec /usr/bin/curl "$@"'
+	-- <tag> <curl arguments>. The shell becomes curl, so it answers as curl does
+	-- here; the generic shell answer below would report a download that never ran.
+	if path == "/bin/sh" and args[1] == "-c" and tostring(args[2]):find('exec /usr/bin/curl "$@"', 1, true) then
+		local curl_args = {}
+		for index = 4, #args do curl_args[#curl_args + 1] = args[index] end
+		return machine_answer("/usr/bin/curl", curl_args, helper, environment, launcher_environment)
+	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
+	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
+	-- its folder steps succeed and the E2E Mac is offline, so the download fails
+	-- by name and the owned boot reports artifact_fetch_failed.
+	if (path == "/bin/rm" or path == "/bin/mkdir") and owned_artifact_paths(args) then return { code = 0 } end
+	if path == "/usr/bin/curl" and tostring(args[#args]):find("/releases/download/remap-runtime-v", 1, true) then
+		return { code = 6, stderr = "curl: (6) Could not resolve host: github.com" }
+	end
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
 end
 
 -- The processors a Mac can have, as `uname -m` names them. The platform
--- default AI backend follows it (modules/llm/backend_detector.lua): MLX on
+-- default AI backend follows it (ai/engine/api/backend_detector.lua): MLX on
 -- Apple silicon, Ollama on Intel, which an older config.toml without a
 -- selected backend restores.
 M.ARCHITECTURES = { "arm64", "x86_64" }
@@ -677,7 +739,8 @@ end
 --- @return table env
 function M.launcher_environment(app_root, home)
 	local bundle = app_root .. "/ErgoptiPlus.app"
-	local logs = home .. "/Library/Logs/ergopti_plus"
+	local AppDirs = require("core.fs.engine.app_dirs")
+	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
 		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),
 		ERGOPTI_LAUNCHER_PID = "4242",
@@ -686,13 +749,13 @@ function M.launcher_environment(app_root, home)
 		ERGOPTI_LOG_TOKEN = string.rep("e2e-token-", 5),
 		ERGOPTI_LAUNCHER_VERSION = "0.0.0-e2e",
 		ERGOPTI_CONFIG_DIR = bundle .. "/Contents/Resources/static/ergopti_plus/macos",
-		ERGOPTI_PATHS_FILE = home .. "/Library/Application Support/ErgoptiPlus/paths.toml",
+		ERGOPTI_PATHS_FILE = home .. "/" .. AppDirs.config.macos_paths_file,
 		ERGOPTI_LAUNCHER_EXECUTABLE = bundle .. "/Contents/MacOS/ErgoptiPlus",
 		ERGOPTI_REMAP_GUARDIAN_STATUS = "ready",
 		ERGOPTI_LAUNCHER_DEVICE = "16777233",
 		ERGOPTI_LAUNCHER_INODE = "424242",
-		ERGOPTI_FATAL_REPORT_FILE = logs .. "/hammerspoon-fatal.txt",
-		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/launcher.log",
+		ERGOPTI_FATAL_REPORT_FILE = logs .. "/" .. AppDirs.macos.fatal_report,
+		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/" .. AppDirs.macos.launcher_log,
 		HOME = home,
 	}
 end
@@ -701,7 +764,7 @@ end
 --- next clock turn, as the launcher's datagram worker does.
 local function install_log_transport()
 	local pending, options = {}, nil
-	package.preload["adapters.log_transport"] = function()
+	package.preload["core.logger.adapters.log_transport"] = function()
 		local transport = {}
 		function transport.start(start_options) options = start_options; return true end
 		function transport.enqueue(line, variant)
@@ -769,7 +832,7 @@ end
 
 --- Runs the folder commands of the modelled Mac for real inside its HOME.
 --- The shared hs.execute stub answers any command it does not know with a
---- synthetic success that does nothing. infra/driver_control.lua makes its
+--- synthetic success that does nothing. core/lifecycle/engine/driver_control.lua makes its
 --- folder with `/bin/mkdir -p P && /bin/chmod 700 P` and then checks the result
 --- with hs.fs.attributes, so the stub's success left no folder and every boot
 --- logged that the control could not start. Only that exact shape, on paths
@@ -804,6 +867,31 @@ local function install_private_folder_commands(hs, home)
 		end
 		return stub_execute(cmd, with_user_env)
 	end
+end
+
+local PNG_SIGNATURE = "\137PNG\r\n\26\n"
+
+--- hs.image.imageFromPath of the modelled Mac: a PNG decodes to an image of
+--- its IHDR size, and a missing, foreign or truncated file answers nil, as
+--- NSImage does, so a broken shipped logo still fails the boot.
+--- @param path string
+--- @return table|nil image An image double with size() and setSize().
+function M.image_from_path(path)
+	local file = type(path) == "string" and io.open(path, "rb") or nil
+	if file == nil then return nil end
+	local header = file:read(24)
+	file:close()
+	if type(header) ~= "string" or #header < 24 or header:sub(1, 8) ~= PNG_SIGNATURE
+		or header:sub(13, 16) ~= "IHDR" then
+		return nil
+	end
+	local width, height = string.unpack(">I4>I4", header, 17)
+	if width == 0 or height == 0 then return nil end
+	local size = { w = width, h = height }
+	return handle({
+		size = function() return { w = size.w, h = size.h } end,
+		setSize = function(self, new_size) size = { w = new_size.w, h = new_size.h }; return self end,
+	})
 end
 
 --- Completes the hs stub where the boot needs a native answer it lacks.
@@ -913,6 +1001,9 @@ local function install_natives(hs, env, arch, machine_root)
 		webview.delete = function() return nil end
 		return webview
 	end
+	-- The shared stub decodes no image, which the menu bar reads as an
+	-- undecodable shipped logo (TRAY-05).
+	hs.image.imageFromPath = M.image_from_path
 	-- A modal answers with M.dialog_choice(buttons), the first button unless a
 	-- scenario chose otherwise for the dialog it is about to raise.
 	hs.dialog.blockAlert = function(message, informative, first, second)
@@ -1274,6 +1365,10 @@ function M.install(hs, options)
 	install_natives(hs, env, options.arch, options.machine_root)
 	install_extension_searcher(hs)
 	install_file_system(hs, options)
+	-- This headless world models an empty SQLite database, including the native
+	-- backup/revision protocol used by first-run aggregate recovery.
+	require("tests.e2e.boot.empty_sqlite").install(hs,
+		options.app_root .. "/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared")
 	hs.configdir = env.ERGOPTI_CONFIG_DIR
 	local real_exit = os.exit
 	os.exit = function(code)
@@ -1287,7 +1382,7 @@ end
 
 --- Delivers every queued log record to the logger's sink.
 function M.flush_logs()
-	local loaded = package.loaded["adapters.log_transport"]
+	local loaded = package.loaded["core.logger.adapters.log_transport"]
 	if type(loaded) == "table" and type(loaded.flush) == "function" then loaded.flush() end
 end
 

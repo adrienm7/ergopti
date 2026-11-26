@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/nl.msg
-# AUTO-GENERATED from _shared/data/locales/nl.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/nl.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-netwerkmodule uit de broncode gebouwd.
 build_luv.recipe_required=De native luv-build heeft zijn bronrecept nodig.
 install.already_installed={1} — al geïnstalleerd
 install.archive_digest_unavailable=updates met vastgehouden descriptor vereisen een echte OpenSSL3-runtime; de functie blijft niet beschikbaar.
+install.bytecode_skipped=De voorgecompileerde modules konden niet worden gemaakt — Ergopti start vanuit de broncode, iets trager.
 install.capability_verified={1} — functie gecontroleerd
 install.command_still_missing={1} is geïnstalleerd, maar '{2}' is nog steeds niet te vinden.
 install.daemon_manual=Om de daemon handmatig te starten:
 install.daemon_running=De daemon draait op de achtergrond. Om de status te controleren:
+install.focus_integration_enabled={1}-focusintegratie ingeschakeld
+install.focus_integration_failed=De {1}-focusintegratie kon niet worden ingeschakeld — regels per toepassing blijven inactief op deze desktop.
+install.focus_integration_next_login={1}-focusintegratie geïnstalleerd (actief bij de volgende aanmelding)
+install.focus_integration_updated={1}-focusintegratie bijgewerkt
 install.gnome_extension_active=GNOME AppIndicator-extensie — al actief
 install.gnome_extension_enabled=GNOME AppIndicator-extensie ingeschakeld
 install.gnome_extension_failed=Kan de AppIndicator-extensie niet inschakelen — zonder haar toont GNOME het pictogram niet.
 install.gnome_extension_missing=GNOME AppIndicator-extensie ontbreekt — {1} wordt geïnstalleerd…
 install.gnome_extension_next_login=GNOME AppIndicator-extensie ingeschakeld (actief bij de volgende aanmelding)
+install.gnome_extension_not_installed=Geen pakket van deze distributie bevat de GNOME AppIndicator-extensie: installeer AppIndicator and KStatusNotifierItem Support via {1} en meld je daarna af en weer aan — zonder deze extensie toont GNOME het pictogram niet.
 install.gnome_without_extensions=GNOME zonder gnome-extensions — schakel een AppIndicator-extensie in om het pictogram te zien.
 install.help_help=Toont dit helpbericht
 install.help_no_deps=Installeert geen afhankelijkheden (die regelt u zelf)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — controle van afhankelijkheden
 install.section_deps_skipped=Afhankelijkheden overgeslagen (--no-deps)
 install.section_done=Installatie voltooid
 install.section_files=Bestanden installeren
+install.section_focus=Actieve toepassing onder Wayland (GNOME, KDE)
 install.section_lua_deps=Optionele Lua-afhankelijkheden (gebeurtenislus, timers, webviews, signalen)
 install.section_permissions=Invoerrechten (vereist sudo)
 install.section_services=De systemd-gebruikersservices aanmaken
@@ -63,6 +70,7 @@ install.section_tray=Pictogram in het systeemvak en vensters
 install.security_warning_body=Lid zijn van de groep 'input' maakt het mogelijk ELKE toetsaanslag van de sessie te lezen, ook wachtwoorden die in een willekeurige toepassing worden getypt. Precies dat heeft een hotstring-engine nodig, en zo werken ook keyd en xremap.
 install.security_warning_title=BEVEILIGINGSWAARSCHUWING
 install.service_started=service ergopti-hotstrings ingeschakeld en gestart
+install.session_without_graphical_target=Deze sessie start systemd's graphical-session.target nooit (i3, Openbox, Xfce, sway zonder sessiebeheerder), dus de gebruikersunit zou nooit draaien: Ergopti+ start in plaats daarvan bij de volgende aanmelding via het XDG-autostartitem. Een vensterbeheerder die XDG-autostart negeert (i3, sway) heeft de regel exec {1} in zijn configuratie nodig.
 install.source_toolchain_unavailable=de geïnstalleerde compiler kan de native archiefbackend niet bouwen.
 install.startup_choice_unreadable=De opstartkeuze kon niet worden gelezen.
 install.summary_config=Configuratie: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ draait al in deze sessie ({1} is bezet); deze start is geweigerd.
 launch.authorization_failed=De autorisatie voor invoertoegang is geannuleerd of mislukt.
 launch.groups_unavailable=De sessie kon haar ingestelde invoergroepen niet verkrijgen.
+launch.restarting=Ergopti+ draait al in deze sessie; het wordt gevraagd af te sluiten en daarna opnieuw gestart.
+launch.session_lock_invalid=De map voor de sessievergrendeling moet een absoluut pad zijn.
 launcher.dependencies_installed=Afhankelijkheden geïnstalleerd.
 launcher.driver_missing=Fout: map van het Linux-stuurprogramma niet gevonden: {1}
 launcher.install_deps_hint=Voer uit: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Het installatiepad loopt via een symbolische koppeling
 uninstall.system_prefix=Systeeminstallatievoorvoegsel geweigerd.
 uninstall.unsafe_path=Onveilig eigendomspad.
 uninstall.unsupported_argument=Niet-ondersteund verwijderargument: {1}
+xkb_helpers.not_found=De installatiebestanden voor toetsenbordindelingen zijn niet gevonden naast {1} of in {2}: zonder deze kan geen indeling worden geïnstalleerd.

@@ -22,8 +22,8 @@ import tempfile
 
 WORKER = r"""
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=load\n")
-local Chooser = require("ui.app_chooser")
-local Actions = require("modules.gestures.manager")
+local Chooser = require("apps.ui.chooser")
+local Actions = require("gestures.engine.manager")
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=chooser\n")
 local id = assert(Chooser.desktop_id(os.getenv("ERGOPTI_NATIVE_APPLICATION_ENTRY")))
 io.stderr:write("ERGOPTI_APPLICATION_STAGE=assignment\n")
@@ -208,7 +208,7 @@ def main():
                             "ERGOPTI_NATIVE_APPLICATION_READY": str(root / ("ready-" + str(index))),
                             "ERGOPTI_NATIVE_APPLICATION_ENTRY": str(entry),
                             "ERGOPTI_NATIVE_APPLICATION_RECEIPT": str(receipt),
-                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                            "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                         }
                     )
                     before_child = time.monotonic_ns()

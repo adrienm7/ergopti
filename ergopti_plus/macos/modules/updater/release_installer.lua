@@ -30,18 +30,22 @@
 
 local M = {}
 
-local Identifiers = require("identifiers")
-local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
-local NativePath  = require("native_path")
-local FileSystem  = require("adapters.file_system")
-local JsonCodec   = require("adapters.json_codec")
-local ShellRunner = require("adapters.shell_runner")
-local Archives    = require("updater.release_assets")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger      = require("core.logger.engine.logger")
+local Paths       = require("core.fs.engine.paths")
+local NativePath  = require("core.fs.engine.native_path")
+local FileSystem  = require("core.fs.adapters.file_system")
+local JsonCodec   = require("core.fs.adapters.json_codec")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local Archives    = require("updater.engine.release_assets")
+local ProxyPolicy = require("core.network.engine.proxy_policy_core")
+local WorkerProtocol = require("core.network.engine.managed_http_protocol")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
 local RENAME_FLAG = "--release-rename"
+-- Distinguish attempts started within one wall-clock second in this process.
+local stage_sequence = 0
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
@@ -63,16 +67,25 @@ M._getenv = os.getenv
 -- ================================
 -- ================================
 
--- Exit codes of the staging script: 10 is the download, 20 and up a check.
+-- Exit codes of the staging script: 10 is the download, 20 and up a check,
+-- 27 the code signature of the new app (codesign --verify, UPD-10).
 M.EXIT_DOWNLOAD = 10
 M.EXIT_VERIFY_FIRST = 20
+M.EXIT_SIGNATURE = 27
 
 --- The native extraction owner, captured once through the source-layout resolver.
 local stage_path = Paths.shared("../macos/adapters/release_stage.sh")
 M.STAGE_SCRIPT = type(stage_path) == "string" and FileSystem.read(stage_path) or nil
 assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native release staging script is unavailable")
+assert(M.STAGE_SCRIPT:find("codesign %-%-verify[^\n]*|| exit " .. M.EXIT_SIGNATURE .. "\n"),
+	"The native release staging script names no code-signature exit")
 
---- Replaces the installed app once the launcher has quit.
+--- Replaces the installed app once the launcher has quit, then keeps it only
+--- once its boot reports ready (the Windows swap's boot-ready and probation):
+--- a build that never reports within the wait, or exits during the probation,
+--- is stopped and moved aside, and the previous app is put back and opened.
+--- The wait is the new build's boot, so a user's Quit lands there: the boot
+--- writes `quit` to the token, and the swap keeps the build and opens nothing.
 --- Arguments: launcher pid, installed app, verified app, previous-app path.
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
@@ -86,6 +99,7 @@ M.SWAP_SCRIPT = table.concat({
 	'	case "$device" in ""|*[!0-9]*) echo "The replacement filesystem identity is invalid."; exit 1 ;; esac',
 	'done',
 	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
+	'if [ -e "$previous" ] || [ -L "$previous" ]; then echo "Move the existing backup at $previous before retrying."; exit 1; fi',
 	'# Stage/destination filesystem admission ends',
 	'rename_flag=' .. RENAME_FLAG,
 	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
@@ -99,7 +113,6 @@ M.SWAP_SCRIPT = table.concat({
 	'	if [ "$waited" -gt 1200 ]; then echo "ErgoptiPlus did not quit: nothing was replaced."; exit 3; fi',
 	"	/bin/sleep 0.1",
 	"done",
-	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
 	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
 	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
 	'# Occupied destinations are retained rather than overwritten or nested into',
@@ -112,10 +125,76 @@ M.SWAP_SCRIPT = table.concat({
 	'}',
 	'# Occupied destination admission ends',
 	'replacement_path_clear || exit 8',
+	'# Successor boot-ready receiving begins',
+	'stop_successor() {',
+	'	pids=$1',
+	"	[ -n \"$pids\" ] || pids=$(/bin/ps -axo pid=,command= | /usr/bin/awk -v root=\"$app/Contents/\" '",
+	"		{ pid = $1; $1 = \"\"; sub(/^ +/, \"\") }",
+	"		index($0, root) == 1 && index($0, \" " .. RENAME_FLAG .. " \") == 0 { print pid }')",
+	'	for p in $pids; do /bin/kill -TERM "$p" 2>/dev/null; done',
+	'	stop_ticks=0',
+	'	for p in $pids; do',
+	'		while /bin/kill -0 "$p" 2>/dev/null && [ "$stop_ticks" -lt 50 ]; do stop_ticks=$((stop_ticks + 1)); /bin/sleep 0.1; done',
+	'		/bin/kill -KILL "$p" 2>/dev/null',
+	'	done',
+	'	return 0',
+	'}',
+	'open_until_ready() {',
+	'	ready_dir=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/ergopti-boot-ready.XXXXXX") || { failure="no ready folder"; return 1; }',
+	'	if ! /usr/bin/open --env "ERGOPTI_UPDATER_BOOT_READY=$ready_dir/ready" -- "$app"; then',
+	'		/bin/rm -rf "$ready_dir"',
+	'		failure="the app could not be opened"',
+	'		return 1',
+	'	fi',
+	'	ready_ticks=0',
+	'	while [ ! -s "$ready_dir/ready" ]; do',
+	'		ready_ticks=$((ready_ticks + 1))',
+	'		if [ "$ready_ticks" -gt 600 ]; then /bin/rm -rf "$ready_dir"; failure="no boot report"; return 1; fi',
+	'		/bin/sleep 0.1',
+	'	done',
+	'	successor=$(/bin/cat "$ready_dir/ready")',
+	'	# A Quit is no failed start: the boot writes quit (infra/updater_boot_ready.lua)',
+	'	if [ "$successor" = quit ]; then /bin/rm -rf "$ready_dir"; successor=; kept="before it reported ready"; return 1; fi',
+	'	case "$successor" in ""|*[!0-9]*) /bin/rm -rf "$ready_dir"; successor=; failure="an invalid boot report"; return 1 ;; esac',
+	'	/bin/sleep 0.75',
+	'	if ! /bin/kill -0 "$successor" 2>/dev/null; then',
+	'		[ "$(/bin/cat "$ready_dir/ready" 2>/dev/null)" = quit ] && kept="during its probation"',
+	'		/bin/rm -rf "$ready_dir"',
+	'		[ -n "$kept" ] && return 1',
+	'		failure="it quit during the probation"; return 1',
+	'	fi',
+	'	/bin/rm -rf "$ready_dir"',
+	'	return 0',
+	'}',
+	'# Successor boot-ready receiving ends',
 	'if "$launcher" "$rename_flag" move "$staged" "$app"; then',
 	'	echo "Installed."',
-	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
-	"	exit 0",
+	'	# A build carrying its boot reporter (infra/updater_boot_ready.lua) is checked; an older one is only opened',
+	'	if [ ! -f "$app/Contents/Resources/static/ergopti_plus/macos/infra/updater_boot_ready.lua" ]; then',
+	'		/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
+	'		exit 0',
+	'	fi',
+	'	successor=; failure=; kept=',
+	'	if open_until_ready; then echo "The installed app reported a healthy start."; exit 0; fi',
+	'	if [ -n "$kept" ]; then echo "The installed app was quit $kept: it stays installed and nothing is opened."; exit 0; fi',
+	'	stop_successor "$successor"',
+	'	failed_app="$app.failed-$$"',
+	'	if [ -e "$failed_app" ] || [ -L "$failed_app" ]; then',
+	'		echo "The installed app did not start ($failure) and $failed_app is occupied: the previous app remains at $previous."',
+	'		exit 10',
+	'	fi',
+	'	if ! "$launcher" "$rename_flag" move "$app" "$failed_app"; then',
+	'		echo "The installed app did not start ($failure) and could not be moved aside: the previous app remains at $previous."',
+	'		exit 10',
+	'	fi',
+	'	replacement_path_clear || exit 8',
+	'	if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
+	'		echo "The previous app could not be restored: it remains at $previous, the new one at $failed_app."',
+	'		exit 8',
+	'	fi',
+	'	echo "The installed app did not start ($failure): the previous one is back and the new one is at $failed_app."',
+	'	/usr/bin/open -- "$app"',
+	'	exit 9',
 	"fi",
 	'replacement_path_clear || exit 8',
 	'if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
@@ -157,7 +236,7 @@ local DETACH_SCRIPT = table.concat({
 --- Resolves the ordered native archive bindings from the shared updater defaults.
 --- @return table|nil identity Result of Archives.resolve().
 local function identity()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
 	local resolved, reason = Archives.resolve(decoded)
@@ -214,9 +293,48 @@ end
 -- =================================
 -- =================================
 
---- Downloads and verifies one release into a fresh staging folder.
+-- How long the armed swap waits for the launcher to quit, read from the script
+-- itself (the physical probe runs its literal text): that many sleeps of 0.1 s,
+-- so never less than SWAP_WAIT_SECONDS. The Versions session holds a release
+-- whose restart was refused for that long, then reports it not installed: the
+-- worker has given up and replaced nothing.
+M.SWAP_WAIT_TICKS = tonumber(M.SWAP_SCRIPT:match('%[ "%$waited" %-gt (%d+) %]'))
+assert(M.SWAP_WAIT_TICKS, "The release swap script names no launcher wait")
+M.SWAP_WAIT_SECONDS = M.SWAP_WAIT_TICKS / 10
+-- How long the swap waits for the opened build's boot report.
+M.SWAP_READY_TICKS = tonumber(M.SWAP_SCRIPT:match('%[ "%$ready_ticks" %-gt (%d+) %]'))
+assert(M.SWAP_READY_TICKS, "The release swap script names no boot-ready wait")
+-- The file a build carries when it reports its boot, read from the script.
+M.BOOT_READY_CAPABILITY = M.SWAP_SCRIPT:match('%[ ! %-f "%$app(/Contents/Resources/[^"]+)" %]')
+assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready capability")
+
+-- The curl exit codes whose stage is proven (proxy name resolution, peer
+-- certificate), as the Linux curl receipts read them.
+local CURL_STAGES = { [5] = "proxy_resolve", [60] = "tls" }
+
+--- The failure receipt of the staging script's output: the closed fact it
+--- printed, or an empty receipt (an unknown cause) when it printed none.
+--- @param stdout string|nil The script's standard output.
+--- @return table receipt Fields of _shared/core/network/data/managed_network.json.
+function M.failure_receipt(stdout)
+	local fact = type(stdout) == "string" and stdout:match("^FAILED ([%w_:]+)\n$") or nil
+	-- « FAILED native:<reason> » carries a ManagedBootstrapDownload reason; the
+	-- worker protocol owns what each one proves, and an unnamed one proves nothing
+	local reason = fact and fact:match("^native:([%w_]+)$")
+	if reason then return WorkerProtocol.failure_receipt(reason) end
+	local exit_code = fact and tonumber(fact:match("^curl:(%d+)$"))
+	if exit_code then
+		local stage = CURL_STAGES[exit_code]
+		return { backend = "curl", stage = stage or "connect", failure_provenance = stage and "verified" or "unknown",
+			curl_exit = exit_code, tls_verification = "enforced" }
+	end
+	return {}
+end
+
+--- Downloads and verifies one release into a fresh staging folder; the
+--- staging script removes that folder on any failure.
 --- @param asset table M.find_asset() result.
---- @param done function fn(staged_app|nil, stage "download"|"verify", detail).
+--- @param done function fn(staged_app|nil, stage "download"|"verify"|"signature", detail, failure_receipt|nil).
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
@@ -231,33 +349,63 @@ function M.stage(asset, done)
 	end
 	-- Publication must remain a rename: a failed cross-device mv can leave a
 	-- partial destination that makes rollback nest the original app inside it.
-	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	stage_sequence = stage_sequence + 1
+	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-"
+		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
+	-- The archive's absolute and idle bounds, declared once in the shared updater
+	-- defaults (decided by the maintainer on 2026-11-12, aligned on Windows).
+	local defaults_path = Paths.shared("updater/data/defaults.json")
+	local defaults_raw = type(defaults_path) == "string" and FileSystem.read(defaults_path) or nil
+	local limits = require("updater.engine.transfer_budget").archive_limits(
+		type(defaults_raw) == "string" and JsonCodec.decode(defaults_raw) or nil)
+	if not limits then
+		Logger.error(LOG, "Cannot stage %s: the shared release archive budget is unavailable.", tostring(asset.tag))
+		return false
+	end
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
-		output = stage_dir .. "/release." .. asset.format, timeout_ms = 900000 })
+		output = stage_dir .. "/release." .. asset.format, timeout_ms = limits.absolute_ms,
+		idle_timeout_ms = limits.idle_ms })
 	if request_err ~= nil or type(request) ~= "string" or request == "" or #request >= 65536 then
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
-	-- The stage script downloads with the system curl, checked at this use.
-	if not require("adapters.system_curl").check("the release download") then return false end
+	-- Read the shared proxy policy instead of maintaining another precedence.
+	-- Only the staging script's explicit-environment branch invokes curl.
+	local policy_path = Paths.shared("core/network/data/proxy_policy.json")
+	local raw = type(policy_path) == "string" and FileSystem.read(policy_path) or nil
+	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
+	local policy = ProxyPolicy.new(decoded)
+	if not policy then Logger.error(LOG, "The release proxy policy is unavailable."); return false end
+	local environment = {}
+	for _, name in ipairs(policy.environment_names()) do environment[name] = M._getenv(name) or "" end
+	local route = policy.route(asset.url, environment)
+	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
+	if route.mode == "environment" and not require("core.network.adapters.system_curl").check("the release download") then return false end
+	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
+	environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS = string.format("%d", limits.absolute_ms)
+	environment.ERGOPTI_RELEASE_STAGE_IDLE_MS = string.format("%d", limits.idle_ms)
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
+		local expected = stage_dir .. "/app/" .. APP_NAME
 		local staged = exit_code == 0 and type(stdout) == "string"
-			and stdout:gsub("%s+$", ""):match("^READY (/.+)$") or nil
+			and stdout == "READY " .. expected .. "\n" and expected or nil
 		if staged then
 			Logger.success(LOG, "Release %s downloaded and verified.", asset.tag)
 			done(staged, nil, nil)
 			return
 		end
 		local code = tonumber(exit_code)
-		local stage = (code and code >= M.EXIT_VERIFY_FIRST) and "verify" or "download"
+		local stage = code == M.EXIT_SIGNATURE and "signature"
+			or (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
-		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
-		done(nil, stage, detail)
-	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
+		Logger.error(LOG, "Release %s refused at the %s; its stage %s is removed (%s).", asset.tag, stage, stage_dir, detail)
+		-- The failure's own receipt names its cause (proxy, offline, certificate)
+		-- in the Versions window, never an empty one (UPD-11)
+		done(nil, stage, detail, stage == "download" and M.failure_receipt(stdout) or nil)
+	end, nil, environment)
 	return type(handle) == "table" and handle.start() == true
 end
 
@@ -289,7 +437,15 @@ function M.arm_swap(staged_app, done)
 				staged_app, app, log)
 			done(true)
 		else
-			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s).", tostring(ok))
+			Logger.error(LOG, "The detached installer refused its arming receipt (completion=%s; log: %s). If %s exists, move it aside before retrying.",
+				tostring(ok), log, app .. ".previous")
+			if type(FileSystem.classify_no_follow) == "function" then
+				local checked, _, status = pcall(FileSystem.classify_no_follow, app .. ".previous")
+				if checked and status == "ok" then
+					done(false, "previous_backup_occupied")
+					return
+				end
+			end
 			done(false, "the detached installer did not acknowledge arming")
 		end
 	end

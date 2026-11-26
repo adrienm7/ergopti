@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The release build stamps it. The version used to be a "3.0.0" literal that
----    no build rewrote, while releases are published as 0.0.0-dev.N and N.N.N:
+---    no build rewrote, while releases are published as X.Y.Z-dev.N and X.Y.Z:
 ---    every installed driver showed a version that never existed, and the
 ---    updater compared releases against it. tools/build/write_build_stamp.sh now
 ---    writes `version=` next to `commit=` in the shared tree's build stamp,
@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger   = require("logger.shim")
-local Snapshot = require("diagnostics.snapshot")
-local Paths    = require("infra.paths")
-local FileSystem = require("adapters.file_system")
-local VersionLabel = require("updater.version_label")
+local Logger   = require("core.logger.engine.shim")
+local Snapshot = require("diagnostics.engine.snapshot")
+local Paths    = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
+local VersionLabel = require("updater.engine.version_label")
 
 local LOG = "Version"
 
@@ -91,7 +91,7 @@ function M.resolve_identity(opts)
 	local version = opts.version or M.VERSION
 	-- Required here, not at load: infra.diagnostic_snapshot reads M.VERSION.
 	local ok, commit, commit_source = pcall(function()
-		return require("infra.diagnostic_snapshot").resolve_commit(opts.commit_opts)
+		return require("diagnostics.engine.reports.snapshot").resolve_commit(opts.commit_opts)
 	end)
 	if not ok then
 		Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))

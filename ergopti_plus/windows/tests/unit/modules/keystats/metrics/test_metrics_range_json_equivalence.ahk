@@ -34,7 +34,10 @@ _MRJE_Projection(Db) {
 		AssertEqual(13, Encoded["historical"].Count)
 		AssertEqual(2, Encoded["today"].Count, "selected app plus Unknown must survive; excluded app must not")
 		for Code, Bucket in Encoded["historical"] {
-			AssertEqual(Bounds[1] == "2030-01-02" ? 0 : TokensPerCell, Bucket.Count)
+			; A selection ending after the snapshot day keeps that later day in
+			; history (range-future-after-clock-rollback): 2030-01-03 here, as
+			; 2030-01-01 for the other bounds; the snapshot day stays in today.
+			AssertEqual(TokensPerCell, Bucket.Count)
 			for Token, Item in Bucket
 				AssertEqual(4, Item["c"], "history sums two devices across selected and Unknown apps")
 			for App in ["editor.exe", "Unknown"] {

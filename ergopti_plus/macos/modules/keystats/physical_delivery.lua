@@ -6,8 +6,8 @@ local M = {}
 local Wire = require("modules.keystats.physical_wire")
 local Baseline = require("modules.keystats.physical_baseline")
 local Protocol = require("modules.keystats.physical_protocol")
-local Release = require("keystats.physical_release")
-local Position = require("keystats.physical_position_observation")
+local Release = require("metrics.engine.capture.physical_release")
+local Position = require("metrics.engine.capture.physical_position_observation")
 local decimal, successor = Wire.decimal, Wire.successor
 
 --- Orders uncounted tally rows by page, usage, keyboard type and reason.

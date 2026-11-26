@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("initial canonical ledger publication", function()
 	helpers.it("(ledger-bootstrap-publication) retries refused write and close before public admission", function()

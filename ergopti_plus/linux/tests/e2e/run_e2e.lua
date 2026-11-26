@@ -36,13 +36,13 @@ local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_root  = drivers_root .. "/_shared"
-local shared_lua   = shared_root .. "/lua"
+local shared_lua   = shared_root .. ""
 local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
 	driver_root .. "/?.lua",
 	driver_root .. "/?/init.lua",
-	driver_root .. "/modules/hotstrings/?.lua",
+	driver_root .. "/hotstrings/engine/?.lua",
 	shared_lua  .. "/?.lua",
 	shared_lua  .. "/?/init.lua",
 	driver_root .. "/tests/?.lua",
@@ -53,7 +53,7 @@ package.path = table.concat({
 -- this harness cannot open the end-char path for a character the driver would
 -- leave alone. Deciding that here by hand is what made a correct engine look
 -- wrong against a correct vector.
-local terminators = require("keymap.terminators")
+local terminators = require("layouts.engine.layers.terminators")
 local Contract = require("tests.e2e.contract")
 local ChildCapture = require("tests.support.e2e.child_capture")
 
@@ -111,7 +111,7 @@ local function make_vkb(trigger, replacement, opts)
 	opts = opts or {}
 
 	-- Fresh engine instance — no cross-test leakage.
-	local engine_mod = require("modules.hotstrings.engine")
+	local engine_mod = require("hotstrings.engine.engine")
 	local engine     = engine_mod.new()
 
 	-- Every per-entry flag, driven off a list. Naming a subset is what broke this
@@ -384,7 +384,7 @@ assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_A
 -- this driver ships and replayed exactly as a corpus vector.
 print("\n--- Shipped hotstring family samples ---")
 local static_root = drivers_root:match("^(.*)/[^/]+$")
-local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+local ok_samples, samples = pcall(require("tests.lua.hotstrings.family_samples").load, static_root)
 if not ok_samples then
 	fail("mandatory family samples", "resolved samples", tostring(samples))
 else
@@ -418,7 +418,7 @@ end
 --- @return string screen What the application shows.
 --- @return number fired Expansions that fired.
 local function type_sequence(mappings, text)
-	local engine = require("modules.hotstrings.engine").new()
+	local engine = require("hotstrings.engine.engine").new()
 	local list = {}
 	for _, m in ipairs(mappings) do
 		local mapping = { trigger = m.trigger, replacement = m.replacement }
@@ -447,7 +447,7 @@ end
 
 local ok_sequences, sequences = pcall(function()
 	local handle = assert(io.open(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json", "r"))
-	local decoded = require("json").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.json").decode(handle:read("*a"))
 	handle:close()
 	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
 	return decoded.vectors
@@ -475,16 +475,56 @@ end
 -- word-only cases first type a real separator and retain it in the independent
 -- screen oracle; an empty modeled field never grants the engine that knowledge.
 local DAEMON_SCENARIOS = {
+	-- Item 50: fb gives facebook, facebook gives Facebook, as one edit; the
+	-- expectations are _shared/tests/corpus/hotstrings/cascade_vectors.json's
+	-- fb_* vectors. cascade = "<arrows>[,consume]" sets the private config.
+	{ name = "item 50: fb + Space at three arrows cascades and keeps the Space", keys = " fb ", screen = " Facebook ",
+		cascade = "3" },
+	{ name = "item 50: fb + Space at two arrows cascades", keys = " fb ", screen = " Facebook ", cascade = "2" },
+	{ name = "item 50: fb + Space at one arrow is a single expansion", keys = " fb ", screen = " facebook ",
+		cascade = "1" },
+	{ name = "item 50: fb + consumed Space cascades and swallows it once", keys = " fb ", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + consumed Space at one arrow", keys = " fb ", screen = " facebook", cascade = "1,consume" },
+	{ name = "item 50: fb + Enter at three arrows keeps the Enter", keys = " fb{ENTER}", screen = " Facebook\n",
+		cascade = "3" },
+	{ name = "item 50: fb + consumed Enter cascades and swallows it", keys = " fb{ENTER}", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + Enter at one arrow", keys = " fb{ENTER}", screen = " facebook\n", cascade = "1" },
+	{ name = "item 50: fb + the magic key cascades and swallows it", keys = " fb★", screen = " Facebook", cascade = "2" },
+	{ name = "item 50: fb + the magic key at one arrow", keys = " fb★", screen = " facebook", cascade = "1" },
+	{ name = "item 50: fb + the magic key at three arrows", keys = " fb★", screen = " Facebook", cascade = "3" },
 	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
 	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
+	{ name = "input queued during an expansion can complete the next trigger", keys = "pk★z", screen = "parce queMATCH", queue_output = true, llm = true, queue_ai = "pk★xz" },
 	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
-	-- count it, or the first character of the replacement stays ("Aadn").
-	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
-	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
-	-- The restored trigger ends the line without being buffered: the next word-only
-	-- trigger continues that word (unknown-context-resets).
-	{ name = "a word-only trigger does not fire inside a restored trigger", keys = " adn {BS}adn ", screen = " adnadn " },
+	-- count it, or the first character of the replacement stays ("Aadn"). What
+	-- comes back is what was typed (_shared/hotstrings/engine/backspace_restore.lua):
+	-- the trigger and its terminator, and a trigger the magic key ended without
+	-- the star.
+	{ name = "Backspace after an end-char expansion restores the trigger and its terminator", keys = " adn {BS}",
+		screen = " adn " },
+	{ name = "Backspace after an auto expansion restores the trigger without the magic key", keys = "pk★{BS}",
+		screen = "pk" },
+	-- A trigger restored without a terminator ends the line without being
+	-- buffered: the next word-only trigger continues that word
+	-- (unknown-context-resets).
+	{ name = "a word-only trigger does not fire inside a restored trigger", keys = "pk★{BS}adn ", screen = "pkadn " },
+	-- A restored terminator ends the word, so the next key starts one there.
+	{ name = "a word-only trigger fires after a restored terminator", keys = " adn {BS}adn ", screen = " adn ADN " },
+	-- The buffer holds the restored text, so the trigger key typed again
+	-- expands at once (decision of 2026-11-20): the undo used to empty it, and
+	-- the star after it stayed a star.
+	{ name = "a restored magic-key trigger expands again at once", keys = "pk★{BS}★", screen = "parce que" },
+	{ name = "a restored trigger undoes and expands again, twice", keys = "pk★{BS}★{BS}★", screen = "parce que" },
+	-- Deleting the restored terminator leaves the trigger in the buffer, where a
+	-- terminator fires it as typing it would; the Backspace after the undo is a
+	-- plain one, inside or past the undo window.
+	{ name = "a terminator fires a trigger whose restored terminator was deleted", keys = " adn {BS}{BS} ",
+		screen = " ADN " },
+	{ name = "past the undo window a terminator fires the trigger whose restored terminator was deleted",
+		keys = " adn {BS}{TICK}{BS} ", screen = " ADN ", clock = "seconds" },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
@@ -550,6 +590,14 @@ local TAP_WRAP_SCENARIOS = {
 		receipt = "attempts=1 queued=0 executed=0 reads=2 action=none binding=none" },
 }
 
+-- The first key of a session reads no source file: the typing path's settings
+-- and catalogues are read at start-up. Read lazily, two config.toml decodes and
+-- the tap-key catalogue put an 89 ms input.dispatch into an X270's first key.
+local FIRST_KEY_SCENARIOS = {
+	{ name = "the first key of a session reads no configuration or catalogue", keys = "a ",
+		screen = "a ", first_key_reads = "0 none" },
+}
+
 -- Built-in dynamic hotstrings fire only at a word start (item 129): with the
 -- date rules on, "td★" after a space expands, which proves they are live, and
 -- the same suffix ending a longer word stays as typed. The date is read
@@ -563,44 +611,16 @@ local DYNAMIC_SCENARIOS = {
 		screen = " update★" },
 }
 
--- A real consumed down owns repeats only while its native epochs and owners
--- remain valid. A refused repeat stays swallowed until release, even if the
--- pause, group or inhibition is restored before the next repeat.
-local MAGIC_REPEAT_SCENARIOS = {
-	{ name = "a captured assigned source refuses without changing configuration", magic_repeat = "tap-choice", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=KeyJ tap=send_text queued=0 executed=0 bytes=true captured=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment" },
-	{ name = "old conflicting magic intent preserves acknowledged tap priority", magic_repeat = "tap-legacy", keys = "",
-		screen = "replacement", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=1 executed=1 bytes=false captured=nil" },
-	{ name = "disabled shortcut delivery releases old conflicting native source", magic_repeat = "tap-off", keys = "",
-		screen = "★★★", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "paused conflicting sources produce no automated output", magic_repeat = "tap-paused", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "none releases configured source ownership", magic_repeat = "tap-none", keys = "",
-		screen = "★★★", tap_collision_receipt = "choice=true reason=nil source=Backquote tap=none queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "modified old conflicting sources preserve the physical chord", magic_repeat = "tap-modified", keys = "",
-		screen = "", tap_collision_receipt = "choice=false reason=menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment source=Backquote tap=send_text queued=0 executed=0 bytes=false captured=nil" },
-	{ name = "a held physical magic key emits every acknowledged repeat", magic_repeat = "accepted", keys = "",
-		screen = "★★★", magic_receipt = "decisions=1 dispatched=3 attempts=3 origins=1 raw=0 chosen=0" },
-	{ name = "a refused magic injection retires the held press", magic_repeat = "injection", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=2 origins=1 raw=0 chosen=0" },
-	{ name = "an untrusted origin cannot own magic repeats", magic_repeat = "untrusted", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a captured magic source consumes the held answer once", magic_repeat = "capture", keys = "",
-		screen = "", magic_receipt = "decisions=1 dispatched=0 attempts=0 origins=1 raw=0 chosen=1" },
-	{ name = "a pause retires magic repeats through resume", magic_repeat = "paused", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a group change retires magic repeats through restoration", magic_repeat = "group", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a source choice retires the old held magic key", magic_repeat = "source", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "input inhibition retires magic repeats through release", magic_repeat = "inhibited", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "an origin epoch change retires magic repeats", magic_repeat = "origin", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=2 raw=0 chosen=0" },
-	{ name = "an initial compose refusal retires the magic press through recovery", magic_repeat = "compose-first", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
-	{ name = "a refused compose retirement suppresses magic repeats", magic_repeat = "compose", keys = "",
-		screen = "★", magic_receipt = "decisions=1 dispatched=1 attempts=1 origins=1 raw=0 chosen=0" },
+-- Items 104, 105: each common autocorrection section fires alone. With only
+-- one section on, its trigger expands and the other two sections' triggers
+-- stay as typed (_shared/tests/corpus/hotstrings/common_autocorrection_entries.json).
+local AUTOCORRECT_SCENARIOS = {
+	{ name = "the names section alone expands a name", autocorrect = "names",
+		keys = " chatgpt adn adaboost ", screen = " ChatGPT adn adaboost " },
+	{ name = "the abbreviations section alone expands an abbreviation", autocorrect = "abbreviations",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt ADN adaboost " },
+	{ name = "the technical terms section alone expands a technical term", autocorrect = "technical_terms",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt adn AdaBoost " },
 }
 
 -- Each scenario runs in its own daemon child, started through the shell that
@@ -670,15 +690,7 @@ do
 	local output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
 	os.remove(child)
 	assert_true("a child error after a forged clean screen is rejected", status == 23
-		and not ChildCapture.accepted(output, status, false))
-	child = os.tmpname()
-	file = assert(io.open(child, "wb"))
-	assert(file:write([[print('SCREEN "misleading"'); print("E2E_EXPECTED_FAILURE injection output_debt=false signals_settled=true"); os.exit(1)]]))
-	assert(file:close())
-	output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
-	os.remove(child)
-	assert_true("exit one without the injected Writer debt is rejected", status == 1
-		and not ChildCapture.accepted(output, status, true))
+		and not ChildCapture.accepted(output, status))
 end
 
 do
@@ -711,20 +723,25 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_CLOCK", scenario.clock or "system" }
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
-			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_AUTOCORRECT", scenario.autocorrect or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
+			env[#env + 1] = { "ERGOPTI_E2E_CASCADE", scenario.cascade or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_FIRST_KEY_READS", scenario.first_key_reads and "1" or "0" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
 			local expected_after = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
-			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
-			if scenario.tap_collision_receipt then
-				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
-				if receipt == scenario.tap_collision_receipt then
-					pass(prefix .. scenario.name .. " (exact admission receipt)")
-				else
-					fail(prefix .. scenario.name .. " (exact admission receipt)", scenario.tap_collision_receipt, receipt or "absent")
-				end
+			local completed = ChildCapture.accepted(output, status)
+			if scenario.queue_ai then
+				local receipt = output:match("QUEUE_AI ([^\r\n]+)")
+				if receipt == scenario.queue_ai then pass(prefix .. scenario.name .. " (AI input order)")
+				else fail(prefix .. scenario.name .. " (AI input order)", scenario.queue_ai, receipt or "absent") end
+			end
+			if scenario.first_key_reads then
+				local receipt = output:match("FIRST_KEY_READS ([^\r\n]+)")
+				if receipt == scenario.first_key_reads then pass(prefix .. scenario.name .. " (file reads)")
+				else fail(prefix .. scenario.name .. " (file reads)", scenario.first_key_reads, receipt or "absent") end
 			end
 			if scenario.receipt then
 				local receipt = output:match("TAP_WRAP ([^\r\n]+)")
@@ -732,14 +749,6 @@ do
 					pass(prefix .. scenario.name .. " (exact owner receipt)")
 				else
 					fail(prefix .. scenario.name .. " (exact owner receipt)", scenario.receipt, receipt or "absent")
-				end
-			end
-			if scenario.magic_receipt then
-				local receipt = output:match("MAGIC_REPEAT ([^\r\n]+)")
-				if receipt == scenario.magic_receipt then
-					pass(prefix .. scenario.name .. " (exact repeat receipt)")
-				else
-					fail(prefix .. scenario.name .. " (exact repeat receipt)", scenario.magic_receipt, receipt or "absent")
 				end
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
@@ -754,8 +763,9 @@ do
 	end
 	run_key_scenarios(home_env, "")
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
-	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
 	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
+	run_key_scenarios(home_env, "", AUTOCORRECT_SCENARIOS)
+	run_key_scenarios(home_env, "", FIRST_KEY_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree
@@ -804,7 +814,7 @@ do
 	local agent = rows_fh and rows_fh:read("*l") or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
-	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
+	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status)
 	if rows_child_accepted and rows and rows > 100 and rows <= MENU_ROW_CEILING then
 		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
 	else

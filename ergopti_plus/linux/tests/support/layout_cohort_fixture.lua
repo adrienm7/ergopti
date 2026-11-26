@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Utf8 = require("compat.utf8")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = source:match("^(.*)/tests/support/layout_cohort_fixture%.lua$") or "."
 

@@ -11,7 +11,7 @@ assert(mode == "success" or mode == "failure" or mode == "error", "invalid probe
 local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 local root = assert(source:match("^(.*)/tests/support/property_runner_probe%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 
 local pbt = require("tests.helpers.pbt")
 local check = pbt.check
@@ -33,7 +33,7 @@ end
 local exit = os.exit
 local marker, exit_code = {}, nil
 os.exit = function(code) exit_code = code; error(marker, 0) end
-arg = { "--only", "tests/unit/modules/keymap/registry/test_hotstring_properties.lua" }
+arg = { "--only", "tests/unit/hotstrings/engine/expander/registry/test_properties.lua" }
 local ok, reason = pcall(dofile, root .. "/tests/run.lua")
 os.exit = exit
 assert(not ok and reason == marker, "the real runner must reach its terminal boundary")

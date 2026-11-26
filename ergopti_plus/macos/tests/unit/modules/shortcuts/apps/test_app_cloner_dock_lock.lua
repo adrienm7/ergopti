@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("App Cloner Dock writer coordination", function()
 	helpers.it("preserves concurrent clone entries with one held kernel lock", function()

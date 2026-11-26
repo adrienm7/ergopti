@@ -9,67 +9,67 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.http_client",
-	"ui.menu.menu_llm.ollama_enable_probe",
-	"llm.enable_admission",
-	"infra.logger",
-	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.i18n",
+	"core.network.adapters.http_client",
+	"ai.ui.menu.models.ollama_enable_probe",
+	"ai.engine.settings.enable_admission_core",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_reader",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
-	"modules.llm",
-	"ui.menu.menu_llm.models_manager",
-	"ui.menu.menu_llm.profiles_manager",
-	"modules.llm.profiles",
-	"ui.menu.menu_llm.settings_manager",
-	"ui.menu.menu_llm.temperature_panel",
-	"ui.menu.menu_llm.streaming_panel",
-	"ui.menu.menu_llm.warmup_controller",
-	"ui.menu.menu_llm.backend_panel",
-	"ui.menu.menu_llm.trigger_panel",
-	"ui.menu.menu_llm.api_panel",
-	"ui.menu.menu_llm.model_selector_page",
-	"ui.menu.menu_llm.model_switcher",
-	"modules.llm.api_mlx",
-	"ui.menu.menu_llm.startup_controller",
-	"ui.menu.menu_llm.trigger_orchestrator",
-	"ui.menu.menu_llm.menu_layout",
-	"infra.manifest_menu",
-	"modules.llm.mlx_deps_checker",
-	"modules.llm.ollama_deps_checker",
-	"ui.menu.menu_llm.runtime_install_offer",
-	"ui.menu.menu_llm.mlx_repair_offer",
-	"modules.llm.mlx_bootstrap_diagnosis",
-	"modules.llm.backend_detector",
-	"adapters.timer_scheduler",
-	"ui.menu.menu_llm.activation_pause_owner",
-	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"infra.keycodes",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
-	"adapters.key_state",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"ai.engine",
+	"ai.ui.menu.models.manager",
+	"ai.ui.menu.profiles_manager",
+	"ai.engine.settings.profiles",
+	"ai.ui.menu.settings_manager",
+	"ai.ui.menu.panels.temperature_panel",
+	"ai.ui.menu.panels.streaming_panel",
+	"ai.ui.menu.warmup_controller",
+	"ai.ui.menu.panels.backend_panel",
+	"ai.ui.menu.panels.trigger_panel",
+	"ai.ui.menu.panels.api_panel",
+	"ai.ui.menu.models.selector_page",
+	"ai.ui.menu.models.switcher",
+	"ai.engine.api.mlx",
+	"ai.ui.menu.startup_controller",
+	"ai.ui.menu.trigger_orchestrator",
+	"ai.ui.menu.layout",
+	"menu.engine.manifest_menu",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.ollama.deps_checker",
+	"ai.ui.menu.runtime_install_offer",
+	"ai.ui.menu.models.mlx_repair_offer",
+	"ai.engine.local_servers.mlx_bootstrap_diagnosis",
+	"ai.engine.api.backend_detector",
+	"core.events.timer_scheduler",
+	"ai.ui.menu.activation_pause_owner",
+	"diagnostics.adapters.event_provenance",
+	"platform.input.synthetic_input",
+	"platform.input.keycodes",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
+	"platform.input.key_state",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
-	"ui.menu.menu_llm",
-	"ui.menu.menu_llm.prediction_lock_registry",
-	"ui.menu.menu_llm.profile_label",
-	"infra.dialog_util",
-	"adapters.shell_runner",
-	"infra.deferred_work",
-	"ui.menu.menu_llm.local_server_panel",
-	"ui.menu.menu_llm.unreachable_backend_offer",
-	"modules.llm.local_servers",
-	"modules.llm.ollama_endpoint",
+	"ai.ui.menu",
+	"ai.ui.menu.prediction_lock_registry",
+	"ai.ui.menu.profile_label",
+	"core.ui.engine.dialog_util",
+	"core.process.adapters.shell_runner",
+	"core.timing.engine.deferred_work",
+	"ai.ui.menu.panels.local_server_panel",
+	"ai.ui.menu.unreachable_backend_offer",
+	"ai.engine.local_servers.local_servers",
+	"ai.engine.ollama.endpoint",
 }
 
--- The local OpenAI-compatible servers of _shared/modules/llm/local_servers.json
+-- The local OpenAI-compatible servers of _shared/ai/data/local_servers.json
 local LOCAL_SERVER_ORDER = { "omlx", "lmstudio", "llamacpp", "jan" }
 local LOCAL_SERVERS = {
 	omlx = { label = "oMLX", base_url = "http://localhost:8000/v1" },
@@ -80,7 +80,7 @@ local LOCAL_SERVERS = {
 
 local function build_fixture(backend, save_results, options)
 	-- Bind the real shared row policy before the fixture installs its menu port.
-	local native_renderer = require("infra.manifest_menu")
+	local native_renderer = require("menu.engine.manifest_menu")
 	options = options or {}
 	local noop = function() end
 	local calls = {
@@ -153,7 +153,7 @@ local function build_fixture(backend, save_results, options)
 		return strict_result(mode, "backend setter")
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop, info = noop, warn = noop, error = noop, done = noop,
 		start = noop, success = noop,
 		callback = function(_, _, callback, ...)
@@ -163,7 +163,7 @@ local function build_fixture(backend, save_results, options)
 	calls.runtime_notices = {}
 	calls.offers = 0
 	calls.notices = {}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, body, kind, on_click)
 			calls.notices[#calls.notices + 1] = { title = message, body = body, kind = kind, on_click = on_click }
 			if message == "notify.llm_enabled" or message == "notify.llm_disabled" then
@@ -179,7 +179,7 @@ local function build_fixture(backend, save_results, options)
 	-- The unreachable-backend error picks through options.offer_pick(dialog),
 	-- which returns the chosen index, or nil to keep the AI off.
 	calls.offer_dialogs = {}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
 			return options.ollama_offer_choice or "ollama.native_offer_keep"
@@ -194,15 +194,15 @@ local function build_fixture(backend, save_results, options)
 			return options.offer_pick(dialog)
 		end,
 	}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 		return key
 	end
 	-- format keeps its arguments visible: "key|arg1|arg2"
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = fixture_caption,
 		format = function(key, ...)
 			local parts = { key }
@@ -221,7 +221,7 @@ local function build_fixture(backend, save_results, options)
 		end
 		return { status = "up", base_url = LOCAL_SERVERS[id].base_url, models = models }
 	end
-	package.loaded["modules.llm.local_servers"] = {
+	package.loaded["ai.engine.local_servers.local_servers"] = {
 		ORDER = LOCAL_SERVER_ORDER,
 		SERVERS = LOCAL_SERVERS,
 		STATUS_UP = "up",
@@ -238,7 +238,7 @@ local function build_fixture(backend, save_results, options)
 	}
 	-- The engine menu's switch to a server: stores its entry, selects the API backend
 	calls.server_switches = {}
-	package.loaded["ui.menu.menu_llm.local_server_panel"] = {
+	package.loaded["ai.ui.menu.panels.local_server_panel"] = {
 		rows = function() return {} end,
 		set_agent_context = noop,
 		use_server = function(id, model, on_selected)
@@ -250,7 +250,7 @@ local function build_fixture(backend, save_results, options)
 		end,
 	}
 	package.loaded["ui.menu.shortcut_utils"] = {}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		api_remote = {
 			detect_local_servers = function(on_done)
 				calls.sweeps = calls.sweeps + 1
@@ -311,12 +311,12 @@ local function build_fixture(backend, save_results, options)
 			return true
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.models_manager"] = { new = function()
+	package.loaded["ai.ui.menu.models.manager"] = { new = function()
 		calls.models_constructed = (calls.models_constructed or 0) + 1
 		return models
 	end }
 	local genuine_profiles_new
-	package.loaded["ui.menu.menu_llm.profiles_manager"] = {
+	package.loaded["ai.ui.menu.profiles_manager"] = {
 		new = function(deps)
 			calls.profiles_constructed = (calls.profiles_constructed or 0) + 1
 			calls.profile_deps = deps
@@ -337,7 +337,7 @@ local function build_fixture(backend, save_results, options)
 			return manager
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.settings_manager"] = {
+	package.loaded["ai.ui.menu.settings_manager"] = {
 		new = function()
 			calls.settings_constructed = (calls.settings_constructed or 0) + 1
 			return {
@@ -357,34 +357,34 @@ local function build_fixture(backend, save_results, options)
 		end,
 	}
 	-- The genuine panel binds the fixture's callbacks after its manifest port exists.
-	package.loaded["ui.menu.menu_llm.temperature_panel"] = nil
-	package.loaded["ui.menu.menu_llm.streaming_panel"] = { build = function() return {} end }
-	package.loaded["ui.menu.menu_llm.warmup_controller"] = { warmup = noop }
-	package.loaded["ui.menu.menu_llm.backend_panel"] = {
+	package.loaded["ai.ui.menu.panels.temperature_panel"] = nil
+	package.loaded["ai.ui.menu.panels.streaming_panel"] = { build = function() return {} end }
+	package.loaded["ai.ui.menu.warmup_controller"] = { warmup = noop }
+	package.loaded["ai.ui.menu.panels.backend_panel"] = {
 		scope_idle = function() return true end,
 		is_apple_silicon = function() return false end,
 		build = function() return "backend", {} end,
 	}
-	package.loaded["ui.menu.menu_llm.trigger_panel"] = { build = function() return {} end }
-	package.loaded["ui.menu.menu_llm.api_panel"] = {
+	package.loaded["ai.ui.menu.panels.trigger_panel"] = { build = function() return {} end }
+	package.loaded["ai.ui.menu.panels.api_panel"] = {
 		build = function() return nil, nil end,
 		active_entry_caption_text = function() return nil end,
 	}
 	-- The menu binds the model selector page's context; the page builds no rows.
-	package.loaded["ui.menu.menu_llm.model_selector_page"] = {
+	package.loaded["ai.ui.menu.models.selector_page"] = {
 		bind = function(ctx) calls.model_selector_page_ctx = ctx end,
 		caption = function() return "model" end,
 		refresh = function() return false end,
 		open = function() return true end,
 		-- The page owner selects a server through the engine panel's selection.
 		use_local_server = function(id, model, on_selected)
-			return package.loaded["ui.menu.menu_llm.local_server_panel"].use_server(id, model, on_selected)
+			return package.loaded["ai.ui.menu.panels.local_server_panel"].use_server(id, model, on_selected)
 		end,
 	}
 	if options.real_switcher then
-		package.loaded["ui.menu.menu_llm.model_switcher"] = nil
+		package.loaded["ai.ui.menu.models.switcher"] = nil
 	else
-		package.loaded["ui.menu.menu_llm.model_switcher"] = {
+		package.loaded["ai.ui.menu.models.switcher"] = {
 			new = function(ctx)
 				calls.switchers_constructed = (calls.switchers_constructed or 0) + 1
 				calls.switcher_ctx = ctx
@@ -409,14 +409,14 @@ local function build_fixture(backend, save_results, options)
 			end,
 		}
 	end
-	package.loaded["modules.llm.api_mlx"] = {}
-	package.loaded["ui.menu.menu_llm.startup_controller"] = {
+	package.loaded["ai.engine.api.mlx"] = {}
+	package.loaded["ai.ui.menu.startup_controller"] = {
 		new = function(ctx)
 			calls.startup_ctx = ctx
 			return noop, function() return true end
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = {
+	package.loaded["ai.ui.menu.trigger_orchestrator"] = {
 		new = function()
 			return {
 				bind_hotkey = noop,
@@ -426,18 +426,18 @@ local function build_fixture(backend, save_results, options)
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.menu_layout"] = {
+	package.loaded["ai.ui.menu.layout"] = {
 		row_disabled = function() return false end,
 		title_health_dot = function() return nil end,
 	}
-	local presentation_renderer = assert(require("menu.renderer").new({
+	local presentation_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-		json_decode = require("adapters.json_codec").decode,
-		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
-		logger = package.loaded["infra.logger"],
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+		json_decode = require("core.fs.adapters.json_codec").decode,
+		i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
+		logger = package.loaded["core.logger.engine.logger"],
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		check_row = native_renderer.check_row,
 		group_row = presentation_renderer.group_row,
 		native_child_rows = native_renderer.native_child_rows,
@@ -457,9 +457,9 @@ local function build_fixture(backend, save_results, options)
 			return {}
 		end,
 	}
-	local profile_constructor = package.loaded["ui.menu.menu_llm.profiles_manager"]
-	local core = package.loaded["modules.llm"]
-	core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+	local profile_constructor = package.loaded["ai.ui.menu.profiles_manager"]
+	local core = package.loaded["ai.engine"]
+	core.BUILTIN_PROFILES = require("ai.engine.settings.profiles").BUILTIN_PROFILES
 	calls.profile_constructor_sync = {}
 	core.set_user_profiles = function()
 		calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "users"
@@ -469,9 +469,9 @@ local function build_fixture(backend, save_results, options)
 		calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "active"
 		return true
 	end
-	package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-	genuine_profiles_new = require("ui.menu.menu_llm.profiles_manager").new
-	package.loaded["ui.menu.menu_llm.profiles_manager"] = profile_constructor
+	package.loaded["ai.ui.menu.profiles_manager"] = nil
+	genuine_profiles_new = require("ai.ui.menu.profiles_manager").new
+	package.loaded["ai.ui.menu.profiles_manager"] = profile_constructor
 	-- The menu reaches the MLX runtime only through its selection entry.
 	local function mlx_selection_bootstrap(callback)
 		calls.bootstrap = calls.bootstrap + 1
@@ -491,7 +491,7 @@ local function build_fixture(backend, save_results, options)
 		if options.bootstrap_return ~= nil then return options.bootstrap_return end
 		return true
 	end
-	package.loaded["modules.llm.mlx_deps_checker"] = {
+	package.loaded["ai.engine.local_servers.mlx_deps_checker"] = {
 		install_for_selection = mlx_selection_bootstrap,
 		runtime_installed = function() return options.mlx_installed == true end,
 		-- A failed selection opens the repair offer with the checker's cause.
@@ -515,7 +515,7 @@ local function build_fixture(backend, save_results, options)
 		return receipt
 	end
 
-	package.loaded["modules.llm.ollama_deps_checker"] = {
+	package.loaded["ai.engine.ollama.deps_checker"] = {
 		-- An installed Ollama is reused, so enabling offers no download unless
 		-- a case sets ollama_installed = false.
 		provisioning_idle = function() return options.provisioning_debt ~= true end,
@@ -544,7 +544,7 @@ local function build_fixture(backend, save_results, options)
 			return receipt
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, callback)
 			local handle = { timer = {}, callback = callback, observers = {} }
 			calls.resume_timers[#calls.resume_timers + 1] = handle
@@ -571,16 +571,16 @@ local function build_fixture(backend, save_results, options)
 			return { timer = {}, callback = callback, observers = {} }, true
 		end,
 	}
-	package.loaded["ui.menu.menu_llm.activation_pause_owner"] = nil
+	package.loaded["ai.ui.menu.activation_pause_owner"] = nil
 
 	local script_control
 	if options.real_script_control then
 		local admission_fence = nil
-		package.loaded["adapters.event_provenance"] = {
+		package.loaded["diagnostics.adapters.event_provenance"] = {
 			mark = function() return true end,
 			is_synthetic = function() return false end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -594,7 +594,7 @@ local function build_fixture(backend, save_results, options)
 			end,
 			defer_after_callback = function(_, callback) return callback() end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -602,30 +602,30 @@ local function build_fixture(backend, save_results, options)
 			RETURN = 36,
 			ESCAPE = 53,
 		}
-		package.loaded["modules.gestures.engine"] = {}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {}
+		package.loaded["gestures.engine.actions"] = {
 			get_label = function(name) return name end,
 			execute_single = function() return true end,
 			SG_NAMES = {},
 			AX_NAMES = {},
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["modules.llm.api_mlx"] = {
+		package.loaded["ai.engine.api.mlx"] = {
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["modules.llm.warmup_controller"] = {
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["modules.llm.api_ollama"] = {
+		package.loaded["ai.engine.api.ollama"] = {
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
-		package.loaded["modules.llm.api_remote"] = {
+		package.loaded["ai.engine.api.remote"] = {
 			pause_warmup = function() return true end,
 			resume_warmup = function() return true end,
 		}
@@ -642,7 +642,7 @@ local function build_fixture(backend, save_results, options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = nil
@@ -658,8 +658,8 @@ local function build_fixture(backend, save_results, options)
 		}
 	end
 
-	package.loaded["modules.llm"].configuration_idle = function() return true end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["ai.engine"].configuration_idle = function() return true end
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			local active = false
 			local observers = {}
@@ -696,7 +696,7 @@ local function build_fixture(backend, save_results, options)
 			}
 		end,
 	}
-	local service = package.loaded["modules.llm.api_ollama"] or {}
+	local service = package.loaded["ai.engine.api.ollama"] or {}
 	service.startup_idle = function() return options.startup_debt ~= true end
 	service.ensure_running = function(context)
 		calls.service_repairs = calls.service_repairs + 1
@@ -709,17 +709,17 @@ local function build_fixture(backend, save_results, options)
 	end
 	-- Installing Ergopti's own Ollama first proves no Ollama request is in flight.
 	service.migration_idle = function() return options.migration_debt ~= true end
-	package.loaded["modules.llm.api_ollama"] = service
-	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = package.loaded["ui.menu.menu_llm.models_manager_ollama"]
+	package.loaded["ai.engine.api.ollama"] = service
+	package.loaded["ai.ui.menu.models.manager_ollama"] = package.loaded["ai.ui.menu.models.manager_ollama"]
 		or {}
-	package.loaded["ui.menu.menu_llm.models_manager_ollama"].migration_idle = function()
+	package.loaded["ai.ui.menu.models.manager_ollama"].migration_idle = function()
 		return options.migration_debt ~= true
 	end
 
-	package.loaded["ui.menu.menu_llm.runtime_install_offer"] = nil
-	calls.temperature_builder = require("ui.menu.menu_llm.temperature_panel").build
-	package.loaded["ui.menu.menu_llm"] = nil
-	MenuLLM = require("ui.menu.menu_llm")
+	package.loaded["ai.ui.menu.runtime_install_offer"] = nil
+	calls.temperature_builder = require("ai.ui.menu.panels.temperature_panel").build
+	package.loaded["ai.ui.menu"] = nil
+	MenuLLM = require("ai.ui.menu")
 	deps = {
 		state = state,
 		keymap = {

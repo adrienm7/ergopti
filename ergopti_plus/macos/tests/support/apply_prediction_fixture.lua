@@ -20,8 +20,7 @@ local function noop() end
 local function purge_driver_modules()
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:find("^modules%.") or name:find("^adapters%.")
-				or name:find("^infra%.") or name:find("^ui%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -54,6 +53,7 @@ function M.run(options)
 	local clipboard_value = "original"
 	local clipboard_restores = 0
 	hs_stub.pasteboard.getContents = function() return clipboard_value end
+	hs_stub.pasteboard.allContentTypes = function() return { { "text" } } end
 	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
 		clipboard_generation = clipboard_generation + 1
@@ -111,8 +111,8 @@ function M.run(options)
 
 	local logger = helpers.make_logger_stub()
 	logger.LEVELS = { DEBUG = 10 }
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.05 end,
 		ms = function() return options.pace_ms or 20 end,
 	}
@@ -167,10 +167,11 @@ function M.run(options)
 		stop_timer = function() return true end,
 		perform_check = noop,
 		handle_chain_signal = function() return false end,
+		has_pending_work    = function() return false end,
 		navigate = noop,
 	}
-	package.loaded["modules.llm.prediction_engine"] = engine
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine.prediction.engine"] = engine
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = {
 			llm_after_hotstring = false,
 			llm_reset_on_nav = false,
@@ -179,12 +180,13 @@ function M.run(options)
 	}
 
 	local tooltip_accept_callback = nil
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		hide = noop,
 		show_stacked = noop,
 		set_timeout = noop,
 		is_visible = function() return false end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 		set_colorization_enabled = noop,
 		set_accent_color = noop,
 		set_accept_callback = function(callback) tooltip_accept_callback = callback end,
@@ -192,35 +194,35 @@ function M.run(options)
 		set_on_show_callback = noop,
 		set_runtime_guard = noop,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = noop }
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
+	package.loaded["hotstrings.engine.expander.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {}
-	package.loaded["modules.keymap.terminator_replay"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {}
+	package.loaded["hotstrings.engine.expander.terminator_replay"] = {
 		init = function() return true end,
 		flush_now = noop,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.trigger_char" then return "\u{2605}" end
 			return false
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 		to_name = function() return "f16" end,
 	}
 
-	local synthetic = require("adapters.synthetic_input")
-	local km_utils = require("modules.keymap.utils")
+	local synthetic = require("platform.input.synthetic_input")
+	local km_utils = require("hotstrings.engine.expander.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
-		local text_sender = require("adapters.text_sender")
+		local text_sender = require("platform.input.text_sender")
 		text_sender.terminalInputTarget = function() return terminal_target end
 	end
 	-- Keep the fixture about dispatch, not overlap policy.
@@ -235,18 +237,18 @@ function M.run(options)
 	local expander
 	if options.expander then
 		expander = options.expander
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
 		}
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	else
-		expander = require("modules.keymap.expander")
+		expander = require("hotstrings.engine.expander.expander")
 	end
 
-	local bridge = require("modules.keymap.llm_bridge")
+	local bridge = require("ai.engine.bridge")
 	local suppress_count = 0
 	local state = {
 		buffer = options.buffer or "prefix ",
@@ -263,12 +265,16 @@ function M.run(options)
 			suppress_count = suppress_count + 1
 		end,
 	}
+	local context = (options.llm_private_mark or "") .. (options.llm_buffer or options.buffer or "prefix ")
+	-- Malformed hotstring buffers exercise rejection independently of AI state.
+	if not utf8.len(context) then context = "" end
+	require("ai.engine.api.context").seed(state, context, options.llm_private_mark or "")
 	bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
 	})
 	if not options.expander_failure and not options.expander then
-		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
+		expander.init(state, package.loaded["hotstrings.engine.expander.registry"], bridge)
 	end
 
 	local buffer_before = state.buffer
@@ -303,8 +309,8 @@ function M.run(options)
 		end
 	end
 
-	package.loaded["adapters.event_provenance"] = nil
-	local provenance = require("adapters.event_provenance")
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	local provenance = require("diagnostics.adapters.event_provenance")
 	local function fire_next_timer()
 		local selected = nil
 		for _, timer in ipairs(hs_stub.timer.__timers) do

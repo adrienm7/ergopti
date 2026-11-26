@@ -1,8 +1,8 @@
 {
-	"_comment": "Output token limit of one backend call, replayed through _shared/lua/llm/request_plan/token_budget.lua by the macOS and Linux runners. A call returning one prediction keeps the base budget; a batch call returning per_call predictions gets per_call * (base + 5), the five being a variant's numbering and separator. Linux used per_call * base (no overhead) before this corpus: a deliberate convergence to the macOS and Windows rule, so a batch of three is no longer cut short on Linux. retry adds the retry policy's extra tokens. expect_error is a substring of the message the plan must raise.",
+	"_comment": "Output token limit of one backend call, replayed through _shared/ai/engine/request_plan/token_budget.lua by the macOS and Linux runners. A call returning one prediction keeps the base budget; a batch call returning per_call predictions gets per_call * (base + 5), the five being a variant's numbering and separator. Linux used per_call * base (no overhead) before this corpus: a deliberate convergence to the macOS and Windows rule, so a batch of three is no longer cut short on Linux. retry adds the retry policy's extra tokens. expect_error is a substring of the message the plan must raise.",
 	"drivers": {
-		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
-		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"macos": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
 		"windows": "Replays every vector through prediction_exec.ahk (tests/meta/corpus/test_corpus_llm_small_families.ahk)."
 	},
 	"differences": {

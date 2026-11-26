@@ -1,0 +1,145 @@
+# _shared/core/logger/data/log_export.toml
+#
+# ==============================================================================
+# SCHEMA: Log Export Archive
+# DESCRIPTION:
+# What « Export the logs (zip) » in the Debug menu puts in its one archive, on
+# every driver (maintainer decision, 2026-11-25: testers had to send dozens of
+# log files). tools/codegen/codegen-log-export.cjs emits this file for the
+# shared Lua tree (macOS and Linux) and for AutoHotkey; no driver parses it at
+# runtime.
+#
+# WHAT THE ARCHIVE HOLDS (file names from app_dirs.toml):
+#   - the daily unified logs and errors mirrors of the last `days` calendar
+#     days, today included;
+#   - the files written where the logger cannot write: bootstrap.log and, on
+#     macOS, the native launcher's launcher.log, fatal report and reload
+#     breadcrumb, all read from the DEFAULT logs folder;
+#   - every *.json crash report of <logs>/crash_reports/.
+# Nothing else in the folder is ever read: a user file or a retired topical
+# file never enters the archive.
+#
+# PRIVACY:
+# Every entry is copied through the [scrub] rules below before it is archived,
+# the runtime port of tools/dev/field-log-scrub.py: the user's typed text
+# (expansions, prompts, model text, selections, typed characters) never leaves
+# the machine. Each rule finds `marker` in a line (a plain substring), then
+# `cut` from the end of the marker ("" cuts right after it), keeps the line up
+# to the end of the cut and appends `withheld`. A rewritten line withholds the
+# continuation lines of its record too (a line that does not start with a
+# timestamp or a "=====" banner), because a multi-line body has no timestamp
+# of its own. Unlike the field report, a bundled trigger is withheld as well:
+# the runtime has no list of public triggers, and withholding more is safe.
+# tools/test/test-log-export-contract.cjs checks every vector of
+# _shared/tests/corpus/logger/log_export_vectors.json against both this port
+# and field-log-scrub.py.
+# ==============================================================================
+
+# ===============================
+# ===============================
+# ======= 1/ Archive ============
+# ===============================
+# ===============================
+
+[archive]
+# Calendar days of daily logs and errors mirrors, today included.
+days = 3
+# <name_prefix>YYYY-MM-DD_HH-MM-SS<extension>, in the user's Downloads folder
+# (Desktop when there is none).
+name_prefix = "Ergopti-logs_"
+extension = ".zip"
+# Crash reports are the files of <logs>/<crash_reports_dir> with this extension.
+crash_report_extension = ".json"
+
+# ===============================
+# ===============================
+# ======= 2/ Scrub rules ========
+# ===============================
+# ===============================
+
+[scrub]
+withheld = "<text withheld>"
+
+# Every expansion, with its trigger: both sides are what the user typed.
+[[scrub.rules]]
+marker = "Auto-expand: "
+cut = ""
+
+[[scrub.rules]]
+marker = "Terminator-expand: "
+cut = ""
+
+# Windows names the fired trigger alone.
+[[scrub.rules]]
+marker = "KL_LogHotstring: trigger="
+cut = ""
+
+[[scrub.rules]]
+marker = "Fire-log drain failed for trigger "
+cut = ""
+
+# AI prompts (STREAM_PROMPT included) and streamed chunks keep their size.
+[[scrub.rules]]
+marker = "PROMPT ("
+cut = " -> "
+
+[[scrub.rules]]
+marker = "STREAM chunk ("
+cut = "): "
+
+# Windows: the typed character, the first tooltip row, the model's text.
+[[scrub.rules]]
+marker = "KEEP: keystroke "
+cut = ""
+
+[[scrub.rules]]
+marker = "DISMISS: keystroke "
+cut = ""
+
+[[scrub.rules]]
+marker = "OnChar error for char "
+cut = ""
+
+[[scrub.rules]]
+marker = "UIA wrap error for char "
+cut = ""
+
+[[scrub.rules]]
+marker = "DBG calling TooltipShow: "
+cut = "first="
+
+[[scrub.rules]]
+marker = "Raw ("
+cut = "c): "
+
+# The selection a shortcut acted on: a path, a URL or any selected text.
+[[scrub.rules]]
+marker = "Opening the selected "
+cut = " "
+
+[[scrub.rules]]
+marker = "Handed the selected "
+cut = " "
+
+[[scrub.rules]]
+marker = "Registry navigation to "
+cut = ""
+
+# Linux: every expansion's replacement, the refused replacement, the symbol.
+[[scrub.rules]]
+marker = "inject(): bc="
+cut = "text="
+
+[[scrub.rules]]
+marker = "Cannot deliver '"
+cut = ""
+
+[[scrub.rules]]
+marker = "selection window opened — typing "
+cut = ""
+
+# Every driver quotes model and payload text in guillemets, and no other log
+# line uses them.
+[[scrub.rules]]
+marker = "«"
+cut = ""

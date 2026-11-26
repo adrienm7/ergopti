@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the tone ladder behind the more formal / more familiar actions: the next register, which text a step rewrites, and how the answer is read. Replayed by the shared Lua module (_shared/lua/llm/tone.lua, macOS and Linux) and its AutoHotkey port.",
+	"description": "Golden vectors for the tone ladder behind the more formal / more familiar actions: the next register, which text a step rewrites, and how the answer is read. Replayed by the shared Lua module (_shared/ai/engine/prediction/tone.lua, macOS and Linux) and its AutoHotkey port.",
 	"rule": "Ladder: 1 tone_familiar, 2 tone_neutral, 3 tone_formal, 4 tone_very_formal. A step moves by +1 (more formal) or -1 (more familiar); past an end it stops (nil) unless cycling, which wraps to the opposite end. A selection equal to the remembered output resumes from the remembered source and level; any other non-blank selection starts from itself at level 2. extract reads the first line after a case-insensitive REWRITE:, drops ** and a quote pair wrapping the whole answer, and trims; nothing left is nil. A step vector without expected stops; an extract vector without expected reads nothing.",
 	"step_vectors": [
 		{

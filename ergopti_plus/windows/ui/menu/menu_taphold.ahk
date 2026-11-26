@@ -5,13 +5,15 @@
 ; DESCRIPTION:
 ; Builds the Tap-Hold category: per-key tap and hold pickers, reset/disable-all actions and the closure factory classes that bind a key id to a menu callback.
 ;
-; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
+; Split out of menu/ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\core\text\engine\number.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 
 
@@ -54,6 +56,7 @@ _BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
 		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
+		"tap_hold_one_shot_delay", (*) => _TH_OneShotDelayRows(),
 		"tap_hold_lone_tap", (*) => _TH_LoneTapRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
@@ -68,6 +71,75 @@ _TH_GlobalDelayRows() {
 	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
 	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
 	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
+}
+
+; The one-shot Shift timeout row (tap_holds.sticky_timeout_ms, macOS's sticky
+; delay): the label carries the value in force; the click asks for a new one.
+; @returns {Array} One row.
+_TH_OneShotDelayRows() {
+	CurrentMs := TapHoldOneShotTimeoutMs()
+	Label := StrReplace(t("menu.tapholds.sticky_title"), "%s",
+		CurrentMs == 0 ? t("menu.tapholds.sticky_no_limit") : CurrentMs . " ms")
+	return [Map("label", Label, "action", (*) => _TH_PromptOneShotDelay())]
+}
+
+/**
+ * Asks for the one-shot Shift timeout in milliseconds, then commits it.
+ * @param {Func} PromptFn Replaces the input box in tests.
+ * @param {String} Path The config.toml to write; ConfigurationFile by default.
+ * @param {Func} ReloadFn Replaces the reload in tests.
+ * @returns {Boolean} False when nothing was committed.
+ */
+_TH_PromptOneShotDelay(PromptFn := 0, Path := "", ReloadFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_PromptOneShotDelay(PromptFn, Path, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	CurrentMs := TapHoldOneShotTimeoutMs()
+	Prompt := t("menu.tapholds.sticky_dialog_prompt")
+	Title := t("menu.tapholds.sticky_dialog_title")
+	try {
+		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
+			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
+		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
+			return false
+		; The shared value check names the accepted range in its refusal.
+		; A blank answer resets the setting to its default (PCK-13).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Answer.Value,
+			ManifestDefaultFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS))
+		if !Typed["ok"] {
+			ValueCheckShowRefusal(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS, Typed, Answer.Value)
+			return false
+		}
+		Ms := Typed["value"]
+	} catch as Err {
+		try LoggerError("TapHoldMenu", "The one-shot Shift timeout prompt was refused: {1}.", Err.Message)
+		return false
+	}
+	return _TH_CommitOneShotTimeoutMs(Ms, Path, ReloadFn)
+}
+
+; Persists the one-shot Shift timeout, then reloads. The registry default is
+; written as an absent leaf, as macOS does.
+; @param Ms {Integer} 0 (no time limit) or a positive whole number of milliseconds.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Boolean} False when nothing was committed.
+_TH_CommitOneShotTimeoutMs(Ms, Path := "", ReloadFn := 0) {
+	global ConfigurationFile
+	try TapHoldValidOneShotTimeoutMs(Ms)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The one-shot Shift timeout is refused: {1}.", Err.Message)
+		return false
+	}
+	IsDefault := Ms == TimingsGet("tap_hold", "one_shot_shift_timeout_ms")
+	Rows := [ManifestConfigRow(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS, Ms, IsDefault)]
+	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the one-shot Shift timeout")
+		return false
+	try LoggerInfo("TapHoldMenu", "One-shot Shift timeout set to {1} ms (pid={2}).", Ms, DriverPid)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
 ; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
@@ -560,18 +632,21 @@ _TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		Raw := Trim(Answer.Value, " `t")
-		if !IsNumber(Raw)
+		; The shared value schema owns the accepted range and its refusal text.
+		; A blank answer resets the global delay to its default (PCK-13).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.time_activation_seconds"), Answer.Value,
+			TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+		if !Typed["ok"] {
+			ValueCheckShowRefusal("tap_hold.time_activation_seconds", Typed, Answer.Value)
 			return false
-		Ms := Round(Raw + 0)
-		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
-			return false
+		}
+		Seconds := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The global delay prompt was refused: {1}.", Err.Message)
 		return false
 	}
-	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Ms / 1000)
-		: WriteTapHoldGlobalDuration(Ms / 1000)
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Seconds)
+		: WriteTapHoldGlobalDuration(Seconds)
 	catch as Err {
 		try LoggerError("TapHoldMenu", "The global delay could not be saved: {1}.", Err.Message)
 		return false
@@ -627,15 +702,15 @@ _TH_ResetKeyDelay(KeyId, SetterFn := 0, ReloadFn := 0) {
  * @param {String} KeyId Shared physical-key identifier.
  * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
  */
-_TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+_TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0, ResetFn := 0) {
 	global TapHold
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _TH_PromptKeyDelay(KeyId, PromptFn, SetterFn, ReloadFn)
+		try return _TH_PromptKeyDelay(KeyId, PromptFn, SetterFn, ReloadFn, ResetFn)
 		finally Critical(InheritedCritical)
 	}
-	for Adapter in [PromptFn, SetterFn, ReloadFn] {
+	for Adapter in [PromptFn, SetterFn, ReloadFn, ResetFn] {
 		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
 			return false
 	}
@@ -656,22 +731,27 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 	if !_TH_DurationSourceMatches(SourceWitness, StartPath)
 		return false
 	CurrentMs := Round(TapHoldDuration(MasterGateDesiredTapHold(StartState), KeyId) * 1000)
-	Prompt := StrReplace(t("menu.tapholds.key_tap_delay_dialog_prompt_current"), "%d", CurrentMs)
+	; The hint names the global delay a blank answer goes back to.
+	Prompt := StrReplace(t("menu.tapholds.key_tap_delay_dialog_prompt"), "%d",
+		Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(StartState)) * 1000))
 	Title := t("menu.tapholds.key_tap_delay_dialog_title")
 	try {
 		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
 			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
 		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
 			return false
-		Raw := Trim(Answer.Value, " `t")
-		if !IsNumber(Raw)
+		; The shared value schema owns the accepted range and its refusal text. A
+		; blank answer removes the key's own delay, so the global delay applies
+		; again (maintainer decision of 22 November 2026, PCK-13 for overrides).
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor("tap_hold.keys.*.time_activation_seconds"), Answer.Value,
+			ValueCheckInherit())
+		if !Typed["ok"] {
+			ValueCheckShowRefusal("tap_hold.keys.*.time_activation_seconds", Typed, Answer.Value)
 			return false
-		Ms := Raw + 0
-		if !_TH_DurationValueValid(Ms / 1000)
-			return false
-		Ms := Round(Ms)
-		if Ms <= 0
-			return false
+		}
+		if Typed.Has("inherit")
+			return _TH_ResetKeyDelay(KeyId, ResetFn, ReloadFn)
+		Seconds := Typed["value"]
 	} catch as Err {
 		try LoggerError("TapHoldMenu", "The per-key delay prompt was refused: {1}.", Err.Message)
 		return false
@@ -680,8 +760,8 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		try LoggerWarn("TapHoldMenu", "The per-key delay source changed while its prompt was open.")
 		return false
 	}
-	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId, Ms / 1000, SourceWitness)
-		: WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId, Seconds, SourceWitness)
+		: WriteTapHoldDuration(KeyId, Seconds, 0, 0, 0, 0, SourceWitness)
 	catch as Err {
 		try LoggerError("TapHoldMenu", "The per-key delay could not be saved: {1}.", Err.Message)
 		return false
@@ -690,7 +770,7 @@ _TH_PromptKeyDelay(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 		return false
 	; A persistence callback cannot acknowledge a different key or parent and
 	; then send Reload to that successor configuration.
-	if !_TH_DurationReceiptMatches(SourceWitness, _TH_TapHoldConfigPath(), KeyId, Ms / 1000)
+	if !_TH_DurationReceiptMatches(SourceWitness, _TH_TapHoldConfigPath(), KeyId, Seconds)
 		return false
 	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("delay_set", KeyId)
 		: _TH_ReloadTapHoldMenu("delay_set", KeyId)
@@ -766,5 +846,5 @@ _TH_ScopeCommands(Options := unset) {
 		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
 		MenuCommand.SCOPE_RESTORE, (*) => TapHoldScopeApply("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => TapHoldScopeApply("clear", OwnedOptions),
-		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
+		MenuCommand.EDIT_NAV_LAYER, LayoutEditorWindow_OpenOnNav)
 }

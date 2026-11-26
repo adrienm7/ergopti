@@ -23,14 +23,16 @@
 	--accent-text: var(--theme-dialog-accent-text);
 	--ok: var(--theme-dialog-ok);
 	--fail: var(--theme-dialog-fail);
-	--pending: var(--theme-hue-9a6700);
+	/* 10:1 on the white page: the former #9a6700 read 4.87:1, below the 7:1 of AAA. */
+	--pending: var(--theme-hue-5c3800);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
 		--label: var(--theme-grey-b0b0b0);
 		--code: var(--theme-grey-2d2d2d);
-		--pending: var(--theme-hue-d29922);
+		/* 9:1 on the dark page: the former #d29922 read 6.53:1. */
+		--pending: var(--theme-hue-f0c040);
 	}
 }
 
@@ -65,11 +67,15 @@ body {
 	padding: 10px 16px 6px;
 }
 
+/* A menu: the toolbar's list of command groups, drawn as its grid. */
 .toolbar .buttons {
 	background: var(--panel);
 	display: grid;
 	gap: 6px;
 	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	list-style: none;
+	margin: 0;
+	padding: 0;
 	position: sticky;
 	top: 0;
 	z-index: 1;
@@ -154,11 +160,21 @@ button.primary {
 	color: var(--accent-text);
 }
 
+/* A checkbox and its label, side by side as one inline line. */
 .toolbar .details {
 	align-items: center;
 	display: inline-flex;
 	gap: 6px;
-	margin-top: 8px;
+	margin: 8px 0 0;
+}
+
+/* The day log's checkbox, alone on its line: the browser's 13 px box is
+   below the 24 px target WCAG 2.5.8 asks for. */
+#chk-day-log {
+	block-size: 24px;
+	inline-size: 24px;
+	margin: 0 6px 0 0;
+	vertical-align: middle;
 }
 
 .status {
@@ -218,7 +234,7 @@ th,
 td {
 	border: 1px solid var(--border);
 	padding: 0.3em 0.65em;
-	text-align: left;
+	text-align: start;
 	vertical-align: top;
 }
 
@@ -235,13 +251,13 @@ table.items thead th {
 
 .row-action {
 	font-size: 0.9em;
-	margin-left: 6px;
+	margin-inline-start: 6px;
 	padding: 1px 8px;
 }
 
 .fix {
 	color: var(--muted);
-	margin-top: 4px;
+	margin: 4px 0 0;
 }
 
 ul.problems {
@@ -251,6 +267,11 @@ ul.problems {
 
 ul.problems li {
 	margin: 0.3em 0;
+}
+
+/* The problem's text takes the failure colour, its bullet the text's. */
+ul.problems li::marker {
+	color: var(--text);
 }
 
 pre {

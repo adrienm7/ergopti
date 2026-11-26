@@ -16,15 +16,15 @@ local function with_window(scenario)
 	local records = { bridges = {}, views = {}, deletes = 0, releases = 0 }
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.download_window", "ui.download_window.javascript",
-			"ui.download_window.pending_queue", "ui.ui_builder", "infra.logger", "infra.paths", "infra.timings",
-			"infra.i18n", "infra.deferred_work", "adapters.shell_runner",
-			"adapters.timer_scheduler", "error_description", "number_policy" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = { shared = function() return "/virtual/assets" end }
+			"ui.download_window.pending_queue", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
+			"core.i18n.engine.i18n", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner",
+			"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/assets" end }
 			helpers.provide_timings()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
-			package.loaded["adapters.shell_runner"] = {}
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+			package.loaded["core.process.adapters.shell_runner"] = {}
 			_G.hs = {
 				timer = { secondsSinceEpoch = function() return 1 end,
 					absoluteTime = function() return 1000000000 end },
@@ -46,7 +46,7 @@ local function with_window(scenario)
 					return bridge
 				end } },
 			}
-			package.loaded["ui.ui_builder"] = {
+			package.loaded["core.ui.ui.builder"] = {
 				get_app_geometry = function() return { width = 460, height = 380 } end,
 				show_webview = function(options)
 					local view = { options = options, deleted = false }

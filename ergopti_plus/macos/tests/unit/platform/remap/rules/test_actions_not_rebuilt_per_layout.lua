@@ -39,8 +39,8 @@ local ACTIONS_FILE = "/fake/actions.json"
 --- @return table Config, function read_count
 local function load_config()
 	package.loaded["platform.remap.config"] = nil
-	package.loaded["infra.logger"] = nil
-	_ = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	_ = helpers.load_with_stubs("core.logger.engine.logger")
 
 	local reads = { n = 0 }
 	local real_open = io.open
@@ -128,6 +128,20 @@ helpers.describe("karabiner actions: a layout change re-resolves, not rebuilds",
 		helpers.assert_eq(n, 1, "only the logical_char action is layout-dependent")
 		helpers.assert_type(list[1].karabiner_to, "table",
 			"and it must have been given a physical key code")
+	end)
+
+	-- Field report 2026-11-03: karabiner.layout_actions cost 230 ms cold, native
+	-- work; the next report must say whether the registry snapshot or the
+	-- keycode lookups hold it.
+	helpers.it("times the registry snapshot and the keycode lookups apart", function()
+		local Config = load_config()
+		local Phases = require("infra.phase_stats")
+		Phases.reset()
+		Config.resolve_layout_actions({ { id = "x", logical_char = "e" } })
+		for _, name in ipairs({ "karabiner.layout_actions.keyboard_form", "karabiner.layout_actions.key_codes" }) do
+			local figures = Phases.figures(name)
+			helpers.assert_eq(figures and figures.n, 1, name .. " is recorded once per resolution")
+		end
 	end)
 
 	helpers.it("rejects a non-table without raising", function()

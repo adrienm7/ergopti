@@ -42,15 +42,37 @@
 ; CapsWord is armed as ToggleCapsWord arms it, with the given checked
 ; delimiters (the manifest defaults unless named): the dispatcher asks the
 ; auto-off settings whether the tap's key ends it.
-_CTU_DispatchWith(KeyId, Terminators := unset) {
+_CTU_DispatchWith(KeyId, Terminators := unset, TapAction := "") {
 	global CapsWordEnabled, TapHold
 	_CWAO_ArmWith(IsSet(Terminators) ? Terminators : ManifestDefaultFor("shortcuts.caps_word.terminators"))
 	Ran := false
+	SavedTapHold := TapHold
+	if (TapAction != "")
+		TapHold := Map("keys", Map(KeyId, Map("time_activation_seconds", 0.2,
+			"tap_action", TapAction)), "layers", Map())
 	try {
 		TapHoldDispatchTap(KeyId, (*) => (Ran := true))
 		StillLatched := CapsWordEnabled
-	} finally _CWAO_Reset()
+	} finally {
+		TapHold := SavedTapHold
+		_CWAO_Reset()
+	}
 	return { Ran: Ran, StillLatched: StillLatched }
+}
+
+; The delimiter is the key the tap types, not the physical key it came from
+; (CWW-001): Tab typed as Backspace is no Tab, CapsLock typed as Enter is one.
+_CTU_TapJudgesTheEmittedKey() {
+	R := _CTU_DispatchWith("tab", ["tab"], "backspace")
+	Assert(R.Ran, "the tap must still run")
+	Assert(R.StillLatched, "a Tab that types Backspace must keep CapsWord even with only Tab checked")
+	R := _CTU_DispatchWith("caps_lock", ["enter"], "enter")
+	Assert(R.Ran, "the tap must still run")
+	Assert(!R.StillLatched, "a CapsLock that types Enter must end CapsWord when only Enter is checked")
+	R := _CTU_DispatchWith("space", ["space"], "enter")
+	Assert(R.StillLatched, "a Space that types Enter must keep CapsWord when only Space is checked")
+	R := _CTU_DispatchWith("caps_lock", ["enter"], "paste")
+	Assert(R.StillLatched, "a command tap types no delimiter")
 }
 
 ; Unchecked, Space no longer ends CapsWord from its tap either; a checked Tab
@@ -138,6 +160,8 @@ Test("capsword-taphold-unlatch: a tap-hold Enter ends CapsWord",
 	_CTU_EnterTapUnlatchesCapsWord)
 Test("capsword-taphold-unlatch: a non-terminator tap leaves CapsWord latched",
 	_CTU_NonTerminatorTapKeepsCapsWord)
+Test("capsword-taphold-unlatch: a tap is judged by the key it types",
+	_CTU_TapJudgesTheEmittedKey)
 Test("capsword-taphold-unlatch: a tap follows the checked CapsWord delimiters",
 	_CTU_TapFollowsTheCheckedDelimiters)
 Test("capsword-taphold-unlatch: tap_holds is still included after shortcuts",

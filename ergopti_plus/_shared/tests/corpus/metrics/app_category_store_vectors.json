@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the app category store (_shared/lua/keystats/app_category_store.lua): the versioned document macOS and Linux share, the previous macOS flat layout it upgrades, the documents it refuses, and the edits applied to a model.",
+	"description": "Golden vectors for the app category store (_shared/metrics/engine/apps/category_store.lua): the versioned document macOS and Linux share, the previous macOS flat layout it upgrades, the documents it refuses, and the edits applied to a model.",
 	"rule": "A document is refused whole when it is not a JSON object, names another schema version, or holds an entry whose category is blank or whose score is not a number in [-2, 2]; a refused document is never read as empty. A flat map of { type, score } records (no schema member) is read as legacy. Editing sets the category and score of one application; renaming changes every application holding the old category; importing adds only the applications the model does not already hold.",
 	"decode": [
 		{

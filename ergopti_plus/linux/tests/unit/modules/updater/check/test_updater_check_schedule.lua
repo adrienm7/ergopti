@@ -27,11 +27,11 @@ local T0 = 1700000000
 --- says otherwise: the suite itself runs from a checkout, which checks for
 --- nothing on its own.
 local function with_manager(opts, body)
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local previous = {}
-	for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+	for _, name in ipairs({ "core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager" }) do
 		previous[name] = package.loaded[name]
 	end
 	local ctx = { timers = {}, dispatches = {}, clock = { now = opts.now }, available = {} }
@@ -46,16 +46,26 @@ local function with_manager(opts, body)
 		return true
 	end
 	ctx.timer = timer
-	package.loaded["adapters.timer_scheduler"] = timer
+	package.loaded["core.events.timer_scheduler"] = timer
 	local initial = {}
 	ctx.state_key = nil
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.updater.manager"] = nil
 	local probe = require("modules.updater.manager")
 	ctx.state_key = probe.CHECK_STATE_KEY
 	if opts.record then initial[ctx.state_key] = opts.record end
 	ctx.storage = Fakes.storage({ initial = initial })
-	package.loaded["adapters.storage"] = ctx.storage
+	ctx.record_read_error = opts.record_read_error == true
+	local original_get = ctx.storage.get
+	ctx.storage.get = function(key, default)
+		if key == ctx.state_key and ctx.record_read_error then return default end
+		return original_get(key, default)
+	end
+	ctx.storage.read_exact = function(key)
+		if key == ctx.state_key and ctx.record_read_error then return false, nil end
+		return true, ctx.storage.get(key, nil)
+	end
+	package.loaded["core.fs.adapters.storage"] = ctx.storage
 	package.loaded["modules.updater.manager"] = nil
 	ctx.M = require("modules.updater.manager")
 	for name, value in pairs(previous) do package.loaded[name] = value end
@@ -112,6 +122,28 @@ local function record(ctx)
 end
 
 helpers.describe("updater (linux): the check schedule follows the persisted record", function()
+	helpers.it("retains the persisted record after an unavailable read", function()
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v1.2.3" }
+		with_manager({ now = T0, record = original, record_read_error = true }, function(ctx)
+			helpers.assert_eq(ctx.storage.values[ctx.state_key], original)
+			helpers.assert_eq(#ctx.dispatches, 0)
+			ctx.record_read_error = false
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.reevaluate_sec
+			fire(ctx)
+			helpers.assert_eq(record(ctx), original)
+			helpers.assert_eq(#ctx.dispatches, 0)
+		end)
+	end)
+	helpers.it("clock rollback behind startup restarts the boot delay", function()
+		with_manager({ now = T0, record = { seed = SEED } }, function(ctx)
+			ctx.clock.now = T0 - 86400
+			fire(ctx)
+			helpers.assert_eq(last_timer(ctx).delay, ctx.M.TIMING.boot_check_delay_sec)
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.dispatches, 1)
+		end)
+	end)
 	-- A local version run from source has no installation to update. It used
 	-- to check on the schedule all the same, and announce releases it could
 	-- not install; the tray now greys its update rows and nothing is armed.
@@ -131,6 +163,23 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		with_manager({ now = T0, install_kind = "package" }, function(ctx)
 			helpers.assert_eq(#ctx.timers, 0, "no check is scheduled for a package installation")
 			helpers.assert_eq(#ctx.dispatches, 0, "and none is dispatched")
+		end)
+	end)
+
+	-- An AppImage has no manager that announces a release: with no check at all,
+	-- a dev-channel AppImage user never learned of a new version. Its checks run
+	-- and announce (installing it stays refused; install_origin).
+	helpers.it("(appimage-update-announced) an AppImage arms its checks and announces a new release", function()
+		with_manager({ now = T0, install_kind = "appimage", record = { seed = SEED } }, function(ctx)
+			helpers.assert_true(#ctx.timers > 0, "an AppImage schedules its check")
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.dispatches, 1, "the due check is dispatched")
+			ctx.dispatches[1](true, { tag = "v1.4.0" }, nil)
+			helpers.assert_eq(ctx.available, { "v1.4.0" }, "the new release is announced")
+		end)
+		with_manager({ now = T0, install_kind = "flatpak" }, function(ctx)
+			helpers.assert_eq(#ctx.timers, 0, "a Flatpak is still announced by its own manager")
 		end)
 	end)
 
@@ -234,6 +283,21 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 	end)
 
+	-- A failed check hands back the release a manual check already found; it
+	-- was announced, the log reading « failure » then « New release ». Windows
+	-- records the failure and shows nothing until a successful check (UPL-001,
+	-- failed-check-no-announcement).
+	helpers.it("a failed check announces nothing, even with a release known (failed-check-no-announcement)", function()
+		with_manager({ now = T0, record = { seed = SEED, last_check_at = T0 - 2 * 86400 } }, function(ctx)
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			ctx.dispatches[1](true, { tag = "v1.4.0" }, "offline")
+			helpers.assert_eq(#ctx.available, 0, "no notification from a failed check")
+			helpers.assert_eq(record(ctx).failures, 1, "the failure is counted")
+			helpers.assert_nil(record(ctx).last_notified_tag, "and the release stays to announce")
+		end)
+	end)
+
 	helpers.it("a release is announced once, across restarts", function()
 		local previous = { seed = SEED, last_check_at = T0 - 2 * 86400, last_notified_tag = "v1.3.0" }
 		with_manager({ now = T0, record = previous }, function(ctx)
@@ -253,12 +317,39 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 	end)
 
+	helpers.it("uses the default for an infinite saved interval", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = inf\n" }, function(ctx)
+			helpers.assert_eq(ctx.M.get_check_interval(), ctx.M.TIMING.default_check_interval_sec)
+		end)
+	end)
+
+	-- Past the shared value schema's maximum the default applies (value-validation);
+	-- up to it, a long interval still snaps to the longest preset.
+	helpers.it("uses the default for an enormous finite interval without raising", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 1e100\n" }, function(ctx)
+			helpers.assert_eq(ctx.M.get_check_interval(), ctx.M.TIMING.default_check_interval_sec)
+		end)
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 2147483647\n" }, function(ctx)
+			local presets = ctx.M.TIMING.check_interval_presets
+			helpers.assert_eq(ctx.M.get_check_interval(), presets[#presets - 1].seconds, "the declared maximum snaps")
+		end)
+	end)
+
+	helpers.it("the setter refuses what the value schema refuses (value-validation)", function()
+		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 3600\n" }, function(ctx)
+			for _, refused in ipairs({ "21600", 0 / 0, 1 / 0, 300.5, -1, 2147483648 }) do
+				helpers.assert_eq(ctx.M.set_check_interval(refused), false, "refused: " .. tostring(refused))
+				helpers.assert_eq(ctx.M.get_check_interval(), 3600, "the interval is kept: " .. tostring(refused))
+			end
+		end)
+	end)
+
 	helpers.it("the interval lives in config.toml and snaps to a preset", function()
 		with_manager({ now = T0, config = "[updater]\ncheck_interval_seconds = 7200\n" }, function(ctx)
 			helpers.assert_eq(ctx.M.get_check_interval(), 3600, "a retired 2 hours snaps to 1 hour")
 			helpers.assert_true(ctx.M.set_check_interval(21600))
 			local handle = assert(io.open(ctx.config_path, "r"))
-			local decoded = require("toml_codec").decode(handle:read("*a"))
+			local decoded = require("core.text.engine.toml_codec").decode(handle:read("*a"))
 			handle:close()
 			helpers.assert_eq(decoded.updater.check_interval_seconds, 21600, "the choice is written to config.toml")
 			local marked = {}

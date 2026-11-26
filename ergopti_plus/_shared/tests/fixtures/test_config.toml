@@ -135,12 +135,6 @@ enabled = false
 [hotstrings.rolls.chevron_equal]
 enabled = true
 
-[hotstrings.rolls.chevron_greater]
-enabled = true
-
-[hotstrings.rolls.chevron_less]
-enabled = true
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = true
 time_activation_seconds = 0.5
@@ -181,9 +175,6 @@ enabled = true
 enabled = true
 
 [hotstrings.rolls.paren_quote]
-enabled = true
-
-[hotstrings.magic_key.replace]
 enabled = true
 
 [hotstrings.magic_key.repeat_corrections]
@@ -230,7 +221,6 @@ enabled = true
 
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = true
-pattern_max_length = 1
 
 [hotstrings.personal.autocorrection]
 enabled = false
@@ -307,7 +297,6 @@ list = []
 
 [shortcuts]
 get_hex_value = false
-microsoft_bold = false
 title_case = true
 uppercase = true
 paste_without_formatting = true

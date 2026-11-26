@@ -1,0 +1,380 @@
+/* _shared/ui/layout_analysis/analysis_panel.css */
+
+/* =========================================================================== */
+/* The live analysis panel beside the layout editor's board (analysis_panel.js) */
+/* — a column on wide screens, below the board on narrow ones. Light and dark  */
+/* through theme.css.                                                          */
+/* =========================================================================== */
+
+/* ============================== */
+/* ============================== */
+/* ======= 1/ Panel ============= */
+/* ============================== */
+/* ============================== */
+
+.la-panel {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	/* The body's columns follow the panel's own width (section 1's queries). */
+	container-type: inline-size;
+	flex: 1 1 300px;
+	max-width: 420px;
+	padding: 10px 12px;
+}
+
+.la-panel-title {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+/* The settings and score, the finger load and analysers, and the fingering
+   board: one column in a narrow panel, side by side when the panel spans the
+   editor's width, so a wide window is not left with one tall strip. */
+.la-panel-body {
+	align-items: start;
+	display: grid;
+	gap: 8px 28px;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.la-panel-column {
+	min-width: 0;
+}
+
+/* Two columns: the score beside the finger load, the fingering board below. */
+@container (min-width: 640px) {
+	.la-panel-body {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.la-panel-column:last-child {
+		grid-column: 1 / -1;
+	}
+}
+
+/* Three columns; the fingering board gets the width of its full keyboard. */
+@container (min-width: 1180px) {
+	.la-panel-body {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(560px, 1.2fr);
+	}
+
+	.la-panel-column:last-child {
+		grid-column: auto;
+	}
+}
+
+.la-panel-controls {
+	align-items: center;
+	display: grid;
+	gap: 6px 8px;
+	grid-template-columns: auto 1fr;
+	margin: 10px 0;
+}
+
+.la-panel-controls select {
+	min-width: 0;
+	width: 100%;
+}
+
+/* Each button takes its own row, so its length never widens the label column. */
+.la-panel-compare,
+.la-panel-optimize {
+	grid-column: 1 / -1;
+	justify-self: start;
+}
+
+/* « Optimize this layout » leads to the Optimiser: its accent and its spark mark. */
+.la-panel-optimize {
+	border-color: var(--theme-accent);
+	color: var(--theme-accent);
+	font-weight: 600;
+}
+
+.la-panel-optimize::before {
+	content: '✦ ';
+}
+
+.la-panel-score {
+	font-size: 1.1em;
+	font-weight: 600;
+	margin: 6px 0 2px;
+}
+
+.la-panel-error {
+	color: var(--theme-bad-text);
+	font-size: 1em;
+	font-weight: normal;
+}
+
+.la-panel-note {
+	color: var(--theme-sub);
+	font-size: 0.85em;
+	margin: 0 0 8px;
+}
+
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.la-panel :is(p.la-muted, p.la-panel-note) {
+	max-width: 60ch;
+}
+
+/* An incomplete layout says so in words, in the refusal colour. */
+.la-panel-incomplete {
+	color: var(--theme-bad-text);
+	font-weight: 600;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 2/ Metrics & fingers = */
+/* ============================== */
+/* ============================== */
+
+.la-panel-metrics {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.la-panel-metrics th,
+.la-panel-metrics td {
+	border-bottom: 1px solid var(--theme-separator);
+	padding: 3px 4px;
+}
+
+.la-panel-metrics th {
+	font-weight: normal;
+	text-align: left;
+}
+
+.la-panel-metrics td {
+	text-align: right;
+	white-space: nowrap;
+}
+
+/* The analysers' statistics are long: they wrap inside the panel. */
+.la-panel-analysers td {
+	font-size: 0.9em;
+	white-space: normal;
+}
+
+.la-panel-analysers small {
+	color: var(--theme-sub);
+	display: block;
+}
+
+.la-panel-delta {
+	color: var(--theme-sub);
+	font-size: 0.85em;
+	min-width: 4em;
+}
+
+.la-panel-good {
+	color: var(--theme-good-text);
+}
+
+.la-panel-bad {
+	color: var(--theme-bad-text);
+}
+
+/* The best swaps (best_swaps.js): a card under the score, one row per swap. */
+.la-panel-swaps {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-left: 4px solid var(--theme-good-text);
+	border-radius: 10px;
+	margin: 14px 0;
+	padding: 10px 14px 12px;
+}
+
+.la-panel .la-swaps-title {
+	margin-top: 0;
+}
+
+.la-swaps-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0;
+}
+
+.la-swaps-progress {
+	accent-color: var(--theme-good-text);
+	height: 10px;
+	margin: 10px 0 0;
+	width: 100%;
+}
+
+.la-swaps-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+}
+
+.la-swap {
+	align-items: center;
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	display: grid;
+	gap: 10px;
+	grid-template-columns: auto 1fr auto;
+	padding: 4px 6px 4px 10px;
+}
+
+.la-swap-keys {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	margin: 0;
+}
+
+.la-swap-arrow {
+	color: var(--theme-sub);
+}
+
+.la-panel .la-swaps-subtitle {
+	font-size: 0.9em;
+	margin: 14px 0 0;
+}
+
+/* A cycle of three keys: its own accent stripe, the loop mark in the accent. */
+.la-cycle {
+	border-left: 4px solid var(--theme-accent);
+}
+
+.la-cycle-back {
+	color: var(--theme-accent);
+	font-weight: 700;
+}
+
+.la-swap-gain {
+	color: var(--theme-good-text);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+/* The worst n-grams take the panel's whole width, under its columns. */
+.la-panel-ngrams-box {
+	grid-column: 1 / -1;
+}
+
+/* The mark of a better or worse value (▲ ▼), beside its sign and its colour. */
+.la-panel-verdict {
+	font-size: 0.8em;
+}
+
+/* Text for screen readers only: the editor page does not load the Comparer's
+   stylesheet, so the panel carries its own copy of the rule. */
+.la-panel .la-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-panel h3 {
+	font-size: 1em;
+	margin: 12px 0 6px;
+}
+
+/* The finger load is a table whose rows are grids: the cells take no table
+   padding, and the finger's name no header weight or centring. */
+.la-panel-fingers {
+	display: block;
+}
+
+.la-panel-finger > th,
+.la-panel-finger > td {
+	padding: 0;
+}
+
+.la-panel-finger-name {
+	font-weight: normal;
+	text-align: start;
+}
+
+.la-panel-finger {
+	align-items: center;
+	display: grid;
+	font-size: 0.9em;
+	gap: 6px;
+	grid-template-columns: 9em 1fr 4em;
+	margin: 2px 0;
+}
+
+.la-panel-track {
+	background: var(--theme-surface-2);
+	border-radius: 3px;
+	height: 8px;
+	overflow: hidden;
+	position: relative;
+}
+
+/* The ideal load of the finger, a mark across its bar. */
+.la-panel-target {
+	background: var(--theme-text);
+	bottom: 0;
+	margin-left: -1px;
+	position: absolute;
+	top: 0;
+	width: 2px;
+}
+
+.la-panel-bar {
+	background: var(--theme-accent);
+	display: block;
+	height: 100%;
+}
+
+.la-panel-finger-value {
+	text-align: right;
+}
+
+/* A narrow panel (a phone, or larger text): the tables' cells wrap and each
+   finger's value goes under its name and bar, so the panel never scrolls the
+   page sideways (WCAG 1.4.10). */
+@container (max-width: 300px) {
+	.la-panel-metrics {
+		table-layout: fixed;
+	}
+
+	.la-panel-metrics :is(th, td) {
+		overflow-wrap: anywhere;
+		white-space: normal;
+	}
+
+	.la-panel-finger {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+
+	.la-panel-finger-value {
+		grid-column: 1 / -1;
+		text-align: start;
+	}
+}
+
+.la-panel-section {
+	margin-top: 10px;
+}
+
+@media (max-width: 700px) {
+	.la-panel {
+		max-width: none;
+	}
+}
+
+/* The tap-hold keys' table scrolls on its own in a narrow panel. */
+.la-panel-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}

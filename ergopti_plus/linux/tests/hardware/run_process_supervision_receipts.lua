@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Runner = require("adapters.process_runner")
+local Runner = require("core.process.adapters.runner")
 local checks, failures = 0, 0
 
 for _, operation in ipairs({ "timer", "stdout", "stderr" }) do

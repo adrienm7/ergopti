@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/es.msg
-# AUTO-GENERATED from _shared/data/locales/es.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/es.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Módulo de red de LuaJIT compilado desde el código fuente.
 build_luv.recipe_required=La compilación nativa de luv necesita su receta de código fuente.
 install.already_installed={1} — ya instalado
 install.archive_digest_unavailable=las actualizaciones con descriptor retenido requieren un entorno OpenSSL3 real; la capacidad sigue sin estar disponible.
+install.bytecode_skipped=No se pudieron generar los módulos precompilados — Ergopti arranca desde el código fuente, algo más despacio.
 install.capability_verified={1} — capacidad verificada
 install.command_still_missing=Se instaló {1}, pero sigue sin encontrarse '{2}'.
 install.daemon_manual=Para iniciar el servicio manualmente:
 install.daemon_running=El servicio se ejecuta en segundo plano. Para comprobar su estado:
+install.focus_integration_enabled=integración de foco de {1} activada
+install.focus_integration_failed=No se pudo activar la integración de foco de {1}: las reglas por aplicación siguen inactivas en este escritorio.
+install.focus_integration_next_login=integración de foco de {1} instalada (efectiva en el próximo inicio de sesión)
+install.focus_integration_updated=integración de foco de {1} actualizada
 install.gnome_extension_active=extensión AppIndicator de GNOME: ya activa
 install.gnome_extension_enabled=extensión AppIndicator de GNOME activada
 install.gnome_extension_failed=No se pudo activar la extensión AppIndicator; sin ella, GNOME no muestra el icono.
 install.gnome_extension_missing=falta la extensión AppIndicator de GNOME: instalando {1}…
 install.gnome_extension_next_login=extensión AppIndicator de GNOME activada (efectiva en el próximo inicio de sesión)
+install.gnome_extension_not_installed=Ningún paquete de esta distribución incluye la extensión GNOME AppIndicator: instala AppIndicator and KStatusNotifierItem Support desde {1} y luego cierra y vuelve a abrir la sesión — sin ella, GNOME no muestra el icono.
 install.gnome_without_extensions=GNOME sin gnome-extensions: activa una extensión AppIndicator para ver el icono.
 install.help_help=Muestra este mensaje de ayuda
 install.help_no_deps=No instala ninguna dependencia (corren por tu cuenta)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1}: comprobación de dependencias
 install.section_deps_skipped=Dependencias omitidas (--no-deps)
 install.section_done=Instalación completada
 install.section_files=Instalando archivos
+install.section_focus=Aplicación activa en Wayland (GNOME, KDE)
 install.section_lua_deps=Dependencias opcionales de Lua (bucle de eventos, temporizadores, webviews, señales)
 install.section_permissions=Permisos de entrada (requiere sudo)
 install.section_services=Creando los servicios de usuario de systemd
@@ -63,6 +70,7 @@ install.section_tray=Icono del área de notificación y ventanas
 install.security_warning_body=Pertenecer al grupo «input» permite leer TODAS las pulsaciones de la sesión, incluidas las contraseñas escritas en cualquier aplicación. Es lo que necesita un motor de hotstrings, y es lo que hacen keyd y xremap.
 install.security_warning_title=ADVERTENCIA DE SEGURIDAD
 install.service_started=servicio ergopti-hotstrings activado e iniciado
+install.session_without_graphical_target=Esta sesión nunca inicia graphical-session.target de systemd (i3, Openbox, Xfce, sway sin gestor de sesión), así que la unidad de usuario nunca se ejecutaría: Ergopti+ se inicia en su lugar desde la entrada de inicio automático XDG en el próximo inicio de sesión. Un gestor de ventanas que ignora el inicio automático XDG (i3, sway) necesita la línea exec {1} en su configuración.
 install.source_toolchain_unavailable=el compilador instalado no puede compilar el motor de archivos nativo.
 install.startup_choice_unreadable=No se pudo leer la elección de inicio.
 install.summary_config=Configuración: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=inicio automático de XDG: {1}
 launch.already_running=Ergopti+ ya se está ejecutando en esta sesión ({1} está ocupado); se rechazó este inicio.
 launch.authorization_failed=La autorización del acceso a la entrada se canceló o falló.
 launch.groups_unavailable=La sesión no pudo obtener sus grupos de entrada configurados.
+launch.restarting=Ergopti+ ya se está ejecutando en esta sesión; se le pide que se cierre y luego se reinicia.
+launch.session_lock_invalid=La carpeta de bloqueo de la sesión debe ser una ruta absoluta.
 launcher.dependencies_installed=Dependencias instaladas.
 launcher.driver_missing=Error: no se encuentra el directorio del controlador de Linux: {1}
 launcher.install_deps_hint=Ejecuta: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=La ruta de instalación atraviesa un enlace simbólico
 uninstall.system_prefix=Se rechaza un prefijo de instalación del sistema.
 uninstall.unsafe_path=Ruta de propiedad no segura.
 uninstall.unsupported_argument=Argumento de desinstalación no admitido: {1}
+xkb_helpers.not_found=No se encontraron los archivos de instalación de distribuciones de teclado junto a {1} ni en {2}: sin ellos no se puede instalar ninguna distribución.

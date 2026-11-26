@@ -24,7 +24,7 @@ _UCSch_Store(Initial := "") {
 	if (Initial is Map)
 		Store.Values[UpdateSchedule_Timing()["state_storage_key"]] := Initial
 	Store.Port := Map(
-		"read", (Key) => Store.Values.Get(Key, ""),
+		"read_exact", (Key) => ({ Ok: true, Value: Store.Values.Get(Key, "") }),
 		"write", (Key, Value) => (Store.Writes += 1, Store.Values[Key] := Value, true))
 	return Store
 }
@@ -38,7 +38,7 @@ global _UpdaterCheckStateStore := _UCSch_Store().Port
 _UCSch_SuiteUsesAnInMemoryRecord() {
 	global _UpdaterCheckStateStore
 	AssertTrue(_UpdaterCheckStateStore is Map, "the suite must never touch the real Storage port")
-	AssertTrue(HasMethod(_UpdaterCheckStateStore["read"], "Call")
+	AssertTrue(HasMethod(_UpdaterCheckStateStore["read_exact"], "Call")
 		&& HasMethod(_UpdaterCheckStateStore["write"], "Call"), "the suite store reads and writes")
 }
 Test("Updater schedule: the suite runs over an in-memory check record", _UCSch_SuiteUsesAnInMemoryRecord)
@@ -103,6 +103,36 @@ _UCSch_With(Record, Now, StartedAt, Interval, Body) {
 		_UpdaterBackgroundOwner := SavedOwner
 	}
 }
+
+_UCSch_ReadFailurePreservesRecord() {
+	Body(Store, Clock) {
+		OriginalRead := Store.Port["read_exact"]
+		Store.Port["read_exact"] := (Key) => ({ Ok: false })
+		Decision := _Updater_ScheduleDecision()
+		AssertEqual("record_unavailable", Decision.Reason)
+		AssertEqual(0, Store.Writes, "an unavailable read must not create a seed")
+		Store.Port["read_exact"] := OriginalRead
+		Decision := _Updater_ScheduleDecision()
+		AssertEqual("scheduled", Decision.Reason)
+		AssertEqual("v1.2.3", _UCSch_Record(Store)["last_notified_tag"])
+	}
+	_UCSch_With(Map("seed", "7f3a9c21e5b04d68", "last_check_at", 1699999880,
+		"last_notified_tag", "v1.2.3"), 1700000000, 1700000000, 86400, Body)
+}
+Test("Updater schedule: an unavailable read preserves the stored record", _UCSch_ReadFailurePreservesRecord)
+
+_UCSch_ClockRollbackRestartsBootDelay() {
+	Body(Store, Clock) {
+		global _UpdaterStartedAt
+		Decision := _Updater_ScheduleDecision()
+		AssertEqual(Clock.Now, _UpdaterStartedAt, "the startup anchor follows the rolled-back clock")
+		AssertEqual(UpdateSchedule_Timing()["boot_check_delay_sec"] * 1000, Decision.WaitMs)
+		Clock.Now += UpdateSchedule_Timing()["boot_check_delay_sec"]
+		AssertEqual(true, _Updater_ScheduleDecision().Due)
+	}
+	_UCSch_With(Map("seed", "7f3a9c21e5b04d68"), 1699913600, 1700000000, 86400, Body)
+}
+Test("Updater schedule: a clock rollback restarts the boot delay", _UCSch_ClockRollbackRestartsBootDelay)
 
 ; A restart in the middle of the interval arms for the persisted due time
 ; (bounded by the re-evaluation period), never for a boot check.

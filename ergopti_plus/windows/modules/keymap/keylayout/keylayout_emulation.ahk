@@ -32,6 +32,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\game_keys.ahk
 
 
 
@@ -102,12 +103,22 @@ global KLE_LevelIndex := Map()
 ; Dead-key state -> native character -> resolved transition, built at load.
 global KLE_Compositions := Map()
 global KLE_Registered := false
+; Whether the emulated layout is of the Ergopti family: its keys typing è, ê,
+; é and à send the letters chosen in [shortcuts], as the built-in base does
+; (ErgoptiBaseMapping), instead of the Command level's default letters.
+global KLE_Ergopti := false
 ; Captured reset metadata is unavailable after partial registration. No rollback
 ; of already installed hotkeys, native consumption or replay admission is implied.
 global _KLE_ResetObserverRegistering := 0
 global _KLE_ResetObserverCohort := 0
 global _KLE_ResetObserverCapture := 0
 global _KLE_ResetObserverGeneration := 0
+; The layout source emulation (source_emulation.ahk) of the composed layout:
+; its session, or 0 while no emulation table is performed, and the scan code
+; of every physical key (KeyboardEvent.code) its actions send.
+global KLE_SourceSession := 0
+global KLE_SourceScans := Map()
+global KLE_SourceRegistered := false
 
 /**
  * The physical rows the layout emulation (a registry layout or the built-in
@@ -128,7 +139,8 @@ LayoutEmulationRows(SharedRoot := unset) {
 	if Rows is Map
 		return Rows
 	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
-	Registry := JsonParse(FSReadStrict(Root . "\data\keycodes\physical_keys.json"))
+	RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
+	Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 	Built := Map()
 	for Row, Codes in LayoutRowsPolicyKeys(Registry) {
 		Names := []
@@ -199,6 +211,10 @@ LayoutRowsAllEmulated(Switches := unset) {
  * @returns {Boolean}
  */
 LayoutRowIsEmulated(Sc) {
+	; « Touches de jeu » at their physical place in a game, with the Ergopti
+	; system layout installed: that layout types there (GameKeys_PassThrough).
+	if GameKeys_PassThrough()
+		return false
 	Switches := LayoutRowSwitches()
 	if LayoutRowsAllEmulated(Switches)
 		return true
@@ -282,25 +298,9 @@ _KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 		return false
 	if KLE_State != KEYLAYOUT_NEUTRAL_STATE
 		return true
-	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
-		return false
 	; A row switched off is the OS layout's (LayoutRowIsEmulated).
 	return KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && LayoutRowIsEmulated(Sc)
 		&& !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
-}
-
-; The magic key is an Ergopti feature tied to the layout that declares it: when
-; the active layout declares its key (the built-in Ergopti emulation) or the
-; user chose one, that key's unshifted level belongs to the magic-key remap
-; (modules/keymap/layout.ahk), as the independent digit row belongs to its own
-; override. An emulated layout that declares none, such as Ergo-L, keeps its
-; own character there. Shift, AltGr and the shortcut chords always keep the
-; emulated layout's characters.
-_KLE_MagicKeyOwnsKey(Sc) {
-	global Features, ScriptInformation
-	return ScriptInformation["MagicKeySourceOverridesEmulation"]
-		&& Sc == ScriptInformation["MagicKeySourceScan"]
-		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"]
 }
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
@@ -365,7 +365,7 @@ _KLE_ComboKey(Shift, Caps, Option) {
 /**
  * AHK scan code -> macOS key code of every key of the shared table, read
  * through a layout's keycode convention.
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
  * @returns {Map}
  * @throws {ValueError} On an unknown convention.
@@ -389,13 +389,17 @@ KeylayoutEmulation_KeyCodes(KeycodeTable, Convention) {
  * @param {string} Id - Registry id.
  * @param {string} Text - .keylayout content.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {Integer} Number of keys emulated.
  * @throws {ValueError} On a malformed layout or keycode table; the previous
  *   layout, if any, stays loaded.
  */
 KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
-	return _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
+	global KLE_Ergopti
+	Keys := _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
+	; A new layout reads the accented-letter choices only once the boot names its family.
+	KLE_Ergopti := false
+	return Keys
 }
 
 /**
@@ -407,7 +411,7 @@ KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
  * @param {string} Id - Registry id.
  * @param {string} Text - .keylayout content.
  * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @returns {Integer} Number of keys the emulation would take.
  * @throws {Error} Where Load would refuse the layout.
  */
@@ -486,7 +490,9 @@ _KLE_BuildCompositions(Model) {
  * Stops emulating: drops the model so every emulation hotkey stands down.
  */
 KeylayoutEmulation_Unload() {
+	global KLE_Ergopti
 	_KLE_CanonicalSourceOwner("unload")
+	KLE_Ergopti := false
 }
 
 
@@ -580,6 +586,18 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 		if Swapped != ""
 			Native := {Count: 1, Text: Swapped}
 	}
+	return KeylayoutEmulation_ComposeNative(Native)
+}
+
+/**
+ * Completes the pending registry dead key with what the OS layout types.
+ * Split from KeylayoutEmulation_PressNative so the shared emulation vectors
+ * can feed the OS character the corpus names instead of reading the machine's.
+ * @param {Object} Native - {Count, Text}: the OS character, Count 0 for none.
+ * @returns {Map} Output and Native (whether the OS must receive the original key).
+ */
+KeylayoutEmulation_ComposeNative(Native) {
+	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
 	Transitions := KLE_Compositions.Get(KLE_State, Map())
 	if Native.Count > 0 && Transitions.Has(Native.Text) {
 		Step := Transitions[Native.Text]
@@ -595,7 +613,10 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 
 /**
  * Character a shortcut chord sends for ``Sc``: the layout's Command level, or,
- * for the layout the composer built, the level of the held modifier.
+ * for the layout the composer built, the level of the held modifier. On a
+ * layout of the Ergopti family, the key typing an accented letter unshifted
+ * sends the letter chosen for it, or that accented letter while its shortcut
+ * is off (_ErgoptiLetterOr, as the built-in base).
  * @param {string} Sc - AHK scan code.
  * @param {string} Mods - The chord's AutoHotkey modifier prefix ("^", "!+", "#"...);
  *   its first character names the modifier. Win (the Command level) by default.
@@ -606,6 +627,14 @@ KeylayoutEmulation_ShortcutChar(Sc, Mods := "#") {
 	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex
 	if !IsObject(KLE_Model) || !KLE_KeyCodes.Has(Sc)
 		return ""
+	global KLE_Ergopti, ACCENTED_SHORTCUT_LETTERS
+	if KLE_Ergopti {
+		Base := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Sc])
+		if Base["Kind"] == "text"
+			for Id, Letter in ACCENTED_SHORTCUT_LETTERS
+				if Base["Text"] == Letter
+					return _ErgoptiLetterOr(Id, Letter)
+	}
 	Level := Map("^", "ctrl", "!", "alt").Get(SubStr(Mods, 1, 1), "win")
 	Resolved := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[Level], KLE_KeyCodes[Sc])
 	if (Resolved["Kind"] != "text")
@@ -738,7 +767,9 @@ _KLE_Emit(Sc, Shift, Option) {
 	_AtCrit := Critical("On")
 	try {
 		Output := KeylayoutEmulation_Press(Sc, Shift, KS_CapsLockToggleState(), Option)
-		if (Output != "")
+		; Held for as long as the physical key is, when the system layout types
+		; it (« Touches de jeu »); any other text keeps the Unicode route.
+		if (Output != "" && !GameKeys_TryHold(Sc, Output))
 			SendNewResult(Output)
 	} finally {
 		Critical(_AtCrit)
@@ -747,7 +778,11 @@ _KLE_Emit(Sc, Shift, Option) {
 
 _KLE_OnKey(Sc, Shift, *) {
 	global _SHIFT_DIGIT_SCS
-	if NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
+	; A pending dead key admits every continuation (_KLE_BaseCriterion), but a
+	; row switched off still belongs to the OS layout: its native character
+	; completes the accent, whatever the global base switch says.
+	RowEmulated := LayoutRowIsEmulated(Sc)
+	if RowEmulated && NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
 			&& NumberRowSymbolsCapable(KS_CapsLockToggleState()) {
 		Code := Integer("0x" . SubStr(Sc, 3))
 		Level := NumberRowSymbolsLevel(Code, KS_CapsLockToggleState())
@@ -758,7 +793,7 @@ _KLE_OnKey(Sc, Shift, *) {
 			return
 		}
 	}
-	if Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
+	if RowEmulated && Shift && _SHIFT_DIGIT_SCS.Has(Sc) {
 		Code := Integer("0x" . SubStr(Sc, 3))
 		Resolution := _DigitRowSwapResolution(Code, GetForegroundKeyboardLayout())
 		if Resolution["swap"] && Resolution["source"] == "emulated" {
@@ -769,7 +804,7 @@ _KLE_OnKey(Sc, Shift, *) {
 			return
 		}
 	}
-	if KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift) {
+	if RowEmulated && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) && !_KLE_DigitsOwnKey(Sc, Shift) {
 		_KLE_Emit(Sc, Shift, false)
 		return
 	}
@@ -786,7 +821,67 @@ _KLE_OnKey(Sc, Shift, *) {
 }
 
 _KLE_OnAltGr(Sc, *) {
-	_KLE_Emit(Sc, KS_ShiftIsHeld(), true)
+	Shift := KS_ShiftIsHeld()
+	Mods := _KLE_AltGrShortcutMods(_KLE_RealCtrlHeld(), Shift)
+	if (Mods != "") {
+		; SCD-3: a Ctrl slot of the logical key runs its action, as Linux does.
+		Slot := IsSet(KeyboardShortcutAssignments) && IsCategoryGated("Shortcuts")
+			? _KLE_AltGrSlotFor(KeylayoutEmulation_ShortcutChar(Sc, Mods), Mods, KeyboardShortcutAssignments) : ""
+		if (Slot != "") {
+			KeylayoutEmulation_ResetDeadKey()
+			RunKeyboardShortcutAction(Slot)
+			return
+		}
+		_KLE_OnShortcut(Sc, Mods)
+		return
+	}
+	_KLE_Emit(Sc, Shift, true)
+}
+
+; Ctrl+AltGr+key sends Ctrl and the logical key, AltGr suspended (ILD-2, decided
+; by the maintainer on 2026-11-11, as Linux does): the chord a real Ctrl makes
+; of an AltGr press, or "" when AltGr types its level.
+; @param CtrlHeld {Boolean} A Ctrl other than AltGr's own is physically held.
+; @param Shift {Boolean} Shift is held.
+; @returns {String} "^", "^+" or "".
+_KLE_AltGrShortcutMods(CtrlHeld, Shift) {
+	if !CtrlHeld
+		return ""
+	return Shift ? "^+" : "^"
+}
+
+; The keyboard slot a Ctrl+AltGr press runs (SCD-3, decided by the maintainer on
+; 2026-11-11: AltGr is suspended under Ctrl, so a Ctrl slot fires for
+; Ctrl+AltGr+key as Linux does), or "" when no slot of that chord is assigned.
+; @param Char {String} The logical key the chord names ("" when none).
+; @param Mods {String} "^" or "^+", from _KLE_AltGrShortcutMods.
+; @param Assignments {Map} Slot -> action (KeyboardShortcutAssignments).
+; @returns {String}
+_KLE_AltGrSlotFor(Char, Mods, Assignments) {
+	if (Char == "" || StrLen(Char) != 1 || !(Assignments is Map))
+		return ""
+	Slot := (Mods == "^+" ? "primary_shift_" : "primary_") . StrLower(Char)
+	return (Assignments.Has(Slot) && Assignments[Slot] != "none") ? Slot : ""
+}
+
+; Whether a Ctrl other than AltGr's own is physically held: the right Ctrl, or a
+; left Ctrl that is not the fake LCtrl a standard AltGr layout adds to every
+; AltGr press (the press ledger tells the real key from that alias).
+; @param StateFn {Func} (Name) -> physical state; KS_IsDown by default.
+; @param RealFn {Func} (Name) -> 1 real, 0 alias, -1 unknown; KS_RealPressState by default.
+; @returns {Boolean}
+_KLE_RealCtrlHeld(StateFn := 0, RealFn := 0) {
+	if !HasMethod(StateFn, "Call")
+		StateFn := KS_IsDown
+	if !HasMethod(RealFn, "Call")
+		RealFn := KS_RealPressState
+	if StateFn.Call("RCtrl")
+		return true
+	if !StateFn.Call("LCtrl")
+		return false
+	if !KS_AltGrAddsFakeLCtrl()
+		return true
+	return RealFn.Call("LCtrl") == 1
 }
 
 _KLE_OnShortcut(Sc, Mods, *) {
@@ -831,7 +926,7 @@ _KLE_PendingDeadKeyCriterion(*) {
  * Registers the emulation hotkeys of every key of the shared keycode table.
  * They stay inert until a layout is loaded. Must run before the Ergopti
  * layers register theirs (see the module header).
- * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @param {Map} KeycodeTable - Parsed _shared/layouts/data/mac_keycodes.json.
  * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
  * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
  * @param {Func|Integer} ForegroundFn Foreground layout reader; native by default.
@@ -839,7 +934,7 @@ _KLE_PendingDeadKeyCriterion(*) {
  * @throws {Error} On a second registration.
  */
 KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
-		BrokerFn := MagicEditorRecordLayoutFallback) {
+		BrokerFn := StarSlotRecordLayoutFallback) {
 	return _KLE_AltGrBindingOwner("register", KeycodeTable, HotkeyFn, HotIfFn, ForegroundFn, BrokerFn)
 }
 
@@ -868,7 +963,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 		_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
 		_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
 		LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
-		_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+		_KLE_BindingDeclaration, StarSlotRecordLayoutFallback,
 		Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
 
 	OwnersCurrent() {
@@ -878,7 +973,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 			_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
 			_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
 			LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
-			_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+			_KLE_BindingDeclaration, StarSlotRecordLayoutFallback,
 			Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
 		for BindingIndex, BindingOwnerFunction in Owners
 			if !(BindingOwnerFunction is Func) || BindingOwnerFunction != Current[BindingIndex]
@@ -1016,7 +1111,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 	try {
 		; Injected ports retain their old controlled behavior without source issuance.
 		if !OwnersCurrent() || Args[2] != Hotkey || Args[3] != HotIf
-				|| !(Args[4] is Integer) || Args[4] != 0 || Args[5] != MagicEditorRecordLayoutFallback {
+				|| !(Args[4] is Integer) || Args[4] != 0 || Args[5] != StarSlotRecordLayoutFallback {
 			Phase := "failed"
 			return NativeCall.Call(_KLE_RegisterBindings, Args*)
 		}
@@ -1082,7 +1177,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 
 	; The effectful body is lexical: no public alternate registration can bypass ownership.
 	_KLE_RegisterBindings(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
-			BrokerFn := MagicEditorRecordLayoutFallback) {
+			BrokerFn := StarSlotRecordLayoutFallback) {
 		local Count
 		static WinCriteria := Map()
 		global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
@@ -1186,73 +1281,101 @@ _KLE_DefaultBootDeps() {
 	return Map(
 		"keycodes", LayoutRegistry_Keycodes,
 		"register", KeylayoutEmulation_Register,
-		"read_local", LayoutRegistry_ReadLocal,
-		"install", LayoutCatalogue_Install
+		"read_local", LayoutRegistry_ReadLocal
 	)
 }
 
+; The registry id the boot could not emulate (not installed, unreadable or
+; refused), "" otherwise: the menu names it with « — cannot be emulated ».
+global KLE_BootFailedId := ""
+
 /**
- * Registers the emulation and loads the selected layout, installing it first
- * through the layout catalogue when it is not installed or its copy no longer
- * matches its record. Runs once at boot, before the Ergopti layers register
- * their hotkeys.
+ * The selected layout the boot could not emulate, as macOS and Linux report
+ * their emulation status error.
+ * @returns {string} Its registry id, or "".
+ */
+KeylayoutEmulation_FailedId() {
+	global KLE_BootFailedId
+	return KLE_BootFailedId
+}
+
+/**
+ * Registers the emulation and loads the selected layout from its installed
+ * copy. Runs once at boot, before the Ergopti layers register their hotkeys.
+ * The boot never installs (decided on 2026-11-12, as macOS and Linux): a layout
+ * the user uninstalled stays chosen and is not emulated until it is installed
+ * again, and a missing or damaged copy is reported, never silently downloaded.
+ * The menu choice installs a layout that is not installed yet.
  * @param {string} ConfigDir - Configuration folder, with its trailing backslash.
- * @param {Map} Deps - "keycodes", "register", "read_local" and "install"
- *   implementations; injectable for tests.
+ * @param {Map} Deps - "keycodes", "register" and "read_local" implementations;
+ *   injectable for tests.
  * @returns {boolean} Whether the layout is emulated when this returns (false
- *   while it downloads, or when nothing is selected or it failed).
+ *   when nothing is selected or it cannot be emulated).
  */
 KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
+	global KLE_BootFailedId
 	if !(Deps is Map)
 		Deps := _KLE_DefaultBootDeps()
+	KLE_BootFailedId := ""
 	Id := KeylayoutEmulation_SelectedId()
 	if (Id == "")
 		return false
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerError("LayoutEmulation", "The emulated layout '{1}' is not a registry id; nothing is emulated.", Id)
+		KLE_BootFailedId := Id
 		return false
 	}
 	KeycodeTable := Deps["keycodes"].Call()
+	Composed := Id == LayoutRegistry_Composer()["id"]
+	; The source emulation registers first: AHK fires the earliest-created
+	; variant whose criterion holds, and its keys go on to the layout below.
+	if Composed
+		_KLE_SourceBoot(ConfigDir, Deps)
 	Hotkeys := Deps["register"].Call(KeycodeTable)
 	LoggerInfo("LayoutEmulation", "Registered {1} emulation hotkeys for the '{2}' layout.", Hotkeys, Id)
 	LocalDir := LayoutRegistry_LocalDir(ConfigDir)
 	try {
 		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
 	} catch as Err {
-		if Id == LayoutRegistry_Composer()["id"] {
-			; The composition exists only on this machine: there is nothing to download.
+		if Composed {
+			; The composition exists only on this machine: there is nothing to
+			; download. A source stored for the emulation alone (composer_emulate)
+			; is read from the composer folder, as read_composed does on macOS and Linux.
+			try Stored := Deps.Get("read_composed", LayoutComposer_ReadComposed).Call(ConfigDir)
+			catch as StoredErr {
+				LoggerError("LayoutEmulation", "The composed layout source is not usable ({1}); save it again in the layout editor.", StoredErr.Message)
+				KLE_BootFailedId := Id
+				return false
+			}
+			if Stored is Map {
+				LoggerInfo("LayoutEmulation", "Emulating the layout source stored in the composer folder.")
+				return _KLE_Activate(Id, Stored, KeycodeTable)
+			}
 			LoggerError("LayoutEmulation", "The composed layout is not usable ({1}); save it again in the layout manager.", Err.Message)
+			KLE_BootFailedId := Id
 			return false
 		}
-		LoggerInfo("LayoutEmulation", "The '{1}' layout is not usable locally ({2}); installing it.", Id, Err.Message)
-		Deps["install"].Call(Id, LocalDir, _KLE_OnInstalled.Bind(Id, LocalDir, KeycodeTable, Deps))
+		LoggerError("LayoutEmulation", "The '{1}' layout cannot be emulated ({2}); it stays chosen. Choose it again in the Keyboard layout menu, or install it in the layout manager.",
+			Id, Err.Message)
+		KLE_BootFailedId := Id
 		return false
 	}
 	return _KLE_Activate(Id, LocalCopy, KeycodeTable)
 }
 
-_KLE_OnInstalled(Id, LocalDir, KeycodeTable, Deps, Ok, Detail*) {
-	; LayoutCatalogue_Install already logged the failure and its reason.
-	if !Ok
-		return
-	try {
-		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
-	} catch as Err {
-		LoggerError("LayoutEmulation", "The downloaded '{1}' layout cannot be read back: {2}", Id, Err.Message)
-		return
-	}
-	_KLE_Activate(Id, LocalCopy, KeycodeTable)
-}
-
 _KLE_Activate(Id, LocalCopy, KeycodeTable) {
+	global KLE_BootFailedId
 	LoggerStart("LayoutEmulation", "Loading the '{1}' layout for emulation…", Id)
 	try {
 		Keys := KeylayoutEmulation_Load(Id, LocalCopy["Text"], LocalCopy["Entry"]["keycode_convention"], KeycodeTable)
 	} catch as Err {
 		; Failed preparation must not unload the previously admitted source.
 		LoggerError("LayoutEmulation", "Loading the '{1}' layout failed: {2}", Id, Err.Message)
+		KLE_BootFailedId := Id
 		return false
 	}
+	global KLE_Ergopti
+	KLE_Ergopti := LayoutCatalogue_IsErgopti(LocalCopy["Entry"])
 	LoggerSuccess("LayoutEmulation", "Emulating the '{1}' layout, version {2} ({3} keys).",
 		Id, LocalCopy["Entry"]["version"], Keys)
 	return true
@@ -1745,4 +1868,269 @@ _KLE_CanonicalSourceOwner(Request, Args*) {
 /** Returns source data issued by the original loader, never by supplied maps. */
 KeylayoutEmulation_CaptureCanonicalSource() {
 	return _KLE_CanonicalSourceOwner("capture")
+}
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 8/ Source emulation =======
+; ===================================
+; ===================================
+
+; Keys the source emulation never takes: the built-in modifiers it reads the
+; state of, and the keys the source compiler reports as not emulated. Caps Lock
+; and AltGr are taken only while they hold a custom modifier
+; (_KLE_SourceHoldsModifierKey).
+_KLE_SourceUntaken() {
+	static Untaken := Map("ShiftLeft", true, "ShiftRight", true, "ControlLeft", true, "ControlRight", true,
+		"AltLeft", true, "AltRight", true, "MetaLeft", true, "MetaRight", true, "CapsLock", true, "ContextMenu", true,
+		; The JIS input-method keys stay the IME's, as the menu key stays the system's.
+		"NonConvert", true, "Convert", true, "KanaMode", true)
+	return Untaken
+}
+
+; Caps Lock and AltGr holding a custom modifier of the table (Neo's Mod3 and
+; Mod4): the source emulation takes them as plain keys, so the suppressed press
+; neither toggles Caps Lock nor reaches Windows as AltGr. Any other modifier key
+; stays untaken, and a layout holding nothing on these two leaves them alone.
+_KLE_SourceHoldsModifierKey(Model, Code) {
+	static Holdable := Map("CapsLock", true, "AltRight", true)
+	return Holdable.Has(Code) && SourceEmulation_HoldsModifierKey(Model, Code)
+}
+
+; The hotkey names one source key takes: those of the layout below (so the
+; earlier variant wins whatever the precedence of a wildcard), then the wildcard.
+_KLE_SourceHotkeyNames(Sc) {
+	Names := [Sc, "+" . Sc]
+	for Prefix in KLE_SHORTCUT_PREFIXES
+		Names.Push(Prefix . Sc)
+	Names.Push("*" . Sc)
+	return Names
+}
+
+/**
+ * Loads the emulation table of the composed layout's source and registers its
+ * keys. Registered before the keylayout emulation and at the default input
+ * level 0, so only physical input reaches it: a key it leaves alone is sent on
+ * at SendLevel 1, which the layout emulation below (I2) receives.
+ * @param {Map} Model - From SourceEmulation_Compile.
+ * @param {Map} Registry - Decoded physical_keys.json.
+ * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
+ * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
+ * @returns {Integer} Number of hotkeys registered.
+ * @throws {Error} On a second registration or a key the registry does not know.
+ */
+KeylayoutEmulation_SourceLoad(Model, Registry, HotkeyFn := Hotkey, HotIfFn := HotIf) {
+	global KLE_SourceSession, KLE_SourceScans, KLE_SourceRegistered
+	if KLE_SourceRegistered
+		throw Error("The layout source emulation is already registered.")
+	Scans := Map()
+	for Code, Key in Registry["keys"]
+		if Key.Get("kind", "") == "key" && Key.Get("ahk", 0) is String
+			Scans[Code] := StrUpper(Key["ahk"])
+	Codes := SourceEmulation_Keys(Model)
+	; An emulated layer types nothing on the keys it does not map: it takes them all.
+	if SourceEmulation_HasEmulatedLayer(Model)
+		for Code, Key in Registry["keys"]
+			if Key.Get("group", "") == "alphanumeric" && Scans.Has(Code)
+				Codes[Code] := true
+	Taken := []
+	for Code in Codes {
+		if _KLE_SourceUntaken().Has(Code) && !_KLE_SourceHoldsModifierKey(Model, Code)
+			continue
+		if !Scans.Has(Code)
+			throw Error("The layout source emulation names the unknown key " . Code . ".")
+		Taken.Push(Code)
+	}
+	KLE_SourceScans := Scans
+	KLE_SourceSession := SourceEmulation_NewSession(Model)
+	KLE_SourceRegistered := true
+	Count := 0
+	HotIfFn.Call(_KLE_SourceCriterion)
+	try {
+		for Code in Taken {
+			Sc := Scans[Code]
+			for Name in _KLE_SourceHotkeyNames(Sc)
+				HotkeyFn.Call(Name, _KLE_SourceOnPress.Bind(Code, Sc), "I0"), Count += 1
+			HotkeyFn.Call("*" . Sc . " up", _KLE_SourceOnRelease.Bind(Code, Sc), "I0"), Count += 1
+		}
+	} finally HotIfFn.Call()
+	return Count
+}
+
+; Reads, compiles and registers the composed layout's emulation table, when the
+; source form stored one (composer_emulate or composer_save with a source).
+_KLE_SourceBoot(ConfigDir, Deps) {
+	global _SharedDir
+	try {
+		Table := Deps.Get("read_emulation", LayoutComposer_ReadEmulation).Call(ConfigDir)
+		if !(Table is Map)
+			return 0
+		Model := SourceEmulation_Compile(Table)
+		if !SourceEmulation_HasRecords(Model)
+			return 0
+		RegistryPath := _SharedDir . "\layouts\data\keycodes\physical_keys.json"
+		Registry := Deps.Has("physical_keys") ? Deps["physical_keys"]
+			: JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
+		Count := KeylayoutEmulation_SourceLoad(Model, Registry, Deps.Get("source_hotkey", Hotkey),
+			Deps.Get("source_hotif", HotIf))
+	} catch as Err {
+		LoggerError("LayoutEmulation", "The layout source emulation table is not performed: {1}", Err.Message)
+		return 0
+	}
+	LoggerInfo("LayoutEmulation", "Registered {1} hotkeys of the layout source emulation.", Count)
+	return Count
+}
+
+/** Drops the source emulation's state, for a test or a stop. */
+KeylayoutEmulation_SourceUnload() {
+	global KLE_SourceSession, KLE_SourceScans, KLE_SourceRegistered
+	KLE_SourceSession := 0
+	KLE_SourceScans := Map()
+	KLE_SourceRegistered := false
+}
+
+_KLE_SourceCriterion(*) {
+	global KLE_SourceSession
+	return (KLE_SourceSession is Map) && !A_IsSuspended
+}
+
+/**
+ * The built-in modifiers held now, as the engine names them.
+ * Reads through the key-state adapter, the one owner of the physical state.
+ * @param {Func} StateFn - (Name) -> physical state; KS_IsDown, or a stand-in for a test.
+ * @param {Func} CapsFn - () -> Caps Lock toggle; KS_CapsLockToggleState, or a stand-in.
+ * @param {Func} UserLCtrlFn - () -> whether a held LCtrl is the user's and not the
+ *   one an AltGr layout adds to AltGr; TapHoldUserLCtrlHeld, or a stand-in.
+ * @returns {Map}
+ */
+KeylayoutEmulation_SourceHeld(StateFn := KS_IsDown, CapsFn := KS_CapsLockToggleState,
+		UserLCtrlFn := TapHoldUserLCtrlHeld) {
+	global KLE_SourceSession
+	Held := Map()
+	if StateFn.Call("LShift") || StateFn.Call("RShift")
+		Held["shift"] := true
+	; While AltGr holds a custom modifier, the LCtrl an AltGr layout adds to it is
+	; AltGr's, not a Control the user holds (the engine drops the AltGr itself).
+	AltGrHeld := (KLE_SourceSession is Map) && KLE_SourceSession["held_keys"].Get("AltRight", "") == "modifier"
+	if StateFn.Call("RControl") || (StateFn.Call("LControl") && (!AltGrHeld || UserLCtrlFn.Call()))
+		Held["control"] := true
+	if StateFn.Call("LAlt")
+		Held["alt"] := true
+	if StateFn.Call("RAlt")
+		Held["alt_right"] := true
+	if StateFn.Call("LWin") || StateFn.Call("RWin")
+		Held["meta"] := true
+	if CapsFn.Call()
+		Held["caps_lock"] := true
+	return Held
+}
+
+/**
+ * What one engine action sends: the text to type, or the Send keys of a key or
+ * modifier action. Key actions release the hand's modifiers and press only
+ * theirs, as the macOS and Linux drivers post them.
+ * @param {Map} Action - From SourceEmulation_Press.
+ * @param {Map} Scans - KeyboardEvent.code -> scan code name.
+ * @returns {Map} "text" or "keys".
+ */
+KeylayoutEmulation_SourceSend(Action, Scans) {
+	static Prefixes := Map("shift", "+", "shift_left", "<+", "shift_right", ">+", "control", "^",
+		"control_left", "<^", "control_right", ">^", "alt", "!", "alt_left", "<!", "alt_right", ">!",
+		"meta", "#", "meta_left", "<#", "meta_right", ">#")
+	static Keys := Map("shift", "LShift", "shift_left", "LShift", "shift_right", "RShift",
+		"control", "LControl", "control_left", "LControl", "control_right", "RControl",
+		"alt", "LAlt", "alt_left", "LAlt", "alt_right", "RAlt", "meta", "LWin", "meta_left", "LWin",
+		"meta_right", "RWin")
+	switch Action["type"] {
+		case "text":
+			return Map("text", Action["text"])
+		case "key":
+			if !Scans.Has(Action["key"])
+				throw Error("The layout source emulation sends the unknown key " . Action["key"] . ".")
+			Prefix := ""
+			for Id in Action["modifiers"]
+				if Prefixes.Has(Id) && !InStr(Prefix, Prefixes[Id])
+					Prefix .= Prefixes[Id]
+			return Map("keys", Prefix . "{" . Scans[Action["key"]] . "}")
+		case "modifier":
+			if !Keys.Has(Action["id"])
+				throw Error("The layout source emulation holds the unknown modifier " . Action["id"] . ".")
+			return Map("keys", "{" . Keys[Action["id"]] . (Action["down"] ? " down}" : " up}"))
+	}
+	throw Error("The layout source emulation returned an unknown action.")
+}
+
+; Performs the engine's actions in order: text through the driver's text
+; sender, keys at SendLevel 1 so the layout emulation below interprets them.
+_KLE_SourcePerform(Actions) {
+	global KLE_SourceScans
+	for Action in Actions {
+		Emitted := KeylayoutEmulation_SourceSend(Action, KLE_SourceScans)
+		if Emitted.Has("text") {
+			SendNewResult(Emitted["text"])
+			continue
+		}
+		SendLevel(1)
+		SendEvent(Emitted["keys"])
+	}
+}
+
+; A tap-hold whose threshold passes starts its hold without waiting for a key.
+_KLE_SourceArmTick() {
+	global KLE_SourceSession
+	Delay := (KLE_SourceSession is Map) ? SourceEmulation_PendingDelay(KLE_SourceSession, A_TickCount) : 0
+	if Delay > 0
+		SetTimer(_KLE_SourceTick, -Delay)
+}
+
+_KLE_SourceTick() {
+	global KLE_SourceSession
+	if !(KLE_SourceSession is Map)
+		return
+	_AtCrit := Critical("On")
+	try {
+		; A timer still runs while the driver is paused: release what the engine holds.
+		Actions := A_IsSuspended ? SourceEmulation_Reset(KLE_SourceSession)
+			: SourceEmulation_Tick(KLE_SourceSession, A_TickCount)
+		_KLE_SourcePerform(Actions)
+	} finally Critical(_AtCrit)
+}
+
+; What a layout's own repeat and magic keys read: the hotstrings' buffer, the
+; text typed to the left of the caret (hotstrings/engine/matcher/engine_main.ahk).
+_KLE_TypedText() {
+	global HSE_Buffer
+	return HSE_Buffer
+}
+
+_KLE_SourceOnPress(Code, Sc, *) {
+	global KLE_SourceSession
+	_AtCrit := Critical("On")
+	try {
+		Result := SourceEmulation_Press(KLE_SourceSession, Code, KeylayoutEmulation_SourceHeld(), A_TickCount,
+			_KLE_TypedText())
+		_KLE_SourcePerform(Result["actions"])
+		if !Result["consumed"] {
+			SendLevel(1)
+			SendEvent("{Blind}{" . Sc . " down}")
+		}
+	} finally Critical(_AtCrit)
+	_KLE_SourceArmTick()
+}
+
+_KLE_SourceOnRelease(Code, Sc, *) {
+	global KLE_SourceSession
+	_AtCrit := Critical("On")
+	try {
+		Result := SourceEmulation_Release(KLE_SourceSession, Code, A_TickCount)
+		_KLE_SourcePerform(Result["actions"])
+		if !Result["consumed"] {
+			SendLevel(1)
+			SendEvent("{Blind}{" . Sc . " up}")
+		}
+	} finally Critical(_AtCrit)
 }

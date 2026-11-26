@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"ui.menu.menu_llm.agent_panel", "modules.llm.agent_runner", "modules.llm.agent_connectors",
-	"infra.dialog_util", "ui.tooltip", "infra.app_picker", "infra.manifest_menu", "modules.llm.api_remote",
-	"infra.logger", "infra.locale", "modules.llm.api_ollama", "modules.llm.local_model_offer",
-	"modules.llm.local_servers", "ui.menu.menu_llm.local_server_panel",
+	"ai.ui.menu.panels.agent_panel", "ai.engine.agent.runner", "ai.engine.agent.connectors",
+	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "apps.engine.picker", "menu.engine.manifest_menu", "ai.engine.api.remote",
+	"core.logger.engine.logger", "core.i18n.engine.locale", "ai.engine.api.ollama", "ai.engine.ollama.local_model_offer",
+	"ai.engine.local_servers.local_servers", "ai.ui.menu.panels.local_server_panel",
 }
 
 --- Builds the panel over a state and faked owners.
@@ -27,7 +27,7 @@ local function with_panel(state, scenario, language)
 			-- verifications asked for, the alerts and the downloads
 			listed = nil, refreshes = 0, verifications = {}, alerts = {}, alert_answer = nil, installs = {},
 			listing_done = nil, menu_updates = 0 }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(title, message, default, ok_label, cancel_label)
 				world.dialogs[#world.dialogs + 1] = { title = title, message = message, default = default }
 				return world.dialog_answer[1] == "OK" and ok_label or cancel_label, world.dialog_answer[2]
@@ -37,7 +37,7 @@ local function with_panel(state, scenario, language)
 				return world.alert_answer == "first" and first or second
 			end,
 		}
-		package.loaded["modules.llm.api_ollama"] = {
+		package.loaded["ai.engine.api.ollama"] = {
 			MODEL_MISSING = "model_missing",
 			get_base_url = function() return "http://127.0.0.1:11470" end,
 			capture_service_owner = function() return function() return true end end,
@@ -54,22 +54,22 @@ local function with_panel(state, scenario, language)
 			end,
 			forget_local_models = function() end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			show = function(text) world.notices[#world.notices + 1] = text; return true end,
 		}
-		package.loaded["infra.app_picker"] = {
+		package.loaded["apps.engine.picker"] = {
 			build_menu = function(apps, on_change, placeholder)
 				world.pickers[#world.pickers + 1] = { apps = apps, on_change = on_change, placeholder = placeholder }
 				return { { label = "picker-row", action = function() end } }
 			end,
 		}
-		package.loaded["modules.llm.agent_connectors"] = {
+		package.loaded["ai.engine.agent.connectors"] = {
 			list_tools = function(_, on_done) world.tool_lists = (world.tool_lists or 0) + 1; on_done({}) end,
 		}
-		local Panel = helpers.load_with_stubs("ui.menu.menu_llm.agent_panel")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local i18n = require("infra.i18n")
-		local Locale = require("infra.locale")
+		local Panel = helpers.load_with_stubs("ai.ui.menu.panels.agent_panel")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		local i18n = require("core.i18n.engine.i18n")
+		local Locale = require("core.i18n.engine.locale")
 		local previous_locale = Locale.all()["_meta.locale"]
 		Locale.set_locale(language or "en")
 		i18n.get = function(key)
@@ -84,7 +84,7 @@ local function with_panel(state, scenario, language)
 			return text
 		end
 		world.i18n = i18n
-		require("modules.llm.local_model_offer").set_installer(function(model)
+		require("ai.engine.ollama.local_model_offer").set_installer(function(model)
 			world.installs[#world.installs + 1] = model
 			return true
 		end)
@@ -133,7 +133,7 @@ local function mode_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus, err = require("adapters.json_codec").decode(raw)
+	local corpus, err = require("core.fs.adapters.json_codec").decode(raw)
 	helpers.assert_not_nil(corpus, tostring(err))
 	helpers.assert_eq(#corpus.modes, 3)
 	helpers.assert_eq(#corpus.states, 3)
@@ -145,7 +145,7 @@ local function system_model_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_system_model.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 return {

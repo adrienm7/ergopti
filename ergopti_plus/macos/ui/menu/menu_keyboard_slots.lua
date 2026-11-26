@@ -26,20 +26,20 @@
 --- ==============================================================================
 
 local M = {}
-local ParameterLabel = require("action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 
 local hs           = hs
-local i18n         = require("infra.i18n")
-local LabelValue = require("locale.label_value")
-local Logger       = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
+local i18n         = require("core.i18n.engine.i18n")
+local LabelValue = require("core.i18n.engine.label_value")
+local Logger       = require("core.logger.engine.logger")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local ActionPicker = require("ui.action_picker")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
 local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
-local ManifestMenu = require("infra.manifest_menu")
-local ShellRunner  = require("adapters.shell_runner")
-local dialog       = require("infra.dialog_util")
+local ManifestMenu = require("menu.engine.manifest_menu")
+local ShellRunner  = require("core.process.adapters.shell_runner")
+local dialog       = require("core.ui.engine.dialog_util")
 
 local LOG = "menu.keyboard_slots"
 
@@ -127,7 +127,7 @@ function M.warn_if_input_source_conflict(slot_id)
 		if #ids == 0 then return end
 		Logger.warn(LOG, "Slot '%s' is also macOS's input-source shortcut (symbolic hotkey %s) — it will not fire.",
 			slot_id, table.concat(ids, ", "))
-		DeferredWork.after(require("infra.timings").sec("ui", "slot_conflict_notice_delay_ms"), function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "slot_conflict_notice_delay_ms"), function()
 			local open_label = i18n.get("button.open_settings")
 			local ok, clicked = pcall(dialog.block_alert,
 				i18n.get("dialog.keyboard_shortcut.input_source_conflict_title"),
@@ -182,10 +182,10 @@ local function choose_action_for(slot_id, ctx)
 		local spec = type(gestures) == "table" and type(gestures.get_action_parameter_spec) == "function"
 			and gestures.get_action_parameter_spec(action_id) or nil
 		if not spec then return bind() end
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+		return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 			local committed = ShortcutUtils.prompt_action_parameter(gestures,
 				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
-					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
+					publishes_assignment = true, section = require("settings.engine.keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
 					read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
 					apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
 					restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,
@@ -196,7 +196,6 @@ local function choose_action_for(slot_id, ctx)
 			end
 			return committed
 		end, "menu_keyboard_slots.action_parameter")
-		return true
 	end)
 end
 
@@ -219,7 +218,7 @@ local function add_binding_to(prefix, ctx)
 		-- The second picker is opened on the next tick: the shared webview needs
 		-- the first window torn down before it will build another, and chaining
 		-- them synchronously leaves the user staring at nothing.
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
+		return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"),
 			function() choose_action_for(slot_id, ctx) end,
 			"menu_keyboard_slots.action_picker")
 	end)
@@ -250,12 +249,12 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	local gestures = ctx.gestures
 
 	local function add_for(prefix)
-		return function() return not group.fixed and group.prefix == prefix end
+		return function() return group.prefix == prefix end
 	end
 	local getters = {
-		keyboard_group_has_scope = function() return not group.fixed end,
+		keyboard_group_has_scope = function() return true end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
-		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
+		keyboard_group_ready = function() return not disabled end,
 		keyboard_group_add_option = add_for("alt_"),
 		keyboard_group_add_ctrl = add_for("secondary_"),
 		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
@@ -290,9 +289,9 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		keyboard_group_assigned_rows = assigned_provider,
 	})
 	-- The scope group (restore, clear, separator) and the Add row belong to
-	-- every group the user can bind; a fixed group has neither.
-	local scope_count = not group.fixed and 3 or 0
-	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
+	-- every group.
+	local scope_count = 3
+	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + 1
 	if type(admission) ~= "table" or #admission ~= fixed_count then
 		Logger.error(LOG, "Declared keyboard group admission refused for '%s'.", tostring(group.prefix))
 		return nil
@@ -321,7 +320,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	})
 	-- A withdrawn Add, restore or clear declaration must not publish a group
 	-- missing one of its ports.
-	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
+	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + 1
 	if type(rows) ~= "table" or #rows ~= expected then
 		Logger.error(LOG, "Declared keyboard group frame refused for '%s'.", tostring(group.prefix))
 		return nil

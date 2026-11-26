@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 
 
 

@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 -- Keep-awake confirms a toggle for a moment; it explains nothing.
 local ALLOWED_BANNER_KEYS = {
 	["shortcuts.keep_awake_on"] = true,
-	["shortcuts.keep_awake_off"] = true,
+	["shortcuts.keep_awake_ended"] = true,
 }
 
 
@@ -52,21 +52,25 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_eq(#offenders, 0, "hs.alert banner outside the allowlist:\n" .. table.concat(offenders, "\n"))
 	end)
 
-	helpers.it("the boot's Accessibility wait opens the permission dialog", function()
-		local unit, err = helpers.read_driver_unit("local function show_accessibility_guidance()")
+	helpers.it("the boot's Accessibility wait shows the steps that name ErgoptiPlus.app", function()
+		-- The 2026-11-05 report retired these steps in favour of macOS's prompt
+		-- alone. That prompt adds a "Hammerspoon" entry; turning it on did not
+		-- start a first install, and nothing said to add ErgoptiPlus.app with +
+		-- or that no reload is needed (field report 2026-11-23). The steps are
+		-- back for every wait, and name the other copies when there are some.
+		local unit, err = helpers.read_driver_unit("AccessibilityWait.start({")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
-		local at = body:find("local function show_accessibility_guidance()", 1, true)
-		local stop = body:find("\nend\n", at, true)
-		local fn = body:sub(at, stop)
-		helpers.assert_true(fn:find('require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)',
-			1, true) ~= nil, "the wait must show the native dialog")
-		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a dialog failure must never stop the boot")
-		helpers.assert_true(body:find("show_guidance = function() close_guidance = show_accessibility_guidance() end",
-			1, true) ~= nil, "the wait must own the dialog it closes on the grant")
+		helpers.assert_true(body:find("guide_accessibility(AccessibilityPermission, copies)", 1, true) ~= nil,
+			"the wait must be given the steps, copies included")
+		helpers.assert_true(body:find("name_other_copies", 1, true) == nil,
+			"a copies-only dialog left a lone copy without steps")
+		local dialog = helpers.read_module_source("ui.permission_dialog")
+		helpers.assert_true(dialog ~= nil and dialog:find("permission.grant_app_path()", 1, true) ~= nil,
+			"the steps quote the app the user installed, not the runtime nested in it")
 	end)
 
-	helpers.it("reopening ErgoptiPlus during the wait shows the steps again", function()
+	helpers.it("reopening ErgoptiPlus during the wait asks for the prompt again", function()
 		local unit, err = helpers.read_driver_unit("local function watch_launcher_reopen(on_reopen)")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
@@ -77,7 +81,7 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a watch failure must never stop the boot")
 		local wait_at = body:find("AccessibilityWait.start({", 1, true)
 		helpers.assert_true(wait_at ~= nil and body:find("watch_reopen = watch_launcher_reopen,", wait_at, true) ~= nil,
-			"the wait must be given the reopen watch, or a closed dialog cannot come back")
+			"the wait must be given the reopen watch, or a dismissed prompt cannot come back")
 	end)
 
 	-- The unit suite never runs init.lua, so the one registration that makes

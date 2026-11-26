@@ -53,6 +53,7 @@ local function load_remap(initially_enabled, options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = initially_enabled,
 				tap_hold_config = { caps = { tap = "ergopti_output", hold = "none" } },
 				mod_combos_config = {},
@@ -150,7 +151,7 @@ local function load_remap(initially_enabled, options)
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		unbind = function(handle)
 			ctx.unbind_attempts[handle] = (ctx.unbind_attempts[handle] or 0) + 1
 			if options.fail_cycle_unbind_once and handle == "cycle"
@@ -159,9 +160,9 @@ local function load_remap(initially_enabled, options)
 			return true
 		end,
 	}
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
@@ -177,7 +178,7 @@ local function load_remap(initially_enabled, options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["platform.remap"] = nil
 

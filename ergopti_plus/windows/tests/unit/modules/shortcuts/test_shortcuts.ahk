@@ -287,14 +287,14 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
-	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (infra/lifecycle.ahk).
-	Src := _DriverDirConcat("infra")
+	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (core/lifecycle/engine/lifecycle.ahk).
+	Src := _DriverDirsConcat("infra", "hotstrings/engine", "diagnostics/engine/reports", "diagnostics/engine/field_run", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
-	Assert(Body != "", "ToggleSuspend must exist in infra/lifecycle.ahk")
+	Assert(Body != "", "ToggleSuspend must exist in core/lifecycle/engine/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
-	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,
+	Assert(ClearPos > 0 and InStr(Body, 'SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))') > ClearPos,
 		"ToggleSuspend must defer Suspend until the physical AltGr/Kana prefix has released")
 }
 Test("Shortcuts/AltGr: ToggleSuspend drains the AltGr prefix latch before toggling Suspend (historical AltGr latch gotcha)",
@@ -305,7 +305,7 @@ TestShortcuts_MenuItemsUseRegisterMenuItem() {
 	; the menu_dispatcher WM_COMMAND retry path and silently drops ~1 click in 3
 	; under AHK 2.0. All actionable shortcut menu items must go through
 	; RegisterMenuItem instead.
-	Src := _DriverDirConcat("ui/menu")
+	Src := _DriverDirsConcat("ui/menu", "hotstrings/ui/menu", "gestures/ui/menu", "apps/ui/menu", "ai/ui/menu", "menu/ui/builder")
 	Assert(Src != "", "ui/menu must be readable")
 	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
 	; TWO ways to be on the retry path, and the file must be on one of them. It
@@ -325,23 +325,25 @@ Test("Shortcuts/menu: shortcut menu items are registered via RegisterMenuItem, n
 	TestShortcuts_MenuItemsUseRegisterMenuItem)
 
 TestShortcuts_KeepAwakeDeactivation() {
-	; Test that the keep-awake mode (ActivitySimulation) properly cancels on user input
-	global ActivitySimulation, AwakeOriginX, AwakeOriginY
-	ActivitySimulation := true
-	AwakeOriginX := 100
-	AwakeOriginY := 100
-
-	; Keyboard input should stop simulation
-	AwakeCancelOnKeypress("", "")
-	Sleep(10)
-	AssertFalse(ActivitySimulation, "Keyboard input should immediately deactivate keep-awake simulation")
-
-	; Reset
-	ActivitySimulation := true
-	AwakeCancelOnMouse()
-	Sleep(10)
-	AssertFalse(ActivitySimulation, "Mouse click should immediately deactivate keep-awake simulation")
+	global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+	SavedActive := ActivitySimulation, SavedHook := AwakeInputHook
+	SavedX := AwakeOriginX, SavedY := AwakeOriginY
+	try {
+		ActivitySimulation := true
+		AwakeOriginX := 100, AwakeOriginY := 100
+		Hook := InputHook()
+		AwakeInputHook := Hook
+		AwakeCancelOnKeypress(Hook, "")
+		AssertFalse(ActivitySimulation, "The current keyboard observer cancels keep-awake")
+		ActivitySimulation := true
+		AwakeCancelOnMouse()
+		AssertFalse(ActivitySimulation, "Mouse clicks cancel keep-awake")
+	} finally {
+		ActivitySimulation := SavedActive, AwakeInputHook := SavedHook
+		AwakeOriginX := SavedX, AwakeOriginY := SavedY
+	}
 }
+
 Test("Shortcuts: keep-awake simulation cancels on mouse or keyboard input", TestShortcuts_KeepAwakeDeactivation)
 
 class _KeepAwakeStopRetryStub {
@@ -381,8 +383,8 @@ Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-1
 _SPT_AssertRecordingBoundary() {
 	Body := _DriverFuncBody("SearchPath")
 	Code := _DriverMaskNonCode(&Body)
-	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened\)"),
-		"the search launch and report seams must retain their explicit native defaults")
+	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened, PathStatusFn := _SearchPathStatus\)"),
+		"the search launch, report and metadata seams must retain their explicit native defaults")
 	AssertFalse(RegExMatch(Code, "i)\bRun\s*\("), "the recording probe must never reach a raw native launch")
 	Assignments := 0, Calls := 0
 	Position := 1
@@ -518,7 +520,7 @@ _SRCT_RecordLaunch(State, Target) {
 	State["events"].Push("run")
 	State["launches"] += 1
 	State["suspended_at_launch"] := A_IsSuspended
-	AssertEqual("Regedit.exe", Target)
+	AssertEqual('"' . A_WinDir . '\regedit.exe"', Target, "the Registry Editor starts by its absolute path")
 	if State["throw_launch"]
 		throw Error("owned launch failure")
 	return true
@@ -647,7 +649,7 @@ Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
 TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
 	Targets := []
 	AssertTrue(_OpenDownloadsWith(() => "Z:\Company\Alice Downloads", (Command) => Targets.Push(Command)))
-	AssertEqual('explorer.exe "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
+	AssertEqual('"' . A_WinDir . '\explorer.exe" "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
 	FailedResolve() {
 		throw Error("Downloads lookup denied")
 	}

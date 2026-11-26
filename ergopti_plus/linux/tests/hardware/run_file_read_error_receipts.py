@@ -16,7 +16,7 @@ WORKER = r"""
 local source = assert(os.getenv("ERGOPTI_READ_SOURCE"))
 local read = os.getenv("ERGOPTI_READ_PORT") == "updater"
 	and require("modules.updater.installer").DEFAULT_OPS.read
-	or require("adapters.file_system").read
+	or require("core.fs.adapters.file_system").read
 local bytes = read(source)
 if os.getenv("ERGOPTI_READ_FAULT") then
 	assert(bytes == nil, "a failed stream receipt published successful file contents")
@@ -45,7 +45,7 @@ def main():
                 ERGOPTI_READ_SOURCE=str(source),
                 ERGOPTI_READ_PORT=port,
                 XDG_CONFIG_HOME=str(root / "config"),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             )
             reference = root / (port + "-reference.trace")
             probe = run(interpreter, reference, env)

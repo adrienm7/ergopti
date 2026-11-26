@@ -78,9 +78,9 @@ local PERSONAL_SOURCE = '[meta]\nname = "WebKit fixture"\n[General]\n"probe" = {
 --- Creates an independently authored source for the real editor opening owner.
 --- @return string directory An exclusively created temporary directory.
 local function prepare_personal_source()
-	local Shell = require("adapters.shell_runner")
-	local Writer = require("toml_codec.writer")
-	local Reader = require("toml_codec.reader")
+	local Shell = require("core.process.adapters.shell_runner")
+	local Writer = require("core.text.engine.toml_codec.writer")
+	local Reader = require("core.text.engine.toml_codec.reader")
 	local directory = os.tmpname()
 	assert(os.remove(directory), "the owned temporary placeholder must retire")
 	assert(Shell.run("mkdir " .. Shell.quote(directory)) == true,
@@ -105,7 +105,7 @@ end
 --- @return boolean
 local function retire_personal_source()
 	if personal_directory == nil then return true end
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local removed = os.remove(personal_directory .. "/personal.toml")
 	if not removed then return false end
 	local retired = Shell.run("rmdir " .. Shell.quote(personal_directory)) == true
@@ -118,14 +118,14 @@ local Manager
 --- Runs the original real-window checks with an owned editor source.
 --- @return integer
 local function run()
-	Manager = require("ui.webview_manager")
+	Manager = require("core.ui.ui.webview_manager")
 
 	-- The daemon state the bridges read. Without it the settings window's payload is
 	-- an empty shell — correctly, since it has nothing to describe — and the "did the
 	-- push change the page" assertion would fail for a reason that says nothing about
 	-- the push. The REAL config module is used, loading the bundled packs, so what
 	-- the page renders is what a user would see.
-	local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
+	local HotstringsConfig = require("hotstrings.engine.catalogue.config")
 	local config_dir = nil
 	if arg and arg[1] == "hotstring_editor" then config_dir = prepare_personal_source() end
 	assert(HotstringsConfig.init(nil, config_dir, nil) == true,

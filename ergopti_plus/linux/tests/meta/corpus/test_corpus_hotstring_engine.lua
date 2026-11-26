@@ -37,15 +37,15 @@ local shared_root = driver_root .. "/../_shared"
 -- =========================================
 -- =========================================
 
---- Resolves the path to _shared/lua/ from this test file's location.
+--- Resolves the path to _shared/ from this test file's location.
 local function shared_lua_path()
 	local this = debug.getinfo(1, "S").source:gsub("^@", "")
 	local linux_root = this:match("^(.*[/\\])tests[/\\]")
 	if not linux_root then return nil end
-	return linux_root .. "../../_shared/lua"
+	return linux_root .. "../../_shared"
 end
 
--- Bootstrap: inject _shared/lua/ into package.path before requiring the engine.
+-- Bootstrap: inject _shared/ into package.path before requiring the engine.
 local _shared = shared_lua_path()
 if _shared then
 	local entry = _shared .. "/?.lua"
@@ -54,7 +54,7 @@ if _shared then
 	end
 end
 
-local engine_mod = require("hotstring_engine")
+local engine_mod = require("hotstrings.engine.matcher")
 
 --- Every per-entry flag a vector may declare. Driven off a LIST because this
 --- harness used to name the fields one by one and dropped two of them:
@@ -102,7 +102,7 @@ local function load_corpus()
 	local raw = f:read("*a")
 	f:close()
 
-	local ok, json_mod = pcall(require, "json")
+	local ok, json_mod = pcall(require, "core.text.engine.json")
 	if ok and json_mod and json_mod.decode then
 		return json_mod.decode(raw)
 	end
@@ -147,7 +147,7 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 	local corpus = load_corpus()
 
 	it("corpus JSON decodes without error", function()
-		assert_true(corpus ~= nil, "hotstrings/vectors.json must decode — is _shared/lua/json.lua available?")
+		assert_true(corpus ~= nil, "hotstrings/vectors.json must decode — is _shared/core/text/engine/json.lua available?")
 	end)
 
 	if not corpus then return end

@@ -23,8 +23,8 @@ import tempfile
 
 
 MODEL = "granite4:350m-h"
-ARCHIVE_BYTES = 1436408810
-ARCHIVE_SHA256 = "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a"
+ARCHIVE_BYTES = 1438364593
+ARCHIVE_SHA256 = "c164ab8b1b28e2a247c29719b8e404c423c5b83ae64c3ab4e59d50c7ff7fc5e0"
 
 
 WORK_PHASES = frozenset(
@@ -490,18 +490,29 @@ def main():
         assert os.uname().machine in ("x86_64", "amd64"), (
             "frozen official amd64 expectations required"
         )
-        catalogue = repository / "static/ergopti_plus/_shared/modules/llm/models.json"
+        catalogue = repository / "static/ergopti_plus/_shared/ai/data/models.json"
         assert canonical_model(json.loads(catalogue.read_text())), (
             "canonical model identity required"
         )
         pins = json.loads(
-            (repository / "static/ergopti_plus/_shared/modules/llm/ollama_release.json").read_text()
+            (repository / "static/ergopti_plus/_shared/ai/data/ollama_release.json").read_text()
         )
-        assert pins["version"] == "0.40.4" and pins["assets"]["linux-amd64"] == {
-            "filename": "ollama-linux-amd64.tar.zst",
-            "bytes": ARCHIVE_BYTES,
-            "sha256": ARCHIVE_SHA256,
-        }, "independently frozen official archive fields required"
+        asset = pins["assets"]["linux-amd64"]
+        # unpacked_bytes is the repository's own measure of the archive
+        # (tools/build/pin-ollama-release.cjs, OLL-14), not an official field:
+        # it is admitted by shape, the official fields stay frozen here.
+        assert (
+            pins["version"] == "0.40.6"
+            and set(asset) == {"filename", "bytes", "sha256", "unpacked_bytes"}
+            and {key: asset[key] for key in ("filename", "bytes", "sha256")}
+            == {
+                "filename": "ollama-linux-amd64.tar.zst",
+                "bytes": ARCHIVE_BYTES,
+                "sha256": ARCHIVE_SHA256,
+            }
+            and type(asset["unpacked_bytes"]) is int
+            and asset["unpacked_bytes"] > ARCHIVE_BYTES
+        ), "independently frozen official archive fields required"
 
         # HOME is trusted by the production resolver; /tmp and writable-by-others
         # ancestors deliberately remain refused. Never rewrite an existing path.
@@ -530,10 +541,12 @@ def main():
             ERGOPTI_MODEL_RECEIPT_DIR=str(root),
         )
         subjects = set((repository / "static/ergopti_plus/linux").rglob("*.lua"))
-        subjects.update((repository / "static/ergopti_plus/_shared/lua").rglob("*.lua"))
-        subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.json"))
-        subjects.update((repository / "static/ergopti_plus/_shared/modules").rglob("*.toml"))
-        subjects.update((repository / "static/ergopti_plus/_shared/data/locales").glob("*.json"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.lua"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.json"))
+        subjects.update((repository / "static/ergopti_plus/_shared").rglob("*.toml"))
+        subjects.update(
+            (repository / "static/ergopti_plus/_shared/core/i18n/data/locales").glob("*.json")
+        )
         subjects.update(
             [
                 Path(__file__).resolve(),
@@ -613,7 +626,7 @@ def main():
             accepted = (
                 receipt.get("archive_sha256") == ARCHIVE_SHA256
                 and receipt.get("archive_bytes") == ARCHIVE_BYTES
-                and receipt.get("typed_version") == "0.40.4"
+                and receipt.get("typed_version") == "0.40.6"
                 and all(
                     type(receipt.get(key)) is int and receipt[key] == 1
                     for key in (

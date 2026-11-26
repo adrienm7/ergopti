@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: LLM Bridge Fixture
 --- DESCRIPTION:
---- Loads the real modules/keymap/llm_bridge.lua over strict tooltip and
+--- Loads the real ai/engine/bridge.lua over strict tooltip and
 --- prediction-engine doubles and restores package.loaded and the hs global
 --- exactly afterwards, so a scenario can never inherit another test's partial
 --- double.
@@ -80,6 +80,7 @@ local function make_tooltip(fixture)
 		set_chain_start = return_true,
 		mark_chain_complete = return_true,
 		tint = return_empty_table,
+		glyph = function() return nil, nil end,
 		set_accent_color = return_true,
 	}
 end
@@ -125,6 +126,7 @@ local function make_prediction_engine(fixture)
 		start_timer_word_end = return_true,
 		stop_timer = return_true,
 		handle_chain_signal = return_false,
+		has_pending_work = return_false,
 		is_visible = function() return fixture.engine_visible == true end,
 		is_chain_pending = return_false,
 		get_predictions = function() return fixture.predictions or {} end,
@@ -146,7 +148,7 @@ local function with_bridge_fixture(callback, options)
 	local baseline_hs = rawget(_G, "hs")
 
 	if options.preloaded_tooltip ~= nil then
-		package.loaded["ui.tooltip"] = options.preloaded_tooltip
+		package.loaded["core.ui.ui.tooltip"] = options.preloaded_tooltip
 	end
 	local pre_fixture_loaded = snapshot_package_loaded()
 	local pre_fixture_hs = rawget(_G, "hs")
@@ -155,20 +157,20 @@ local function with_bridge_fixture(callback, options)
 		local fixture = {}
 		fixture.tooltip = make_tooltip(fixture)
 		fixture.engine = make_prediction_engine(fixture)
-		package.loaded["ui.tooltip"] = fixture.tooltip
-		package.loaded["modules.llm.prediction_engine"] = fixture.engine
-		package.loaded["infra.logger"] = nil
-		package.loaded["adapters.event_provenance"] = options.event_provenance
-		fixture.bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		package.loaded["core.ui.ui.tooltip"] = fixture.tooltip
+		package.loaded["ai.engine.prediction.engine"] = fixture.engine
+		package.loaded["core.logger.engine.logger"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = options.event_provenance
+		fixture.bridge = helpers.load_with_stubs("ai.engine.bridge")
 		fixture.hs = rawget(_G, "hs")
-		fixture.logger = package.loaded["infra.logger"]
+		fixture.logger = package.loaded["core.logger.engine.logger"]
 		return callback(fixture)
 	end, debug.traceback))
 
 	restore_package_loaded(pre_fixture_loaded)
 	_G.hs = pre_fixture_hs
 	local preloaded_restored = options.preloaded_tooltip == nil
-		or package.loaded["ui.tooltip"] == options.preloaded_tooltip
+		or package.loaded["core.ui.ui.tooltip"] == options.preloaded_tooltip
 	restore_package_loaded(baseline_loaded)
 	_G.hs = baseline_hs
 

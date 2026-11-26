@@ -4,13 +4,13 @@
 ; MODULE: Layout Manager WebView2 Host
 ; DESCRIPTION:
 ; Hosts the shared layout manager page (_shared/ui/layout_manager) on Windows
-; through WebView2: the "Manage layouts…" row of the keyboard-layout submenu
+; through WebView2: the « Install or remove layouts… » row of the layout submenu
 ; opens it, and it lists, installs, updates, uninstalls and selects the
 ; layouts of the registry through modules/keymap/keylayout/layout_catalogue.ahk.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The same rules as the macOS and Linux hosts
-;    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
+;    (_shared/layouts/engine/manager_bridge.lua): an allowlist of actions, each
 ;    checked against the catalogue or the installed layouts before it runs,
 ;    and one page state for the three drivers.
 ; 2. Selecting a layout writes [layout] emulated_layout (the Ergopti layouts
@@ -18,10 +18,21 @@
 ;    emulation registers its hotkeys.
 ; 3. Singleton window; every WebView2 callback is fenced by a session epoch,
 ;    so a late callback of a closed window never writes into its successor.
+; 4. The unified layout editor (docs/design/layout-editor.md « Windows host »)
+;    has its own window (editor_window.ahk): the page's « Layout editor » button
+;    posts open_editor and opens it on its editor tab, and the tray root's
+;    « Ergopti Studio… » opens it directly. LayoutManager_HandleEditorAction answers the editor's actions:
+;    source_open and source_save go to source_store.ahk, composer_save with a
+;    source and composer_emulate to composer.ahk, nav_save to the navigation
+;    layer editor's own save; WebView2's own file chooser opens files, so
+;    source_pick is refused here.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\emulation_recents.ahk
 
 
 
@@ -41,6 +52,11 @@ global _LayMgrWeb_NavSub     := unset
 global _LayMgrWeb_ResetDone  := false
 global _LayMgrWeb_SessionEpoch := 0
 global _LayMgrWeb_ReadyEpoch := 0
+; An in-flight subscription must return before its controller and HWND retire.
+global _LayMgrWeb_SubscriptionOwner := 0
+global _LayMgrWeb_RetiredHosts := []
+; The current presentation owns its own paths and push port.
+global _LayMgrWeb_PresentationDeps := 0
 ; Result of the last operation, shown by the page (0 when none).
 global _LayMgrWeb_Result := 0
 ; A durable catalogue operation still waits for its terminal runtime refresh.
@@ -51,10 +67,36 @@ global LAYMGR_VHOST := "ergopti.layoutmanager"
 global LAYMGR_HOST_ACCESS_ALLOW := 1
 
 ; The only actions the page may send (the page and the Lua hosts declare the
-; same list; tools/test/test-layout-manager-page.cjs pins the three).
+; same list; tools/test/test-layout-manager-page.cjs pins the three). The
+; layout editor's own window has its list in editor_window.ahk.
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true,
-	"composer_open", true, "composer_save", true, "composer_remove", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true, "open_editor", true)
+
+; The actions that change the installed or selected layout, refused while a
+; runtime refresh is pending.
+global LAYMGR_MUTATIONS := Map("install", true, "update", true, "uninstall", true, "select", true,
+	"composer_save", true, "composer_remove", true, "composer_emulate", true, "nav_save", true)
+
+; A JSON boolean: AutoHotkey's true is the integer 1, which the page's strict
+; `=== true` would read as a number.
+class LayMgrJsonBool {
+	__New(Value) {
+		this.Value := Value ? true : false
+	}
+}
+
+global LAYMGR_JSON_TRUE := LayMgrJsonBool(true)
+global LAYMGR_JSON_FALSE := LayMgrJsonBool(false)
+
+/**
+ * The JSON boolean of a truth value.
+ * @param {Any} Value
+ * @returns {LayMgrJsonBool}
+ */
+LayMgrJsonBool_Of(Value) {
+	global LAYMGR_JSON_TRUE, LAYMGR_JSON_FALSE
+	return Value ? LAYMGR_JSON_TRUE : LAYMGR_JSON_FALSE
+}
 
 
 
@@ -91,8 +133,8 @@ LayoutManager_ActiveId(FeaturesSource := unset) {
 	Selected := KeylayoutEmulation_SelectedId(FeaturesSource)
 	if (Selected != "")
 		return Selected
-	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
-	if !(Layout.Get(ConfigLeaf.ERGOPTI_BASE, false) = true)
+	; The selection alone: a layer switch selects no layout.
+	if !ErgoptiLayout_LayoutIsSelected(FeaturesSource)
 		return ""
 	return ErgoptiLayout_BuiltinVariant(FeaturesSource)
 }
@@ -102,6 +144,8 @@ _LayMgrWeb_Json(Value) {
 	global JSON_NULL
 	if (Value == JSON_NULL)
 		return "null"
+	if Value is LayMgrJsonBool
+		return Value.Value ? "true" : "false"
 	if (Value is Map) {
 		Out := ""
 		for Key, Item in Value
@@ -120,11 +164,36 @@ _LayMgrWeb_Json(Value) {
 }
 
 /**
+ * The read-only registry ports of KbdRegister_Inspect and KbdRegister_Installed,
+ * on the 64-bit view where the layout DLLs are registered.
+ * @returns {Map} "reg_read" and "reg_subkeys".
+ */
+LayoutManager_RegistryPorts() {
+	return Map("reg_read", LayoutInstallRegRead64, "reg_subkeys", LayoutInstallRegSubkeys64)
+}
+
+/**
+ * The keyboard layouts Studio registered as Windows DLLs, as the page lists
+ * them (the `native` field of the page state).
+ * @param {Map} Registry - LayoutManager_RegistryPorts or a fake.
+ * @returns {Array} Maps dll, name, author and klid.
+ */
+LayoutManager_NativeLayouts(Registry) {
+	Rows := []
+	for Found in KbdRegister_Installed(Registry)
+		Rows.Push(Map("dll", Found["dll"], "name", Found["text"] != "" ? Found["text"] : Found["dll"],
+			"author", Found["company"], "klid", Found["klid"]))
+	return Rows
+}
+
+/**
  * The state the page renders (the shape every host sends).
  * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir; the configured one by default.
+ * @param {Map} Registry - The registry ports the native layouts are read with;
+ *   LayoutManager_RegistryPorts when it is not a Map.
  * @returns {Map}
  */
-LayoutManager_PageState(LocalDir := unset) {
+LayoutManager_PageState(LocalDir := unset, Registry := 0) {
 	global _ConfigDir, _LayMgrWeb_Result, JSON_NULL, LAYOUT_CATALOGUE_SOURCE_BUNDLED
 	if !IsSet(LocalDir)
 		LocalDir := LayoutRegistry_LocalDir(_ConfigDir)
@@ -144,6 +213,13 @@ LayoutManager_PageState(LocalDir := unset) {
 		Installed := Map()
 		RecordError := Err.Message
 	}
+	; A registry that cannot be read lists no DLL; the record error says so.
+	try Native := LayoutManager_NativeLayouts((Registry is Map) ? Registry : LayoutManager_RegistryPorts())
+	catch as Err {
+		Native := []
+		LoggerError("LayoutManager", "The keyboard layouts registered by Studio cannot be listed: {1}", Err.Message)
+		RecordError := Err.Message
+	}
 	global _LayMgrWeb_RuntimeRefresh
 	Busy := (_LayMgrWeb_RuntimeRefresh is Map) ? _LayMgrWeb_RuntimeRefresh : LayoutCatalogue_Busy()
 	; shortcut_menu_path: the extension file this driver loads as a layout's
@@ -156,6 +232,7 @@ LayoutManager_PageState(LocalDir := unset) {
 		"source", Source,
 		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
 		"installed", Installed,
+		"native", Native,
 		"provided", Map(),
 		"builtin", LayoutManager_BuiltinIds(),
 		"active", LayoutManager_ActiveId(),
@@ -199,6 +276,7 @@ _LayMgrWeb_Strings() {
  */
 LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	global LAYMGR_ACTIONS, _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_PresentationDeps
 	if !IsSet(SessionEpoch)
 		SessionEpoch := _LayMgrWeb_SessionEpoch
 	if !(Payload is Map) || !Payload.Has("action") || !(Payload["action"] is String)
@@ -213,23 +291,31 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps := _LayMgrWeb_DefaultDeps()
 	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 		return false
-	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
-			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
-			|| Action == "composer_remove") {
+	; Each retained callback owns the admitting page, even when Deps is reused.
+	Deps := Deps.Clone()
+	Deps["session_epoch"] := SessionEpoch
+	_LayMgrWeb_PresentationDeps := Deps
+	global LAYMGR_MUTATIONS
+	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
-		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
+		; The page offers the layout editor's window only for a host that stores its files.
+		Initial := Map("strings", _LayMgrWeb_Strings(),
+			"state", LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0)),
+			"source_editor", LayMgrJsonBool_Of(true))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["push"].Call("initData", Initial)
+		_LayMgrWeb_PushPayload(Deps, "initData", Initial)
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
 	}
+	if (Action == "open_editor")
+		return Deps.Get("open_editor", LayoutEditorWindow_OpenOnEdit).Call()
 	if (Action == "refresh") {
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
@@ -238,14 +324,14 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["close"].Call()
 		return true
 	}
-	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
-		return LayoutComposer_Handle(Action, Payload, Deps)
+	if (Action == "uninstall" && Payload.Has("dll"))
+		return _LayMgrWeb_UninstallNative(Deps, Payload["dll"], SessionEpoch)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
 		return false
 	}
-	State := LayoutManager_PageState(Deps["local_dir"])
+	State := LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0))
 	if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 		return false
 	Entry := LayoutCatalogue_Entry(State["index"], Id)
@@ -258,8 +344,7 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		}
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
-		Deps["open_url"].Call(Homepage)
-		return true
+		return Deps["open_url"].Call(Homepage)
 	}
 	if (Action == "install" || Action == "update") {
 		if !(Entry is Map) {
@@ -296,39 +381,126 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	return true
 }
 
-; Readiness initializes the admitted page under pause; user commands do not.
+/**
+ * Removes a keyboard layout Studio registered as a Windows DLL: the page lists
+ * it from its Ergopti_kbd_<dll> uninstall entry (LayoutManager_NativeLayouts),
+ * the user confirms, then the elevated helper runs its uninstall (one UAC
+ * prompt), as Windows Settings › Apps would.
+ * @param {Map} Deps - The page's collaborators: "registry", "confirm" (Text) ->
+ *   Boolean and "uninstall_native" (Dll) -> Map code, detail; the production ones by default.
+ * @param {Any} Dll - The DLL name the page sent.
+ * @param {Integer} SessionEpoch - The page session.
+ * @returns {Boolean} Whether the message was accepted.
+ */
+_LayMgrWeb_UninstallNative(Deps, Dll, SessionEpoch) {
+	Registry := Deps.Get("registry", 0)
+	if !(Registry is Map)
+		Registry := LayoutManager_RegistryPorts()
+	Row := 0
+	if (Dll is String)
+		for Candidate in LayoutManager_NativeLayouts(Registry)
+			if Candidate["dll"] == Dll
+				Row := Candidate
+	if !(Row is Map) {
+		LoggerWarn("LayoutManager", "Refused to uninstall a keyboard layout DLL Ergopti did not register.")
+		return false
+	}
+	Id := "native:" . Dll
+	Confirm := Deps.Get("confirm", _LayMgrWeb_Confirm)
+	if !Confirm.Call(Format(t("layout_manager.confirm_uninstall_native"), Row["name"], Dll)) {
+		LoggerInfo("LayoutManager", "The removal of the keyboard layout {1}.dll was cancelled.", Dll)
+		return true
+	}
+	if !_LayMgrWeb_CommandCurrent(SessionEpoch, "uninstall")
+		return false
+	LoggerStart("LayoutManager", "Uninstalling the keyboard layout {1}.dll registered by Studio…", Dll)
+	Outcome := Deps.Get("uninstall_native", (Name) => LayoutComposer_UninstallDll(0, Name)).Call(Dll)
+	Ok := Outcome["code"] == ""
+	if Ok
+		LoggerSuccess("LayoutManager", "Uninstalled the keyboard layout {1}.dll.", Dll)
+	else
+		LoggerError("LayoutManager", "The keyboard layout {1}.dll was not uninstalled ({2}).", Dll, Outcome["code"])
+	; The row is gone once removed: the page names the layout from the result.
+	Result := Map("id", Id, "action", "uninstall", "ok", Ok, "name", Row["name"])
+	if !Ok {
+		Result["code"] := Outcome["code"]
+		Result["detail"] := Outcome["detail"]
+	}
+	_LayMgrWeb_PublishResult(Deps, Result)
+	_LayMgrWeb_PushState(Deps)
+	return true
+}
+
+; The removal's own question, before Windows asks for the administrator right.
+_LayMgrWeb_Confirm(Text) {
+	global _LayMgrWeb_Gui
+	Options := "YesNo Icon! Default2" . (_LayMgrWeb_Gui ? " Owner" . _LayMgrWeb_Gui.Hwnd : "")
+	return Ui_MsgBox(Text, t("layout_manager.window_title"), Options) = "Yes"
+}
+
+; A command belongs to the page session that sent it. A pause stops typing, not
+; configuration (EDD-1): a paused driver still installs, selects and removes a
+; layout, and the emulation it selects stays inert until the resume.
 _LayMgrWeb_CommandCurrent(SessionEpoch, Action) {
 	global _LayMgrWeb_SessionEpoch
-	return SessionEpoch == _LayMgrWeb_SessionEpoch && (Action == "ready" || !A_IsSuspended)
+	return SessionEpoch == _LayMgrWeb_SessionEpoch
+}
+
+_LayMgrWeb_PresentationCurrent(Deps) {
+	global _LayMgrWeb_SessionEpoch
+	return Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch) == _LayMgrWeb_SessionEpoch
+}
+
+; A result belongs to one page; committing an install remains independent of it.
+_LayMgrWeb_PublishResult(Deps, Result) {
+	global _LayMgrWeb_Result
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayMgrWeb_PresentationCurrent(Deps)
+			return false
+		_LayMgrWeb_Result := Result
+	} finally Critical(PreviousCritical)
+	return true
 }
 
 _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
-	global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+	global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_SessionEpoch
+	; Direct internal callers acquire the same owner as message callbacks.
+	if !Deps.Has("session_epoch") {
+		Deps := Deps.Clone()
+		Deps["session_epoch"] := _LayMgrWeb_SessionEpoch
+	}
 	if !Ok {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", false, "code", String(CodeOrDetail),
-			"detail", String(Detail))
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", false,
+			"code", String(CodeOrDetail), "detail", String(Detail)))
 		_LayMgrWeb_PushState(Deps)
 		return false
 	}
 	if !Deps.Has("after") {
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", true)
+		_LayMgrWeb_PublishResult(Deps, Map("id", Id, "action", Action, "ok", true))
 		_LayMgrWeb_PushState(Deps)
 		return true
 	}
 	Pending := Map("id", Id, "action", Action)
 	_LayMgrWeb_RuntimeRefresh := Pending
-	_LayMgrWeb_Result := 0
+	_LayMgrWeb_PublishResult(Deps, 0)
 	_LayMgrWeb_PushState(Deps)
 	Finish(Ready) {
-		global _LayMgrWeb_Result, _LayMgrWeb_RuntimeRefresh
+		global _LayMgrWeb_RuntimeRefresh, _LayMgrWeb_PresentationDeps
 		if _LayMgrWeb_RuntimeRefresh != Pending
 			return false
 		_LayMgrWeb_RuntimeRefresh := 0
 		Accepted := (Ready is Integer) && Ready == 1
-		_LayMgrWeb_Result := Map("id", Id, "action", Action, "ok", Accepted)
+		Result := Map("id", Id, "action", Action, "ok", Accepted)
 		if !Accepted
-			_LayMgrWeb_Result["code"] := "other"
-		_LayMgrWeb_PushState(Deps)
+			Result["code"] := "other"
+		_LayMgrWeb_PublishResult(Deps, Result)
+		; A replacement page may have observed the operation as busy. Retire
+		; that projection with fresh state while preserving its own result.
+		if _LayMgrWeb_PresentationCurrent(Deps)
+			_LayMgrWeb_PushState(Deps)
+		else if _LayMgrWeb_PresentationDeps is Map
+			_LayMgrWeb_PushState(_LayMgrWeb_PresentationDeps)
 		return true
 	}
 	try Started := Deps["after"].Call(Id, Action, Finish)
@@ -344,7 +516,152 @@ _LayMgrWeb_OnDone(Deps, Id, Action, Ok, CodeOrDetail := "", Detail := "") {
 }
 
 _LayMgrWeb_PushState(Deps, *) {
-	Deps["push"].Call("updateState", LayoutManager_PageState(Deps["local_dir"]))
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	State := LayoutManager_PageState(Deps["local_dir"], Deps.Get("registry", 0))
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	return _LayMgrWeb_PushPayload(Deps, "updateState", State)
+}
+
+_LayMgrWeb_PushPayload(Deps, Name, Payload) {
+	global _LayMgrWeb_SessionEpoch
+	if !_LayMgrWeb_PresentationCurrent(Deps)
+		return false
+	if Deps["push"] == _LayMgrWeb_Push
+		return _LayMgrWeb_Push(Name, Payload, Deps.Get("session_epoch", _LayMgrWeb_SessionEpoch))
+	Deps["push"].Call(Name, Payload)
+	return true
+}
+
+; The configuration folder the editor's files go to: the test's, else the driver's.
+_LayMgrWeb_ConfigDir(Deps) {
+	global _ConfigDir
+	return Deps.Has("config_dir") ? Deps["config_dir"] : _ConfigDir
+}
+
+/**
+ * The layout editor's strings in the active locale: the whole catalogue, as
+ * the macOS and Linux hosts seed it in window._i18n_strings before the page
+ * runs; this host sends it with sourceData, the first message the editor reads.
+ * The Studio reads keys of many families (layout_editor.*, layout_analysis.*,
+ * layout_optimizer.*, the layer editor's layer_editor.key.* key names, the
+ * action labels), so a prefix filter here dropped every family it did not
+ * list and the « Edit » tab showed layer_editor.key.shift for Shift.
+ * @returns {Map} Every catalogue key -> its translation (active over en over fr).
+ */
+LayoutManager_EditorStrings() {
+	global _I18nCache, _I18nCacheEn
+	_I18nEnsureLoaded()
+	Strings := Map()
+	for Cache in [_I18nCache, _I18nCacheEn]
+		for Key in Cache
+			if !Strings.Has(Key)
+				Strings[Key] := I18nLookup(Key)
+	return Strings
+}
+
+; Answers the editor's source_open: the last saved source, else text null.
+_LayMgrWeb_SourceOpen(Deps) {
+	global JSON_NULL
+	Data := SourceStore_Open(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps), Deps.Get("source_ports", 0))
+	if !Data.Has("text")
+		Data["text"] := JSON_NULL, Data["filename"] := JSON_NULL
+	Data["strings"] := Deps.Get("editor_strings", LayoutManager_EditorStrings).Call()
+	return _LayMgrWeb_PushPayload(Deps, "sourceData", Data)
+}
+
+; « Apply the navigation layer »: the window-free layers.toml save, then
+; the pause-preserving reload that applies it.
+_LayMgrWeb_ApplyNav(Text) {
+	global _SharedDir, _ConfigDir
+	return NavLayerSave_SaveAndApply(Text, _SharedDir, _ConfigDir, ReloadPreservingSuspend)
+}
+
+/**
+ * Answers a layout editor change refused while a runtime refresh is pending:
+ * the page waits for exactly one answer per change, so a refusal without one
+ * left « Install », « Emulate » or « Apply » pending until the window closed,
+ * and every later one refused as busy by the page itself (LTP-04). macOS and
+ * Linux answer a busy registry with the same code.
+ * @param {Map} Deps - "push" (FunctionName, Payload).
+ * @param {String} Action - composer_save, composer_emulate or nav_save.
+ */
+_LayMgrWeb_AnswerBusy(Deps, Action) {
+	global LAYOUT_CATALOGUE_FAILURE_BUSY
+	Detail := "a layout change is still being applied"
+	if (Action == "composer_save" || Action == "composer_emulate")
+		_LayMgrWeb_PushPayload(Deps, "composerResult", Map("action", Action, "ok", LayMgrJsonBool_Of(false),
+			"code", LAYOUT_CATALOGUE_FAILURE_BUSY, "detail", Detail))
+	else if (Action == "nav_save")
+		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(false),
+			"applied", LayMgrJsonBool_Of(false),
+			"errors", [Map("code", LAYOUT_CATALOGUE_FAILURE_BUSY, "detail", Detail)]))
+}
+
+/**
+ * Answers one action of the layout editor (its own window, editor_window.ahk):
+ * source_open, source_save, source_export, source_pick, nav_save,
+ * composer_open, composer_save and composer_emulate. The caller checked its
+ * allowlist.
+ * @param {String} Action - The page's action.
+ * @param {Map} Payload - Decoded message.
+ * @param {Map} Deps - "push" (FunctionName, Payload), "local_dir", and the
+ *   optional "config_dir", "source_ports", "export_ports", "apply_nav" and
+ *   composer ports.
+ * @returns {Boolean} Whether the action was accepted.
+ */
+LayoutManager_HandleEditorAction(Action, Payload, Deps) {
+	global LAYMGR_MUTATIONS, _LayMgrWeb_RuntimeRefresh
+	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
+		LoggerWarn("LayoutManager", "Refused a layout editor change while runtime refresh is pending.")
+		_LayMgrWeb_AnswerBusy(Deps, Action)
+		return false
+	}
+	if (Action == "source_open") {
+		_LayMgrWeb_SourceOpen(Deps)
+		return true
+	}
+	if (Action == "source_save") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor save without its file name and text.")
+			return false
+		}
+		Result := SourceStore_Save(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps),
+			Map("filename", Payload["filename"], "text", Payload["text"]), Deps.Get("source_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "sourceResult", Result)
+		return true
+	}
+	if (Action == "source_export") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("data", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor download without its file name and bytes.")
+			return false
+		}
+		Result := SourceStore_Export(SourceStore_SharedSettings(),
+			Map("filename", Payload["filename"], "data", Payload["data"]), Deps.Get("export_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "exportResult", Result)
+		return true
+	}
+	if (Action == "source_pick") {
+		LoggerWarn("LayoutManager", "Refused a layout editor file pick: this host lets the page pick files.")
+		return false
+	}
+	if (Action == "nav_save") {
+		if !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a navigation layer save without its layers.toml text.")
+			return false
+		}
+		Result := Deps.Get("apply_nav", _LayMgrWeb_ApplyNav).Call(Payload["text"])
+		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(Result.Get("saved", false)),
+			"applied", LayMgrJsonBool_Of(Result.Get("applied", false)), "errors", Result.Get("errors", [])))
+		return true
+	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_emulate")
+		return LayoutComposer_Handle(Action, Payload, Deps)
+	LoggerWarn("LayoutManager", "Refused the layout editor action '{1}'.", Action)
+	return false
 }
 
 /**
@@ -359,6 +676,54 @@ LayoutManager_Select(Id, Options := unset) {
 }
 
 /**
+ * Selects a layout and reports its terminal outcome. Launch acceptance only
+ * means the successor started: the configuration is rolled back if it later
+ * refuses the handoff, so success is reported when the reload commits.
+ * @param {String} Id Registry layout identifier.
+ * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
+ */
+LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
+	Settled := false
+	Settle(Ok, Detail := "") {
+		if Settled
+			return
+		Settled := true
+		OnDone.Call(Ok, Detail)
+	}
+	Lifecycle := IsSet(Options) ? Options.Clone() : Map()
+	ReloadFn := Lifecycle.Get("reload", ReloadPreservingSuspend)
+	Lifecycle["reload"] := (OnCommitted, Bundle, Refused) => ReloadFn.Call(
+		(*) => (OnCommitted.Call(), Settle(true)),
+		Bundle,
+		(Reason := "") => (Refused.Call(Reason), Settle(false, "the driver refused the layout handoff")))
+	Receipt := LayoutManager_SelectTransition(Id, Lifecycle)
+	if Receipt["status"] == "committed" {
+		Settle(true)
+		return true
+	}
+	if Receipt["status"] == "pending"
+		return true
+	Settle(false, "the layout could not be selected")
+	return false
+}
+
+/**
+ * Makes a stored layout the emulated one ([layout] emulated_layout), the
+ * « Emulate without installing » of the layout editor, and reports its terminal
+ * outcome as LayoutManager_SelectSettled. The selection is the one gate of the
+ * layer switches, which keep the user's choice.
+ * @param {String} Id Registry layout identifier (the composer's).
+ * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
+ */
+LayoutManager_EmulateSettled(Id, OnDone, Options := unset) {
+	return LayoutManager_SelectSettled(Id, OnDone, IsSet(Options) ? Options : Map())
+}
+
+/**
  * Retains the selected configuration until successor completion or rollback.
  * The resident input owner keeps its admitted layout while the reload is pending.
  * @param {String} Id Registry layout identifier.
@@ -366,7 +731,8 @@ LayoutManager_Select(Id, Options := unset) {
  * @returns {Map} Pending or terminal configuration receipt.
  */
 LayoutManager_SelectTransition(Id, Options := unset) {
-	if !LayoutRegistry_IsValidId(Id)
+	; "" is the menu's « none »: the system layout types.
+	if Id != "" && !LayoutRegistry_IsValidId(Id)
 		throw ValueError("The layout selection requires a valid registry identifier.")
 	if !IsSet(Options)
 		Options := Map()
@@ -384,7 +750,11 @@ LayoutManager_SelectTransition(Id, Options := unset) {
 }
 
 ; Built-in selections keep the existing empty-emulation contract and overlays.
-; A registry selection changes only its source identifier; it owns no layer gate.
+; A selection writes only its source: the selection is the one gate of the
+; layer switches, which it never writes (maintainer decision of 2026-11-23).
+; A layout selected also leads the recent layouts the « Layout to emulate »
+; menu offers, in the same write, as macOS and Linux record it
+; (layouts/engine/emulation/settings.lua choice_values); « None » is never recorded.
 _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 	global ERGOPTI_PLUS_LAYOUT_ID
 	Current := SnapshotFn.Call(Path)
@@ -395,13 +765,20 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 			|| StrCompare(Expected["content"], Current["content"], true) != 0
 			|| !ManifestValuesEqual(Expected["values"], Current["values"])
 		throw Error("The selected helper source intent changed or could not be admitted.")
+	if Id == ""
+		return [
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, "none"),
+		]
+	Recents := ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT_RECENTS,
+		EmulationRecents_After(Current.Get("recents", []), Id))
 	if LayoutManager_BuiltinIds().Has(Id)
 		return [
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
-			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
+			Recents,
 		]
-	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
+	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id), Recents]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
@@ -425,12 +802,11 @@ _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
 		OnDone.Call(true)
 		return true
 	}
-	if Selected && Action == "uninstall" {
-		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, ConfigKey.LAYOUT_EMULATED_LAYOUT, Value))
-		if !WriteSelection.Call("")
-			return ConfigReportPersistenceFailure("the layout selection")
-	}
+	; The stored choice is kept (decided on 2026-11-12, as macOS and Linux): the
+	; reload stops the emulation, the menu names the layout « cannot be emulated »,
+	; and installing it again resumes it. The boot never reinstalls it.
+	if Selected && Action == "uninstall"
+		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; it stays chosen and is no longer emulated.", Id)
 	Refused(Reason) {
 		LoggerError("LayoutManager", "Runtime refresh refused after catalogue publication: {1}.", Reason)
 		OnDone.Call(false)
@@ -469,9 +845,16 @@ _LayMgrWeb_DefaultDeps() {
 ; ===================================
 ; ===================================
 
-_LayMgrWeb_Available() {
-	global _VendorDir
-	return IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+/**
+ * The statement the page runs before its own scripts: the interface language
+ * its root names and the reader's font and spacing, as every other window's
+ * host and the macOS and Linux page builders seed them. This window had
+ * neither, so it kept the default font and read as French (LTP-01).
+ * @returns {String}
+ */
+_LayMgrWeb_SeedScript() {
+	global _I18nLocale
+	return "window._i18n_locale=" . JsonStringLiteral(_I18nLocale) . ";" . ReadingPrefs_SeedScript()
 }
 
 /**
@@ -490,11 +873,9 @@ LayoutManager_Open(*) {
 	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
 	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _VendorDir, _SharedDir, LAYMGR_VHOST
 	global LAYMGR_HOST_ACCESS_ALLOW
-	if !_LayMgrWeb_Available() {
-		LoggerError("LayoutManager", "The layout manager needs the WebView2 runtime, which is unavailable.")
-		Ui_MsgBox(t("layout_manager.failure_other"), t("layout_manager.window_title"), "Iconx")
+	_LayMgrWeb_RetryRetiredHosts()
+	if !WebView_RequireAvailable("layout manager")
 		return false
-	}
 	if (_LayMgrWeb_Gui != 0) {
 		WMPresentWindow(_LayMgrWeb_Gui)
 		return true
@@ -528,32 +909,205 @@ LayoutManager_Open(*) {
 			_LayMgrWeb_Close()
 		return false
 	}
-	; SDK creation pumps messages while awaiting COM. The exact opening window
-	; may have closed or been replaced before the controller becomes available.
-	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+	; SDK creation pumps messages while awaiting COM. Claim only the exact GUI
+	; before giving its native Close callback custody of this controller.
+	PreviousCritical := Critical("On")
+	try {
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g)
+		if Admitted
+			_LayMgrWeb_Controller := CreatedController
+	} finally Critical(PreviousCritical)
+	if !Admitted {
 		CreatedController.Close()
 		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
 		return false
 	}
-	_LayMgrWeb_Controller := CreatedController
-	_LayMgrWeb_WebView := CreatedController.CoreWebView2
+	Controller := CreatedController
+	View := Controller.CoreWebView2
+	; A Close during the property getter already retired the published controller.
+	; The abandoned frame must neither close it twice nor publish over a successor.
+	PreviousCritical := Critical("On")
 	try {
-		s := _LayMgrWeb_WebView.Settings
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller)
+		if Admitted
+			_LayMgrWeb_WebView := View
+	} finally Critical(PreviousCritical)
+	if !Admitted
+		return false
+	try {
+		s := View.Settings
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDevToolsEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDefaultContextMenusEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsStatusBarEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreBrowserAcceleratorKeysEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsSwipeNavigationEnabled := false
 	}
-	; Subscription handles live in globals so they are not collected, which
-	; would silently drop the JS->AHK channel.
-	_LayMgrWeb_MsgSub := _LayMgrWeb_WebView.WebMessageReceived(_LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
-	_LayMgrWeb_NavSub := _LayMgrWeb_WebView.NavigationCompleted(_LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
-	_LayMgrWeb_WebView.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
-	_LayMgrWeb_WebView.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
-	_LayMgrWeb_Controller.Fill()
+	; Optional settings may throw as before; cancellation is still terminal.
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	Host := _LayMgrWeb_BeginSubscriptions(SessionEpoch, g, Controller, View)
+	if !IsObject(Host)
+		return false
+	if !_LayMgrWeb_Subscribe(Host, "message", _LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
+		return false
+	if !_LayMgrWeb_Subscribe(Host, "navigation", _LayMgrWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		return false
+	View.SetVirtualHostNameToFolderMapping(LAYMGR_VHOST, _SharedDir, LAYMGR_HOST_ACCESS_ALLOW)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	ReadingPrefs_Track(View)
+	View.AddScriptToExecuteOnDocumentCreated(_LayMgrWeb_SeedScript())
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	View.Navigate("https://" . LAYMGR_VHOST . "/ui/layout_manager/index.html?cb=" . A_TickCount)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	Controller.Fill()
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
+	WebView_TakeFocus(Controller)
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
 	LoggerSuccess("LayoutManager", "Layout manager opened.")
-	return true
+	return _LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+}
+
+
+; RAM-only admission for a partially configured native host. Browser calls stay
+; outside Critical, and a returned old frame never adopts current globals.
+_LayMgrWeb_StartupCurrent(SessionEpoch, Window, Controller := 0, View := 0) {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_Gui, _LayMgrWeb_ResetDone
+	global _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != Window || _LayMgrWeb_ResetDone
+		return false
+	if IsObject(Controller) && (!IsSet(_LayMgrWeb_Controller) || _LayMgrWeb_Controller != Controller)
+		return false
+	return !IsObject(View) || (IsSet(_LayMgrWeb_WebView) && _LayMgrWeb_WebView == View)
+}
+
+
+_LayMgrWeb_BeginSubscriptions(Epoch, Window, Controller, View) {
+	global _LayMgrWeb_SubscriptionOwner
+	Host := {epoch: Epoch, gui: Window, controller: Controller, view: View,
+		message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_LayMgrWeb_StartupCurrent(Epoch, Window, Controller, View) || IsObject(_LayMgrWeb_SubscriptionOwner)
+			return 0
+		_LayMgrWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+; The SDK creates its unsubscribe handle after add_Event returns. Native Close
+; can retire the GUI while that call pumps, but cannot close its controller yet.
+_LayMgrWeb_Subscribe(Host, Kind, Handler) {
+	global _LayMgrWeb_SubscriptionOwner, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _LayMgrWeb_SubscriptionOwner != Host
+				|| !_LayMgrWeb_StartupCurrent(Host.epoch, Host.gui, Host.controller, Host.view)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureType := ""
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureType := Type(Failure)
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			; Host retains the handle before this alias disappears; clearing the
+			; alias cannot invoke its destructor inside the short RAM claim.
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _LayMgrWeb_SubscriptionOwner == Host
+				&& _LayMgrWeb_StartupCurrent(Host.epoch, Host.gui, Host.controller, Host.view)
+			if Current && !Failed {
+				if Kind == "message"
+					_LayMgrWeb_MsgSub := Host.message
+				else
+					_LayMgrWeb_NavSub := Host.navigation
+			}
+		} finally Critical(PreviousCritical)
+	}
+	if Failed && Current
+		_LayMgrWeb_Reset(Host)
+	if Host.retired
+		_LayMgrWeb_RetryRetiredHosts()
+	if Failed
+		try LoggerError("LayoutManager", "Browser subscription failed (error_type={1}).", FailureType)
+	return !Failed && Current && !Host.retired
+}
+
+_LayMgrWeb_QueueRetiredHost(Host) {
+	global _LayMgrWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try {
+		for Pending in _LayMgrWeb_RetiredHosts
+			if Pending == Host
+				return
+		_LayMgrWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+}
+
+; Close refusals retain the exact controller and HWND, never a pathname-like
+; lookup of the current singleton. A successor can be opened independently.
+_LayMgrWeb_RetryRetiredHosts() {
+	global _LayMgrWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _LayMgrWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			; No local alias may keep either SDK handle beyond controller Close.
+			Host.message := 0
+			Host.navigation := 0
+			if !Host.closed && IsObject(Host.controller) {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			if IsObject(Host.gui)
+				Host.gui.Destroy()
+			Host.gui := 0, Host.controller := 0, Host.view := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("LayoutManager", "Native layout host retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _LayMgrWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _LayMgrWeb_RetiredHosts[Index] == Host
+							_LayMgrWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
 }
 
 _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
@@ -570,10 +1124,6 @@ _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		LoggerWarn("LayoutManager", "Refused a layout manager message that is not JSON.")
 		return
 	}
-	; A COM callback bypasses Suspend: a paused driver must not install or
-	; reload from a page click, but the page's own ready signal still loads it.
-	if A_IsSuspended && !((Payload is Map) && Payload.Get("action", "") == "ready")
-		return
 	SetTimer(_LayMgrWeb_SessionCall.Bind(SessionEpoch, LayoutManager_HandleMessage, Payload), -1)
 }
 
@@ -609,12 +1159,17 @@ _LayMgrWeb_SessionCall(SessionEpoch, Callback, Params*) {
 }
 
 ; Fire-and-forget push to the page; the window may already be gone.
-_LayMgrWeb_Push(FunctionName, Payload) {
-	global _LayMgrWeb_WebView
-	if !IsSet(_LayMgrWeb_WebView)
+_LayMgrWeb_Push(FunctionName, Payload, ExpectedEpoch := unset) {
+	global _LayMgrWeb_WebView, _LayMgrWeb_SessionEpoch
+	if !IsSet(ExpectedEpoch)
+		ExpectedEpoch := _LayMgrWeb_SessionEpoch
+	if ExpectedEpoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView)
 		return false
-	WebView_RunScriptAsync(_LayMgrWeb_WebView,
-		"if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")", "LayoutManager")
+	View := _LayMgrWeb_WebView, Epoch := ExpectedEpoch
+	Script := "if(window." . FunctionName . ")window." . FunctionName . "(" . _LayMgrWeb_Json(Payload) . ")"
+	if Epoch != _LayMgrWeb_SessionEpoch || !IsSet(_LayMgrWeb_WebView) || View != _LayMgrWeb_WebView
+		return false
+	WebView_RunScriptAsync(View, Script, "LayoutManager")
 	return true
 }
 
@@ -626,32 +1181,48 @@ _LayMgrWeb_OnResize(GuiObj, MinMax, Width, Height) {
 		try WebView_FitToWindow(_LayMgrWeb_Controller)
 }
 
-_LayMgrWeb_Close(*) {
-	global _LayMgrWeb_Gui
-	Owned := _LayMgrWeb_Gui
-	_LayMgrWeb_Reset()
-	_LayMgrWeb_Gui := 0
-	if Owned
-		try Owned.Destroy()
+_LayMgrWeb_Close(Params*) {
+	Window := Params.Length && Params[1] is Gui ? Params[1] : 0
+	_LayMgrWeb_Reset(0, Window)
 }
 
-; Releases the subscriptions while the controller is alive, then closes it;
-; idempotent, because the page's close and the window's Close event both come here.
-_LayMgrWeb_Reset() {
-	global _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
-	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch
-	if _LayMgrWeb_ResetDone
-		return
-	_LayMgrWeb_ResetDone := true
-	_LayMgrWeb_SessionEpoch += 1
+; Retire the exact logical host before unsubscribe, Close, Hide or Destroy can
+; deliver another public opening. A pending add_Event keeps its HWND alive.
+_LayMgrWeb_Reset(ExpectedHost := 0, ExpectedWindow := 0) {
+	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	global _LayMgrWeb_ResetDone, _LayMgrWeb_SessionEpoch, _LayMgrWeb_PresentationDeps, _LayMgrWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
 	try {
-		_LayMgrWeb_MsgSub := unset
-		_LayMgrWeb_NavSub := unset
+		if _LayMgrWeb_ResetDone
+			return
+		if IsObject(ExpectedWindow) && _LayMgrWeb_Gui != ExpectedWindow
+			return
+		if IsObject(ExpectedHost) && (_LayMgrWeb_SubscriptionOwner != ExpectedHost
+				|| !_LayMgrWeb_StartupCurrent(ExpectedHost.epoch, ExpectedHost.gui, ExpectedHost.controller, ExpectedHost.view))
+			return
+		Host := IsObject(_LayMgrWeb_SubscriptionOwner) ? _LayMgrWeb_SubscriptionOwner
+			: {epoch: _LayMgrWeb_SessionEpoch, gui: _LayMgrWeb_Gui, controller: 0, view: 0,
+				message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false}
 		if IsSet(_LayMgrWeb_Controller)
-			_LayMgrWeb_Controller.Close()
-	}
-	_LayMgrWeb_Controller := unset
-	_LayMgrWeb_WebView := unset
+			Host.controller := _LayMgrWeb_Controller
+		if IsSet(_LayMgrWeb_WebView)
+			Host.view := _LayMgrWeb_WebView
+		if IsSet(_LayMgrWeb_MsgSub)
+			Host.message := _LayMgrWeb_MsgSub
+		if IsSet(_LayMgrWeb_NavSub)
+			Host.navigation := _LayMgrWeb_NavSub
+		Presentation := _LayMgrWeb_PresentationDeps
+		Host.retired := true
+		_LayMgrWeb_ResetDone := true
+		_LayMgrWeb_SessionEpoch += 1
+		_LayMgrWeb_Gui := 0, _LayMgrWeb_SubscriptionOwner := 0, _LayMgrWeb_PresentationDeps := 0
+		_LayMgrWeb_Controller := unset, _LayMgrWeb_WebView := unset
+		_LayMgrWeb_MsgSub := unset, _LayMgrWeb_NavSub := unset
+	} finally Critical(PreviousCritical)
+	_LayMgrWeb_QueueRetiredHost(Host)
+	if IsObject(Host.gui)
+		try Host.gui.Hide()
+	_LayMgrWeb_RetryRetiredHosts()
 }
 
 ; Snapshot both typed variant and independent source/layer intent without mutating them.
@@ -684,6 +1255,12 @@ _LayMgrWeb_BuiltinVariantSnapshot(Path) {
 				return Snapshot
 			Snapshot["values"][Field] := Value
 		}
+		; The recent layouts a selection moves its layout to the head of: a list in
+		; another shape is outdated, read as none and replaced by the selection.
+		Recents := _TOML_DocumentLookup(Document, StrSplit(ConfigKey.LAYOUT_EMULATED_LAYOUT_RECENTS, "."))
+		if Recents["blocked"]
+			return Snapshot
+		Snapshot["recents"] := Recents["found"] && EmulationRecents_IsValid(Recents["value"]) ? Recents["value"] : []
 		Snapshot["valid"] := _TOML_WriteSourceMatches(Path, Snapshot["presence"], Snapshot["content"])
 	} catch {
 		Snapshot["valid"] := false

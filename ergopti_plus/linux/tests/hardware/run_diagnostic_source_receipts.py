@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-local Collector = require("infra.diagnostic_snapshot")
+local Collector = require("diagnostics.engine.reports.snapshot")
 if os.getenv("ERGOPTI_DIAGNOSTIC_CONTROL") == "pid" then
     assert(tonumber(Collector.pid()) and tonumber(Collector.pid()) > 0, "native /proc pid missing")
 elseif os.getenv("ERGOPTI_DIAGNOSTIC_CONTROL") == "facts" then
@@ -90,7 +90,7 @@ def main():
                     ERGOPTI_DIAGNOSTIC_COMMIT=expected,
                     ERGOPTI_DIAGNOSTIC_ORIGIN=origin,
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 )
                 try:
                     result = subprocess.run(

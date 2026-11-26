@@ -27,7 +27,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			var code: SecStaticCode?, path: CFURL?
 			guard SecCodeCopyStaticCode(guest, [], &code) == errSecSuccess, let code,
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
-				let values = fields[kSecCodeInfoCdHashes as String] as? [Data], values.count == 2, Set(values) == hashes,
+				let values = OwnedRuntimePublisherSignature.codeDirectoryHashes(fields), Set(values) == hashes,
 				SecCodeCopyPath(code, [], &path) == errSecSuccess, let path else { return false }
 			let actual = (path as URL).standardizedFileURL
 			return (actual == stage || actual == stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer")) && issuer.current()
@@ -72,8 +72,8 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		return true
 	}
 	func requestStop() { lock.lock(); stopped = true; let channel = channel; lock.unlock(); _ = channel?.withdraw() }
-	private static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
-	private static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
+	static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
+	static func appleQuote(_ value: String) -> String { "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
 	private func prepareAndPrompt() {
 		guard sourceCurrent() else { lock.lock(); refused = true; lock.unlock(); return }
 		var selfImage = ergopti_vhd_report_self_image()
@@ -96,8 +96,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
 				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
 				SecCertificateCopyData(certificate) as Data == publisher?.leaf,
-				let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], hashes.count == 2, Set(hashes).count == 2,
-				hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { markRefused(); return }
+				let hashes = OwnedRuntimePublisherSignature.codeDirectoryHashes(fields) else { markRefused(); return }
 			let bytes = try Data(contentsOf: helper.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer"))
 			guard OwnedRuntimeInstallOwner.systemClosedExecutableForInstaller(bytes) else { markRefused(); return }; try source.verify()
 			guard queryPurpose(helper: helper, hashes: Set(hashes)), sourceCurrent(), let leaf = publisher?.leaf else { markRefused(); return }
@@ -106,9 +105,8 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			guard !stopped, channel.current() else { markRefused(); return }
 			let generation = UUID().uuidString, stage = URL(fileURLWithPath: "/Library/Application Support/ErgoptiPlus/.runtime-installer-" + generation + "/Helper.app")
 			let expectation = HelperExpectation(issuer: issuer, channel: channel, hashes: Set(hashes), stage: stage)
-			let leafHash = Insecure.SHA1.hash(data: leaf).map { String(format: "%02x", $0) }.joined()
-			let codeHashes = hashes.map { "cdhash H\"" + $0.map { String(format: "%02x", $0) }.joined() + "\"" }.sorted().joined(separator: " or ")
-			let requirement = "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\"" + leafHash + "\" and (" + codeHashes + ")"
+			guard let slices = OwnedRuntimeInstallMainOperation.sliceCodeHashes(helper) else { markRefused(); return }
+			let requirement = OwnedRuntimeInstallMainOperation.stagedRequirement(leaf: leaf, slices: slices)
 			let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 			guard source.releaseOwnedDescriptors(), sourceCurrent(), channel.current() else { markRefused(); return }
 			lock.lock(); sourceClosed = true; self.expectation = expectation; lock.unlock()
@@ -143,7 +141,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 				OwnedRuntimePublisherSignature.currentLeaf(guest, role: .installer) == publisher?.leaf,
 				SecCodeCopyStaticCode(guest, [], &code) == errSecSuccess, let code,
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
-				let actual = fields[kSecCodeInfoCdHashes as String] as? [Data], actual.count == 2, Set(actual) == hashes,
+				let actual = OwnedRuntimePublisherSignature.codeDirectoryHashes(fields), Set(actual) == hashes,
 				SecCodeCopyPath(code, [], &path) == errSecSuccess, let path else { return false }
 			let named = (path as URL).standardizedFileURL
 			return (named == helper || named.path == executable) && inputsCurrent()
@@ -242,10 +240,31 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 	private func markRefused() { lock.lock(); refused = true; lock.unlock() }
 	/// Fixed system tools only. No runtime publication/service/driver command is admitted by this purpose.
 	private static func stagingProgram(source: String, stage: URL, requirement: String, digest: String, route: String) -> String {
+		stagedHelperProgram(source: source, stage: stage, requirement: requirement, digest: digest) { executable in
+			"task_step=helper; /usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker"
+		}
+	}
+	/// The stderr line the staged program writes when a step fails: `ergopti-step=<step> status=<n>`. An
+	/// administrator shell that only answered "status 1" left two field runs without the failing step
+	/// (field reports 2026-11-05 and 2026-11-06), so every step names itself before it runs.
+	static let failedStepMarker = "ergopti-step="
+	/// Copies the helper root-owned into a fresh UUID stage, proves its requirement and digest, then runs the
+	/// one command the purpose names on that exact staged executable (the report worker or the first install).
+	/// The copy drops extended attributes and resource forks: `codesign --strict` refuses Finder information and
+	/// similar detritus, which security agents and Finder attach to downloaded bundles on managed Macs, while
+	/// the signature seals none of them.
+	/// The `codesign --test-requirement` argument for a requirement text. codesign reads an argument without a
+	/// leading `=` as the path of a requirement file: the bare text failed every install with « No such file or
+	/// directory | invalid requirement specification » at stage_signature (field report 2026-11-08, issue #106).
+	static func testRequirementArgument(_ requirement: String) -> String { "=" + requirement }
+	static func stagedHelperProgram(source: String, stage: URL, requirement: String, digest: String, then command: (String) -> String) -> String {
 		let parent = "/Library/Application Support/ErgoptiPlus", directory = stage.deletingLastPathComponent().path
 		let executable = stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer").path
 		let program = """
 		set -eu
+		task_step=start
+		task_report() { task_exit=$?; [ "$task_exit" = 0 ] || printf '\(failedStepMarker)%s status=%s\\n' "$task_step" "$task_exit" >&2; }
+		trap task_report EXIT
 		assert_directory() {
 		  [ ! -L "$1" ] && [ -d "$1" ] && [ "$(/usr/bin/stat -f '%u' "$1")" = 0 ] || exit 77
 		  task_mode=$(/usr/bin/stat -f '%Lp' "$1")
@@ -254,20 +273,24 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 		  task_listing=$(/bin/ls -lde "$1"); task_permissions=${task_listing%% *}
 		  case "$task_permissions" in ??????????|??????????@) ;; *) exit 77 ;; esac
 		}
-		assert_directory '/'; assert_directory '/Library'; assert_directory '/Library/Application Support'
+		task_step=system_folders; assert_directory '/'; assert_directory '/Library'; assert_directory '/Library/Application Support'
+		task_step=parent_folder
 		if [ ! -e \(quote(parent)) ] && [ ! -L \(quote(parent)) ]; then /bin/mkdir -m 0755 \(quote(parent)); fi
 		assert_directory \(quote(parent))
-		/bin/mkdir -m 0700 \(quote(directory))
-		/usr/bin/ditto --noqtn --noacl \(quote(source)) \(quote(stage.path))
+		task_step=stage_folder; /bin/mkdir -m 0700 \(quote(directory))
+		task_step=stage_copy; /usr/bin/ditto --noqtn --noacl --noextattr --norsrc \(quote(source)) \(quote(stage.path))
+		task_step=stage_members
 		task_bad=$(/usr/bin/find \(quote(directory)) -type l -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) ! \\( -type f -o -type d \\) -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) -type f -links +1 -print -quit); [ -z "$task_bad" ] || exit 77
 		task_bad=$(/usr/bin/find \(quote(directory)) \\( -perm -4000 -o -perm -2000 \\) -print -quit); [ -z "$task_bad" ] || exit 77
-		/usr/sbin/chown -R root:wheel \(quote(directory)); /bin/chmod -RN \(quote(directory)); /bin/chmod -R go-w \(quote(directory))
+		task_step=stage_owner; /usr/sbin/chown -R root:wheel \(quote(directory)); /bin/chmod -RN \(quote(directory)); /bin/chmod -R go-w \(quote(directory))
 		assert_directory \(quote(directory))
-		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(requirement)) \(quote(stage.path))
+		task_step=stage_signature
+		/usr/bin/codesign --verify --strict --all-architectures --deep --test-requirement \(quote(testRequirementArgument(requirement))) \(quote(stage.path))
+		task_step=stage_digest
 		task_digest=$(/usr/bin/shasum -a 256 \(quote(executable))); task_digest=${task_digest%% *}; [ "$task_digest" = \(quote(digest)) ] || exit 77
-		/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin ERGOPTI_VHD_REPORT_ROUTE=\(quote(route)) \(quote(executable)) --virtual-hid-daemon-report-worker
+		\(command(executable))
 		"""
 		return "/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/sh -c " + quote(program)
 	}

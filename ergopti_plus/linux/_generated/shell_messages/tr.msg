@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/tr.msg
-# AUTO-GENERATED from _shared/data/locales/tr.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/tr.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT ağ modülü kaynaktan derlendi.
 build_luv.recipe_required=Yerel luv derlemesi kaynak tarifini gerektirir.
 install.already_installed={1} — zaten yüklü
 install.archive_digest_unavailable=tutulan tanımlayıcılı güncellemeler gerçek bir OpenSSL3 çalışma zamanı gerektirir; yetenek kullanılamaz durumda kalıyor.
+install.bytecode_skipped=Önceden derlenmiş modüller oluşturulamadı — Ergopti kaynak koddan, biraz daha yavaş başlıyor.
 install.capability_verified={1} — yetenek doğrulandı
 install.command_still_missing={1} yüklendi, ancak '{2}' hâlâ bulunamıyor.
 install.daemon_manual=Daemon'u elle başlatmak için:
 install.daemon_running=Daemon arka planda çalışıyor. Durumunu denetlemek için:
+install.focus_integration_enabled={1} odak entegrasyonu etkinleştirildi
+install.focus_integration_failed={1} odak entegrasyonu etkinleştirilemedi — uygulamaya özel kurallar bu masaüstünde etkin değil.
+install.focus_integration_next_login={1} odak entegrasyonu kuruldu (bir sonraki oturum açışta etkin)
+install.focus_integration_updated={1} odak entegrasyonu güncellendi
 install.gnome_extension_active=GNOME AppIndicator uzantısı — zaten etkin
 install.gnome_extension_enabled=GNOME AppIndicator uzantısı etkinleştirildi
 install.gnome_extension_failed=AppIndicator uzantısı etkinleştirilemedi — o olmadan GNOME simgeyi göstermez.
 install.gnome_extension_missing=GNOME AppIndicator uzantısı eksik — {1} yükleniyor…
 install.gnome_extension_next_login=GNOME AppIndicator uzantısı etkinleştirildi (bir sonraki oturum açışta geçerli)
+install.gnome_extension_not_installed=Bu dağıtımın hiçbir paketi GNOME AppIndicator uzantısını içermiyor: AppIndicator and KStatusNotifierItem Support uzantısını {1} adresinden kurun, ardından oturumu kapatıp yeniden açın — o olmadan GNOME simgeyi göstermez.
 install.gnome_without_extensions=gnome-extensions olmadan GNOME — simgeyi görmek için bir AppIndicator uzantısını etkinleştirin.
 install.help_help=Bu yardım iletisini gösterir
 install.help_no_deps=Hiçbir bağımlılık yüklemez (sizin sorumluluğunuzda)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — bağımlılık denetimi
 install.section_deps_skipped=Bağımlılıklar atlandı (--no-deps)
 install.section_done=Kurulum tamamlandı
 install.section_files=Dosyalar yükleniyor
+install.section_focus=Wayland altında etkin uygulama (GNOME, KDE)
 install.section_lua_deps=İsteğe bağlı Lua bağımlılıkları (olay döngüsü, zamanlayıcılar, web görünümleri, sinyaller)
 install.section_permissions=Giriş izinleri (sudo gerekir)
 install.section_services=systemd kullanıcı hizmetleri oluşturuluyor
@@ -63,6 +70,7 @@ install.section_tray=Sistem tepsisi simgesi ve pencereler
 install.security_warning_body='input' grubunda olmak, oturumdaki TÜM tuş vuruşlarını, herhangi bir uygulamada yazılan parolalar dahil, okumayı sağlar. Bir hotstring motorunun ihtiyacı tam olarak budur; keyd ve xremap de böyle çalışır.
 install.security_warning_title=GÜVENLİK UYARISI
 install.service_started=ergopti-hotstrings hizmeti etkinleştirildi ve başlatıldı
+install.session_without_graphical_target=Bu oturum systemd'nin graphical-session.target hedefini hiç başlatmıyor (i3, Openbox, Xfce, oturum yöneticisi olmadan sway), bu yüzden kullanıcı birimi hiç çalışmazdı: Ergopti+ bunun yerine bir sonraki oturum açışta XDG otomatik başlatma girdisinden başlar. XDG otomatik başlatmayı yok sayan bir pencere yöneticisinin (i3, sway) yapılandırmasında exec {1} satırı gerekir.
 install.source_toolchain_unavailable=yüklü derleyici yerel arşiv arka ucunu derleyemiyor.
 install.startup_choice_unreadable=Başlangıç seçimi okunamadı.
 install.summary_config=Yapılandırma: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG otomatik başlatma: {1}
 launch.already_running=Ergopti+ bu oturumda zaten çalışıyor ({1} kilitli); bu başlatma reddedildi.
 launch.authorization_failed=Giriş erişimi yetkilendirmesi iptal edildi veya başarısız oldu.
 launch.groups_unavailable=Oturum yapılandırılmış giriş gruplarını alamadı.
+launch.restarting=Ergopti+ bu oturumda zaten çalışıyor; kapanması isteniyor, ardından yeniden başlatılıyor.
+launch.session_lock_invalid=Oturum kilidi klasörü mutlak bir yol olmalıdır.
 launcher.dependencies_installed=Bağımlılıklar yüklendi.
 launcher.driver_missing=Hata: Linux sürücüsü dizini bulunamadı: {1}
 launcher.install_deps_hint=Çalıştırın: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Kurulum yolu sembolik bir bağlantıdan geçiyor.
 uninstall.system_prefix=Sistem kurulum öneki reddedildi.
 uninstall.unsafe_path=Güvenli olmayan sahiplik yolu.
 uninstall.unsupported_argument=Desteklenmeyen kaldırma bağımsız değişkeni: {1}
+xkb_helpers.not_found=Klavye düzeni kurulum dosyaları ne {1} yanında ne de {2} içinde bulundu: bunlar olmadan hiçbir düzen kurulamaz.

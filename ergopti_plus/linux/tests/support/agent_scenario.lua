@@ -15,7 +15,7 @@ local M = {}
 
 local Fakes = require("tests.fakes")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 -- The key the user stored for Cerebras
@@ -26,15 +26,15 @@ M.NOW = os.time({ year = 2026, month = 9, day = 29, hour = 14, min = 5, sec = 0 
 
 -- Modules loaded afresh for each scenario, so they bind the scripted boundaries
 local RELOADED = {
-	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
-	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote", "modules.llm.agent_settings", "modules.llm.agent_connectors",
-	"modules.llm.agent_learning", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
+	"ai.engine.prediction.engine", "ai.engine.settings.settings", "ai.engine.settings.profile_settings",
+	"ai.engine.settings.display_settings", "ai.engine.settings.trigger_settings", "ai.engine.settings.navigation_settings",
+	"ai.engine.api.api_remote", "ai.engine.settings.agent_settings", "ai.engine.agent.connectors",
+	"ai.engine.agent.learning", "ai.engine.ollama.local_model_probe", "ai.engine.ollama.local_model_offer",
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama", "adapters.shell_runner",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "ai.engine.settings.api_entries",
+	"ai.engine.settings.profiles", "ai.engine.api.api_ollama", "core.process.adapters.shell_runner",
 }
 
 -- The preferences every scenario starts from: the menu's predictions go to the
@@ -70,12 +70,12 @@ function M.run(opts, body)
 			window = opts.window or { app = "Mail", title = "Re: devis" }, secure = false, preview = false,
 			base_url = "http://127.0.0.1:11434",
 		}
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return world.secure end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, headers, options, callback)
 				world.probes[#world.probes + 1] = { url = url, options = options, callback = callback }
 				return true
@@ -98,7 +98,7 @@ function M.run(opts, body)
 		local entries = opts.entries or { M.ENTRY }
 		local active_entry = entries[1]
 		if opts.active_entry ~= nil then active_entry = opts.active_entry or nil end
-		package.loaded["modules.llm.api_entries"] = {
+		package.loaded["ai.engine.settings.api_entries"] = {
 			active = function() return active_entry end,
 			list = function() return entries end,
 		}
@@ -111,16 +111,16 @@ function M.run(opts, body)
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
 		})
-		package.loaded["modules.llm.profiles"] = profiles
+		package.loaded["ai.engine.settings.profiles"] = profiles
 		if opts.local_backend then
-			package.loaded["modules.llm.api_ollama"] = nil
+			package.loaded["ai.engine.api.api_ollama"] = nil
 		else
-			package.loaded["modules.llm.api_ollama"] = {
+			package.loaded["ai.engine.api.api_ollama"] = {
 				chat = function() error("the scenario runs through the API") end,
 				cancel = function() return true end,
 			}
 		end
-		require("modules.llm.local_model_offer")._reset_for_test({
+		require("ai.engine.ollama.local_model_offer")._reset_for_test({
 			confirm = not opts.native_model_dialog and function(title, text, offer_opts)
 				if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world, offer_opts) end
 				world.model_offers[#world.model_offers + 1] = { title = title, text = text }
@@ -134,14 +134,14 @@ function M.run(opts, body)
 		})
 
 		if opts.native_model_dialog then
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(command) return command == "zenity" end,
 				quote = function(value) return "'" .. value:gsub("'", "'\"'\"'") .. "'" end,
 				exec_checked = function(command)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
 					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
-						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or require("diagnostics.engine.adapter_errors").COMMAND_EXITED_NONZERO,
 						opts.download_choice == true and nil or 1
 				end,
 			}
@@ -149,7 +149,7 @@ function M.run(opts, body)
 
 		local scheduler = Fakes.timer_scheduler()
 		world.scheduler = scheduler
-		local Connectors = require("modules.llm.agent_connectors")
+		local Connectors = require("ai.engine.agent.connectors")
 		Connectors._set_deps_for_test({
 			run = function(executable, args, options, callback)
 				local run = { executable = executable, args = args, timeout_ms = options.timeout_ms, callback = callback }
@@ -176,9 +176,9 @@ function M.run(opts, body)
 		local learning_path = opts.learning_path or os.tmpname()
 		if not opts.learning_path then os.remove(learning_path) end
 		world.learning_path = learning_path
-		require("modules.llm.agent_learning")._reset_for_test({ path = learning_path, scheduler = scheduler })
+		require("ai.engine.agent.learning")._reset_for_test({ path = learning_path, scheduler = scheduler })
 
-		local engine = require("modules.llm.prediction_engine")
+		local engine = require("ai.engine.prediction.engine")
 		engine.init({
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
@@ -188,6 +188,10 @@ function M.run(opts, body)
 			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
+			on_agent_mode_change = function(mode)
+				world.mode_redraws = world.mode_redraws or {}
+				world.mode_redraws[#world.mode_redraws + 1] = mode
+			end,
 			overlay = {
 				show = function(candidates, meta)
 					world.shown = { candidates = candidates, meta = meta }
@@ -229,7 +233,7 @@ function M.run(opts, body)
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
-		world.config = require("modules.llm.agent_settings").config()
+		world.config = require("ai.engine.settings.agent_settings").config()
 
 		--- The remote server answers request `index` with `text`.
 		function world.respond(index, text)
@@ -307,7 +311,7 @@ end
 --- @param args table|nil
 --- @return string
 function M.text(key, args)
-	local template = require("infra.i18n").get(key)
+	local template = require("core.i18n.engine.i18n").get(key)
 	return (template:gsub("{(%d+)}", function(index) return tostring((args or {})[tonumber(index)]) end))
 end
 

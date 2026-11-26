@@ -1,0 +1,35 @@
+# ABNT keyboard fixture (tools/test/test-layout-jis-abnt.cjs): a layout for a
+# Brazilian ABNT 2 keyboard. The key between Slash and the right Shift (IntlRo,
+# ABNT C1) types « / » and « ? », the keypad's extra key (NumpadComma, ABNT C2)
+# types « . », and the ISO key left of Z is still there.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "abnt_fixture"
+name = "ABNT Fixture"
+
+[physical]
+base = "iso"
+keyboard = "abnt"
+
+[[layers]]
+id = "base"
+required = []
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "q" }, KeyA = { text = "a" }, Semicolon = { text = "ç" }, IntlBackslash = { text = "\\" }, IntlRo = { text = "/" }, NumpadComma = { text = "." } }
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "Q" }, KeyA = { text = "A" }, Semicolon = { text = "Ç" }, IntlBackslash = { text = "|" }, IntlRo = { text = "?" } }
+
+[exports.windows]
+locale = "pt-BR"
+layout_id = "00000416"
+dll_name = "kbdabnfx"
+
+[exports.linux]
+name = "abnt_fixture"
+description = "ABNT Fixture"

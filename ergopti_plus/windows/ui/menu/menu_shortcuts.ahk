@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Shortcuts category: personal shortcuts, script-control entries, extension shortcuts, the edit action and the surrounding-symbols (wrap) editor with its custom-pair CRUD.
 ;
-; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
+; Split out of menu/ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -61,13 +61,18 @@ _BuildShortcutsSubmenu(TargetMenu := unset) {
 		IsSet(TargetMenu) ? TargetMenu : unset, , DeclaredFrames)
 }
 
-; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
-; of the key-combinations and script-control group titles.
+; The checked_when getters of the Shortcuts submenu: its switch, the ticks of
+; the key-combinations and script-control group titles, and the disabled_when
+; getters of the physical shortcut editor row.
 _SC_Getters() {
-	return Map(
+	Getters := Map(
 		"shortcuts_enabled", () => IsCategoryGated("Shortcuts"),
 		"key_combinations_enabled", () => IsCategoryGated("KeyCombinations"),
 		"script_control_enabled", () => ScriptShortcutChordsAreOn())
+	; The physical shortcut editor row: ready, and the cause it names when greyed.
+	for Key, Getter in PhysicalShortcutsMenuGetters()
+		Getters[Key] := Getter
+	return Getters
 }
 
 ; The « Combinaisons de touches » group: its own first-row switch (the
@@ -90,6 +95,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 	return Map(
 		MenuCommand.KEY_COMBINATIONS_TOGGLE, MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		MenuCommand.COMBO_SYMMETRIC, (*) => KeyCombinationChordToggleSymmetric(),
+		MenuCommand.COPY_TAP_TO_COMBO, (*) => KeyCombinationCopyTapsToChords(),
 		MenuCommand.SCOPE_RESTORE, (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
 }
@@ -97,7 +103,7 @@ _SC_KeyCombinationCommands(Options := unset) {
 ; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
 ; the delay choice, one checkbox per delimiter of the hotstring catalogue and
 ; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
-; through CapsWordAutoOffStore, which the next activation reads; no reload.
+; through CapsWordAutoOffStore, which re-arms an active CapsWord; no reload.
 _SC_CapsWordAutoOffSubmenu() {
 	Commands := Map(MenuCommand.CAPS_WORD_IDLE_TIMEOUT,
 		(Seconds, *) => CapsWordAutoOffStore(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS, Seconds))
@@ -331,7 +337,7 @@ _WS_BuildSymbolRows() {
 		return []
 
 	; ── Built-in symbols, one named nested group per family ──────────────────
-	; Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; Order and grouping come from _shared/keyboard/data/wrap_symbols/wrap_symbols.json.
 	; Each group carries its own « check all / uncheck all » so a whole family can
 	; be flipped at once, and the parent row ticks when every symbol in it is on.
 	for _, Group in _WS_BUILTIN_GROUPS {
@@ -481,7 +487,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	LeftChar := Trim(IB1.Value, " `t")
-	if (StrLen(LeftChar) != 1) {
+	if !WrapSymbols_IsSingleSymbol(LeftChar) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
 		return
 	}
@@ -492,7 +498,7 @@ _WS_MenuAddCustom() {
 		return
 	}
 	RightChar := Trim(IB2.Value, " `t")
-	if (RightChar != "" and StrLen(RightChar) != 1) {
+	if (RightChar != "" and !WrapSymbols_IsSingleSymbol(RightChar)) {
 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
 		return
 	}
@@ -510,6 +516,8 @@ _SC_ScopeCommands(Options := unset) {
 	return Map(
 		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
 		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
+		MenuCommand.PHYSICAL_SHORTCUTS_EDITOR, ObjBindMethod(PhysicalShortcutsMenuPort(), "Open"),
+		MenuCommand.USER_WORKFLOWS_EDITOR, WorkflowsEditorOpen,
 		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }

@@ -23,19 +23,19 @@ local M = {}
 -- =======================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
-	"infra.logger",
-	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.timings",
-	"modules.gestures",
-	"modules.gestures.actions",
-	"modules.gestures.conflicts",
-	"modules.gestures.engine",
-	"modules.gestures.init",
+	"core.logger.engine.logger",
+	"menu.engine.manifest_reader",
+	"core.ui.engine.notifications",
+	"core.timing.engine.timings",
+	"gestures.engine",
+	"gestures.engine.actions",
+	"gestures.engine.conflicts",
+	"gestures.engine.engine",
+	"gestures.engine.init",
 	"tests.stubs.hs",
 }
 
@@ -96,20 +96,20 @@ function M.with_fixture(options, scenario)
 			return pcall(fn, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "health_check_interval_ms" then return 30 end
 			if key == "startup_phase_timeout_ms" then return 10 end
 			return 5
 		end,
 	}
-	package.loaded["modules.gestures.actions"] = setmetatable({
+	package.loaded["gestures.engine.actions"] = setmetatable({
 		AX_NAMES = {},
 		SG_NAMES = {},
 		init = noop,
@@ -122,7 +122,7 @@ function M.with_fixture(options, scenario)
 			return true
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["modules.gestures.engine"] = setmetatable({
+	package.loaded["gestures.engine.engine"] = setmetatable({
 		init = function() return true end,
 		process_frame = function(_, frame_stamp)
 			runtime.engine_process_calls = runtime.engine_process_calls + 1
@@ -135,7 +135,7 @@ function M.with_fixture(options, scenario)
 		cancel_current_gesture = function() return true end,
 		emergency_reset = noop,
 	}, { __index = function() return noop end })
-	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
+	package.loaded["gestures.engine.conflicts"] = setmetatable({}, {
 		__index = function() return noop end,
 	})
 
@@ -150,7 +150,7 @@ function M.with_fixture(options, scenario)
 		if handle then handle.active = false end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	local watcher = {
 		running_state = false,
@@ -265,7 +265,7 @@ function M.with_fixture(options, scenario)
 		end,
 	}
 
-	gestures = require("modules.gestures.init")
+	gestures = require("gestures.engine.init")
 	local ok, err = xpcall(function()
 		scenario(gestures, runtime, watcher, device)
 	end, debug.traceback)

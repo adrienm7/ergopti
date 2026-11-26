@@ -1,5 +1,5 @@
 {
-	"_comment": "Pins _shared/lua/llm/translate.lua and windows/modules/llm/translate.ahk (llm_translate_selection) against _shared/modules/llm/translate.json and _shared/data/locale_names.json. An extract vector without `text` expects no translation.",
+	"_comment": "Pins _shared/ai/engine/prediction/translate.lua and windows/ai/engine/prediction/translate.ahk (llm_translate_selection) against _shared/ai/data/translate.json and _shared/core/i18n/data/locale_names.json. An extract vector without `text` expects no translation.",
 	"parse_vectors": [
 		{
 			"id": "interface_language",
@@ -144,6 +144,16 @@
 			"id": "bold_mixed_case",
 			"block": "**Translation:** Hola,\n¿qué tal?",
 			"text": "Hola,\n¿qué tal?"
+		},
+		{
+			"id": "bold_body",
+			"block": "TRANSLATION: **important**",
+			"text": "**important**"
+		},
+		{
+			"id": "bold_tag_and_body",
+			"block": "**TRANSLATION:** **important**",
+			"text": "**important**"
 		},
 		{
 			"id": "preamble",

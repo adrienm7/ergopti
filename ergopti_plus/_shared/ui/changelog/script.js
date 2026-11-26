@@ -45,6 +45,10 @@
  *    phase through setInstallProgress(). A failure stays in the window with a
  *    Retry button. A host that cannot install (a source run, a system package)
  *    names why, and the button stays greyed with that reason.
+ *    An installed release whose restart the host refused is not a failure: the
+ *    host reports restart_pending (also in its install context, for a window
+ *    opened later), the install buttons stay greyed, and « Restart now » posts
+ *    complete_install_restart until the host restarts or the wait lapses.
  * 8. Restoring the backup: the host names the latest pre-install backup it can
  *    restore; the banner's button posts restore_backup with its id.
  * 9. Feed-only lists: the Atom feed names no files and no digests, so no host
@@ -56,8 +60,11 @@
  *    only and only when the shared offer rule offers it, an install that posts
  *    install_through_updater: the host hands the channel to that updater,
  *    which shows its own dialog. Older rows keep the warning. Windows and
- *    Linux seed nothing: their updaters verify only against the digest or the
- *    checksum asset that the API list names.
+ *    Linux seed nothing: the page posts install_release as for any row, and
+ *    their host installs the newest feed release itself once the downloaded
+ *    asset matches a detached signature of the pinned key, refusing older rows
+ *    (install_error_feed_not_newest) and every row while no key is provisioned
+ *    (install_error_no_details).
  * ==============================================================================
  */
 
@@ -93,7 +100,7 @@ var _ghRepo = window.__changelog_gh_repo || 'ergopti';
 var _bridgeSession =
 	typeof window.__changelog_session === 'string' ? window.__changelog_session : '';
 // Upper bound for one load, from request to data or error. Mirrors
-// release_sources.ui_watchdog_sec in _shared/modules/updater/defaults.json and
+// release_sources.ui_watchdog_sec in _shared/updater/data/defaults.json and
 // exceeds the hosts' proxy-resolution plus API plus feed budgets (pinned by
 // tools/test/test-changelog-network-resilience.cjs).
 var CHANGELOG_WATCHDOG_MS = 45000;
@@ -107,6 +114,8 @@ var INSTALL_PHASES = {
 	downloading: true,
 	installing: true,
 	restarting: true,
+	// Installed (or armed for the quit), waiting for a restart the host refused.
+	restart_pending: true,
 	failed: true
 };
 // The restore phases a host reports.
@@ -132,6 +141,8 @@ var _installBlockedKey = _hostKey(window.__install_blocked_key, INSTALL_BLOCKED_
 var _install = null;
 // The pre-install backup the host can restore ({ id, createdAt, tag }), or null.
 var _restorable = _hostBackup(window.__restorable_backup);
+// An installed release the host holds for its restart, seeded before the page runs.
+_adoptPendingInstall(_hostPendingInstall(window.__install_pending));
 // Restore state: 'idle', 'pending' (request posted), 'restoring', 'restored' or 'failed'.
 var _restoreState = 'idle';
 var _restoreReasonKey = '';
@@ -174,6 +185,18 @@ function _hostString(value) {
  */
 function _hostKey(value, family) {
 	return typeof value === 'string' && family.test(value) ? value : '';
+}
+
+/**
+ * The installed release a host holds for its restart, or null for anything else.
+ * @param {*} value - { tag, backup_path } as the host sends it.
+ * @return {?{tag: string, backupPath: string}}
+ */
+function _hostPendingInstall(value) {
+	if (!value || typeof value !== 'object') return null;
+	var tag = _hostString(value.tag);
+	if (!tag) return null;
+	return { tag: tag, backupPath: _hostString(value.backup_path) || '' };
 }
 
 /**
@@ -402,9 +425,11 @@ function _initializePage() {
 	var cancel = document.getElementById('btn-subscribe-cancel');
 	var install = document.getElementById('btn-install');
 	var installRetry = document.getElementById('btn-install-retry');
+	var installRestart = document.getElementById('btn-install-restart');
 	var restore = document.getElementById('btn-restore');
 	if (install) install.addEventListener('click', requestInstall);
 	if (installRetry) installRetry.addEventListener('click', retryInstall);
+	if (installRestart) installRestart.addEventListener('click', completeInstallRestart);
 	if (restore) restore.addEventListener('click', requestRestore);
 	if (subscribe) subscribe.addEventListener('click', requestSubscription);
 	if (confirm) confirm.addEventListener('click', confirmSubscription);
@@ -503,6 +528,8 @@ function _renderChannelTabs() {
 		var tab = document.createElement('button');
 		tab.className = 'channel-btn' + (id === _currentChannel ? ' active' : '');
 		tab.setAttribute('data-channel', id);
+		// The active tab is said, not only coloured (WCAG 1.3.1, 4.1.2).
+		tab.setAttribute('aria-pressed', id === _currentChannel ? 'true' : 'false');
 		tab.textContent = _t(_channels.channel(id).labelKey) || '';
 		tab.onclick = function () {
 			setChannel(id);
@@ -732,7 +759,7 @@ function renderReleaseList() {
 	list.replaceChildren();
 
 	if (_releases.length === 0) {
-		var empty = document.createElement('div');
+		var empty = document.createElement('li');
 		empty.style.cssText =
 			'color:' + ThemeTokens.color('grey-555') + ';font-size:12px;padding:16px 14px;';
 		empty.textContent = _t('changelog_window.no_releases');
@@ -741,45 +768,72 @@ function renderReleaseList() {
 	}
 
 	_releases.forEach(function (release, idx) {
-		var item = document.createElement('div');
+		// A button in a list item: the keyboard reaches it and Enter or Space
+		// picks it (WCAG 2.1.1); aria-current names the release on screen
+		// (_markSelectedRelease) and the arrow keys move along the list.
+		var row = document.createElement('li');
+		var item = document.createElement('button');
+		item.type = 'button';
 		item.className = 'release-item' + (release.prerelease ? ' prerelease' : '');
 		item.setAttribute('data-idx', idx);
 		item.onclick = function () {
 			selectRelease(idx);
 		};
+		item.onkeydown = _moveInReleaseList;
 
-		var tag = document.createElement('div');
+		var tag = document.createElement('strong');
 		tag.className = 'release-item-tag';
 		tag.textContent = release.tag_name || '?';
 		item.appendChild(tag);
 
-		var date = document.createElement('div');
+		var date = document.createElement('time');
 		date.className = 'release-item-date';
+		if (release.published_at) date.setAttribute('datetime', release.published_at);
 		date.textContent = _formatDate(release.published_at);
 		item.appendChild(date);
 
 		if (release.prerelease) {
-			var badge = document.createElement('div');
+			var badge = document.createElement('small');
 			badge.className = 'release-item-badge badge-prerelease';
 			badge.textContent = _t('changelog_window.badge_prerelease');
 			item.appendChild(badge);
 		} else if (idx === 0) {
-			var badge2 = document.createElement('div');
+			var badge2 = document.createElement('small');
 			badge2.className = 'release-item-badge badge-latest';
 			badge2.textContent = _t('changelog_window.badge_latest');
 			item.appendChild(badge2);
 		}
 		if (_isInstalled(release)) {
 			item.classList.add('installed');
-			var installedBadge = document.createElement('div');
+			var installedBadge = document.createElement('small');
 			installedBadge.className = 'release-item-badge badge-installed';
 			installedBadge.setAttribute('data-i18n', 'changelog_window.badge_installed');
 			installedBadge.textContent = _t('changelog_window.badge_installed') || '';
 			item.appendChild(installedBadge);
 		}
 
-		list.appendChild(item);
+		row.appendChild(item);
+		list.appendChild(row);
 	});
+}
+
+/**
+ * Moves the focus along the release list with the arrow keys, Home and End,
+ * so a long list is walked without a Tab stop per release.
+ * @param {KeyboardEvent} event
+ */
+function _moveInReleaseList(event) {
+	var items = Array.prototype.slice.call(document.querySelectorAll('.release-item'));
+	var at = items.indexOf(event.currentTarget);
+	var next = {
+		ArrowDown: at + 1,
+		ArrowUp: at - 1,
+		Home: 0,
+		End: items.length - 1
+	}[event.key];
+	if (next === undefined || at === -1 || next < 0 || next >= items.length) return;
+	event.preventDefault();
+	items[next].focus();
 }
 
 // =========================================
@@ -794,12 +848,26 @@ function clearContent() {
 	var metaEl = document.getElementById('release-meta');
 	var bodyEl = document.getElementById('release-body');
 	var btnGh = document.getElementById('btn-github');
-	if (tagEl) tagEl.textContent = '';
+	// An empty heading is still read as one: hidden until a release names it.
+	if (tagEl) {
+		tagEl.textContent = '';
+		tagEl.hidden = true;
+	}
 	if (metaEl) metaEl.textContent = '';
 	if (bodyEl) bodyEl.replaceChildren();
 	if (btnGh) btnGh.style.display = 'none';
 	_currentReleaseUrl = null;
 	_renderInstallControls();
+}
+
+/** Marks the selected release row, for the eye and for assistive technology. */
+function _markSelectedRelease() {
+	document.querySelectorAll('.release-item').forEach(function (el) {
+		var selected = parseInt(el.getAttribute('data-idx'), 10) === _selectedIndex;
+		el.classList.toggle('selected', selected);
+		if (selected) el.setAttribute('aria-current', 'true');
+		else el.removeAttribute('aria-current');
+	});
 }
 
 /**
@@ -811,9 +879,7 @@ function selectRelease(idx) {
 	_selectedIndex = idx;
 
 	// Update sidebar selection state.
-	document.querySelectorAll('.release-item').forEach(function (el) {
-		el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === idx);
-	});
+	_markSelectedRelease();
 
 	var release = _releases[idx];
 	_currentReleaseUrl = _isAllowedRepositoryUrl(release.html_url) ? release.html_url : null;
@@ -822,7 +888,10 @@ function selectRelease(idx) {
 	var tagEl = document.getElementById('release-tag');
 	var metaEl = document.getElementById('release-meta');
 	var btnGh = document.getElementById('btn-github');
-	if (tagEl) tagEl.textContent = release.tag_name || '';
+	if (tagEl) {
+		tagEl.textContent = release.tag_name || '';
+		tagEl.hidden = !release.tag_name;
+	}
 	if (metaEl) {
 		var parts = [];
 		if (release.published_at) parts.push(_formatDate(release.published_at));
@@ -849,7 +918,9 @@ function selectRelease(idx) {
 		allow: _isAllowedRepositoryUrl,
 		open: function (url) {
 			_postChangelogMessage({ action: 'open_url', url: url });
-		}
+		},
+		// Read under the release's h2: the body's own headings start at level 3.
+		topLevel: 3
 	};
 	// CI orders the body for github.com (downloads first, changelog folded);
 	// the sections are read before rendering, which strips their markers.
@@ -894,7 +965,7 @@ function _renderReleaseSections(bodyEl, parts, markdownOptions) {
 	}
 
 	if (parts.footer !== '') {
-		var footer = document.createElement('div');
+		var footer = document.createElement('footer');
 		footer.className = 'release-footer';
 		renderMarkdownInto(footer, parts.footer, markdownOptions);
 		bodyEl.appendChild(footer);
@@ -1043,6 +1114,8 @@ function _installStatusText() {
 		return _fillInstall('changelog_window.install_installing', tag, path);
 	if (_install.phase === 'restarting')
 		return _fillInstall('changelog_window.install_restarting', tag, path);
+	if (_install.phase === 'restart_pending')
+		return _fillInstall('changelog_window.install_restart_pending', tag, path);
 	var reason = _fillInstall(
 		(_install.failureReport && _install.failureReport.message_key) ||
 			_install.reasonKey ||
@@ -1097,6 +1170,13 @@ function _renderInstallControls() {
 		retryButton.style.display =
 			_install && _install.phase === 'failed' && !_install.managedFailure ? '' : 'none';
 	}
+	var restartButton = document.getElementById('btn-install-restart');
+	if (restartButton) {
+		var waiting = _install !== null && _install.phase === 'restart_pending';
+		restartButton.textContent = _t('changelog_window.install_restart_now') || '';
+		restartButton.style.display = waiting ? '' : 'none';
+		restartButton.disabled = waiting && _install.restartRequested === true;
+	}
 	_renderInstallFailureActions();
 }
 
@@ -1121,6 +1201,39 @@ function retryInstall() {
 	if (_installBlockedKey !== '') return;
 	if (_install.handoff) _postHandoff(_install.tag, _install.channel);
 	else _postInstall(_install.tag, _install.channel);
+}
+
+/**
+ * Asks the host again for the restart that completes an installed release.
+ * The button stays greyed until the host answers with the next phase.
+ */
+function completeInstallRestart() {
+	if (!_install || _install.phase !== 'restart_pending' || _install.restartRequested) return;
+	_install.restartRequested = true;
+	_renderInstallControls();
+	_postChangelogMessage({ action: 'complete_install_restart', tag: _install.tag });
+}
+
+/**
+ * Shows the installed release a host holds for its restart, unless the page
+ * already follows an install of its own.
+ * @param {?{tag: string, backupPath: string}} pending
+ */
+function _adoptPendingInstall(pending) {
+	if (!pending) return;
+	if (_install !== null && _install.phase !== 'failed' && _install.phase !== 'handed_off') return;
+	_install = {
+		tag: pending.tag,
+		channel: _currentChannel,
+		phase: 'restart_pending',
+		handoff: false,
+		reasonKey: '',
+		backupPath: pending.backupPath,
+		operation: 0,
+		failureEpoch: 0,
+		managedFailure: false,
+		failureReport: null
+	};
 }
 
 /**
@@ -1262,11 +1375,10 @@ function setInstallContext(context) {
 	if (Object.prototype.hasOwnProperty.call(context, 'backup')) {
 		_restorable = _hostBackup(context.backup);
 	}
+	_adoptPendingInstall(_hostPendingInstall(context.pending));
 	renderReleaseList();
 	if (_selectedIndex >= 0) {
-		document.querySelectorAll('.release-item').forEach(function (el) {
-			el.classList.toggle('selected', parseInt(el.getAttribute('data-idx'), 10) === _selectedIndex);
-		});
+		_markSelectedRelease();
 	}
 	_renderInstallControls();
 	_renderRestoreBanner();

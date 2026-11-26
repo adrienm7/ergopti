@@ -27,6 +27,9 @@
 ;    posts restore_backup; the driver reloads on the restored configuration.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
+
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
 
 
@@ -81,7 +84,7 @@ global CHANGELOG_HOST_ACCESS_ALLOW := 1
 ; Release sources, tried in order: the REST API, then the public Atom feed on
 ; github.com, which corporate proxies usually leave reachable when they block
 ; or throttle api.github.com. Mirrors release_sources in
-; _shared/modules/updater/defaults.json (pinned by
+; _shared/updater/data/defaults.json (pinned by
 ; tools/test/test-changelog-network-resilience.cjs).
 global CHANGELOG_API_URL_TEMPLATE  := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=20"
 global CHANGELOG_FEED_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB . "/{owner}/{repo}/releases.atom"
@@ -107,11 +110,8 @@ global _CLW_FeedStarter := 0
  */
 Changelog_Open(Channel) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
-	if A_IsSuspended
-		return _Updater_RefuseManualWhileSuspended()
+	; A pause stops typing, not the changelog (UPD-2).
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
 	return _CLW_OpenCapturedRequest(Channel, Request)
 }
 
@@ -139,12 +139,10 @@ _CLW_OpenCapturedRequest(Channel, Request) {
 	_CLW_Ready   := false
 	_CLW_Queue   := []
 
-	; Bail early if WebView2 is unavailable, or if free RAM is too low to absorb
-	; the Chromium cold start — fall back to the lighter native changelog window.
-	if (!_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()) {
-		_Updater_OpenChangelogWindow(Channel, Request)
-		return
-	}
+	; There is no native Versions window: without WebView2 the opening refuses
+	; in words before building anything (maintainer decision 2026-11-21).
+	if !WebView_RequireAvailable("Versions window")
+		return false
 
 	_CLW_BuildWindow(Channel, Request)
 }
@@ -153,16 +151,12 @@ _CLW_OpenCapturedRequest(Channel, Request) {
  * Closes the changelog window if open.
  */
 Changelog_Close() {
-	global _CLW_Gui
-	; Same reorder as _CLW_OnClose -- close the WebView2 controller before
-	; destroying the Gui (WebView2 spec requirement).
-	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
-	_CLW_Reset()
+	; Reset claims and detaches the exact closing owner before any COM callout.
+	SavedGui := _CLW_Reset()
 	try {
-		if saved_gui
-			saved_gui.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 
@@ -192,18 +186,47 @@ _CLW_BuildWindow(Channel, Request) {
 	g.MarginY   := 0
 
 	; Full-window placeholder that WebView2.Fill() will cover.
-	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x580, SSoT);
+	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x620, SSoT);
 	; pinned by tools/test/test-webview-geometry-single-source.cjs.
-	Placeholder := g.Add("Text", "x0 y0 w860 h580", "")
+	Placeholder := g.Add("Text", "x0 y0 w860 h620", "")
 
 	g.OnEvent("Close",  _CLW_OnClose)
 	g.OnEvent("Escape", _CLW_OnClose)
 	g.OnEvent("Size",   _CLW_OnResize)
 
-	g.Show("w860 h580")
-	_CLW_Gui := g
+	; Show pumps a real Close before it returns. Publish this native host first
+	; so Close can retire it, and never let its old opening republish afterward.
+	Published := false
+	PreviousCritical := Critical("On")
+	try {
+		if WindowEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui) {
+			_CLW_Gui := g
+			_CLW_ResetDone := false
+			Published := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		try g.Destroy()
+		return false
+	}
+	try g.Show("w860 h620")
+	catch as Err {
+		; Native destruction during Show is an ordinary retired opening.
+		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+			return false
+		; This Show failed while its exact native host was still current.
+		; Reset first, then destroy only that host: Destroy may open a successor.
+		SavedGui := _CLW_Reset(g, WindowEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		throw Err
+	}
+	if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+		return false
 	if !_Updater_RequestMayPublish(Request) {
-		_CLW_OnClose()
+		_CLW_OnClose(g)
 		return false
 	}
 
@@ -211,7 +234,7 @@ _CLW_BuildWindow(Channel, Request) {
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 	try {
-		; Reuse the shared session environment (infra/webview_utils.ahk) so no
+		; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
@@ -219,14 +242,15 @@ _CLW_BuildWindow(Channel, Request) {
 		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
 			return false
 		; Retire this opening before destroying its native host, which may pump.
-		_CLW_Reset()
-		if IsSet(_CLW_Gui) && _CLW_Gui == g
-			_CLW_Gui := unset
-		ResetEpoch := _CLW_WindowEpoch
-		try g.Destroy()
-		; A replacement owns its own renderer; a cancelled opening cannot fall back.
-		if ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
-			_Updater_OpenChangelogWindow(Channel, Request)
+		SavedGui := _CLW_Reset(g, WindowEpoch, &ResetEpoch)
+		try {
+			if SavedGui
+				SavedGui.Destroy()
+		}
+		; The epoch belongs to this retirement, before any abort/COM/native callout:
+		; only this exact failed opening refuses, a newer one speaks for itself.
+		if SavedGui && ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
+			WebView_RefuseUnavailable("Versions window", Err.Message)
 		return false
 	}
 	RequestCurrent := _Updater_RequestMayPublish(Request)
@@ -238,7 +262,7 @@ _CLW_BuildWindow(Channel, Request) {
 	if !RequestCurrent {
 		CreatedController.Close()
 		if WindowEpoch == _CLW_WindowEpoch && IsSet(_CLW_Gui) && _CLW_Gui == g
-			_CLW_OnClose()
+			_CLW_OnClose(g)
 		return false
 	}
 	_CLW_Controller := CreatedController
@@ -274,6 +298,7 @@ _CLW_BuildWindow(Channel, Request) {
 	session     := _CLW_BridgeSessionToken
 	seed := "window.__i18n_base='" . locales_url . "';"
 		. "window._i18n_locale='" . locale_code . "';"
+		. ReadingPrefs_SeedScript()
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
 		. "window.__changelog_channel="  . _CLW_JsStr(Channel)  . ";"
@@ -281,6 +306,7 @@ _CLW_BuildWindow(Channel, Request) {
 		. "window.__channel_switch_restarts=true;"
 		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 		. _CLW_InstallSeed()
+	ReadingPrefs_Track(_CLW_WebView)
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.
@@ -305,6 +331,7 @@ _CLW_BuildWindow(Channel, Request) {
 
 	; Fill the WebView2 to cover the entire window client area.
 	try _CLW_Controller.Fill()
+	WebView_TakeFocus(_CLW_Controller)
 
 	; Safety flush in case the "ready" message from JS never fires.
 	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
@@ -537,10 +564,8 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		_CLW_OnPageReady(ExpectedWindowEpoch)
 		return
 	}
-	; WebMessageReceived bypasses native Suspend. A click born paused refuses
-	; visibly; a click interrupted during TryGet retains one resume terminal.
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
+	; A click while paused is a click (UPD-2): the request policy still drops
+	; one whose channel changed meanwhile.
 	if !_Updater_RequestMayPublish(Request)
 		return
 
@@ -839,7 +864,8 @@ _CLW_PollFetch(Req, Context, Polls) {
 	; The text crosses into the page as a JS string literal and is parsed there
 	; (JSON.parse or the Atom reader); a response is never evaluated as script.
 	; injectReleases* keeps what the channel's view lists (shared registry).
-	global _CLW_LastList := Map("kind", Context.Stage == "feed" ? "feed" : "json", "json", Json)
+	global _CLW_LastList := Map("kind", Context.Stage == "feed" ? "feed" : "json", "json", Json,
+		"request_epoch", Context.RequestEpoch)
 	if (Context.Stage == "feed") {
 		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
 			Channel, Context.ApiFailure)
@@ -902,7 +928,7 @@ _CLW_InstallDeps(Request) {
 		"blocked", _CLW_InstallBlocked,
 		"find", _CLW_FindRelease,
 		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
-		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
+		"asset", _CLW_ReleaseAsset,
 		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
 		"report", _CLW_ReportInstall,
 		"failure_owner", () => Owner,
@@ -916,9 +942,10 @@ _CLW_InstallDeps(Request) {
 ; This native owner is never serialized. A refreshed list or replaced window
 ; cannot lend an older staging intent its action authority.
 _CLW_ManagedFailureCurrent(Current) {
-	global _CLW_LastList
+	global _CLW_LastList, _CLW_RequestEpoch
 	Owner := Current["native_owner"]
-	return Owner is Map && IsObject(Owner["list"]) && IsObject(_CLW_LastList)
+	return Owner is Map && IsObject(Owner["list"]) && (_CLW_LastList is Map)
+		&& _CLW_LastList.Get("request_epoch", 0) == _CLW_RequestEpoch
 		&& ObjPtr(Owner["list"]) == ObjPtr(_CLW_LastList)
 		&& _CLW_BridgeSessionIsCurrent(Owner["window_epoch"], Owner["session"])
 		&& _Updater_ManagedFailureOwnerIsCurrent(Current["stage_owner"])
@@ -929,17 +956,72 @@ _CLW_RetryUpdatePath(Owner, Observer) {
 }
 
 /**
- * Finds a release in the list this window last fetched from the GitHub API.
+ * The asset a release installs from: the authenticated one of an API release,
+ * or the conventional URL of a feed release, whose size and digest the update
+ * path takes from its required signature.
+ * @param {Object} Release
+ * @returns {Object|Integer} The asset, or 0 when the release has none for Windows.
+ */
+_CLW_ReleaseAsset(Release) {
+	global BUNDLE_RELEASE_ASSET
+	if Release.HasProp("FeedOnly") && Release.FeedOnly == true {
+		Url := AssetSignature_FeedAssetUrl(BUNDLE_RELEASE_ASSET, Release.Tag)
+		return Url == "" ? 0 : {Url: Url}
+	}
+	return _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag)
+}
+
+/**
+ * Finds the release of a feed-only list that may install: the newest release
+ * of the channel on screen when the shared offer rule offers it, as macOS hands
+ * that one release to Sparkle. The feed names no files and no digests, so the
+ * release installs only through its detached signature: without a provisioned
+ * key every row keeps the no-details refusal.
  * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @param {Func|Integer} AvailableFn - Replaces the signing-key probe (tests only).
  * @returns {Map} Map("release", Release) or Map("reason", page locale key).
  */
-_CLW_FindRelease(Tag) {
-	global _CLW_LastList, RELEASE_INSTALL_REASONS
-	if !IsObject(_CLW_LastList)
+_CLW_FindFeedRelease(Tag, Channel, AvailableFn := 0) {
+	global _CLW_LastList, RELEASE_INSTALL_REASONS, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(IsObject(AvailableFn) ? AvailableFn.Call() : AssetSignature_FeedInstallAvailable())
+		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+	if !(Channel is String) || Channel == "" || UpdateChannels_ForTag(Tag) == ""
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	List := _Updater_ParseReleaseFeed(_CLW_LastList["json"], UPDATER_GH_OWNER, UPDATER_GH_REPO, &Detail)
+	if (List == "")
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Wanted := _Updater_NormalizeTag(Tag)
+	Listed := false
+	for _, Row in Updater_ParseReleasesList(List)
+		if (_Updater_NormalizeTag(Row.Tag) == Wanted)
+			Listed := true
+	if !Listed
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Newest := _Updater_SelectChannelRelease(List, Channel, _Updater_ReleaseListIndex(List))
+	NewestTag := (Newest is String && Newest != "") ? Updater_ParseTagName(Newest) : ""
+	if (NewestTag == "" || _Updater_NormalizeTag(NewestTag) != Wanted
+			|| !UpdateChannels_ShouldOffer(NewestTag, Updater_CurrentVersion(), Channel, _Updater_InstalledChannel()))
+		return Map("reason", RELEASE_INSTALL_REASONS["feed_not_newest"])
+	try LoggerInfo("Changelog", "Release {1} is the newest of channel {2} in the public feed: it installs only once its detached signature verifies.",
+		NewestTag, Channel)
+	return Map("release", {Tag: NewestTag, RawJson: Newest, FeedOnly: true, Body: "",
+		HtmlUrl: "", PublishedAt: "", Prerelease: false})
+}
+
+/**
+ * Finds a release in the list this window last fetched.
+ * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @returns {Map} Map("release", Release) or Map("reason", page locale key).
+ */
+_CLW_FindRelease(Tag, Channel := "") {
+	global _CLW_LastList, _CLW_RequestEpoch, RELEASE_INSTALL_REASONS
+	if !(_CLW_LastList is Map) || _CLW_LastList.Get("request_epoch", 0) != _CLW_RequestEpoch
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	; The Atom feed carries no asset list and no digest.
 	if (_CLW_LastList["kind"] != "json")
-		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+		return _CLW_FindFeedRelease(Tag, Channel)
 	if (UpdateChannels_ForTag(Tag) == "")
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	Wanted := _Updater_NormalizeTag(Tag)
@@ -1183,13 +1265,14 @@ _CLW_ReportRejectedBridgeMessage() {
  * @returns {integer} The new window epoch.
  */
 _CLW_BeginWindowSession() {
-	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_WindowEpoch, _CLW_RequestEpoch, _CLW_ResetDone
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
 	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
 	NewSession := _CLW_NewBridgeSessionToken()
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
+		_CLW_ResetDone := false
 		_CLW_WindowEpoch += 1
 		_CLW_RequestEpoch += 1
 		OldRequest := _CLW_ActiveRequest
@@ -1325,16 +1408,6 @@ _CLW_AbortRequest(Request) {
 }
 
 /**
- * Returns true when WebView2 is available and the loader DLL exists.
- * @returns {boolean}
- */
-_CLW_WebView2Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
-}
-
-/**
  * Returns the https:// virtual-host URL for _shared/ui/changelog/index.html.
  * A per-open cache-buster forces a fresh document each launch instead of a
  * WebView2-cached stale copy from the virtual host.
@@ -1346,12 +1419,12 @@ _CLW_HtmlUrl() {
 }
 
 /**
- * Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash).
+ * Returns the https:// virtual-host URL for _shared/core/i18n/data/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {
 	global CHANGELOG_VHOST
-	return "https://" . CHANGELOG_VHOST . "/data/locales/"
+	return "https://" . CHANGELOG_VHOST . "/core/i18n/data/locales/"
 }
 
 /**
@@ -1361,7 +1434,7 @@ _CLW_LocalesUrl() {
  */
 _CLW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\core\i18n\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")
@@ -1381,31 +1454,51 @@ _CLW_JsStr(s) {
 /**
  * Resets all module-level state after window close.
  */
-_CLW_Reset() {
+_CLW_Reset(ExpectedGui := unset, ExpectedWindowEpoch := unset, &RetiredEpoch := 0) {
 	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue, _CLW_ResetDone
-	global _CLW_Request
-	; Close and Escape are wired to the same handler and Controller.Close() pumps
-	; messages, so a second dispatch can re-enter this function while the first
-	; teardown is still in flight. Short-circuit instead of running the release +
-	; Close sequence twice against a controller that is already going away.
-	if _CLW_ResetDone
-		return
-	_CLW_ResetDone := true
-	; Invalidate request and script provenance before releasing the controller.
-	; Abort is performed outside the helper's short Critical transaction.
-	_CLW_InvalidateWindowSession()
-	; Release the subscription FIRST, while the controller is still alive. Its
-	; __Delete unsubscribes via remove_WebMessageReceived on the live
-	; controller; doing it AFTER Controller.Close() raises a COM error.
-	try _CLW_MsgSub := unset
-	if IsSet(_CLW_Controller)
-		try _CLW_Controller.Close()
-	_CLW_Gui        := unset
-	_CLW_WebView    := unset
-	_CLW_Controller := unset
-	_CLW_Ready      := false
-	_CLW_Queue      := []
-	_CLW_Request    := unset
+	global _CLW_Request, _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
+	RetiredEpoch := 0
+	PreviousCritical := Critical("On")
+	try {
+		if _CLW_ResetDone
+			return 0
+		if IsSet(ExpectedGui) && (!IsSet(_CLW_Gui) || _CLW_Gui != ExpectedGui)
+			return 0
+		if IsSet(ExpectedWindowEpoch) && ExpectedWindowEpoch != _CLW_WindowEpoch
+			return 0
+		; Keep every old strong reference alive through the RAM-only detach.
+		; Subscription destruction, HTTP abort and controller Close may all reenter.
+		SavedGui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
+		SavedWebView := IsSet(_CLW_WebView) ? _CLW_WebView : 0
+		SavedController := IsSet(_CLW_Controller) ? _CLW_Controller : 0
+		SavedSubscription := IsSet(_CLW_MsgSub) ? _CLW_MsgSub : 0
+		SavedRequest := IsSet(_CLW_Request) ? _CLW_Request : 0
+		SavedQueue := _CLW_Queue
+		SavedActiveRequest := _CLW_ActiveRequest
+		_CLW_ResetDone := true
+		_CLW_WindowEpoch += 1
+		_CLW_RequestEpoch += 1
+		RetiredEpoch := _CLW_WindowEpoch
+		_CLW_ActiveRequest := 0
+		_CLW_ActiveRequestEpoch := 0
+		_CLW_BridgeSessionToken := ""
+		_CLW_BridgeRejectionReported := false
+		_CLW_Gui := unset
+		_CLW_WebView := unset
+		_CLW_Controller := unset
+		_CLW_MsgSub := unset
+		_CLW_Request := unset
+		_CLW_Ready := false
+		_CLW_Queue := []
+	} finally Critical(PreviousCritical)
+	_CLW_AbortRequest(SavedActiveRequest)
+	; Unsubscribe while this exact old controller is still alive.
+	try SavedSubscription := unset
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }
 
 
@@ -1418,20 +1511,14 @@ _CLW_Reset() {
 ; ========================================
 ; ========================================
 
-_CLW_OnClose(*) {
-	global _CLW_Gui
-	; Save the Gui reference BEFORE Reset clears the global, then close the
-	; WebView2 controller first (while the parent window is still alive) and
-	; only destroy the Gui afterwards -- the WebView2 spec requires Controller
-	; to be closed before its host HWND is destroyed. Mirrors
-	; ui/model_browser/init.ahk's _LLM_MBW_OnClose.
-	saved_gui := IsSet(_CLW_Gui) ? _CLW_Gui : 0
-	_CLW_Reset()
+_CLW_OnClose(GuiObj := unset, *) {
+	; Native Close/Escape supplies its originating Gui. A delayed event from A
+	; must never claim the replacement B published by a teardown callout.
+	SavedGui := IsSet(GuiObj) ? _CLW_Reset(GuiObj) : _CLW_Reset()
 	try {
-		if saved_gui
-			saved_gui.Destroy()
+		if SavedGui
+			SavedGui.Destroy()
 	}
-	_CLW_Gui := unset   ; Always clear the reference, even if Destroy threw
 }
 
 _CLW_OnResize(GuiObj, MinMax, Width, Height) {

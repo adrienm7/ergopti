@@ -29,7 +29,7 @@ _KLRPP_RowsAcrossDevices(Db) {
 	AssertTrue(SQLite_Exec(Db, "INSERT INTO events_typing "
 		. "SELECT device_id,0,ts,'2026-01-02',app,app_category,title,url,field_role,layout,document_path,"
 		. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,pause_before_ms,"
-		. "battery_level,audio_volume,wpm,text,rich_text,events_json FROM events_typing WHERE id=-1;"))
+		. "battery_level,audio_volume,wpm,text,rich_text,events_json,utc_offset_min FROM events_typing WHERE id=-1;"))
 	for IncludePayload in [false, true] {
 		AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], IncludePayload))
 		AssertEqual(0, SQLite_Query(Db,

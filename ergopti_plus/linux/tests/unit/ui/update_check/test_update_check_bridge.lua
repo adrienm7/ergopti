@@ -22,10 +22,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local STUBBED = {
-	"ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
+	"core.ui.ui.webview_manager", "ui.download_window.bridge", "diagnostics.ui.error_dialog", "ui.changelog.bridge",
 }
 
 --- Loads the real bridge with controlled collaborators.
@@ -40,14 +40,23 @@ local function load_bridge(answer)
 	}
 	for _, name in ipairs(STUBBED) do context.saved[name] = package.loaded[name] end
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	context.real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
-	package.loaded["ui.webview_manager"] = {
-		show = function(app) context.shown[#context.shown + 1] = app; return true end,
-		hide = function() context.hidden = context.hidden + 1; return true end,
+	package.loaded["core.ui.ui.webview_manager"] = {
+		show = function(app)
+			context.shown[#context.shown + 1] = app
+			if context.on_show then return context.on_show(app) end
+			return true
+		end,
+		hide = function()
+			context.hidden = context.hidden + 1
+			if context.on_hide then return context.on_hide() end
+			return true
+		end,
 		eval_js = function(app, js)
+			if context.on_push then context.on_push() end
 			local payload = js:match("receiveUpdateCheck%((.*)%)$")
 			context.pushed[#context.pushed + 1] = { app = app, message = payload and Json.decode(payload) }
 			return true
@@ -57,8 +66,12 @@ local function load_bridge(answer)
 		show = function(opts) context.windows[#context.windows + 1] = opts; return 7 end,
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
-	package.loaded["ui.error_dialog.bridge"] = {
-		report = function(record, complete) context.reports[#context.reports + 1] = record; complete(true) end,
+	package.loaded["diagnostics.ui.error_dialog"] = {
+		report = function(record, complete)
+			context.reports[#context.reports + 1] = record
+			if context.on_report then return context.on_report() end
+			complete(true)
+		end,
 	}
 	package.loaded["ui.changelog.bridge"] = {
 		push_subscribed_channel = function(id) context.channel_pushes[#context.channel_pushes + 1] = id end,
@@ -106,7 +119,7 @@ end
 
 local function restore(context)
 	for _, name in ipairs(STUBBED) do package.loaded[name] = context.saved[name] end
-	require("infra.installation").is_source_run = context.real_is_source_run
+	require("core.lifecycle.engine.installation").is_source_run = context.real_is_source_run
 	package.loaded["ui.update_check.bridge"] = nil
 end
 
@@ -127,6 +140,121 @@ end
 local function last(context) return context.pushed[#context.pushed].message end
 
 helpers.describe("update-check window bridge (Linux)", function()
+	for _, old_result in ipairs({ false, true }) do
+		helpers.it("(update-check-open-owner) old opening preserves replacement when result is " .. tostring(old_result), function()
+		scenario(available, function(bridge, context)
+			context.on_show = function()
+				context.on_show = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return old_result
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement still answers")
+		end)
+		end)
+	end
+
+	for _, operation in ipairs({ "close", "replace", "page-close" }) do
+		helpers.it("(update-check-retire-owner) preserves replacement during " .. operation, function()
+			scenario(function(channel) return { state = "error", channel = channel, current = "0.0.0-dev.144", others = {} } end,
+				function(bridge, context)
+					bridge.open(context.ctx)
+					context.on_report = function()
+						return { cancel = function()
+							context.on_report = nil
+							helpers.assert_true(bridge.open(context.ctx))
+						end }
+					end
+					bridge.on_message({ action = "report" })
+					if operation == "close" then bridge.on_window_closed()
+					elseif operation == "page-close" then bridge.on_message({ action = "close" })
+					else bridge.open(context.ctx) end
+					local before = #context.pushed
+					bridge.on_message("ready")
+					helpers.assert_true(#context.pushed > before, "replacement remains active")
+					helpers.assert_eq(#context.checks, 2, "old operation must not start another check")
+					helpers.assert_eq(context.hidden, 0, "old operation must not hide the replacement")
+				end)
+		end)
+	end
+
+	helpers.it("(update-check-close-owner) keeps the session when native close is refused", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function() return false end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "a refused close retains the session")
+			context.on_hide = nil
+			bridge.on_message({ action = "close" })
+			before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_eq(#context.pushed, before, "an accepted close retires the session")
+		end)
+	end)
+
+	helpers.it("(update-check-close-owner) preserves a successor opened during close", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return true
+			end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the successor remains active")
+		end)
+	end)
+
+	helpers.it("(update-check-start-owner) retired session cannot start a check after reentrant publication", function()
+		scenario(available, function(bridge, context)
+			context.on_push = function()
+				context.on_push = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+			end
+			helpers.assert_eq(bridge.open(context.ctx), false)
+			helpers.assert_eq(#context.checks, 1, "only the replacement may start its check")
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the replacement session remains active")
+		end)
+	end)
+
+	for _, kind in ipairs({ "fifo", "regular" }) do
+		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
+			if package.config:sub(1, 1) == "\\" then return end
+			local path = os.tmpname(); os.remove(path)
+			local quote, root = require("core.text.engine.utils_core").shell_quote, helpers.driver_root()
+			if kind == "fifo" then
+				local made = os.execute("mkfifo " .. quote(path))
+				assert(made == true or made == 0)
+			else
+				local file = assert(io.open(path, "w")); assert(file:write("log")); assert(file:close())
+			end
+			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
+				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
+				.. "package.loaded['core.lifecycle.engine.installation']={is_source_run=function()return false end};"
+				.. "package.loaded['core.logger.engine.sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
+				.. "package.loaded['core.process.adapters.shell_runner']={has_command=function()return true end};"
+				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
+				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"
+				.. "get_cached_release=function()return release end,get_state=function()return 'idle' end,"
+				.. "get_channel=function()return 'dev' end,download_update=function()return true end};"
+				.. "assert(require('ui.update_check.bridge').download_offered(u,release,{on_open_today_log=function()end}));"
+				.. "assert(window.can_open_diagnostics()==" .. tostring(kind == "regular") .. ")"
+			local status = os.execute("timeout 3 " .. quote(assert(require("luv").exepath())) .. " -e " .. quote(source))
+			assert(os.remove(path))
+			helpers.assert_true(status == true or status == 0, "special logs must be refused without waiting")
+		end)
+	end
 	helpers.it("opens the window, shows checking, then the updater's answer", function()
 		scenario(available, function(bridge, context)
 			helpers.assert_true(bridge.open(context.ctx))
@@ -155,6 +283,82 @@ helpers.describe("update-check window bridge (Linux)", function()
 			helpers.assert_eq(context.finished[1], { true, "v0.0.0-dev.150", "install" },
 				"the daemon restarts on the installed release")
 			helpers.assert_eq(context.hidden, 1, "the update-check window closes")
+		end)
+	end)
+
+	-- UPD-09: the window said « installed, restarting » before the restart
+	-- was tried, and kept saying it when the restart was refused.
+	for _, armed in ipairs({ true, false }) do
+		helpers.it("upd-09: the window reports the restart only once it is armed (armed=" .. tostring(armed) .. ")", function()
+			scenario(available, function(bridge, context)
+				local order = {}
+				context.ctx.on_update_finished = function()
+					order[#order + 1] = "restart"
+					return armed
+				end
+				local complete = package.loaded["ui.download_window.bridge"].complete
+				package.loaded["ui.download_window.bridge"].complete = function(id, ok, message)
+					order[#order + 1] = "window"
+					return complete(id, ok, message)
+				end
+				bridge.open(context.ctx)
+				bridge.on_message({ action = "update" })
+				helpers.assert_eq(order, { "restart", "window" }, "the restart is tried before the window says it")
+				local I18n = require("core.i18n.engine.i18n")
+				local key = armed and "updater.installed_restarting" or "updater.installed_restart_refused"
+				helpers.assert_eq(context.completed[1][3], (I18n.get(key):gsub("{1}", "v0.0.0-dev.150")))
+				helpers.assert_true(I18n.get("updater.installed_restart_refused") ~= "updater.installed_restart_refused",
+					"the refused restart has its own localized line")
+			end)
+		end)
+	end
+
+	-- UPD-07: the download window stayed at 0 % « Starting… » until the end
+	helpers.it("upd-07: the update download's progress reaches its window", function()
+		scenario(available, function(bridge, context)
+			local updates = {}
+			package.loaded["ui.download_window.bridge"].update = function(id, percent, detail)
+				updates[#updates + 1] = { id, percent, detail }
+				return true
+			end
+			context.release.size = 1024
+			context.updater.download_update = function(_, callback, on_progress)
+				on_progress(256); on_progress(300); on_progress(512)
+				callback("/tmp/update.tar.gz", nil)
+				on_progress(1024)
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(updates, {
+				{ 7, 25, I18n.get("menu.about.update_downloading") },
+				{ 7, 29, I18n.get("menu.about.update_downloading") },
+				{ 7, 50, I18n.get("menu.about.update_downloading") },
+			}, "each new percentage, and nothing once the attempt ended")
+		end)
+	end)
+
+	-- UPD-10: a refused signature read as an integrity check
+	helpers.it("upd-10: the window names a refused signature, with no network receipt", function()
+		scenario(available, function(bridge, context)
+			local receipts = {}
+			package.loaded["ui.download_window.bridge"].complete = function(id, ok, message, receipt)
+				context.completed[#context.completed + 1] = { id, ok, message }
+				receipts[#receipts + 1] = receipt == nil and "none" or receipt
+			end
+			context.updater.download_update = function(_, callback)
+				callback(nil, "update signature refused: the signature does not match", "signature", { stage = "http" })
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(context.completed[1][2], false)
+			helpers.assert_eq(context.completed[1][3],
+				(I18n.get("changelog_window.install_error_signature"):gsub("{tag}", "v0.0.0-dev.150")))
+			helpers.assert_eq(receipts[1], "none", "a refused signature is no network failure")
+			helpers.assert_eq(context.finished[1][3], "signature", "the hook hears the stage")
 		end)
 	end)
 
@@ -265,8 +469,8 @@ helpers.describe("update-check window bridge (Linux)", function()
 
 	helpers.it("opens a repository link of the notes with xdg-open, nothing else", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, commands = package.loaded["adapters.shell_runner"], {}
-			package.loaded["adapters.shell_runner"] = {
+			local saved, commands = package.loaded["core.process.adapters.shell_runner"], {}
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(text) return "'" .. text .. "'" end,
 				run = function(command) commands[#commands + 1] = command; return true end,
@@ -282,15 +486,15 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(#commands, 1, "a link outside the repository never reaches the shell")
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
 
 	helpers.it("says so when xdg-open is missing", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, ran = package.loaded["adapters.shell_runner"], 0
-			package.loaded["adapters.shell_runner"] = {
+			local saved, ran = package.loaded["core.process.adapters.shell_runner"], 0
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return false end,
 				quote = function(text) return text end,
 				run = function() ran = ran + 1; return true end,
@@ -301,7 +505,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(ran, 0)
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)

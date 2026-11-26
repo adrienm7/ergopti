@@ -23,7 +23,7 @@ helpers.describe("metrics disk cache persistence", function()
 						end
 						return "{}"
 					end
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings = warnings + 1
 						helpers.assert_true(string.format(message, ...):find("encoding", 1, true) ~= nil)
 					end
@@ -45,7 +45,7 @@ helpers.describe("metrics disk cache persistence", function()
 		with_delivery(false, function(dashboard, _, _, _, _, pending)
 			local previous_open, refused, warnings = io.open, true, 0
 			local ok, err = xpcall(function()
-				package.loaded["infra.logger"].warn = function() warnings = warnings + 1 end
+				package.loaded["core.logger.engine.logger"].warn = function() warnings = warnings + 1 end
 				io.open = function()
 					if refused then return nil, "PRIVATE_CACHE_PATH", 13 end
 					return { write = function(self) return self end, close = function() return true end }
@@ -74,7 +74,7 @@ helpers.describe("metrics disk cache persistence", function()
 				local previous_open = io.open
 				local warnings, opens, writes, closes = {}, 0, 0, 0
 				local ok, err = xpcall(function()
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					io.open = function(_, file_mode)

@@ -231,3 +231,28 @@ _KLEI_JournalTailAdvancesPastUncommittedIds() {
 }
 Test("keystats event id: uncommitted journal tail advances allocator (journal-stable-event-id)",
 	_KLEI_JournalTailAdvancesPastUncommittedIds)
+
+
+_KLEI_AllocationCapacity() {
+	Saved := Keystats.next_event_id, PreviousCritical := Critical(37)
+	try {
+		Keystats.next_event_id := 0x7FFFFFFFFFFFFFFE
+		AssertEqual(0x7FFFFFFFFFFFFFFE, KL_AllocEventId())
+		AssertEqual(0x7FFFFFFFFFFFFFFF, Keystats.next_event_id)
+		Failure := 0
+		try KL_AllocEventId()
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is ValueError, "capacity must refuse before accepting an event with an unrepresentable next checkpoint")
+		AssertEqual(0x7FFFFFFFFFFFFFFF, Keystats.next_event_id)
+		AssertEqual(37, A_IsCritical, "allocation refusal restores the exact caller's Critical setting")
+		Existing := Map("_event_id", 0x7FFFFFFFFFFFFFFF)
+		AssertEqual(0x7FFFFFFFFFFFFFFF, KL_AssignStableEventId(Existing), "an already reserved historical terminal identity remains replayable")
+		AssertEqual(0x7FFFFFFFFFFFFFFF, Keystats.next_event_id)
+	} finally {
+		Keystats.next_event_id := Saved
+		Critical(PreviousCritical)
+	}
+}
+Test("Keystats event identity: capacity refusal retains its checkpoint and existing replay (event-id-allocation-capacity)",
+	_KLEI_AllocationCapacity)

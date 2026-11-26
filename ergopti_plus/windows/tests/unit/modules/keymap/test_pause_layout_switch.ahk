@@ -44,6 +44,36 @@ _PLS_Apply() {
 	AssertEqual(0, Selected.Length)
 }
 
+/** A start applies the layout of the live pause state, once. */
+_PLS_Startup() {
+	Selected := []
+	Select(Id) {
+		Selected.Push(Id)
+		return 1
+	}
+	Saved := PauseLayoutSwitchState.event_applied
+	try {
+		PauseLayoutSwitchState.event_applied := false
+		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
+			AssertEqual(1, PauseLayoutSwitch_ApplyStartup(0, Select))))
+		PauseLayoutSwitchState.event_applied := false
+		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
+			AssertEqual(1, PauseLayoutSwitch_ApplyStartup(1, Select))))
+		AssertEqual("A000040C,0000040C", Selected[1] . "," . Selected[2], "running then paused start")
+		; A restored pause already switched: the start selects nothing more.
+		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
+			AssertEqual(1, PauseLayoutSwitch_ApplyStartup(1, Select))))
+		AssertEqual(2, Selected.Length, "a pause transition keeps its choice")
+		_PLS_WithSettings(true, "0000040C", "A000040C", () => (
+			AssertThrows(() => PauseLayoutSwitch_ApplyStartup("paused", Select), "a start state is a boolean")))
+	} finally PauseLayoutSwitchState.event_applied := Saved
+	Entry := FSReadUtf8Exact(A_ScriptDir . "\..\ErgoptiPlus.ahk")
+	Ready := InStr(Entry, '`n_DriverBootPhase := "ready"`n')
+	Start := InStr(Entry, "PauseLayoutSwitch_ApplyStartup(A_IsSuspended ? 1 : 0)")
+	Assert(Ready > 0 && Start > Ready, "the boot applies the start layout once ready")
+	AssertContains(SubStr(Entry, Ready, Start - Ready), "if !_DriverSmokeInputQuarantined", "a smoke run keeps the layout")
+}
+
 /** A refused switch is false, the debt of its lifecycle owner. */
 _PLS_Refused() {
 	Refuse(Id) => false
@@ -111,7 +141,59 @@ _PLS_MenuRows() {
 	AssertEqual("layout.pause_switch_enabled=0", Writes[3])
 }
 
+; Runs Body under one shipped locale, then restores the translation cache.
+_PLS_WithLocale(Code, Body) {
+	global _SharedDir, _I18nCache, _I18nCacheLoaded
+	HadCache := IsSet(_I18nCache), OldCache := HadCache ? _I18nCache : false
+	HadLoaded := IsSet(_I18nCacheLoaded), OldLoaded := HadLoaded ? _I18nCacheLoaded : false
+	try {
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		Body.Call()
+	} finally {
+		if HadCache
+			_I18nCache := OldCache
+		else
+			_I18nCache := unset
+		if HadLoaded
+			_I18nCacheLoaded := OldLoaded
+		else
+			_I18nCacheLoaded := unset
+	}
+}
+
+/**
+ * The shared corpus captions every locale's switch and both pickers with no
+ * layout chosen; the real Windows rows owner must draw those exact captions.
+ */
+_PLS_CorpusCaptions() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\layout_switching_captions.json", "UTF-8"))
+	AssertEqual(21, Corpus.Count, "the corpus covers every shipped locale")
+	for Code, Expected in Corpus
+		_PLS_WithLocale(Code, _PLS_CheckCorpusCaptions.Bind(Code, Expected))
+}
+
+_PLS_CheckCorpusCaptions(Code, Expected) {
+	Writes := []
+	SetFn(Path, Value) {
+		Writes.Push(Path . "=" . String(Value))
+		return 1
+	}
+	Rows := []
+	_PLS_WithSettings(true, "", "", () => (Rows := PauseLayoutSwitch_MenuRows(() => [], SetFn)))
+	AssertEqual(3, Rows.Length, Code . ": the switch and two pickers")
+	AssertEqual(Expected["switch"], Rows[1]["label"], Code . ": switch caption")
+	AssertEqual(Expected["pause"], Rows[2]["label"], Code . ": pause picker caption")
+	AssertEqual(Expected["resume"], Rows[3]["label"], Code . ": resume picker caption")
+	AssertEqual(Expected["automatic"], Rows[2]["items"][1]["label"], Code . ": the no-change choice")
+	AssertEqual(0, Writes.Length, Code . ": drawing the rows writes nothing")
+}
+
 Test("pause layout switch: each event selects its layout", _PLS_Apply)
+Test("pause layout switch: a start applies the live pause state's layout", _PLS_Startup)
 Test("pause layout switch: a refused switch is lifecycle debt", _PLS_Refused)
 Test("pause layout switch: suspend, resume and user quit run the owner", _PLS_Lifecycle)
 Test("pause layout switch: menu rows from the shared frames", _PLS_MenuRows)
+Test("pause layout switch: the 21 corpus captions of the switch and pickers (layout-switching-captions)",
+	_PLS_CorpusCaptions)

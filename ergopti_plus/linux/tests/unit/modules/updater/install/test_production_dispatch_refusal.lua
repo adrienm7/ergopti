@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "toml_codec.writer", "adapters.storage" }
+  "core.logger.engine.monotonic", "core.lifecycle.engine.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "core.fs.adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -19,7 +19,7 @@ local function scenario(options, body)
  if not drivers_root or type(package.searchpath) ~= "function" then
   error("updater fixture repository source roots unavailable", 0)
  end
- local shared_root = drivers_root .. "/_shared/lua"
+ local shared_root = drivers_root .. "/_shared"
  local original_require, original_searchpath, original_path = require, package.searchpath, package.path
  _G.require = function(name, ...)
   if type(name) == "string" and saved[name] == nil and package.preload[name] == nil
@@ -39,7 +39,7 @@ local function scenario(options, body)
   -- Runtime check state belongs to this model. A warmed real Storage would
   -- otherwise retain this scenario's fake Writer after the cache is restored.
   local stored = {}
-  package.loaded["adapters.storage"] = {
+  package.loaded["core.fs.adapters.storage"] = {
    get = function(key, default) local value = stored[key]; if value == nil then return default end; return value end,
    set = function(key, value) stored[key] = value; return true end,
   }
@@ -76,9 +76,9 @@ local function scenario(options, body)
    if options.component_missing then return nil end
    return artifact
   end }
-  package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+  package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
    backend = function() return "luv.hrtime" end, now_ms = function() return 1.25 end }
-  package.loaded["infra.installation"] = { is_source_run = function() return true end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
   package.loaded["modules.updater.archive_transfer"] = { new = function(ports)
    h.source = function() return ports.current(transaction) end
    local flow = {}
@@ -110,7 +110,7 @@ local function scenario(options, body)
   if actual_installer then
    package.loaded["modules.updater.installer"].install_owned = actual_installer.install_owned
   end
-  package.loaded["toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
+  package.loaded["core.text.engine.toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
   package.loaded["modules.updater.manager"] = nil
   h.manager = require("modules.updater.manager")
   h.manager.init({ is_paused = function() return h.paused end })
@@ -199,7 +199,7 @@ test("captured closed allocator fact preserves the existing available offer desp
   assert(callbacks == 1 and h.manager.get_state() == "available")
  end)
 end)
-test("matching historical error text without the fixed allocator fact keeps ordinary failure state", function()
+test("upd-08: a failed update download keeps the offer it failed on", function()
  scenario({ construct = function(h, terminal)
   h.flow_operation.started = false; h.flow_physical = true
   terminal(nil, "temporary path unavailable", "download")
@@ -209,10 +209,11 @@ test("matching historical error text without the fixed allocator fact keeps ordi
   assert(h.manager.download_update(nil, function(path, message)
    callbacks = callbacks + 1; assert(path == nil and message == "temporary path unavailable")
   end) == false)
-  assert(callbacks == 1 and h.manager.get_state() == "idle")
+  assert(callbacks == 1 and h.manager.get_state() == "available", "upd-08: the menu keeps « Update now »")
+  assert(h.manager.get_cached_release() == h.release)
  end)
 end)
-test("physical-probe source withdrawal prevents restoring an old available offer", function()
+test("upd-08: physical-probe source withdrawal still leaves the cached offer available", function()
  scenario({ construct = function(h, terminal)
   h.flow_operation.started = false; h.flow_operation.closed_allocation_refusal = true; h.flow_physical = true
   terminal(nil, "independent allocator error", "download")
@@ -221,7 +222,7 @@ test("physical-probe source withdrawal prevents restoring an old available offer
   h.manager._test_set_cached_release(h.release)
   local callbacks = 0
   assert(h.manager.download_update(nil, function(path) callbacks = callbacks + 1; assert(path == nil) end) == false)
-  assert(callbacks == 1 and h.paused == true and h.manager.get_state() == "idle")
+  assert(callbacks == 1 and h.paused == true and h.manager.get_state() == "available")
  end)
 end)
 assert(#tests == 8, "actual dispatch receiving floor")

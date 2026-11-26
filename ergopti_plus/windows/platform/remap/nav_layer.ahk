@@ -9,7 +9,7 @@
 ; platform/remap/nav_layer_table.ahk as one hotkey per bound key under the
 ; LayerEnabled gate. Without a layers.toml nothing is bound and every key keeps
 ; its normal behaviour while the layer is held; Ergopti's own layer is
-; _shared/keymap/layers.recommended.toml, which reaches layers.toml through the
+; _shared/layouts/data/layers.recommended.toml, which reaches layers.toml through the
 ; first-run wizard or "Restore recommended values".
 ;
 ; What stays here is the code no binding can express: how a hold key ENTERS the
@@ -45,7 +45,12 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 		_LAltIsBackspaceLayer()
 		and LayerEnabled
 )
-*SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
+; Clear the orphaned physical Alt bit that can leave VSCode in multicursor mode,
+; while preserving an Alt legitimately held by another synthetic gesture.
+*SC038:: {
+	if !TapHoldReleasePhysicalKey("LAlt")
+		return
+}
 #HotIf
 
 

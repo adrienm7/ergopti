@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Corpus = require("test.app_category_store_corpus")
+local Json = require("core.text.engine.json")
+local Corpus = require("tests.lua.app_category_store_corpus")
 
 Corpus.register(helpers, {
 	path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/app_category_store_vectors.json",

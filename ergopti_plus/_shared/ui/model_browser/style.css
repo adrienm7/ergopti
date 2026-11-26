@@ -19,7 +19,8 @@
 	--row-sel: var(--theme-hue-094771);
 	--row-sel-border: var(--theme-hue-1f6feb);
 	--text: var(--theme-hue-d4d4d6);
-	--text-dim: var(--theme-hue-8a8a90);
+	/* 5.2:1 on the header and alternate rows (WCAG 1.4.3). */
+	--text-dim: var(--theme-hue-c4c4ca);
 	--border: var(--theme-hue-3a3a3d);
 	--accent: var(--theme-hue-4ea1ff);
 	--installed: var(--theme-hue-3fb950);
@@ -86,8 +87,21 @@ body {
 	position: relative;
 }
 
+/* The name column takes what the fixed columns leave (script.js draws three
+   numeric ones). In a window narrower than their sum, it fell to 0 px and its
+   44 px sort button ran over « Disque »: the table keeps the name column's
+   minimum and scrolls sideways in #table-wrap instead. */
 table {
+	--col-current-width: 64px;
+	--col-status-width: 140px;
+	--col-actions-width: 230px;
+	--col-num-width: 88px;
+	--col-name-min-width: 10em;
 	border-collapse: collapse;
+	min-inline-size: calc(
+		var(--col-current-width) + var(--col-name-min-width) + 3 * var(--col-num-width) +
+			var(--col-status-width) + var(--col-actions-width)
+	);
 	table-layout: fixed;
 	width: 100%;
 }
@@ -100,13 +114,15 @@ thead th {
 	font-size: 11px;
 	font-weight: 600;
 	letter-spacing: 0.4px;
+	/* A column's name wraps under a wider spacing instead of running into
+	   the next column's. */
+	overflow-wrap: anywhere;
 	padding: 9px 10px;
 	position: sticky;
-	text-align: left;
+	text-align: start;
 	text-transform: uppercase;
 	top: 0;
 	user-select: none;
-	white-space: nowrap;
 	z-index: 1;
 }
 
@@ -126,32 +142,32 @@ thead th.sorted-desc::after {
 
 .col-current {
 	text-align: center;
-	width: 64px;
+	width: var(--col-current-width);
 }
 .col-status {
 	text-align: center;
-	width: 140px;
+	width: var(--col-status-width);
 }
 .col-actions {
-	width: 230px;
+	width: var(--col-actions-width);
 }
 .col-num {
-	text-align: right;
-	width: 88px;
+	text-align: end;
+	width: var(--col-num-width);
 }
 
+/* A model's name, family or size wraps in its fixed column rather than being
+   cut: larger text or wider spacing must not hide it (WCAG 1.4.12). */
 tbody td {
 	border-bottom: 1px solid var(--theme-hue-2a2a2d);
-	overflow: hidden;
+	overflow-wrap: anywhere;
 	padding: 8px 10px;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 tbody td.num {
 	color: var(--text-dim);
 	font-variant-numeric: tabular-nums;
-	text-align: right;
+	text-align: end;
 }
 
 tbody td.center {
@@ -171,11 +187,18 @@ tbody tr.selected {
 	box-shadow: inset 2px 0 0 var(--row-sel-border);
 }
 
+/* The dim text is 3.7:1 on the selection's blue; a lighter grey keeps 4.5:1
+   (WCAG 1.4.3). */
+tbody tr.selected td.num,
+tbody tr.selected .sub {
+	color: var(--theme-hue-d0d0d4);
+}
+
 tbody tr.active .name-cell::after {
 	color: var(--accent);
 	content: '●';
 	font-size: 10px;
-	margin-left: 7px;
+	margin-inline-start: 7px;
 	vertical-align: middle;
 }
 
@@ -184,11 +207,19 @@ tbody tr.active .name-cell::after {
 	font-weight: 600;
 }
 
+/* A family or a tag is small by its own rule, not the browser's. */
+.sub,
+.chip,
+.reason {
+	font-size: inherit;
+}
+
 .dot {
 	background: var(--theme-grey-555);
 	border-radius: 50%;
 	display: inline-block;
 	height: 9px;
+	vertical-align: baseline;
 	width: 9px;
 }
 
@@ -243,13 +274,21 @@ tbody tr.active .name-cell::after {
 #hint {
 	color: var(--text-dim);
 	font-size: 12px;
+	margin: 0;
+}
+
+/* The paragraphs and lists keep the box the plain blocks had. */
+#current,
+#empty {
+	margin: 0;
 }
 
 #btn-use {
 	background: var(--accent);
 	border: none;
 	border-radius: 6px;
-	color: var(--theme-hue-06243f);
+	/* Black on the light blue holds 7:1 (WCAG 1.4.6); the dark navy was 5.9:1. */
+	color: var(--theme-black);
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 600;
@@ -291,7 +330,7 @@ tbody tr.group th {
 	color: var(--text);
 	font-size: 12px;
 	padding: 8px 10px;
-	text-align: left;
+	text-align: start;
 }
 
 /* The whole header opens and closes its group; only its controls keep their cursor. */
@@ -308,7 +347,7 @@ tbody tr.group .group-add {
 	flex-wrap: wrap;
 	font-weight: 400;
 	gap: 6px;
-	margin-top: 4px;
+	margin: 4px 0 0;
 }
 
 tbody tr.group .group-tools:empty,
@@ -316,11 +355,25 @@ tbody tr.group .group-add:empty {
 	display: none;
 }
 
+/* A button that reads as the header's text. */
 tbody tr.group .group-toggle {
+	background: none;
+	border: 0;
 	border-radius: 4px;
+	color: inherit;
 	display: inline-block;
+	font: inherit;
 	font-weight: 600;
 	padding: 2px 4px;
+	text-align: start;
+}
+
+/* The header's words keep the size and weight of its text. */
+tbody tr.group .chevron,
+tbody tr.group .group-title,
+tbody tr.group small {
+	font-size: inherit;
+	font-weight: inherit;
 }
 
 /* A provider inside a backend: a step in from the backend's own header. */
@@ -349,11 +402,13 @@ tbody tr.group .group-count,
 tbody tr.group .group-active {
 	color: var(--text-dim);
 	font-weight: 400;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
+/* A lighter blue than the accent: 9.8:1 on the dark rows, where the accent
+   was 6.2:1 (WCAG 1.4.6). */
 tbody tr.group .group-active {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
 }
 
 /* The thin line between the local backends and the remote API. */
@@ -372,7 +427,7 @@ tbody tr.unavailable {
 tbody tr.group .reason {
 	color: var(--text-dim);
 	font-weight: 400;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
 tbody tr.unavailable,
@@ -391,7 +446,19 @@ tbody tr.unavailable td.col-actions {
 
 tbody tr:focus,
 button:focus-visible,
-thead th:focus-visible,
+/* The sort button reads as the header text it replaces. */
+thead .sort-btn {
+	background: none;
+	border: 0;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+	text-align: inherit;
+	width: 100%;
+}
+
+thead .sort-btn:focus-visible,
 #backend-filter:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: -2px;
@@ -403,18 +470,27 @@ thead th:focus-visible,
 	font-size: 11px;
 }
 
+/* The active mark and the remote status are text: the lighter blue holds
+   7.6:1 on every dark row (WCAG 1.4.6), where the accent was 4.9:1 to 6.2:1. */
 .mark.on {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
 	font-weight: 700;
 }
 
+/* Near-black on the green: the light text read 1.4:1 (WCAG 1.4.3). */
 .chip.default {
 	background: var(--theme-green-dark);
-	color: var(--text);
+	color: var(--theme-grey-0b0b0b);
 }
 
 .status.remote {
-	color: var(--accent);
+	color: var(--theme-hue-9ccaff);
+}
+
+/* The selection's blue takes a paler one: 7.3:1 there. */
+tbody tr.selected .mark.on,
+tbody tr.selected .status.remote {
+	color: var(--theme-hue-cfe0ff);
 }
 
 .act {
@@ -424,7 +500,7 @@ thead th:focus-visible,
 	color: var(--text);
 	cursor: pointer;
 	font-size: 12px;
-	margin-right: 4px;
+	margin-inline-end: 4px;
 	padding: 3px 9px;
 }
 
@@ -444,7 +520,7 @@ thead th:focus-visible,
 .install-note {
 	color: var(--theme-hue-f87171);
 	font-size: 12px;
-	margin-left: 8px;
+	margin-inline-start: 8px;
 }
 
 .act.danger:hover {
@@ -459,6 +535,9 @@ thead th:focus-visible,
 #footer-actions {
 	display: flex;
 	gap: 8px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 #btn-disable,

@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 helpers.describe("remap defaults: the one-shot timeout is the shared registry's (one-shot-timeout-shared)", function()
 	helpers.it("takes the cross-driver registry value, not a macOS-only one (one-shot-timeout-shared)", function()
 		package.loaded["platform.remap.defaults"] = nil
-		local Timings = require("infra.timings")
+		local Timings = require("core.timing.engine.timings")
 		local Defaults = require("platform.remap.defaults")
 		helpers.assert_eq(Defaults.sticky_timeout_ms, Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 			"the macOS one-shot default is the value Windows and Linux read")

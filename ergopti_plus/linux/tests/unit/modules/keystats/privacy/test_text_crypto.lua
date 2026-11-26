@@ -24,15 +24,15 @@
 
 local helpers = require("tests.helpers")
 
-local TextCrypto = require("keystats.text_crypto")
-local Heredoc    = require("shell.heredoc")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
+local Heredoc    = require("core.process.shell_heredoc")
 
 --- Resolves the shell adapter at CALL time, never once at file scope. Another
 --- test file reloads adapters.shell_runner through helpers.load_module, which
 --- replaces the cached instance — a reference captured up here would then be a
 --- stale table whose test seam the cipher never sees.
 local function Shell()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 --- A syntactically valid AES-256 key and IV, for the pure command builders.
@@ -57,19 +57,19 @@ local function load_cipher(provider)
 		encrypt = function(_, _, data) return data:reverse() end,
 		decrypt = function(_, _, data) return data:reverse() end,
 	}
-	local codec = require("compat.base64")
+	local codec = require("core.lifecycle.engine.compat.base64")
 	provider.encode_base64, provider.decode_base64 = codec.encode, codec.decode
-	local previous = package.loaded["infra.openssl_cipher"]
-	package.loaded["infra.openssl_cipher"] = provider
+	local previous = package.loaded["core.network.engine.openssl_cipher"]
+	package.loaded["core.network.engine.openssl_cipher"] = provider
 	local ok, cipher = pcall(helpers.load_module, "modules.keystats.text_cipher")
-	package.loaded["infra.openssl_cipher"] = previous
+	package.loaded["core.network.engine.openssl_cipher"] = previous
 	assert(ok, cipher)
 	return cipher
 end
 
 --- Loads fresh state; only the explicitly supplied EVP and shell ports are fake.
 local function fresh_cipher(provider)
-	helpers.load_module("adapters.crypto")
+	helpers.load_module("core.crypto.crypto")
 	local cipher = load_cipher(provider)
 	cipher._set_machine_id_path(write_machine_id())
 	return cipher
@@ -240,6 +240,57 @@ end)
 -- =========================================
 -- =========================================
 
+helpers.it("text cipher refuses a FIFO machine identity without blocking", function()
+	local uv = require("luv")
+	local previous_shell, previous_cipher = package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
+	shell._set_runner(function(command) return native_receipt(command, "key=" .. KEY .. "\n") end)
+	local cipher = load_cipher()
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-machine-id-XXXXXX"))
+	local path = dir .. "/id"
+	local made = os.execute("mkfifo '" .. path .. "'"); assert(made == 0 or made == true)
+	cipher._set_machine_id_path(path)
+	local exited, process = false, nil
+	process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; printf synthetic-machine-id > "$1"', "fixture", path } }, function()
+		exited = true; process:close()
+	end))
+	local called, available = pcall(cipher.is_available)
+	os.remove(path); os.remove(dir)
+	while not exited do uv.run("once") end
+	package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
+	assert(called, available)
+	helpers.assert_eq(available, false, "a FIFO cannot provide a machine identity")
+end)
+
+for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
+	helpers.it("text cipher refuses an incomplete machine identity " .. fault, function()
+		local Reader = require("core.fs.engine.regular_file_reader")
+		local original = Reader.open_source
+		local previous_shell, previous_cipher = package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
+		local commands, closes = 0, 0
+		shell._set_runner(function(command) commands = commands + 1; return native_receipt(command, "key=" .. KEY .. "\n") end)
+		local cipher = load_cipher(); cipher._set_machine_id_path("/controlled/machine-id")
+		Reader.open_source = function(path, ...)
+			if path ~= "/controlled/machine-id" then return original(path, ...) end
+			return { read = function()
+				if fault == "read_throw" then error("injected read") end
+				if fault == "read_nil" then return nil end
+				return "synthetic"
+			end, close = function()
+				closes = closes + 1
+				if fault == "close_throw" then error("injected close") end
+				return fault ~= "close_false"
+			end }
+		end
+		local called, result = pcall(cipher.is_available)
+		Reader.open_source = original
+		package.loaded["core.process.adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"] = previous_shell, previous_cipher
+		helpers.assert_true(called); helpers.assert_eq(result, false)
+		helpers.assert_eq(commands, 0); helpers.assert_eq(closes, 1)
+	end)
+end
+
 helpers.describe("text_cipher — default machine-ID candidate receipts", function()
 	local cases = {
 		{ primary = false, fallback = "synthetic-dbus", expected = "/var/lib/dbus/machine-id" },
@@ -251,13 +302,14 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 	}
 	for index, case in ipairs(cases) do
 		helpers.it("uses the canonical native machine-ID candidate " .. index .. " (machine-id-fallback-receipts)", function()
-			local previous_open = io.open
-			local previous_shell = package.loaded["adapters.shell_runner"]
+			local Reader = require("core.fs.engine.regular_file_reader")
+			local previous_open = Reader.open_source
+			local previous_shell = package.loaded["core.process.adapters.shell_runner"]
 			local previous_cipher = package.loaded["modules.keystats.text_cipher"]
-			local shell = helpers.load_module("adapters.shell_runner")
+			local shell = helpers.load_module("core.process.adapters.shell_runner")
 			local commands, closed = {}, 0
 			shell._set_runner(function(command) commands[#commands + 1] = command; return native_receipt(command, "key=" .. KEY .. "\n") end)
-			io.open = function(path, mode)
+			Reader.open_source = function(path, mode)
 				local value
 				if path == "/etc/machine-id" then value = case.primary
 				elseif path == "/var/lib/dbus/machine-id" then value = case.fallback
@@ -283,8 +335,8 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 						"missing identities must keep encryption fail-closed")
 				end
 			end)
-			io.open = previous_open
-			package.loaded["adapters.shell_runner"] = previous_shell
+			Reader.open_source = previous_open
+			package.loaded["core.process.adapters.shell_runner"] = previous_shell
 			package.loaded["modules.keystats.text_cipher"] = previous_cipher
 			helpers.assert_true(ok, tostring(err))
 		end)
@@ -342,14 +394,15 @@ helpers.describe("text_cipher — enabled changes what is stored", function()
 		helpers.assert_true(a ~= b, "identical text in two rows must not produce identical envelopes")
 	end)
 
-	helpers.it("does not double-wrap a value that is already encrypted", function()
+	helpers.it("seals raw text that copies an envelope instead of trusting it", function()
 		local cipher = fresh_cipher()
 		capture_shell()
 		cipher.set_enabled(true)
 		local once  = cipher.encrypt("dev", 1, "text")
-		local twice = cipher.encrypt("dev", 1, once)
+		local twice = cipher.encrypt("dev", 2, once)
 		Shell()._reset_runner()
-		helpers.assert_eq(twice, once, "re-encrypting would make the value undecryptable in one pass")
+		helpers.assert_true(TextCrypto.is_encrypted(twice) and twice ~= once,
+			"a raw value is sealed; only the migration skips stored envelopes")
 	end)
 
 	helpers.it("leaves an empty value alone", function()
@@ -384,7 +437,7 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 			helpers.assert_eq(received.key, KEY)
 			helpers.assert_eq(#received.iv, 32)
 			local _, payload = TextCrypto.unwrap(result)
-			helpers.assert_eq(require("compat.base64").decode(payload), "\0ciphertext\255")
+			helpers.assert_eq(require("core.lifecycle.engine.compat.base64").decode(payload), "\0ciphertext\255")
 			for _, command in ipairs(seen) do
 				helpers.assert_true(not command:find("-K", 1, true), "no per-value command may expose key arguments")
 			end
@@ -443,7 +496,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 			calls = calls + 1
 			return native_receipt(command, "Synthetic output", 0)
 		end)
-		local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", "text")
+		local ok, result = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", "text")
 		shell.has_command = previous
 		shell._reset_runner()
 		helpers.assert_true(ok)
@@ -458,7 +511,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 				captured = command
 				return native_receipt(command, "Synthetic output", 0)
 			end)
-			local ok, result = pcall(require("infra.openssl_command").exec, "openssl fixture", input)
+			local ok, result = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", input)
 			shell._reset_runner()
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, "Synthetic output")
@@ -487,7 +540,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 				return native_receipt(command, "Synthetic output", 0)
 			end)
 			local options = checked and { pipefail = true } or nil
-			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture", nil, options)
+			local ok, result, reason = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture", nil, options)
 			shell.has_command = previous
 			shell._reset_runner()
 			helpers.assert_true(ok)
@@ -514,7 +567,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		helpers.it("retains only the current complete native stdout receipt " .. index .. " (openssl-capture-receipts)", function()
 			local shell = Shell()
 			shell._set_runner(function(command) return native_receipt(command, case.output, case.status) end)
-			local ok, result, reason = pcall(require("infra.openssl_command").exec, "openssl fixture")
+			local ok, result, reason = pcall(require("core.network.engine.openssl_command").exec, "openssl fixture")
 			shell._reset_runner()
 			helpers.assert_true(ok)
 			helpers.assert_eq(result, case.expected)
@@ -528,7 +581,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		local shell, calls = Shell(), 0
 		shell._set_runner(function() calls = calls + 1; return "" end)
 		local ok, err = pcall(function()
-			local capture = require("infra.openssl_command")
+			local capture = require("core.network.engine.openssl_command")
 			for _, pair in ipairs({ { "", "text" }, { false, "text" }, { "openssl\0hidden", "text" },
 				{ "openssl fixture", "binary\0stdin" }, { "openssl fixture", false },
 				{ "openssl fixture", "text", false }, { "openssl fixture", "text", "invalid" },
@@ -638,10 +691,17 @@ helpers.describe("sqlite_writer — encryption is not optional once enabled", fu
 
 	helpers.it("routes the typed-text columns through the cipher", function()
 		local code = writer_code()
-		helpers.assert_contains(code, "TextCipher.encrypt(device_id, event_id",
+		-- The shared migration plan owns each column's IV id, so the writer and
+		-- the at-rest migration derive the same one.
+		helpers.assert_contains(code, 'local text_id = MigrationPlan.iv_event_id(event_id, "text")')
+		helpers.assert_contains(code, "TextCipher.encrypt(device_id, text_id, raw_text)",
 			"events_typing.text must be encrypted before it is stored")
-		helpers.assert_contains(code, 'TextCipher.encrypt(device_id, tostring(event_id) .. "j"',
+		helpers.assert_contains(code, 'local json_id = MigrationPlan.iv_event_id(event_id, "events_json")')
+		helpers.assert_contains(code, "TextCipher.encrypt(device_id, json_id, raw_json)",
 			"events_json holds the same characters and must be encrypted too")
+		local Plan = require("metrics.engine.privacy.text_migration_core")
+		helpers.assert_eq(Plan.iv_event_id(7, "text"), "7", "the text column keeps its historical IV id")
+		helpers.assert_eq(Plan.iv_event_id(7, "events_json"), "7j", "the JSON column keeps a distinct IV id")
 	end)
 
 	helpers.it("drops the batch rather than storing plaintext on failure", function()

@@ -17,8 +17,9 @@
 --- 2. One key: KeyT bound to F3 instead of F2 changes the t manipulators only.
 --- 3. Contracts: every manipulator is gated on layer_active; no binding is no
 ---    rule; `none` swallows the key; a mouse button is a layer key; the wheel
----    and a repeat count have no Karabiner form, the wheel being the strokes
----    Hammerspoon posts (wheel_slots); every macOS call handler the
+---    has no Karabiner form, being the strokes Hammerspoon posts
+---    (wheel_slots); a repeat count is the nav_repeat_count variable, as
+---    Windows' NumberOfRepetitions (layer-repeat-count-macos); every macOS call handler the
 ---    vocabulary declares is implemented; a layers.toml rejected as a whole
 ---    closes its START with an error and no SUCCESS.
 --- 4. The generator deploys state.nav_layer in place of the static file and
@@ -30,12 +31,12 @@
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local Layers    = require("keymap.layers")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Layers    = require("layouts.engine.layers.layers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
 
 local LEGACY_PATH = helpers.driver_root() .. "/platform/remap/data/legacy_layer_keys.json"
@@ -89,7 +90,7 @@ local ctx = Layers.load_context({
 	toml_decode = TomlCodec.decode,
 	read_file   = read_file,
 })
-local recommended = read_file(helpers.shared("keymap/layers.recommended.toml"))
+local recommended = read_file(helpers.shared("layouts/data/layers.recommended.toml"))
 
 --- The navigation bindings a layer file resolves to on macOS; the file must load cleanly.
 local function bindings_of(text)
@@ -236,14 +237,133 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_eq(actual.button4, "to=left_arrow[option]")
 	end)
 
-	helpers.it("the wheel and a repeat count have no Karabiner form", function()
+	helpers.it("the wheel has no Karabiner form", function()
 		local wheel_only = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n')
 		helpers.assert_not_nil(wheel_only.WheelUp, "the loader takes the wheel as a macOS layer key (layer-wheel-slots)")
 		helpers.assert_nil(NavLayer.build_rule(wheel_only, ctx.registry, "ansi"),
 			"the wheel is Hammerspoon's to run: Karabiner gets no manipulator for it")
-		helpers.assert_throws(function()
-			NavLayer.build_rule({ Digit1 = { kind = "repeat_count", count = 1 } }, ctx.registry, "ansi")
-		end, "a repeat count does not exist on macOS")
+	end)
+
+	--- The manipulators firing on one Karabiner key code, in rule order.
+	local function on_key(rule, key_code)
+		local found = {}
+		for _, manipulator in ipairs(rule.manipulators) do
+			if manipulator.from.key_code == key_code then found[#found + 1] = manipulator end
+		end
+		return found
+	end
+
+	--- The value a manipulator's condition on a variable requires, or nil.
+	local function required(manipulator, name)
+		for _, condition in ipairs(manipulator.conditions) do
+			if condition.name == name and condition.type == "variable_if" then return condition.value end
+		end
+		return nil
+	end
+
+	--- The key codes a manipulator sends, and the repeat counts it sets.
+	local function sent(manipulator)
+		local parts = {}
+		for _, event in ipairs(manipulator.to) do
+			if event.key_code then parts[#parts + 1] = event.key_code end
+			if event.set_variable then
+				parts[#parts + 1] = event.set_variable.name .. "=" .. tostring(event.set_variable.value)
+			end
+		end
+		return table.concat(parts, " ")
+	end
+
+	helpers.it("(layer-repeat-count-macos) a repeat_count key sets the count a repeatable action spends", function()
+		local bindings = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit3" = "repeat_count:3"\n"Digit5" = "repeat_count:5"\n"KeyK" = "arrow_left"\n'
+			.. '"KeyJ" = "keystroke:Home"\n')
+		helpers.assert_eq(bindings.Digit3, { kind = "repeat_count", count = 3 }, "macOS resolves the count now")
+		local rule = NavLayer.build_rule(bindings, ctx.registry, "ansi")
+		local digit = on_key(rule, "3")
+		helpers.assert_eq(#digit, 1)
+		helpers.assert_eq(sent(digit[1]), "nav_repeat_count=3", "the count key only sets the variable")
+		local arrow = on_key(rule, "k")
+		helpers.assert_eq(#arrow, 3, "one variant per count, then the plain send")
+		helpers.assert_eq(required(arrow[1], "nav_repeat_count"), 3)
+		helpers.assert_eq(sent(arrow[1]), "left_arrow left_arrow left_arrow nav_repeat_count=1")
+		helpers.assert_eq(required(arrow[2], "nav_repeat_count"), 5)
+		helpers.assert_eq(sent(arrow[2]), "left_arrow left_arrow left_arrow left_arrow left_arrow nav_repeat_count=1")
+		helpers.assert_nil(required(arrow[3], "nav_repeat_count"), "the plain send matches whatever the count")
+		helpers.assert_eq(sent(arrow[3]), "left_arrow nav_repeat_count=1")
+		local home = on_key(rule, "j")
+		helpers.assert_eq(#home, 1, "a literal keystroke is not repeatable")
+		helpers.assert_eq(sent(home[1]), "home nav_repeat_count=1", "but its send spends the count")
+	end)
+
+	helpers.it("(layer-repeat-count-macos) replays 3 then arrow_up as three moves, then one, then none kept", function()
+		-- The Mac check « Navigation layer repeat count » (TODO, To confirm on the
+		-- Mac) replayed with Karabiner's matching: the first manipulator of the key
+		-- whose variable conditions hold fires, and its set_variable events apply in
+		-- order. Entering the layer resets the count to 1 (generator test
+		-- « entering the layer resets the count only when the layer binds one »),
+		-- which is what makes a release after `3` forget the count.
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit3" = "repeat_count:3"\n"KeyI" = "arrow_up"\n'), ctx.registry, "ansi")
+		local arrows = on_key(rule, "i")
+		local plain = arrows[#arrows]
+		helpers.assert_nil(required(plain, "nav_repeat_count"), "the last arrow manipulator is the plain send")
+		local entered = {}
+		for _, condition in ipairs(plain.conditions) do
+			if condition.type == "variable_if" then entered[condition.name] = condition.value end
+		end
+		local vars
+		local function enter_layer()
+			vars = {}
+			for name, value in pairs(entered) do vars[name] = value end
+			vars.nav_repeat_count = 1
+		end
+		local function matches(manipulator)
+			for _, condition in ipairs(manipulator.conditions or {}) do
+				local value = vars[condition.name] or 0
+				if condition.type == "variable_if" and value ~= condition.value then return false end
+				if condition.type == "variable_unless" and value == condition.value then return false end
+			end
+			return true
+		end
+		local function press(key_code)
+			for _, manipulator in ipairs(on_key(rule, key_code)) do
+				if matches(manipulator) then
+					local keys = {}
+					for _, event in ipairs(manipulator.to) do
+						if event.key_code then keys[#keys + 1] = event.key_code end
+						if event.set_variable then vars[event.set_variable.name] = event.set_variable.value end
+					end
+					return table.concat(keys, " ")
+				end
+			end
+			return nil
+		end
+		enter_layer()
+		helpers.assert_eq(press("3"), "", "the count key types nothing")
+		helpers.assert_eq(press("i"), "up_arrow up_arrow up_arrow", "3 then arrow_up moves up three lines")
+		helpers.assert_eq(press("i"), "up_arrow", "the next arrow_up moves one line")
+		helpers.assert_eq(press("3"), "")
+		enter_layer()
+		helpers.assert_eq(press("i"), "up_arrow", "a count typed before the layer was released is forgotten")
+	end)
+
+	helpers.it("(layer-repeat-count-macos) a layer without a count generates exactly what it did before", function()
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"KeyK" = "arrow_left"\n'), ctx.registry, "ansi")
+		local arrow = on_key(rule, "k")
+		helpers.assert_eq(#arrow, 1)
+		helpers.assert_eq(sent(arrow[1]), "left_arrow")
+	end)
+
+	helpers.it("(layer-repeat-count-macos) a counted function key keeps both top-row variants", function()
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit2" = "repeat_count:2"\n"KeyK" = "keystroke:F2"\n"KeyL" = "vol_up"\n'), ctx.registry, "ansi")
+		helpers.assert_eq(#on_key(rule, "k"), 2, "F2 is not repeatable: one plain send per top-row mode")
+		helpers.assert_eq(sent(on_key(rule, "k")[1]), "f2 nav_repeat_count=1")
+		helpers.assert_true(NavLayer.binds_repeat_count(bindings_of('[_meta]\nschema_version = 1\n\n'
+			.. '[layers.nav.all]\n"Digit2" = "repeat_count:2"\n')))
+		helpers.assert_true(not NavLayer.binds_repeat_count(bindings_of(recommended)),
+			"the recommended macOS layer keeps its F-key number row")
 	end)
 
 	helpers.it("(layer-wheel-slots) the recommended wheel is volume up and down, posted as media keys", function()
@@ -305,8 +425,8 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
 			capture[level] = function() levels[#levels + 1] = level end
 		end
-		local saved_logger = package.loaded["infra.logger"]
-		package.loaded["infra.logger"] = capture
+		local saved_logger = package.loaded["core.logger.engine.logger"]
+		package.loaded["core.logger.engine.logger"] = capture
 		local ok, err = pcall(function()
 			local Fresh = helpers.load_with_stubs("platform.remap.nav_layer")
 			local layer = Fresh.load({ shared_root = helpers.shared(), config_dir = dir })
@@ -315,7 +435,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 			-- so no SUCCESS may follow it.
 			helpers.assert_eq(table.concat(levels, " "), "start warn error")
 		end)
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["platform.remap.nav_layer"] = nil
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
@@ -372,6 +492,37 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		end)
 	end)
 
+	helpers.it("refuses a shipped preset read or close failure and closes the stream", function()
+		with_folder(function(dir)
+			for _, failure in ipairs({ "read_throw", "read_nil", "close_nil" }) do
+				local original_open, closes = io.open, 0
+				io.open = function(path, mode)
+					local file, err = original_open(path, mode)
+					if not file or not path:match("layer_actions%.toml$") then return file, err end
+					return {
+						read = function(_, ...)
+							if failure == "read_throw" then error("read refused") end
+							if failure == "read_nil" then return nil, "read refused" end
+							return file:read(...)
+						end,
+						close = function()
+							closes = closes + 1
+							file:close()
+							if failure == "close_nil" then return nil, "close refused" end
+							return true
+						end,
+					}
+				end
+				local called, imported = pcall(NavLayer.import_recommended, { shared_root = helpers.shared(), config_dir = dir })
+				io.open = original_open
+				helpers.assert_true(called)
+				helpers.assert_nil(imported, failure .. " must prevent publishing the preset")
+				helpers.assert_eq(closes, 1)
+				helpers.assert_nil(content(dir .. "/layers.toml"))
+			end
+		end)
+	end)
+
 	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
 		for label, own in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
 			empty = "" }) do
@@ -386,6 +537,21 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 				helpers.assert_eq(content(dir .. "/layers.toml"), own, label .. ": an undo never removes a kept file")
 			end)
 		end
+	end)
+
+	helpers.it("refuses an unreadable existing navigation layer", function()
+		with_folder(function(dir)
+			local writes = 0
+			local import, err = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir,
+				file_adapter = {
+					read_with_status = function() return nil, "error", "permission denied" end,
+					write_if_unchanged = function() writes = writes + 1; return true end,
+				},
+			})
+			helpers.assert_nil(import, "an unreadable layer must not be reported as usable")
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(writes, 0, "the inaccessible file remains untouched")
+		end)
 	end)
 
 	helpers.it("(nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it", function()
@@ -460,7 +626,7 @@ helpers.describe("navigation source close acknowledgement", function()
 			return record.closed
 		end
 		local called, outcome = pcall(function()
-			quote = require("text_utils").shell_quote
+			quote = require("core.text.engine.utils_core").shell_quote
 			fixture_sequence = fixture_sequence + 1
 			directory = helpers.temp_dir() .. "/ergopti_mac_nav_close_" .. tostring(os.time()) .. "_"
 				.. tostring(math.random(100000, 999999)) .. "_" .. tostring(fixture_sequence)
@@ -478,10 +644,10 @@ helpers.describe("navigation source close acknowledgement", function()
 			for _, level in ipairs({ "start", "success", "warn", "error" }) do
 				capture[level] = function() levels[#levels + 1] = level end
 			end
-			package.loaded["infra.logger"] = capture
+			package.loaded["core.logger.engine.logger"] = capture
 			package.loaded["platform.remap.nav_layer"] = nil
 			local Fresh = require("platform.remap.nav_layer")
-			local target = source == "user" and user_path or helpers.shared("data/keycodes/physical_keys.json")
+			local target = source == "user" and user_path or helpers.shared("layouts/data/keycodes/physical_keys.json")
 			io.open = function(path, mode)
 				if path ~= target or mode ~= "r" and mode ~= "rb" then return original_open(path, mode) end
 				local handle, detail, code = original_open(path, mode)
@@ -599,8 +765,8 @@ helpers.describe("navigation configured input observations", function()
 		end
 		write(text)
 		local called, detail = xpcall(function()
-			helpers.with_stub_scope({ "platform.remap.nav_layer", "infra.logger" }, function()
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+			helpers.with_stub_scope({ "platform.remap.nav_layer", "core.logger.engine.logger" }, function()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["platform.remap.nav_layer"] = nil
 				local subject = require("platform.remap.nav_layer")
 				callback(subject, { shared_root = helpers.shared(), config_dir = directory }, write, path)
@@ -663,7 +829,7 @@ helpers.describe("navigation configured input observations", function()
 	helpers.it("nav-configured source exports cannot supply replacement observations", function()
 		with_source(function(subject, options)
 			local layer, observation = subject.load(options)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original, reads = writer.read_classified, 0
 			writer.read_classified = function(...) reads = reads + 1; return original(...) end
 			local called, capture = pcall(subject.capture_configured_inputs, layer, observation)
@@ -676,7 +842,7 @@ helpers.describe("navigation configured input observations", function()
 
 	helpers.it("nav-configured rejoins original source bytes after the load logger callback", function()
 		with_source(function(subject, options, write)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.success = function() write(text .. "# logger successor\n") end
 			local layer, observation = subject.load(options)
 			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))

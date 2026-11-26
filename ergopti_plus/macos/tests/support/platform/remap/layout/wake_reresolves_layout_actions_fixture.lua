@@ -74,7 +74,7 @@ local function load_remap(options)
 			}
 		end
 	end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = log("start"),
 		debug = log("debug"),
 		info = log("info"),
@@ -96,6 +96,7 @@ local function load_remap(options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = options.enabled ~= false,
 				tap_hold_config = {},
 				mod_combos_config = {},
@@ -276,9 +277,9 @@ local function load_remap(options)
 		stop_input_source_watcher = function() return true end,
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
@@ -294,7 +295,7 @@ local function load_remap(options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function()
 			append("pause-query")
@@ -377,7 +378,7 @@ local function load_remap(options)
 		if options.settle_timer_synchronous and delay ~= 2.0 then timer:fire() end
 		return timer
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			return new_timer(delay, callback), true
 		end,

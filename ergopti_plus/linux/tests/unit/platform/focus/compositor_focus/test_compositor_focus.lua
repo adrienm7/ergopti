@@ -1,0 +1,568 @@
+--- tests/unit/platform/focus/compositor_focus/test_compositor_focus.lua
+
+--- ==============================================================================
+--- MODULE: Compositor focus source (GNOME Shell extension, KWin script)
+--- DESCRIPTION:
+--- The daemon side of the pushed focus: worker lines in, snapshot out, with a
+--- fake resident process. Every unknown is asserted as a stated outcome: before
+--- readiness, after a clear, a malformed line or the worker's exit, the answer
+--- is nil and never the previous window. Then the join through window_info:
+--- the four-times-a-second poll reads the source without running a command.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+--- A fake OwnedProcess.start keeping the output and exit callbacks.
+--- @return function start, table process
+local function fake_process()
+	local process = { cancelled = 0, settled = false }
+	local function start(executable, arguments, options, callback)
+		process.executable, process.arguments, process.options = executable, arguments, options
+		process.exit = callback
+		local operation = { started = true }
+		function operation:is_running() return not process.settled end
+		function operation:is_settled() return process.settled end
+		function operation:cancel()
+			process.cancelled = process.cancelled + 1
+			process.settled = true
+			return true
+		end
+		process.operation = operation
+		return operation
+	end
+	function process.say(text) process.options.on_output(text, "stdout") end
+	return start, process
+end
+
+local function new_source(family)
+	local Focus = helpers.load_module("platform.focus.compositor_focus")
+	local start, process = fake_process()
+	local source = Focus.new({
+		family = family or "gnome", start_process = start,
+		command = function() return "/usr/bin/luajit", { "worker" }, "/driver" end,
+	})
+	return source, process
+end
+
+local FOCUS = '{"kind":"focus","class":"org.gnome.Nautilus","title":"Documents","pid":4242,"id":"17"}\n'
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 1/ Admission ============
+-- =================================
+-- =================================
+
+helpers.describe("compositor_focus: admission", function()
+	helpers.it("(wayland-desktop-focus) names GNOME, KDE and COSMIC from XDG_CURRENT_DESKTOP only", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		helpers.assert_eq(Focus.desktop_family("ubuntu:GNOME"), "gnome")
+		helpers.assert_eq(Focus.desktop_family("KDE"), "kde")
+		helpers.assert_eq(Focus.desktop_family("COSMIC"), "cosmic")
+		helpers.assert_eq(Focus.desktop_family("pop:COSMIC"), "cosmic")
+		helpers.assert_eq(Focus.desktop_family("gnome-flashback:gnome-classic"), nil,
+			"a token that only contains gnome is another session")
+		helpers.assert_eq(Focus.desktop_family(""), nil)
+	end)
+
+	helpers.it("(wayland-desktop-focus) the worker admits a bounded report and refuses the rest", function()
+		local Worker = helpers.load_module("platform.focus.compositor_focus_worker")
+		helpers.assert_eq(Worker.activation_record("kitty", "nvim", "2468", "{a1-b2}"),
+			{ kind = "focus", class = "kitty", title = "nvim", pid = 2468, id = "{a1-b2}" })
+		helpers.assert_eq(Worker.activation_record("kitty", "nvim", "", "9").pid, nil)
+		for _, case in ipairs({
+			{ "kitty", "nvim", "0", "9" }, { "kitty", "nvim", "-1", "9" }, { "kitty", "nvim", "12x", "9" },
+			{ "kitty", "nvim", "99999999999", "9" }, { "kitty", "nvim", "1", "" },
+			{ "kitty", "nvim", "1", "a b" }, { "kitty", string.rep("t", 2049), "1", "9" },
+			{ "kitty\0", "nvim", "1", "9" },
+		}) do
+			helpers.assert_eq(Worker.activation_record(case[1], case[2], case[3], case[4]), nil,
+				"refused: " .. table.concat(case, "|"))
+		end
+	end)
+end)
+
+
+
+
+helpers.describe("compositor_focus: COSMIC toplevel tracker", function()
+	local Worker = helpers.load_module("platform.focus.cosmic_toplevel_worker")
+	local ACTIVATED = Worker.STATE_ACTIVATED
+
+	helpers.it("(wayland-desktop-focus) commits on done and names the single activated window", function()
+		local tracker = Worker.new_tracker()
+		tracker.add("a")
+		tracker.title("a", "notes")
+		tracker.app_id("a", "com.system76.CosmicEdit")
+		tracker.state("a", { ACTIVATED })
+		local record = tracker.done("a")
+		helpers.assert_eq(record, { kind = "focus", class = "com.system76.CosmicEdit", title = "notes", id = "cosmic-1" })
+		tracker.title("a", "notes*")
+		helpers.assert_eq(tracker.current().title, "notes", "a pending title is not the window's until done")
+		helpers.assert_eq(tracker.done("a").title, "notes*")
+		helpers.assert_eq(tracker.done("a"), nil, "an unchanged focus prints nothing")
+	end)
+
+	helpers.it("(wayland-desktop-focus) none or two activated windows, and a close, are judged fail-closed", function()
+		local tracker = Worker.new_tracker()
+		tracker.add("a"); tracker.state("a", { ACTIVATED }); tracker.done("a")
+		tracker.add("b"); tracker.state("b", { 0, ACTIVATED })
+		helpers.assert_eq(tracker.done("b"), { kind = "clear" }, "two activated windows are unknown")
+		tracker.state("a", { 1 })
+		helpers.assert_eq(tracker.done("a").id, "cosmic-2")
+		helpers.assert_eq(tracker.closed("b"), { kind = "clear" }, "no activated window is unknown")
+		helpers.assert_eq(pcall(tracker.done, "b"), false, "an event for a closed handle is a protocol failure")
+		helpers.assert_eq(pcall(tracker.add, "a"), false, "a handle announced twice is a protocol failure")
+		helpers.assert_eq(pcall(tracker.title, "a", string.rep("t", 2049)), false, "an oversized title is refused")
+	end)
+
+	helpers.it("(wayland-desktop-focus) binds version 2 only beside the toplevel list, version 1 otherwise", function()
+		local info, list = Worker.INFO_INTERFACE, Worker.LIST_INTERFACE
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 1 } }),
+			{ info_version = 1, list = false }, "a version 1 compositor")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 3 }, [list] = { name = 8, version = 1 } }),
+			{ info_version = 2, list = true }, "a version 3 compositor with the list")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 2 } }),
+			{ info_version = 1, list = false }, "a later version without the list keeps version 1")
+		helpers.assert_eq(Worker.choose_protocol({ [info] = { name = 7, version = 1 }, [list] = { name = 8, version = 1 } }),
+			{ info_version = 1, list = false }, "the list alone does not raise a version 1 global")
+		helpers.assert_eq(pcall(Worker.choose_protocol, { [list] = { name = 8, version = 1 } }), false,
+			"no toplevel info is a failure, never a guess")
+		helpers.assert_eq(pcall(Worker.choose_protocol, { [info] = { name = 7, version = 0 } }), false,
+			"an invalid version is refused")
+	end)
+
+	helpers.it("(wayland-desktop-focus) version 2 commits states only with the batch done", function()
+		local tracker = Worker.new_tracker({ atomic_states = true })
+		tracker.add("a"); tracker.title("a", "notes"); tracker.app_id("a", "com.system76.CosmicEdit")
+		helpers.assert_eq(tracker.done("a"), { kind = "clear" }, "a window with no committed state is not the focus")
+		tracker.state("a", { ACTIVATED })
+		helpers.assert_eq(tracker.current(), { kind = "clear" }, "a pending state is not the window's until the batch")
+		helpers.assert_eq(tracker.batch_done().id, "cosmic-1")
+		tracker.add("b"); tracker.app_id("b", "com.system76.CosmicTerm"); tracker.done("b")
+		tracker.state("a", {})
+		tracker.state("b", { ACTIVATED })
+		helpers.assert_eq(tracker.batch_done().class, "com.system76.CosmicTerm",
+			"the activation moves with no clear in between")
+		helpers.assert_eq(tracker.batch_done(), nil, "an empty batch prints nothing")
+		tracker.title("b", "~")
+		helpers.assert_eq(tracker.done("b").title, "~", "a title is committed by the window's own done")
+		helpers.assert_eq(pcall(Worker.new_tracker().batch_done), false, "version 1 has no batch done")
+	end)
+
+	helpers.it("(wayland-desktop-focus) the COSMIC worker command names its own worker and the Wayland library", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		local start, process = fake_process()
+		local source = Focus.new({ family = "cosmic", start_process = start })
+		helpers.assert_true(source.start())
+		helpers.assert_true(process.arguments[1]:find("/platform/focus/cosmic_toplevel_worker.lua$") ~= nil)
+		helpers.assert_eq(process.arguments[2], require("_generated.native_runtime").optional.wayland_client)
+		source.stop()
+	end)
+end)
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 2/ Source ===============
+-- =================================
+-- =================================
+
+helpers.describe("compositor_focus: source", function()
+	helpers.it("(wayland-desktop-focus) answers only after readiness and from the last report", function()
+		local source, process = new_source("gnome")
+		helpers.assert_true(source.start())
+		helpers.assert_eq(process.arguments, { "worker" })
+		helpers.assert_eq(source.snapshot(), nil, "unknown before the worker owns its name")
+		process.say('{"kind":"ready"}\n')
+		helpers.assert_eq(source.snapshot(), nil, "unknown until the desktop reports")
+		-- A line split across chunks is one record.
+		process.say(FOCUS:sub(1, 20))
+		helpers.assert_eq(source.snapshot(), nil)
+		process.say(FOCUS:sub(21))
+		helpers.assert_eq(source.snapshot(), { class = "org.gnome.Nautilus", title = "Documents", pid = 4242, id = "17" })
+		process.say('{"kind":"clear"}\n')
+		helpers.assert_eq(source.snapshot(), nil, "a cleared focus is unknown, not the last window")
+	end)
+
+	helpers.it("(text-automation-visible) records whether KWin runs the focus script", function()
+		-- Field report, Plasma 6.8 Wayland, 2026-11-25: the worker listened,
+		-- KWin never loaded the script, and nothing said so.
+		local source, process = new_source("kde")
+		helpers.assert_true(source.start())
+		process.say('{"kind":"ready"}\n')
+		helpers.assert_eq(source.script_state(), nil, "unknown until the worker asked KWin")
+		process.say('{"kind":"script","loaded":false,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "not_loaded")
+		helpers.assert_eq(source.status(), "ready", "a script KWin does not run is a fact, not a worker failure")
+		process.say('{"kind":"script","loaded":false,"answered":false}\n')
+		helpers.assert_eq(source.script_state(), "unanswered")
+		process.say('{"kind":"script","loaded":true,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "loaded")
+		process.say('{"kind":"script","loaded":"yes","answered":true}\n')
+		helpers.assert_eq(source.status(), "failed", "a malformed script record fails closed")
+	end)
+
+	for _, case in ipairs({
+		{ "a report before readiness", FOCUS },
+		{ "a malformed line", '{"kind":"ready"}\nnot json\n' },
+		{ "an unknown kind", '{"kind":"ready"}\n{"kind":"guess"}\n' },
+		{ "a zero process id", '{"kind":"ready"}\n{"kind":"focus","class":"a","title":"b","pid":0,"id":"1"}\n' },
+		{ "a second readiness", '{"kind":"ready"}\n{"kind":"ready"}\n' },
+		{ "a readiness naming a fractional protocol", '{"kind":"ready","protocol":1.5}\n' },
+		{ "an unbounded line", '{"kind":"ready"}\n' .. string.rep("x", 9000) },
+	}) do
+		helpers.it("(wayland-desktop-focus) fails closed on " .. case[1], function()
+			local source, process = new_source("kde")
+			source.start()
+			process.say(case[2])
+			process.say('{"kind":"ready"}\n' .. FOCUS)
+			helpers.assert_eq(source.snapshot(), nil)
+			helpers.assert_eq(process.cancelled, 1, "the worker that misspoke is stopped")
+			helpers.assert_true(source.is_active(), "the failed source still owns the answer: unknown")
+		end)
+	end
+
+	helpers.it("(wayland-desktop-focus) the worker's exit forgets the focus", function()
+		local source, process = new_source("gnome")
+		source.start()
+		process.say('{"kind":"ready"}\n' .. FOCUS)
+		helpers.assert_true(source.snapshot() ~= nil)
+		process.exit({ stderr = "bus name org.ergopti.Focus already owned\n" })
+		helpers.assert_eq(source.snapshot(), nil)
+	end)
+
+	helpers.it("(wayland-desktop-focus) a refused dispatch is unknown, and start is single-use", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		local source = Focus.new({ family = "gnome", command = function() return "x", {}, "/" end,
+			start_process = function() return { started = false } end })
+		helpers.assert_eq(source.start(), false)
+		helpers.assert_eq(source.snapshot(), nil)
+		helpers.assert_eq(pcall(source.start), false, "a second start is refused")
+	end)
+
+	helpers.it("(wayland-desktop-focus) stop cancels the worker and ignores its late lines", function()
+		local source, process = new_source("gnome")
+		source.start()
+		process.say('{"kind":"ready"}\n')
+		helpers.assert_true(source.stop())
+		helpers.assert_eq(process.cancelled, 1)
+		process.say(FOCUS)
+		helpers.assert_eq(source.snapshot(), nil)
+		helpers.assert_eq(source.is_active(), false)
+	end)
+end)
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 3/ GNOME extension state ====
+-- =====================================
+-- =====================================
+
+--- A recording logger, installed for the source the case creates.
+--- @return table logger, function restore
+local function recording_logger()
+	local previous = package.loaded["core.logger.engine.shim"]
+	local logger = helpers.make_logger_stub()
+	logger.lines = {}
+	for _, level in ipairs({ "info", "warn", "error" }) do
+		logger[level] = function(_, template, ...)
+			logger.lines[#logger.lines + 1] = { level = level, text = string.format(template, ...) }
+		end
+	end
+	package.loaded["core.logger.engine.shim"] = logger
+	return logger, function() package.loaded["core.logger.engine.shim"] = previous end
+end
+
+--- The lines of one level that contain a text.
+local function lines_with(logger, level, text)
+	local count = 0
+	for _, line in ipairs(logger.lines) do
+		if line.level == level and line.text:find(text, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+--- A fake GNOME Shell Extensions interface: GetExtensionInfo answers from a
+--- queue of dictionaries (false: no answer), recording each call.
+--- @param answers table
+--- @return function read_info, table calls
+local function fake_shell(answers)
+	local calls = { count = 0 }
+	return function()
+		calls.count = calls.count + 1
+		local answer = table.remove(answers, 1)
+		if answer == false then return nil end
+		return answer
+	end, calls
+end
+
+helpers.describe("compositor_focus: GNOME extension state (gnome-focus-extension)", function()
+	local Worker = helpers.load_module("platform.focus.compositor_focus_worker")
+
+	helpers.it("(gnome-focus-extension) the worker names each GetExtensionInfo answer", function()
+		for _, case in ipairs({
+			{ {}, "absent", "an empty dictionary: GNOME Shell knows no such extension" },
+			{ { state = 99 }, "absent", "uninstalled" },
+			{ { state = 1 }, "active" },
+			{ { state = 8 }, "active", "enabling" },
+			{ { state = 2 }, "inactive", "disabled" },
+			{ { state = 6 }, "inactive", "initialized, never enabled" },
+			{ { state = 4 }, "out_of_date" },
+			{ { state = 3 }, "error" },
+			{ { state = 42 }, "unknown", "a state this worker does not know is not guessed" },
+			{ nil, "unanswered", "no answer from GNOME Shell" },
+		}) do
+			helpers.assert_eq(Worker.extension_record(case[1], false),
+				{ kind = "extension", state = case[2], silent = false }, case[3] or case[2])
+		end
+		helpers.assert_eq(Worker.extension_record({ state = 1 }, true).silent, true)
+	end)
+
+	helpers.it("(gnome-focus-extension) the worker asks again after the silence bound only when nothing reported", function()
+		local emitted = {}
+		local read, calls = fake_shell({ { state = 1 }, { state = 1 } })
+		local monitor = Worker.new_extension_monitor(read, function(record) emitted[#emitted + 1] = record end)
+		monitor.check(false)
+		helpers.assert_eq(emitted[1], { kind = "extension", state = "active", silent = false })
+		helpers.assert_true(monitor.silence_elapsed(), "active but silent: GNOME Shell is asked again")
+		helpers.assert_eq(emitted[2], { kind = "extension", state = "active", silent = true })
+		helpers.assert_eq(calls.count, 2)
+
+		local quiet = {}
+		local reader, asked = fake_shell({ { state = 1 } })
+		local reporting = Worker.new_extension_monitor(reader, function(record) quiet[#quiet + 1] = record end)
+		reporting.check(false)
+		reporting.admitted()
+		helpers.assert_eq(reporting.silence_elapsed(), false, "a report arrived: nothing to ask")
+		helpers.assert_eq(#quiet, 1)
+		helpers.assert_eq(asked.count, 1)
+	end)
+
+	for _, case in ipairs({
+		{ "absent", {}, "log out and back in after an install" },
+		{ "inactive", { state = 2 }, "gnome-extensions enable focus@ergopti.fr" },
+		{ "out_of_date", { state = 4 }, "update Ergopti+" },
+		{ "error", { state = 3 }, "gnome-extensions info focus@ergopti.fr" },
+	}) do
+		helpers.it("(gnome-focus-extension) an extension " .. case[1] .. " is named at start, once, then recovers", function()
+			local logger, restore = recording_logger()
+			local ok, failure = pcall(function()
+				local source, process = new_source("gnome")
+				source.start()
+				local emitted = {}
+				local monitor = Worker.new_extension_monitor(fake_shell({ case[2], case[2] }), function(record)
+					emitted[#emitted + 1] = record
+				end)
+				process.say('{"kind":"ready"}\n')
+				monitor.check(false)
+				local Json = require("core.text.engine.json")
+				process.say(Json.encode(emitted[1]) .. "\n")
+				helpers.assert_eq(source.extension_problem(), case[1], "named without waiting for the silence bound")
+				helpers.assert_eq(source.status(), "ready", "a missing reporter is a fact, not a worker failure")
+				monitor.silence_elapsed()
+				process.say(Json.encode(emitted[2]) .. "\n")
+				helpers.assert_eq(lines_with(logger, "warn", "(" .. case[1] .. ", state "), 1, "one diagnosis line")
+				helpers.assert_true(lines_with(logger, "warn", case[3]) == 1, "the line says what to do")
+				-- The user fixes it and GNOME Shell reports.
+				process.say(FOCUS)
+				helpers.assert_eq(source.extension_problem(), nil, "a report clears the problem")
+				helpers.assert_eq(lines_with(logger, "info", "reports focus again (after " .. case[1] .. ")"), 1,
+					"the diagnosis is paired")
+				helpers.assert_true(source.snapshot() ~= nil)
+			end)
+			restore()
+			helpers.assert_true(ok, tostring(failure))
+		end)
+	end
+
+	helpers.it("(gnome-focus-extension) an active extension that stays silent is named after the bound", function()
+		local logger, restore = recording_logger()
+		local ok, failure = pcall(function()
+			local source, process = new_source("gnome")
+			source.start()
+			process.say('{"kind":"ready"}\n{"kind":"extension","state":"active","silent":false}\n')
+			helpers.assert_eq(source.extension_problem(), nil, "active: the first report may still come")
+			helpers.assert_eq(lines_with(logger, "warn", "sends no focus report"), 0)
+			process.say('{"kind":"extension","state":"active","silent":true}\n')
+			helpers.assert_eq(source.extension_problem(), "silent")
+			helpers.assert_eq(lines_with(logger, "warn", "log out and back in"), 1)
+			process.say('{"kind":"clear"}\n')
+			helpers.assert_eq(source.extension_problem(), nil, "a clear is a report too")
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(gnome-focus-extension) an unanswered query waits for the bound, and reports win over it", function()
+		local source, process = new_source("gnome")
+		source.start()
+		process.say('{"kind":"ready"}\n{"kind":"extension","state":"unanswered","silent":false}\n')
+		helpers.assert_eq(source.extension_problem(), nil)
+		process.say(FOCUS .. '{"kind":"extension","state":"unanswered","silent":true}\n')
+		helpers.assert_eq(source.extension_problem(), nil, "reports arrived before the bound: nothing to name")
+	end)
+
+	for _, case in ipairs({
+		{ "an extension record off GNOME", "kde", '{"kind":"extension","state":"active","silent":false}\n' },
+		{ "an unknown extension state", "gnome", '{"kind":"extension","state":"broken","silent":false}\n' },
+		{ "an extension record without its silence flag", "gnome", '{"kind":"extension","state":"active"}\n' },
+	}) do
+		helpers.it("(gnome-focus-extension) fails closed on " .. case[1], function()
+			local source, process = new_source(case[2])
+			source.start()
+			process.say('{"kind":"ready"}\n' .. case[3])
+			helpers.assert_eq(source.status(), "failed")
+			helpers.assert_eq(source.extension_problem(), nil)
+		end)
+	end
+
+	helpers.it("(gnome-focus-extension) the GNOME worker command carries the registry's silence bound", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		local start, process = fake_process()
+		local source = Focus.new({ family = "gnome", start_process = start })
+		helpers.assert_true(source.start())
+		helpers.assert_true(process.arguments[1]:find("/platform/focus/compositor_focus_worker.lua$") ~= nil)
+		helpers.assert_eq(process.arguments[2], "org.gnome.Shell")
+		local Timings = require("core.timing.engine.timings")
+		helpers.assert_eq(process.arguments[5], tostring(Timings.ms("adapters", "desktop_focus_silence_ms")))
+		source.stop()
+	end)
+end)
+
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 4/ WindowInfo join =======
+-- ==================================
+-- ==================================
+
+--- Loads window_info under a Wayland desktop with a shell that records commands.
+local function wayland_window_info(desktop)
+	local display = helpers.load_module("core.ui.engine.display_server")
+	display._set_for_test(display.WAYLAND, desktop)
+	package.loaded["core.ui.engine.display_server"] = display
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
+	local commands = {}
+	shell._set_runner(function(command)
+		commands[#commands + 1] = command
+		if command:find("command -v", 1, true) then return false end
+		return ""
+	end)
+	local window_info = helpers.load_module("platform.focus.window_info")
+	window_info._reset_state()
+	return window_info, commands, function()
+		window_info._reset_state()
+		shell._reset_runner()
+	end
+end
+
+helpers.describe("compositor_focus: window_info join", function()
+	helpers.it("(wayland-desktop-focus) GNOME answers the poll from memory, without a command", function()
+		local window_info, commands, restore = wayland_window_info("ubuntu:GNOME")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			helpers.assert_true(window_info.start_compositor_focus({ start_process = start,
+				command = function() return "luajit", {}, "/" end }))
+			helpers.assert_eq(window_info.getFocused().appId, "", "unknown before the first report")
+			process.say('{"kind":"ready"}\n' .. FOCUS)
+			for _ = 1, 4 do
+				helpers.assert_eq(window_info.getFocused(),
+					{ appId = "org.gnome.Nautilus", windowTitle = "Documents", bundleId = "", executablePath = "" })
+			end
+			local info, identity, pid = window_info.focused_process_snapshot()
+			helpers.assert_eq(info.windowTitle, "Documents")
+			helpers.assert_eq(identity, "gnome:4242:17")
+			helpers.assert_eq(pid, 4242)
+			helpers.assert_eq(commands, {}, "the focus poll may not fork: no sway, hyprctl, niri or lswt probe either")
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(wayland-desktop-focus) KWin without a class is named by its process, read in-process", function()
+		local window_info, commands, restore = wayland_window_info("KDE")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			window_info._set_proc_comm_reader_for_test(function(pid) return pid == 77 and "konsole" or "" end)
+			window_info.start_compositor_focus({ start_process = start, command = function() return "luajit", {}, "/" end })
+			process.say('{"kind":"ready"}\n{"kind":"focus","class":"","title":"~","pid":77,"id":"{u-1}"}\n')
+			helpers.assert_eq(window_info.getFocused().appId, "konsole")
+			helpers.assert_eq(window_info.focused_identity(), "kwin:77:{u-1}")
+			helpers.assert_eq(commands, {})
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(gnome-focus-extension) window_info names GNOME Shell's missing reporter, nil off GNOME", function()
+		local window_info, _, restore = wayland_window_info("ubuntu:GNOME")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			helpers.assert_eq(window_info.compositor_extension_problem(), nil, "no source yet")
+			window_info.start_compositor_focus({ start_process = start, command = function() return "luajit", {}, "/" end })
+			process.say('{"kind":"ready"}\n{"kind":"extension","state":"out_of_date","silent":false}\n')
+			helpers.assert_eq(window_info.compositor_extension_problem(), "out_of_date")
+			process.say(FOCUS)
+			helpers.assert_eq(window_info.compositor_extension_problem(), nil)
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(wayland-desktop-focus) a failed source stays unknown and does not fall through", function()
+		local window_info, commands, restore = wayland_window_info("GNOME")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			window_info.start_compositor_focus({ start_process = start, command = function() return "luajit", {}, "/" end })
+			process.say('{"kind":"ready"}\n' .. FOCUS)
+			process.exit({})
+			helpers.assert_eq(window_info.getFocused().appId, "")
+			helpers.assert_eq(window_info.focused_process_snapshot().appId, "")
+			helpers.assert_eq(commands, {})
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(wayland-desktop-focus) COSMIC answers from its toplevel worker, without a process id", function()
+		local window_info, commands, restore = wayland_window_info("COSMIC")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			helpers.assert_true(window_info.start_compositor_focus({ start_process = start,
+				command = function() return "luajit", {}, "/" end }))
+			process.say('{"kind":"ready","protocol":2}\n{"kind":"focus","class":"com.system76.CosmicTerm","title":"~","id":"cosmic-2"}\n')
+			helpers.assert_eq(window_info.getFocused().appId, "com.system76.CosmicTerm")
+			helpers.assert_eq(window_info.focused_identity(), "cosmic::cosmic-2")
+			helpers.assert_eq(commands, {}, "no lswt probe either")
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	for _, case in ipairs({ { "x11", "GNOME" }, { "x11", "COSMIC" }, { "wayland", "sway" } }) do
+		helpers.it("(wayland-desktop-focus) starts nothing on " .. case[1] .. " " .. case[2], function()
+			local display = helpers.load_module("core.ui.engine.display_server")
+			display._set_for_test(case[1], case[2])
+			package.loaded["core.ui.engine.display_server"] = display
+			local window_info = helpers.load_module("platform.focus.window_info")
+			window_info._reset_state()
+			local started = false
+			local result = window_info.start_compositor_focus({ start_process = function() started = true end })
+			window_info._reset_state()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(started, false)
+		end)
+	end
+end)

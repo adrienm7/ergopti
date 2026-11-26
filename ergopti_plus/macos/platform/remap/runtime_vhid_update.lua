@@ -30,11 +30,11 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 local Fetch = require("platform.remap.runtime_artifact_fetch")
-local NativePath = require("native_path")
-local text_utils = require("infra.text_utils")
+local NativePath = require("core.fs.engine.native_path")
+local text_utils = require("core.text.engine.utils")
 
 local LOG = "remap.runtime_vhid_update"
 
@@ -175,22 +175,26 @@ end
 --- Creates an updater bound to its ports.
 --- Port contracts:
 ---   exec(executable, args, timeout, fn(code|nil, stdout, stderr)) runs one command;
----   expand(path) -> absolute path.
---- @param ports table exec, expand.
+---   expand(path) -> absolute path;
+---   network_command(curl_args) -> executable, args, describe(code, stderr) | nil, err
+---     wraps the download behind the system network route (NET-001).
+--- @param ports table exec, expand, network_command.
 --- @return table updater { update }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing VirtualHIDDevice update ports")
-	for _, name in ipairs({ "exec", "expand" }) do
+	for _, name in ipairs({ "exec", "expand", "network_command" }) do
 		assert(type(ports[name]) == "function", "Missing VirtualHIDDevice update port: " .. name)
 	end
 	local updater = {}
 	local waiters
 
 	--- Settles every waiter of the running update once.
-	local function settle(ok, reason, detail)
+	local function settle(ok, reason, detail, kind)
 		local pending = waiters
 		waiters = nil
-		if ok then
+		if ok and kind == "fetched" then
+			Logger.success(LOG, "VirtualHIDDevice driver downloaded and verified for the first install.")
+		elseif ok then
 			Logger.success(LOG, "VirtualHIDDevice driver update installed and activation requested.")
 		elseif reason == REASON.CANCELLED then
 			Logger.info(LOG, "VirtualHIDDevice driver update cancelled at the administrator prompt.")
@@ -209,39 +213,40 @@ function M.new(ports)
 			.. ((type(stderr) == "string" and stderr ~= "") and (": " .. stderr:gsub("%s+$", "")) or "")
 	end
 
+	-- The failure describer of a wrapped command, keyed by its exact argv table.
+	local describers = setmetatable({}, { __mode = "k" })
+
 	--- Runs one step and continues only on exit 0.
 	local function step(executable, args, timeout, reason, detail, continue)
+		local describe = describers[args]
 		ports.exec(executable, args, timeout, function(code, stdout, stderr)
 			if code ~= 0 then
-				return settle(false, reason, detail .. " (" .. failure(executable, code, stderr) .. ")")
+				local named = describe and describe(code, stderr)
+				return settle(false, reason, detail .. " (" .. (named or failure(executable, code, stderr)) .. ")")
 			end
 			continue(stdout or "")
 		end)
 	end
 
-	--- Downloads, verifies, installs and activates the pinned driver.
-	--- @param pin table The manifest's `virtual_hid_device` group.
-	--- @param callback function fn(ok, reason|nil, explanation|nil) called once.
-	function updater.update(pin, callback)
-		assert(type(callback) == "function", "Missing driver update callback")
-		if not M.complete_pin(pin) then
-			return callback(false, REASON.UNPINNED, "the VirtualHIDDevice driver is not pinned in the manifest")
-		end
-		if waiters then
-			waiters[#waiters + 1] = callback
-			return
-		end
-		waiters = { callback }
+	--- Downloads and verifies the pinned driver into Ergopti's folder, then continues.
+	--- @param pin table Complete `virtual_hid_device` group.
+	--- @param continue function fn(package_path) once the verified package is kept.
+	local function download(pin, continue)
 		local home = ports.expand(M.home_for(pin.version))
 		local package = home .. "/" .. pin.file_name
 		local partial = home .. "/." .. pin.file_name .. ".partial"
-		Logger.start(LOG, "Updating the VirtualHIDDevice driver to %s on the user's request…", pin.version)
 		step("/bin/rm", { "-f", partial, package }, STEP_TIMEOUT_SEC, REASON.STORE,
 			"the driver folder could not be cleared", function()
 		step("/bin/mkdir", { "-p", home }, STEP_TIMEOUT_SEC, REASON.STORE,
 			"the driver folder could not be created", function()
-		step("/usr/bin/curl", { "-L", "--fail", "--silent", "--show-error", "--proto", "=https",
-			"--max-filesize", tostring(pin.size), "--output", partial, pin.source_url },
+		-- Behind the system network route, as every remap download (NET-001).
+		local download, download_args, describe = ports.network_command({ "-L", "--fail", "--silent",
+			"--show-error", "--proto", "=https", "--max-filesize", tostring(pin.size), "--output", partial, pin.source_url })
+		if not download then
+			return settle(false, REASON.DOWNLOAD, "the network route is unavailable: " .. tostring(download_args))
+		end
+		describers[download_args] = describe
+		step(download, download_args,
 			DOWNLOAD_TIMEOUT_SEC, REASON.DOWNLOAD, "the driver could not be downloaded from " .. pin.source_url,
 			function()
 		step("/usr/bin/stat", { "-f", "%z", partial }, STEP_TIMEOUT_SEC, REASON.SIZE,
@@ -259,6 +264,33 @@ function M.new(ports)
 			end
 		step("/bin/mv", { partial, package }, STEP_TIMEOUT_SEC, REASON.STORE,
 			"the verified driver could not be kept", function()
+			continue(package)
+		end) end) end) end) end) end)
+	end
+
+	--- Starts one run, or queues the callback behind the running one.
+	--- @return boolean started False when the pin is incomplete or a run already runs.
+	local function begin(pin, callback)
+		assert(type(callback) == "function", "Missing driver update callback")
+		if not M.complete_pin(pin) then
+			callback(false, REASON.UNPINNED, "the VirtualHIDDevice driver is not pinned in the manifest")
+			return false
+		end
+		if waiters then
+			waiters[#waiters + 1] = callback
+			return false
+		end
+		waiters = { callback }
+		return true
+	end
+
+	--- Downloads, verifies, installs and activates the pinned driver.
+	--- @param pin table The manifest's `virtual_hid_device` group.
+	--- @param callback function fn(ok, reason|nil, explanation|nil) called once.
+	function updater.update(pin, callback)
+		if not begin(pin, callback) then return end
+		Logger.start(LOG, "Updating the VirtualHIDDevice driver to %s on the user's request…", pin.version)
+		download(pin, function(package)
 		ports.exec("/usr/bin/osascript", M.install_args(package, pin), M.INSTALL_TIMEOUT_SEC,
 			function(code, _, stderr)
 			if code ~= 0 then
@@ -268,7 +300,17 @@ function M.new(ports)
 		step(M.MANAGER, { "forceActivate" }, STEP_TIMEOUT_SEC, REASON.ACTIVATE,
 			"macOS was not asked to activate the new driver", function()
 			settle(true)
-		end) end) end) end) end) end) end) end)
+		end) end) end)
+	end
+
+	--- Downloads and verifies the pinned driver only, for the owned runtime's first
+	--- install, whose administrator shell installs it (OwnedRuntimeInstallMainOperation.swift).
+	--- @param pin table The manifest's `virtual_hid_device` group.
+	--- @param callback function fn(ok, reason|nil, explanation|nil) called once.
+	function updater.fetch(pin, callback)
+		if not begin(pin, callback) then return end
+		Logger.start(LOG, "Downloading the VirtualHIDDevice driver %s for the first install…", pin.version)
+		download(pin, function() settle(true, nil, nil, "fetched") end)
 	end
 
 	return updater

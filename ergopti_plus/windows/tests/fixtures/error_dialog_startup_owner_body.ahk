@@ -41,6 +41,14 @@ _EDOS_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+; The native box is the opener's answer to a window that cannot open. A window
+; the user closed while WebView2 was being created must not come back as one.
+Ui_MsgBox(Text := "", Title := "", Options := "") {
+	global _EDOS
+	_EDOS.Announcements += 1
+	return ""
+}
+
 _EDOS_Failure(Failure) {
 	global _EDOS
 	if !IsObject(_EDOS.Failure)
@@ -56,13 +64,23 @@ _EDOS_OnError(Failure, Mode) {
 }
 
 ; Real SDK calls receive passive typed objects, never synthetic native handles.
+class _EDOS_Subscription {
+	__New(Core, Callback) {
+		this.Core := Core, this.Callback := Callback
+	}
+	__Delete() {
+		this.Core.ActiveSubscriptions -= 1
+	}
+}
+
 class _EDOS_Core {
 	__New() {
-		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0, this.Scripts := 0
+		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0, this.Scripts := 0, this.ActiveSubscriptions := 0
 	}
 	WebMessageReceived(Callback) {
 		this.Subscriptions += 1
-		return {Callback: Callback}
+		this.ActiveSubscriptions += 1
+		return _EDOS_Subscription(this, Callback)
 	}
 	AddScriptToExecuteOnDocumentCreated(*) => 0
 	SetVirtualHostNameToFolderMapping(*) => 0
@@ -77,12 +95,26 @@ class _EDOS_Core {
 }
 
 class _EDOS_Controller {
-	__New() {
-		this.CoreWebView2 := _EDOS_Core(), this.Closed := 0, this.Fills := 0
+	__New(Hwnd) {
+		global _EDOS
+		this.Hwnd := Hwnd, this.CoreWebView2 := _EDOS_Core(), this.Closed := 0, this.Fills := 0, this.CloseAttempts := 0
+		this.RefusalsRemaining := InStr(_EDOS.Mode, "refusal") && _EDOS.Pages.Length == 0 ? 1 : 0
 	}
 	Close() {
+		global _EDOS
+		_EDOS_Require(DllCall("User32\IsWindow", "Ptr", this.Hwnd, "Int"),
+			"Each controller Close attempt must retain its actual native HWND.")
+		_EDOS_Require(this.CoreWebView2.ActiveSubscriptions == 0,
+			"The actual subscription destructor must run before controller closure.")
+		this.CloseAttempts += 1
+		if this.RefusalsRemaining > 0 {
+			this.RefusalsRemaining -= 1
+			throw Error("controlled error-dialog controller close refusal")
+		}
 		this.Closed += 1
-		_EDOS_Require(this.Closed == 1, "An exact passive controller must retire only once.")
+		_EDOS_Require(this.Closed == 1, "An exact passive controller must retire successfully only once.")
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -136,9 +168,9 @@ _EDOS_Create(Hwnd) {
 	_EDOS_Require(IsSet(_ED_Gui) && _ED_Gui == Window
 		&& DllCall("User32\IsWindowVisible", "Ptr", Parent, "Int"),
 		"The actual error GUI must already be visible and published before create awaits.")
-	Page := {Window: Window, Hwnd: Parent, Controller: _EDOS_Controller(), Epoch: _ED_WindowEpoch}
+	Page := {Window: Window, Hwnd: Parent, Controller: _EDOS_Controller(Parent), Epoch: _ED_WindowEpoch}
 	_EDOS.Pages.Push(Page)
-	if _EDOS.Pages.Length > 1 || _EDOS.Mode == "current"
+	if _EDOS.Pages.Length > 1 || InStr(_EDOS.Mode, "current") == 1
 		return Promise.resolve(Page.Controller)
 	_EDOS.Pending := Promise.withResolvers()
 	; An independent observer prevents Promise.task's unobserved-rejection error;
@@ -151,18 +183,25 @@ _EDOS_Create(Hwnd) {
 }
 
 _EDOS_NativeClose(Page) {
-	global _ED_WindowEpoch
+	global _ED_WindowEpoch, _ED_OpeningHost
 	Before := _ED_WindowEpoch
+	Retain := (IsObject(_ED_OpeningHost) && _ED_OpeningHost.Window == Page.Window && _ED_OpeningHost.Building)
+		|| Page.Controller.RefusalsRemaining > 0
 	_EDOS_Require(DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int"), "Native Close needs the exact live private HWND.")
 	_EDOS_Phase("before native WM_CLOSE")
 	DllCall("User32\SendMessageW", "Ptr", Page.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
 	_EDOS_Phase("after native WM_CLOSE send")
 	Started := A_TickCount
-	while (DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int") || _ED_WindowEpoch <= Before)
-		&& TickElapsed64(Started) < 1000
+	while _ED_WindowEpoch <= Before && TickElapsed64(Started) < 1000
 		Sleep(10)
-	_EDOS_Require(!DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int") && _ED_WindowEpoch > Before,
-		"The native Close callback must destroy the real GUI and revoke its epoch.")
+	_EDOS_Require(_ED_WindowEpoch > Before, "The native Close must revoke its exact epoch.")
+	if Retain
+		_EDOS_Require(DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int")
+			&& !DllCall("User32\IsWindowVisible", "Ptr", Page.Hwnd, "Int"),
+			"A pending factory or refused Close must retain its HWND hidden until controller retirement.")
+	else
+		_EDOS_Require(!DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int"),
+			"The completed current host must be destroyed after controller retirement.")
 }
 
 _EDOS_Timeout() {
@@ -219,6 +258,7 @@ _EDOS_Observe() {
 
 _EDOS_Check() {
 	global _EDOS, _ED_WindowEpoch, _ED_Session, _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone
+	global _ED_RetiredHosts, _ED_OpeningHost
 	if IsObject(_EDOS.Failure)
 		throw _EDOS.Failure
 	_EDOS_Require(_EDOS.EnvironmentCalls == 1 && _EDOS.SourceErrors == 1 && _EDOS.Pages.Length >= 1,
@@ -226,21 +266,44 @@ _EDOS_Check() {
 	A := _EDOS.Pages[1]
 	_EDOS_Require(InStr(FSReadStrict(LoggerTodayErrorsPath()), "[EDStartupA] Controlled source error A") > 0,
 		"The genuine source error must reach the actual private errors file.")
-	if _EDOS.Mode == "current" {
+	if InStr(_EDOS.Mode, "current") == 1 {
 		_EDOS_Require(_EDOS.Pages.Length == 1 && _EDOS_Ready(A), "The current positive must retain its complete open session.")
+		FileAppend("REPORT error-dialog-startup schema_version=" . _ED_Session["snapshot"]["schema_version"]
+			. " recent_source=" . _ED_Session["snapshot"]["sections"]["issues"]["recent_source"]
+			. " source_text=" . (InStr(_ED_Session["report"]["text"], "Controlled source error A") > 0)
+			. " log_path_match=" . (_ED_Session["log_path"] == LoggerTodayErrorsPath()) . "`n", "*", "UTF-8")
 		_EDOS_Require(_ED_Session["snapshot"]["schema_version"] == 2
 			&& _ED_Session["snapshot"]["sections"]["issues"]["recent_source"] == "errors_file"
 			&& InStr(_ED_Session["report"]["text"], "Controlled source error A") > 0
 			&& _ED_Session["log_path"] == LoggerTodayErrorsPath(),
 			"The true phase-A report must retain the source error and its private log path.")
 		_EDOS_NativeClose(A)
+		if _EDOS.Mode == "current-refusal" {
+			_EDOS_Require(_ED_RetiredHosts.Length == 1 && A.Controller.Closed == 0 && A.Controller.CloseAttempts == 1,
+				"A refused current Close must retain its exact cleanup record without destroying the HWND.")
+			_EDOS_Require(_ErrorDialog_RetireHosts(), "The exact refused current host must retire on retry.")
+			_EDOS_Require(!DllCall("User32\IsWindow", "Ptr", A.Hwnd, "Int") && _ED_RetiredHosts.Length == 0,
+				"A successful retry must discharge the HWND and its exact record.")
+		}
 		_EDOS_Require(A.Controller.Closed == 1, "The current controller must retire through actual native Close.")
 		return
 	}
 	_EDOS_Require(_EDOS.ActorDone && _EDOS.CloseAck == 1, "Cancellation must occur at the genuine constructor wait.")
+	_EDOS_Require(_EDOS.Announcements == 0,
+		"A window the user closed during the constructor wait must not reopen as a message box.")
 	if InStr(_EDOS.Mode, "reject")
 		_EDOS_Require(_EDOS.Pending.promise.status == "rejected" && _EDOS.Pending.promise.result is Error,
 			"The controlled failure must remain an actual rejected Promise.")
+	if InStr(_EDOS.Mode, "refusal") {
+		_EDOS_Require(A.Controller.Closed == 0 && A.Controller.CloseAttempts == 1
+			&& _ED_RetiredHosts.Length == 1 && DllCall("User32\IsWindow", "Ptr", A.Hwnd, "Int"),
+			"A refused late controller close must retain its exact HWND and cleanup record.")
+		_EDOS_Require(_ErrorDialog_RetireHosts(), "An explicit old-host drain must retry without closing B.")
+		_EDOS_Require(_ED_RetiredHosts.Length == 0, "The retry must discharge its exact cleanup record.")
+	}
+	if InStr(_EDOS.Mode, "reject")
+		_EDOS_Require(A.Controller.CloseAttempts == 0 && A.Controller.Closed == 0,
+			"A rejected factory never handed its fake controller to the subject for retirement.")
 	if !InStr(_EDOS.Mode, "reject")
 		_EDOS_Require(A.Controller.Closed == 1, "A controller returned after Close must retire exactly once.")
 	_EDOS_Require(A.Controller.CoreWebView2.Subscriptions == 0 && A.Controller.CoreWebView2.Navigations == 0,
@@ -271,20 +334,13 @@ _EDOS_Cleanup() {
 	try _ErrorDialog_CloseWindow()
 	catch Any as Failure
 		_EDOS_Failure(Failure)
-	for Page in _EDOS.Pages {
-		try {
-			if Page.Controller.Closed == 0
-				Page.Controller.Close()
-		} catch Any as Failure {
-			_EDOS_Failure(Failure)
-		}
-		try {
-			if DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int")
-				Page.Window.Destroy()
-			_EDOS_Require(!DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int"), "Every acquired real error GUI must retire.")
-		} catch Any as Failure {
-			_EDOS_Failure(Failure)
-		}
+	try {
+		_EDOS_Require(_ErrorDialog_RetireHosts(), "Production cleanup must discharge every retained host.")
+		for Page in _EDOS.Pages
+			_EDOS_Require(!DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int"),
+				"Every acquired real error GUI must retire through its production owner.")
+	} catch Any as Failure {
+		_EDOS_Failure(Failure)
 	}
 	try {
 		_EDOS_Require(LoggerPrepareShutdown() == true, "The real private logger must flush before child exit.")
@@ -304,7 +360,7 @@ _EDOS_Main() {
 	Persistent(true)
 	_EDOS := {Mode: A_Args[1], Pages: [], Logs: [], Environment: _EDOS_Environment(), EnvironmentCalls: 0,
 		Failure: 0, Pending: 0, Actor: _EDOS_Actor, Timeout: _EDOS_Timeout, ActorDone: false,
-		CloseAck: 0, Successor: 0, Opened: 0, SourceErrors: 0}
+		CloseAck: 0, Successor: 0, Opened: 0, SourceErrors: 0, Announcements: 0}
 	Primary := 0, Observed := false, PreviousCritical := Critical("Off"), PreviousSuspend := A_IsSuspended
 	Thread("Interrupt", 0)
 	Suspend(false)
@@ -334,8 +390,23 @@ _EDOS_Main() {
 		Warm := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
 		_EDOS_Phase("after shared environment warm await")
 		_EDOS_Require(Warm == _EDOS.Environment, "Only the genuine shared helper may publish the passive environment.")
+		; An ERROR emitted while an interrupted background flush still owns the
+		; queue reaches the errors file only when that flush resumes, so the
+		; report could snapshot before the file existed and read the ring. The
+		; source error is emitted once no flush is in flight, under Critical so
+		; no timer tick can start one between the check and the emission.
+		Started := A_TickCount
+		loop {
+			Critical("On")
+			if LoggerFlushSettled()
+				break
+			Critical("Off")
+			_EDOS_Require(TickElapsed64(Started) < 3000, "The logger must settle before the source error.")
+			Sleep(10)
+		}
 		_EDOS_Phase("before LoggerError A")
-		LoggerError("EDStartupA", "Controlled source error A")
+		try LoggerError("EDStartupA", "Controlled source error A")
+		finally Critical("Off")
 		_EDOS_Phase("after LoggerError A")
 		Started := A_TickCount
 		; Main cannot resume from the presenter's interrupt until its Open stack

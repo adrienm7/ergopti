@@ -18,9 +18,13 @@ import time
 
 WORKER = r"""
 local R = require("modules.updater.restarter")
-io.write(R.relay_command(tonumber(os.getenv("ERGOPTI_RELAY_TARGET")),
+-- The relay holds only the process it was started for: the production reader
+-- captures the target's kernel start tick, as the restart does before dispatch.
+local target = tonumber(os.getenv("ERGOPTI_RELAY_TARGET"))
+io.write(R.relay_command(target,
 	os.getenv("ERGOPTI_RELAY_WRAPPER"),
-	{os.getenv("ERGOPTI_RELAY_PAYLOAD"), os.getenv("ERGOPTI_RELAY_RECEIPT")}))
+	{os.getenv("ERGOPTI_RELAY_PAYLOAD"), os.getenv("ERGOPTI_RELAY_RECEIPT")},
+	nil, assert(R.process_start_time(target), "the target's start tick is unreadable")))
 """
 PAYLOAD = "literal ' payload\nsecond line"
 PR_SET_NAME, PR_SET_CHILD_SUBREAPER = 15, 36  # Native Linux prctl operations.
@@ -53,7 +57,10 @@ def owned_children():
 
 def check_case(root, interpreter, name, state):
     wrapper, receipt = root / "wrapper", root / "receipt"
-    wrapper.write_text('#!/bin/sh\nprintf "%s" "$1" > "$2"\n')
+    # The receipt appears only once complete: the shell creates a redirect
+    # target before printf writes it, so a direct "> $2" let the poll below
+    # read an empty receipt and report changed argument bytes.
+    wrapper.write_text('#!/bin/sh\nprintf "%s" "$1" > "$2.partial" && mv "$2.partial" "$2"\n')
     wrapper.chmod(0o700)
     ready_read, ready_write = os.pipe()
     release_read, release_write = os.pipe()
@@ -79,7 +86,7 @@ def check_case(root, interpreter, name, state):
             wait_for(lambda: zombie(target), "owned target did not become a zombie")
         env = dict(os.environ)
         env.update(
-            LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+            LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             ERGOPTI_RELAY_TARGET=str(target),
             ERGOPTI_RELAY_WRAPPER=str(wrapper),
             ERGOPTI_RELAY_RECEIPT=str(receipt),

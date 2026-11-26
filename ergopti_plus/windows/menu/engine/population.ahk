@@ -1,0 +1,843 @@
+﻿; menu/engine/population.ahk
+
+; ==============================================================================
+; MODULE: Native Menu Population
+; DESCRIPTION:
+; Publish leaf pickers with a real first row, prewarm them in small batches, and
+; finish a requested picker before Windows paints it. Ownership follows HMENU
+; reachability across root replacements; native callbacks keep their tokens.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+global _MenuPopulationBuilding := false
+global _MenuPopulationPublished := false
+global MENU_POPULATION_TICK_MS := 10
+; Native flag decoding measured ~6 ms per row. Background work must not
+; interrupt a foreground WebView Promise wait; navigation still completes inline.
+global MENU_POPULATION_THREAD_PRIORITY := -1
+; A 384-choice native fixture took 17–23 ms in one critical section. Sixteen
+; rows keep ordinary batches near 1 ms while retaining synchronous before-paint
+; completion for navigation; this bounds work, not native-call wall time.
+global MENU_POPULATION_BATCH_ROWS := 16
+
+; Submenus published with one placeholder row, built when first opened, by handle.
+; Global rather than owned by a build: SubMenus can outlive a refused publication
+; and reach the tray through the updater's bare initMenu, and a child whose owner
+; went with that build would show its placeholder for ever.
+global _MenuDeferredChildren := Map()
+; The probe of the deferred build in progress, or 0. A cold CI boot spent about
+; 200 million more thread cycles on one deferred build than a warm one, on
+; whichever list it fell (run 44931338249), and no local boot reproduced it: the
+; probe says which call inside the build ran them and what the process did then.
+global _MenuDeferredProbe := 0
+; Probe segments one line names, the costliest own cycles first; the rest are
+; summed into one figure.
+global MENU_DEFERRED_PROBE_TOP := 6
+
+class MenuPopulationReentryError extends Error {
+}
+
+/**
+ * Publishes a submenu whose rows are built at its first open, from the state of
+ * that moment. The placeholder keeps the row a real parent: a declared group
+ * with an empty child is not drawn.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Menu} The published child.
+ */
+MenuDeferred_Create(BuildFn, ListId) {
+	global _MenuDeferredChildren
+	if !HasMethod(BuildFn, "Call")
+		throw TypeError("A deferred submenu requires a builder")
+	Child := Menu()
+	_MenuDeferred_AddPlaceholder(Child)
+	_MenuDeferredChildren[Child.Handle] := { MenuObj: Child, BuildFn: BuildFn, ListId: ListId, Busy: false }
+	return Child
+}
+
+/**
+ * Publishes an attached submenu again: its rows are dropped and built at its
+ * next open, from the state of that moment. A pause or a resume uses it, so a
+ * live submenu shows which of its rows wait for the resume without waiting for
+ * a root rebuild (EDD-1).
+ * @param {Menu} MenuObj The attached native submenu, kept as it is.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Boolean} False when the submenu was still waiting for its build.
+ */
+MenuDeferred_Rearm(MenuObj, BuildFn, ListId) {
+	global _MenuDeferredChildren
+	if !(MenuObj is Menu) || !HasMethod(BuildFn, "Call")
+		throw TypeError("A deferred re-arm requires its native menu and builder")
+	if _MenuDeferredChildren.Has(MenuObj.Handle)
+		return false
+	MenuObj.Delete()
+	if IsSet(MenuDispatcher_PruneMenu)
+		MenuDispatcher_PruneMenu(MenuObj)
+	_MenuDeferred_AddPlaceholder(MenuObj)
+	_MenuDeferredChildren[MenuObj.Handle] := { MenuObj: MenuObj, BuildFn: BuildFn, ListId: ListId, Busy: false }
+	return true
+}
+
+/**
+ * The submenu of one tray build: deferred inside a population build, built at
+ * once for a caller with no owner, such as a unit test reading the rows.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Menu} The child to attach.
+ */
+MenuDeferOrBuild(BuildFn, ListId) {
+	global _MenuPopulationBuilding
+	if _MenuPopulationBuilding is MenuPopulation
+		return MenuDeferred_Create(BuildFn, ListId)
+	Child := Menu()
+	BuildFn.Call(Child)
+	return Child
+}
+
+_MenuDeferred_AddPlaceholder(Child) {
+	Label := t("common.loading")
+	Child.Add(Label, (*) => 0)
+	Child.Disable(Label)
+}
+
+/**
+ * Builds one deferred submenu before Windows paints it. Runs outside Critical:
+ * a build reads files and native state, and an open menu already holds the
+ * script's other threads. A failed build keeps its placeholder and stays pending,
+ * so the next open tries again.
+ * @param {Integer} Handle The native menu about to open.
+ * @param {String} Reason What asked for it.
+ * @returns {Boolean} True when this call built the rows.
+ */
+MenuDeferred_Build(Handle, Reason := "navigation") {
+	global _MenuDeferredChildren, _MenuPopulationBuilding, _MenuPopulationPublished, _MenuDeferredProbe
+	if !_MenuDeferredChildren.Has(Handle)
+		return false
+	Entry := _MenuDeferredChildren[Handle]
+	if Entry.Busy
+		throw MenuPopulationReentryError("Deferred submenu build reentered")
+	Entry.Busy := true
+	HotPath_SpanTrace("tray.fill")
+	; Started outside the measured cycles: its module census is not the build's.
+	PreviousProbe := _MenuDeferredProbe
+	Probe := MenuDeferredProbe()
+	_MenuDeferredProbe := Probe
+	LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' build started for {2}.", Entry.ListId, Reason))
+	StartedAt := HotPath_Now()
+	Probe.Begin("build")
+	StartedCycles := ProcessThreadCycles()
+	PreviousBuilding := _MenuPopulationBuilding
+	; Nested pickers stay deferred under the published owner, finished at their open.
+	if _MenuPopulationPublished is MenuPopulation
+		_MenuPopulationBuilding := _MenuPopulationPublished
+	try {
+		Entry.MenuObj.Delete()
+		Entry.BuildFn.Call(Entry.MenuObj)
+		_MenuDeferredChildren.Delete(Handle)
+		; Formatted first: the logger folds repeats of one template, and each list's
+		; first-open cost must stay readable (the startup smoke bounds this line).
+		ElapsedMs := Round(PerfElapsedUs(StartedAt) / 1000)
+		Cycles := ProcessThreadCycles() - StartedCycles
+		Probe.Unwind(0)
+		; The startup smoke judges a list by its own thread's cycles per row:
+		; neither load nor another process's file scan moves that cost.
+		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' built in {2} ms, {3} thread cycle(s) for {4} row(s), for {5}.",
+			Entry.ListId, ElapsedMs, Cycles, _MenuDeferred_RowCount(Handle, Map()), Reason))
+		LoggerInfo("MenuPopulation", Format("Deferred submenu '{1}' probe: {2}.", Entry.ListId, Probe.Describe()))
+	} catch as Err {
+		Entry.MenuObj.Delete()
+		_MenuDeferred_AddPlaceholder(Entry.MenuObj)
+		LoggerError("MenuPopulation", "Deferred submenu '{1}' could not be built for {2}: {3}.",
+			Entry.ListId, Reason, Err.Message)
+		throw Err
+	} finally {
+		_MenuDeferredProbe := PreviousProbe
+		_MenuPopulationBuilding := PreviousBuilding
+		Entry.Busy := false
+		PerfCount("menu.deferred_open_us." . Entry.ListId, PerfElapsedUs(StartedAt))
+		PerfCount("menu.deferred_open_runs." . Entry.ListId)
+		HotPath_LogIfSlow("Menu.deferred_build", StartedAt, Format("{1}; list={2}", Reason, Entry.ListId))
+		HotPath_SpanDone("tray.fill", StartedAt, "list=" . Entry.ListId)
+	}
+	return true
+}
+
+/**
+ * Attributes one deferred build's cost to the calls inside it. A segment's own
+ * cost excludes the segments nested in it, so the costliest one names the call
+ * that ran the cycles. Thread cycles and thread times are this thread's; page
+ * faults and I/O operations are the whole process's, so another thread's work
+ * shows there and not in the cycles. Thread times advance by scheduler ticks.
+ */
+class MenuDeferredProbe {
+	; Cycles, kernel and user 100 ns units, page faults, read operations, read
+	; bytes, other I/O operations (opens, queries), performance-counter ticks.
+	static Fields := 8
+
+	__New() {
+		this.Stack := []
+		this.Segments := Map()
+		this.Totals := 0
+		this.ModulesBefore := ProcessLoadedModules()
+		this.ObjectsBefore := ProcessGuiObjects()
+		this.StartedAfterMs := ProcessAgeMs()
+		this.CountersBefore := _MenuDeferred_CounterSnapshot()
+	}
+
+	/**
+	 * Opens a segment nested in the current one.
+	 * @param {String} Label A closed code name: a list id or a manifest row id.
+	 */
+	Begin(Label) {
+		this.Stack.Push({ Label: Label, At: _MenuDeferred_ProbeSample(), Nested: [0, 0, 0, 0, 0, 0, 0, 0] })
+	}
+
+	/**
+	 * Closes every segment deeper than Depth, the innermost first. The outermost
+	 * one's inclusive cost becomes the build's totals.
+	 * @param {Integer} Depth The open segments to keep.
+	 */
+	Unwind(Depth) {
+		while this.Stack.Length > Depth {
+			Now := _MenuDeferred_ProbeSample()
+			Frame := this.Stack.Pop()
+			Inclusive := []
+			loop MenuDeferredProbe.Fields
+				Inclusive.Push(Now[A_Index] - Frame.At[A_Index])
+			if this.Stack.Length {
+				Parent := this.Stack[this.Stack.Length]
+				loop MenuDeferredProbe.Fields
+					Parent.Nested[A_Index] += Inclusive[A_Index]
+			} else
+				this.Totals := Inclusive
+			if !this.Segments.Has(Frame.Label)
+				this.Segments[Frame.Label] := { Calls: 0, Own: [0, 0, 0, 0, 0, 0, 0, 0] }
+			Segment := this.Segments[Frame.Label]
+			Segment.Calls += 1
+			loop MenuDeferredProbe.Fields
+				Segment.Own[A_Index] += Inclusive[A_Index] - Frame.Nested[A_Index]
+		}
+	}
+
+	/**
+	 * The probe line: totals, modules loaded and GUI objects created during the
+	 * build, then its costliest segments by own cycles.
+	 * @returns {String}
+	 */
+	Describe() {
+		global MENU_DEFERRED_PROBE_TOP
+		if !(this.Totals is Array)
+			throw Error("A deferred build probe is described only once its build closed")
+		Loaded := _MenuDeferred_ModuleNames(this.ModulesBefore, ProcessLoadedModules())
+		Objects := ProcessGuiObjects()
+		Text := Format("started {1} ms after process start; {2}; modules loaded: {3}; GDI {4:+d}, USER {5:+d}; {6}",
+			this.StartedAfterMs, _MenuDeferred_ProbeCost(this.Totals), Loaded == "" ? "none" : Loaded,
+			Objects[1] - this.ObjectsBefore[1], Objects[2] - this.ObjectsBefore[2],
+			_MenuDeferred_CounterMoves(this.CountersBefore, _MenuDeferred_CounterSnapshot()))
+		Ranked := []
+		for Label, Segment in this.Segments
+			Ranked.Push({ Label: Label, Segment: Segment })
+		; Insertion sort: a build has a few dozen segments.
+		loop Ranked.Length {
+			Index := A_Index
+			while Index > 1 && Ranked[Index].Segment.Own[1] > Ranked[Index - 1].Segment.Own[1] {
+				Swap := Ranked[Index], Ranked[Index] := Ranked[Index - 1], Ranked[Index - 1] := Swap
+				Index -= 1
+			}
+		}
+		Text .= "; own costliest:"
+		Rest := [0, 0, 0, 0, 0, 0, 0, 0], RestCount := 0
+		for Row in Ranked {
+			if A_Index <= MENU_DEFERRED_PROBE_TOP {
+				Text .= Format(" | {1} x{2}: {3}", Row.Label, Row.Segment.Calls, _MenuDeferred_ProbeCost(Row.Segment.Own))
+				continue
+			}
+			RestCount += 1
+			loop MenuDeferredProbe.Fields
+				Rest[A_Index] += Row.Segment.Own[A_Index]
+		}
+		if RestCount
+			Text .= Format(" | {1} other segment(s): {2}", RestCount, _MenuDeferred_ProbeCost(Rest))
+		return Text
+	}
+}
+
+/**
+ * Opens one renderer build's segment in the deferred build in progress.
+ * @param {String} Label The manifest key.
+ * @returns {Object|Integer} The token Step and End take; 0 outside a deferred build.
+ */
+MenuDeferred_ProbeBegin(Label) {
+	global _MenuDeferredProbe
+	if !(_MenuDeferredProbe is MenuDeferredProbe)
+		return 0
+	Token := { Probe: _MenuDeferredProbe, Depth: _MenuDeferredProbe.Stack.Length }
+	_MenuDeferredProbe.Begin(Label)
+	return Token
+}
+
+/**
+ * Ends the previous step of a renderer build and opens the next one, nested in
+ * its build's segment. An early continue or a caught error needs no closing call.
+ * @param {Object|Integer} Token What MenuDeferred_ProbeBegin returned.
+ * @param {String} Label The step's closed code name.
+ */
+MenuDeferred_ProbeStep(Token, Label) {
+	if !Token
+		return
+	Token.Probe.Unwind(Token.Depth + 1)
+	Token.Probe.Begin(Label)
+}
+
+/**
+ * Closes a renderer build's segment and its last step.
+ * @param {Object|Integer} Token What MenuDeferred_ProbeBegin returned.
+ */
+MenuDeferred_ProbeEnd(Token) {
+	if Token
+		Token.Probe.Unwind(Token.Depth)
+}
+
+/**
+ * One cost as the probe line prints it.
+ * @param {Array} Cost The eight probe fields.
+ * @returns {String}
+ */
+_MenuDeferred_ProbeCost(Cost) {
+	return Format("{1:.1f}M cycles, {2:.1f} ms wall, kernel {3:.1f} ms, user {4:.1f} ms, {5} page fault(s), {6} read op(s) of {7} byte(s), {8} other I/O op(s)",
+		Cost[1] / 1000000, Cost[8] * 1000 / PerfClockFrequency(), Cost[2] / 10000, Cost[3] / 10000,
+		Cost[4], Cost[5], Cost[6], Cost[7])
+}
+
+/**
+ * Samples the probe fields: the process counters (core/events/boot_clock.ahk)
+ * and the performance-counter ticks.
+ * @returns {Array} The eight probe fields.
+ */
+_MenuDeferred_ProbeSample() {
+	; One uninterrupted read: a thread run between two of these reads billed its
+	; cycles to one segment and its wall time to the next (measured 2026-11-21).
+	PreviousCritical := Critical("On")
+	try {
+		Sample := ProcessProbeCounters()
+		Sample.Push(PerfClockTicks())
+	} finally Critical(PreviousCritical)
+	return Sample
+}
+
+/**
+ * The interval counters and hot-path segment counts at one moment. Another
+ * AutoHotkey thread that interrupts a build runs on this same OS thread, so its
+ * cycles are the build's: what it counted is what names it.
+ * @returns {Object} Counters is the live registry, Counts and Segments copies.
+ */
+_MenuDeferred_CounterSnapshot() {
+	Live := _PerfCountersOwner().Counts
+	Counts := Map()
+	for Name, Value in Live
+		Counts[Name] := Value
+	Segments := Map()
+	for Label, Sample in _HotPathStatisticsOwner().Stats.Series
+		Segments[Label] := Sample.Count
+	return { Counters: Live, Counts: Counts, Stats: _HotPathStatisticsOwner().Stats, Segments: Segments }
+}
+
+/**
+ * What moved between two counter snapshots, as the probe line prints it. A
+ * flush between them publishes and resets the registry, which says so instead.
+ * @param {Object} Before The earlier snapshot.
+ * @param {Object} After The later snapshot.
+ * @returns {String}
+ */
+_MenuDeferred_CounterMoves(Before, After) {
+	if Before.Counters != After.Counters
+		Moved := "flushed during the build"
+	else {
+		Moved := ""
+		for Name, Value in After.Counts
+			if Value != Before.Counts.Get(Name, 0)
+				Moved .= (Moved == "" ? "" : ", ") . Name . "+" . (Value - Before.Counts.Get(Name, 0))
+	}
+	if Before.Stats != After.Stats
+		Ran := "summarised during the build"
+	else {
+		Ran := ""
+		for Label, Count in After.Segments
+			if Count != Before.Segments.Get(Label, 0)
+				Ran .= (Ran == "" ? "" : ", ") . Label . " x" . (Count - Before.Segments.Get(Label, 0))
+	}
+	return Format("counters moved: {1}; hot-path segments run: {2}",
+		Moved == "" ? "none" : Moved, Ran == "" ? "none" : Ran)
+}
+
+/**
+ * The base names of the modules loaded since a census.
+ * @param {Map} Before The earlier census.
+ * @param {Map} After The later census.
+ * @returns {String} Comma-separated names, empty when none.
+ */
+_MenuDeferred_ModuleNames(Before, After) {
+	Names := ""
+	for Module in After
+		if !Before.Has(Module)
+			Names .= (Names == "" ? "" : ", ") . ProcessModuleBaseName(Module)
+	return Names
+}
+
+/**
+ * The native rows one build produced: its own rows and those of every submenu
+ * it built at once. A still-deferred child counts at its own build.
+ * @param {Integer} Handle The built native menu.
+ * @param {Map} Seen The menus already counted.
+ * @returns {Integer} The row count.
+ */
+_MenuDeferred_RowCount(Handle, Seen) {
+	global _MenuDeferredChildren
+	if Seen.Has(Handle)
+		return 0
+	Seen[Handle] := true
+	Count := TrayMenuHandleItemCount(Handle)
+	if Count < 0
+		throw OSError(A_LastError, -1, "GetMenuItemCount")
+	Rows := Count
+	loop Count {
+		Sub := TrayMenuSubmenuHandle(Handle, A_Index - 1)
+		if Sub && !_MenuDeferredChildren.Has(Sub)
+			Rows += _MenuDeferred_RowCount(Sub, Seen)
+	}
+	return Rows
+}
+
+/** Builds every deferred submenu: a reload replay must search the whole tree. */
+MenuDeferred_BuildAll(Reason) {
+	global _MenuDeferredChildren
+	Handles := []
+	for Handle in _MenuDeferredChildren
+		Handles.Push(Handle)
+	for Handle in Handles
+		MenuDeferred_Build(Handle, Reason)
+}
+
+/** Forgets children neither the tray nor SubMenus can reach any more. */
+MenuDeferred_Retire(LiveHandles) {
+	global _MenuDeferredChildren, SubMenus
+	Held := Map()
+	if IsSet(SubMenus) && SubMenus is Map
+		for , Child in SubMenus
+			Held[Child.Handle] := true
+	Retired := []
+	for Handle in _MenuDeferredChildren
+		if !LiveHandles.Has(Handle) && !Held.Has(Handle)
+			Retired.Push(Handle)
+	for Handle in Retired
+		_MenuDeferredChildren.Delete(Handle)
+}
+
+/**
+ * The rows a pending leaf still has to draw, sealed: the store keeps its own deep
+ * copy, which no caller holds, so neither the caller's row Maps nor a reader can
+ * change them. Rows go in once, at construction, and come out as fresh copies.
+ * What a copy cannot isolate, the callables and menus the rows name, is checked
+ * by MenuSealedRows_Stamp. The ticket keeps no data: the store is keyed by the
+ * ticket's identity and drops its rows when the ticket goes.
+ */
+class MenuSealedRows {
+	/** @param {Array} Rows The leaf rows to seal. */
+	__New(Rows) {
+		_MenuSealedRows_Store("put", this, Rows)
+	}
+
+	__Delete() {
+		_MenuSealedRows_Store("drop", this)
+	}
+}
+
+/**
+ * How many rows a sealed store holds.
+ * @param {MenuSealedRows} Ticket
+ * @returns {Integer}
+ */
+MenuSealedRows_Count(Ticket) {
+	return _MenuSealedRows_Store("count", Ticket)
+}
+
+/**
+ * Fresh copies of a sealed store's rows, From to To inclusive.
+ * @param {MenuSealedRows} Ticket
+ * @param {Integer} From First row, 1-based.
+ * @param {Integer} To Last row; below From gives no row.
+ * @returns {Array}
+ */
+MenuSealedRows_Slice(Ticket, From, To) {
+	return _MenuSealedRows_Store("slice", Ticket, From, To)
+}
+
+/**
+ * The stamp a sealed store had when it was written, while it is still that store
+ * and every callable and menu its rows name is intact; 0 otherwise. A store that
+ * was dropped and written again under the same ticket has a new stamp.
+ * @param {MenuSealedRows} Ticket
+ * @returns {Integer}
+ */
+MenuSealedRows_Stamp(Ticket) {
+	return _MenuSealedRows_Store("stamp", Ticket)
+}
+
+; The one owner of every sealed row copy. Its slots are reachable from nowhere
+; else, so "put" and "drop" are the only ways they change, and each "put" takes a
+; new serial.
+_MenuSealedRows_Store(Operation, Ticket, From := 0, To := 0) {
+	static Slots := Map(), Serial := 0
+	if !(Ticket is MenuSealedRows)
+		throw TypeError("Sealed menu rows need their ticket")
+	Key := ObjPtr(Ticket)
+	if Operation == "drop" {
+		if Slots.Has(Key)
+			Slots.Delete(Key)
+		return true
+	}
+	if Operation == "put" {
+		if Slots.Has(Key)
+			throw Error("Sealed menu rows are written once")
+		if !(From is Array)
+			throw TypeError("Sealed menu rows must be an Array")
+		Objects := []
+		Copy := _MenuSealedRows_Copy(From, Objects)
+		Serial += 1
+		Slots[Key] := { Rows: Copy, Objects: Objects, Serial: Serial }
+		return Serial
+	}
+	if Operation == "stamp" {
+		if !Slots.Has(Key)
+			return 0
+		Slot := Slots[Key]
+		for Value in Slot.Objects
+			if !_MenuSealedRows_ObjectIntact(Value)
+				return 0
+		return Slot.Serial
+	}
+	if !Slots.Has(Key)
+		throw Error("Sealed menu rows were dropped")
+	Rows := Slots[Key].Rows
+	if Operation == "count"
+		return Rows.Length
+	if Operation == "slice" {
+		Slice := []
+		Index := From
+		while Index <= To
+			Slice.Push(_MenuSealedRows_Copy(Rows[Index++]))
+		return Slice
+	}
+	throw ValueError("Unknown sealed menu rows operation: " . Operation)
+}
+
+; A deep copy of the Maps and Arrays; other objects are kept by identity and,
+; when Objects is given, listed for the stamp.
+_MenuSealedRows_Copy(Value, Objects := 0) {
+	if Value is Map {
+		Copy := Map()
+		Copy.CaseSense := Value.CaseSense
+		for Key, Field in Value
+			Copy[Key] := _MenuSealedRows_Copy(Field, Objects)
+		return Copy
+	}
+	if Value is Array {
+		Copy := []
+		loop Value.Length
+			Copy.Push(Value.Has(A_Index) ? _MenuSealedRows_Copy(Value[A_Index], Objects) : unset)
+		return Copy
+	}
+	if IsObject(Value) && Objects is Array
+		Objects.Push(Value)
+	return Value
+}
+
+; What a receipt of the rows checked of the objects they name: a callable keeps
+; its intrinsic Call, a menu keeps its native methods.
+_MenuSealedRows_ObjectIntact(Value) {
+	if Value is Func
+		return !Object.Prototype.HasOwnProp.Call(Value, "Call")
+	if Value is Menu {
+		if ObjGetBase(Value) != Menu.Prototype
+			return false
+		for Name in ["Handle", "Add", "Delete", "Check", "Disable", "Enable", "Uncheck", "SetIcon"]
+			if Object.Prototype.HasOwnProp.Call(Value, Name)
+				return false
+	}
+	return true
+}
+
+/** Owns the unpublished remainder of native leaf menus for one root build. */
+class MenuPopulation {
+	__New() {
+		; Install before a seeded menu can be attached, separately from timers.
+		OnMessage(0x117, MenuPopulation_OnInitPopup)
+		this.Pending := Map()
+		this.Timer := 0
+		this.Started := false
+		this.Eligible := false
+		this.Failed := false
+		this.Completed := 0
+	}
+
+	/** Builds a real first row; the remaining leaf choices stay build-local. */
+	Create(Rows, ListId, Depth) {
+		MenuObj := Menu()
+		this.Fill(MenuObj, Rows, ListId, Depth)
+		return MenuObj
+	}
+
+	/** Seeds an existing detached picker without replacing its native identity. */
+	Fill(MenuObj, Rows, ListId, Depth) {
+		global MR_MAX_LIST_DEPTH
+		; Batches render later, one slice at a time: distinguish the whole list now.
+		Rows := _MR_NativeDistinctRows(Rows)
+		if Depth > MR_MAX_LIST_DEPTH {
+			_MR_RenderRows(MenuObj, Rows, ListId, Depth, 0)
+			return MenuObj
+		}
+		Remainder := []
+		Seeded := false
+		for Row in Rows {
+			if Seeded {
+				Remainder.Push(Row)
+				continue
+			}
+			if _MR_RenderRows(MenuObj, [Row], ListId, Depth, 0, true) > 0
+				Seeded := true
+		}
+		_MR_NormalizeSeparators(MenuObj)
+		if Remainder.Length > 0
+			this.Pending[MenuObj.Handle] := { MenuObj: MenuObj, Rows: MenuSealedRows(Remainder),
+				ListId: ListId, Depth: Depth, NextRow: 1, Busy: false, Failure: "" }
+		return MenuObj
+	}
+
+	/** Completes only a deferred picker containing the requested canonical action. */
+	CompleteReplayIdentity(Identity) {
+		MenuDeferred_BuildAll("reload replay identity")
+		Handles := []
+		for Handle, Entry in this.Pending {
+			for Row in MenuSealedRows_Slice(Entry.Rows, 1, MenuSealedRows_Count(Entry.Rows)) {
+				if Row is Map && Row.Get("replay_id", "") == Identity {
+					Handles.Push(Handle)
+					break
+				}
+			}
+		}
+		for Handle in Handles
+			this.Complete(Handle, "reload replay identity")
+	}
+
+	/** Appends an owned prefix, or completes all remaining rows before paint. */
+	Complete(Handle, Reason := "navigation", RenderFn := 0, MaxRows := 0) {
+		if !(MaxRows is Integer) || MaxRows < 0
+			throw ValueError("Native population row limit must be a nonnegative integer")
+		MenuDeferred_Build(Handle, Reason)
+		PreviousCritical := Critical("On")
+		StartedAt := HotPath_Now()
+		OwnBusy := false
+		Appended := 0
+		Remaining := 0
+		Finished := false
+		try {
+			if !this.Pending.Has(Handle)
+				return false
+			Entry := this.Pending[Handle]
+			if Entry.Busy
+				throw MenuPopulationReentryError("Native leaf population reentered")
+			if Entry.Failure != ""
+				throw Error("Native leaf population previously failed: " . Entry.Failure)
+			Entry.Busy := true
+			OwnBusy := true
+			RowCount := MenuSealedRows_Count(Entry.Rows)
+			LastRow := MaxRows ? Min(RowCount, Entry.NextRow + MaxRows - 1) : RowCount
+			Batch := MenuSealedRows_Slice(Entry.Rows, Entry.NextRow, LastRow)
+			; Only prepared rows are appended here: no file discovery or provider
+			; invocation. Leaf menus retain their own remaining rows. Tray requests wait;
+			; unexpected synchronous 0x117 reentry is refused before partial paint.
+			if HasMethod(RenderFn, "Call")
+				RenderFn.Call(Entry.MenuObj, Batch, Entry.ListId, Entry.Depth)
+			else
+				_MR_RenderRows(Entry.MenuObj, Batch, Entry.ListId, Entry.Depth, 0, true)
+			Appended := Batch.Length
+			PerfCount(Reason == "background" ? "menu.leaf_background" : "menu.leaf_foreground")
+			PerfCount("menu.leaf_rows", Appended)
+			Entry.NextRow := LastRow + 1
+			Remaining := RowCount - LastRow
+			if Remaining == 0 {
+				; Normalize once, across every batch boundary. Intermediate trailing
+				; separators belong to the unpublished remainder, never a painted menu.
+				_MR_NormalizeSeparators(Entry.MenuObj)
+				this.Pending.Delete(Handle)
+				this.Completed += 1
+				Finished := true
+			}
+		} catch as Err {
+			if IsSet(Entry) && !(Err is MenuPopulationReentryError) {
+				Entry.Failure := Err.Message
+				this.Failed := true
+				this.Stop()
+			}
+			try LoggerError("MenuPopulation", "Native leaf could not be completed for {1}: {2}.", Reason, Err.Message)
+			throw Err
+		} finally {
+			if OwnBusy
+				Entry.Busy := false
+			Critical(PreviousCritical)
+			; Per-list totals ride the interval counter record: how often each submenu was
+			; opened or prewarmed and what that cost, by manifest list id (a closed set).
+			if IsSet(Entry) {
+				PerfCount((Reason == "background" ? "menu.leaf_background_us." : "menu.leaf_open_us.") . Entry.ListId,
+					PerfElapsedUs(StartedAt))
+				PerfCount((Reason == "background" ? "menu.leaf_background_runs." : "menu.leaf_open_runs.") . Entry.ListId)
+			}
+			HotPath_LogIfSlow("Menu.populate_leaf", StartedAt,
+				Format("{1}; list={2}; rows={3}; remaining={4}",
+					Reason, IsSet(Entry) ? Entry.ListId : "unowned", Appended, Remaining))
+		}
+		if Finished
+			try LoggerDebug("MenuPopulation", "Leaf '{1}' completed for {2}; {3} pending.",
+				Entry.ListId, Reason, this.Pending.Count)
+		if this.Pending.Count == 0
+			this.Stop(true)
+		return true
+	}
+
+	/** Arms bounded background preparation after the actual root is published. */
+	Start() {
+		global MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY
+		this.Eligible := true
+		if A_IsSuspended || this.Failed
+			return false
+		if this.Started || this.Pending.Count == 0
+			return false
+		this.Started := true
+		this.Timer := ObjBindMethod(this, "Pump")
+		try LoggerStart("MenuPopulation", "Prewarming {1} native leaf menu(s)…", this.Pending.Count)
+		try SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+		catch as FirstError {
+			try this.Stop()
+			catch as CleanupError
+				FirstError.MenuPopulationRetirementError := CleanupError
+			throw FirstError
+		}
+		return true
+	}
+
+	/** Appends one bounded row batch, then yields to input and tray requests. */
+	Pump(*) {
+		global MENU_POPULATION_TICK_MS, MENU_POPULATION_BATCH_ROWS, MENU_POPULATION_THREAD_PRIORITY
+		if A_IsSuspended {
+			this.Stop()
+			return
+		}
+		for Handle in this.Pending {
+			this.Complete(Handle, "background", 0, MENU_POPULATION_BATCH_ROWS)
+			if this.Pending.Count > 0 && HasMethod(this.Timer, "Call") {
+				try SetTimer(this.Timer, -MENU_POPULATION_TICK_MS, MENU_POPULATION_THREAD_PRIORITY)
+				catch as FirstError {
+					try this.Stop()
+					catch as CleanupError
+						FirstError.MenuPopulationRetirementError := CleanupError
+					throw FirstError
+				}
+			}
+			return
+		}
+		this.Stop(true)
+	}
+
+	/** Releases timer ownership and closes the prewarming lifecycle. */
+	Stop(Succeeded := false) {
+		if HasMethod(this.Timer, "Call") {
+			SetTimer(this.Timer, 0)
+			this.Timer := 0
+		}
+		if this.Started {
+			this.Started := false
+			if Succeeded {
+				try LoggerSuccess("MenuPopulation", "Native leaf prewarming completed: {1} menu(s).", this.Completed)
+			} else {
+				try LoggerWarn("MenuPopulation", "Native leaf prewarming retired with {1} pending menu(s).", this.Pending.Count)
+			}
+		}
+	}
+}
+
+/** Accepts only leaf row arrays; nested trees retain their ordinary renderer. */
+MenuPopulation_IsLeaf(Rows) {
+	for Row in Rows {
+		if Row is Map && (Row.Has("items") || Row.Has("submenu"))
+			return false
+	}
+	return true
+}
+
+/** Completes an owned popup in the synchronous message sent before its paint. */
+MenuPopulation_OnInitPopup(Handle, *) {
+	; Native configuration navigation remains available while paused. This only
+	; prepares rows: each one reads the pause state while it is built (EDD-1).
+	global _MenuPopulationPublished
+	PerfCount("menu.initpopup")
+	try {
+		MenuDeferred_Build(Handle)
+		if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation
+			_MenuPopulationPublished.Complete(Handle)
+	} catch as Err {
+		TrayMenuCancelNavigation()
+		throw Err
+	}
+}
+
+/** Retains deferred leaves only when their native menus survive publication. */
+MenuPopulation_Publish(RootMenu) {
+	global _MenuPopulationBuilding, _MenuPopulationPublished
+	NextOwner := _MenuPopulationBuilding is MenuPopulation
+		? _MenuPopulationBuilding : _MenuPopulationPublished
+	if !(NextOwner is MenuPopulation)
+		return
+	LiveHandles := Map()
+	_MenuDispatchCollectLiveIds(RootMenu.Handle, Map(), LiveHandles)
+	MenuDeferred_Retire(LiveHandles)
+	Previous := _MenuPopulationPublished
+	if Previous is MenuPopulation && Previous != NextOwner {
+		Previous.Stop()
+		for Handle, Entry in Previous.Pending {
+			if LiveHandles.Has(Handle)
+				NextOwner.Pending[Handle] := Entry
+		}
+		Previous.Pending.Clear()
+	}
+	Retired := []
+	for Handle in NextOwner.Pending {
+		if !LiveHandles.Has(Handle)
+			Retired.Push(Handle)
+	}
+	for Handle in Retired
+		NextOwner.Pending.Delete(Handle)
+	_MenuPopulationPublished := NextOwner
+	if NextOwner.Pending.Count == 0
+		NextOwner.Stop(true)
+}
+
+/** Resumes preparation after pause; a new boot owner starts after its stage ends. */
+MenuPopulation_Resume() {
+	global _MenuPopulationPublished
+	if !A_IsSuspended && IsSet(_MenuPopulationPublished)
+			&& _MenuPopulationPublished is MenuPopulation && _MenuPopulationPublished.Eligible
+		_MenuPopulationPublished.Start()
+}
+
+/** Retires timer and native-menu references when the driver exits. */
+MenuPopulation_Shutdown() {
+	global _MenuPopulationPublished, _MenuDeferredChildren
+	_MenuDeferredChildren.Clear()
+	if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation {
+		_MenuPopulationPublished.Stop()
+		_MenuPopulationPublished.Pending.Clear()
+		_MenuPopulationPublished := false
+	}
+}

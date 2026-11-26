@@ -346,6 +346,16 @@ end)
 
 
 helpers.describe("sqlite_command — diagnostics carry no typed text", function()
+	helpers.it("linux-sqlite-error-privacy: never logs sqlite's echoed SQL source", function()
+		local diagnostic = [[Parse error near line 1: near ";": syntax error
+  SELECT 'private_token_456' FROM ;
+                    error here ---^
+]]
+		local msg = Cmd.sanitise_error(diagnostic)
+		assert_absent(msg, "private_token_456", "single-quoted user input must never reach logs")
+		helpers.assert_contains(msg, "syntax error")
+		helpers.assert_eq(Cmd.sanitise_error("unrecognized payload_private_789"), "SQLite command failed")
+	end)
 	helpers.it("redacts the SQL fragment sqlite3 echoes back", function()
 		local msg = Cmd.sanitise_error('Error: near line 1: near "my secret password": syntax error')
 		assert_absent(msg, "my secret password", "the echoed token is user-typed text")
@@ -465,7 +475,7 @@ helpers.describe("sqlite_command — native filesystem database paths", function
 				"file:owned.sqlite", "file:encoded%20name.sqlite", "file:query.sqlite?mode=ro",
 				"file:fragment.sqlite#tail", ":memory:", "-metrics.sqlite", "-", "été ' .sqlite" }) do
 				local command = assert(Cmd.build(path, "SELECT 42;", { flags = flags, capture_exit = true }))
-				local quoted = require("adapters.shell_runner").quote("./" .. path)
+				local quoted = require("core.process.adapters.shell_runner").quote("./" .. path)
 				helpers.assert_contains(command, quoted, "the CLI must open the filesystem path, not its URI or option interpretation")
 				helpers.assert_contains(command, "SELECT 42;")
 				helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
@@ -476,7 +486,7 @@ helpers.describe("sqlite_command — native filesystem database paths", function
 	helpers.it("linux-sqlite-filesystem-path: leaves absolute database bytes unchanged", function()
 		for _, path in ipairs({ "/db/metrics.sqlite", "/db/file:owned.sqlite", "/db/:memory:", "/db/été ' .sqlite" }) do
 			local command = assert(Cmd.build(path, "SELECT 42;"))
-			helpers.assert_contains(command, require("adapters.shell_runner").quote(path))
+			helpers.assert_contains(command, require("core.process.adapters.shell_runner").quote(path))
 			assert_absent(command, "./" .. path, "absolute filesystem identities must not change")
 		end
 	end)

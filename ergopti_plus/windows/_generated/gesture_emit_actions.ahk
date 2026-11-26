@@ -1,5 +1,5 @@
 ﻿; _generated/gesture_emit_actions.ahk
-; AUTO-GENERATED from _shared/modules/actions/actions.toml.
+; AUTO-GENERATED from _shared/shortcuts/data/actions/actions.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:gesture-emit-actions` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -7,7 +7,7 @@
 ; MODULE: Gesture Emit Actions (Windows)
 ; DESCRIPTION:
 ; Every action whose behaviour the shared catalogue fully describes: a key plus
-; modifiers, or a raw send sequence. modules/gestures/actions.ahk turns these
+; modifiers, or a raw send sequence. gestures/engine/actions.ahk turns these
 ; into registry handlers at static-init, so nothing here runs on the boot path
 ; and no TOML is parsed to register them.
 ;
@@ -83,7 +83,6 @@ GestureEmitActionsData() {
 		"vol_up", { Key: "Volume_Up", Mods: [] },
 		"word_next", { Key: "Right", Mods: ["Ctrl"] },
 		"word_prev", { Key: "Left", Mods: ["Ctrl"] },
-		"ocr_screenshot", { Seq: "#+t" },
 		"open_emoji_picker", { Seq: "#." },
 		"screen_capture", { Seq: "#+s" },
 		"select_line", { Seq: "{Home}{Shift Down}{End}{Shift Up}" },

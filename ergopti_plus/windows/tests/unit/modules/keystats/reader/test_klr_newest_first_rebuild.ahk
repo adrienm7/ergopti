@@ -99,18 +99,22 @@ Test("KLR rebuild: newest day is rolled up first and the end is exact (klr-newes
 
 ; Reading backward must not change which copy of a reused event key survives:
 ; the one-pass build keeps the first copy in file order.
-_KLRNF_FirstCopyWins() {
+_KLRNF_FirstCopyWins(ChunkBytes := 700) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
 		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger()
 			. _KLRDC_TypingBatch(3, "2026-03-04 12:00:00.000", "2026-03-04", "four.exe", ["x", "y", "z", "w"]))
 		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
-		Db := _KLRNF_Build(true)
+		Db := _KLRNF_Build(true, 0, 0, ChunkBytes)
 		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Db),
 			"a reused key must keep its first copy when read backward (klr-newest-first-collision)")
 		AssertEqual("2026-03-01,2026-03-02,2026-03-03", _KLRNF_Days(Db),
 			"the displaced newer copy must leave no rollup behind")
+		Survivor := SQLite_Query(Db, "SELECT date,app FROM events_typing WHERE device_id='dev-one' AND id=3;")[1]
+		AssertEqual("2026-03-02", Survivor["date"])
+		AssertEqual("two.exe", Survivor["app"])
+		AssertEqual(0, _KLR_RebuildSeenTables(Db).Length, "per-span ownership must not survive publication")
 		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.sqlite_schema WHERE type='trigger';")[1]["n"],
 			"the temporary first-wins triggers must not survive into the published image")
 	} finally {
@@ -119,6 +123,9 @@ _KLRNF_FirstCopyWins() {
 }
 Test("KLR rebuild: a reused event key keeps its first copy (klr-newest-first-collision)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWins))
+
+Test("KLR rebuild: same-frame duplicates keep the first copy (klr-newest-first-collision)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWins.Bind(4 * 1024 * 1024)))
 
 ; A writer caught mid-append must not fail the rebuild: the torn batch is left
 ; to the next incremental refresh from the recorded offset.
@@ -147,16 +154,25 @@ Test("KLR rebuild: a torn tail is left to the next refresh (klr-newest-first-tor
 
 ; A driver reload kills the worker mid-rebuild. The next worker must continue
 ; from the last checkpoint instead of starting over, and still end exact.
-_KLRNF_KilledWorkerResumes() {
+_KLRNF_KilledWorkerResumes(Obsolete := false) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
-		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger()
+			. _KLRDC_TypingBatch(3, "2026-03-04 12:00:00.000", "2026-03-04", "later.exe", ["x", "y"]))
 		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
 		Checkpoint := KLR_RebuildCheckpointPath(_KLRDC_Root())
 		AssertEqual(0, _KLRNF_Build(true, 0, 3), "the interrupted worker must not publish anything")
 		AssertTrue(FSExists(Checkpoint), "an interrupted rebuild must leave its checkpoint (klr-rebuild-resume)")
 		AssertFalse(FSExists(KLR_CachePath(_KLRDC_Root())), "an interrupted rebuild must not publish an image")
+		if Obsolete {
+			Stored := SQLite_Open(Checkpoint)
+			AssertTrue(Stored != 0)
+			try AssertTrue(SQLite_Exec(Stored, "UPDATE klr_rebuild_meta SET value="
+				. SQLite_Q(Obsolete is String ? Obsolete : "2") . " WHERE key='checkpoint_format';"))
+			finally SQLite_Close(Stored)
+		}
+
 
 		First := 0
 		Observe(Info) {
@@ -165,8 +181,11 @@ _KLRNF_KilledWorkerResumes() {
 		}
 		Resumed := _KLRNF_Build(true, Observe)
 		AssertTrue(IsObject(First))
-		AssertTrue(First["done_bytes"] > First["run_bytes"],
-			"the next worker must continue from the checkpoint, not from zero (klr-rebuild-resume)")
+		if Obsolete
+			AssertEqual(First["done_bytes"], First["run_bytes"], "an obsolete replay protocol must restart")
+		else
+			AssertTrue(First["done_bytes"] > First["run_bytes"],
+				"the next worker must continue from the checkpoint, not from zero (klr-rebuild-resume)")
 		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Resumed),
 			"a resumed rebuild must end exactly where an uninterrupted one ends (klr-rebuild-resume)")
 		AssertFalse(FSExists(Checkpoint), "a published image supersedes its checkpoint")
@@ -176,6 +195,9 @@ _KLRNF_KilledWorkerResumes() {
 }
 Test("KLR rebuild: a killed worker resumes from its checkpoint (klr-rebuild-resume)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes))
+
+Test("KLR rebuild: obsolete first-copy checkpoints restart safely (klr-rebuild-resume)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind(true)))
 
 ; A checkpoint only describes the exact ledger bytes it consumed.
 _KLRNF_ReplacedLedgerDiscardsCheckpoint() {
@@ -351,3 +373,135 @@ for _KLRNF64Kind in ["round", "checkpoint"] {
 #Include test_klr_trusted_frames.ahk
 
 #Include test_klr_executed_rounds.ahk
+
+
+_KLRNF_FirstCopyWithinTransaction() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		First := _KLRDC_TypingBatch(7, "2026-03-04 10:00:00.000", "2026-03-04", "first.exe", ["a", "b"])
+		Later := _KLRDC_TypingBatch(7, "2026-03-05 10:00:00.000", "2026-03-05", "later.exe", ["x", "y", "z"])
+		InsertAt := InStr(Later, "INSERT OR IGNORE")
+		AssertTrue(InsertAt > 0, "the second fixture must contain its actual insert")
+		Ledger := _KLRNF_ThreeDayLedger() . StrReplace(First, "COMMIT;", "") . SubStr(Later, InsertAt)
+		_KLRDC_WriteLedger(Ledger)
+		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
+		Db := _KLRNF_Build(true, 0, 0, 4 * 1024 * 1024)
+		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Db), "one transaction must keep its first valid copy")
+		Survivor := SQLite_Query(Db, "SELECT date,app FROM events_typing WHERE device_id='dev-one' AND id=7;")[1]
+		AssertEqual("first.exe", Survivor["app"])
+		AssertEqual("2026-03-04", Survivor["date"])
+	} finally _KLRDC_Cleanup()
+}
+Test("KLR rebuild: duplicates within one transaction keep the first copy (klr-newest-first-collision)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWithinTransaction))
+
+Test("KLR rebuild: ambiguous tuple checkpoints restart safely (walker-composite-checkpoint)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind("3")))
+
+
+; This timer only releases a real filesystem obstruction after observing an
+; incorrect wait. It never supplies a lock receipt to the function under test.
+_KLRNF_ReleaseLockProbe(Path, Probe, Peer) {
+	Probe["released"] := true
+	if Peer {
+		Probe["close_ok"] := FSCloseExclusiveGuard(Probe["held"])
+		if Probe["close_ok"]
+			Probe["held"] := 0
+	} else
+		DirDelete(Path)
+}
+
+_KLRNF_GuardRefusalIsNotPeerContention(Peer) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Guard := 0
+	Deadline := 0
+	Probe := Map("released", false, "held", 0, "close_ok", false)
+	try {
+		DirCreate(KLR_CacheDir(_KLRDC_Root()))
+		Path := KLR_RebuildLockPath(_KLRDC_Root())
+		if Peer {
+			Probe["held"] := FSOpenExclusiveGuard(Path)
+			AssertTrue(Probe["held"] != 0, "a genuine native peer must own the guard")
+		} else {
+			DirCreate(Path)
+			AssertTrue(DirExist(Path), "a genuine directory obstructs the file admission")
+		}
+		Deadline := _KLRNF_ReleaseLockProbe.Bind(Path, Probe, Peer)
+		try {
+			SetTimer(Deadline, Peer ? -100 : -1000)
+			Guard := _KLR_RebuildAcquire(_KLRDC_Root(), "", &Waited)
+		} finally SetTimer(Deadline, 0)
+		_TestPrint("# KLR_NATIVE_GUARD_RETURN " . KL_JsonEncode(Map("peer", Peer,
+			"release_used", Probe["released"], "waited", Waited, "acquired", Guard != 0)))
+		if Peer {
+			AssertTrue(Probe["released"] && Probe["close_ok"], "the exact native peer actually released its ownership")
+			AssertTrue(Waited && Guard != 0, "real sharing contention must remain eligible for a later acquisition")
+		} else {
+			AssertFalse(Probe["released"], "a wrong path type must return without waiting for an invented peer")
+			AssertFalse(Waited)
+			AssertEqual(0, Guard)
+			AssertTrue(DirExist(Path), "a refused source obstruction must remain unchanged")
+		}
+	} finally {
+		if IsObject(Deadline)
+			SetTimer(Deadline, 0)
+		if Guard
+			AssertTrue(FSCloseExclusiveGuard(Guard))
+		if Probe["held"]
+			AssertTrue(FSCloseExclusiveGuard(Probe["held"]))
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: a directory guard refusal cannot invent a peer (klr-rebuild-guard-admission)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(false)))
+Test("KLR rebuild: actual peer contention waits for native release (klr-rebuild-guard-admission)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalIsNotPeerContention.Bind(true)))
+
+
+_KLRNF_GuardRefusalKeepsPublishedImage() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Deadline := 0
+	UnexpectedDb := 0
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		Published := _KLRNF_Build(false)
+		Fingerprint := _KLRDC_DerivedFingerprint(Published)
+		ImageBefore := KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))
+		LedgerBefore := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
+		AssertTrue(ImageBefore.Get("ok", false))
+		Path := KLR_RebuildLockPath(_KLRDC_Root())
+		DirCreate(Path)
+		Probe := Map("released", false, "held", 0, "close_ok", false)
+		Deadline := _KLRNF_ReleaseLockProbe.Bind(Path, Probe, false)
+		try {
+			SetTimer(Deadline, -1000)
+			Result := KLR_BuildColdSegmented(_KLRDC_Root(), "", [_KLRDC_LedgerPath()])
+			UnexpectedDb := Result.Get("db", 0)
+		} finally SetTimer(Deadline, 0)
+		_TestPrint("# KLR_NATIVE_GUARD_CALLER " . KL_JsonEncode(Map("release_used", Probe["released"],
+			"ok", Result["ok"], "db", UnexpectedDb != 0, "peer_published", Result.Get("peer_published", false))))
+		AssertFalse(Probe["released"], "the cold builder must propagate guard refusal without a fake peer wait")
+		AssertFalse(Result["ok"])
+		AssertEqual(0, UnexpectedDb, "guard refusal must never return a successful empty replacement")
+		AssertFalse(Result.Get("peer_published", false), "a path-type refusal is not proof of another publisher")
+		AssertEqual(Published, KLRCache.db, "refusal leaves the exact last-good handle published")
+		AssertEqual(Fingerprint, _KLRDC_DerivedFingerprint(Published))
+		AssertTrue(KLR_LedgerSnapshotIsSame(ImageBefore, KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))))
+		AssertTrue(KLR_LedgerSnapshotIsSame(LedgerBefore, KLR_LedgerSnapshot(_KLRDC_LedgerPath())))
+	} finally {
+		if IsObject(Deadline)
+			SetTimer(Deadline, 0)
+		if UnexpectedDb && UnexpectedDb != KLRCache.db
+			SQLite_Close(UnexpectedDb)
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: refused guard preserves the exact published image (klr-rebuild-guard-caller)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalKeepsPublishedImage))
+
+
+Test("KLR thinking pauses: old format6 checkpoints restart through actual replay (klr-thinking-pause-checkpoint)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind("6")))

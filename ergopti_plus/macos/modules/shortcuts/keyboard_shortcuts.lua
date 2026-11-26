@@ -16,40 +16,41 @@
 ---    acquires native chords for explicitly assigned catalogue slots.
 --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
 ---    and rebuilt after any assignment change + reload. The OS call itself lives
----    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
+---    in platform/input/hotkey_registrar.lua, so this module never names hs.hotkey.
 --- ==============================================================================
 
 local M = {}
 
-local JsonCodec   = require("adapters.json_codec")
-local Chord       = require("chord")
-local Registrar   = require("adapters.hotkey_registrar")
-local FileSystem  = require("adapters.file_system")
-local Paths       = require("infra.paths")
-local Logger      = require("infra.logger")
+local JsonCodec   = require("core.fs.adapters.json_codec")
+local Chord       = require("keyboard.engine.chord")
+local Registrar   = require("platform.input.hotkey_registrar")
+local FileSystem  = require("core.fs.adapters.file_system")
+local Paths       = require("core.fs.engine.paths")
+local Logger      = require("core.logger.engine.logger")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
-local OperationReporter = require("diagnostics.operation_reporter")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
 local GestActions = nil
-local Codec       = require("toml_codec")
-local Writer      = require("toml_codec.writer")
-local Preferences = require("infra.preferences")
-local ConfigPaths = require("infra.config_paths")
-local Manifest    = require("infra.manifest_reader")
-local ConfigOutdated = require("config_outdated")
-local MagicPolicy = require("shortcuts.magic_editor")
-local KeyboardPublication = require("config_keyboard_publication")
+local Codec       = require("core.text.engine.toml_codec")
+local Writer      = require("core.text.engine.toml_codec.writer")
+local Preferences = require("settings.engine.preferences.preferences")
+local ConfigPaths = require("settings.engine.paths")
+local Manifest    = require("menu.engine.manifest_reader")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+-- The ★ key's Ctrl slot (secondary_star), bound by modules/shortcuts/star_slot.lua.
+local STAR_SLOT_ID = require("shortcuts.engine.star_slot_core").slot("macos").id
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
-local Assignment = require("shortcuts.assignment")
-local SlotRoles = require("shortcuts.slot_roles")
-local PhysicalSlots = require("shortcuts.physical_slots")
+local Assignment = require("shortcuts.engine.assignment")
+local SlotRoles = require("shortcuts.engine.slot_roles")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
-local PhysicalAvailability = require("shortcuts.physical_availability")
-local i18n = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
+local i18n = require("core.i18n.engine.i18n")
+local KeyNames = require("platform.input.keycodes.key_names")
 local AiActions = require("modules.shortcuts.ai_actions")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
@@ -60,7 +61,7 @@ local _full_rebind_retry_index = nil
 -- Ownership inspection needs only key identities; action initialization belongs
 -- to assignment validation and delivery, not the cleanup reader.
 local function action_catalogue()
-	if GestActions == nil then GestActions = require("modules.gestures.actions") end
+	if GestActions == nil then GestActions = require("gestures.engine.actions") end
 	return GestActions
 end
 
@@ -83,8 +84,8 @@ local _start_attempt = nil
 local _native_acquisition_depth = 0
 local _explicit_actions = {}
 local _physical_assignments = {}
-local _magic_context = nil
-local _magic_owner = nil
+local _star_context = nil
+local _star_owner = nil
 local _configuration_generation = 0
 -- Configured slots whose own registration was refused (slot -> why). Each slot
 -- is an independent OS hotkey: one refusal is retried alone while the other
@@ -121,10 +122,9 @@ local SLOT_MODS = nil
 local SPECIAL_KEYS = nil
 
 -- The groups the menu offers, in display order, each with the i18n keys for its
--- submenu title and its "add a binding" row. Physical groups use SLOT_MODS;
--- the contextual group owns one logical slot whose numeric source is measured.
+-- submenu title and its "add a binding" row. Physical groups use SLOT_MODS; the
+-- Ctrl group also lists the ★ key's slot, whose physical key is measured.
 M.SLOT_GROUPS = {
-	{ prefix = "contextual", fixed = true, group_key = "menu.shortcuts.group_contextual", add_key = "menu.shortcuts.add_contextual" },
 	{ prefix = "alt_",              group_key = "menu.shortcuts.alt_group",        add_key = "menu.shortcuts.alt_add" },
 	{ prefix = "secondary_",        group_key = "menu.shortcuts.ctrl_group",       add_key = "menu.shortcuts.ctrl_add" },
 	{ prefix = "secondary_shift_",  group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
@@ -140,13 +140,11 @@ function M.get_keyboard_group_modifiers_label(group)
 	return KeyNames.modifiers_label(SlotRoles.family_modifiers("macos", group.prefix), "macos", i18n.get)
 end
 
---- The heading of one group's submenu: the contextual group's own title, a
---- modifier group's template filled with its glyphs and names (« ⌥ Option
---- shortcuts », « ⌘⇧ Cmd + Maj shortcuts »).
+--- The heading of one group's submenu: its template filled with its modifiers'
+--- glyphs and names (« ⌥ Option shortcuts », « ⌘⇧ Cmd + Maj shortcuts »).
 --- @param group table An entry of M.SLOT_GROUPS.
 --- @return string
 function M.get_keyboard_group_label(group)
-	if group.fixed then return i18n.get(group.group_key) end
 	local modifiers = SlotRoles.family_modifiers("macos", group.prefix)
 	return KeyNames.fill(group.group_key, KeyNames.modifiers_heading(modifiers, "macos", i18n.get), i18n.get)
 end
@@ -154,7 +152,7 @@ end
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
 -- are the same 40 the gesture actions and the Windows driver already use — a
 -- private list here would be a fourth answer to "which keys exist".
-local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
+local KEY_CATALOGUE_PATH = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 
 -- The manifest section whose entries are this driver's shipped slot bindings.
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
@@ -226,7 +224,7 @@ local function catalogue_keys()
 		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
 		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded
-		local admitted, publication = pcall(KeyboardPublication.publish, decoded.keys, SLOT_MODS, MagicPolicy.SLOT_ID)
+		local admitted, publication = pcall(KeyboardPublication.publish, decoded.keys, SLOT_MODS, STAR_SLOT_ID)
 		if admitted then
 			_binding_publication = publication
 		else
@@ -256,7 +254,7 @@ end
 --- @return table index Set of canonical slot IDs.
 local function owned_slots()
 	local keys = assert(catalogue_keys(), "keyboard key catalogue unavailable")
-	local index = { [MagicPolicy.SLOT_ID] = true }
+	local index = { [STAR_SLOT_ID] = true }
 	for _, group in ipairs(slot_mods()) do
 		for _, key in ipairs(keys) do index[group[1] .. key.id] = true end
 	end
@@ -266,10 +264,10 @@ end
 --- Loads the immutable shared physical registry without a host key fallback.
 local function physical_model()
 	if _physical_model == nil then
-		assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+		assert(rawequal(rawget(package.loaded, "shortcuts.engine.physical_slots"), PhysicalSlots)
 			and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 			"physical-key constructor ownership changed")
-		local raw = assert(FileSystem.read(Paths.shared("data/keycodes/physical_keys.json")), "physical registry unavailable")
+		local raw = assert(FileSystem.read(Paths.shared("layouts/data/keycodes/physical_keys.json")), "physical registry unavailable")
 		local decoded, detail = JsonCodec.decode(raw)
 		assert(decoded and not detail, "physical registry malformed")
 		_physical_model, _physical_binding_publication = PhysicalSlotConstructor(decoded)
@@ -438,10 +436,11 @@ local function slot_label(slot_id)
 		parts[#parts + 1] = KeyNames.physical_label(descriptor.code, "macos", i18n.get)
 		return table.concat(parts, " ")
 	end
-	if slot_id == MagicPolicy.SLOT_ID then
-		local label = i18n.get("menu.shortcuts.keyboard.magic_editor")
-		local reason = _magic_owner and _magic_owner.reason()
-		if reason then return label .. " (" .. i18n.get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
+	if slot_id == STAR_SLOT_ID then
+		-- The real ★ key, whatever the configured magic key: « ⌃ ★ ».
+		local label = KeyNames.macos_symbol("ctrl") .. " ★"
+		local reason = _star_owner and _star_owner.reason()
+		if reason then return label .. " (" .. i18n.get("menu.shortcuts.keyboard.star_slot_reason." .. reason) .. ")" end
 		return label
 	end
 	for _, entry in ipairs(slot_mods()) do
@@ -465,10 +464,10 @@ local function slot_label(slot_id)
 end
 
 local function refresh_claims(assignments)
-	if _magic_context == nil then return true end
+	if _star_context == nil then return true end
 	local rows = {}
 	for slot, action in pairs(assignments or _physical_assignments) do
-		if slot ~= MagicPolicy.SLOT_ID then
+		if slot ~= STAR_SLOT_ID then
 			local descriptor = M.physical_slot_descriptor(slot)
 			local native = descriptor and physical_model().stable_native_code(slot, "hs")
 			local chord = not descriptor and slot_to_chord(slot) or nil
@@ -519,11 +518,13 @@ local function physical_receipt_current(receipt)
 end
 
 --- Reports whether native source, all-owner collisions and output custody are joined.
---- The physical broker/output integration is not yet qualified on macOS. Existing
---- named shortcuts and contextual native owners retain their separate lifecycles.
+--- Turned on by the maintainer on 2026-11-11 (LIN-004), on macOS as on Linux;
+--- the next Mac field report validates it. Each dispatch still passes the
+--- source, collision and output refusals of physical_admission. Named
+--- shortcuts and contextual native owners keep their separate lifecycles.
 --- @return boolean available Native physical delivery capability.
 function M.physical_delivery_available()
-	return false
+	return true
 end
 
 --- Carries one private receipt across source and runtime callbacks.
@@ -552,10 +553,10 @@ local function physical_admission(previous)
 	if receipt.source ~= nil and receipt.source ~= expected then return false end
 	local content, status = FileSystem.read_with_status(path)
 	if not physical_receipt_current(receipt) or status ~= "ok" or content ~= expected then return false end
-	if _magic_context ~= nil then
-		local context = _magic_context
-		if context.paused() ~= false or not physical_receipt_current(receipt) or _magic_context ~= context then return false end
-		if context.inhibited() ~= false or not physical_receipt_current(receipt) or _magic_context ~= context then return false end
+	if _star_context ~= nil then
+		local context = _star_context
+		if context.paused() ~= false or not physical_receipt_current(receipt) or _star_context ~= context then return false end
+		if context.inhibited() ~= false or not physical_receipt_current(receipt) or _star_context ~= context then return false end
 	end
 	receipt.source = expected
 	return physical_receipt_current(receipt), receipt
@@ -581,7 +582,7 @@ local function physical_conflict(slot, mods, native)
 	local identity = Registrar.physical_identity(physical_modifiers(mods), native)
 	if identity == nil then return true end
 	for existing in pairs(_physical_assignments) do
-		if not PhysicalSlots.is_namespace(existing) and existing ~= MagicPolicy.SLOT_ID then
+		if not PhysicalSlots.is_namespace(existing) and existing ~= STAR_SLOT_ID then
 			local chord = slot_to_chord(existing)
 			local parsed = chord and Chord.parse(chord)
 			if parsed and Registrar.physical_identity(parsed.mods, parsed.key) == identity then return true end
@@ -692,14 +693,14 @@ local function start_physical(assignments)
 	return true
 end
 
-local function start_magic(action)
-	if _magic_context == nil then return true end
-	if _magic_owner == nil then _magic_owner = require("modules.shortcuts.magic_editor") end
+local function start_star(action)
+	if _star_context == nil then return true end
+	if _star_owner == nil then _star_owner = require("modules.shortcuts.star_slot") end
 	local epoch = _lifecycle_epoch
 	local context = {}
-	for key, value in pairs(_magic_context) do context[key] = value end
-	context.assignment_unavailable = action == nil and _physical_assignments[MagicPolicy.SLOT_ID] ~= nil
-	return _magic_owner.start({
+	for key, value in pairs(_star_context) do context[key] = value end
+	context.assignment_unavailable = action == nil and _physical_assignments[STAR_SLOT_ID] ~= nil
+	return _star_owner.start({
 		action = action,
 		configuration_generation = _configuration_generation,
 		context = context,
@@ -936,7 +937,7 @@ end
 --- @param slot_id string
 --- @return table|nil mods, string|nil key Nil when the slot has no known prefix.
 function M.get_slot_chord(slot_id)
-	if slot_id == MagicPolicy.SLOT_ID then return { "ctrl" }, nil end
+	if slot_id == STAR_SLOT_ID then return { "ctrl" }, nil end
 	if type(slot_id) ~= "string" then return nil, nil end
 	for _, entry in ipairs(slot_mods()) do
 		local prefix, mods = entry[1], entry[2]
@@ -955,9 +956,6 @@ end
 --- @param prefix string One of M.SLOT_GROUPS' prefixes.
 --- @return table
 function M.available_slots(prefix)
-	if prefix == "contextual" then
-		return { { id = MagicPolicy.SLOT_ID, label = slot_label(MagicPolicy.SLOT_ID) } }
-	end
 	local known = false
 	for _, entry in ipairs(slot_mods()) do
 		if entry[1] == prefix then known = true; break end
@@ -971,6 +969,10 @@ function M.available_slots(prefix)
 	for _, key in ipairs(catalogue_keys() or {}) do
 		out[#out + 1] = { id = prefix .. key.id, label = key.label or key.id }
 	end
+	-- The ★ key's slot is an ordinary row of the Ctrl group (2026-11-21).
+	if STAR_SLOT_ID:sub(1, #prefix) == prefix and not STAR_SLOT_ID:sub(#prefix + 1):find("_", 1, true) then
+		out[#out + 1] = { id = STAR_SLOT_ID, label = slot_label(STAR_SLOT_ID) }
+	end
 	return out
 end
 
@@ -982,10 +984,6 @@ end
 --- @return table Array of { id, label, action } for assigned slots only.
 function M.assigned_slots(prefix)
 	ensure_loaded()
-	if prefix == "contextual" then
-		return { { id = MagicPolicy.SLOT_ID, label = slot_label(MagicPolicy.SLOT_ID),
-			action = _actions[MagicPolicy.SLOT_ID] or "none" } }
-	end
 	local out = {}
 	for _, slot in ipairs(M.available_slots(prefix)) do
 		local action = _actions[slot.id]
@@ -1046,7 +1044,10 @@ local function set_action(slot_id, action_id, on_error, publication_observer)
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
 		return false
 	end
-	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
+	-- A pause admits the edit (EDD-1): the paused module holds no hotkey, so
+	-- the assignment is only published, and the resume start binds it from the
+	-- file. A start in progress is refused, since it is reading that file.
+	if _start_attempt ~= nil then return false end
 	if not owns_slot(slot_id) then return false end
 	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
 		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
@@ -1061,7 +1062,7 @@ local function set_action(slot_id, action_id, on_error, publication_observer)
 	local rows = Preferences.prepare_shortcut_updates(source, { operation }, { "keyboard" })
 
 	local native_transition = nil
-	local conditional = slot_id == MagicPolicy.SLOT_ID
+	local conditional = slot_id == STAR_SLOT_ID
 	if _started and not conditional and old_action == "none" and action_id ~= "none" then
 		if bind_slot(slot_id, action_id) ~= true then return false end
 		native_transition = "enabled"
@@ -1074,18 +1075,18 @@ local function set_action(slot_id, action_id, on_error, publication_observer)
 	local previous_physical = _physical_assignments[slot_id]
 	_physical_assignments[slot_id] = candidate_explicit
 	_configuration_generation = _configuration_generation + 1
-	local candidate_magic = _explicit_actions[MagicPolicy.SLOT_ID]
-	if conditional then candidate_magic = candidate_explicit end
+	local candidate_star = _explicit_actions[STAR_SLOT_ID]
+	if conditional then candidate_star = candidate_explicit end
 	local function restore_conditional()
 		_physical_assignments[slot_id] = previous_physical
 		_configuration_generation = _configuration_generation + 1
 		refresh_claims()
-		if _started and start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) ~= true then
+		if _started and start_star(_explicit_actions[STAR_SLOT_ID]) ~= true then
 			Logger.error(LOG, "Conditional shortcut publication rollback has native cleanup debt.")
 		end
 	end
 	local conditional_admitted = refresh_claims() == true
-		and (not _started or start_magic(candidate_magic) == true)
+		and (not _started or start_star(candidate_star) == true)
 	if not conditional_admitted
 		or Preferences.publish_owned(ConfigPaths.get("ConfigTomlPath"), rows, source, on_error, publication_observer) ~= true then
 		restore_conditional()
@@ -1133,7 +1134,7 @@ function M.apply_configuration(decoded, raw_claims)
 	if type(decoded) ~= "table" or _editing or _started or _start_attempt ~= nil
 		or _native_acquisition_depth ~= 0 or next(_hotkeys) ~= nil then return false end
 	if _physical_owner and _physical_owner.stop() ~= true then return false end
-	if _magic_owner and _magic_owner.stop() ~= true then return false end
+	if _star_owner and _star_owner.stop() ~= true then return false end
 	_editing = true
 	local called, detail = xpcall(load_assignments, debug.traceback, decoded, raw_claims)
 	_editing = false
@@ -1147,28 +1148,19 @@ function M.is_started()
 	return _started and _delivery_enabled
 end
 
---- Supplies live editor-source gates without owning a second UI hotkey.
---- @param context table Native trigger, physical replacement and lifecycle readers.
+--- Supplies the ★ key slot's live lifecycle gates without owning a second UI hotkey.
+--- @param context table Pause and inhibition readers.
 --- @return boolean applied
-function M.configure_magic_editor(context)
+function M.configure_star_slot(context)
 	if type(context) ~= "table" then return false end
-	for _, key in ipairs({ "trigger", "magic_source", "replace_active", "paused", "inhibited" }) do
+	for _, key in ipairs({ "paused", "inhibited" }) do
 		if type(context[key]) ~= "function" then return false end
 	end
-	_magic_context = context
+	_star_context = context
 	_configuration_generation = _configuration_generation + 1
 	if refresh_claims() ~= true then return false end
-	if _started then return start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) end
+	if _started then return start_star(_explicit_actions[STAR_SLOT_ID]) end
 	return true
-end
-
---- Retargets the contextual owner after an acknowledged effective-source edit.
---- A stopped category remains stopped; no setting or native owner is invented.
---- @return boolean accepted
-function M.refresh_magic_editor()
-	if not _started or _magic_context == nil then return true end
-	_configuration_generation = _configuration_generation + 1
-	return start_magic(_explicit_actions[MagicPolicy.SLOT_ID])
 end
 
 --- Starts the keyboard shortcuts module and owns every configured binding.
@@ -1217,7 +1209,7 @@ function M.start(candidate, raw_claims)
 	-- half-bound. A lifecycle change mid-start rolls every slot back either way.
 	_pending_slots = {}
 	for slot, action in pairs(_actions) do
-		if slot ~= MagicPolicy.SLOT_ID and action ~= "none" then
+		if slot ~= STAR_SLOT_ID and action ~= "none" then
 			if candidate == nil then
 				acquire_slot(slot, action)
 			elseif bind_slot(slot, action) ~= true then
@@ -1235,7 +1227,7 @@ function M.start(candidate, raw_claims)
 	end
 	if start_physical() ~= true then M.stop(); return false end
 	if not start_is_current(attempt) then M.stop(); return false end
-	if start_magic(_explicit_actions[MagicPolicy.SLOT_ID]) ~= true then M.stop(); return false end
+	if start_star(_explicit_actions[STAR_SLOT_ID]) ~= true then M.stop(); return false end
 	if not start_is_current(attempt) then
 		M.stop()
 		return false
@@ -1265,7 +1257,7 @@ function M.stop()
 	_pending_slots = {}
 	_refusal_retry.cancel()
 	local physical_settled = _physical_owner == nil or _physical_owner.stop() == true
-	local conditional_settled = _magic_owner == nil or _magic_owner.stop() == true
+	local conditional_settled = _star_owner == nil or _star_owner.stop() == true
 	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 and conditional_settled and physical_settled then
 		Logger.debug(LOG, "stop() called before start() — nothing to stop.")
 		return true
@@ -1372,7 +1364,7 @@ end
 --- Returns a detached complete native publication without reading or binding input.
 --- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
 function M.published_binding_catalogue()
-	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+	if not rawequal(rawget(package.loaded, "settings.engine.publication.keyboard_publication"), KeyboardPublication)
 		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
 		or type(KeyboardOwnerCurrent) ~= "function"
 		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)
@@ -1380,7 +1372,7 @@ function M.published_binding_catalogue()
 		or not KeyboardOwnerCurrent(M)
 		or _binding_publication == nil or _physical_binding_publication == nil
 		or type(_catalogue) ~= "table" then return nil end
-	return KeyboardComposition(_binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, MagicPolicy.SLOT_ID),
+	return KeyboardComposition(_binding_publication(rawget(_catalogue, "keys"), SLOT_MODS, STAR_SLOT_ID),
 		_physical_binding_publication(_physical_model))
 end
 

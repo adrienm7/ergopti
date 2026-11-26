@@ -7,9 +7,8 @@
 global _SharedDir := A_Args[3]
 global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", false,
-	"emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC030")
+	"emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 global _LRPS_Bindings := Map(), _LRPS_Current := 0, _LRPS_Emits := []
 global _LRPS_Throw := A_Args[2] == "throw"
 
@@ -25,7 +24,8 @@ _LRPS_HotIf(Args*) {
 
 _LRPS_Register(Name, Callback, Options) {
 	global _LRPS_Bindings, _LRPS_Current
-	_LRPS_Bindings[Name] := Map("callback", Callback, "criterion", _LRPS_Current, "options", Options)
+	_LRPS_Require(SubStr(Name, 1, 1) == "~", "every native-row variant must admit its original host event")
+	_LRPS_Bindings[StrReplace(Name, "~")] := Map("name", Name, "callback", Callback, "criterion", _LRPS_Current, "options", Options)
 }
 
 ; AHK permits overriding a built-in function in this isolated child only.
@@ -51,23 +51,21 @@ _LRPS_Run() {
 	for Prefix in ["", "*", "+", "^", "!"] {
 		Name := Prefix . "SC010"
 		Binding := _LRPS_Bindings[Name]
-		_LRPS_Require((Binding["criterion"]).Call(Name), "the disabled row must admit " . Name)
+		_LRPS_Require((Binding["criterion"]).Call(Binding["name"]), "the disabled row must admit " . Name)
 		SendLevel(CallerLevel)
 		_LRPS_Emits := []
-		Failure := ""
-		try (Binding["callback"]).Call(Name)
-		catch as Err
-			Failure := Err.Message
-		_LRPS_Require(Failure == (_LRPS_Throw ? "fixture sender refused" : ""), "sender refusal must propagate exactly")
-		_LRPS_Require(A_SendLevel == CallerLevel, "the caller's send level must survive success and refusal")
-		_LRPS_Require(_LRPS_Emits.Length == 1, "one admitted press must reach the sender exactly once")
-		Emission := _LRPS_Emits[1]
-		_LRPS_Require(Emission["keys"] == "{Blind}{SC010}", "physical identity and held modifiers must survive the native route")
-		; AHK2.0.26 HotInputLevelAllowsFiring admits only SendLevel > InputLevel.
-		; Both I2 and I3 must ignore this already-forwarded physical key.
-		InputLevel := Integer(SubStr(Binding["options"], 2))
-		_LRPS_Require(Emission["level"] <= InputLevel, "forwarded output must not reactivate " . Name)
-		_LRPS_Require(Emission["level"] >= ObserverMinimum, "forwarded output must still reach the real input observers")
+		; The caught state is the verdict: a trap raised with an empty message is
+		; still a call, and a message sentinel alone accepted it.
+		Trapped := false, Failure := ""
+		try (Binding["callback"]).Call(Binding["name"])
+		catch as Err {
+			Trapped := true
+			Failure := Type(Err) . ": " . Err.Message
+		}
+		_LRPS_Require(!Trapped, "a native pass-through must never call even the refusing sender trap: " . Failure)
+		_LRPS_Require(A_SendLevel == CallerLevel, "the pass-through callback must preserve its caller's send level")
+		_LRPS_Require(_LRPS_Emits.Length == 0, "the original tilde event must not be duplicated by synthetic output")
+		_LRPS_Require(Binding["options"] == (Prefix == "!" ? "I3" : "I2"), "the same five identities must retain their exact input levels")
 	}
 }
 

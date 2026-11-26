@@ -20,19 +20,21 @@ _HCWS_Require(Condition, Message) {
 t(Key) => Key
 LoggerSuccess(*) => 0
 LoggerError(*) => 0
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
 	global _HCWS
 	Window := Gui(Options, Title)
 	_HCWS.Windows.Push(Window), _HCWS.Hwnds.Push(Window.Hwnd)
-	; A retired open returning false reaches the public native fallback. Observe
-	; its real new HWND, then fail this forbidden path before unrelated native
-	; controls/data can introduce a prerequisite failure instead of the oracle.
+	; A retired open must never build another window. Observe its real new
+	; HWND, then fail this forbidden path before unrelated controls/data can
+	; introduce a prerequisite failure instead of the oracle.
 	Limit := InStr(_HCWS.Mode, "reopen") ? 2 : 1
 	if _HCWS.Windows.Length > Limit {
 		_HCWS.FallbackAttempts += 1
-		throw Error("Business oracle: a retired web opening attempted native fallback.")
+		throw Error("Business oracle: a retired web opening built another window.")
 	}
 	return Window
 }
@@ -70,6 +72,8 @@ class _HCWS_Controller {
 	}
 	Close() {
 		this.Closed += 1
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -174,7 +178,7 @@ _HCWS_Check() {
 		throw _HCWS.Failure
 	if _HCWS.Mode == "current" {
 		_HCWS_Require(_HCWS.Controllers.Length == 1 && _HCWS.Windows.Length == 1,
-			"The current positive must open exactly one web config editor without native fallback.")
+			"The current positive must open exactly one web config editor and no other window.")
 		_HCWS_Require(_HCWWeb_Controller == _HCWS.Controllers[1]
 			&& _HCWWeb_WebView == _HCWS.Controllers[1].CoreWebView2
 			&& _HCWS.Controllers[1].CoreWebView2.Subscriptions == 2,
@@ -188,7 +192,7 @@ _HCWS_Check() {
 	} else {
 		Reopened := InStr(_HCWS.Mode, "reopen") != 0
 		_HCWS_Require(_HCWS.CloseSent == 1 && _HCWS.Windows.Length == (Reopened ? 2 : 1),
-			"A consumed Close must never reopen the legacy native fallback.")
+			"A consumed Close must never open another window.")
 		if !InStr(_HCWS.Mode, "reject")
 			_HCWS_Require(_HCWS.Controllers[1].Closed == 1,
 				"A controller returned after its native window closed must retire exactly once.")
@@ -230,10 +234,10 @@ _HCWS_Main() {
 	Primary := 0, Observed := false
 	OnError(_HCWS_OnError)
 	try {
-		for Directory in [_SharedDir . "\modules\hotstrings", _ExtensionsDir, ScriptInformation["PersonalHotstringsDir"]]
+		for Directory in [_SharedDir . "\hotstrings\data\catalogue", _ExtensionsDir, ScriptInformation["PersonalHotstringsDir"]]
 			DirCreate(Directory)
-		IndexSource := _HCWS_SourceShared . "\modules\hotstrings\_index.toml"
-		IndexTarget := _SharedDir . "\modules\hotstrings\_index.toml"
+		IndexSource := _HCWS_SourceShared . "\hotstrings\data\catalogue\_index.toml"
+		IndexTarget := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 		FileCopy(IndexSource, IndexTarget, false)
 		IndexHash := CryptoSha256Bytes(FSReadBytesStrict(IndexSource))
 		_HCWS_Require(RegExMatch(IndexHash, "^[0-9a-f]{64}$")

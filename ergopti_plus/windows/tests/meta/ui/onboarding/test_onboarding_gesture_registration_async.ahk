@@ -4,13 +4,13 @@
 _OGRA_NativeRegistrationIsAsync() {
     Start := _DriverFuncBody("_Onboarding_StartGestureAuto")
     Poll := _DriverFuncBody("_Onboarding_PollGestureAuto")
-    Builder := _DriverFuncBody("_Onboarding_BuildGesturePsScript")
+    Builder := _DriverFuncBody("_GestureRestartBuildPsScript")
     Web := _DriverFuncBody("_OnbWeb_RegisterGesturesAuto")
     Assert(Start != "" && Poll != "" && Builder != "" && Web != "", "onboarding async registration helpers must exist")
     Assert(InStr(Start, "RunWait") = 0,
         "onboarding gesture registration must never block the AHK thread with RunWait")
     Reserve := _DriverFuncBody("_Onboarding_ReserveGestureAuto")
-    Assert(InStr(Start, "Run(") > 0 && InStr(Start, "&Pid") > 0
+    Assert(InStr(Start, "GestureRestartRunElevated(") > 0 && InStr(Start, "&Pid") > 0
 			&& InStr(Start, "_Onboarding_ReserveGestureAuto(") > 0
 			&& InStr(Reserve, 'TimerFn.Call(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0
 			&& InStr(Reserve, 'SetTimer(PollFn, -TimingsGet("gestures", "worker_result_poll_ms"))') > 0,
@@ -21,8 +21,10 @@ _OGRA_NativeRegistrationIsAsync() {
 	StartPidPos := InStr(Start, "ProcessExist(_OnboardingGestureJob")
 	Assert(StartReceiptPos > 0 && StartPidPos > StartReceiptPos,
 		"a second launch must consume the old receipt before consulting its recyclable PID")
-	Assert(InStr(Poll, "ProcessExist") > 0 && InStr(Poll, "A_IsSuspended") > 0 && InStr(Poll, "_Onboarding_ReadGestureAutoResult") > 0,
-		"completion must wait across Suspend and trust only the worker-authored result, never a racy PID exit-code lookup")
+	; Waiting across a pause is called under a real Suspend in
+	; tests/unit/gestures/engine/test_worker_result_poll_pause.ahk.
+	Assert(InStr(Poll, "ProcessExist") > 0 && InStr(Poll, "_Onboarding_ReadGestureAutoResult") > 0,
+		"completion must trust only the worker-authored result, never a racy PID exit-code lookup")
 	ReceiptPos := InStr(Poll, "FileExist(_OnboardingGestureJob")
 	PidPos := InStr(Poll, "ProcessExist(_OnboardingGestureJob")
 	Assert(ReceiptPos > 0 && PidPos > ReceiptPos,
@@ -74,7 +76,7 @@ _OGRA_ElevatedLaunchIsReservedBeforeRun() {
 			"a rejected onboarding duplicate must not acquire another poller")
 		Body := _DriverFuncBody("_Onboarding_StartGestureAuto")
 		Assert(InStr(Body, "_Onboarding_ReserveGestureAuto(") > 0
-				&& InStr(Body, "_Onboarding_ReserveGestureAuto(") < InStr(Body, "Run("),
+				&& InStr(Body, "_Onboarding_ReserveGestureAuto(") < InStr(Body, "GestureRestartRunElevated("),
 			"onboarding must reserve the worker before crossing the elevated Run seam")
 	} finally {
 		_OnboardingGestureJob := SavedJob

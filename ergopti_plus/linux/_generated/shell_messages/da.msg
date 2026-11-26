@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/da.msg
-# AUTO-GENERATED from _shared/data/locales/da.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/da.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-netværksmodul bygget fra kildekoden.
 build_luv.recipe_required=Den native kompilering af luv kræver sin kildeopskrift.
 install.already_installed={1} — allerede installeret
 install.archive_digest_unavailable=opdateringer med fastholdt deskriptor kræver en egentlig OpenSSL3-runtime; funktionen forbliver utilgængelig.
+install.bytecode_skipped=De forudkompilerede moduler kunne ikke oprettes — Ergopti starter fra kildekoden, lidt langsommere.
 install.capability_verified={1} — funktion bekræftet
 install.command_still_missing={1} blev installeret, men '{2}' findes stadig ikke.
 install.daemon_manual=Sådan starter du dæmonen manuelt:
 install.daemon_running=Dæmonen kører i baggrunden. Sådan kontrollerer du dens status:
+install.focus_integration_enabled={1}-fokusintegration aktiveret
+install.focus_integration_failed=Kunne ikke aktivere {1}-fokusintegrationen — regler pr. program forbliver inaktive på dette skrivebord.
+install.focus_integration_next_login={1}-fokusintegration installeret (træder i kraft ved næste login)
+install.focus_integration_updated={1}-fokusintegration opdateret
 install.gnome_extension_active=GNOME AppIndicator-udvidelse — allerede aktiv
 install.gnome_extension_enabled=GNOME AppIndicator-udvidelse aktiveret
 install.gnome_extension_failed=Kunne ikke aktivere AppIndicator-udvidelsen — uden den viser GNOME ikke ikonet.
 install.gnome_extension_missing=GNOME AppIndicator-udvidelse mangler — installerer {1}…
 install.gnome_extension_next_login=GNOME AppIndicator-udvidelse aktiveret (gælder fra næste login)
+install.gnome_extension_not_installed=Ingen pakke i denne distribution indeholder GNOME AppIndicator-udvidelsen: installer AppIndicator and KStatusNotifierItem Support fra {1}, og log derefter ud og ind igen — uden den viser GNOME ikke ikonet.
 install.gnome_without_extensions=GNOME uden gnome-extensions — aktivér en AppIndicator-udvidelse for at se ikonet.
 install.help_help=Viser denne hjælpetekst
 install.help_no_deps=Installerer ingen afhængigheder (dem sørger du selv for)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — kontrol af afhængigheder
 install.section_deps_skipped=Afhængigheder sprunget over (--no-deps)
 install.section_done=Installation fuldført
 install.section_files=Installerer filer
+install.section_focus=Aktivt program under Wayland (GNOME, KDE)
 install.section_lua_deps=Valgfrie Lua-afhængigheder (hændelsesløkke, timere, webviews, signaler)
 install.section_permissions=Inputtilladelser (kræver sudo)
 install.section_services=Opretter systemd-brugertjenesterne
@@ -63,6 +70,7 @@ install.section_tray=Ikon i systembakken og vinduer
 install.security_warning_body=Medlemskab af gruppen 'input' gør det muligt at læse HVERT tastetryk i sessionen, også adgangskoder indtastet i et hvilket som helst program. Det er netop, hvad en hotstring-motor kræver, og det gør keyd og xremap også.
 install.security_warning_title=SIKKERHEDSADVARSEL
 install.service_started=tjenesten ergopti-hotstrings aktiveret og startet
+install.session_without_graphical_target=Denne session starter aldrig systemds graphical-session.target (i3, Openbox, Xfce, sway uden sessionsstyring), så brugerenheden ville aldrig køre: Ergopti+ starter i stedet fra XDG-autostartposten ved næste login. En vindueshåndtering, der ignorerer XDG-autostart (i3, sway), skal have linjen exec {1} i sin konfiguration.
 install.source_toolchain_unavailable=den installerede compiler kan ikke bygge den native arkivmotor.
 install.startup_choice_unreadable=Startvalget kunne ikke læses.
 install.summary_config=Konfiguration: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ kører allerede i denne session ({1} er optaget); denne start blev afvist.
 launch.authorization_failed=Godkendelsen af inputadgang blev annulleret eller mislykkedes.
 launch.groups_unavailable=Sessionen kunne ikke få sine konfigurerede inputgrupper.
+launch.restarting=Ergopti+ kører allerede i denne session; det bliver bedt om at afslutte og genstartes derefter.
+launch.session_lock_invalid=Sessionslåsens mappe skal være en absolut sti.
 launcher.dependencies_installed=Afhængigheder installeret.
 launcher.driver_missing=Fejl: Linux-driverens mappe blev ikke fundet: {1}
 launcher.install_deps_hint=Kør: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Installationsstien går gennem et symbolsk link.
 uninstall.system_prefix=Afviser et systeminstallationspræfiks.
 uninstall.unsafe_path=Usikker ejerskabssti.
 uninstall.unsupported_argument=Ikke-understøttet afinstallationsargument: {1}
+xkb_helpers.not_found=Installationsfilerne til tastaturlayouts blev hverken fundet ved siden af {1} eller i {2}: uden dem kan intet layout installeres.

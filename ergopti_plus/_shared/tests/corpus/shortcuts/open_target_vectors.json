@@ -1,10 +1,10 @@
 {
-	"description": "Golden vectors for the copy_selected_path action outside a file manager: what a selected text names before it is opened. Replayed by the macOS and Linux suites against _shared/lua/open_target and by the Windows suite against windows/infra/open_target.ahk, each with the environment below. A vector's expect applies to every OS; a windows, posix (macOS and Linux), macos or linux entry replaces it on that OS.",
+	"description": "Golden vectors for the copy_selected_path action outside a file manager: what a selected text names before it is opened. Replayed by the macOS and Linux suites against _shared/shortcuts/engine and by the Windows suite against windows/infra/open_target.ahk, each with the environment below. A vector's expect applies to every OS; a windows, posix (macOS and Linux), macos or linux entry replaces it on that OS.",
 	"rule": "Trim spaces (no-break and zero-width ones included); an empty text is empty, a text holding a line break is searched. Unwrap quotes, brackets and guillemets that wrap the whole text. Then, in order: a registry key (an optional Computer\\, Ordinateur\\ or Registry:: prefix, a root such as HKEY_LOCAL_MACHINE or HKLM, an optional PowerShell colon, then \\subkeys; trailing backslashes dropped) opens Regedit on Windows; a file: URI is the local path it decodes to; a drive path (C:, C:\\ or C:/), a UNC path (\\\\server\\share, smb:// on macOS and Linux) or a %VARIABLE% path is a path on Windows; ~ is the home folder; an absolute POSIX path or a $VARIABLE path is a path on macOS and Linux; a scheme followed by // is a URL, as are the opaque schemes mailto, tel, sms, callto, sip, xmpp, magnet and news; ms-settings: and shell: open on Windows only; javascript:, vbscript: and data: are never opened; a mail address becomes mailto:; an IPv4 (each octet at most 255), a bracketed or bare IPv6 and localhost, each with an optional port and path, become http://; a domain name with an optional port and path becomes https://, unless it is a single name.ext with a known file extension, which is a file name without its folder. When trailing punctuation or an unopened closing bracket removed gives the same kind, or the only kind, that cleaned target wins. Anything else is searched as the trimmed text. A Windows-only target on macOS or Linux is unsupported, never searched.",
 	"env": {
 		"windows": {
 			"USERPROFILE": "C:\\Users\\ada",
-			"APPDATA": "C:\\Users\\ada\\AppData\\Roaming"
+			"LOCALAPPDATA": "C:\\Users\\ada\\AppData\\Local"
 		},
 		"posix": {
 			"HOME": "/home/ada",
@@ -59,9 +59,197 @@
 		},
 		{ "id": "ipv6_loopback", "text": "::1", "expect": { "kind": "url", "target": "http://[::1]" } },
 		{
+			"id": "ipv6_unspecified",
+			"text": "::",
+			"expect": { "kind": "url", "target": "http://[::]" }
+		},
+		{
+			"id": "ipv6_ipv4_mapped",
+			"text": "::ffff:192.0.2.1",
+			"expect": { "kind": "url", "target": "http://[::ffff:192.0.2.1]" }
+		},
+		{
+			"id": "ipv6_ipv4_uncompressed",
+			"text": "1:2:3:4:5:6:192.0.2.1",
+			"expect": { "kind": "url", "target": "http://[1:2:3:4:5:6:192.0.2.1]" }
+		},
+		{
+			"id": "ipv6_ipv4_mapped_port",
+			"text": "[::ffff:192.0.2.1]:8080/status",
+			"expect": { "kind": "url", "target": "http://[::ffff:192.0.2.1]:8080/status" }
+		},
+		{
+			"id": "ipv6_ipv4_leading_zero_rejected",
+			"text": "::ffff:192.168.001.1",
+			"expect": { "kind": "search", "target": "::ffff:192.168.001.1" }
+		},
+		{
+			"id": "ipv6_ipv4_double_zero_rejected",
+			"text": "[::ffff:00.0.0.0]:8080",
+			"expect": { "kind": "search", "target": "[::ffff:00.0.0.0]:8080" }
+		},
+		{
+			"id": "ipv6_ipv4_single_zero_accepted",
+			"text": "::ffff:0.0.0.0",
+			"expect": { "kind": "url", "target": "http://[::ffff:0.0.0.0]" }
+		},
+		{
+			"id": "ipv6_ipv4_invalid_octet",
+			"text": "::ffff:192.0.2.256",
+			"expect": { "kind": "search", "target": "::ffff:192.0.2.256" }
+		},
+		{
+			"id": "ipv6_ipv4_too_many_groups",
+			"text": "1:2:3:4:5:6:7:192.0.2.1",
+			"expect": { "kind": "search", "target": "1:2:3:4:5:6:7:192.0.2.1" }
+		},
+		{
+			"id": "ipv6_compressed_trailing_single_group",
+			"text": "1:2:3:4:5:6:7::",
+			"expect": { "kind": "url", "target": "http://[1:2:3:4:5:6:7::]" }
+		},
+		{
+			"id": "ipv6_compressed_leading_single_group",
+			"text": "::1:2:3:4:5:6:7",
+			"expect": { "kind": "url", "target": "http://[::1:2:3:4:5:6:7]" }
+		},
+		{
+			"id": "ipv6_compressed_cannot_have_eight_groups",
+			"text": "1:2:3:4:5:6:7::8",
+			"expect": { "kind": "search", "target": "1:2:3:4:5:6:7::8" }
+		},
+		{
 			"id": "ipv6_full",
 			"text": "2001:0db8:0000:0000:0000:ff00:0042:8329",
 			"expect": { "kind": "url", "target": "http://[2001:0db8:0000:0000:0000:ff00:0042:8329]" }
+		},
+		{
+			"id": "ipv6_single_zero_compression_0",
+			"text": "::2001:db8:1:2:3:4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[::2001:db8:1:2:3:4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_1",
+			"text": "2001::db8:1:2:3:4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001::db8:1:2:3:4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_2",
+			"text": "2001:db8::1:2:3:4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8::1:2:3:4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_3",
+			"text": "2001:db8:1::2:3:4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8:1::2:3:4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_4",
+			"text": "2001:db8:1:2::3:4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8:1:2::3:4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_5",
+			"text": "2001:db8:1:2:3::4:5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8:1:2:3::4:5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_6",
+			"text": "2001:db8:1:2:3:4::5",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8:1:2:3:4::5]"
+			}
+		},
+		{
+			"id": "ipv6_single_zero_compression_7",
+			"text": "2001:db8:1:2:3:4:5::",
+			"expect": {
+				"kind": "url",
+				"target": "http://[2001:db8:1:2:3:4:5::]"
+			}
+		},
+		{
+			"id": "ipv6_unspecified_8",
+			"text": "::",
+			"expect": {
+				"kind": "url",
+				"target": "http://[::]"
+			}
+		},
+		{
+			"id": "ipv6_unspecified_9",
+			"text": "[::]:8080/status",
+			"expect": {
+				"kind": "url",
+				"target": "http://[::]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_0",
+			"text": "[1:2:3:4:5:6:7::8]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[1:2:3:4:5:6:7::8]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_1",
+			"text": "[::1:2:3:4:5:6:7:8]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[::1:2:3:4:5:6:7:8]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_2",
+			"text": "[1:2:3:4:5:6:7:8::]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[1:2:3:4:5:6:7:8::]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_3",
+			"text": "[1:2:3:4:5:6:7:8:9]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[1:2:3:4:5:6:7:8:9]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_4",
+			"text": "[1::2::3]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[1::2::3]:8080/status"
+			}
+		},
+		{
+			"id": "ipv6_invalid_compression_5",
+			"text": "[:::]:8080/status",
+			"expect": {
+				"kind": "search",
+				"target": "[:::]:8080/status"
+			}
 		},
 		{
 			"id": "cpp_scope_is_text",
@@ -372,9 +560,13 @@
 		},
 		{
 			"id": "environment_variable_path",
-			"text": "%APPDATA%\\Ergopti",
-			"windows": { "kind": "path", "target": "C:\\Users\\ada\\AppData\\Roaming\\Ergopti" },
-			"posix": { "kind": "unsupported", "target": "%APPDATA%\\Ergopti", "reason": "windows_only" }
+			"text": "%LOCALAPPDATA%\\Ergopti",
+			"windows": { "kind": "path", "target": "C:\\Users\\ada\\AppData\\Local\\Ergopti" },
+			"posix": {
+				"kind": "unsupported",
+				"target": "%LOCALAPPDATA%\\Ergopti",
+				"reason": "windows_only"
+			}
 		},
 		{
 			"id": "unknown_environment_variable_stays_literal",

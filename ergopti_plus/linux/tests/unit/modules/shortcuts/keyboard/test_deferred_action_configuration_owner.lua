@@ -8,29 +8,36 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
 --- Runs an actual owner over a private TOML file and acknowledged manual queue.
 --- @param domain string Tap key or script-control chord.
 --- @param body function body(context)
 local function with_owner(domain, body)
 	local module_name = domain == "tap" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_chords"
-	local names = { "infra.config_paths", "modules.gestures.manager", "logger.shim", module_name }
+	local names = { "settings.engine.paths", "gestures.engine.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local source = '[shortcuts.tap_keys]\nnumber_row_left = "screen_capture"\n'
 		.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "screen_capture"\n'
 	local called, failure = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local ctx = { deferred = {}, executed = {}, paused = false, path = path }
-			local Logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local Logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			Logger.set_level("debug")
 			Logger.set_sink(function(line)
 				if line:find("fired", 1, true) and ctx.on_log then ctx.on_log() end
 			end)
-			package.loaded["logger.shim"] = Logger
-			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["modules.gestures.manager"] = {
-				is_assignable = function(id) return id == "screen_capture" or id == "send_text" or id == "script_pause_toggle" end,
+			package.loaded["core.logger.engine.shim"] = Logger
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
+			-- Each persist revalidates every slot, so the catalogue also accepts
+			-- the manifest defaults of the slots the source leaves unset.
+			local assignable = { screen_capture = true, send_text = true, script_pause_toggle = true }
+			local Manifest, section = require("menu.engine.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
+			for _, slot in ipairs(require("modules.shortcuts.script_chords").slots()) do
+				assignable[Manifest.default_for(section .. "." .. slot.id)] = true
+			end
+			package.loaded["gestures.engine.manager"] = {
+				is_assignable = function(id) return assignable[id] == true end,
 				execute_action = function(action, binding) ctx.executed[#ctx.executed + 1] = { action, binding } end,
 			}
 			package.loaded[module_name] = nil
@@ -38,7 +45,7 @@ local function with_owner(domain, body)
 			ctx.owner = owner
 			ctx.id = domain == "tap" and "number_row_left" or "script_altgr_enter"
 			ctx.binding = owner.binding_id(ctx.id)
-			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true } }
+			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true }, prior_role = "altgr" }
 			local function observe()
 				if ctx.on_admission then ctx.on_admission() end
 				return ctx.paused

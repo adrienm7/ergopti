@@ -146,10 +146,10 @@ local function load_fixture(options)
 		return task
 	end
 
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.llm.ollama_binary"] = {
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["ai.engine.ollama.binary"] = {
 		-- These existing daemon-ready cases model a native-owned source.
 		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 		-- metadata_pending_reads models the runtime metadata still being read
@@ -162,7 +162,7 @@ local function load_fixture(options)
 			return "/fixture/ollama", {}
 		end,
 	}
-	package.loaded["modules.llm.api_ollama"] = {
+	package.loaded["ai.engine.api.ollama"] = {
 		ensure_running = function(transaction)
 			fixture.daemon_calls = fixture.daemon_calls + 1
 			if options.defer_daemon_ready == true then
@@ -192,7 +192,7 @@ local function load_fixture(options)
 		end,
 		resume_warmup = function() return true end,
 	}
-	package.loaded["modules.llm.api_common"] = {
+	package.loaded["ai.engine.api.common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) == "function" then return callback(...) end
 			return true
@@ -227,15 +227,15 @@ local function load_fixture(options)
 	}
 
 	local checker_name = options.backend == "mlx"
-		and "modules.llm.mlx_deps_checker"
-		or "modules.llm.ollama_deps_checker"
+		and "ai.engine.local_servers.mlx_deps_checker"
+		or "ai.engine.ollama.deps_checker"
 	if options.backend == "mlx" then
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function()
-				return "/repo/modules/llm/ensure-mlx-deps.sh"
+				return "/repo/ai/engine/ensure-mlx-deps.sh"
 			end,
 		}
-		package.loaded["modules.llm.pty_process_group"] = {
+		package.loaded["ai.engine.bootstrap.pty_process_group"] = {
 			create = function()
 				fixture.pty_create_calls = fixture.pty_create_calls + 1
 				interrupt_preflight("pty")
@@ -256,7 +256,7 @@ local function load_fixture(options)
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 			"resolve_bootstrap_script_path", function()
 				interrupt_preflight("path")
-				return "/repo/modules/llm/ensure-mlx-deps.sh"
+				return "/repo/ai/engine/ensure-mlx-deps.sh"
 			end))
 	elseif options.backend ~= "mlx" then
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
@@ -277,8 +277,8 @@ local function load_fixture(options)
 
 	local control
 	if options.real_script_control == true then
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -286,9 +286,9 @@ local function load_fixture(options)
 			RETURN = 36,
 			ESCAPE = 53,
 		}
-		package.loaded["adapters.event_provenance"] = {}
+		package.loaded["diagnostics.adapters.event_provenance"] = {}
 		local admission_fence = nil
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -305,19 +305,19 @@ local function load_fixture(options)
 				return callback() == true
 			end,
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {}
+		package.loaded["gestures.engine.actions"] = {
 			SG_NAMES = {}, AX_NAMES = {},
 			get_label = function(value) return value end,
 			execute_single = function() return true end,
 		}
 		for _, module_name in ipairs({
-			"modules.llm", "modules.llm.api_mlx",
-			"modules.llm.warmup_controller", "modules.llm.api_remote",
+			"ai.engine", "ai.engine.api.mlx",
+			"ai.engine.local_servers.warmup_controller", "ai.engine.api.remote",
 		}) do
 			package.loaded[module_name] = {
 				pause_warmup = function() return true end,
@@ -329,7 +329,7 @@ local function load_fixture(options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.keystats"] = {

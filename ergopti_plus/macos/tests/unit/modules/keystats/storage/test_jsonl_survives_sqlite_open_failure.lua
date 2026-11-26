@@ -83,9 +83,9 @@ end
 -- ========================================
 -- ========================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
-package.loaded["infra.timings"] = {
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function() return 1000 end,
 	sec = function() return 1 end,
 }

@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local function actor_for(capacity, receive, refused)
 	local now = 0
-	local actor = require("keystats.physical_lifecycle_observation").new("pause", function() now = now + 1; return now end, function() end)
+	local actor = require("metrics.engine.capture.physical_lifecycle_observation").new("pause", function() now = now + 1; return now end, function() end)
 	local owner = {}; local token, _, scope = actor.bind(owner, capacity or 20, receive or function() return true end, refused)
 	return actor, owner, token, scope
 end

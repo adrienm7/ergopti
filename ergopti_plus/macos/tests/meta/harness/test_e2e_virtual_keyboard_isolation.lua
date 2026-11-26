@@ -19,9 +19,9 @@ end
 helpers.describe("Virtual-keyboard E2E scenario isolation", function()
 	helpers.it("reloads adapters which capture the scenario-local hs stub", function()
 		local src = e2e_source()
-		helpers.assert_contains(src, 'package.loaded["adapters.text_sender"]        = nil',
+		helpers.assert_contains(src, 'package.loaded["platform.input.text_sender"]        = nil',
 			"each E2E scenario must reload TextSender under its fresh hs stub")
-		helpers.assert_contains(src, 'package.loaded["adapters.clipboard"]          = nil',
+		helpers.assert_contains(src, 'package.loaded["clipboard.adapters.clipboard"]          = nil',
 			"each E2E scenario must reload Clipboard with its TextSender dependency")
 	end)
 end)

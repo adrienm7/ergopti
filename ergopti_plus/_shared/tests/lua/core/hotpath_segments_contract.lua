@@ -1,0 +1,170 @@
+--- _shared/tests/lua/core/hotpath_segments_contract.lua
+
+--- ==============================================================================
+--- MODULE: Hot-path Segment Inventory Contract
+--- DESCRIPTION:
+--- Instrumentation is the one kind of code whose absence is invisible: a
+--- missing assertion fails a test, a missing segment yields a profile that
+--- looks clean because nothing measured the slow part. This contract holds a
+--- Lua driver to the shared inventory (metrics/engine/perf/hotpath_segments.lua) the way
+--- tools/test/test-hotpath-segments-declared.cjs holds the Windows driver to its
+--- own: every declared segment is still emitted, every emitted segment is
+--- declared, and the parse that proves it cannot silently match nothing.
+---
+--- FEATURES & RATIONALE:
+--- 1. Same checks on both Lua drivers, so macOS and Linux cannot drift apart.
+--- 2. A declared entry carries its reason; a failure quotes it, so a segment
+---    deleted in a refactor fails with why it was added, not with a diff.
+--- 3. Comment lines are ignored, so documentation can show a call without
+---    counting as an emission.
+--- ==============================================================================
+
+local M = {}
+local Inventory = require("metrics.engine.perf.hotpath_segments")
+local Discovery = require("tests.lua.core.runner_discovery")
+
+-- The parse must find at least this many call sites, or a pattern that stopped
+-- matching would report nothing and pass over nothing.
+local MIN_PARSED_SITES = 4
+local SKIPPED_DIRECTORIES = { tests = true, vendor = true, _generated = true, native = true }
+
+--- Lists production Lua files through the supplied port or the native census.
+--- @param root string Absolute driver root.
+--- @param directory table|nil Native directory port supplied by the driver.
+--- @return table paths Sorted, native path bytes preserved.
+local function production_files(root, directory)
+	local found = {}
+	if directory then
+		local function walk(dir)
+			for _, entry in ipairs(assert(directory.entries(dir))) do
+				if not SKIPPED_DIRECTORIES[entry.name] then
+					local full = directory.join(dir, entry.name)
+					local kind = entry.kind
+					if kind == "link" then kind = assert(directory.target_kind(full)) end
+					if kind == "directory" then walk(full)
+					elseif kind == "file" and entry.name:match("%.lua$") then found[#found + 1] = full end
+				end
+			end
+		end
+		walk(root)
+		table.sort(found)
+		return found
+	end
+	local files, detail = Discovery.files(root, function(name)
+		return name:match("%.lua$") ~= nil
+	end, SKIPPED_DIRECTORIES)
+	assert(files, detail)
+	return files
+end
+
+--- Collects the segment names a driver emits, with the file of the first emission.
+--- @param root string Absolute driver root.
+--- @param call_patterns table Lua patterns, each with one capture: the segment name.
+--- @param directory table|nil Native directory port supplied by the driver.
+--- @return table emitted name -> relative path
+--- @return number sites Call sites parsed.
+local function emitted_segments(root, call_patterns, directory)
+	local emitted, sites = {}, 0
+	for _, path in ipairs(production_files(root, directory)) do
+		local handle = assert(io.open(path, "rb"))
+		local source = handle:read("*a")
+		handle:close()
+		for line in source:gmatch("[^\n]+") do
+			if not line:match("^%s*%-%-") then
+				for _, call_pattern in ipairs(call_patterns) do
+					for name in line:gmatch(call_pattern) do
+						sites = sites + 1
+						emitted[name] = emitted[name] or path:sub(#root + 2)
+					end
+				end
+			end
+		end
+	end
+	return emitted, sites
+end
+
+--- Registers the inventory tests of one driver.
+--- @param helpers table The runner's test helpers.
+--- @param options table { driver = "macos"|"linux", root = absolute driver root,
+---   call_patterns = patterns, each capturing the segment name of one emission
+---   form (a span closed by span(), by done(), a recorded duration),
+---   directory = optional native directory port,
+---   timed_only = optional set of emitted names that are deliberately not
+---   segments (a timed wait or a background build) }.
+function M.register(helpers, options)
+	local declared = Inventory.for_driver(options.driver)
+	local timed_only = options.timed_only or {}
+	assert(type(options.default_slow_ms) == "number", "the contract needs the registry's hotpath_slow_ms")
+	assert(type(options.call_patterns) == "table" and #options.call_patterns > 0, "the contract needs its emission patterns")
+	local emitted, sites = emitted_segments(options.root, options.call_patterns, options.directory)
+
+	helpers.describe("hot-path segment inventory: " .. options.driver, function()
+		helpers.it("parses the driver's emissions", function()
+			helpers.assert_true(sites >= MIN_PARSED_SITES, "parsed " .. sites
+				.. " emission(s); the pattern drifted and the checks below would pass over nothing")
+		end)
+
+		helpers.it("still emits every declared segment", function()
+			for name, segment in pairs(declared) do
+				helpers.assert_true(emitted[name] ~= nil, "the '" .. name .. "' segment is gone. It measured: "
+					.. segment.why .. ". A missing segment leaves a profile that looks clean.")
+			end
+		end)
+
+		helpers.it("declares every segment it emits", function()
+			for name, where in pairs(emitted) do
+				helpers.assert_true(declared[name] ~= nil or timed_only[name] == true, "'" .. name .. "' (" .. where
+					.. ") is emitted but not in _shared/metrics/engine/perf/hotpath_segments.lua. Declare it with the hot path it covers.")
+			end
+		end)
+
+		helpers.it("keeps timed-only names out of the inventory", function()
+			for name in pairs(timed_only) do
+				helpers.assert_true(declared[name] == nil, "'" .. name
+					.. "' is both timed-only and a declared segment; pick one")
+			end
+		end)
+
+		helpers.it("gives every declared segment a threshold and a reason", function()
+			for name, segment in pairs(declared) do
+				helpers.assert_true(Inventory.threshold_ms(name, options.default_slow_ms) > 0, name .. " needs a positive threshold")
+				helpers.assert_true(#segment.why > 0, name .. " needs a reason")
+			end
+		end)
+
+		helpers.it("slows a segment from the 5 ms the three drivers share", function()
+			for name in pairs(declared) do
+				helpers.assert_true(Inventory.threshold_ms(name, options.default_slow_ms) <= 5,
+					name .. " must be reported slow from 5 ms at the latest, as on Windows")
+			end
+			helpers.assert_eq(options.default_slow_ms, 5, "the registry's [logger] hotpath_slow_ms")
+		end)
+
+		helpers.it("names the phase of a declared segment and refuses an undeclared one", function()
+			for name in pairs(declared) do
+				helpers.assert_eq(Inventory.phase(name), "hotpath." .. name)
+			end
+			local ok, err = pcall(Inventory.phase, "not.a.segment")
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find("undeclared hot-path segment", 1, true) ~= nil, tostring(err))
+		end)
+
+		helpers.it("rate-limits the slow-segment line per segment, first occurrence always admitted", function()
+			local window = Inventory.LOG_WINDOW_MS
+			helpers.assert_true(window > 0, "the log window needs a positive length")
+			local admit = Inventory.new_slow_gate()
+			local ok, skipped = admit("a", 1000)
+			helpers.assert_true(ok and skipped == 0, "the first occurrence is logged")
+			helpers.assert_eq((admit("a", 1000 + window - 1)), false, "inside the window")
+			helpers.assert_eq((admit("a", 1000 + window - 1)), false, "inside the window, again")
+			helpers.assert_true((admit("b", 1001)), "another segment has its own window")
+			ok, skipped = admit("a", 1000 + window)
+			helpers.assert_true(ok, "logged again once the window has passed")
+			helpers.assert_eq(skipped, 2, "the line reports the repeats it stands for")
+			ok, skipped = admit("a", 1000 + 2 * window)
+			helpers.assert_true(ok and skipped == 0, "nothing withheld, nothing reported")
+		end)
+	end)
+end
+
+return M

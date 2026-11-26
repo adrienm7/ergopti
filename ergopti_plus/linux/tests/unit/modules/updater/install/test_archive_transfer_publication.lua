@@ -34,7 +34,8 @@ local function fixture()
    return h.active
   end,
   defaults = { archive_transfer = { schema_version = 1,
-   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 } } },
+   phase_timeout_ms = { checksum = 15000, archive = 300000, hash = 15000 },
+   archive_idle_timeout_ms = 60000 } },
   headers = { Accept = "application/octet-stream" },
   parse_checksum = function(body) assert(body == "literal-checksum-record"); return string.rep("a", 64) end,
   http = {

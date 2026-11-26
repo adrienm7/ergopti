@@ -17,8 +17,8 @@ local M = {}
 local hs        = hs
 local keystats = require("modules.keystats")
 local WPMShared = require("ui.wpm.shared")
-local Logger    = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger    = require("core.logger.engine.logger")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "wpm_menubar"
 
@@ -31,11 +31,28 @@ local _running           = false -- true between start() and stop(); guards redu
 local _pause_restore_pending = false
 local _use_source_colors = true
 local _generation        = 0
+local _retired_items     = {}
+local _retired_releasing = false
+
+--- Releases unpublished native items that returned after their owner retired.
+--- @return boolean settled
+local function release_retired_items()
+	if _retired_releasing then return false end
+	_retired_releasing = true
+	local pending = _retired_items
+	_retired_items = {}
+	for _, item in ipairs(pending) do
+		local ok = pcall(item.delete, item)
+		if not ok then _retired_items[#_retired_items + 1] = item end
+	end
+	_retired_releasing = false
+	return #_retired_items == 0
+end
 
 -- The colour hold and the refresh, from the shared timings registry — the
 -- same hold the floating widget reads, so the two agree on how long a source
 -- colour lingers. The registry fails fast on a missing key: no literal copy.
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local COLOR_HOLD_S = Timings.sec("ui", "wpm_color_hold_ms")
 local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 
@@ -82,7 +99,7 @@ update_menubar_body = function(generation)
 	local active_source = WPMShared.get_active_source(stats, COLOR_HOLD_S, now)
 	if not is_current(generation) then return false end
 	
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()
@@ -95,8 +112,16 @@ update_menubar_body = function(generation)
 		if not canon then return false end
 		local style = canon.menubar
 		if not _menubar then 
-			_menubar = hs.menubar.new() 
-			if not _menubar then error("Menubar construction refused") end
+			local item = hs.menubar.new()
+			if not item then error("Menubar construction refused") end
+			if not is_current(generation) or _menubar ~= nil then
+				_retired_items[#_retired_items + 1] = item
+				if not release_retired_items() then
+					Logger.error(LOG, "Retired WPM menubar item cleanup failed; exact item retained.")
+				end
+				return false
+			end
+			_menubar = item
 			Logger.debug(LOG, "Menubar item created.")
 		end
 		if not is_current(generation) then return false end
@@ -158,6 +183,7 @@ end
 --- Starts the menubar monitoring loop.
 --- @return boolean committed True only when the recurring timer is active.
 function M.start()
+	if not release_retired_items() then return false end
 	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
 	-- redundant timer restart and menubar re-render when already polling — the 0.5 s
 	-- timer already keeps the icon fresh.
@@ -205,6 +231,7 @@ end
 --- Halts the menubar updating and removes the icon.
 --- @return boolean settled True only when the recurring timer was released.
 function M.stop()
+	if not release_retired_items() then return false end
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
 	if not _running and not _timer and not _menubar then

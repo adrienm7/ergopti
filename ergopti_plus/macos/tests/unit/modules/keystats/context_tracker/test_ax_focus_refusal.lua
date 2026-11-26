@@ -58,7 +58,7 @@ helpers.describe("Confirmed AX focus refusal during public resume", function()
     -- read refuses permission; no new secure field is invented between calls.
     target(runtime, site ~= "bootstrap")
     if site ~= "bootstrap" then
-     local detector = assert(package.loaded["adapters.secure_field_detector"])
+     local detector = assert(package.loaded["platform.focus.secure_field_detector"])
      local secure, detail = detector.inspectFocusedElement(runtime.native.pid)
      helpers.assert_eq(secure, true); helpers.assert_nil(detail)
     end

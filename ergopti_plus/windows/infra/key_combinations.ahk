@@ -33,7 +33,9 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\ai_action_gate.ahk
+#Include %A_LineFile%\..\..\core\lifecycle\engine\value_check.ahk
+#Include %A_LineFile%\..\..\ai\engine\action_gate.ahk
+#Include %A_LineFile%\..\..\core\text\engine\number.ahk
 
 
 
@@ -166,42 +168,57 @@ KeyCombinationsReadConfig(Cache) {
 	}
 	_KeyCombinationScanNames := ScanNames
 	_KeyCombinationKeysByScanName := KeysByScanName
-	Taps := Map()
-	Holds := Map()
-	for _, Entry in ManifestFeaturesForSection(KEY_COMBINATION_TAP_SECTION) {
-		if (Entry["default"] != KEY_COMBINATION_NONE)
-			Taps[Entry["id"]] := Entry["default"]
-	}
-	for Section, Target in Map(KEY_COMBINATION_TAP_SECTION, Taps, KEY_COMBINATION_HOLD_SECTION, Holds) {
-		if !(Cache is Map) || !Cache.Has(Section)
-			continue
-		for PairId, Value in Cache[Section] {
-			if !(KeyCombinationParsePair(PairId) is Map) {
-				LoggerWarn("KeyCombinations", "[{1}] '{2}' names no pair of tap-hold keys — ignored.", Section, PairId)
-				continue
-			}
-			if (Value == KEY_COMBINATION_NONE) {
-				if Target.Has(PairId)
-					Target.Delete(PairId)
-				continue
-			}
-			Known := (Section == KEY_COMBINATION_TAP_SECTION)
-				? ((Value is String) && GESTURE_ACTIONS.Has(Value))
-				: KeyCombinationHoldIsKnown(Value)
-			if !Known {
-				LoggerWarn("KeyCombinations", "[{1}] '{2}' holds unknown value '{3}' — left empty.", Section, PairId, Value)
-				if Target.Has(PairId)
-					Target.Delete(PairId)
-				continue
-			}
-			Target[PairId] := Value
-		}
-	}
+	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, true)
+	Holds := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_HOLD_SECTION, true)
 	KeyCombinationTaps := Taps
 	KeyCombinationHolds := Holds
 	_KeyCombinationFirstKeys := _KeyCombinationIndexFirstKeys(Taps, Holds)
 	LoggerInfo("KeyCombinations", "Key combinations read: {1} tap slot(s), {2} hold slot(s).", Taps.Count, Holds.Count)
 	KeyCombinationChordsReadConfig(Cache)
+}
+
+; The filled slots of one section: the config value when present, the manifest
+; default of a declared tap slot otherwise. The boot read reports what it
+; drops; a later planner reading the same file passes Warn := false.
+; @param Cache {Map} A parsed config (boot cache or decoded snapshot cache).
+; @param Section {String} KEY_COMBINATION_TAP_SECTION or KEY_COMBINATION_HOLD_SECTION.
+; @param Warn {Boolean} Whether to log the ignored and emptied slots.
+; @returns {Map} Pair id -> action or hold id; an empty slot is absent.
+_KeyCombinationReadSlots(Cache, Section, Warn) {
+	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, GESTURE_ACTIONS
+	Target := Map()
+	if (Section == KEY_COMBINATION_TAP_SECTION) {
+		for _, Entry in ManifestFeaturesForSection(KEY_COMBINATION_TAP_SECTION) {
+			if (Entry["default"] != KEY_COMBINATION_NONE)
+				Target[Entry["id"]] := Entry["default"]
+		}
+	}
+	if !(Cache is Map) || !Cache.Has(Section)
+		return Target
+	for PairId, Value in Cache[Section] {
+		if !(KeyCombinationParsePair(PairId) is Map) {
+			if Warn
+				LoggerWarn("KeyCombinations", "[{1}] '{2}' names no pair of tap-hold keys — ignored.", Section, PairId)
+			continue
+		}
+		if (Value == KEY_COMBINATION_NONE) {
+			if Target.Has(PairId)
+				Target.Delete(PairId)
+			continue
+		}
+		Known := (Section == KEY_COMBINATION_TAP_SECTION)
+			? ((Value is String) && GESTURE_ACTIONS.Has(Value))
+			: KeyCombinationHoldIsKnown(Value)
+		if !Known {
+			if Warn
+				LoggerWarn("KeyCombinations", "[{1}] '{2}' holds unknown value '{3}' — left empty.", Section, PairId, Value)
+			if Target.Has(PairId)
+				Target.Delete(PairId)
+			continue
+		}
+		Target[PairId] := Value
+	}
+	return Target
 }
 
 ; Second key id -> first key ids with a slot, in catalogue order.
@@ -449,7 +466,7 @@ _KeyCombinationPorts() {
 		"own_modifier", (Second, ModKey, Seconds) => TapHoldOwnImmediateModifier(
 			Second, _KeyCombinationScanNames[Second], ModKey, Seconds),
 		"own_layer", (Second, Seconds) => TapHoldOwnImmediateLayer(
-			Second, _KeyCombinationScanNames[Second], Seconds),
+			Second, _KeyCombinationScanNames[Second], Seconds, 0, 0, 0, 0, 0, 0, 0, TapHoldShouldCancelTap),
 		"run_tap", _KeyCombinationRunTap,
 		"take_first", _KeyCombinationTakeFirstKey)
 	return Ports
@@ -514,7 +531,11 @@ KeyCombinationFire(Second, Ports := 0) {
 	}
 	; The hold is taken at key-down, as every tap-hold of this driver takes
 	; it; a release inside the second key's threshold makes the press a tap.
-	if (Result["tap"] && Tap != KEY_COMBINATION_NONE) {
+	; The pair's own tap takes the strict threshold, never the lone tap window
+	; the modifier owner grants a key pressed alone: the shared policy macOS
+	; and Linux follow (maintainer decision THD-2, 2026-11-21).
+	PairTap := Result["tap"] && Result["elapsed_ms"] <= Seconds * 1000
+	if (PairTap && Tap != KEY_COMBINATION_NONE) {
 		; The original owner has already retired; deny only a newly emitted tap.
 		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"
@@ -538,23 +559,53 @@ _KeyCombinationTakeFirstKey(First, Second) {
 
 ; Runs a pair's action as the key combination alone: without the modifier the
 ; first key holds synthetically, which AutoHotkey keeps down around a Send, and
-; out of the navigation layer that key may hold. A one-shot Shift the first or
-; the second key armed on its press is dropped: the key was part of a
-; combination, not a Shift for the next character.
+; out of the navigation layer that key may hold. The layer is lifted for the
+; action only and comes back afterwards while its owner still holds it, as the
+; Linux engine's combination_lift / combination_restore do (maintainer decision
+; THD-1 of 2026-11-21). A one-shot Shift the first or the second key armed on
+; its press is dropped: the key was part of a combination, not a Shift for the
+; next character.
 ; @param First {String} Tap-hold key id of the key held first.
 ; @param Second {String} Tap-hold key id of the key struck under it.
 ; @param ActionId {String} A catalogue action id.
 _KeyCombinationRunTap(First, Second, ActionId) {
-	global TapHold, LayerEnabled, _TH_OwnedModifiers
+	global TapHold, _TH_OwnedModifiers
 	if (ActionId != "one_shot_shift"
 			&& (TapHoldTapAction(TapHold, First) == "one_shot_shift"
 				|| TapHoldTapAction(TapHold, Second) == "one_shot_shift"))
 		OneShotShiftFix()
-	if (IsSet(LayerEnabled) && LayerEnabled)
-		DisableLayer()
 	RunAction := GestureInvokeAction.Bind(ActionId, KeyCombinationBindingId(KeyCombinationPairId(First, Second)))
 	Held := _TH_OwnedModifiers.Has(First) ? _TH_SyntheticKeyList(_TH_OwnedModifiers[First]) : []
-	return _KeyCombinationRunWithKeysUp(Held, 1, RunAction)
+	return _KeyCombinationRunOutOfLayer(_KeyCombinationRunWithKeysUp.Bind(Held, 1, RunAction))
+}
+
+; Runs RunFn with the navigation layer lifted, then gives the layer back to
+; the owner that held it, unless that owner released it meanwhile (its
+; DisableLayer(Owner) closed it) or the driver was suspended. The owner stays
+; recorded while lifted, so a release during the action still proves itself.
+; @param RunFn {Func} The action.
+; @returns {Any} What RunFn returns.
+_KeyCombinationRunOutOfLayer(RunFn) {
+	global LayerEnabled, _TH_LayerOwner
+	if !(IsSet(LayerEnabled) && LayerEnabled)
+		return RunFn.Call()
+	Owner := _TH_LayerOwner
+	LayerEnabled := false
+	UpdateCapsLockLED()
+	try return RunFn.Call()
+	finally _KeyCombinationRestoreLayer(Owner)
+}
+
+; Gives the lifted layer back to Owner when Owner still holds it.
+; @param Owner {Object|Integer} The layer owner recorded at the lift, 0 for none.
+_KeyCombinationRestoreLayer(Owner) {
+	global LayerEnabled, _TH_LayerOwner
+	if A_IsSuspended || LayerEnabled || _TH_LayerOwner != Owner
+		return
+	if IsObject(Owner) && (!TapHoldOwnerCurrent(Owner) || Owner.Closed)
+		return
+	LayerEnabled := true
+	UpdateCapsLockLED()
 }
 
 ; Runs RunFn with every key of Names lifted, each given back afterwards to
@@ -781,12 +832,28 @@ _KeyCombinationPairRow(First, Second) {
 	IsAssigned := KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationChordOf(PairId) != KEY_COMBINATION_NONE
-	ActionLabel := _KeyCombinationTapLabel(PairId)
-	if KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
-		ActionLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE
-			? _KeyCombinationHoldLabel(PairId) : ActionLabel . " / " . _KeyCombinationHoldLabel(PairId)
-	Label := LabelValue(PairLabel, ActionLabel)
+	TapLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationTapLabel(PairId)
+	HoldLabel := KeyCombinationHoldOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationHoldLabel(PairId)
+	ChordLabel := KeyCombinationChordOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationChordLabel(PairId)
+	Label := LabelValue(PairLabel, KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel))
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
+}
+
+; A pair's summary: the label of each assigned slot in the order tap, hold,
+; chord, joined by " / ", or the picker's « disabled » when none is set.
+; Linux and macOS draw the same (_shared/tap_hold/engine/combination_labels.lua
+; summary); all replay _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
+; @param TapLabel {String} The tap's label, "" when empty.
+; @param HoldLabel {String} The hold's label, "" when empty.
+; @param ChordLabel {String} The chord's label, "" when empty.
+; @returns {String}
+KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel) {
+	Summary := ""
+	for _, Label in [TapLabel, HoldLabel, ChordLabel] {
+		if (Label != "")
+			Summary .= (Summary == "" ? "" : " / ") . Label
+	}
+	return Summary == "" ? t("dialog.action_picker.disabled") : Summary
 }
 
 _KeyCombinationPairMenuOpener(PairId, PairLabel) {
@@ -831,9 +898,26 @@ KeyCombinationSlotRows(PairId, PairLabel) {
 			"disabled", true, "disabled_reason_key", "menu.shortcuts.key_combinations_chord_no_altgr")]
 	ChordRow := Map("action", (*) => ShowActionPicker(t("menu.shortcuts.key_combinations_chord_title_prefix") . PairLabel,
 		KeyCombinationChordOf(PairId), (ActionName) => SetKeyCombinationChord(PairId, ActionName),
-		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId))))
+		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId)), 0, KeyCombinationChordPickerItems()))
 	ChordRow["label"] := StrReplace(t("menu.shortcuts.key_combinations_chord"), "%s", _KeyCombinationChordLabel(PairId))
 	return [TapRow, HoldRow, ChordRow]
+}
+
+; The chord picker's items: the catalogue's, without the actions no chord runs
+; on any OS (KEY_COMBINATION_CHORD_REFUSED_ACTIONS, the one-shot Shift). A
+; program launch and the monitor Alt-Tab run in a chord on the three OS
+; (maintainer decision KCD-2 of 2026-11-22).
+; @param Items {Array} Replaces GestureActionPickerItems() in tests.
+; @returns {Array} Picker items.
+KeyCombinationChordPickerItems(Items := 0) {
+	global KEY_COMBINATION_CHORD_REFUSED_ACTIONS
+	Source := (Items is Array) ? Items : GestureActionPickerItems()
+	Kept := []
+	for _, Item in Source {
+		if (Item.Type != "action") || !KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Item.Id)
+			Kept.Push(Item)
+	}
+	return Kept
 }
 
 ; Opens the shared action picker on a pair's hold slot: the shared hold
@@ -939,7 +1023,7 @@ KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
 ; =============================================
 ; =============================================
 
-; The pure third-slot policy that _shared/lua/tap_hold/key_combinations.lua owns
+; The pure third-slot policy that _shared/tap_hold/engine/key_combinations.lua owns
 ; on macOS and Linux: which pair a press of two keys within the simultaneous
 ; delay selects. _shared/tests/corpus/tap_hold/key_combination_chords.json holds
 ; the cases. The engine that buffers a first key for it is section 6.
@@ -950,8 +1034,8 @@ KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
 ; @param Symmetric {Integer} Whether both orders of a pair select one owner.
 ; @returns {Map} Map("simultaneous_threshold_ms", ..., "combo_symmetric", ...).
 KeyCombinationChordSettings(DelayMs, Symmetric) {
-	if !(DelayMs is Number) || !(DelayMs - DelayMs == 0) || DelayMs <= 0
-		throw ValueError("The chord delay must be a positive finite number.", -1, String(DelayMs))
+	; The shared value schema owns the bounds: a whole number of milliseconds.
+	DelayMs := ValueCheckRequire(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, DelayMs)
 	if !(Symmetric is Integer) || (Symmetric != 0 && Symmetric != 1)
 		throw ValueError("The chord symmetry must be an exact boolean.", -1, IsObject(Symmetric) ? Type(Symmetric) : Symmetric)
 	return Map(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, DelayMs, MenuCommand.COMBO_SYMMETRIC, Symmetric)
@@ -1060,8 +1144,10 @@ class KeyCombinationChordPolicy {
 ; How often the wait looks at its key, and the level the keys are sent again at.
 global KEY_COMBINATION_CHORD_POLL_MS := 5
 global KEY_COMBINATION_CHORD_REPLAY_LEVEL := 1
-; Actions a chord cannot hold: they need the key's own press or release. As Linux.
-global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true, "run_program", true, "alt_tab_monitor", true)
+; Actions a chord cannot hold: they need the key's own press or release. The
+; shared list (CHORD_REFUSED_EVERYWHERE); a program launch and the monitor
+; Alt-Tab run in a chord (maintainer decision KCD-2 of 2026-11-22).
+global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true)
 
 ; Pair id -> action, the delay and symmetry in force, and the switch of the chords.
 global KeyCombinationChords := Map()
@@ -1081,6 +1167,8 @@ global _KeyCombinationChordBusy := false
 ; The key being sent again: its own chord variants stand aside.
 global _KeyCombinationChordReplaying := ""
 global _KeyCombinationChordTimerFn := 0
+; The waiting/queued batch keeps the lifecycle authority admitted before probes.
+global _KeyCombinationChordOwner := 0
 
 ; The production effects of the engine, replaced by recorders in the unit suite.
 _KeyCombinationChordPorts() {
@@ -1110,6 +1198,24 @@ KeyCombinationChordCurrentSettings() {
 ; Reads the third slots with the other two: an action is admitted as on Linux, and
 ; the delay and symmetry fall to the manifest's declared values when absent.
 ; @param Cache {Map} The parsed config.
+
+; This private compatibility switch is not a feature-manifest leaf. Its owner
+; defaults to on, with native booleans and the old writer's exact bare0/1
+; spellings admitted; other source types retain that default.
+_KeyCombinationChordBootEnabled(Snapshot) {
+	for Row in Snapshot.Rows {
+		if Row.Section != ConfigLeaf.MOD_COMBOS || Row.Key != "enabled"
+			continue
+		if Row.Typed is TOML_Bool
+			return !!Row.Typed.Value
+		Raw := Trim(TOML_StripInlineComment(Row.Raw), " `t")
+		if Row.Typed is Integer && (Raw == "0" || Raw == "1")
+			return Row.Typed == 1
+		return true
+	}
+	return true
+}
+
 KeyCombinationChordsReadConfig(Cache) {
 	global KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts
 	global KEY_COMBINATION_NONE, GESTURE_ACTIONS, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
@@ -1117,6 +1223,12 @@ KeyCombinationChordsReadConfig(Cache) {
 	Delay := Stored.Get(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 	Symmetric := Stored.Get("symmetric", ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC))
 	Enabled := Stored.Get("enabled", true)
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	if IsObject(Snapshot) {
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, &Delay)
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
+		Enabled := _KeyCombinationChordBootEnabled(Snapshot)
+	}
 	try KeyCombinationChordConfig := KeyCombinationChordSettings(
 		IsNumber(Delay) ? Delay + 0 : Delay, Symmetric ? 1 : 0)
 	catch as Err {
@@ -1206,10 +1318,14 @@ _KeyCombinationKeyIsHeld(KeyId) {
 ; @returns {Boolean}
 KeyCombinationChordOwns(KeyId, Ports := 0) {
 	global _KeyCombinationChordFirsts, _KeyCombinationChordTaken, _KeyCombinationChordBusy, _KeyCombinationChordReplaying
+	global _KeyCombinationChordOwner
 	if !IsSet(_KeyCombinationChordBusy) || !IsSet(_KeyCombinationChordFirsts) || !IsSet(_KeyCombinationChordTaken)
-			|| !IsSet(_KeyCombinationChordReplaying)
+			|| !IsSet(_KeyCombinationChordReplaying) || !IsSet(_KeyCombinationChordOwner)
 		return false
-	if (_KeyCombinationChordReplaying == KeyId)
+	if !(Ports is Map)
+		Ports := _KeyCombinationChordPorts()
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if A_IsSuspended || _KeyCombinationChordReplaying == KeyId
 		return false
 	if _KeyCombinationChordTaken.Has(KeyId)
 		return true
@@ -1217,10 +1333,64 @@ KeyCombinationChordOwns(KeyId, Ports := 0) {
 		return KeyCombinationChordKeyIsAllowed(KeyId)
 	if !_KeyCombinationChordFirsts.Has(KeyId) || !KeyCombinationChordKeyIsAllowed(KeyId)
 		return false
-	if !_KeyCombinationChordCanWait(KeyId, Ports is Map ? Ports : _KeyCombinationChordPorts())
+	Candidate := IsObject(Owner) ? Owner : TapHoldNewOwner()
+	if !_KeyCombinationChordCanWait(KeyId, Ports)
 		return false
-	_KeyCombinationChordBusy := true
-	return true
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || !TapHoldOwnerCurrent(Candidate) || _KeyCombinationChordOwner != Owner
+			return false
+		_KeyCombinationChordOwner := Candidate
+		_KeyCombinationChordBusy := true
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+
+; A retired batch cannot intercept fresh typing before its old timer delivers.
+KeyCombinationChordIsBusy() {
+	global _KeyCombinationChordBusy, _KeyCombinationChordOwner
+	return IsSet(_KeyCombinationChordBusy) && _KeyCombinationChordBusy
+		&& IsSet(_KeyCombinationChordOwner) && _KeyCombinationChordIsCurrent(_KeyCombinationChordOwner)
+}
+
+; Exact batch identity prevents an old callback from mutating resumed input.
+_KeyCombinationChordIsCurrent(Owner) {
+	global _KeyCombinationChordOwner
+	; A roll-key #HotIf reaches this through KeyCombinationChordIsBusy at boot.
+	return IsObject(Owner) && IsSet(_KeyCombinationChordOwner) && _KeyCombinationChordOwner == Owner
+		&& TapHoldOwnerCurrent(Owner) && !A_IsSuspended
+}
+
+_KeyCombinationChordRetire(Owner, Ports) {
+	global _KeyCombinationChordOwner, _KeyCombinationChordWaiting, _KeyCombinationChordWaitAt
+	global _KeyCombinationChordTaken, _KeyCombinationChordQueue, _KeyCombinationChordBusy, _KeyCombinationChordReplaying
+	PreviousCritical := Critical("On")
+	try {
+		if _KeyCombinationChordOwner != Owner
+			return false
+		_KeyCombinationChordOwner := 0
+		_KeyCombinationChordWaiting := "", _KeyCombinationChordWaitAt := 0
+		_KeyCombinationChordTaken := Map(), _KeyCombinationChordQueue := []
+		_KeyCombinationChordBusy := false, _KeyCombinationChordReplaying := ""
+		; This batch has no owned native Down: discard only its unsent replay.
+		Ports["arm_poll"].Call(false)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_KeyCombinationChordCurrentOwner(Ports) {
+	global _KeyCombinationChordOwner
+	if !IsSet(_KeyCombinationChordOwner)
+		return 0
+	Owner := _KeyCombinationChordOwner
+	if !IsObject(Owner)
+		return 0
+	if !_KeyCombinationChordIsCurrent(Owner) {
+		_KeyCombinationChordRetire(Owner, Ports)
+		return 0
+	}
+	return Owner
 }
 
 ; Whether a press of KeyId begins a wait: the chords are on, nothing owns the keyboard
@@ -1248,41 +1418,73 @@ KeyCombinationChordHandle(KeyId, Ports := 0) {
 	global _KeyCombinationChordTaken, _KeyCombinationChordBusy, _KeyCombinationChordQueue
 	if !(Ports is Map)
 		Ports := _KeyCombinationChordPorts()
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if !IsObject(Owner) {
+		if !KeyCombinationChordOwns(KeyId, Ports)
+			return ""
+		Owner := _KeyCombinationChordCurrentOwner(Ports)
+		if !IsObject(Owner)
+			return ""
+	}
 	if _KeyCombinationChordTaken.Has(KeyId)
 		return "swallowed"
 	if (_KeyCombinationChordWaiting == "" && _KeyCombinationChordQueue.Length == 0) {
 		global _KeyCombinationChordFirsts
 		if !_KeyCombinationChordFirsts.Has(KeyId) || !KeyCombinationChordOwns(KeyId, Ports) {
-			_KeyCombinationChordEndWait()
+			_KeyCombinationChordEndWait(Owner)
 			return ""
 		}
-		_KeyCombinationChordWaiting := KeyId
-		_KeyCombinationChordWaitAt := Ports["tick"].Call()
-		_KeyCombinationChordBusy := true
+		Now := Ports["tick"].Call()
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return ""
+		PreviousCritical := Critical("On")
+		try {
+			if !_KeyCombinationChordIsCurrent(Owner)
+				return ""
+			_KeyCombinationChordWaiting := KeyId
+			_KeyCombinationChordWaitAt := Now
+			_KeyCombinationChordBusy := true
+		} finally Critical(PreviousCritical)
 		Ports["arm_poll"].Call(true)
-		return "wait"
+		return _KeyCombinationChordIsCurrent(Owner) ? "wait" : ""
 	}
-	; The waiting key's own auto-repeat.
 	if (_KeyCombinationChordWaiting == KeyId)
 		return "swallowed"
 	if (_KeyCombinationChordWaiting != "") {
 		First := _KeyCombinationChordWaiting
-		Chosen := _KeyCombinationChordPolicy.Choose(First, KeyId,
-			TickElapsed(_KeyCombinationChordWaitAt, Ports["tick"].Call()))
+		WaitAt := _KeyCombinationChordWaitAt
+		Now := Ports["tick"].Call()
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return ""
+		Chosen := _KeyCombinationChordPolicy.Choose(First, KeyId, TickElapsed(WaitAt, Now))
 		if ((Chosen is Map) && !AiActionBlocked(Chosen["action"])) {
-			_KeyCombinationChordEndWait()
-			_KeyCombinationChordTaken[First] := true
-			_KeyCombinationChordTaken[KeyId] := true
+			PreviousCritical := Critical("On")
+			try {
+				if !_KeyCombinationChordIsCurrent(Owner)
+					return ""
+				_KeyCombinationChordEndWait(Owner)
+				_KeyCombinationChordTaken[First] := true
+				_KeyCombinationChordTaken[KeyId] := true
+			} finally Critical(PreviousCritical)
 			Ports["arm_poll"].Call(true)
-			Owner := KeyCombinationParsePair(Chosen["pair_id"])
+			if !_KeyCombinationChordIsCurrent(Owner)
+				return ""
+			Pair := KeyCombinationParsePair(Chosen["pair_id"])
 			LoggerInfo("KeyCombinations", "Chord '{1}' fired.", Chosen["pair_id"])
-			Ports["run_action"].Call(Owner["first"], Owner["second"], Chosen["action"])
+			if !_KeyCombinationChordIsCurrent(Owner)
+				return ""
+			Ports["run_action"].Call(Pair["first"], Pair["second"], Chosen["action"])
 			return "chord"
 		}
 		_KeyCombinationChordFlush(Ports)
 	}
-	_KeyCombinationChordQueue.Push("key:" . KeyId)
-	_KeyCombinationChordBusy := true
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return ""
+		_KeyCombinationChordQueue.Push("key:" . KeyId)
+		_KeyCombinationChordBusy := true
+	} finally Critical(PreviousCritical)
 	Ports["arm_drain"].Call()
 	return "queued"
 }
@@ -1294,46 +1496,85 @@ KeyCombinationChordInterrupt(Sc, Ports := 0) {
 	global _KeyCombinationChordQueue, _KeyCombinationChordBusy
 	if !(Ports is Map)
 		Ports := _KeyCombinationChordPorts()
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if !IsObject(Owner)
+		return
 	_KeyCombinationChordFlush(Ports)
-	_KeyCombinationChordQueue.Push(Sc)
-	_KeyCombinationChordBusy := true
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		_KeyCombinationChordQueue.Push(Sc)
+		_KeyCombinationChordBusy := true
+	} finally Critical(PreviousCritical)
 	Ports["arm_drain"].Call()
 }
 
 ; Marks the wait over; the queue may still keep the chords busy.
-_KeyCombinationChordEndWait() {
+_KeyCombinationChordEndWait(Owner := 0) {
 	global _KeyCombinationChordWaiting, _KeyCombinationChordBusy, _KeyCombinationChordQueue
-	_KeyCombinationChordWaiting := ""
-	_KeyCombinationChordBusy := _KeyCombinationChordQueue.Length > 0
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Owner) && !_KeyCombinationChordIsCurrent(Owner)
+			return
+		_KeyCombinationChordWaiting := ""
+		_KeyCombinationChordBusy := _KeyCombinationChordQueue.Length > 0
+	} finally Critical(PreviousCritical)
 }
 
 ; Ends a wait with no chord: the first key is sent again, as a press when it is
 ; still held (its physical release follows) and as a tap when it already came up.
 _KeyCombinationChordFlush(Ports) {
 	global _KeyCombinationChordWaiting, _KeyCombinationChordQueue
-	First := _KeyCombinationChordWaiting
-	if (First == "")
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if !IsObject(Owner)
 		return
-	; A pending Busy keeps a later character behind this key.
-	_KeyCombinationChordQueue.Push("key:" . First)
-	_KeyCombinationChordEndWait()
-	_KeyCombinationChordSendKey(First, Ports["is_held"].Call(First), Ports)
-	_KeyCombinationChordQueue.RemoveAt(1)
-	_KeyCombinationChordEndWait()
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		First := _KeyCombinationChordWaiting
+		if (First == "")
+			return
+		Queue := _KeyCombinationChordQueue
+		Queue.Push("key:" . First)
+		_KeyCombinationChordEndWait(Owner)
+	} finally Critical(PreviousCritical)
+	Held := Ports["is_held"].Call(First)
+	if !_KeyCombinationChordIsCurrent(Owner)
+		return
+	_KeyCombinationChordSendKey(First, Held, Ports, Owner)
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner) || _KeyCombinationChordQueue != Queue
+			return
+		if Queue.Length > 0 && Queue[1] == "key:" . First
+			Queue.RemoveAt(1)
+		_KeyCombinationChordEndWait(Owner)
+	} finally Critical(PreviousCritical)
 }
 
 ; Sends one catalogue key again, past its own chord variants.
-_KeyCombinationChordSendKey(KeyId, Held, Ports) {
+_KeyCombinationChordSendKey(KeyId, Held, Ports, Owner := 0) {
 	global _KeyCombinationChordReplaying, _KeyCombinationScanNames, KEY_COMBINATION_CHORD_REPLAY_LEVEL
-	Name := _KeyCombinationScanNames[KeyId]
-	PreviousLevel := A_SendLevel
-	SendLevel(KEY_COMBINATION_CHORD_REPLAY_LEVEL)
-	_KeyCombinationChordReplaying := KeyId
-	try Ports["send"].Call("{Blind}{" . Name . (Held ? " down" : "") . "}")
-	finally {
-		_KeyCombinationChordReplaying := ""
-		SendLevel(PreviousLevel)
-	}
+	if !IsObject(Owner)
+		Owner := _KeyCombinationChordCurrentOwner(Ports)
+	; Only this one replay edge is atomic with its admission, never the queue.
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		Name := _KeyCombinationScanNames[KeyId]
+		PreviousLevel := A_SendLevel
+		SendLevel(KEY_COMBINATION_CHORD_REPLAY_LEVEL)
+		_KeyCombinationChordReplaying := KeyId
+		try Ports["send"].Call("{Blind}{" . Name . (Held ? " down" : "") . "}")
+		finally {
+			if _KeyCombinationChordIsCurrent(Owner)
+				_KeyCombinationChordReplaying := ""
+			SendLevel(PreviousLevel)
+		}
+	} finally Critical(PreviousCritical)
 }
 
 ; Sends the queued keys, in the order they were struck. A catalogue key struck under
@@ -1343,25 +1584,45 @@ KeyCombinationChordDrain(Ports := 0) {
 	global _KeyCombinationChordQueue, KEY_COMBINATION_CHORD_REPLAY_LEVEL, _KeyCombinationChordWaiting
 	if !(Ports is Map)
 		Ports := _KeyCombinationChordPorts()
-	while (_KeyCombinationChordQueue.Length > 0) {
-		Item := _KeyCombinationChordQueue.RemoveAt(1)
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if !IsObject(Owner)
+		return
+	Queue := _KeyCombinationChordQueue
+	while (Queue.Length > 0) {
+		PreviousCritical := Critical("On")
+		try {
+			if !_KeyCombinationChordIsCurrent(Owner) || _KeyCombinationChordQueue != Queue
+				return
+			Item := Queue.RemoveAt(1)
+		} finally Critical(PreviousCritical)
 		if !(Item is String) {
-			PreviousLevel := A_SendLevel
-			SendLevel(KEY_COMBINATION_CHORD_REPLAY_LEVEL)
-			try Ports["send"].Call("{Blind}{" . Format("SC{:03X}", Item) . "}")
-			finally SendLevel(PreviousLevel)
+			PreviousCritical := Critical("On")
+			try {
+				if !_KeyCombinationChordIsCurrent(Owner)
+					return
+				PreviousLevel := A_SendLevel
+				SendLevel(KEY_COMBINATION_CHORD_REPLAY_LEVEL)
+				try Ports["send"].Call("{Blind}{" . Format("SC{:03X}", Item) . "}")
+				finally SendLevel(PreviousLevel)
+			} finally Critical(PreviousCritical)
 			continue
 		}
 		KeyId := SubStr(Item, 5)
 		IsHeld := Ports["is_held"]
-		if KeyCombinationOwns(KeyId, (Name) => Name == KeyId ? false : IsHeld.Call(Name)) {
-			_KeyCombinationChordEndWait()
+		Taken := KeyCombinationOwns(KeyId, (Name) => Name == KeyId ? false : IsHeld.Call(Name))
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		if Taken {
+			_KeyCombinationChordEndWait(Owner)
 			KeyCombinationFire(KeyId)
 		} else {
-			_KeyCombinationChordSendKey(KeyId, IsHeld.Call(KeyId), Ports)
+			Held := IsHeld.Call(KeyId)
+			if !_KeyCombinationChordIsCurrent(Owner)
+				return
+			_KeyCombinationChordSendKey(KeyId, Held, Ports, Owner)
 		}
 	}
-	_KeyCombinationChordEndWait()
+	_KeyCombinationChordEndWait(Owner)
 }
 
 ; One look at the wait and at the keys a chord took.
@@ -1370,22 +1631,41 @@ KeyCombinationChordTick(Ports := 0) {
 	global _KeyCombinationChordWaiting, _KeyCombinationChordWaitAt, _KeyCombinationChordTaken, KeyCombinationChordConfig
 	if !(Ports is Map)
 		Ports := _KeyCombinationChordPorts()
+	Owner := _KeyCombinationChordCurrentOwner(Ports)
+	if !IsObject(Owner)
+		return
 	IsHeld := Ports["is_held"]
 	if (_KeyCombinationChordWaiting != "") {
-		Elapsed := TickElapsed(_KeyCombinationChordWaitAt, Ports["tick"].Call())
-		; AltGr passes untouched (point 5): the wait ends as soon as it is seen.
-		if (A_IsSuspended || Elapsed > KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS]
-				|| !IsHeld.Call(_KeyCombinationChordWaiting) || KS_IsDown("SC138"))
+		Waiting := _KeyCombinationChordWaiting, WaitAt := _KeyCombinationChordWaitAt
+		Now := Ports["tick"].Call()
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		Elapsed := TickElapsed(WaitAt, Now)
+		Held := IsHeld.Call(Waiting)
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		if (Elapsed > KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS] || !Held || KS_IsDown("SC138"))
 			_KeyCombinationChordFlush(Ports)
 	}
-	Done := []
-	for KeyId in _KeyCombinationChordTaken {
-		if !IsHeld.Call(KeyId)
+	if !_KeyCombinationChordIsCurrent(Owner)
+		return
+	Taken := _KeyCombinationChordTaken, Done := []
+	for KeyId in Taken {
+		Held := IsHeld.Call(KeyId)
+		if !_KeyCombinationChordIsCurrent(Owner)
+			return
+		if !Held
 			Done.Push(KeyId)
 	}
-	for _, KeyId in Done
-		_KeyCombinationChordTaken.Delete(KeyId)
-	if (_KeyCombinationChordWaiting == "" && _KeyCombinationChordTaken.Count == 0)
+	PreviousCritical := Critical("On")
+	try {
+		if !_KeyCombinationChordIsCurrent(Owner) || _KeyCombinationChordTaken != Taken
+			return
+		for _, KeyId in Done
+			Taken.Delete(KeyId)
+		Disarm := _KeyCombinationChordWaiting == "" && Taken.Count == 0
+	} finally Critical(PreviousCritical)
+	if Disarm && _KeyCombinationChordIsCurrent(Owner)
 		Ports["arm_poll"].Call(false)
 }
 
@@ -1432,8 +1712,19 @@ SetKeyCombinationChord(PairId, ActionName, Path := "", ReloadFn := 0) {
 ; @returns {String} A pair id.
 KeyCombinationChordOwnerPair(PairId) {
 	global KeyCombinationChordConfig
+	if !IsObject(KeyCombinationChordConfig)
+		return PairId
+	return _KeyCombinationChordOwnerPairFor(PairId, KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])
+}
+
+; The owner pair of PairId's chord under an explicit symmetry, for a planner
+; reading a configuration other than the one in force.
+; @param PairId {String} A pair id.
+; @param Symmetric {Boolean} Whether both orders of a pair share one chord.
+; @returns {String} A pair id.
+_KeyCombinationChordOwnerPairFor(PairId, Symmetric) {
 	Pair := KeyCombinationParsePair(PairId)
-	if !(Pair is Map) || !IsObject(KeyCombinationChordConfig) || !KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC]
+	if !(Pair is Map) || !Symmetric
 		return PairId
 	for _, Id in KeyCombinationKeyIds() {
 		if (Id == Pair["first"])
@@ -1475,6 +1766,83 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
+; The rows that copy every pair's tap slot into its chord slot, planned from one
+; decoded configuration as macOS and Linux plan their bulk copy: the chord takes
+; the tap's action and an empty tap empties the chord. Each order writes its own
+; chord, symmetry or not, as the shared plan_chord_copy does: only the earlier
+; order's chord runs under symmetry, and the later one's shows again once
+; symmetry is turned off (decision KCD-1 of 2026-11-21). The shared vectors of
+; _shared/tests/corpus/tap_hold/key_combination_chord_copy.json pin both
+; planners. A pair that cannot hold a chord on the layout in force is skipped,
+; and so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
+; which is logged with its pair.
+; @param Snapshot {Object} A ConfigTomlDecodeSnapshot result.
+; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
+; @returns {Array} Config update rows; empty when every chord already matches.
+KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
+	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
+	Cache := Snapshot.Cache
+	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, false)
+	Allowed := HasMethod(AllowedFn, "Call") ? AllowedFn : KeyCombinationChordPairIsAllowed
+	Rows := []
+	Ids := KeyCombinationKeyIds()
+	for _, First in Ids {
+		for _, Second in Ids {
+			if (First == Second)
+				continue
+			PairId := KeyCombinationPairId(First, Second)
+			if !Allowed.Call(PairId)
+				continue
+			Tap := Taps.Get(PairId, KEY_COMBINATION_NONE)
+			if KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Tap) {
+				LoggerWarn("KeyCombinations", "Pair '{1}' tap '{2}' cannot run as a chord — its chord is left as it is.",
+					PairId, Tap)
+				continue
+			}
+			Section := "mod_combos.config." . PairId
+			Stored := Cache.Get(Section, 0)
+			Current := (Stored is Map) && Stored.Has("combo") ? Stored["combo"] : KEY_COMBINATION_NONE
+			if (Current == Tap)
+				continue
+			if (Tap == KEY_COMBINATION_NONE)
+				Rows.Push({ Section: Section, Key: "combo", Delete: 1 })
+			else
+				Rows.Push({ Section: Section, Key: "combo", Value: Tap })
+		}
+	}
+	return Rows
+}
+
+; Reads the configuration only once the commit owns it, so a sibling write
+; cannot slip between the plan and its batch.
+_KeyCombinationBuildChordCopyPlan(Path, Outcome, AllowedFn := 0) {
+	Content := FileExist(Path) ? FSReadStrict(Path) : ""
+	Rows := KeyCombinationChordCopyRows(ConfigTomlDecodeSnapshot(Content), AllowedFn)
+	Outcome.rows := Rows.Length
+	return Rows.Length ? { updates: Rows } : { noop: true }
+}
+
+; The « Copy tap → combo » command, as on macOS and Linux: every pair's chord
+; slot takes its tap action in one config batch, then the driver reloads.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
+; @returns {Boolean} False when nothing was committed.
+KeyCombinationCopyTapsToChords(Path := "", ReloadFn := 0, AllowedFn := 0) {
+	global ConfigurationFile
+	Target := Path != "" ? Path : ConfigurationFile
+	Outcome := { rows: 0 }
+	if !ConfigCommitBuilt(Target, "the copy of the key combination taps into their chords",
+			_KeyCombinationBuildChordCopyPlan.Bind(Target, Outcome, AllowedFn))
+		return false
+	if (Outcome.rows == 0) {
+		LoggerInfo("KeyCombinations", "Every chord already runs its pair's tap: nothing to copy.")
+		return true
+	}
+	LoggerInfo("KeyCombinations", "{1} chord slot(s) copied from their tap.", Outcome.rows)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
+}
+
 ; The list provider of the manifest's "combo_timings" entry: the delay of the chords.
 ; @returns {Array} One row.
 KeyCombinationChordTimingRows() {
@@ -1504,11 +1872,16 @@ KeyCombinationChordPromptDelay() {
 ; @returns {Boolean} False when nothing was committed.
 KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 	global ConfigurationFile
-	if !RegExMatch(Text, "^\d+(\.\d+)?$") || (Text + 0) <= 0 {
-		LoggerWarn("KeyCombinations", "The chord delay '{1}' is no positive number: nothing changes.", Text)
+	; The shared value schema owns the accepted range and its localized refusal.
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text,
+		ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
+	if !Typed["ok"] {
+		ValueCheckShowRefusal(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Typed, Text)
 		return false
 	}
-	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Text + 0)]
+	Parsed := Typed["value"]
+	Rows := [ManifestSparseOperation(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Parsed)]
 	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the delay of the key chords")
 		return false
 	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()

@@ -12,9 +12,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("curl_http_client: extracted production engine", function()
 	helpers.it("keeps synchronous process execution out of the actual owned dispatch source", function()
-		local engine = require("adapters.curl_http_client")
+		local engine = require("core.network.adapters.curl_http_client")
 		local source_path = debug.getinfo(engine.dispatch_owned, "S").source:gsub("^@", "")
-		helpers.assert_true(source_path:match("/adapters/curl_http_client%.lua$") ~= nil,
+		helpers.assert_true(source_path:match("/core/network/adapters/curl_http_client%.lua$") ~= nil,
 			"the scan must inspect the actual production dispatch source")
 		local file = assert(io.open(source_path, "rb"))
 		local source = file:read("*a"); file:close()

@@ -7,19 +7,19 @@ local helpers = require("tests.helpers")
 
 --- Actual coordinator, shared transition policy, retained lease and target.
 --- Controlled native acknowledgements do not qualify real GIO/curl or files.
-local Managed = require("infra.managed_http")
+local Managed = require("core.network.engine.managed_http")
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
-local Routing = require("network.proxy_policy")
-local Redirect = require("network.http_redirect")
-local Json = require("json")
-local Paths = require("infra.paths")
+local Target = require("core.network.engine.http_output_target")
+local Routing = require("core.network.engine.proxy_policy_core")
+local Redirect = require("core.network.engine.http_redirect")
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
 local function data(path)
  local file = assert(io.open(assert(Paths.shared(path)), "rb"))
  local bytes = assert(file:read("*a")); assert(file:close()); return assert(Json.decode(bytes))
 end
-local routing = assert(Routing.new(data("modules/network/proxy_policy.json")))
-local law = assert(Redirect.new(data("data/http/redirect_policy.json"), data("data/http/transport_policy.json")))
+local routing = assert(Routing.new(data("core/network/data/proxy_policy.json")))
+local law = assert(Redirect.new(data("core/network/data/http/redirect_policy.json"), data("core/network/data/http/transport_policy.json")))
 local INITIAL, DEST = "https://updates.example/archive", "https://cdn.example/archive"
 local tests = {}
 local function test(name, fn) tests[#tests + 1] = { name, fn } end

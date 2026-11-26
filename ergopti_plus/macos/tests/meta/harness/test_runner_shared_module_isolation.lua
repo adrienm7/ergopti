@@ -14,27 +14,27 @@ local helper_source = assert(package.searchpath("tests.helpers", package.path))
 	:gsub("\\", "/")
 local driver_root = helper_source:match("^(.*)/tests/helpers/init%.lua$")
 local drivers_root = driver_root and driver_root:match("^(.*)/[^/]+$")
-local shared_lua = drivers_root and (drivers_root .. "/_shared/lua")
+local shared_lua = drivers_root and (drivers_root .. "/_shared")
 
 helpers.describe("tests/run.lua isolates shared and platform modules", function()
 	helpers.it("replaces a leaked shared terminator stub with the real catalogue", function()
 		local helpers_identity = package.loaded["tests.helpers"]
-		package.loaded["keymap.terminators"] = setmetatable({}, {
+		package.loaded["layouts.engine.layers.terminators"] = setmetatable({}, {
 			__index = function() return function() end end,
 		})
-		package.loaded["keymap.utils"] = { poisoned = true }
+		package.loaded["layouts.engine.utils"] = { poisoned = true }
 		package.loaded["platform.remap.ke_paths"] = { poisoned = true }
-		package.loaded["modules.keymap.terminators"] = nil
+		package.loaded["hotstrings.engine.expander.terminators"] = nil
 
 		Isolation.purge(driver_root, shared_lua)
 
-		helpers.assert_nil(package.loaded["keymap.terminators"])
-		helpers.assert_nil(package.loaded["keymap.utils"])
+		helpers.assert_nil(package.loaded["layouts.engine.layers.terminators"])
+		helpers.assert_nil(package.loaded["layouts.engine.utils"])
 		helpers.assert_nil(package.loaded["platform.remap.ke_paths"])
 		helpers.assert_eq(package.loaded["tests.helpers"], helpers_identity,
 			"test infrastructure must survive the production-module purge")
 
-		local terminators = require("modules.keymap.terminators")
+		local terminators = require("hotstrings.engine.expander.terminators")
 		helpers.assert_eq(type(terminators.TERMINATOR_DEFS), "table",
 			"the next file must receive the real shared terminator catalogue")
 	end)
@@ -52,7 +52,7 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 		helpers.assert_nil(package.loaded["hs.no_such_member"])
 	end)
 
-	for _, module_name in ipairs({ "keymap.terminators", "keymap.terminators_catalogue" }) do
+	for _, module_name in ipairs({ "layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue" }) do
 		helpers.it("reloads a real catalogue after a boolean cache leak in " .. module_name, function()
 			Isolation.purge(driver_root, shared_lua)
 			local helpers_identity = package.loaded["tests.helpers"]
@@ -61,7 +61,7 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 			-- The leak must be harmful before the purge proves anything: either the
 			-- catalogue load fails on the boolean, or the pass-through shim hands
 			-- the boolean itself to every consumer instead of a catalogue.
-			local loaded, result = pcall(require, "modules.keymap.terminators")
+			local loaded, result = pcall(require, "hotstrings.engine.expander.terminators")
 			helpers.assert_true(not loaded or type(result) ~= "table",
 				"the leaked boolean must reproduce the original catalogue failure")
 			if not loaded then
@@ -71,7 +71,7 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 			Isolation.purge(driver_root, shared_lua)
 			helpers.assert_nil(package.loaded[module_name])
 			helpers.assert_eq(package.loaded["tests.helpers"], helpers_identity)
-			local terminators = require("modules.keymap.terminators")
+			local terminators = require("hotstrings.engine.expander.terminators")
 			helpers.assert_eq(type(terminators), "table")
 			helpers.assert_eq(type(terminators.TERMINATOR_DEFS), "table")
 			helpers.assert_true(#terminators.TERMINATOR_DEFS > 0)

@@ -19,6 +19,8 @@
 ; ==============================================================================
 
 #Include keystats_hotstring_units.ahk
+#Include keystats_local_time.ahk
+#Include %A_LineFile%\..\..\..\_generated\registry_limits.ahk
 
 
 
@@ -47,6 +49,14 @@ class KLReadConst {
 		; an 815 MB store; held in ":memory:" it made the worker use about 1 GB.
 		; On a bounded private disk database only this much of it is resident.
 		static WORKER_PAGE_CACHE_KIB := 65536
+		; Growth a refresh may write into the copy-on-write overlay of the shared
+		; image (KLR_OpenOverlayCandidate): a floor for the replayed days, plus a
+		; multiple of the tail's SQL for the rows it adds. Past it SQLite reports
+		; SQLITE_FULL and the refresh fails without publishing. The floor is
+		; [limits] metrics_overlay_slack_bytes: the detached worker runs before
+		; any registry load, so it reads the generated table.
+		static WORKER_OVERLAY_SLACK_BYTES := RegistryLimitsCount("limits", "metrics_overlay_slack_bytes")
+		static WORKER_OVERLAY_SLACK_PER_TAIL_BYTE := 32
 }
 
 
@@ -60,39 +70,155 @@ class KLReadConst {
 ; ================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
-; `static/ergopti_plus/_shared/data/db/schema.sql`; _StaticDir already
+; `static/ergopti_plus/_shared/metrics/data/db/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
 		global _SharedDir
-		base := _SharedDir . "\data\db\schema.sql"
+		base := _SharedDir . "\metrics\data\db\schema.sql"
 		loop files, base
 				return A_LoopFileFullPath
 		return base
 }
 
 KLR_LoadSchema(db) {
+		KLRCache.schema_refusal := ""
 		schema_path := KLR_ResolveSchemaPath()
 		if !FileExist(schema_path)
-				return false
+				return _KLR_RefuseSchema("schema.sql is missing")
 		try schema := FSReadStrict(schema_path)
 		catch as err {
 				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
-				return false
+				return _KLR_RefuseSchema("schema.sql is unreadable")
 		}
 		if !SQLite_Exec(db, schema)
-				return false
+				return _KLR_RefuseSchema("schema.sql was refused by SQLite")
 		return KLR_LoadMediaSchema(db)
+}
+
+; Records the closed reason a schema load refused with.
+; @returns {Boolean} false, the load's result.
+_KLR_RefuseSchema(Reason) {
+		KLRCache.schema_refusal := Reason
+		return false
 }
 
 ; Apply only the additive schema to a private cold or upgrade candidate.
 KLR_LoadMediaSchema(db) {
 		global _SharedDir
-		try media_schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
+		try media_schema := FSReadStrict(_SharedDir . "\metrics\data\db\media_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
-				return false
+				return _KLR_RefuseSchema("media_schema.sql is unreadable")
 		}
-		return SQLite_Exec(db, media_schema)
+		if !SQLite_Exec(db, media_schema)
+				return _KLR_RefuseSchema("media_schema.sql was refused by SQLite")
+		return KLR_LoadPurgeSchema(db)
+}
+
+; Install the purge tombstone triggers after the media tables exist, so every
+; replayed ledger applies a tombstone and never re-imports a purged row. An
+; image created before the utc_offset_min column first gains it, and loses the
+; triggers written before it, which CREATE TRIGGER IF NOT EXISTS would keep.
+KLR_LoadPurgeSchema(db) {
+		global _SharedDir
+		try purge_schema := FSReadStrict(_SharedDir . "\metrics\data\db\purge_schema.sql")
+		catch as err {
+				try LoggerError("KLReader", "Metrics purge schema read failed: {1}.", err.Message)
+				return _KLR_RefuseSchema("purge_schema.sql is unreadable")
+		}
+		if !KLR_EnsureUtcOffsetColumn(db, purge_schema)
+				return false
+		if !SQLite_Exec(db, purge_schema)
+				return _KLR_RefuseSchema("purge_schema.sql was refused by SQLite")
+		return true
+}
+
+; The utc_offset_min migration's shape, read from the shared schema: every raw
+; events_* table of schema.sql carries the column, last, with one definition
+; (maintainer decision KMD-1; the same statements as
+; _shared/metrics/engine/utc_offset_column.lua).
+; @returns {Map} tables {Array} and definition {String}; throws on a schema
+;   that does not spell them.
+KLR_UtcOffsetShape() {
+		static Shape := 0
+		if IsObject(Shape)
+				return Shape
+		Schema := FSReadStrict(KLR_ResolveSchemaPath())
+		Tables := []
+		Position := 1
+		while Position := RegExMatch(Schema, "CREATE TABLE IF NOT EXISTS (events_\w+) \(", &Found, Position) {
+				Tables.Push(Found[1])
+				Position += Found.Len[0]
+		}
+		if !Tables.Length || !RegExMatch(Schema, "m)^\s*utc_offset_min (INTEGER CHECK .+\)),\s*$", &Column)
+				throw Error("schema.sql spells no raw table or no utc_offset_min definition")
+		Shape := Map("tables", Tables, "definition", Column[1])
+		return Shape
+}
+
+; The raw tables of an image still without utc_offset_min, by name.
+; @param db {Integer} Open handle.
+; @returns {Array} Table names.
+KLR_UtcOffsetMissing(db) {
+		Quoted := ""
+		for Name in KLR_UtcOffsetShape()["tables"]
+				Quoted .= (A_Index > 1 ? "," : "") . SQLite_Q(Name)
+		Missing := []
+		for Row in SQLite_Query(db, "SELECT m.name FROM sqlite_master m WHERE m.type = 'table' AND m.name IN ("
+				. Quoted . ") AND NOT EXISTS (SELECT 1 FROM pragma_table_info(m.name) p WHERE p.name = 'utc_offset_min')"
+				. " ORDER BY m.name;")
+				Missing.Push(Row["name"])
+		return Missing
+}
+
+; The statements that add utc_offset_min to the named tables, then retire the
+; purge triggers written before it (every trigger purge_schema.sql creates);
+; none when no table lacks it.
+; @param Missing {Array} Table names from KLR_UtcOffsetMissing.
+; @param PurgeSchema {String} The text of purge_schema.sql.
+; @returns {Array} Statements, in order; run before purge_schema.sql.
+KLR_UtcOffsetStatements(Missing, PurgeSchema) {
+		Statements := []
+		if !Missing.Length
+				return Statements
+		Definition := KLR_UtcOffsetShape()["definition"]
+		for Name in Missing
+				Statements.Push("ALTER TABLE " . Name . " ADD COLUMN utc_offset_min " . Definition . ";")
+		Position := 1
+		while Position := RegExMatch(PurgeSchema, "CREATE TRIGGER IF NOT EXISTS (\w+)", &Found, Position) {
+				Statements.Push("DROP TRIGGER IF EXISTS " . Found[1] . ";")
+				Position += Found.Len[0]
+		}
+		return Statements
+}
+
+; Adds utc_offset_min to an image created before it, in one savepoint, so a
+; ledger row naming the column is accepted again.
+; @param db {Integer} Open handle.
+; @param PurgeSchema {String} The text of purge_schema.sql.
+; @returns {Boolean} True once every raw table has the column.
+KLR_EnsureUtcOffsetColumn(db, PurgeSchema) {
+		try {
+				Missing := KLR_UtcOffsetMissing(db)
+				Statements := KLR_UtcOffsetStatements(Missing, PurgeSchema)
+		} catch as err {
+				try LoggerError("KLReader", "Metrics utc_offset_min migration could not be planned: {1}.", err.Message)
+				return _KLR_RefuseSchema("the utc_offset_min migration could not be planned")
+		}
+		if !Statements.Length
+				return true
+		Sql := "SAVEPOINT klr_utc_offset;"
+		for Statement in Statements
+				Sql .= "`n" . Statement
+		if !SQLite_Exec(db, Sql . "`nRELEASE klr_utc_offset;") {
+				Reason := SQLite_LastError(db)
+				SQLite_Exec(db, "ROLLBACK TO klr_utc_offset; RELEASE klr_utc_offset;")
+				try LoggerError("KLReader", "Metrics utc_offset_min migration was refused by SQLite: {1}.", Reason)
+				return _KLR_RefuseSchema("the utc_offset_min migration was refused by SQLite")
+		}
+		try LoggerInfo("KLReader", "Metrics image gained utc_offset_min on {1} raw table(s); purge triggers renewed.",
+				Missing.Length)
+		return true
 }
 
 
@@ -112,6 +238,9 @@ KLR_LoadMediaSchema(db) {
 ; data.sql since the last call.
 class KLRCache {
 		static db := 0
+		; Why the last schema load refused, "" after one that loaded: a detached
+		; worker has no logger, and its failure line names this closed reason.
+		static schema_refusal := ""
 		; A validated worker image stays file-backed until new ledger bytes arrive.
 		static readonly := false
 		static last_sizes := Map()    ; absolute_path → byte_offset already loaded
@@ -174,6 +303,26 @@ KLR_OpenCandidate() {
 ; @returns {Integer} The candidate handle, or 0.
 KLR_CloneCandidate(Source) {
 		return SQLite_CloneInto(Source, KLR_OpenCandidate)
+}
+
+; Opens the writable candidate of a refresh on the read-only image a worker
+; attached, without copying it: a copy-on-write overlay of the very file the
+; image was validated from (SQLite_OpenCopyOnWrite). The shared file is never
+; written, so every other worker keeps reading the image it attached, and a
+; failure anywhere in the refresh is undone by closing the overlay. The whole
+; image was copied here before, 6 to 20 s on a 1.1 GB image even for 47 KB of
+; new ledger bytes.
+; @param Source {Integer} The read-only image handle (KLRCache.readonly).
+; @param Tails {Map} The prepared ledger tails the refresh will apply.
+; @returns {Integer} The overlay handle; throws when it cannot be built.
+KLR_OpenOverlayCandidate(Source, Tails) {
+		TailBytes := 0
+		for _, Tail in Tails
+				TailBytes += StrLen(Tail["sql"])
+		return SQLite_OpenCopyOnWrite(Source,
+				KLReadConst.WORKER_OVERLAY_SLACK_BYTES
+						+ TailBytes * KLReadConst.WORKER_OVERLAY_SLACK_PER_TAIL_BYTE,
+				KLReadConst.WORKER_PAGE_CACHE_KIB)
 }
 
 ; Append a single diagnostic line to prefetch.log, but only when the logger
@@ -277,7 +426,19 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 
 				candidate := 0
-				if KLRCache.disposable && !KLRCache.readonly {
+				if KLRCache.readonly {
+						; The image every worker shares: write through a private overlay.
+						overlay_tick := HotPath_Now()
+						try {
+								candidate := KLR_OpenOverlayCandidate(KLRCache.db, update["tails"])
+						} catch Error as Failure {
+								try LoggerError("KLReader", "Metrics image overlay failed: {1} Refresh was not published.", Failure.Message)
+								return KLR_ReleaseCandidate(0)
+						} finally {
+								HotPath_LogIfSlow("KLR.CandidateOverlay", overlay_tick,
+										update["tails"].Count . " ledger tail(s)")
+						}
+				} else if KLRCache.disposable {
 						; Nothing else can observe a worker's handle, and the image is
 						; hundreds of megabytes: cloning it to protect a reader that does
 						; not exist would cost more than the refresh. A failure below
@@ -297,7 +458,18 @@ KLR_BuildDatabase(metrics_dir) {
 								return KLR_ReleaseCandidate(0)
 						}
 				}
+				; A worker replays only the app-days the tail changed; the triggers that
+				; record them see exactly the rows SQLite inserted or deleted.
+				scoped := KLRCache.disposable
+				if scoped && !KLR_ReplayScopeBegin(candidate) {
+						try LoggerError("KLReader", "Replay scope capture could not be installed; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
 				applied := KLR_ApplyIncrementalWithCountUnits(candidate, update["tails"], logPath)
+				if scoped && !KLR_ReplayScopeEndCapture(candidate) {
+						try LoggerError("KLReader", "Replay scope capture could not be removed; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
 				if !applied.Get("ok", false) {
 						; Only source failures may suppress a retry; internal recount failures
 						; can recover without a write. For incomplete/invalid tails, after
@@ -312,7 +484,11 @@ KLR_BuildDatabase(metrics_dir) {
 				; drain the live walker delta into the same unpublished candidate.
 				refresh_dates := KLRCache.disposable
 						? KLR_CacheAffectedDates(update["tails"]) : 0
-				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable) {
+				if scoped && !KLR_ReplayScopeBuild(candidate, refresh_dates) {
+						try LoggerError("KLReader", "Replay scope could not be built; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
+				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable, scoped) {
 						try LoggerError("KLReader",
 								"Typing projection preparation failed; retaining the last-good dashboard projection.")
 						return KLR_ReleaseCandidate(candidate)
@@ -326,7 +502,7 @@ KLR_BuildDatabase(metrics_dir) {
 				if (refresh_dates is Array) {
 						KLR_PrefetchDebug(logPath, "KLR refresh scope: "
 								. refresh_dates.Length . " day(s)")
-						if !KLR_ClearAggregates(candidate, refresh_dates)
+						if !KLR_ClearAggregates(candidate, refresh_dates, scoped)
 								return KLR_ReleaseCandidate(candidate)
 				}
 				if !KLR_RebuildAggregates(candidate, refresh_dates) {
@@ -338,13 +514,15 @@ KLR_BuildDatabase(metrics_dir) {
 						KLR_PrefetchDebug(logPath, "KLR scoped aggregates in "
 								. (A_TickCount - refresh_tick) . "ms")
 						refresh_tick := A_TickCount
-						if (KLR_RebuildWalkerAggregates(candidate, true, refresh_dates) < 0) {
+						if (KLR_RebuildWalkerAggregates(candidate, true, refresh_dates, scoped) < 0) {
 								try LoggerError("KLReader",
 										"Walker refresh failed; retaining the last-good dashboard projection.")
 								return KLR_ReleaseCandidate(candidate)
 						}
 						KLR_PrefetchDebug(logPath, "KLR scoped walker replay in "
 								. (A_TickCount - refresh_tick) . "ms")
+						if scoped && !KLR_ReplayScopeDrop(candidate)
+								return KLR_ReleaseCandidate(candidate)
 				} else {
 						try KLR_InjectKlwBatch(candidate)
 						catch Any as Failure {
@@ -378,15 +556,16 @@ KLR_BuildDatabase(metrics_dir) {
 }
 
 ; Preserve the already-validated offsets and numeric projection when an old
-; cache predates the additive media schema. The read-only image stays unchanged
-; until a complete private successor can be published.
+; cache predates the additive media schema or the utc_offset_min column (whose
+; absence made every raw INSERT of a newer ledger fail). The read-only image
+; stays unchanged until a complete private successor can be published.
 KLR_UpgradeMediaCache(LoadMedia := unset) {
 		static UnretiredCandidate := 0
 		if UnretiredCandidate
 				throw Error("Semantic media cache upgrade has an unretired candidate.")
 		Rows := SQLite_Query(KLRCache.db,
 				"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
-		if Rows[1]["n"] = 2
+		if Rows[1]["n"] = 2 && !KLR_UtcOffsetMissing(KLRCache.db).Length
 				return true
 		Candidate := KLR_CloneCandidate(KLRCache.db)
 		if !Candidate
@@ -398,7 +577,7 @@ KLR_UpgradeMediaCache(LoadMedia := unset) {
 						throw Error("Semantic media cache schema installation failed.")
 				Rows := SQLite_Query(Candidate,
 						"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
-				if Rows[1]["n"] != 2
+				if Rows[1]["n"] != 2 || KLR_UtcOffsetMissing(Candidate).Length
 						throw Error("Semantic media cache schema installation is incomplete.")
 				KLR_PublishCandidate(Candidate, KLR_CopyOffsets(KLRCache.last_sizes),
 						KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots))
@@ -612,12 +791,19 @@ KLR_BuildColdCandidate(md, logPath) {
 
 		; Durable raw rows are authoritative on a cold build. Reconstruct every
 		; derived table on the candidate before it becomes observable.
+		KLRLastReplayFailure := Map()
 		if !KLR_PrepareTypingProjection(db) {
 				KLR_PrefetchDebug(logPath, "KLR typing projection FAILED")
 				try LoggerError("KLReader",
 						"Metrics DB build failed while preparing typing projections. Dashboard retains its last-good data.")
+				; The projection reads every typing row before the walker does, so a
+				; malformed row is rejected here: its owned context must survive.
+				Failure := KLRLastReplayFailure.Clone()
+				if Failure.Count && HasMethod(KLRReplayDiagnosticFn, "Call")
+						try KLRReplayDiagnosticFn.Call(Failure)
 				try SQLite_Close(db)
-				return Map("ok", false, "db", 0, "sizes", Map())
+				return Map("ok", false, "db", 0, "sizes", Map(),
+						"failure", Failure)
 		}
 		KLR_PrefetchDebug(logPath, "KLR typing projection in "
 				. (A_TickCount - phase_tick) . "ms")
@@ -1123,6 +1309,12 @@ KLR_PrepareIncremental(md, logPath) {
 ; open SQLite transaction is an interrupted append, not a successful refresh.
 ; The caller discards the candidate and retains bounded path-specific metadata.
 KLR_ApplyIncremental(db, tails, logPath) {
+		; An image restored from an earlier worker may predate the purge triggers;
+		; they must exist before a tail can carry a tombstone or a purged row.
+		if !KLR_LoadPurgeSchema(db) {
+				try LoggerError("KLReader", "Metrics purge triggers could not be installed; retaining the last-good dashboard projection.")
+				return Map("ok", false, "incomplete", false, "retry", false)
+		}
 		total_new := 0
 		for sql_path, tail in tails {
 				result := SQLite_ExecReturnCarry(db, tail["sql"])
@@ -1175,17 +1367,35 @@ KLR_EnsureTypingProjectionTable(db) {
 				try LoggerError("KLReader", "Typing projection storage initialization failed: {1}.", Failure.Message)
 				return false
 		}
-		return SQLite_Exec(db,
+		if !SQLite_Exec(db,
 				"CREATE TEMP TABLE IF NOT EXISTS klr_reader_typing_payload ("
 				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, "
 				. "events_json TEXT NOT NULL, "
 				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;"
 				. "CREATE TABLE IF NOT EXISTS klr_reader_typing_counts ("
 				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, chars INTEGER NOT NULL, "
+				. "pauses INTEGER, think_time_ms INTEGER, think_pause_ms INTEGER, "
 				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;")
+				return false
+		; Upgrade the same numeric owner in place. Nullable additions identify
+		; old chars-only rows without treating their missing metrics as zero.
+		; ALTER preserves existing refusal triggers and never persists payloads.
+		try {
+				Columns := Map()
+				for Column in SQLite_Query(db, "PRAGMA table_info(klr_reader_typing_counts);")
+						Columns[StrLower(Column["name"])] := true
+				for Name in ["pauses", "think_time_ms", "think_pause_ms"]
+						if !Columns.Has(Name)
+								if !SQLite_Exec(db, "ALTER TABLE klr_reader_typing_counts ADD COLUMN " . Name . " INTEGER;")
+										return false
+		} catch Error as Failure {
+				try LoggerError("KLReader", "Typing numeric projection migration failed.")
+				return false
+		}
+		return true
 }
 
-KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
+KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson, &DecodedEvents := unset) {
 		Encrypted := KL_Enc_IsEncrypted(RawValue)
 		ClearJson := RawValue
 		if Encrypted {
@@ -1206,8 +1416,10 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 
 		Decoded := 0
 		try Decoded := KL_JsonDecode(ClearJson)
-		if (Decoded is Array)
+		if (Decoded is Array) {
+				DecodedEvents := Decoded
 				return true
+		}
 		if Encrypted {
 				try LoggerError("KLReader",
 						"Encrypted typing projection decoded to an invalid payload for device={1} id={2}.",
@@ -1218,7 +1430,56 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 		; established safe-skip semantics without letting one malformed JSON value
 		; abort every otherwise valid aggregate query.
 		ClearJson := "[]"
+		DecodedEvents := []
 		return true
+}
+
+; Preserve native integer sums exactly and the existing IEEE Float domain.
+; An unrepresentable result rejects the private candidate instead of wrapping
+; a negative metric or serializing an infinity into generated SQL.
+_KLR_AddThinkingTime(Total, Added) {
+		static MaxInteger := 0x7FFFFFFFFFFFFFFF
+		static MaxFinite := 1.7976931348623157e+308
+		Added := Added + 0
+		if !(Added >= 0 && Added <= MaxFinite && Total >= 0 && Total <= MaxFinite)
+				throw ValueError("Thinking-time inputs must be finite and nonnegative.")
+		if Total is Integer && Added is Integer && Total > MaxInteger - Added
+				throw ValueError("Thinking-time integer sum exceeds its native domain.")
+		Sum := Total + Added
+		if !(Sum >= 0 && Sum <= MaxFinite)
+				throw ValueError("Thinking-time sum must remain finite and nonnegative.")
+		return Sum
+}
+
+; Seventeen significant digits preserve the already-computed IEEE Float when
+; SQLite parses the literal. Integers keep their exact native decimal spelling.
+_KLR_ThinkingTimeSql(Value) {
+		return Value is Integer ? String(Value) : Format("{:.17g}", Value)
+}
+
+; Same event-level thinking-pause rules as the walker: manual backspaces
+; count too, whereas synthetic events and shortcut-only entries do not.
+_KLR_TypingPauseCounts(Events, ThinkPause) {
+		Pauses := 0, ThinkTime := 0
+		for Event in Events {
+				if !(Event is Array) || Event.Length < 2
+						continue
+				Meta := Event.Length >= 3 && Event[3] is Map ? Event[3] : Map()
+				if Meta.Get("s", false) || Meta.Get("sc", "") != ""
+						continue
+				if Event[2] > ThinkPause {
+						Pauses += 1
+						ThinkTime := _KLR_AddThinkingTime(ThinkTime, Event[2])
+				}
+		}
+		return [Pauses, ThinkTime]
+}
+
+; A persisted row is reusable only when all numeric metrics belong to the
+; current threshold. Resident refreshes need no clear historical TEMP payload.
+_KLR_TypingCountsMissing(ThinkPause) {
+		return "c.device_id IS NULL OR c.pauses IS NULL OR c.think_time_ms IS NULL"
+				. " OR c.think_pause_ms IS NULL OR c.think_pause_ms!=" . ThinkPause
 }
 
 ; Populate numeric counts and optional clear replay payloads in bounded pages.
@@ -1229,11 +1490,12 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 ; @param Dates {Integer|Array} 0 for all dates, otherwise affected replay dates.
 ; @param IncludePayload {Boolean} Whether to retain clear events for the walker.
 ; @returns {Boolean} Whether every requested projection row was prepared.
-KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
+KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true, Scoped := false) {
+		ThinkPause := KLWConst.THINK_PAUSE_MS
 		if !KLR_EnsureTypingProjectionTable(db)
 				return false
 		if !(Dates is Array)
-				return _KLR_PrepareTypingPages(db, Dates, IncludePayload)
+				return _KLR_PrepareTypingPages(db, Dates, IncludePayload, false, ThinkPause)
 		; Select missing scoped keys once: the date index otherwise sorts the
 		; same source rows for every page. TEMP storage stays off the disk image.
 		Created := false
@@ -1249,9 +1511,10 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "LEFT JOIN klr_reader_typing_counts AS c "
 						. "ON c.device_id=t.device_id AND c.event_id=t.id "
-						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload
+								? " OR (p.device_id IS NULL" . (Scoped ? KLR_ReplayScopeSql("t") : "") . ")" : "")
 						. ")" . _KLR_DateScope(Dates, "t.date") . ";")
-						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true)
+						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true, ThinkPause)
 		} catch {
 				Success := false
 		} finally {
@@ -1271,11 +1534,14 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 }
 
 ; Page an immutable private source, optionally through owned scoped keys.
-_KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
+_KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause := unset) {
+		if !IsSet(ThinkPause)
+				ThinkPause := KLWConst.THINK_PAUSE_MS
 		static PAGE_ROWS := 128
 		HaveCursor := false
 		LastDevice := ""
 		LastId := 0
+		RowIndex := 0
 		loop {
 				; A row-value bound exposes both columns to the planner, allowing a
 				; primary-index seek past this device's already completed IDs.
@@ -1285,17 +1551,17 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 						? " AND (t.device_id, t.id) > (" . SQLite_Q(LastDevice) . "," . LastId . ")"
 						: ""
 				try Rows := SQLite_Query(db, Scoped
-						? "SELECT t.device_id, t.id, t.events_json FROM temp.klr_reader_typing_keys AS k "
+						? "SELECT t.device_id, t.id, t.ts, t.events_json FROM temp.klr_reader_typing_keys AS k "
 								. "JOIN events_typing AS t ON t.device_id=k.device_id AND t.id=k.event_id"
 								. CursorWhere . " ORDER BY k.device_id,k.event_id LIMIT " . PAGE_ROWS . ";"
 						:
-						"SELECT t.device_id, t.id, t.events_json "
+						"SELECT t.device_id, t.id, t.ts, t.events_json "
 						. "FROM events_typing AS t "
 						. "LEFT JOIN temp.klr_reader_typing_payload AS p "
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "LEFT JOIN klr_reader_typing_counts AS c "
 						. "ON c.device_id=t.device_id AND c.event_id=t.id "
-						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload ? " OR p.device_id IS NULL" : "")
 						. ")" . _KLR_DateScope(Dates, "t.date") . CursorWhere
 						. " ORDER BY t.device_id, t.id LIMIT " . PAGE_ROWS . ";")
 				catch Error as Err {
@@ -1308,15 +1574,26 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 				for Row in Rows {
 						DeviceId := KLR_RowValue(Row, "device_id", "")
 						EventId := KLR_RowValue(Row, "id", 0)
+						RowIndex += 1
 						ClearJson := ""
 						if !KLR_NormalizeTypingEventsJson(
 								KLR_RowValue(Row, "events_json", ""),
-								DeviceId, EventId, &ClearJson)
+								DeviceId, EventId, &ClearJson, &DecodedEvents)
 								return false
-						BatchSql .= "INSERT INTO klr_reader_typing_counts (device_id,event_id,chars) SELECT "
-								. SQLite_Q(DeviceId) . "," . EventId . ",COUNT(*) FROM json_each("
+						try PauseCounts := _KLR_TypingPauseCounts(DecodedEvents, ThinkPause)
+						catch Error as Failure {
+								try LoggerError("KLReader", "Typing pause projection failed for device={1} id={2}.", DeviceId, EventId)
+								KLR_CaptureReplayFailure("typing-projection", DeviceId, RowIndex, EventId,
+										KLR_RowValue(Row, "ts", "unknown"), Failure.Message, Failure)
+								return false
+						}
+						BatchSql .= "INSERT INTO klr_reader_typing_counts "
+								. "(device_id,event_id,chars,pauses,think_time_ms,think_pause_ms) SELECT "
+								. SQLite_Q(DeviceId) . "," . EventId . ",COUNT(*),"
+								. PauseCounts[1] . "," . _KLR_ThinkingTimeSql(PauseCounts[2]) . "," . ThinkPause . " FROM json_each("
 								. SQLite_Q(ClearJson) . ") AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1 "
-								. "ON CONFLICT(device_id,event_id) DO UPDATE SET chars=excluded.chars;"
+								. "ON CONFLICT(device_id,event_id) DO UPDATE SET chars=excluded.chars,"
+								. "pauses=excluded.pauses,think_time_ms=excluded.think_time_ms,think_pause_ms=excluded.think_pause_ms;"
 						if IncludePayload
 								BatchSql .= "INSERT INTO temp.klr_reader_typing_payload "
 								. "(device_id,event_id,events_json) VALUES ("
@@ -1333,7 +1610,7 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 				}
 				HaveCursor := true
 		}
-		return true
+		return ThinkPause = KLWConst.THINK_PAUSE_MS
 }
 
 ; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
@@ -1348,8 +1625,10 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
 ; @param db {Integer} Open database handle.
 ; @param Dates {Integer|Array} 0 for every row, else the dates to clear.
 ; @returns {Boolean} Whether every deletion succeeded; discard the candidate on failure.
-KLR_ClearAggregates(db, Dates := 0) {
+KLR_ClearAggregates(db, Dates := 0, Scoped := false) {
 	Scope := _KLR_DateScope(Dates, "date")
+	if Scoped
+		return _KLR_ClearReplayScope(db, Scope)
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
 	            "agg_app_day_session", "agg_app_day_chars_class",
 	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
@@ -1363,6 +1642,37 @@ KLR_ClearAggregates(db, Dates := 0) {
 	            "ngram_scancodes"]
 		if !KLR_ExecAggregateStep(db, "clear " . tbl,
 				"DELETE FROM " . tbl . " WHERE 1=1" . Scope . ";")
+			return false
+	return true
+}
+
+; Tables a scoped replay clears per app-day: what the logical and window
+; sweeps write (walker-owned or shared with an SQL rollup, keyed by app). The
+; system sweep's tables are cleared only for a whole replayed day; the SQL-only
+; table is cleared for every affected day, as its rollup rebuilds it whole.
+class KLRReplayTables {
+	static PER_APP := ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
+		"agg_app_day_session", "agg_app_day_chars_class", "agg_app_day_errors",
+		"agg_app_day_ergo", "agg_app_day_layouts", "agg_app_day_titles",
+		"agg_app_day_hourly", "agg_app_day_hourly_min5", "ngram_chars",
+		"ngram_bigrams", "ngram_trigrams", "ngram_quadgrams", "ngram_pentagrams",
+		"ngram_hexagrams", "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
+		"ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes", "ngram_scancodes"]
+	static WHOLE_DAY := ["agg_app_day_kc_hold", "agg_system_day"]
+	static SQL_ONLY := ["agg_app_day_switches_to"]
+}
+
+_KLR_ClearReplayScope(db, DateScope) {
+	for tbl in KLRReplayTables.PER_APP
+		if !KLR_ExecAggregateStep(db, "clear " . tbl,
+				"DELETE FROM " . tbl . " WHERE 1=1" . DateScope . KLR_ReplayScopeSql(tbl) . ";")
+			return false
+	for tbl in KLRReplayTables.WHOLE_DAY
+		if !KLR_ExecAggregateStep(db, "clear " . tbl,
+				"DELETE FROM " . tbl . " WHERE 1=1" . DateScope . KLR_ReplayScopeSql(tbl, false) . ";")
+			return false
+	for tbl in KLRReplayTables.SQL_ONLY
+		if !KLR_ExecAggregateStep(db, "clear " . tbl, "DELETE FROM " . tbl . " WHERE 1=1" . DateScope . ";")
 			return false
 	return true
 }
@@ -1409,6 +1719,102 @@ _KLR_DateScope(Dates, Column) {
 	return (Literals = "") ? " AND 0" : " AND " . Column . " IN (" . Literals . ")"
 }
 
+; ======================================================
+; Replay scope: the app-days a ledger tail changed
+; ======================================================
+;
+; A refresh used to clear and replay every app of every day the tail named:
+; 4 to 33 s on a heavy day for a tail of a few keystrokes. The walker's state is
+; keyed by app (the n-gram context) and by app and day (bursts, sessions,
+; errors), and each row it writes carries the app of the event that produced it,
+; so the logical and window sweeps of one app never read or write another app's
+; state. A scoped refresh therefore clears and replays only the (device, day,
+; app) the tail inserted into or deleted from. The system sweep writes per-day
+; rows with no app (agg_system_day): a tail that touches events_system, or an
+; event with no app, rebuilds that device's whole day as before. Days the tail
+; named without changing a replayed row keep their walker rows; their SQL
+; rollups still recompute, and those upsert to the same values.
+;
+; The capture uses TEMP triggers on the candidate, so it records the rows SQLite
+; actually changed: a re-appended row that INSERT OR IGNORE skips, or one the
+; purge guard refuses, adds nothing, and a purge's deletions add their days.
+
+class KLRReplayScope {
+	; Event tables whose rows a replay sweep reads, and whether they carry the app.
+	static SOURCES := Map("events_typing", true, "events_llm", true, "events_shortcut", true,
+		"events_window_switch", true, "events_system", false)
+}
+
+; Starts recording the app-days the next writes touch.
+; @param db {Integer} The private candidate, before the tail is applied.
+; @returns {Boolean} Whether the capture is installed.
+KLR_ReplayScopeBegin(db) {
+	if !KLR_EnsureTypingProjectionTable(db)
+		return false
+	Sql := "CREATE TEMP TABLE klr_replay_touched (device_id TEXT NOT NULL, date TEXT NOT NULL, "
+		. "app TEXT NOT NULL, PRIMARY KEY (device_id, date, app)) WITHOUT ROWID;"
+	for Table, HasApp in KLRReplayScope.SOURCES {
+		for Op, Row in Map("INSERT", "NEW", "DELETE", "OLD", "UPDATE", "OLD") {
+			Rows := (Op = "UPDATE") ? ["OLD", "NEW"] : [Row]
+			Body := ""
+			for Ref in Rows {
+				; A day-wide sweep, or an event without an app, rebuilds the whole day.
+				App := HasApp
+					? "CASE WHEN COALESCE(" . Ref . ".app,'')='' THEN '*' ELSE " . Ref . ".app END"
+					: "'*'"
+				; A trigger body cannot qualify the table it writes: TEMP is searched first.
+				Body .= "INSERT OR IGNORE INTO klr_replay_touched VALUES ("
+					. Ref . ".device_id," . Ref . ".date," . App . ");"
+			}
+			Sql .= "CREATE TEMP TRIGGER klr_replay_touch_" . Table . "_" . StrLower(Op)
+				. " AFTER " . Op . " ON " . Table . " BEGIN " . Body . " END;"
+		}
+	}
+	return SQLite_Exec(db, Sql)
+}
+
+; Stops recording; the touched rows stay for KLR_ReplayScopeBuild.
+; @param db {Integer} The private candidate.
+; @returns {Boolean} Whether every capture trigger is gone.
+KLR_ReplayScopeEndCapture(db) {
+	Sql := ""
+	for Table in KLRReplayScope.SOURCES
+		for Op in ["insert", "delete", "update"]
+			Sql .= "DROP TRIGGER temp.klr_replay_touch_" . Table . "_" . Op . ";"
+	return SQLite_Exec(db, Sql)
+}
+
+; Builds temp.klr_replay_scope: the touched app-days of the affected days, with
+; app '*' for a whole replayed day.
+; @param db {Integer} The private candidate.
+; @param Dates {Array} The days the tail named (KLR_CacheAffectedDates).
+; @returns {Boolean} Whether the scope table is ready.
+KLR_ReplayScopeBuild(db, Dates) {
+	if !(Dates is Array)
+		throw ValueError("A replay scope needs the affected days.")
+	return SQLite_Exec(db, "CREATE TEMP TABLE klr_replay_scope (device_id TEXT NOT NULL, "
+		. "date TEXT NOT NULL, app TEXT NOT NULL, PRIMARY KEY (device_id, date, app)) WITHOUT ROWID;"
+		. "INSERT INTO temp.klr_replay_scope SELECT device_id, date, app FROM temp.klr_replay_touched "
+		. "WHERE 1=1" . _KLR_DateScope(Dates, "date") . ";"
+		. "DROP TABLE temp.klr_replay_touched;")
+}
+
+; @param db {Integer} The private candidate, once its replay is done.
+; @returns {Boolean} Whether the scope table is gone.
+KLR_ReplayScopeDrop(db) {
+	return SQLite_Exec(db, "DROP TABLE temp.klr_replay_scope;")
+}
+
+; SQL fragment keeping a row of Alias inside the replay scope.
+; @param Alias {String} Table name or alias with device_id, date (and app).
+; @param PerApp {Boolean} False for a table without app: only whole days match.
+; @returns {String} An " AND EXISTS (...)" clause.
+KLR_ReplayScopeSql(Alias, PerApp := true) {
+	return " AND EXISTS (SELECT 1 FROM temp.klr_replay_scope AS rs WHERE rs.device_id=" . Alias
+		. ".device_id AND rs.date=" . Alias . ".date AND "
+		. (PerApp ? "rs.app IN ('*'," . Alias . ".app)" : "rs.app='*'") . ")"
+}
+
 ; The unchanged-ledger resident path updates a published handle rather than an
 ; isolated candidate. Own one transaction so a later rollup cannot expose the
 ; successful prefix of a failed refresh. Never adopt a caller's transaction.
@@ -1446,7 +1852,17 @@ KLR_RefreshResidentAggregates(db) {
 }
 
 KLR_RebuildTitleCounts(db, Dates := 0) {
-	return KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	; The shared page labels c as manual keystrokes, not focus visits. The
+	; accepted typing projection already excludes synthetic input and retains
+	; backspaces; group that exact count by the typing row's actual app/title.
+	return KLR_ExecAggregateStep(db, "window-titles",
+		"INSERT INTO agg_app_day_titles (device_id,date,app,title,c) "
+		. "SELECT t.device_id,t.date,t.app,t.title,SUM(p.chars) "
+		. "FROM events_typing AS t JOIN klr_reader_typing_counts AS p "
+		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "WHERE t.title IS NOT NULL AND t.title!=''" . _KLR_DateScope(Dates, "t.date")
+		. " GROUP BY t.device_id,t.date,t.app,t.title ON CONFLICT(device_id,date,app,title) "
+		. "DO UPDATE SET c=excluded.c;")
 }
 
 KLR_TrimTitles(db, Dates := 0) {
@@ -1471,8 +1887,7 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	TypingDailySql := "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms, category) "
 		. "SELECT t.device_id, t.date, t.app, "
 		. "SUM(p.chars), "
-		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), "
-		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END), "
+		. "SUM(p.pauses), SUM(p.think_time_ms), "
 		. "COALESCE((SELECT latest.app_category FROM events_typing AS latest "
 		. "WHERE latest.device_id=t.device_id AND latest.date=t.date AND latest.app=t.app "
 		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
@@ -1513,12 +1928,12 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(" . KLR_LocalTsSql("t") . ",12,2) AS hour, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(lts,12,2) || ':' || CASE WHEN (CAST(substr(lts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(lts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(chars) FROM (SELECT t.device_id, t.date, t.app, " . KLR_LocalTsSql("t") . " AS lts, p.chars FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . ") GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; Standalone SQL refreshes remain bounded; replay restores these counts
@@ -1552,6 +1967,33 @@ KLR_RebuildAggregates(db, Dates := 0) {
 		. "wifi_changes=excluded.wifi_changes,locked_ms=excluded.locked_ms,"
 		. "sleep_ms=excluded.sleep_ms,awake_ms=excluded.awake_ms;")
 		return false
+	; The actual Wi-Fi poll emits network_change, including a first baseline
+	; and signal-only rows. Count only known connectivity or SSID identity changes;
+	; prior connectivity is explicit so reconnects count without treating startup
+	; baselines as transitions. Legacy rows retain only provable hash changes.
+	; Retain historical wifi_change system rows from earlier/imported journals.
+	NetworkHash := "json_extract(meta_json,'$.ssid_hash')"
+	PreviousHash := "json_extract(meta_json,'$.prev_ssid_hash')"
+	NetworkState := "json_extract(meta_json,'$.connection_state')"
+	PreviousState := "json_extract(meta_json,'$.prev_connection_state')"
+	if !KLR_ExecAggregateStep(db, "wifi-day",
+		"INSERT INTO agg_system_day(device_id,date,wifi_changes) "
+		. "SELECT device_id,date,COUNT(*) FROM ("
+		. "SELECT device_id,date FROM events_system WHERE action='wifi_change'"
+		. _KLR_DateScope(Dates, "date")
+		. " UNION ALL SELECT device_id,date FROM events_network WHERE kind='network_change'"
+		. " AND ((" . NetworkState . "='connected' AND " . PreviousState . "='disconnected')"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . "='connected')"
+		. " OR (" . NetworkState . "='connected' AND (" . PreviousState . "='connected' OR " . PreviousState . " IS NULL)"
+		. " AND typeof(" . NetworkHash . ")='text' AND " . NetworkHash . "!=''"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''"
+		. " AND " . NetworkHash . "!=" . PreviousHash . ")"
+		. " OR (" . NetworkState . "='disconnected' AND " . PreviousState . " IS NULL"
+		. " AND typeof(" . PreviousHash . ")='text' AND " . PreviousHash . "!=''))"
+		. _KLR_DateScope(Dates, "date")
+		. ") GROUP BY device_id,date ON CONFLICT(device_id,date) DO UPDATE SET wifi_changes=excluded.wifi_changes;")
+		return false
+
 	return true
 }
 
@@ -1636,24 +2078,26 @@ KLR_ReplaySweep(db, sql, Consumer, Sweep, DeviceId) {
 ;   affected days in full — after KLR_ClearAggregates dropped them — reproduces
 ;   exactly the same rows a cold rebuild would, including the JSON bucket blobs
 ;   that a tail-only replay would truncate (klr-reader-durable-cache).
-KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
+; @param Scoped {Boolean} True to replay only temp.klr_replay_scope, the
+;   app-days a tail changed (KLR_ReplayScopeBegin), each still in full.
+KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0, Scoped := false) {
 		global KLRReplay, KLRLastReplayFailure
 		KLRLastReplayFailure := Map()
 		if !db
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates, true, Scoped)) {
+				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
+						"unknown", "unknown",
+						"typing projection preparation failed")
+				return -1
+		}
 		; SQL-only refreshes may have trimmed a title before its focus time was
 		; known. Restore authoritative counts before the first replay flush.
 		if !KLR_RebuildTitleCounts(db, Dates) {
 				KLR_CaptureReplayFailure("title-counts", "unknown", 0,
 						"unknown", "unknown", "title count restoration failed")
-				return -1
-		}
-		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
-				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
-						"unknown", "unknown",
-						"typing projection preparation failed")
 				return -1
 		}
 
@@ -1667,7 +2111,9 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 		try {
 				accepted_marker := SQLite_Q(KLWConst.LLM_ACCEPTED_METRICS_SOURCE)
 				date_scope := _KLR_DateScope(Dates, "date")
-				devices := SQLite_Query(db,
+				devices := Scoped
+						? SQLite_Query(db, "SELECT DISTINCT device_id FROM temp.klr_replay_scope ORDER BY device_id;")
+						: SQLite_Query(db,
 						"SELECT DISTINCT device_id FROM ("
 						. "SELECT device_id FROM events_typing WHERE 1=1" . date_scope . " "
 						. "UNION SELECT device_id FROM events_shortcut WHERE 1=1" . date_scope . " "
@@ -1688,30 +2134,34 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								"entries_since_flush", 0,
 								"activity", Map(),
 								"replayed", 0,
-								"ok", true
+								"ok", true,
+								"legacy_offset", KLR_LegacyRowOffset(db, device_id),
+								"legacy_rows", 0
 						)
 
 						device_where := " WHERE device_id=" . SQLite_Q(device_id) . date_scope
 						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
 								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
-								. "'' AS shortcut_key "
+								. "'' AS shortcut_key, utc_offset_min "
 								. "FROM events_typing AS t JOIN temp.klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
-								. _KLR_DateScope(Dates, "t.date")
+								. _KLR_DateScope(Dates, "t.date") . (Scoped ? KLR_ReplayScopeSql("t") : "")
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
-								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"
+								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key, utc_offset_min FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
+								. (Scoped ? KLR_ReplayScopeSql("events_llm") : "")
 								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, '' AS context, "
-								. "'' AS prediction, 0 AS deletes, key AS shortcut_key "
+								. "'' AS prediction, 0 AS deletes, key AS shortcut_key, utc_offset_min "
 								. "FROM events_shortcut" . device_where
+								. (Scoped ? KLR_ReplayScopeSql("events_shortcut") : "")
 								. " ORDER BY id;"
-						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
-								. device_where . " ORDER BY ts, id;"
-						system_sql := "SELECT ts, action, metadata_json FROM events_system"
-								. device_where . " ORDER BY ts, id;"
+						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms, utc_offset_min FROM events_window_switch"
+								. device_where . (Scoped ? KLR_ReplayScopeSql("events_window_switch") : "") . " ORDER BY ts, id;"
+						system_sql := "SELECT ts, action, metadata_json, utc_offset_min FROM events_system"
+								. device_where . (Scoped ? KLR_ReplayScopeSql("events_system", false) : "") . " ORDER BY ts, id;"
 
 						if !KLR_ReplaySweep(db, logical_sql,
 								KLR_ReplayLogicalRow, "logical", device_id) {
@@ -1745,6 +2195,9 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								break
 						}
 						replayed += KLRReplay["replayed"]
+						if KLRReplay["legacy_rows"]
+								try LoggerInfo("KLReader", "Read {1} Linux row(s) of {2} recorded before utc_offset_min with this device's offset, {3} min.",
+										KLRReplay["legacy_rows"], device_id, KLRReplay["legacy_offset"])
 				}
 		} catch Error as Err {
 				KLR_CaptureReplayFailure("driver",
@@ -1774,6 +2227,44 @@ KLR_RowValue(row, key, default := "") {
 		return (row is Map && row.Has(key)) ? row[key] : default
 }
 
+; The offset an offset-less row of a device is read with: a Linux row recorded
+; before utc_offset_min held UTC and takes this device's current offset; any
+; other held local time and takes none (maintainer decision KMD-1).
+; @param db {Integer} Open handle.
+; @param DeviceId {String} The replayed device.
+; @returns {Integer|String} The offset, "" for a device whose rows held local time.
+KLR_LegacyRowOffset(db, DeviceId) {
+		Rows := SQLite_Query(db, "SELECT os FROM devices WHERE device_id=" . SQLite_Q(DeviceId) . ";")
+		return (Rows.Length && Rows[1]["os"] = "linux") ? KL_CurrentUtcOffset() : ""
+}
+
+; The offset a replayed row is read with: its own, else its device's legacy
+; reading (counted, so the replay names how many Linux rows took it).
+; @param row {Map} A row selected with utc_offset_min.
+; @returns {Integer|String} Minutes east of UTC, "" for a row in local time.
+KLR_RowOffset(row) {
+		global KLRReplay
+		Offset := KLR_RowValue(row, "utc_offset_min", "")
+		if (Offset != "")
+				return Integer(Offset)
+		Legacy := (KLRReplay is Map) ? KLRReplay.Get("legacy_offset", "") : ""
+		if (Legacy != "")
+				KLRReplay["legacy_rows"] += 1
+		return Legacy
+}
+
+; The local time of a raw row, as SQL over the table alias A: ts plus its
+; offset, an older Linux row's ts plus this device's current offset, any other
+; older row's ts as it is. Its hour and minute are the ones the user lived.
+; @param A {String} The events_* table alias.
+; @returns {String} An SQL expression.
+KLR_LocalTsSql(A) {
+		return "CASE WHEN " . A . ".utc_offset_min IS NOT NULL THEN strftime('%Y-%m-%d %H:%M:%f', " . A . ".ts, printf('%+d minutes', "
+				. A . ".utc_offset_min)) WHEN " . A . ".device_id IN (SELECT device_id FROM devices WHERE os = 'linux') THEN "
+				. "strftime('%Y-%m-%d %H:%M:%f', " . A . ".ts, printf('%+d minutes', " . KL_CurrentUtcOffset() . ")) ELSE "
+				. A . ".ts END"
+}
+
 ; Convert a durable typing row back to the exact entry shape the live walker
 ; receives.  The hand-written JSON parser works on the shipped 64-bit AHK,
 ; unlike the old ScriptControl path, so historical physical key metadata (`kc`
@@ -1784,6 +2275,7 @@ KLR_TypingRowToEntry(row) {
 				return 0
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"app_category", KLR_RowValue(row, "app_category", ""),
 				"title", KLR_RowValue(row, "title", ""),
@@ -1816,6 +2308,7 @@ KLR_LlmAcceptedRowToEntry(row) {
 
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"title", KLR_RowValue(row, "title", ""),
 				"layout", KLR_RowValue(row, "layout", ""),
@@ -1826,6 +2319,7 @@ KLR_LlmAcceptedRowToEntry(row) {
 KLR_ShortcutRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"key", KLR_RowValue(row, "shortcut_key", "")
 		)
@@ -1834,6 +2328,7 @@ KLR_ShortcutRowToEntry(row) {
 KLR_WindowRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
+				"utc_offset_min", KLR_RowOffset(row),
 				"app", KLR_RowValue(row, "app", "Unknown"),
 				"prev_title", KLR_RowValue(row, "prev_title", ""),
 				"next_title", KLR_RowValue(row, "next_title", ""),
@@ -1855,6 +2350,7 @@ KLR_SystemRowToEntry(row) {
 				metadata.Delete("duration_ms")
 		metadata := _KL_JsonNormalizeNull(metadata)
 		metadata["timestamp"] := KLR_RowValue(row, "ts", "")
+		metadata["utc_offset_min"] := KLR_RowOffset(row)
 		metadata["action"] := KLR_RowValue(row, "action", "")
 		return metadata
 }
@@ -1863,7 +2359,7 @@ KLR_SystemRowToEntry(row) {
 ; N-grams retain their existing per-device stream and documented scope behavior.
 KLR_ReplayActivityEntry(Entry) {
 		App := KLW_GetMap(Entry, "app", "Unknown")
-		Day := _KLW_ResolveTypingTime(KLW_GetMap(Entry, "timestamp", ""))["date"]
+		Day := _KLW_ResolveTypingTime(KLW_EntryLocalTimestamp(Entry))["date"]
 		States := KLRReplay["activity"]
 		if !States.Has(App)
 				States[App] := Map()

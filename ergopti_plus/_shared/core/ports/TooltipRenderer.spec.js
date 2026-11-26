@@ -8,14 +8,14 @@
  * displays the Ergopti+ tooltip MUST satisfy this interface. The port accepts
  * the draw_calls[] IR and translates it to native drawing calls. The IR is the
  * payload SHAPE this contract passes; the composer that once built it
- * (_shared/modules/tooltip/draw_calls.js, 433 lines) was deleted on 2026-08-03
+ * (_shared/core/ui/data/tooltip/draw_calls.js, 433 lines) was deleted on 2026-08-03
  * because no driver ever implemented it — Windows and macOS both render natively,
  * and the drivers build the payload themselves.
  *
  * FEATURES & RATIONALE:
  * 1. IR-driven rendering: the adapter receives a draw_calls[] array and maps
  *    each call to its native API (AHK Gui/GDI, HS canvas). No layout
- *    arithmetic is done inside the adapter — that lives in _shared/modules/tooltip/.
+ *    arithmetic is done inside the adapter — that lives in _shared/core/ui/data/tooltip/.
  * 2. Partial update path: adapters that support indexed element mutation
  *    (hs.canvas) implement updateElement() to replace a single draw call
  *    without a full redraw, enabling flicker-free LLM token streaming.
@@ -47,7 +47,7 @@ const portContract = {
 	 * show(payload) — Render or update the tooltip.
 	 *   @param {object}   payload
 	 *   @param {Array}    payload.draw_calls  Ordered draw_calls[] IR array
-	 *                     (see _shared/modules/tooltip/draw_calls.js).
+	 *                     (see _shared/core/ui/data/tooltip/draw_calls.js).
 	 *   @param {object}   payload.position    { x: number, y: number }
 	 *                     Screen coordinates in logical pixels (already clamped
 	 *                     by the layout engine).

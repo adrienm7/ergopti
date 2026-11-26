@@ -37,14 +37,14 @@ local function fresh_harness(options)
 	package.loaded["platform.remap.watchers"] = nil
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
-	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	-- TaskLifecycle captures `hs` at require time; reload it so any task the
 	-- watcher could construct reaches the spy below instead of a stale stub.
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 
 	local h = {
 		clock = 1000,
@@ -80,9 +80,9 @@ local function fresh_harness(options)
 		end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
@@ -98,7 +98,7 @@ local function fresh_harness(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
 	}
 	package.loaded["platform.remap.ke_variables"] = {
@@ -186,7 +186,7 @@ local function fresh_harness(options)
 		},
 	}
 
-	h.sentinels = require("modules.keymap.control_sentinels")
+	h.sentinels = require("hotstrings.engine.expander.control_sentinels")
 	local register_listener = h.sentinels.set_listener
 	h.sentinels.set_listener = function(name, callback)
 		if callback then h.signal_listener = callback end
@@ -238,6 +238,20 @@ end
 -- =========================================
 
 helpers.describe("CapsWord native activation reaches the pointer owner", function()
+	helpers.it("a new activation owns a clear while the old clear is pending (capsword-clear-reentrant)", function()
+		local h = fresh_harness()
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		pointer(h)
+		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })
+		pointer(h)
+		helpers.assert_eq(#h.writers, 2, "the new activation must receive its own clear")
+		settle(h, 1, true)
+		h.pending_activation = true
+		pointer(h)
+		helpers.assert_eq(#h.writers, 2, "old settlement must not release the newer pending clear")
+		settle(h, 2, true)
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+	end)
 	helpers.it("clears a Karabiner activation only after the exact writer acknowledges", function()
 		local h = fresh_harness()
 		h.sentinels.claim_key(90, true, { ctrl = true, alt = true, shift = true })

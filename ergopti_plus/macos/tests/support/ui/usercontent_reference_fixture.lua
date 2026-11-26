@@ -13,20 +13,20 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real picker and native observations.
 local function with_picker(scenario)
 	return helpers.with_stub_scope({
-		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "infra.logger",
-		"infra.i18n", "infra.paths", "infra.timings", "json", "program_provider_picker",
-		"adapters.program_providers", "adapters.apple_shortcuts_native",
+		"ui.action_picker", "core.ui.ui.webview_controller_pool", "core.ui.ui.builder", "core.logger.engine.logger",
+		"core.i18n.engine.i18n", "core.fs.engine.paths", "core.timing.engine.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
+		"core.process.adapters.program_providers", "adapters.apple_shortcuts_native",
 	}, function()
 		local h = { controllers = {}, userdata_refs = {}, callback_refs = {}, views = {}, errors = {}, nil_calls = 0 }
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) h.errors[#h.errors + 1] = string.format(message, ...) end
 		logger.callback = function(_, _, callback, ...) return pcall(callback, ...) end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 		helpers.provide_timings()
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["adapters.apple_shortcuts_native"] = {}
 		local function new_controller(name)
 			local controller = { name = name }
@@ -49,16 +49,25 @@ local function with_picker(scenario)
 			return controller
 		end
 		h.native_new = new_controller
-		_G.hs = { webview = { usercontent = { new = new_controller } }, json = { encode = Json.encode } }
-		package.loaded["ui.ui_builder"] = {
+		_G.hs = { webview = { usercontent = { new = new_controller } }, json = { encode = function(value)
+			if h.encode_throws then error("native encoder refused the payload") end
+			return Json.encode(value)
+		end } }
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 600, height = 400 } end,
 			get_centered_frame = function(width, height) return { x = 0, y = 0, w = width, h = height } end,
+			get_app_frame = function(geo) return { x = 0, y = 0, w = geo.width, h = geo.height } end,
 			show_webview = function(options)
 				if h.factory_refuses then return nil end
-				local view = { options = options, deleted = false, evaluations = {} }
-				function view:evaluateJavaScript(script)
+				local view = { options = options, deleted = false, evaluations = {}, completions = {} }
+				-- h.eval_mode models the native submission: nil accepts and returns the
+				-- view, "throw" raises, "refuse" returns nil.
+				function view:evaluateJavaScript(script, completion)
 					assert(not self.deleted, "retired window cannot receive JavaScript")
 					self.evaluations[#self.evaluations + 1] = script
+					self.completions[#self.completions + 1] = completion
+					if h.eval_mode == "throw" then error("native evaluation raised") end
+					if h.eval_mode == "refuse" then return nil end
 					return self
 				end
 				function view:delete()

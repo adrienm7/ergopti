@@ -39,7 +39,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 			try runtime.verify()
 			try OwnedRuntimeInstallOwner.validateInstalledProductsForPeer(at: Self.runtime, leaf: leaf)
 			try runtime.verify(); try launcher.verifyAnchor()
-			guard publisher.current(), lifecycle.current(), lifecycle.permitsInstalledImages(), signingLeaf(principal) == leaf else { throw OwnedRuntimeInstallFailure.principal }
+			guard publisher.current(), lifecycle.current(), lifecycle.permitsInstalledImages(), signingLeaf(principal) == leaf else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 			let owner = OwnedRuntimeInstalledPeerOwner(publisher: publisher, principal: principal, leaf: leaf, launcher: launcher,
 				runtime: runtime, lifecycle: lifecycle)
 			Self.rootLock.lock(); Self.active[ObjectIdentifier(owner)] = owner; Self.rootLock.unlock()
@@ -51,7 +51,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 	}
 	private func verify() throws {
 		guard !revoked, !closeRefused, publisher.current(), getuid() != 0, getuid() == geteuid(), Bundle.main.bundleIdentifier == kErgoptiBundleId,
-			Self.signingLeaf(principal) == leaf, lifecycle.current(), lifecycle.permitsInstalledImages() else { throw OwnedRuntimeInstallFailure.principal }
+			Self.signingLeaf(principal) == leaf, lifecycle.current(), lifecycle.permitsInstalledImages() else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 		try launcher.verifyAnchor(); try runtimeTree.verify()
 	}
 	/// Native currentness observation only; this creates no peer, image lease, process or readiness authority.
@@ -62,14 +62,14 @@ final class OwnedRuntimeInstalledPeerOwner {
 			try verify()
 			let root = try runtimeTree.duplicateRootDescriptor(); defer { Darwin.close(root) }
 			let bin = openat(root, "bin", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-			guard bin >= 0 else { throw OwnedRuntimeInstallFailure.source }; defer { Darwin.close(bin) }
+			guard bin >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }; defer { Darwin.close(bin) }
 			let descriptor = openat(bin, "ergoptiplus_remap_cli", O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			var admitted = false; defer { if !admitted { Darwin.close(descriptor) } }
 			var identity = stat()
 			guard fstat(descriptor, &identity) == 0, identity.st_uid == 0,
-				identity.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), identity.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.protection }
-			guard leaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.mutated }
+				identity.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), identity.st_nlink == 1 else { throw OwnedRuntimeInstallFailure.traced(.protection) }
+			guard leaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			outstanding += 1; admitted = true
 			return CLIImageLease(owner: self, descriptor: descriptor, identity: identity)
 		} catch { return nil }
@@ -90,7 +90,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 	}
 	private func inheritance(_ descriptor: Int32, identity: stat, actions: inout posix_spawn_file_actions_t?) throws {
 		lock.lock(); defer { lock.unlock() }
-		guard leaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.mutated }
+		guard leaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		try lifecycle.installInheritance(actions: &actions)
 	}
 	/// The Console image is a distinct protected leaf, not a CLI or process capability.
@@ -111,15 +111,15 @@ final class OwnedRuntimeInstalledPeerOwner {
 			var parent = try runtimeTree.duplicateRootDescriptor(); ancestors.append(parent)
 			for component in ["ErgoptiPlus-Remap-Console.app", "Contents", "MacOS"] {
 				let next = openat(parent, component, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-				guard next >= 0 else { throw OwnedRuntimeInstallFailure.source }
+				guard next >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 				ancestors.append(next); parent = next
 			}
 			descriptor = openat(parent, "ErgoptiPlus-Remap-Console", O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.source }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.source) }
 			var identity = stat()
 			guard fstat(descriptor, &identity) == 0, identity.st_uid == 0,
 				identity.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), identity.st_nlink == 1,
-				consoleLeaseCurrent(descriptor, identity: identity), closeAncestors() else { throw OwnedRuntimeInstallFailure.protection }
+				consoleLeaseCurrent(descriptor, identity: identity), closeAncestors() else { throw OwnedRuntimeInstallFailure.traced(.protection) }
 			try verify()
 			outstanding += 1; published = true
 			return ConsoleImageLease(owner: self, descriptor: descriptor, identity: identity)
@@ -138,7 +138,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 	}
 	private func consoleInheritance(_ descriptor: Int32, identity: stat, actions: inout posix_spawn_file_actions_t?) throws {
 		lock.lock(); defer { lock.unlock() }
-		guard consoleLeaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.mutated }
+		guard consoleLeaseCurrent(descriptor, identity: identity) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 		try lifecycle.installInheritance(actions: &actions)
 	}
 	private func consoleGuestCurrent(_ observation: ergopti_owned_program_observation, descriptor: Int32, identity: stat) -> Bool {
@@ -242,7 +242,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 			return !revoked && owner.consoleGuestCurrent(observation, descriptor: descriptor, identity: identity)
 		}
 		func installLifecycleInheritance(actions: inout posix_spawn_file_actions_t?) throws {
-			lock.lock(); defer { lock.unlock() }; guard !revoked else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			lock.lock(); defer { lock.unlock() }; guard !revoked else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			try owner.consoleInheritance(descriptor, identity: identity, actions: &actions)
 		}
 		func requestRetirement() {
@@ -270,7 +270,7 @@ final class OwnedRuntimeInstalledPeerOwner {
 		}
 		func installLifecycleInheritance(actions: inout posix_spawn_file_actions_t?) throws {
 			lock.lock(); defer { lock.unlock() }
-			guard !revoked else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard !revoked else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			try owner.inheritance(descriptor, identity: identity, actions: &actions)
 		}
 		func requestRetirement() {

@@ -13,6 +13,18 @@ local M = {}
 local MODELS = setmetatable({}, { __mode = "k" })
 local INITIAL_HEADERS = setmetatable({}, { __mode = "k" })
 
+--- File name of Ergopti Studio's saved read beside the store, read from its
+--- shared contract with plain io: fixtures load this module while the paths
+--- and file ports are stubbed.
+local SAVED_READ = (function()
+	local file = assert(io.open(helpers.shared("metrics/data/studio_ngrams.json"), "rb"))
+	local raw = file:read("a")
+	file:close()
+	local name = assert(raw:match('"snapshot"%s*:%s*{[^}]-"file"%s*:%s*"([^"]+)"'),
+		"the Ergopti Studio contract names no saved-read file")
+	return "/" .. name
+end)()
+
 --- Models only the create-only initial header of a non-IO fixture volume.
 --- Other files keep their existing failure, identity and publication ports.
 --- @param files table Fixture-owned filesystem model.
@@ -54,6 +66,14 @@ function M.model_initial_header(files, initially_present)
 		end
 		if read then return read(path, ...) end
 		return nil, "absent"
+	end
+	-- A fresh cache retires Ergopti Studio's saved read of the previous one
+	-- (log_manager init); an empty volume has none, so its removal is a no-op.
+	local delete = files.delete
+	function files.delete(path)
+		if type(path) == "string" and path:sub(-#SAVED_READ) == SAVED_READ then return true end
+		assert(type(delete) == "function", "unmodeled initial-volume deletion: " .. tostring(path))
+		return delete(path)
 	end
 end
 
@@ -133,8 +153,8 @@ end
 --- @param overrides table|nil Existing scenario's native overrides.
 --- @return table manager Actual production manager, with no method wrapped.
 function M.load(overrides)
-	local files = package.loaded["adapters.file_system"]
-	if type(files) ~= "table" then files = {}; package.loaded["adapters.file_system"] = files end
+	local files = package.loaded["core.fs.adapters.file_system"]
+	if type(files) ~= "table" then files = {}; package.loaded["core.fs.adapters.file_system"] = files end
 	local manager, ingest_once
 	local function get_current_paths()
 		assert(type(ingest_once) == "function", "fixture manager is not loaded")
@@ -151,7 +171,7 @@ function M.load(overrides)
 		end
 	end
 	M.extend(files, get_current_paths)
-	package.loaded["adapters.ledger_append"] = nil
+	package.loaded["core.fs.adapters.ledger_append"] = nil
 	manager = helpers.load_with_stubs("modules.keystats.log_manager", overrides)
 	-- Scenarios may wrap the public method; retain its actual path owner.
 	ingest_once = manager.ingest_once

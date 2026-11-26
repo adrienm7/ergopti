@@ -25,7 +25,7 @@
 ; If the keyboard layout changes, the script must be reloaded.
 AddShortcut(Modifier, Letter, Callback) {
 		if Modifier == "#"
-				return MagicEditorRecordLegacy(RetrieveScancode(Letter), Callback)
+				return StarSlotRecordLegacy(RetrieveScancode(Letter), Callback)
 		; Hotkey() can reject an unavailable/invalid key combination.  Shortcut
 		; registration happens during boot, so contain the failure here rather than
 		; aborting the remaining keyboard feature registrations.

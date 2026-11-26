@@ -23,6 +23,7 @@
 local helpers        = require("tests.helpers")
 local KarabinerModel = require("tests.support.karabiner_model")
 local SourceFile     = require("tests.support.source_file")
+local Sequence       = require("tests.support.script_chord_sequence")
 
 local TOKEN    = "0123456789abcdef0123456789abcdef"
 local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
@@ -41,8 +42,11 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- The CapsWord rule leaves its delimiter and click exits to the
 -- [shortcuts.caps_word] settings; every other rule digests as before
 -- (capsword-auto-off-settings).
+-- A running script chord is a sequence (2026-11-17): every key-down lowers
+-- the sequence variable right Command raises, and a last rule lowers it for
+-- the registry keys no earlier rule takes (script-chord-sequence).
 local TAP_HOLDS_ON_PINS = {
-	default     = { rules = 24, digest = "cff39a3f5e11da3e" },
+	default     = { rules = 25, digest = "4795ffc1ce7d4f84" },
 	-- Re-pinned for PAR-17: the recommended pairs became the three tap slots
 	-- Windows and Linux ship, with no chord and no hold slot.
 	-- Re-pinned for PAR-15: the global delay is the registry's 200 ms (it was 250 ms)
@@ -52,7 +56,23 @@ local TAP_HOLDS_ON_PINS = {
 	-- the hold labels named from the key name table, which the rule descriptions
 	-- carry (« ⇧ Maj »). Then for the navigation-layer hold named as the hold
 	-- picker names the layer, which the left Command rule's description carries.
-	recommended = { rules = 27, digest = "2aeebd435b52486e" },
+	-- Then for the AltGr hold named from the key name table (it read « ⌥ AltGr
+	-- (option droite — interne) »), which the right Command rule's description carries.
+	-- Then for the tap-hold command marker: a tap sending a Cmd, Ctrl or Option
+	-- chord is led by the tagged F20 the word reset reads (tap_hold_resets_word).
+	-- Then for the tap-hold modifier marker: a hold pressing Ctrl, Cmd or Option
+	-- of its own is led by the untagged context-menu key (the digest is the old
+	-- one with the marker left out). Then for the tap minimum
+	-- (tap_hold.tap_min_duration_ms): every release-judged tap is gated on a
+	-- variable a delayed action raises once the minimum has elapsed. Then for
+	-- the pairs' press order (2026-11-12): a key-down of a first key shared by
+	-- several pairs records the rivals already held, and each such pair waits
+	-- for no rival held before its own first key. Then for the script chord
+	-- sequence (script-chord-sequence). Then for the maintainer decisions of
+	-- 2026-11-21: left Command's Backspace tap gains its modifier variants
+	-- (THD-4) and the pair taps under the layer left Command holds lift it
+	-- around their action (THD-1).
+	recommended = { rules = 28, digest = "1fac3e4662bedc89" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
@@ -143,21 +163,21 @@ local function describe(keys)
 end
 
 helpers.with_fresh_modules({
-	"adapters.file_system",
-	"infra.config_paths",
-	"infra.keycodes",
-	"infra.logger",
-	"infra.toml.codec",
+	"core.fs.adapters.file_system",
+	"settings.engine.paths",
+	"platform.input.keycodes",
+	"core.logger.engine.logger",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.config_paths"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,
@@ -166,9 +186,9 @@ helpers.with_fresh_modules({
 		F19_LAYER_NAV_EXITED    = 80,
 	}
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = SourceFile.read,
 		read_with_status = function(path) return SourceFile.read(path), "ok" end,
 	}
@@ -210,7 +230,7 @@ helpers.with_fresh_modules({
 	local function state_with(tap_holds, combinations, pair, slots)
 		local state = Config.build_default_state(keys, combos)
 		state.tap_holds_enabled = tap_holds
-		state.mod_combos_enabled = combinations
+		state.key_combinations_enabled = combinations
 		if pair then state.mod_combos_config[pair] = slots end
 		return state
 	end
@@ -318,7 +338,7 @@ helpers.with_fresh_modules({
 		helpers.it("a chosen LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)", function()
 			local state = Config.build_recommended_state(keys, combos)
 			state.tap_holds_enabled = false
-			state.mod_combos_enabled = true
+			state.key_combinations_enabled = true
 			state.mod_combos_config.lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
 			local engine = engine_for(rules_of(state))
 			helpers.assert_true(engine:chord({ "left_command", "right_command" }) ~= nil, "a chord rule takes both keys")
@@ -350,7 +370,7 @@ helpers.with_fresh_modules({
 			local recommended = Config.build_recommended_state(keys, combos)
 			recommended.tap_holds_enabled = true
 			local absent = rules_of(recommended)
-			recommended.mod_combos_enabled = true
+			recommended.key_combinations_enabled = true
 			helpers.assert_eq(rules_of(recommended), absent, "an absent switch is on")
 		end)
 
@@ -367,7 +387,7 @@ helpers.with_fresh_modules({
 				for _, combinations in ipairs({ "absent", "on" }) do
 					local state = builders[preset](keys, combos)
 					state.tap_holds_enabled = true
-					state.mod_combos_enabled = combinations == "on" or nil
+					state.key_combinations_enabled = combinations == "on" or nil
 					local rules = rules_of(state)
 					local pin = TAP_HOLDS_ON_PINS[preset]
 					local context = preset .. " preset, key combinations " .. combinations
@@ -395,6 +415,103 @@ helpers.with_fresh_modules({
 			helpers.assert_true(mutated, "the recommended preset has a var-based combination to mutate")
 			helpers.assert_true(digest(rules) ~= before, "a changed manipulator changes the digest")
 		end)
+
+		-- The word reset tells a tap-hold's own command from the keyboard's
+		-- chords by the tagged F20 that leads it (macos-tap-hold-word-reset).
+		helpers.it("a tap sending a Cmd, Ctrl or Option chord is led by the command marker (macos-tap-hold-word-reset)", function()
+			local state = Config.build_recommended_state(keys, combos)
+			state.tap_holds_enabled = true
+			local sentinel = package.loaded["platform.input.keycodes"].to_name(90)
+			local tag = require("layouts.engine.layers.control_signals").modifiers_for("tap_hold_command")
+			local function is_command(event)
+				for _, modifier in ipairs(type(event) == "table" and event.modifiers or {}) do
+					if modifier:find("command", 1, true) or modifier:find("control", 1, true)
+						or modifier:find("option", 1, true) then return true end
+				end
+				return false
+			end
+			local marked, plain = 0, 0
+			for _, rule in ipairs(rules_of(state)) do
+				for _, manipulator in ipairs(rule.manipulators or {}) do
+					local tap = manipulator.to_if_alone
+					if type(tap) == "table" and #tap > 0 then
+						local first = tap[1]
+						local is_marker = first.key_code == sentinel
+							and table.concat(first.modifiers or {}, "+") == table.concat(tag, "+")
+						if is_marker then
+							helpers.assert_true(#tap > 1 and is_command(tap[2]), "a marker leads a command: " .. tostring(rule.description))
+							marked = marked + 1
+						else
+							-- Another control sentinel (one-shot Shift, CapsWord) is no command.
+							for _, event in ipairs(tap) do
+								helpers.assert_true(event.key_code == sentinel or not is_command(event),
+									"an unmarked command tap: " .. tostring(rule.description))
+							end
+							plain = plain + 1
+						end
+					end
+				end
+			end
+			helpers.assert_true(marked > 0, "the recommended preset has command taps")
+			helpers.assert_true(plain > 0, "and taps that type their key")
+		end)
+
+		-- A shortcut under a tap-hold key's Ctrl, Cmd or Option hold follows
+		-- hotstrings.tap_hold_resets_word: an untagged context-menu key leads
+		-- the hold (macos-tap-hold-modifier-word-reset). A tag would make the
+		-- rule claim the hand's modifiers; the last `to` entry is the one
+		-- Karabiner keeps down, so the marker must come first.
+		helpers.it("a Ctrl, Cmd or Option hold is led by the untagged modifier marker (macos-tap-hold-modifier-word-reset)",
+			function()
+				local marker = require("platform.input.keycodes.core").CONTEXT_MENU_KARABINER_NAME
+				local state = Config.build_default_state(keys, combos)
+				state.tap_holds_enabled = true
+				state.tap_hold_config.caps_lock = { tap = "return", hold = "ctrl" }
+				state.tap_hold_config.tab = { tap = "tab", hold = "cmd" }
+				state.tap_hold_config.escape = { tap = "escape", hold = "shift" }
+				state.tap_hold_config.left_control = { tap = "escape", hold = "none" }
+				state.tap_hold_config.spacebar = { tap = "none", hold = "alt" }
+				local function marked_list(manipulator)
+					for _, field in ipairs({ "to", "to_if_held_down" }) do
+						for index, event in ipairs(manipulator[field] or {}) do
+							if type(event) == "table" and event.key_code == marker then
+								return manipulator[field], index
+							end
+						end
+					end
+					return nil
+				end
+				local seen = {}
+				for _, rule in ipairs(rules_of(state)) do
+					-- The rule ending the script chord sequence types the physical
+					-- context-menu key as is, which is no marker.
+					for _, manipulator in ipairs(Sequence.is_sequence_rule(rule) and {} or rule.manipulators or {}) do
+						local list, index = marked_list(manipulator)
+						local key_code = manipulator.from and manipulator.from.key_code
+						if list then
+							helpers.assert_eq(list[index].modifiers, nil, "the marker is untagged: " .. tostring(rule.description))
+							helpers.assert_true(index < #list, "the marker is never the held last entry")
+							local next_event = list[index + 1]
+							helpers.assert_true(next_event.key_code:find("control", 1, true) or next_event.key_code:find("command", 1, true)
+								or next_event.key_code:find("option", 1, true),
+								"the marker leads the hold's modifier: " .. tostring(rule.description))
+							for _, field in ipairs({ "to_if_alone", "to_after_key_up" }) do
+								for _, event in ipairs(manipulator[field] or {}) do
+									helpers.assert_true(event.key_code ~= marker, "no marker on " .. field)
+								end
+							end
+							seen[key_code] = true
+						elseif key_code then
+							seen[key_code] = seen[key_code] or false
+						end
+					end
+				end
+				helpers.assert_eq(seen.caps_lock, true, "caps_lock held as Ctrl is marked")
+				helpers.assert_eq(seen.tab, true, "tab held as Cmd is marked")
+				helpers.assert_eq(seen.spacebar, true, "the space bar held as Option is marked")
+				helpers.assert_eq(seen.escape, false, "a Shift hold only types: unmarked")
+				helpers.assert_eq(seen.left_control, false, "left Control held as itself is the keyboard's modifier")
+			end)
 
 		helpers.it("the combinations switched off generate no combination rule (combos-without-tap-holds)",
 			function()

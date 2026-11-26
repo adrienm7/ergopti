@@ -21,8 +21,8 @@ local helpers = require("tests.helpers")
 -- =========================================
 
 helpers.describe("FocusGuard: same-window secure-field navigation", function()
-	local previous_logger = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local FocusGuard = helpers.load_module("modules.keystats.focus_guard")
 
 	local function fixture()
@@ -156,16 +156,16 @@ helpers.describe("FocusGuard: same-window secure-field navigation", function()
 		helpers.assert_eq(guard.blocks_text(), true, "automation must remain fail-closed")
 	end)
 
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)
 
 
 helpers.describe("FocusGuard: live daemon word-boundary premise", function()
-	local previous_logger = package.loaded["logger.shim"]
-	local previous_engine = package.loaded["hotstring_engine"]
+	local previous_logger = package.loaded["core.logger.engine.shim"]
+	local previous_engine = package.loaded["hotstrings.engine.matcher"]
 	local previous_guard = package.loaded["modules.keystats.focus_guard"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
-	local Engine = helpers.load_module("hotstring_engine")
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
+	local Engine = helpers.load_module("hotstrings.engine.matcher")
 	local FocusGuard = helpers.load_module("modules.keystats.focus_guard")
 
 	local function observe(keys)
@@ -218,7 +218,7 @@ helpers.describe("FocusGuard: live daemon word-boundary premise", function()
 		helpers.assert_eq(matches, 0)
 		helpers.assert_eq(text, "xadn ")
 	end)
-	package.loaded["hotstring_engine"] = previous_engine
+	package.loaded["hotstrings.engine.matcher"] = previous_engine
 	package.loaded["modules.keystats.focus_guard"] = previous_guard
-	package.loaded["logger.shim"] = previous_logger
+	package.loaded["core.logger.engine.shim"] = previous_logger
 end)

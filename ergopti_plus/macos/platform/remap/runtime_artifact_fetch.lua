@@ -30,9 +30,9 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "remap.runtime_artifact_fetch"
 
@@ -64,6 +64,7 @@ M.REASON = {
 	MEMBERS = "artifact_members_refused",
 	EXTRACT = "artifact_extract_failed",
 	STORE = "artifact_store_failed",
+	BUSY = "artifact_busy",
 }
 local REASON = M.REASON
 
@@ -77,7 +78,7 @@ local function complete_pin(pin)
 	for _, key in ipairs(PIN_KEYS) do
 		if pin[key] == nil then return false end
 	end
-	return type(pin.version) == "string" and pin.version:match("^[%w%.%-+]+$") ~= nil
+	return require("platform.remap.runtime_manifest").valid_version(pin.version)
 		and type(pin.file_name) == "string" and pin.file_name:match("^[%w][%w%._%-]*$") ~= nil
 		and type(pin.source_url) == "string" and pin.source_url:match("^https://[^%s]+/" .. pin.file_name:gsub("%p", "%%%0") .. "$") ~= nil
 		and type(pin.sha256) == "string" and #pin.sha256 == 64 and pin.sha256:match("^%x+$") ~= nil
@@ -121,22 +122,26 @@ end
 --- Creates a fetcher bound to its ports.
 --- Port contracts:
 ---   exec(executable, args, timeout, fn(code|nil, stdout, stderr)) runs one command;
+---   network_command(curl_args) -> executable, args, describe(code, stderr) | nil, err
+---     wraps the download behind the system network route (NET-001);
 ---   exists(path) -> boolean; read(path) -> string|nil; write(path, content) -> boolean;
 ---   expand(path) -> absolute path.
 --- @param ports table exec, exists, read, write, expand.
 --- @return table fetcher { ensure, payload_for }.
 function M.new(ports)
 	assert(type(ports) == "table", "Missing artifact fetch ports")
-	for _, name in ipairs({ "exec", "exists", "read", "write", "expand" }) do
+	for _, name in ipairs({ "exec", "network_command", "exists", "read", "write", "expand" }) do
 		assert(type(ports[name]) == "function", "Missing artifact fetch port: " .. name)
 	end
 	local fetcher = {}
 	local waiters
+	local active_pin
 
 	--- Settles every waiter of the running fetch once.
 	local function settle(ok, value, detail)
 		local pending = waiters
 		waiters = nil
+		active_pin = nil
 		if ok then
 			Logger.success(LOG, "Owned runtime artifact ready at %s.", tostring(value))
 		elseif value == REASON.DOWNLOAD then
@@ -151,10 +156,16 @@ function M.new(ports)
 		end
 	end
 
+	-- The failure describer of a wrapped command, keyed by its exact argv table.
+	local describers = setmetatable({}, { __mode = "k" })
+
 	--- Runs one step and continues only on exit 0.
 	local function step(executable, args, timeout, reason, detail, continue)
+		local describe = describers[args]
 		ports.exec(executable, args, timeout, function(code, stdout, stderr)
 			if code ~= 0 then
+				local named = describe and describe(code, stderr)
+				if named then return settle(false, reason, detail .. " (" .. named .. ")") end
 				return settle(false, reason, detail .. " (" .. NativePath.basename(executable) .. " status "
 					.. tostring(code) .. (stderr and stderr ~= "" and (": " .. stderr:gsub("%s+$", "")) or "") .. ")")
 			end
@@ -170,8 +181,10 @@ function M.new(ports)
 		-- A first start has no folder yet: reading through a missing parent is an
 		-- ERROR of the file system adapter, while an absent receipt is the normal case.
 		if ports.exists(home .. "/receipt") ~= true then return false end
-		local receipt = ports.read(home .. "/receipt")
-		if type(receipt) ~= "string" or receipt:match("^(%x+)") ~= pin.sha256 then return false end
+		-- The exact bytes the writer below produces, as the launcher's helper source
+		-- requires (OwnedRuntimeDownloadedHelper.swift): a looser match would call
+		-- the artifact ready while every install keeps refusing it.
+		if ports.read(home .. "/receipt") ~= pin.sha256 .. "\n" then return false end
 		for _, product in ipairs(M.PRODUCTS) do
 			if ports.exists(home .. "/payload/" .. product) ~= true then return false end
 		end
@@ -197,9 +210,18 @@ function M.new(ports)
 			return callback(false, REASON.UNPINNED, "the runtime artifact is not pinned in the manifest")
 		end
 		if waiters then
+			for _, key in ipairs(PIN_KEYS) do
+				if pin[key] ~= active_pin[key] then
+					return callback(false, REASON.BUSY, "another runtime artifact pin is being fetched")
+				end
+			end
 			waiters[#waiters + 1] = callback
 			return
 		end
+		local admitted_pin = {}
+		for _, key in ipairs(PIN_KEYS) do admitted_pin[key] = pin[key] end
+		pin = admitted_pin
+		active_pin = pin
 		waiters = { callback }
 		local home = ports.expand(M.home_for(pin.version))
 		if kept(home, pin) then
@@ -214,8 +236,13 @@ function M.new(ports)
 			REASON.STORE, "the artifact folder could not be cleared", function()
 		step("/bin/mkdir", { "-p", staging }, M.STEP_TIMEOUT_SEC, REASON.STORE,
 			"the artifact folder could not be created", function()
-		step("/usr/bin/curl", { "-L", "--fail", "--silent", "--show-error", "--proto", "=https",
-			"--max-filesize", tostring(pin.size), "--output", partial, pin.source_url },
+		local download, download_args, describe = ports.network_command({ "-L", "--fail", "--silent", "--show-error",
+			"--proto", "=https", "--max-filesize", tostring(pin.size), "--output", partial, pin.source_url })
+		if not download then
+			return settle(false, REASON.DOWNLOAD, "the network route is unavailable: " .. tostring(download_args))
+		end
+		describers[download_args] = describe
+		step(download, download_args,
 			M.DOWNLOAD_TIMEOUT_SEC, REASON.DOWNLOAD, "the artifact could not be downloaded from " .. pin.source_url,
 			function()
 		step("/usr/bin/stat", { "-f", "%z", partial }, M.STEP_TIMEOUT_SEC, REASON.SIZE,

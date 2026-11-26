@@ -13,7 +13,7 @@ local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture
 local function project(state, reader, projection, today)
 	local payload, complete = projection.session(reader, "/fixture/db.sqlite", today, state.pacer)
 		.range(Fixture.PAST, today, { "Editor" })
-	return require("json").decode(payload), complete
+	return require("core.text.engine.json").decode(payload), complete
 end
 
 local function count(payload, token)

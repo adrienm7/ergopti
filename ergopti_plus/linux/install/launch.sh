@@ -8,15 +8,34 @@ set -euo pipefail
 # The sentences this script prints, in the user's language (install/messages.sh).
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+unset ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON
+case "$DRIVER_ROOT${ERGOPTI_RUNTIME_PREFIX:-}" in
+	*[\;\?]*)
+		export ERGOPTI_LITERAL_DRIVER_ROOT="$DRIVER_ROOT"
+		if [ -f "$DRIVER_ROOT/../_shared/core/i18n/data/locales/en.json" ]; then
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/../_shared"
+		else
+			export ERGOPTI_LITERAL_SHARED_ROOT="$DRIVER_ROOT/_shared"
+		fi ;;
+	*) unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_NATIVE_MODULES ;;
+esac
 GROUPS_REFRESHED=false
 if [ "${1:-}" = --groups-refreshed ]; then GROUPS_REFRESHED=true; shift; fi
 SESSION_START=false
 SERVICE_MODE=false
+# The login autostart alone (--session-start) leaves a running instance alone;
+# any other launch restarts it, as Windows' #SingleInstance Force does (MLC-003).
+AUTOSTART=false
 if [ "${1:-}" = --service ]; then SERVICE_MODE=true; shift; fi
 if [ "${1:-}" = --session-start ]; then
 	SESSION_START=true
+	AUTOSTART=true
 	shift
-	set -- --tray "$@"
+	# The native autostart entry already carries --tray. Avoid duplicating it
+	# while keeping every supplied daemon argument in its original order.
+	has_tray=false
+	for value in "$@"; do if [ "$value" = --tray ]; then has_tray=true; fi; done
+	if ! "$has_tray"; then set -- --tray "$@"; fi
 fi
 for arg in "$@"; do if [ "$arg" = --tray ]; then SESSION_START=true; fi; done
 
@@ -27,11 +46,40 @@ for arg in "$@"; do
 	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
 done
 
-if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1 \
+# Only the desktop's bare tray request can be represented by the unit. Any
+# additional daemon arguments must reach the daemon itself in their original order.
+# The AppImage (ERGOPTI_PORTABLE_LAUNCH, set by its AppRun) installs no unit:
+# its desktop launch runs the daemon from here.
+PORTABLE_LAUNCH=false
+if [ "${ERGOPTI_PORTABLE_LAUNCH:-}" = 1 ]; then PORTABLE_LAUNCH=true; fi
+if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && ! "$PORTABLE_LAUNCH" \
+	&& [ "$#" -eq 1 ] && [ "$1" = --tray ] && command -v systemctl >/dev/null 2>&1 \
 	&& systemctl --user show-environment >/dev/null 2>&1; then
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
 	systemctl --user daemon-reload
+	# The unit runs in the user manager's environment, not this session's.
+	# GNOME and Plasma publish their display there; i3, Openbox and sway
+	# without a session manager may not, which started a daemon with no
+	# display at all. A manager that outlived an earlier Wayland login also
+	# keeps its WAYLAND_DISPLAY, which the daemon's display probe would trust
+	# in this X11 session. Publish what this graphical session has and retire
+	# the Wayland socket it lacks; a launch with no display changes nothing.
+	if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+		session_variables=()
+		for variable in DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE; do
+			if [ -n "${!variable:-}" ]; then session_variables+=("$variable"); fi
+		done
+		systemctl --user import-environment "${session_variables[@]}"
+		if [ -z "${WAYLAND_DISPLAY:-}" ]; then systemctl --user unset-environment WAYLAND_DISPLAY; fi
+	fi
+	# A relaunch from the application menu restarts a running unit; systemd stops
+	# it with SIGTERM, the daemon's controlled exit (MLC-003).
+	if ! "$AUTOSTART" && systemctl --user is-active --quiet ergopti-hotstrings.service; then
+		ergopti_msg launch.restarting >&2
+		systemctl --user restart ergopti-hotstrings.service
+		exit 0
+	fi
 	systemctl --user start ergopti-hotstrings.service
 	exit 0
 fi
@@ -41,12 +89,30 @@ for arg in "$@"; do
 		uid="$(id -u)"
 		groups=" $(id -nG "$uid") "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
+			if ! command -v pkexec >/dev/null 2>&1; then
+				export ERGOPTI_MISSING_PROGRAM=pkexec
+				printf '%s\n' 'missing-program pkexec' >&2
+				break
+			fi
 			status=0
-			diagnostic="$(pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
+			setup_root="$DRIVER_ROOT"
+			if "$PORTABLE_LAUNCH"; then
+				# root cannot read a user's FUSE mount, which is where the AppImage's
+				# files are: pkexec gets a private copy of the privileged part.
+				setup_root="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-permissions.XXXXXX")"
+				mkdir -p "$setup_root/install" "$setup_root/_generated"
+				cp -- "$DRIVER_ROOT/install/setup_permissions.sh" "$DRIVER_ROOT/install/messages.sh" \
+					"$DRIVER_ROOT/install/99-ergopti-uinput.rules" "$DRIVER_ROOT/install/ergopti-uinput.conf" \
+					"$setup_root/install/"
+				cp -R -- "$DRIVER_ROOT/_generated/shell_messages" "$setup_root/_generated/"
+				chmod -R a+rX "$setup_root"
+			fi
+			diagnostic="$(pkexec /bin/bash "$setup_root/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
+			if "$PORTABLE_LAUNCH"; then rm -rf -- "$setup_root"; fi
 			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi
 			if [ "$status" -ne 0 ]; then
 				# EX_UNAVAILABLE plus a `missing-program NAME` line: no window exists
-				# yet, so the daemon (infra/input_access.lua) tells the user, in
+				# yet, so the daemon (platform/input/access.lua) tells the user, in
 				# their language, which program to install.
 				last_line="${diagnostic##*$'\n'}"
 				if [ "$status" -eq 69 ] && [[ "$last_line" =~ ^missing-program\ ([A-Za-z0-9._+-]+)$ ]]; then
@@ -54,6 +120,10 @@ for arg in "$@"; do
 					break
 				fi
 				ergopti_msg launch.authorization_failed >&2
+				# A desktop launch of the AppImage has no terminal: the daemon's
+				# tray then names the problem and the way to fix it, where an
+				# exit here left nothing on screen.
+				if "$PORTABLE_LAUNCH"; then break; fi
 				exit 78
 			fi
 		fi
@@ -81,9 +151,46 @@ for arg in "$@"; do
 	fi
 done
 
+# Asks the processes holding the instance lock (descriptor 9 here) for their
+# controlled exit and waits for the lock, within the daemon's own quit deadline
+# plus a margin (_generated/launch_timings.sh).
+# @param $1 The instance lock's path.
+# @return 0 once this launch holds the lock, 1 when it did not get it.
+ergopti_restart_lock_holders() {
+	local lock_path="$1" fd target pid holders=()
+	for fd in /proc/[0-9]*/fd/*; do
+		target="$(readlink -- "$fd" 2>/dev/null)" || continue
+		[ "$target" = "$lock_path" ] || continue
+		pid="${fd#/proc/}"
+		pid="${pid%%/*}"
+		if [ "$pid" != "$$" ] && [ "$pid" != "${BASHPID:-$$}" ]; then holders+=("$pid"); fi
+	done
+	if [ "${#holders[@]}" -eq 0 ]; then return 1; fi
+	ergopti_msg launch.restarting >&2
+	kill -TERM "${holders[@]}" 2>/dev/null || true
+	# shellcheck source=../_generated/launch_timings.sh
+	source "$DRIVER_ROOT/_generated/launch_timings.sh"
+	local wait_ms=$((ERGOPTI_USER_QUIT_DEADLINE_MS + ERGOPTI_QUIT_HANDSHAKE_MARGIN_MS))
+	# BusyBox flock has no -w: a blocking flock under timeout bounds the wait on
+	# util-linux and BusyBox alike.
+	timeout "$((wait_ms / 1000))" flock 9
+}
+
 # Every daemon launch, including a terminal launch, takes the instance lock.
 if "$DAEMON_LAUNCH"; then
-	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
+	lock_base="${XDG_RUNTIME_DIR:-}"
+	if [ -z "$lock_base" ]; then
+		if [[ "${HOME:-}" != /* ]]; then
+			ergopti_msg launch.session_lock_invalid >&2
+			exit 78
+		fi
+		lock_base="$HOME/.cache"
+	fi
+	if [[ "$lock_base" != /* ]]; then
+		ergopti_msg launch.session_lock_invalid >&2
+		exit 78
+	fi
+	lock_root="$lock_base/ergopti"
 	install -d -m 700 "$lock_root"
 	# Read/write open never waits for a peer on a foreign FIFO. Inspect the
 	# resulting descriptor, not the path, before accepting flock ownership.
@@ -105,17 +212,34 @@ if "$DAEMON_LAUNCH"; then
 	else
 		status=$?
 		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
-			ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
-			# A second session start (autostart racing the unit, a tray relaunch)
-			# is expected and succeeds; a direct launch reports the refusal.
-			if "$SESSION_START"; then exit 0; fi
-			exit 75
+			# The login autostart racing the unit is expected and leaves the
+			# running daemon alone.
+			if "$AUTOSTART"; then
+				ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
+				exit 0
+			fi
+			# A direct launch restarts the running daemon, as Windows'
+			# #SingleInstance Force does (MLC-003, decided by the maintainer on
+			# 2026-11-11): the lock holders are asked for their controlled exit
+			# (SIGTERM), and the launch takes the lock once they released it.
+			# A tray launch that cannot restart the holder keeps its session
+			# start contract (status 0); a direct launch reports EX_TEMPFAIL.
+			if ! ergopti_restart_lock_holders "$lock_root/ergopti.lock"; then
+				ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
+				if "$SESSION_START"; then exit 0; fi
+				exit 75
+			fi
+		else
+			if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
+			exit "$status"
 		fi
-		if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
-		exit "$status"
 	fi
 	# LuaJIT restricts inheritance before loading modules that launch children.
 	export ERGOPTI_SESSION_LOCK_FD=9
+	# Every install kind starts here, so the GNOME Shell extension and KWin
+	# script are installed (first run) or refreshed (update) for this user.
+	# Never fatal: without them per-application rules are only inactive.
+	bash "$DRIVER_ROOT/install/compositor_focus.sh" install "$DRIVER_ROOT" 9>&- || true
 fi
 
 # A package's private runtime (network-runtime-env.sh, sourced by its wrapper)

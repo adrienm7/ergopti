@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/ja.msg
-# AUTO-GENERATED from _shared/data/locales/ja.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ja.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT ネットワークモジュールをソースからビルドしました。
 build_luv.recipe_required=luv のネイティブビルドにはソースレシピが必要です。
 install.already_installed={1} — インストール済み
 install.archive_digest_unavailable=保持したディスクリプターによる更新には実際の OpenSSL3 ランタイムが必要です。この機能は利用できないままです。
+install.bytecode_skipped=プリコンパイル済みモジュールを作成できませんでした — Ergopti はソースから起動するため、少し遅くなります。
 install.capability_verified={1} — 機能を確認済み
 install.command_still_missing={1} をインストールしましたが、'{2}' がまだ見つかりません。
 install.daemon_manual=デーモンを手動で起動するには:
 install.daemon_running=デーモンはバックグラウンドで動作しています。状態を確認するには:
+install.focus_integration_enabled={1} のフォーカス連携を有効にしました
+install.focus_integration_failed={1} のフォーカス連携を有効にできませんでした。このデスクトップではアプリケーションごとのルールは無効のままです。
+install.focus_integration_next_login={1} のフォーカス連携をインストールしました（次回ログイン時に有効）
+install.focus_integration_updated={1} のフォーカス連携を更新しました
 install.gnome_extension_active=GNOME AppIndicator 拡張機能 — すでに有効
 install.gnome_extension_enabled=GNOME AppIndicator 拡張機能を有効にしました
 install.gnome_extension_failed=AppIndicator 拡張機能を有効にできませんでした。これがないと GNOME はアイコンを表示しません。
 install.gnome_extension_missing=GNOME AppIndicator 拡張機能がありません — {1} をインストールしています…
 install.gnome_extension_next_login=GNOME AppIndicator 拡張機能を有効にしました (次回ログイン時から有効)
+install.gnome_extension_not_installed=このディストリビューションには GNOME AppIndicator 拡張機能のパッケージがありません。{1} から AppIndicator and KStatusNotifierItem Support をインストールし、ログアウトして再度ログインしてください。これがないと GNOME はアイコンを表示しません。
 install.gnome_without_extensions=gnome-extensions のない GNOME — アイコンを表示するには AppIndicator 拡張機能を有効にしてください。
 install.help_help=このヘルプを表示します
 install.help_no_deps=依存関係をインストールしません (ご自身で用意してください)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — 依存関係の確認
 install.section_deps_skipped=依存関係をスキップしました (--no-deps)
 install.section_done=インストールが完了しました
 install.section_files=ファイルのインストール
+install.section_focus=Wayland でのアクティブなアプリケーション（GNOME、KDE）
 install.section_lua_deps=任意の Lua 依存関係 (イベントループ、タイマー、Web ビュー、シグナル)
 install.section_permissions=入力の権限 (sudo が必要)
 install.section_services=systemd ユーザーサービスの作成
@@ -63,6 +70,7 @@ install.section_tray=システムトレイのアイコンとウィンドウ
 install.security_warning_body='input' グループに属すると、どのアプリケーションで入力したパスワードも含め、セッションのすべてのキー入力を読み取れます。ホットストリングエンジンにはまさにこれが必要で、keyd や xremap も同じです。
 install.security_warning_title=セキュリティ警告
 install.service_started=ergopti-hotstrings サービスを有効化して起動しました
+install.session_without_graphical_target=このセッションは systemd の graphical-session.target を一度も開始しません (i3、Openbox、Xfce、セッションマネージャーなしの sway)。そのためユーザーユニットは起動しないので、Ergopti+ は次回ログイン時に XDG 自動起動エントリーから起動します。XDG 自動起動を無視するウィンドウマネージャー (i3、sway) では、設定に exec {1} の行が必要です。
 install.source_toolchain_unavailable=インストール済みのコンパイラーではネイティブアーカイブバックエンドをビルドできません。
 install.startup_choice_unreadable=起動の選択を読み取れませんでした。
 install.summary_config=設定: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG 自動起動: {1}
 launch.already_running=Ergopti+ はこのセッションですでに実行中です ({1} が使用中)。この起動は拒否されました。
 launch.authorization_failed=入力アクセスの承認がキャンセルされたか、失敗しました。
 launch.groups_unavailable=セッションは設定された入力グループを取得できませんでした。
+launch.restarting=Ergopti+ はこのセッションですでに実行中です。終了を要求してから再起動します。
+launch.session_lock_invalid=セッションロックのフォルダーには絶対パスを指定してください。
 launcher.dependencies_installed=依存関係をインストールしました。
 launcher.driver_missing=エラー: Linux ドライバーのディレクトリが見つかりません: {1}
 launcher.install_deps_hint=実行: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=インストールパスがシンボリックリンク
 uninstall.system_prefix=システムのインストールプレフィックスを拒否しました。
 uninstall.unsafe_path=所有権のパスが安全ではありません。
 uninstall.unsupported_argument=サポートされていないアンインストール引数: {1}
+xkb_helpers.not_found=キーボード配列のインストール用ファイルが {1} の隣にも {2} にも見つかりません。これがないと配列をインストールできません。

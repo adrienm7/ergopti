@@ -35,11 +35,11 @@ local TYPES = {
 local function fresh_harness(overrides)
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
-	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	local h = {
 		clock = 1000, writers = {}, supersede_calls = 0, timers = {}, capslock = {},
@@ -57,8 +57,8 @@ local function fresh_harness(overrides)
 		if not results[1] then logger.error(module, "Exception: %s", tostring(results[2])) end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, cancelled = false }
@@ -70,7 +70,7 @@ local function fresh_harness(overrides)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
 	}
 	package.loaded["platform.remap.ke_variables"] = {
@@ -114,7 +114,7 @@ local function fresh_harness(overrides)
 	end
 	helpers.assert_true(h.settings.apply_state(state), "the test settings must compile")
 
-	h.sentinels = require("modules.keymap.control_sentinels")
+	h.sentinels = require("hotstrings.engine.expander.control_sentinels")
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		eventtap = {
 			new = function(types, callback)
@@ -184,6 +184,39 @@ end
 -- ===================================
 
 helpers.describe("CapsWord watcher: pointer kinds follow the settings", function()
+	helpers.it("retries a refused pointer-motion clear on a subsequent click (capsword-click-retry)", function()
+		local h = fresh_harness()
+		activate(h)
+		local variables = package.loaded["platform.remap.ke_variables"]
+		local supersede = variables.supersede_capsword_activation
+		variables.supersede_capsword_activation = function(callback)
+			if h.supersede_calls == 0 then h.supersede_calls = 1; return false end
+			return supersede(callback)
+		end
+		pointer(h, TYPES.mouseMoved)
+		helpers.assert_true(h.active)
+		h.callback({ getType = function() return TYPES.leftMouseDown end })
+		helpers.assert_eq(#h.writers, 1, "a discrete click must retry the refused clear")
+	end)
+	helpers.it("accepts the first click after activation despite a recent inactive pointer event (capsword-activation-throttle)", function()
+		local h = fresh_harness()
+		pointer(h, TYPES.mouseMoved)
+		helpers.assert_eq(h.supersede_calls, 1)
+		activate(h)
+		h.callback({ getType = function() return TYPES.leftMouseDown end })
+		helpers.assert_eq(#h.writers, 1, "the first click must end the newly activated CapsWord")
+	end)
+	helpers.it("an older clear's late completion cannot mask a newer activation's delimiter (CWM-003)", function()
+		local h = fresh_harness()
+		activate(h)
+		pointer(h, TYPES.mouseMoved)
+		helpers.assert_eq(#h.writers, 1, "the pointer exit queues a clear whose completion is still pending")
+		activate(h)
+		key(h, " ")
+		helpers.assert_eq(#h.writers, 2, "the new activation's delimiter queues its own clear")
+		h.writers[1].callback(true, nil, h.writers[1].revision)
+		helpers.assert_eq(h.capslock, { false }, "the late completion must not touch the newer activation's LED")
+	end)
 	helpers.it("pointer motion ends CapsWord only while it is checked", function()
 		local h = fresh_harness({ [ "caps_word_pointer_pointer_motion" ] = false })
 		activate(h)
@@ -244,6 +277,23 @@ end)
 -- ===================================
 
 helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when checked", function()
+	helpers.it("does not disable a reactivation during synchronous clear settlement (capsword-sync-reactivation)", function()
+		local h = fresh_harness({ caps_word_idle_timeout_seconds = 1 })
+		activate(h)
+		local variables = package.loaded["platform.remap.ke_variables"]
+		local supersede = variables.supersede_capsword_activation
+		variables.supersede_capsword_activation = function(callback)
+			local accepted, revision = supersede(callback)
+			callback(true, nil, revision)
+			activate(h)
+			return accepted, revision
+		end
+		key(h, " ")
+		helpers.assert_true(h.active, "the reentrant activation remains current")
+		helpers.assert_eq(h.capslock, { false }, "only the clear settled before reactivation may affect the LED")
+		local timers = timers_at(h, 1)
+		helpers.assert_eq(#timers, 1, "the new activation must retain its inactivity timer")
+	end)
 	helpers.it("Space ends CapsWord at once, CapsLock off before the next letter", function()
 		local h = fresh_harness()
 		activate(h)
@@ -253,6 +303,22 @@ helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when ch
 		helpers.assert_eq(#h.writers, 1, "a checked Space ends CapsWord")
 		helpers.assert_eq(h.capslock, { false }, "CapsLock goes off before the write settles")
 		assert_logged(h, "delimiter typed")
+	end)
+
+	helpers.it("a second CapsWord action ends it at once and unlocks CapsLock", function()
+		-- The Mac check « a second CapsWord gesture or shortcut switches CapsWord
+		-- off and unlocks CapsLock » (TODO, To confirm on the Mac): gestures and
+		-- keyboard shortcuts both run the catalogue action, which ends a running
+		-- CapsWord through this one entry.
+		local h = fresh_harness()
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true, "the watcher owns the CapsWord listener")
+		helpers.assert_eq(h.capslock, {}, "nothing is unlocked while CapsWord is off")
+		activate(h)
+		key(h, "a")
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true)
+		helpers.assert_eq(#h.writers, 1, "the action ends the running CapsWord")
+		helpers.assert_eq(h.capslock, { false }, "CapsLock goes off at once, before the next letter")
+		assert_logged(h, "switched off by its action")
 	end)
 
 	helpers.it("an unchecked Space leaves CapsWord on", function()
@@ -341,6 +407,65 @@ helpers.describe("CapsWord watcher: the inactivity delay", function()
 		helpers.assert_eq(h.supersede_calls, 0, "a queued check of a stopped lease is inert")
 	end)
 
+	--- Applies a live delay change the way the menu does.
+	local function select_delay(h, seconds)
+		local state = {}
+		for k, v in pairs(h.settings.DEFAULT_STATE) do state[k] = v end
+		state.caps_word_idle_timeout_seconds = seconds
+		state.caps_word_terminators = { "space", "tab", "enter" }
+		helpers.assert_true(h.settings.apply_state(state))
+	end
+
+	helpers.it("a live 0 -> positive change arms the running session (CWM-001)", function()
+		local h = fresh_harness()
+		activate(h)
+		helpers.assert_eq(#h.timers, 0)
+		h.clock = h.clock + 1
+		select_delay(h, 3)
+		local timer = timers_at(h, 2)[1]
+		helpers.assert_true(timer ~= nil, "the deadline is the new delay from the activation")
+		h.clock = h.clock + 2
+		timer.callback()
+		helpers.assert_eq(#h.writers, 1, "the running session ends at the new deadline")
+	end)
+
+	helpers.it("a live shorter or longer change re-times the pending check (CWM-001)", function()
+		local h = fresh_harness({ caps_word_idle_timeout_seconds = 10 })
+		activate(h)
+		local ten = timers_at(h, 10)[1]
+		h.clock = h.clock + 1
+		select_delay(h, 3)
+		helpers.assert_true(ten.cancelled, "the old deadline is retired")
+		local three = timers_at(h, 2)[1]
+		helpers.assert_true(three ~= nil, "3 s counted from the activation leaves 2 s")
+		select_delay(h, 8)
+		helpers.assert_true(three.cancelled)
+		helpers.assert_true(timers_at(h, 7)[1] ~= nil, "a longer delay waits longer")
+		three.callback()
+		helpers.assert_eq(h.supersede_calls, 0, "a retired check is inert")
+	end)
+
+	helpers.it("a live positive -> 0 change retires the check, a rollback restores it (CWM-001)", function()
+		local h = fresh_harness({ caps_word_idle_timeout_seconds = 5 })
+		activate(h)
+		local timer = timers_at(h, 5)[1]
+		select_delay(h, 0)
+		helpers.assert_true(timer.cancelled)
+		select_delay(h, 5)
+		helpers.assert_eq(#timers_at(h, 5), 1, "restoring the delay (a refused save) re-arms one check")
+	end)
+
+	helpers.it("a delay change without an active CapsWord or after stop arms nothing (CWM-001)", function()
+		local h = fresh_harness()
+		select_delay(h, 3)
+		helpers.assert_eq(#h.timers, 0)
+		activate(h)
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+		local before = #h.timers
+		select_delay(h, 4)
+		helpers.assert_eq(#h.timers, before, "a stopped lease is not re-timed")
+	end)
+
 	helpers.it("a CapsWord the driver switched on itself starts the delay", function()
 		local h = fresh_harness({ caps_word_idle_timeout_seconds = 1 })
 		h.active = true
@@ -375,8 +500,8 @@ helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed p
 	helpers.it("arms the shipped inactivity delay at the activation", function()
 		local h = fresh_harness({ shipped = true })
 		activate(h)
-		local delay = require("caps_word.auto_off").idle_delay_ms(h.settings.policy()) / 1000
-		helpers.assert_eq(delay, require("infra.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
+		local delay = require("keyboard.engine.caps_word_auto_off").idle_delay_ms(h.settings.policy()) / 1000
+		helpers.assert_eq(delay, require("menu.engine.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
 			"the shipped delay is the manifest default")
 		helpers.assert_eq(delay, 10, "10 s (maintainer decision of 2026-10-20)")
 		helpers.assert_true(timers_at(h, delay)[1] ~= nil, "the delay counts from the activation")
@@ -414,5 +539,36 @@ helpers.describe("CapsWord watcher: text the driver types ends CapsWord on a del
 		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
 		Output.report(" ")
 		helpers.assert_eq(h.supersede_calls, 0, "a stopped watcher receives nothing")
+	end)
+end)
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 7/ The Pause ==================
+-- ======================================
+-- ======================================
+
+-- Windows and Linux end CapsWord when the driver pauses; macOS kept its
+-- CapsLock on through the pause, the paused Karabiner graph holding no
+-- CapsWord rule (paused-ends-capsword).
+helpers.describe("CapsWord watcher: a pause ends CapsWord", function()
+	helpers.it("(paused-ends-capsword) a pause ends a running CapsWord and its CapsLock", function()
+		local h = fresh_harness()
+		activate(h)
+		helpers.assert_true(h.watchers.end_capsword_for_pause(), "the pause step settles")
+		helpers.assert_eq(#h.writers, 1, "the Karabiner CapsWord is cleared")
+		helpers.assert_eq(h.active, false)
+		helpers.assert_eq(h.capslock[#h.capslock], false, "CapsLock is switched off")
+		assert_logged(h, "script paused")
+	end)
+
+	helpers.it("(paused-ends-capsword) a pause keeps a CapsLock the user set themselves", function()
+		local h = fresh_harness()
+		helpers.assert_true(h.watchers.end_capsword_for_pause())
+		helpers.assert_eq(h.supersede_calls, 0, "no CapsWord, no write")
+		helpers.assert_eq(h.capslock, {}, "the user's CapsLock is untouched")
 	end)
 end)

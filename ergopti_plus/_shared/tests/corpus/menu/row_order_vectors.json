@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of menu.row_order (_shared/modules/menu/row_order.json). `sorts` run the rule's comparator over `input`; a name outside the rule follows the listed ones and ties compare by text. `lists` give the rule's order as the data file projects it. `refusals` name a rule that does not exist.",
+	"_comment": "Vectors of menu.row_order (_shared/menu/data/row_order.json). `sorts` run the rule's comparator over `input`; a name outside the rule follows the listed ones and ties compare by text. `lists` give the rule's order as the data file projects it. `refusals` name a rule that does not exist.",
 	"drivers": ["macos", "linux", "windows"],
 	"sorts": [
 		{

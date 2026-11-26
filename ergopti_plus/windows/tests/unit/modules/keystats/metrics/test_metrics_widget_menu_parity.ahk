@@ -31,6 +31,21 @@ _MWMP_AnchorPosition(Target, Label) {
 	return Found
 }
 
+; A caption reads as its declared label; a twin's zero-width suffix
+; (_MR_CaptionTwinSuffix) and the category-off reason do not change what it says.
+_MWMP_CaptionIs(Caption, Label) {
+	Caption := StrReplace(Caption, Chr(0x200B), "")
+	return Caption == Label || Caption == Label . " — " . _MR_ReasonHead(t("menu.category_off_reason"))
+}
+
+_MWMP_CaptionCount(Target, Label) {
+	Count := 0
+	Loop TrayMenuItemCount(Target)
+		if _MWMP_CaptionIs(TrayMenuItemCaption(Target, A_Index - 1), Label)
+			Count += 1
+	return Count
+}
+
 _MWMP_RenderVector(Vector, Fields, Specs) {
 	global MetricsShortcuts
 	Saved := Map("enabled", MetricsShortcuts.enabled, "visible", WPMWidget.visible,
@@ -46,10 +61,15 @@ _MWMP_RenderVector(Vector, Fields, Specs) {
 		WPMWidget.show_graph := Values["metrics_widget_graph"]
 		Target := BuildMetricsMenu()
 		Start := _MWMP_AnchorPosition(Target, t(Specs[1]["i18n"]))
+		; The notification-area readout's colour check shares the widget colour
+		; caption: both must stay native rows of their own, never one merged item.
+		AssertEqual(2, _MWMP_CaptionCount(Target, t("menu.metrics.colors_by_source")),
+			"the two « colour by source » checks remain two native rows")
 		for Index, Spec in Specs {
 			Position := Start + Index - 1
 			Label := t(Spec["i18n"])
-			AssertEqual(Position, _MWMP_AnchorPosition(Target, Label), Spec["id"] . " follows the declared group order")
+			AssertTrue(_MWMP_CaptionIs(TrayMenuItemCaption(Target, Position), Label),
+				Spec["id"] . " follows the declared group order")
 			State := DllCall("GetMenuState", "Ptr", Target.Handle, "UInt", Position, "UInt", 0x400, "UInt")
 			AssertEqual(Vector["checked"][Index], (State & 0x8) != 0, Spec["id"] . " retains its stored check")
 			AssertEqual(Vector["disabled"][Index], (State & 0x3) != 0, Spec["id"] . " follows the shared gate")

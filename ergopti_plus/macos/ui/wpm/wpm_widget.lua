@@ -12,6 +12,9 @@
 --- 2. Autonomous Polling: Manages its own lifecycle and history array.
 --- 3. Dynamic Styling: Visual feedback changes color based on the typing source.
 --- 4. Effective WPM: Displays the net typing speed, visualizing productivity spikes.
+--- 5. VoiceOver: a canvas cannot carry the accessible name the Windows widget
+---    gets, so a running VoiceOver hears the burst's last speed once, when the
+---    widget hides; never per refresh, and nothing without VoiceOver.
 --- ==============================================================================
 
 local M = {}
@@ -19,16 +22,17 @@ local M = {}
 local hs         = hs
 local keystats  = require("modules.keystats")
 local WPMShared  = require("ui.wpm.shared")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local GraphicsRenderer = require("adapters.graphics_renderer")
-local Storage = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings = require("infra.timings")
-local TomlCodec = require("toml_codec")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local GraphicsRenderer = require("core.ui.adapters.graphics_renderer")
+local Storage = require("core.fs.adapters.storage")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings = require("core.timing.engine.timings")
+local TomlCodec = require("core.text.engine.toml_codec")
 -- What the readouts decide — colours, frames, the graph, the default place —
 -- shared with the Linux driver.
-local WPMModel = require("wpm_widget.model")
+local WPMModel = require("metrics.engine.wpm_widget_model")
 
 local LOG = "wpm_widget"
 
@@ -75,13 +79,13 @@ end
 -- ================================
 -- ================================
 
--- Reads the shared canon (_shared/modules/wpm_widget/constants.toml, checked
+-- Reads the shared canon (_shared/metrics/data/wpm_widget/constants.toml, checked
 -- key by key by the shared model) and the refresh, hold and idle timings.
 -- Fails SOFT per field: an unusable canon logs an ERROR and leaves every canon
 -- field nil rather than raising at module load, where the require-time pcall in
 -- menu_metrics would silently drop the whole widget.
 local function _load_shared_const()
-	local path = resolve_shared_constants_path("modules/wpm_widget/constants.toml")
+	local path = resolve_shared_constants_path("metrics/data/wpm_widget/constants.toml")
 	local canon, err = nil, "not found"
 	if path then canon, err = WPMModel.load(path, TomlCodec.decode) end
 	if not canon then
@@ -122,11 +126,7 @@ M._load_shared_const = _load_shared_const
 
 local CONFIG     = _load_shared_const()
 local IDLE_HIDE_S = CONFIG.idle_hide_s
--- Minimum interval between mouseMoved updates of _last_mouse_sec.
--- Each mouseMoved fires hundreds of times/sec; without throttling, every
--- move re-enters the Lua VM, adding jitter to the input pipeline.
--- Non-move events (clicks, scrollWheel) bypass the throttle and always win.
-local MOUSE_MOVE_THROTTLE_SEC = 0.2
+
 
 
 
@@ -139,6 +139,7 @@ local MOUSE_MOVE_THROTTLE_SEC = 0.2
 -- ========================
 
 local _canvas            = nil
+local _canvas_releasing  = false
 local _timer             = nil
 local _mouse_tap         = nil   -- hs.eventtap watching mouse/touchpad events
 local _running           = false -- true between start() and stop(); guards redundant restarts
@@ -150,8 +151,11 @@ local _generation        = 0
 local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
-local _last_active_sec   = 0    -- wall clock of the last keystroke seen by this widget
 local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
+-- The speed the visible canvas last drew ("72 WPM"), nil while it is hidden.
+-- A canvas has no accessibility element VoiceOver could read, and the speed
+-- changes every refresh: the burst's last speed is said once, when it hides.
+local _shown_readout     = nil
 
 -- Current-cycle canvas geometry, shared with the mouseCallback closure below.
 -- The closure is created ONCE, the first time update_widget_body() creates
@@ -177,6 +181,10 @@ local _SETTINGS_Y = CONFIG.canon and CONFIG.canon.position.storage_y
 -- yields nil for a non-numeric value so the existing default-recompute fires.
 local _pos_x      = _SETTINGS_X and tonumber(Storage.get(_SETTINGS_X)) or nil
 local _pos_y      = _SETTINGS_Y and tonumber(Storage.get(_SETTINGS_Y)) or nil
+local function finite_coordinate(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+if not finite_coordinate(_pos_x) or not finite_coordinate(_pos_y) then _pos_x, _pos_y = nil, nil end
 
 -- Drag state.
 local _drag_start_mouse = nil
@@ -227,7 +235,7 @@ update_widget_body = function(generation)
 	local active_source = WPMShared.get_active_source(stats, CONFIG.source_color_duration, now)
 	if not is_current(generation) then return false end
 
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()
@@ -250,10 +258,14 @@ update_widget_body = function(generation)
 	-- mouse moved since the last keystroke.
 	WPMModel.push_history(canon, _wpm_history, display_wpm, active_source)
 	local show
-	show, _last_active_sec = WPMModel.widget_visible({
+	show = WPMModel.widget_visible({
 		wpm = display_wpm, source = active_source, tooltip_visible = tooltip_visible, now_s = now,
-		last_active_s = _last_active_sec, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
+		last_input_s = stats.last_input_time, last_break_s = stats.last_break_time,
+		last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
 	})
+
+	-- The pointer belongs to the canvas while its drag is in progress.
+	if _drag_start_mouse then show = true end
 
 	if show then
 		-- hs.screen.mainScreen() is documented as possibly returning nil (e.g. no
@@ -283,8 +295,12 @@ update_widget_body = function(generation)
 		_canvas_geom.compact_h     = compact_h
 
 		-- The pill's top-left is the anchor; the graph keeps its bottom-right.
-		if not _pos_x or not _pos_y then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
-		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
+		-- The default anchor is recomputed from the current display each cycle and
+		-- never cached: a cached default would stay outside the desktop after a
+		-- display shrink. Only a user-chosen (dragged) position is retained.
+		local anchor_x, anchor_y = _pos_x, _pos_y
+		if not anchor_x or not anchor_y then anchor_x, anchor_y = WPMModel.default_anchor(canon, full_frame) end
+		local target_x, target_y = WPMModel.frame_origin(canon, frame, anchor_x, anchor_y)
 
 		if not _canvas then
 			local candidate = GraphicsRenderer.createWindow({
@@ -328,13 +344,14 @@ update_widget_body = function(generation)
 					-- update_widget_body() cycle and reflects the CURRENT mode
 					-- (e.g. after the user toggled graph mode post-creation).
 					local f = c:frame()
+					if type(f) ~= "table" or not finite_coordinate(f.x) or not finite_coordinate(f.y) then return end
+					local next_x, next_y = f.x, f.y
 					if _show_graph then
-						_pos_x = f.x + _canvas_geom.canvas_width  - _canvas_geom.compact_w
-						_pos_y = f.y + _canvas_geom.canvas_height - _canvas_geom.compact_h
-					else
-						_pos_x = f.x
-						_pos_y = f.y
+						next_x = f.x + _canvas_geom.canvas_width  - _canvas_geom.compact_w
+						next_y = f.y + _canvas_geom.canvas_height - _canvas_geom.compact_h
 					end
+					if not finite_coordinate(next_x) or not finite_coordinate(next_y) then return end
+					_pos_x, _pos_y = next_x, next_y
 					if _SETTINGS_X then
 						Storage.set(_SETTINGS_X, _pos_x)
 						Storage.set(_SETTINGS_Y, _pos_y)
@@ -351,6 +368,11 @@ update_widget_body = function(generation)
 					})
 				end
 			end)
+			if not is_current(generation) or _canvas ~= candidate then return false end
+			-- hs.canvas initializes every tracking flag to false and its native
+			-- dispatcher delivers a callback only for an enabled class, so the
+			-- callback above would never run without this explicit opt-in.
+			_canvas:canvasMouseEvents(true, true, false, true)
 			if not is_current(generation) or _canvas ~= candidate then return false end
 		else
 			-- Only reposition when not dragging.
@@ -402,8 +424,14 @@ update_widget_body = function(generation)
 		canvas:replaceElements(elements)
 		if not is_current(generation) or _canvas ~= canvas then return false end
 		canvas:show()
+		_shown_readout = math.floor(display_wpm) > 0 and WPMModel.readout_label(display_wpm, frame_opts.unit) or nil
 	else
 		if _canvas then _canvas:hide() end
+		-- The burst ended: its speed is said once, never on a refresh that
+		-- keeps the widget hidden.
+		local readout = _shown_readout
+		_shown_readout = nil
+		if readout then SystemA11y.announce_event(readout) end
 	end
 end
 
@@ -454,6 +482,23 @@ local function release_runtime()
 	return generation == _generation and timer_stopped and tap_stopped
 end
 
+--- Retires the exact canvas before allowing another widget generation.
+--- @return boolean settled
+local function release_canvas()
+	if _canvas_releasing then return false end
+	local canvas = _canvas
+	if not canvas then return true end
+	_canvas_releasing = true
+	local ok = pcall(function() canvas:delete() end)
+	_canvas_releasing = false
+	if not ok then
+		Logger.error(LOG, "WPM widget canvas cleanup failed; exact canvas retained.")
+		return false
+	end
+	if _canvas == canvas then _canvas = nil end
+	return true
+end
+
 
 
 
@@ -463,6 +508,17 @@ end
 -- ======= 4/ Public Control API =======
 -- =====================================
 -- =====================================
+
+--- Whether an event was posted by this process.
+--- @param event any The eventtap event.
+--- @return boolean
+local function is_own_event(event)
+	local properties = hs.eventtap.event.properties
+	local key = type(properties) == "table" and properties.eventSourceUnixProcessID or nil
+	if key == nil or event == nil or type(hs.processInfo) ~= "table" then return false end
+	local ok, pid = pcall(function() return event:getProperty(key) end)
+	return ok and pid ~= nil and pid == hs.processInfo.processID
+end
 
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
@@ -495,6 +551,8 @@ function M.start(show_graph)
 		return false
 	end
 	if before_start ~= _generation then return false end
+	if not release_canvas() then return false end
+	if before_start ~= _generation then return false end
 	_show_graph = want_graph
 	_generation = _generation + 1
 	local generation = _generation
@@ -513,22 +571,21 @@ function M.start(show_graph)
 		return false
 	end
 
-	-- Watch all mouse/touchpad events to know when to hide the widget.
+	-- Watch all mouse/touchpad events to know when to hide the widget: any move,
+	-- a single pixel included, a drag, a click or a wheel or touchpad scroll ends
+	-- the typing burst (TWD-2, decided by the maintainer on 2026-11-16).
+	local types = hs.eventtap.event.types
 	local tap_ok, tap_candidate = xpcall(function()
 		return hs.eventtap.new({
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.scrollWheel,
-		}, function(e)
+			types.mouseMoved, types.leftMouseDragged, types.rightMouseDragged, types.otherMouseDragged,
+			types.leftMouseDown, types.rightMouseDown, types.otherMouseDown, types.scrollWheel,
+		}, function(event)
 			if not _running or generation ~= _generation then return false end
-			local now = hs.timer.absoluteTime() / 1000000000
-			local is_move = e:getType() == hs.eventtap.event.types.mouseMoved
-			-- Throttle mouseMoved: only update at most every MOUSE_MOVE_THROTTLE_SEC.
-			-- Click and scroll events bypass the throttle — they must always register.
-			if not is_move or (now - _last_mouse_sec) >= MOUSE_MOVE_THROTTLE_SEC then
-				_last_mouse_sec = now
-			end
+			-- A move this process posted (a cursor restore, a pointer action) is no
+			-- user input.
+			if is_own_event(event) then return false end
+			-- Even a single move immediately after a key must hide the widget.
+			_last_mouse_sec = hs.timer.absoluteTime() / 1000000000
 			return false  -- do not consume the event
 		end)
 	end, debug.traceback)
@@ -574,11 +631,13 @@ function M.stop()
 		return true
 	end
 	_running = false
+	-- A stop or a pause is no burst ending: nothing is said.
+	_shown_readout = nil
 	_generation = _generation + 1
 	local generation = _generation
 	local runtime_stopped = release_runtime()
 	if generation ~= _generation then return false end
-	if _canvas then _canvas:delete(); _canvas = nil end
+	if not release_canvas() then return false end
 	if generation ~= _generation then return false end
 	Logger.debug(LOG, "Stopping floating WPM widget…")
 	if generation ~= _generation then return false end

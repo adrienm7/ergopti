@@ -56,7 +56,7 @@ function M.with_publication(options, callback)
 				local controls = { today = true, today_only = true }
 				for key, value in pairs(options) do controls[key] = value end
 				local state = Completion.new(controls)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				package.loaded["hs.json"].encode, package.loaded["hs.json"].decode = Json.encode, Json.decode
 				package.loaded["hs.fs"].attributes = function(path)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end

@@ -11,8 +11,8 @@
 local M = {}
 local number_row_sources = setmetatable({}, { __mode = "k" })
 local asynchronous_number_row_sources = setmetatable({}, { __mode = "k" })
-local DisplayServer = require("infra.display_server")
-local Logger = require("logger.shim")
+local DisplayServer = require("core.ui.engine.display_server")
+local Logger = require("core.logger.engine.shim")
 local LOG = "adapters.xkb_source_probe"
 local Runtime = require("_generated.native_runtime")
 
@@ -27,6 +27,14 @@ local _locked_generation, _last_locked = 0, nil
 local _input_generation, _last_input = 0, nil
 local _last_canonical_keymap = nil
 local _last_expected, _last_canonical_expected = nil, nil
+-- XkbNewKeyboardNotify and XkbMapNotify events drained so far: any change of the
+-- core keyboard's keymap reaches this connection as one of them.
+local _keymap_events = 0
+-- The keymap text read() last downloaded, on which connection and at which
+-- keymap event count: while neither moved, the server still holds that keymap,
+-- and read() reuses the text instead of downloading and serializing it again
+-- (about 0.6 ms of every injected press on an idle Xvfb, more on a busy server).
+local _downloaded = { connection = nil, events = nil, text = nil }
 local CORE_KEYBOARD = 0x100
 local GROUP_COMPONENTS = 0xf0
 local LOCKED_COMPONENT = 0x8
@@ -253,6 +261,7 @@ local function retire_published()
 	local connection = _connection
 	_connection, _display_name, _last_keymap, _last_group = nil, nil, nil, nil
 	_last_canonical_keymap = nil
+	_downloaded.connection, _downloaded.events, _downloaded.text = nil, nil, nil
 	_last_expected, _last_canonical_expected = nil, nil
 	_generation = _generation + 1
 	_locked_generation, _last_locked = _locked_generation + 1, nil
@@ -466,6 +475,7 @@ local function drain(native, connection)
 			if kind == 0 or kind == 1 or (kind == 2 and native.bit.band(tonumber(state.changed), GROUP_COMPONENTS) ~= 0) then
 				_generation = _generation + 1
 			end
+			if kind == 0 or kind == 1 then _keymap_events = _keymap_events + 1 end
 			if connection.receiving and (kind == 0 or kind == 1
 				or (kind == 2 and native.bit.band(tonumber(state.changed), GROUP_COMPONENTS + LOCKED_COMPONENT) ~= 0)) then
 				connection.receiving_revision = connection.receiving_revision + 1
@@ -528,8 +538,9 @@ function M.property_invalidation_view()
 	return result
 end
 
---- Orders complete alias declarations without changing any alias name or target.
---- The codec preserves declaration order, which differs between X11 and xkbcomp.
+--- Orders complete alias declarations without changing any alias name or target,
+--- and blanks the group names. The codec preserves declaration order, which
+--- differs between X11 and xkbcomp.
 local function ordered_aliases(text)
 	local result, sections = text:gsub("(xkb_keycodes[^\n]*{\n)(.-)(\n};)", function(header, body, footer)
 		body = body .. "\n"
@@ -545,8 +556,15 @@ local function ordered_aliases(text)
 		end)
 		return header .. body .. footer:sub(2)
 	end)
-	return sections == 1 and result or nil
+	if sections ~= 1 then return nil end
+	-- A group name types nothing, and xkbcomp prints a name byte at or above
+	-- 0x80 as a sign-extended octal escape that libxkbcommon reads back as other
+	-- bytes: a layout named « bépo » or « Français — Ergopti » never matched its
+	-- printed copy, and every key press it was asked to type was refused.
+	return (result:gsub('(\n[ \t]*name%[%a*%d+%][ \t]*=[ \t]*)"[^\n]*";', '%1"";'))
 end
+
+M._ordered_aliases = ordered_aliases
 
 --- Projects native serialization through the capture owner's exact parser codec.
 --- X11 may retain unreferenced types and interprets that a parsed map omits.
@@ -1070,13 +1088,16 @@ local function build_receiving_map(ffi, native, connection, association, token, 
 			if not uint(size, 1048576) or size == 0 then return nil end
 			return ports.string(pointer, size)
 		end
-		local function canonical(map)
-			local raw = text(map)
+		-- Both sides go through the same parse and serialization: libxkbcommon
+		-- 1.13 drops the types a parsed map never references, so a raw text
+		-- and its own reparsed copy no longer compare equal.
+		local function project(raw)
 			if not raw then return nil end
 			local parsed = allocation(ports.map_parse, "map", connection.context, raw, 1, 0)
 			local rendered = parsed and text(parsed)
 			return rendered and ordered_aliases(rendered) or nil
 		end
+		local function canonical(map) return project(text(map)) end
 		local called, result = pcall(function()
 			if drain() ~= true or not current() then return nil end
 			local observed_input_epoch = input_epoch()
@@ -1088,7 +1109,7 @@ local function build_receiving_map(ffi, native, connection, association, token, 
 			local master = allocation(ports.keymap, "map", connection.context, connection.xcb, facts.attachment, 0)
 			if not slave or not master then return nil end
 			local slave_map, master_map = canonical(slave), canonical(master)
-			local acknowledged = ordered_aliases(expected_map)
+			local acknowledged = project(expected_map)
 			if not acknowledged or slave_map ~= acknowledged or master_map ~= acknowledged or not current() then return nil end
 			local state = allocation(ports.state, "state", master, connection.xcb, facts.attachment)
 			if not state or not current() then return nil end
@@ -1136,6 +1157,27 @@ end
 --- @param groups integer Number of groups in that loaded native keymap.
 --- @return table|nil receipt { group, generation, backend, observed_current }.
 --- @return string|nil reason Native qualification refusal.
+--- The core keyboard's keymap text from the server, reused while no keymap
+--- notification was drained since it was downloaded (see _downloaded).
+--- @return string|nil text, string|nil reason
+local function download_keymap(native, connection)
+	if _downloaded.connection == connection and _downloaded.events == _keymap_events and _downloaded.text then
+		return _downloaded.text
+	end
+	local events = _keymap_events
+	local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
+	if device < 0 then return nil, "native-keyboard-unavailable" end
+	local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
+	if keymap == nil then return nil, "native-keymap-unavailable" end
+	local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
+	local text = bytes ~= nil and native.ffi.string(bytes) or nil
+	if bytes ~= nil then native.ffi.C.free(bytes) end
+	native.xkb.xkb_keymap_unref(keymap)
+	if text == nil then return nil, "native-keymap-identity-unavailable" end
+	_downloaded.connection, _downloaded.events, _downloaded.text = connection, events, text
+	return text
+end
+
 local function read(expected, groups, require_locked, require_input)
 	assert(type(expected) == "string" and expected ~= "", "the acknowledged keymap identity is required")
 	assert(type(groups) == "number" and groups >= 1 and groups % 1 == 0, "the native group count is required")
@@ -1154,14 +1196,11 @@ local function read(expected, groups, require_locked, require_input)
 	if not drained then return nil, drain_reason end
 	local before, after = native.ffi.new("ErgoptiXkbState[1]"), native.ffi.new("ErgoptiXkbState[1]")
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, before) ~= 0 then return nil, "native-group-unavailable" end
-	local device = native.xkb11.xkb_x11_get_core_keyboard_device_id(connection.xcb)
-	if device < 0 then return nil, "native-keyboard-unavailable" end
-	local keymap = native.xkb11.xkb_x11_keymap_new_from_device(connection.context, connection.xcb, device, 0)
-	if keymap == nil then return nil, "native-keymap-unavailable" end
-	local bytes = native.xkb.xkb_keymap_get_as_string(keymap, 1)
-	local actual = bytes ~= nil and native.ffi.string(bytes) or nil
-	if bytes ~= nil then native.ffi.C.free(bytes) end
-	native.xkb.xkb_keymap_unref(keymap)
+	-- The drain above synchronized with the server: a keymap change made before
+	-- it has been counted, and one made after it is counted by the drain below,
+	-- which then reports the race exactly as a fresh download would.
+	local actual, download_reason = download_keymap(native, connection)
+	if actual == nil and download_reason ~= "native-keymap-identity-unavailable" then return nil, download_reason end
 	if native.x11.XkbGetState(connection.display, CORE_KEYBOARD, after) ~= 0 then return nil, "native-group-unavailable" end
 	local group = tonumber(after[0].group)
 	local locked = tonumber(after[0].locked_mods)
@@ -1198,7 +1237,9 @@ local function read(expected, groups, require_locked, require_input)
 	if require_locked and _locked_generation ~= acknowledged_locked then return nil, "native-locked-modifiers-raced" end
 	if require_input and _input_generation ~= acknowledged_input then return nil, "native-input-modifiers-raced" end
 	if expected ~= _last_expected then
-		local canonical = ordered_aliases(expected)
+		-- The same projection as the server's map above (libxkbcommon 1.13
+		-- drops unreferenced types when it reserializes).
+		local canonical = canonical_keymap(native, connection, expected)
 		if canonical == nil then return nil, "native-keymap-canonicalization-refused" end
 		_last_expected, _last_canonical_expected = expected, canonical
 	end
@@ -1442,6 +1483,25 @@ end
 --- Existing group/keymap receipt retains its generation semantics across locks.
 function M.read(expected, groups) return read(expected, groups, false) end
 
+--- The server's core keyboard keymap as libxkbcommon serializes it, through
+--- this module's own connection: the text `xkbcli dump-keymap-x11` prints,
+--- without its fork (about 40 ms a resolve through xkbcomp before). The text
+--- is the probe's identity source, so the first read() after it reuses it.
+--- @return string|nil text, string|nil reason
+function M.dump_keymap()
+	local display_name = os.getenv("DISPLAY")
+	if not display_name or display_name == "" then return nil, "native-display-unavailable" end
+	if DisplayServer.is_wayland() then return nil, "native-wayland-seat-unqualified" end
+	local native, reason = bind()
+	if not native then return nil, reason end
+	local connection
+	connection, reason = connect(native, display_name)
+	if not connection then return nil, reason end
+	local drained, drain_reason = drain(native, connection)
+	if not drained then return nil, drain_reason end
+	return download_keymap(native, connection)
+end
+
 --- Detached native locked-modifier receipt. Locked XKB event epochs reject
 --- away-and-back races without treating ordinary key transitions as rebinds.
 function M.read_locked(expected, groups) return read(expected, groups, true) end
@@ -1456,7 +1516,7 @@ function M.read_input_state(expected, groups) return read(expected, groups, true
 --- Writer supplies only its original opaque kernel issuer; no profile boolean.
 
 function M.capture_receiving_source(kernel)
-	local Writer = require("adapters.uinput_writer")
+	local Writer = require("platform.input.uinput_writer")
 	local kernel_ports = Writer.kernel_source_ports
 	if type(kernel_ports) ~= "function" then return nil end
 	local writer = kernel_ports(kernel)
@@ -1481,7 +1541,7 @@ function M.capture_receiving_source(kernel)
 	for _, name in ipairs({ "owner_current", "acquire_path", "current", "retire", "closed", "close" }) do writer_ports[name] = writer[name] end
 	local function current()
 		if retired or unresolved or M.capture_receiving_source ~= original_receiving_capture
-			or package.loaded["adapters.uinput_writer"] ~= Writer or Writer.kernel_source_ports ~= kernel_ports
+			or package.loaded["platform.input.uinput_writer"] ~= Writer or Writer.kernel_source_ports ~= kernel_ports
 			or kernel_ports(kernel) ~= writer or native.x11.XInternAtom ~= intern_atom
 			or _native ~= native or _connection ~= connection or connection.retired
 			or connection.lifetime ~= lifetime or connection.receiving_revision ~= revision

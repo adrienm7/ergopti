@@ -247,7 +247,7 @@ def main():
                     "ERGOPTI_X11_FIXTURE_DATA_DIRS",
                     os.environ.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share"),
                 ),
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             )
 
             def command(*args, check=True):

@@ -92,9 +92,9 @@ local function fresh_bridge(options)
 	ctx.engine["ergopti_revoked_" .. TOKEN_B] = 0
 
 	package.loaded["platform.remap.ke_variables"] = nil
-	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.json_codec"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.fs.adapters.json_codec"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_contract"] = nil
 	package.loaded["platform.remap.lease_controller"] = nil
@@ -105,7 +105,7 @@ local function fresh_bridge(options)
 			message = ok and message or tostring(format_string),
 		}
 	end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function(_, ...) log("debug", ...) end,
 		info = function(_, ...) log("info", ...) end,
 		warn = function(_, ...) log("warn", ...) end,
@@ -137,7 +137,7 @@ local function fresh_bridge(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.json_codec"] = {
+	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function(values)
 			local payload = "payload-" .. tostring(#ctx.payloads + 1)
 			ctx.payloads[#ctx.payloads + 1] = {
@@ -147,7 +147,7 @@ local function fresh_bridge(options)
 			return payload, nil
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local task = {
 				executable = executable,
@@ -190,7 +190,7 @@ local function fresh_bridge(options)
 			}
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay_sec, fn)
 			local timer_index = #ctx.timers + 1
 			local configured = ctx.timer_results[timer_index]
@@ -997,10 +997,10 @@ end)
 
 
 package.loaded["platform.remap.ke_variables"] = nil
-package.loaded["adapters.shell_runner"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
-package.loaded["adapters.json_codec"] = nil
+package.loaded["core.process.adapters.shell_runner"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
+package.loaded["core.fs.adapters.json_codec"] = nil
 package.loaded["platform.remap.ke_paths"] = nil
 package.loaded["platform.remap.lease_contract"] = nil
 package.loaded["platform.remap.lease_controller"] = nil
-package.loaded["infra.logger"] = nil
+package.loaded["core.logger.engine.logger"] = nil

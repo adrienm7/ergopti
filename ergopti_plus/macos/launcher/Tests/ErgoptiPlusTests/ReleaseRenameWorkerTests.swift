@@ -68,6 +68,40 @@ final class ReleaseRenameWorkerTests: XCTestCase {
 		}
 	}
 
+	func testCommittedRenameRemainsSuccessfulWhenDescriptorCloseReportsFailure() throws {
+		try fixture { root in
+			let source = root.appendingPathComponent("source")
+			let destination = root.appendingPathComponent("destination")
+			try directory(source, marker: "original")
+			var closes = 0
+			let result = ReleaseRenameWorker.move(source: source.path, destination: destination.path) { fd in
+				closes += 1
+				_ = Darwin.close(fd)
+				return -1
+			}
+			XCTAssertEqual(result, 0, "a close error cannot revoke a committed rename")
+			XCTAssertEqual(closes, 2)
+			XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+			XCTAssertEqual(try String(contentsOf: destination.appendingPathComponent("marker")), "original")
+		}
+	}
+
+	func testRefusedRenameRemainsFailedWhenDescriptorCloseReportsFailure() throws {
+		try fixture { root in
+			let source = root.appendingPathComponent("source")
+			let destination = root.appendingPathComponent("destination")
+			try directory(source, marker: "original")
+			try directory(destination, marker: "foreign")
+			let result = ReleaseRenameWorker.move(source: source.path, destination: destination.path) { fd in
+				_ = Darwin.close(fd)
+				return -1
+			}
+			XCTAssertEqual(result, 3)
+			XCTAssertEqual(try String(contentsOf: source.appendingPathComponent("marker")), "original")
+			XCTAssertEqual(try String(contentsOf: destination.appendingPathComponent("marker")), "foreign")
+		}
+	}
+
 	func testExistingDirectoryFileAndSymlinkDestinationsRemainUntouched() throws {
 		try fixture { root in
 			for kind in ["directory", "file", "symlink"] {

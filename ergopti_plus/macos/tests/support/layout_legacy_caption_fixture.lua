@@ -15,8 +15,8 @@ local M = {}
 --- @param translator table Current fixture translator, captured by its genuine native producer.
 --- @return table renderer Actual Hammerspoon binding over the canonical shared manifest.
 function M.install(translator)
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
+	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
 	local original_get = translator.get
 	translator.get = function(key)
@@ -28,8 +28,8 @@ function M.install(translator)
 		return original
 	end
 	-- The real binding must capture this fixture's dictionary, never a stale prior fixture.
-	package.loaded["infra.manifest_menu"] = nil
-	return require("infra.manifest_menu")
+	package.loaded["menu.engine.manifest_menu"] = nil
+	return require("menu.engine.manifest_menu")
 end
 
 --- Scopes complete legacy subjects, including their caption assertions, to exact predecessor modules.

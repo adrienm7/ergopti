@@ -24,27 +24,13 @@ local helpers = require("tests.helpers")
 local M = {}
 local memory_source_serial = 0
 
--- A layer binding the wheel: what selects the derived layer_wheel owner.
-local WHEEL_UP_VOLUME = { code = "WheelUp", strokes = { { system = "SOUND_UP" } } }
-
 --- Selects explicit shortcut intent before a lifecycle test acquires handles.
 --- @param bindings table Fresh real bindings owner.
 function M.prefer_all(bindings)
-	-- The layer's wheel owner is derived from layers.toml: a layer that binds
-	-- a wheel direction selects it, through with_bindings' double of the layer
-	-- data, or one installed here instead of the host's configuration folder.
-	local layer = package.loaded["platform.remap.nav_layer"]
-	if type(layer) == "table" and type(layer.select_wheel) == "function" then
-		layer.select_wheel(WHEEL_UP_VOLUME)
-	else
-		package.loaded["platform.remap.nav_layer"] = { load = function()
-			return { bindings = {}, registry = {}, wheel = { vertical = { [1] = WHEEL_UP_VOLUME }, horizontal = {} } }
-		end }
-	end
 	-- Some lifecycle harnesses use real TapKeys, others inject its stateful double.
 	-- Configure either without allowing the real writer to reach the host config.
-	local files = require("adapters.file_system")
-	local paths = require("infra.config_paths")
+	local files = require("core.fs.adapters.file_system")
+	local paths = require("settings.engine.paths")
 	local saved = { read = files.read_with_status, write = files.write,
 		conditional = files.write_if_unchanged, path = paths.get }
 	memory_source_serial = memory_source_serial + 1
@@ -122,7 +108,6 @@ local RAW_FACTORIES = {
 	bind_instant_screenshot = "at_hash",
 	bind_layer_wheel = "layer_wheel",
 	bind_wrap_text_if_selected = "wrap_text_if_selected",
-	bind_cmd_star = "cmd_star",
 	bind_tap_keys = "tap_keys",
 }
 
@@ -209,17 +194,17 @@ function M.with_bindings(callback)
 		factory_args = {}, wheel = { vertical = {}, horizontal = {} } }
 	return helpers.with_stub_scope({
 		"modules.shortcuts.bindings",
-		"adapters.hotkey_registrar",
+		"platform.input.hotkey_registrar",
 		"platform.remap.nav_layer",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
 		"modules.shortcuts.tap_keys",
-		"modules.gestures.actions",
-		"infra.i18n",
-		"infra.logger",
+		"gestures.engine.actions",
+		"core.i18n.engine.i18n",
+		"core.logger.engine.logger",
 	}, function()
-		package.loaded["adapters.hotkey_registrar"] = nil
+		package.loaded["platform.input.hotkey_registrar"] = nil
 		local facades = build_facades(ctx)
 		package.loaded["modules.shortcuts.actions.text"] = facades.text
 		package.loaded["modules.shortcuts.actions.apps"] = facades.apps
@@ -239,19 +224,19 @@ function M.with_bindings(callback)
 			display_name = function() return "@" end,
 		}
 		-- The layer's wheel bindings, which a case may fill (ctx.wheel), instead
-		-- of the configuration folder's layers.toml.
+		-- of the configuration folder's layers.toml. Bindings no longer reads
+		-- them; the wheel owner a case loads beside it does.
 		package.loaded["platform.remap.nav_layer"] = {
 			load = function() return { bindings = {}, registry = {}, wheel = ctx.wheel } end,
-			select_wheel = function(slot) ctx.wheel.vertical[1] = slot end,
 		}
 		-- The unassigned tap-key fixture still initializes through this owner;
 		-- loading the real action catalogue would escape the native boundary.
-		package.loaded["modules.gestures.actions"] = { is_assignable = function() return false end }
+		package.loaded["gestures.engine.actions"] = { is_assignable = function() return false end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
 			hotkey = {
 				bind = function(mods, key)

@@ -10,16 +10,36 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local KeyNames = require("keycodes.key_names")
-local Logger = require("logger.shim")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local KeyNames = require("platform.input.keycodes.key_names")
+local Logger = require("core.logger.engine.shim")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
 
 local LOG = "ui.menu.menu_tap_holds"
+
+--- Reads typed text through the shared value check. A refusal is logged and
+--- shown with the localized text naming the accepted range, and nothing is
+--- written.
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13);
+--- an override passes ValueCheck.INHERIT and gets it back for a blank answer.
+--- @param key string Declaration of the shared value schema.
+--- @param text string What the person typed.
+--- @param default any The setting's default, in the stored unit, or ValueCheck.INHERIT.
+--- @return any|nil value The value in the stored unit, nil when refused.
+local function read_typed(key, text, default)
+	local ValueCheck = require("settings.engine.value_check")
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
+	if result.ok and result.inherit then return ValueCheck.INHERIT end
+	if result.ok then return result.value end
+	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
+	show_error(plain_markup(ValueCheck.refusal_text(key, result, i18n_safe)), i18n_safe("dialog.value_check.title"))
+	return nil
+end
 
 --- Display name of a tap-hold key: its name in the shared key name table, the
 --- one the Windows and macOS menus show. A key the table does not name raises
@@ -36,8 +56,11 @@ end
 --- @return string
 local function _tap_hold_action_label(action, gestures)
 	if type(action) ~= "string" or action == "" then return i18n_safe("tap_hold.tap.none") end
-	local label = i18n_safe("sg_actions." .. action)
-	if label ~= "sg_actions." .. action then return label end
+	-- Probed: an action the gestures manager labels has no sg_actions key.
+	local ok_i18n, I18n = pcall(require, "core.i18n.engine.i18n")
+	if ok_i18n and type(I18n.has) == "function" and I18n.has("sg_actions." .. action) then
+		return i18n_safe("sg_actions." .. action)
+	end
 	if gestures and type(gestures.get_action_label) == "function" then
 		local ok, named = pcall(gestures.get_action_label, action)
 		if ok and type(named) == "string" and named ~= "" then return named end
@@ -65,7 +88,8 @@ end
 --- Builds the Tap-Holds submenu: the feature switch, reset and disable-all,
 --- then one row per key with its tap picker, hold picker and delay — the
 --- Windows menu, on the engine this daemon runs. Every change writes the
---- user's tap_hold.toml and reloads the engine, so it is in force at once.
+--- user's tap_hold.toml (keys and delays) or config.toml (the switch and the
+--- timings) and reloads the engine, so it is in force at once.
 --- @param ctx table Menu context (ctx.tap_holds is the tap-hold manager).
 --- @return table One menu entry with its submenu.
 local function _build_tap_holds(ctx)
@@ -78,8 +102,8 @@ local function _build_tap_holds(ctx)
 		return declared[1]
 	end
 	local Writer = require("platform.remap.tap_hold_writer")
-	local HoldOptions = require("tap_hold.hold_options")
-	local KeyCatalog = require("tap_hold.key_catalog")
+	local HoldOptions = require("tap_hold.engine.hold_options")
+	local KeyCatalog = require("tap_hold.engine.key_catalog")
 
 	local function changed(ok)
 		if not ok then SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end) end
@@ -88,23 +112,22 @@ local function _build_tap_holds(ctx)
 
 	local keys = th.keys()
 	local options = th.hold_options()
-	local feature_on = th.file_enabled() and th.is_enabled()
+	local feature_on = th.feature_enabled() == true
 
 	local capture_edit = th.capture_configuration_edit
+	-- Runs while paused: a pause stops typing, not configuration (EDD-1). The
+	-- manager's scope retires an editor across a pause or resume transition.
 	local function edit_guard(setter_name)
-		local setter, is_paused = Writer[setter_name], ctx.is_paused
+		local setter = Writer[setter_name]
 		if type(capture_edit) ~= "function" or type(setter) ~= "function" then return nil end
 		local ok, scope = pcall(capture_edit)
 		if not ok or type(scope) ~= "function" then return nil end
 		local function ports_current()
 			return ctx.tap_holds == th and th.capture_configuration_edit == capture_edit
 				and package.loaded["platform.remap.tap_hold_writer"] == Writer and Writer[setter_name] == setter
-				and type(is_paused) == "function" and ctx.is_paused == is_paused
 		end
 		local function current()
 			if not ports_current() then return false end
-			local called, paused = pcall(is_paused)
-			if not called or paused ~= false or not ports_current() then return false end
 			local checked, live = pcall(scope)
 			return checked and live == true and ports_current()
 		end
@@ -185,22 +208,22 @@ local function _build_tap_holds(ctx)
 		return true
 	end
 
-	--- Asks for a key's own delay, in milliseconds.
-	local function ask_delay(key_id, current_ms)
+	--- Asks for a key's own delay, in milliseconds. A blank answer removes it,
+	--- so the global delay the hint names applies again (maintainer decision
+	--- of 2026-11-22, PCK-13 for overrides); the setter takes nil for that.
+	local function ask_delay(key_id, current_ms, global_ms)
 		local guard, setter = edit_guard("set_threshold")
 		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
-			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local ms = tonumber(value)
-		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
-			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
-			return false
-		end
+		local ValueCheck = require("settings.engine.value_check")
+		local seconds = read_typed(ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, value, ValueCheck.INHERIT)
+		if seconds == nil then return false end
+		if rawequal(seconds, ValueCheck.INHERIT) then seconds = nil end
 		if guard() ~= true then changed(false); return false end
-		local call_ok, persisted = pcall(setter, key_id, math.floor(ms + 0.5) / 1000, guard)
+		local call_ok, persisted = pcall(setter, key_id, seconds, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -219,14 +242,34 @@ local function _build_tap_holds(ctx)
 			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
 			tostring(current_ms))
 		if value == nil then return false end
-		local ms = tonumber(value)
-		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
-			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
-			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+		local seconds = read_typed(require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, value,
+			require("platform.remap.tap_hold_loader").GLOBAL_DEFAULT_SECONDS)
+		if seconds == nil then return false end
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, seconds, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
 			return false
 		end
+		changed(true)
+		return true
+	end
+
+	--- Asks how long a one-shot modifier waits for its key, in milliseconds
+	--- (macOS's sticky delay row): 0 (no time limit) or a positive whole
+	--- number, live once written. A negative or fractional answer is refused.
+	local function ask_one_shot_delay(current_ms)
+		local guard, setter = edit_guard("set_one_shot_timeout_ms")
+		if not guard then changed(false); return false end
+		local value = prompt_text(i18n_safe("menu.tapholds.sticky_dialog_title"),
+			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
+		if value == nil then return false end
+		-- The shared value check names the accepted range in its refusal.
+		local ms = read_typed(require("settings.engine.value_check").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, value,
+			require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS))
+		if ms == nil then return false end
 		if guard() ~= true then changed(false); return false end
-		local call_ok, persisted = pcall(setter, math.floor(ms + 0.5) / 1000, guard)
+		local call_ok, persisted = pcall(setter, ms, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
@@ -294,11 +337,11 @@ local function _build_tap_holds(ctx)
 			local ms = own_delay and math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5) or global_ms
 
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms) end,
-				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_NATIVE] = function() changed(Writer.set_native(key_id)) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_TAP] = function() pick_tap(catalog_entry, tap) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_HOLD_ACTION] = function() return pick_hold(catalog_entry, hold) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY] = function() return ask_delay(key_id, ms, global_ms) end,
+				[require("settings.engine.keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
@@ -332,12 +375,20 @@ local function _build_tap_holds(ctx)
 				action = function() return ask_global_delay(global_ms) end,
 			} }
 		end,
+		["tap_hold_one_shot_delay"] = function()
+			local current_ms = th.one_shot_timeout_ms()
+			return { {
+				label = string.format(i18n_safe("menu.tapholds.sticky_title"), current_ms == 0
+					and i18n_safe("menu.tapholds.sticky_no_limit") or current_ms .. " ms"),
+				action = function() return ask_one_shot_delay(current_ms) end,
+			} }
+		end,
 		["tap_hold_lone_tap"] = function()
 			local current_ms = th.lone_tap_max_ms()
 			-- The windows offered are the feature's preset_values, the one list the
 			-- three drivers read; 0 is Off, the strict tap-hold.
-			local offered = require("tap_hold.lone_tap").choices(require("infra.manifest_reader")
-				.find_entry_by_path(require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
+			local offered = require("tap_hold.engine.lone_tap").choices(require("menu.engine.manifest_reader")
+				.find_entry_by_path(require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 			local choices = {}
 			for _, ms in ipairs(offered) do
 				choices[#choices + 1] = {
@@ -359,10 +410,9 @@ local function _build_tap_holds(ctx)
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
-	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
-	-- Windows toggle is in its config; turning it on also lifts a runtime
-	-- « Disable all ».
-	render_ctx.commands[require("config_keys").COMMAND.TAPHOLDS_TOGGLE] = function()
+	-- The feature switch is persisted in config.toml ([tap_holds] enabled), as
+	-- the Windows toggle is; turning it on also lifts a runtime « Disable all ».
+	render_ctx.commands[require("settings.engine.keys").COMMAND.TAPHOLDS_TOGGLE] = function()
 		local want = not feature_on
 		local ok = Writer.set_enabled(want)
 		if ok and want then ok = th.set_enabled(true) end
@@ -372,31 +422,32 @@ local function _build_tap_holds(ctx)
 	-- shared scope transaction at once: both files backed up, the engine
 	-- acknowledging the candidate before it is published.
 	local function apply_scope(mode)
-		if ctx.paused == true then return false end
-		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
+		-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+		local committed = require("infra.tap_hold_scope").apply(mode)
 		changed(committed)
 		return committed
 	end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
-	-- The navigation layer editor: the shared page, saved and applied by
-	-- ui/layer_editor/bridge.lua.
-	render_ctx.commands[require("config_keys").COMMAND.EDIT_NAV_LAYER] = function()
+	-- The navigation layer: Ergopti Studio on the source's nav layer, applied
+	-- through modules/keymap/nav_layer_save.lua.
+	render_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
+			Logger.error(LOG, "No webview manager in the menu context — Ergopti Studio cannot open.")
 			return
 		end
-		ctx.webview.show("layer_editor")
+		require("ui.layout_manager.bridge").open_editor_window(ctx.webview, { nav = true })
 	end
 
 	local rows = ManifestMenu
 		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
 		or {}
-	return receive(rows, { tapholds_enabled = function() return nil end })
+	-- The parent row ticks like Shortcuts and Gestures: the same state as the switch.
+	return receive(rows, { tapholds_enabled = function() return feature_on end })
 end
 
 M.build = _build_tap_holds

@@ -76,13 +76,13 @@ final class OwnedRuntimeInstallOwner {
 			let expression = "identifier \"" + product.identifier + "\""
 			guard SecStaticCodeCreateWithPath(path as CFURL, [], &code) == errSecSuccess, let code,
 				SecRequirementCreateWithString(expression as CFString, [], &requirement) == errSecSuccess, let requirement,
-				SecStaticCodeCheckValidity(code, strict, requirement) == errSecSuccess else { throw OwnedRuntimeInstallFailure.signature }
+				SecStaticCodeCheckValidity(code, strict, requirement) == errSecSuccess else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		}
 	}
 	static func validateSignedInstallerForBuild(at helper: URL, leaf: Data) throws {
 		let identifier = Identifiers.SigningIds.runtimeInstaller
 		guard helper.pathExtension == "app", Set(try FileManager.default.contentsOfDirectory(atPath: helper.path)) == ["Contents"] else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		let contents = helper.appendingPathComponent("Contents", isDirectory: true)
 		let names = Set(try FileManager.default.contentsOfDirectory(atPath: contents.path))
@@ -90,10 +90,10 @@ final class OwnedRuntimeInstallOwner {
 		guard names == required || names == required.union(["PkgInfo"]),
 			try FileManager.default.contentsOfDirectory(atPath: contents.appendingPathComponent("MacOS").path) == ["ErgoptiPlus-Runtime-Installer"],
 			try FileManager.default.contentsOfDirectory(atPath: contents.appendingPathComponent("Resources").path) == ["OwnedRuntime"] else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		if names.contains("PkgInfo") {
-			guard try Data(contentsOf: contents.appendingPathComponent("PkgInfo")) == Data("APPL????".utf8) else { throw OwnedRuntimeInstallFailure.signature }
+			guard try Data(contentsOf: contents.appendingPathComponent("PkgInfo")) == Data("APPL????".utf8) else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		}
 		var code: SecStaticCode?, requirement: SecRequirement?
 		let expression = "identifier \"" + identifier + "\""
@@ -102,31 +102,31 @@ final class OwnedRuntimeInstallOwner {
 			SecStaticCodeCheckValidity(code, strict, requirement) == errSecSuccess,
 			leafOf(code, identifier: identifier) == leaf,
 			universalExecutable(try Data(contentsOf: contents.appendingPathComponent("MacOS/ErgoptiPlus-Runtime-Installer"))) else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		try validateSignedProductsForBuild(at: contents.appendingPathComponent("Resources/OwnedRuntime", isDirectory: true), leaf: leaf)
 	}
 	private static func validateProducts(at directory: URL, leaf: Data) throws {
 		guard Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)) == Set(["ErgoptiPlus-Remap-Core.app", "ErgoptiPlus-Remap-Console.app", "bin"]) else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		guard try FileManager.default.contentsOfDirectory(atPath: directory.appendingPathComponent("bin").path) == ["ergoptiplus_remap_cli"] else {
-			throw OwnedRuntimeInstallFailure.signature
+			throw OwnedRuntimeInstallFailure.traced(.signature)
 		}
 		for product in products {
 			let bundle = directory.appendingPathComponent(product.path)
 			var code: SecStaticCode?
 			guard SecStaticCodeCreateWithPath(bundle as CFURL, [], &code) == errSecSuccess, let code,
-				leafOf(code, identifier: product.identifier) == leaf else { throw OwnedRuntimeInstallFailure.signature }
+				leafOf(code, identifier: product.identifier) == leaf else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 			let executable = product.executableRelative.map { bundle.appendingPathComponent($0) } ?? bundle
 			let bytes = try Data(contentsOf: executable)
-			guard universalExecutable(bytes) else { throw OwnedRuntimeInstallFailure.signature }
+			guard universalExecutable(bytes) else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		}
 	}
 	/// The fixed native module has its own exact bundle file type and signed role, never an executable grant.
 	static func validateSignedInstalledSourceForBuild(at module: URL, leaf: Data) throws {
 		let identifier = Identifiers.SigningIds.installedPhysicalSource
-		guard module.lastPathComponent == "installed_physical_source.so" else { throw OwnedRuntimeInstallFailure.signature }
+		guard module.lastPathComponent == "installed_physical_source.so" else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		let parent = try OwnedRuntimeInstallTree(root: module.deletingLastPathComponent(), protected: false)
 		try parent.verify()
 		var code: SecStaticCode?, requirement: SecRequirement?
@@ -134,9 +134,9 @@ final class OwnedRuntimeInstallOwner {
 		guard SecStaticCodeCreateWithPath(module as CFURL, [], &code) == errSecSuccess, let code,
 			SecRequirementCreateWithString(expression as CFString, [], &requirement) == errSecSuccess, let requirement,
 			SecStaticCodeCheckValidity(code, strict, requirement) == errSecSuccess, leafOf(code, identifier: identifier) == leaf,
-			systemClosedBundleForInstalledSource(try Data(contentsOf: module)) else { throw OwnedRuntimeInstallFailure.signature }
+			systemClosedBundleForInstalledSource(try Data(contentsOf: module)) else { throw OwnedRuntimeInstallFailure.traced(.signature) }
 		try parent.verify()
-		guard parent.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.cleanupPending }
+		guard parent.releaseOwnedDescriptors() else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 	}
 	/// Both intended native slices and their load paths must be closed before these bytes can be published.
 	/// Private/framework dependencies are unavailable until a signed packaging closure is implemented.
@@ -224,9 +224,9 @@ final class OwnedRuntimeInstallOwner {
 	/// The caller runs this blocking filesystem role in its dedicated privileged worker, never the Lua loop.
 	func publishFirstInstallation() throws {
 		lock.lock(); defer { lock.unlock() }
-		guard state == .held, staging == nil else { throw OwnedRuntimeInstallFailure.destination }
+		guard state == .held, staging == nil else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 		do {
-			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.principal }
+			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.traced(.principal) }
 			try helper.verify(); try source.verify()
 			// Parent provisioning and administrative authorization remain separate explicit installer work.
 			let parent = try OwnedRuntimeInstallTree(root: Self.parent, protected: true, includeChildren: false)
@@ -238,20 +238,20 @@ final class OwnedRuntimeInstallOwner {
 			let destination = Self.parent.appendingPathComponent("Runtime", isDirectory: true)
 			var existing = stat(); errno = 0
 			guard fstatat(parentDescriptor, "Runtime", &existing, AT_SYMLINK_NOFOLLOW) == -1, errno == ENOENT else {
-				throw OwnedRuntimeInstallFailure.destination
+				throw OwnedRuntimeInstallFailure.traced(.destination)
 			}
 			errno = 0
 			guard fstatat(daemonDescriptor, Identifiers.ServiceLabels.macosCore + ".plist", &existing, AT_SYMLINK_NOFOLLOW) == -1,
-				errno == ENOENT else { throw OwnedRuntimeInstallFailure.destination }
+				errno == ENOENT else { throw OwnedRuntimeInstallFailure.traced(.destination) }
 			let stage = Self.parent.appendingPathComponent(".runtime-install-" + UUID().uuidString, isDirectory: true)
 			let journal = Self.parent.appendingPathComponent(".runtime-install-journal")
 			let descriptor = openat(parentDescriptor, journal.lastPathComponent, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
-			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard descriptor >= 0 else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			journalDescriptor = descriptor; staging = stage
 			// A persistent exclusive journal fences successor helpers after interruption or unknown copy custody.
 			let record = Data(("1\n" + stage.lastPathComponent + "\n").utf8)
 			let written = record.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress, $0.count) }
-			guard written == record.count, fsync(descriptor) == 0, fsync(parentDescriptor) == 0 else { throw OwnedRuntimeInstallFailure.copy }
+			guard written == record.count, fsync(descriptor) == 0, fsync(parentDescriptor) == 0 else { throw OwnedRuntimeInstallFailure.traced(.copy) }
 			try source.copy(into: stage, custody: { self.scratch = $0 })
 			let copied = try OwnedRuntimeInstallTree(root: stage, protected: true)
 			try Self.validateProducts(at: stage, leaf: leaf)
@@ -260,22 +260,22 @@ final class OwnedRuntimeInstallOwner {
 			try parent.verifyAnchor()
 			let protectedStage = try OwnedRuntimeInstallTree(root: stage, protected: true)
 			try protectedStage.verify()
-			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.principal }
-			guard let scratch else { throw OwnedRuntimeInstallFailure.cleanupPending }
+			guard publisher.current(), Self.signingLeaf(principal: principal, identifier: Identifiers.SigningIds.runtimeInstaller) == leaf else { throw OwnedRuntimeInstallFailure.traced(.principal) }
+			guard let scratch else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 			try scratch.publishRuntime(); filesPublished = true
 			let installed = try OwnedRuntimeInstallTree(root: destination, protected: true)
 			try Self.validateProducts(at: destination, leaf: leaf)
-			guard try source.matchesBytes(of: installed) else { throw OwnedRuntimeInstallFailure.mutated }
+			guard try source.matchesBytes(of: installed) else { throw OwnedRuntimeInstallFailure.traced(.mutated) }
 			var heldJournal = stat(), namedJournal = stat()
 			guard fstat(descriptor, &heldJournal) == 0, fstatat(parentDescriptor, journal.lastPathComponent, &namedJournal, AT_SYMLINK_NOFOLLOW) == 0,
 				heldJournal.st_dev == namedJournal.st_dev, heldJournal.st_ino == namedJournal.st_ino,
 				namedJournal.st_uid == 0, namedJournal.st_nlink == 1,
 				namedJournal.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), namedJournal.st_mode & 0o077 == 0 else {
-				throw OwnedRuntimeInstallFailure.cleanupPending
+				throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 			}
 			try parent.verifyAnchor()
 			guard fsync(parentDescriptor) == 0, unlinkat(parentDescriptor, journal.lastPathComponent, 0) == 0, fsync(parentDescriptor) == 0 else {
-				throw OwnedRuntimeInstallFailure.cleanupPending
+				throw OwnedRuntimeInstallFailure.traced(.cleanupPending)
 			}
 			Darwin.close(descriptor); journalDescriptor = nil
 			staging = nil; state = .published

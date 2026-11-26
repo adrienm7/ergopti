@@ -9,11 +9,16 @@ import os
 import pathlib
 import subprocess
 import tempfile
+import tomllib
 import time
+
+# The application folder under every XDG base, read from the one declaration.
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
 WORKER = r"""
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 print("ready"); io.stdout:flush()
 assert(Storage.get("value", "default") == "default")
 local recovery = assert(Storage.recovery_status())
@@ -34,7 +39,7 @@ def main():
 
         def case(kind, depth):
             home = root / f"{kind}-{depth}"
-            directory = home / "ergopti_plus"
+            directory = home / FOLDER
             directory.mkdir(parents=True)
             store = directory / "storage.json"
             first = directory / "storage.json.corrupt"
@@ -46,9 +51,7 @@ def main():
             trace = home / "trace"
             env = dict(os.environ)
             env["XDG_CONFIG_HOME"] = str(home)
-            env["LUA_PATH"] = (
-                "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
-            )
+            env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
             with subprocess.Popen(
                 [
                     "strace",

@@ -9,10 +9,13 @@
 
 local driver, root, entry, mode = assert(arg[1]), assert(arg[2]), assert(arg[3]), assert(arg[4])
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. driver .. "/../_shared/lua/?.lua;" .. driver .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local Shell, Json = require("adapters.shell_runner"), require("json")
-local Paths, Writer = require("infra.config_paths"), require("toml_codec.writer")
+	.. driver .. "/../_shared/?.lua;" .. driver .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local Shell, Json = require("core.process.adapters.shell_runner"), require("core.text.engine.json")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+local Paths, Writer = require("settings.engine.paths"), require("core.text.engine.toml_codec.writer")
 
 --- Writes and closes the exact native fixture bytes.
 --- @param path string Private destination.
@@ -24,7 +27,7 @@ end
 --- Reads the real durable locator, independently of the storage cache.
 --- @return string bytes
 local function locator()
-	local file = assert(io.open(Paths.config_home() .. "/ergopti_plus/storage.json", "rb"))
+	local file = assert(io.open(Paths.config_home() .. "/" .. FOLDER .. "/storage.json", "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 end
 
@@ -49,7 +52,7 @@ local saved, hidden, reloaded
 if entry == "single" then saved = Paths.set_config_dir(target)
 elseif entry == "batch" then saved = Paths.set_paths(target, root .. "/new logs")
 else
-	local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = target }, {
+	local result = require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = target }, {
 		webview_manager = { hide = function() hides = hides + 1; return true end },
 		on_reload = function() reloads = reloads + 1; return true end,
 	})

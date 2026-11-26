@@ -85,9 +85,9 @@ local function load_remote_native_http()
 			return new_task()
 		end,
 	}
-	reset_module("adapters.http_client")
-	reset_module("adapters.timer_scheduler")
-	helpers.load_with_stubs("adapters.http_client", {
+	reset_module("core.network.adapters.http_client")
+	reset_module("core.events.timer_scheduler")
+	helpers.load_with_stubs("core.network.adapters.http_client", {
 		timer = timer_stub,
 		http = http_stub,
 	})
@@ -95,8 +95,8 @@ local function load_remote_native_http()
 		is_paused = function() return false end,
 		get_pause_epoch = function() return 0 end,
 	}
-	reset_module("modules.llm.api_remote")
-	local api = helpers.load_with_stubs("modules.llm.api_remote")
+	reset_module("ai.engine.api.remote")
+	local api = helpers.load_with_stubs("ai.engine.api.remote")
 	api.PROVIDERS.fixture = {
 		label = "Fixture",
 		base_url = "https://fixture.invalid",

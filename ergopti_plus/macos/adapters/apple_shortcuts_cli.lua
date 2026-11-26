@@ -19,19 +19,19 @@
 --- 3. Cancellation stops the command-line tool. Shortcuts runs a shortcut in
 ---    its own service, which may finish the actions already handed to it: the
 ---    owner's automation receipt here is the tool's exit, and the README says
----    so (security notes of _shared/modules/actions).
+---    so (security notes of _shared/shortcuts/data/actions).
 --- 4. Payload-free native logging: shortcut names, identifiers and the text a
 ---    run receives or returns never reach the log.
 --- ==============================================================================
 
 local M = {}
 
-local Shell = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Shell = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Owner = require("adapters.apple_shortcuts")
 local Native = require("adapters.apple_shortcuts_native")
-local Parameter = require("program_parameter")
-local Json = require("json")
+local Parameter = require("settings.engine.program_parameter")
+local Json = require("core.text.engine.json")
 
 --- The system tool every transport of the owner names.
 M.SHORTCUTS_BIN = "/usr/bin/shortcuts"
@@ -177,11 +177,22 @@ local function spawn_bounded(args, limit, timeout_sec, done)
 	function handle.start()
 		local started = raw.start() == true
 		if started and not raw.isSettled() then
-			timer = TimerScheduler.after(timeout_sec, function()
+			local scheduled, candidate, committed = pcall(TimerScheduler.after, timeout_sec, function()
 				timer = nil
 				timed_out = true
 				pcall(raw.terminate)
 			end)
+			if not scheduled or committed ~= true then
+				-- A running tool without its deadline is not an accepted bounded run.
+				-- The owner keeps this exact process until termination is acknowledged.
+				pcall(raw.terminate)
+				return false
+			end
+			if raw.isSettled() then
+				TimerScheduler.cancel(candidate)
+			else
+				timer = candidate
+			end
 		end
 		return started
 	end

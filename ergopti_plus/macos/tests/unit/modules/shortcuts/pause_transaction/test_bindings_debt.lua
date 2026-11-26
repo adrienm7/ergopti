@@ -144,4 +144,39 @@ helpers.describe("script-control: bindings child cleanup debt", function()
 			script_control.stop()
 		end)
 	end)
+
+	-- A pause stops typing, not configuration (EDD-1): a layer OFF at pause time
+	-- resumes through the inverse that starts it when the switch turned it ON.
+	helpers.it("resumes an OFF snapshot through the switch-aware inverse (edd1-paused-writes)", function()
+		local calls = { after_pause = 0, release = 0 }
+		with_context({
+			shortcuts_factory = function()
+				return {
+					is_bindings_started = function() return false end,
+					pause_bindings = function() return true end,
+					resume_bindings = function() return true end,
+					release_bindings_pause_claim = function()
+						calls.release = calls.release + 1
+						return true
+					end,
+					resume_bindings_after_pause = function(parent)
+						helpers.assert_eq(parent, "script_control")
+						calls.after_pause = calls.after_pause + 1
+						return true
+					end,
+				}
+			end,
+		}, function(script_control, ctx)
+			helpers.assert_eq(script_control.pause_all(), true)
+			ctx.fire_deferred()
+			ctx.pause_callback(true, "paused")
+			helpers.assert_eq(script_control.resume_all(), true)
+			ctx.fire_deferred()
+			ctx.resume_callback(true, "resumed")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(calls.after_pause, 1)
+			helpers.assert_eq(calls.release, 0, "the claim-only inverse is the fallback")
+			script_control.stop()
+		end)
+	end)
 end)

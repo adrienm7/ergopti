@@ -17,8 +17,12 @@ for runtime in /run/user/[0-9]*; do
 	uid="${runtime##*/}"
 	[[ "$uid" =~ ^[0-9]+$ ]] || exit 1
 	account="$(getent passwd "$uid")"
-	user="${account%%:*}"
-	[ -n "$user" ] || exit 1
+	case "$account" in *$'\n'*) printf '[stop_sessions] code=identity-mismatch uid=%s\n' "$uid" >&2; exit 1 ;; esac
+	IFS=: read -r user password account_uid rest <<< "$account"
+	if [ -z "$user" ] || [ "$account_uid" != "$uid" ]; then
+		printf '[stop_sessions] code=identity-mismatch uid=%s\n' "$uid" >&2
+		exit 1
+	fi
 	command=(runuser -u "$user" -- env "XDG_RUNTIME_DIR=$runtime" "DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus" systemctl --user)
 	if ! fragment="$("${command[@]}" show ergopti-hotstrings.service -p FragmentPath --value)"; then
 		if [ -S "$runtime/bus" ]; then exit 1; fi

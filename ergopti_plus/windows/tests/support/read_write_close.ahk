@@ -3,9 +3,9 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 #Warn VarUnset, Off
-#Include infra/file_read_activity.ahk
-#Include adapters/file_system.ahk
-#Include infra/config_write_lease.ahk
+#Include core/logger/engine/file_read_activity.ahk
+#Include core/fs/adapters/file_system.ahk
+#Include settings/engine/publication/write_lease.ahk
 global _FRC_Handle := -1
 _FRC_RefuseClose(Handle) {
 	global _FRC_Handle

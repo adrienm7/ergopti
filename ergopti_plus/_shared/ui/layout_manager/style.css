@@ -42,8 +42,10 @@ h1 {
 	margin: 0 0 2px;
 }
 
+/* Muted lines take the system's secondary label grey: 4.7:1 on the page and
+   5.1:1 on a card, where #888 and #777 held 3.5:1 and 4.5:1 at best. */
 .subtitle {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-48484c);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 10px;
@@ -64,7 +66,7 @@ h1 {
 }
 
 .catalogue-status {
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	flex-grow: 1;
 	font-size: 11px;
 	margin: 0;
@@ -72,13 +74,13 @@ h1 {
 
 .catalogue-status.is-error,
 .result.is-error {
-	color: var(--theme-hue-b3261e);
+	color: var(--theme-hue-8a1a14);
 }
 
 .result {
 	background: var(--theme-hue-eef6ee);
 	border-radius: 6px;
-	color: var(--theme-hue-1e5e22);
+	color: var(--theme-hue-154218);
 	flex-shrink: 0;
 	font-size: 12px;
 	margin: 0 0 8px;
@@ -122,21 +124,26 @@ h1 {
 	justify-content: space-between;
 }
 
+/* An h2 for the outline, sized as the card's title. */
 .layout-name {
 	color: var(--theme-label);
 	font-size: 13px;
 	font-weight: 600;
+	margin: 0;
 }
 
 .layout-badges {
 	display: flex;
 	gap: 4px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 .badge {
 	background: var(--theme-hue-ececf0);
 	border-radius: 10px;
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	font-size: 10px;
 	padding: 2px 8px;
 }
@@ -145,26 +152,28 @@ h1 {
 .badge-builtin,
 .badge-provided {
 	background: var(--theme-hue-e3f1e4);
-	color: var(--theme-hue-1e5e22);
+	color: var(--theme-hue-154218);
 }
 
 .badge-update {
 	background: var(--theme-hue-fff1d6);
-	color: var(--theme-hue-7a4b00);
+	color: var(--theme-hue-5c3800);
 }
 
 .badge-active {
 	background: var(--theme-hue-dceaff);
-	color: var(--theme-hue-0b4ea2);
+	color: var(--theme-hue-0a3a6e);
 }
 
 .layout-meta {
-	color: var(--theme-grey-777);
+	color: var(--theme-hue-48484c);
 	display: flex;
 	flex-wrap: wrap;
 	font-size: 11px;
 	gap: 4px 14px;
+	list-style: none;
 	margin: 4px 0 6px;
+	padding: 0;
 }
 
 .layout-actions {
@@ -174,14 +183,16 @@ h1 {
 	justify-content: flex-end;
 }
 
+/* Two paragraphs, spaced as one block: 8 px above the first, below the note. */
 .layout-content {
 	font-size: 12px;
 	line-height: 1.5;
-	margin: 8px 0;
+	margin: 8px 0 0;
 }
 
 .layout-content-note {
 	font-size: 11px;
+	margin: 0 0 8px;
 	opacity: 0.8;
 }
 
@@ -190,6 +201,7 @@ h1 {
 	flex-grow: 1;
 	font-size: 11px;
 	font-style: italic;
+	margin: 0;
 }
 
 .empty {
@@ -204,8 +216,9 @@ h1 {
 /* ============================== */
 /* ============================== */
 
+/* White on the accent fill holds 4.5:1; on the system blue it held 4.0:1. */
 button {
-	background: var(--theme-blue);
+	background: var(--theme-accent-fill);
 	border: none;
 	border-radius: 6px;
 	color: var(--theme-white);
@@ -225,15 +238,16 @@ button.link {
 	color: var(--theme-label);
 }
 
+/* The light accent, 5.9:1 on a card; the system blue held 4.0:1. */
 button.link {
 	background: transparent;
-	color: var(--theme-blue);
+	color: var(--theme-hue-004a99);
 	padding: 5px 6px;
 }
 
 button.danger {
 	background: var(--theme-gray5);
-	color: var(--theme-hue-b3261e);
+	color: var(--theme-hue-8a1a14);
 }
 
 .btns {
@@ -268,7 +282,7 @@ button.danger {
 	}
 
 	.catalogue-status {
-		color: var(--theme-grey-aaa);
+		color: var(--theme-grey-ccc);
 	}
 
 	button.secondary,
@@ -278,6 +292,17 @@ button.danger {
 	}
 
 	button.danger {
-		color: var(--theme-hue-ff6b61);
+		color: var(--theme-hue-ffc4bf);
+	}
+
+	/* On the dark card the meta grey, the pale blue and the pale red all hold
+	   7:1 (WCAG 1.4.6). */
+	.subtitle,
+	.layout-meta {
+		color: var(--theme-grey-ccc);
+	}
+
+	button.link {
+		color: var(--theme-hue-a8d8ff);
 	}
 }

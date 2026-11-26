@@ -56,11 +56,12 @@
 			"admitted": false
 		},
 		{
-			"id": "paused",
+			"id": "paused configuration stays editable",
 			"current": {
 				"paused": true
 			},
-			"admitted": false
+			"admitted": true,
+			"value": false
 		},
 		{
 			"id": "refused owner",

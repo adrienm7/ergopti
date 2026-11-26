@@ -31,16 +31,16 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local NumberRow = require("layout.number_row_native")
+local TableUtil = require("core.text.engine.table_util")
+local NumberRow = require("layouts.engine.layout.number_row_native")
 local number_row_receipts = setmetatable({}, { __mode = "k" })
 local receiving_rows = setmetatable({}, { __mode = "k" })
 local original_receiving_rows = nil
 local receiving_native_backends = setmetatable({}, { __mode = "k" })
 
-local Logger = require("logger.shim")
-local Keysym = require("infra.keysym")
-local EvdevCodes = require("infra.evdev_codes")
+local Logger = require("core.logger.engine.shim")
+local Keysym = require("platform.input.keysym")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "adapters.xkb_capture"
 
@@ -65,7 +65,7 @@ local VALUE_REPEAT = 2
 local XKB_KEY_UP = 0
 local XKB_KEY_DOWN = 1
 
--- The two modifier keys the injector presses (modules/hotstrings/injector.lua
+-- The two modifier keys the injector presses (hotstrings/engine/injector.lua
 -- MODIFIER_CODES), in XKB numbering, so the inverse table is probed with the
 -- very chords that will be emitted.
 local XKB_LEFTSHIFT = EvdevCodes.KEY_LEFTSHIFT + EVDEV_TO_XKB_OFFSET
@@ -114,7 +114,8 @@ local MODIFIER_ROLE_OF_KEYSYM = {
 --   key_utf8(session, xkb_keycode) -> string|nil
 --   sym_utf8(session, keysym) -> string|nil
 --   update_key(session, xkb_keycode, XKB_KEY_{UP,DOWN})
---   compose_feed/status/utf8/reset(session, ...)
+--   compose_feed/status/utf8/reset(session, ...); compose_feed returns false
+--     only for a keysym Compose ignores (a modifier)
 local _backend = nil
 local _session = nil
 local _keymap_text = nil
@@ -128,6 +129,9 @@ local _capture_group, _capture_generation = nil, 0
 local _inverse_receipts = setmetatable({}, { __mode = "k" })
 -- A reset keeps the loaded map owner; a load or backend replacement retires it.
 local _inverse_map_owner = 0
+-- The 0-based group the desktop reported as active for the loaded keymap
+-- (select_group), nil when none was selected: a state reset keeps it.
+local _selected_group = nil
 
 --- Tracks source changes without treating an ordinary key-up as a rebind.
 local function source_identity()
@@ -183,6 +187,7 @@ function M._set_backend(backend)
 	_backend = backend
 	_session = nil
 	_keymap_text = nil
+	_selected_group = nil
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
@@ -394,6 +399,14 @@ local function bind_ffi_backend()
 		return tonumber(lib.xkb_state_serialize_layout(session.state, XKB_STATE_LAYOUT_EFFECTIVE))
 	end
 
+	--- Moves the state to `group`, keeping its modifiers.
+	function backend.set_group(session, group)
+		lib.xkb_state_update_mask(session.state,
+			lib.xkb_state_serialize_mods(session.state, 1), lib.xkb_state_serialize_mods(session.state, 2),
+			lib.xkb_state_serialize_mods(session.state, 4), 0, 0, group)
+		return backend.capture_group(session) == group
+	end
+
 	function backend.source_group(session, allow_seed)
 		if not session.identity then return nil, "native-keymap-identity-unavailable" end
 		if not probe_current() then return nil, "native-source-issuer-replaced" end
@@ -545,8 +558,9 @@ local function bind_ffi_backend()
 		return rows
 	end
 
+	-- enum xkb_compose_feed_result: IGNORED (0) leaves the sequence untouched.
 	function backend.compose_feed(session, sym)
-		lib.xkb_compose_state_feed(session.compose_state, sym or 0)
+		return tonumber(lib.xkb_compose_state_feed(session.compose_state, sym or 0)) ~= 0
 	end
 
 	function backend.compose_status(session)
@@ -673,6 +687,7 @@ function M.load(text, locale)
 	local previous = _session
 	_session = next_session
 	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
+	_selected_group = nil
 	_keymap_text = text
 	_locale = selected_locale
 	_source_group, _source_native_generation = nil, nil
@@ -692,6 +707,10 @@ function M.reset_state()
 	local previous = _session
 	_session = next_session
 	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
+	-- The fresh state starts in group 1: the group the desktop reported stays.
+	if _selected_group ~= nil and type(_backend.set_group) == "function" then
+		pcall(_backend.set_group, _session, _selected_group)
+	end
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
 	_source_generation = _source_generation + 1
@@ -710,6 +729,27 @@ function M.clear()
 	_capture_group, _capture_generation = nil, _capture_generation + 1
 	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
+end
+
+--- Moves the capture to the group the desktop reports as active. A dumped
+--- keymap carries every layout of the session as one group each, and its
+--- fresh state sits in group 1: on KDE Plasma, where KWin switches the group
+--- itself, the second layout of « us, fr » was read as the first one, and
+--- every character resolved on the wrong layout (a↔q, m↔, on AZERTY).
+--- @param group integer 0-based layout index.
+--- @return boolean ok
+--- @return string|nil error
+function M.select_group(group)
+	if not _session then return false, "no XKB keymap is loaded" end
+	if type(group) ~= "number" or group < 0 or group % 1 ~= 0
+		or type(_session.groups) == "number" and group >= _session.groups then
+		return false, "the keymap has no layout " .. tostring(group)
+	end
+	if type(_backend.set_group) ~= "function" then return false, "the capture backend cannot select a layout" end
+	local ok, moved = pcall(_backend.set_group, _session, group)
+	if not ok or moved ~= true then return false, "the XKB state refused layout " .. tostring(group) end
+	_selected_group = group
+	return true, nil
 end
 
 --- @return boolean True when process() has a validated live state.
@@ -809,6 +849,16 @@ function M.inverse_table(require_source)
 		desktop_epoch = desktop_epoch, desktop_native_generation = _source_native_generation,
 		source_getter = source_getter, observed_current = after_observed }
 	return detached, nil, receipt
+end
+
+--- Whether a receipt is bound to the desktop's own XKB source (the X11 native
+--- probe), whose keymap and group notifications revoke it: inverse_current()
+--- then proves it live without a new keymap dump.
+--- @param receipt table Receipt returned by inverse_table.
+--- @return boolean
+function M.inverse_receipt_watched(receipt)
+	local owned = _inverse_receipts[receipt]
+	return owned ~= nil and not owned.revoked and owned.desktop_generation ~= nil
 end
 
 --- The 1-based XKB group (layout index plus one) an inverse receipt was taken
@@ -928,10 +978,16 @@ local function retarget_inverse(previous)
 	inverse_retargeting = true
 	local fresh
 	local called, built, reason, receipt = pcall(function()
+		-- An equal group is renewed too (decided by the maintainer on 2026-11-11):
+		-- Xorg sends a new-keyboard notify whenever the slave feeding the core
+		-- keyboard changes, which bumps the native generation without changing
+		-- the layout. source_identity() has just dumped the server keymap and
+		-- the probe refuses it unless it equals the capture's own map, so a
+		-- keymap that really differs keeps the receipt revoked.
 		local observed_generation, _, observed = source_identity()
 		local group = _source_group
 		if not provenance() or not observed_generation or type(observed) ~= "function"
-			or group == owned.group then return nil, "inverse-group-renewal-refused" end
+			or type(group) ~= "number" then return nil, "inverse-group-renewal-refused" end
 		local values, why, next_receipt = issue_inverse(true)
 		fresh = _inverse_receipts[next_receipt]
 		if not values or not fresh then return nil, why or "inverse-group-renewal-refused" end
@@ -956,8 +1012,10 @@ local function retarget_inverse(previous)
 	return built, reason, receipt
 end
 
---- Renews an automatic desktop inverse for an observed different group only.
---- Exact old map/session/issuer provenance stays required; old plans stay revoked.
+--- Renews an automatic desktop inverse after an observed native source change:
+--- a different group, or the same group whose server keymap was re-read equal
+--- to the capture's map. Exact old map/session/issuer provenance stays
+--- required; old plans stay revoked.
 --- @param previous table Retired inverse receipt from the same live capture.
 --- @return table|nil built Detached output steps, never input/output authority.
 --- @return string|nil reason Closed refusal.
@@ -1303,13 +1361,36 @@ end
 -- =========================================
 -- =========================================
 
+-- The keysyms of the pending Compose sequence, kept on the session so a new
+-- session starts empty. A consumer that keeps a press from the application
+-- restores the sequence that preceded it (M.restore_compose): resetting would
+-- also forget a dead key the application did receive.
+local EMPTY_COMPOSE = {}
+
+--- Records one fed keysym in the session's pending sequence.
+--- @param session table Capture session.
+--- @param sym integer|nil Fed keysym.
+--- @param accepted boolean|nil False when Compose ignored the keysym.
+--- @param status string Compose status after the feed.
+local function track_compose(session, sym, accepted, status)
+	if accepted == false then return end
+	if status ~= "composing" then session.compose_pending = EMPTY_COMPOSE; return end
+	local pending = session.compose_pending or EMPTY_COMPOSE
+	local extended = {}
+	for index = 1, #pending do extended[index] = pending[index] end
+	extended[#extended + 1] = sym or 0
+	session.compose_pending = extended
+end
+
 local function resolve_press(keycode)
 	local sym = _backend.key_sym(_session, keycode)
 	local identity = sym and _backend.sym_utf8(_session, sym) or nil
 	local text = _backend.key_utf8(_session, keycode)
 
-	_backend.compose_feed(_session, sym)
+	local mark = { session = _session, pending = _session.compose_pending or EMPTY_COMPOSE }
+	local accepted = _backend.compose_feed(_session, sym)
 	local status = _backend.compose_status(_session)
+	track_compose(_session, sym, accepted, status)
 	if status == "composing" then
 		text = nil
 	elseif status == "composed" then
@@ -1326,16 +1407,36 @@ local function resolve_press(keycode)
 	-- during pending Compose does not cancel or reset the Compose owner.
 	local control = status ~= "composed" and (text == nil or text == "")
 		and SEMANTIC_CONTROL_OF_KEYSYM[sym] or nil
-	return text, identity, control
+	return text, identity, control, mark
 end
 
---- Ends a pending Compose sequence, leaving the key state as it is. For a press
---- the application never received: the dead key it fed must not compose with
---- the next key here while the application types that key plain.
+--- Withdraws one press from Compose, leaving the key state as it is. For a
+--- press the application never received: Compose returns to the sequence that
+--- preceded it, so a dead key the application did receive still composes with
+--- the next key, and a dead key it did not receive composes with nothing.
+--- @param mark table The Compose mark M.process returned for that press.
 --- @return boolean ok, string|nil error
-function M.cancel_compose()
+function M.restore_compose(mark)
 	if not _session then return false, "XKB capture state is not ready" end
-	local ok, err = pcall(_backend.compose_reset, _session)
+	if type(mark) ~= "table" or type(mark.pending) ~= "table" then
+		return false, "a Compose mark from XkbCapture.process is required"
+	end
+	-- A mark of a replaced session describes a sequence the new state never fed.
+	local pending = mark.session == _session and mark.pending or EMPTY_COMPOSE
+	local ok, err = pcall(function()
+		_backend.compose_reset(_session)
+		local status = "nothing"
+		for index = 1, #pending do
+			_backend.compose_feed(_session, pending[index])
+			status = _backend.compose_status(_session)
+		end
+		local expected = #pending > 0 and "composing" or "nothing"
+		if status ~= expected then
+			_backend.compose_reset(_session)
+			error("the restored Compose sequence reads " .. tostring(status) .. ", not " .. expected)
+		end
+	end)
+	_session.compose_pending = ok and pending or EMPTY_COMPOSE
 	if not ok then return false, tostring(err) end
 	return true, nil
 end
@@ -1379,6 +1480,8 @@ end
 --- @param evdev_code integer Linux input-event keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
 --- @return string|nil text, string|nil identity, string|nil error, string|nil control
+--- @return table|nil compose_mark For a press or repeat: the Compose sequence
+---   before it, for M.restore_compose.
 function M.process(evdev_code, value)
 	_physical_probe_epoch = _physical_probe_epoch + 1
 	if not _session then return nil, nil, "XKB capture state is not ready" end
@@ -1397,7 +1500,7 @@ function M.process(evdev_code, value)
 		return nil, nil, nil
 	end
 
-	local ok_resolve, text, identity, control = pcall(resolve_press, keycode)
+	local ok_resolve, text, identity, control, compose_mark = pcall(resolve_press, keycode)
 	if not ok_resolve then return nil, nil, tostring(text) end
 	if value == VALUE_DOWN then
 		local ok_update, update_err = pcall(
@@ -1405,7 +1508,7 @@ function M.process(evdev_code, value)
 		if not ok_update then return nil, nil, tostring(update_err) end
 		capture_identity()
 	end
-	return text, identity, nil, control
+	return text, identity, nil, control, compose_mark
 end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
@@ -1512,10 +1615,11 @@ local function build_row_commit(rows, backend, session, capture_current, physica
 		local direct = observed.text ~= "" and observed.text or nil
 		local result
 		if emitted then
-			feed(session, sym)
+			local accepted = feed(session, sym)
 			if not current() then return false end
 			local phase = status(session)
 			if not current() then return false end
+			track_compose(session, sym, accepted, phase)
 			result = direct
 			if phase == "composing" then result = nil
 			elseif phase == "composed" then

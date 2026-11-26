@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 --- Quotes one owned fixture path for the host shell.
 --- @param path string
@@ -59,12 +59,20 @@ helpers.describe("layout install: literal source directory", function()
 	}) do
 		helpers.it("discovers versions in " .. folder_name .. " (layout-source-literal-paths)", function()
 			with_bundle_source(folder_name, function(source)
-				local install = helpers.load_with_stubs("modules.keymap.layout_install")
-				helpers.assert_eq(install.pick_latest_bundle(source), "Ergopti_v2.2.2.bundle",
-					"a literal source path must retain the latest bundle offered for installation")
-				local installed = install.highest_installed(source)
-				helpers.assert_true(installed ~= nil, "the same real bundles must remain discoverable as installed")
-				helpers.assert_eq(installed.name, "Ergopti_v2.2.2.bundle")
+				helpers.with_fresh_modules({ "core.fs.engine.dir", "modules.keymap.layout_install" }, function()
+					local uv = require("luv")
+					local install = helpers.load_with_stubs("modules.keymap.layout_install", { fs = {
+						dir = function(path)
+							local scan = assert(uv.fs_scandir(path))
+							return function() return uv.fs_scandir_next(scan) end
+						end,
+					} })
+					helpers.assert_eq(install.pick_latest_bundle(source), "Ergopti_v2.2.2.bundle",
+						"a literal source path must retain the latest bundle offered for installation")
+					local installed = install.highest_installed(source)
+					helpers.assert_true(installed ~= nil, "the same real bundles must remain discoverable as installed")
+					helpers.assert_eq(installed.name, "Ergopti_v2.2.2.bundle")
+				end)
 			end)
 		end)
 	end

@@ -48,7 +48,11 @@ const app_state = {
 	historical_cache: null,
 	// Host serial of historical_cache; the macOS host omits a history it names
 	historical_serial: null,
+	historical_cache_incomplete: false,
 	today_live_data: null,
+	// Explicitly omitted live slots retain their prior same-day data until fetched.
+	today_partial_types: [],
+	today_live_date: '',
 	data: {
 		c: {},
 		bg: {},
@@ -70,6 +74,8 @@ const app_state = {
 	selected_apps: new Set(),
 	app_selection_mode: APP_SELECTION_MODE.UNINITIALIZED,
 	did_apply_initial_reset: false,
+	// Whether a range read has been received: an empty card then says so.
+	range_data_landed: false,
 	current_tab: 'c',
 	sort_col: 'count',
 	sort_asc: false,
@@ -109,7 +115,7 @@ let auto_refresh_bound = false;
 // =================================
 
 const INFO_SVG =
-	'<svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+	'<svg class="info-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
 
 // ============================================
 // ============================================
@@ -399,7 +405,7 @@ const HALF_HEIGHT_KEYS = {
 
 // =================================================================================
 // Single source of truth for keycode → finger / hand / home assignments is
-// `static/ergopti_plus/_shared/data/keycodes/azerty.json` (DC-1). KEYCODE_DATA
+// `static/ergopti_plus/_shared/layouts/data/keycodes/azerty.json` (DC-1). KEYCODE_DATA
 // itself is generated from it by `npm run codegen:keycode-data:js` into
 // _generated/keycode_data.js, loaded via a <script> tag immediately before this
 // file in index.html — the global KEYCODE_DATA it declares is used below. The

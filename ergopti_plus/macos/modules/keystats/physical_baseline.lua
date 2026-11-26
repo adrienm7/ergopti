@@ -13,7 +13,7 @@
 local M = {}
 local Wire = require("modules.keystats.physical_wire")
 local Protocol = require("modules.keystats.physical_protocol")
-local Position = require("keystats.physical_position_observation")
+local Position = require("metrics.engine.capture.physical_position_observation")
 local resolve_position = require("modules.keystats.physical_key_identity").resolve
 local ENVELOPE = { "version", "kind", "coverage", "incarnation", "lease" }
 local PAGE = { "version", "kind", "coverage", "incarnation", "lease",

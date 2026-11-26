@@ -35,7 +35,7 @@ if not ok_webkit then
 end
 local Gtk = lgi.require("Gtk", "3.0")
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local profile = assert(uv.fs_mkdtemp("/tmp/ergopti-typing-none-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	local directory = profile .. "/" .. name:lower()
@@ -43,7 +43,7 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", directory))
 end
 print("OWNED_PROFILE " .. profile)
-local J=require('json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
+local J=require('core.text.engine.json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
 -- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
 local Drain=require('tests.support.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))
@@ -55,7 +55,7 @@ assert(W.upsert_app_day('owned-webkit','2000-01-01','Editor',{chars=7,time_ms=70
 assert(W.upsert_ngrams('owned-webkit','2000-01-01','Editor',{h={c=7,td=700,cd=7}},'ngram_chars'))
 assert(W.upsert_app_day('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{chars=3,time_ms=300}))
 assert(W.upsert_ngrams('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{u={c=3,td=300,cd=3}},'ngram_chars'))
-local Manager=require('ui.webview_manager'); Manager.set_daemon_state({keystats=K})
+local Manager=require('core.ui.ui.webview_manager'); Manager.set_daemon_state({keystats=K})
 local checks,failed=0,0
 local function check(name,fn) checks=checks+1; local ok,e=xpcall(fn,debug.traceback); print((ok and 'PASS ' or 'FAIL ')..name..(ok and '' or ': '..e)); if not ok then failed=failed+1 end end
 print('ENGINE WebKit '..WK.get_major_version()..'.'..WK.get_minor_version()..'.'..WK.get_micro_version()..'; real SQLite; virtual X11; deadline180s; sandbox enabled')
@@ -111,8 +111,10 @@ String((() => {
 end)
 -- END rendered-table NONE regression.
 eval("document.querySelector('[onclick=\"open_app_modal()\"]').click(); document.querySelector('[onclick=\"select_all_apps()\"]').click(); document.querySelector('[onclick=\"close_app_modal()\"]').click(); 'clicked'"); assert(wait("String(app_state.app_selection_mode==='all' && !app_state.loading_data && app_state.data.c.h?.count===7)"),'ALL restore deadline')
-check('actual ALL restore preserves literal counts',function() assert(eval("String(app_state.data.c.h.count===7 && app_state.data.c.u===undefined && app_state.data.c.z.count===2)")=='true') end)
-check('actual retained query renders healthy counts',function() assert(eval("apply_local_filters(); apply_local_filters(); String(app_state.data.c.h.count===7 && app_state.data.c.u===undefined && typingFilterPerformance.hits>0)")=='true') end)
+-- Every selection mode but an explicit NONE keeps Unknown (matches_typing_app_selection),
+-- so the restored ALL shows its live count again, as the initial prefetch did.
+check('actual ALL restore preserves literal counts',function() assert(eval("String(app_state.data.c.h.count===7 && app_state.data.c.u?.count===3 && app_state.data.c.z.count===2)")=='true') end)
+check('actual retained query renders healthy counts',function() assert(eval("apply_local_filters(); apply_local_filters(); String(app_state.data.c.h.count===7 && app_state.data.c.u?.count===3 && typingFilterPerformance.hits>0)")=='true') end)
 assert(checks==9,'renderer subject floor9'); W.close_db()
 local file=assert(io.open(os.getenv('ERGOPTI_NATIVE_WEBVIEW_RECEIPT') or (profile .. '/receipt.json'),'w')); assert(file:write(J.encode({checks=checks,passed=checks-failed,failed=failed})) and file:close())
 print(string.format('Native virtual WebKit: %d checks, %d failures',checks,failed)); os.exit(failed==0 and 0 or 1)

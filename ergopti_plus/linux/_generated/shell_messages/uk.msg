@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/uk.msg
-# AUTO-GENERATED from _shared/data/locales/uk.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/uk.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Мережевий модуль LuaJIT зібрано з вихідного коду.
 build_luv.recipe_required=Для нативної збірки luv потрібен її вихідний рецепт.
 install.already_installed={1} — уже встановлено
 install.archive_digest_unavailable=оновлення зі збереженим дескриптором потребують справжнього середовища OpenSSL3; можливість лишається недоступною.
+install.bytecode_skipped=Не вдалося створити попередньо скомпільовані модулі — Ergopti запускається з вихідного коду, трохи повільніше.
 install.capability_verified={1} — можливість перевірено
 install.command_still_missing={1} встановлено, але '{2}' досі не знайдено.
 install.daemon_manual=Щоб запустити службу вручну:
 install.daemon_running=Служба працює у фоновому режимі. Щоб перевірити її стан:
+install.focus_integration_enabled=інтеграцію фокуса {1} увімкнено
+install.focus_integration_failed=Не вдалося увімкнути інтеграцію фокуса {1} — правила для окремих програм на цьому робочому столі залишаються неактивними.
+install.focus_integration_next_login=інтеграцію фокуса {1} встановлено (діятиме після наступного входу)
+install.focus_integration_updated=інтеграцію фокуса {1} оновлено
 install.gnome_extension_active=розширення GNOME AppIndicator — уже ввімкнено
 install.gnome_extension_enabled=розширення GNOME AppIndicator увімкнено
 install.gnome_extension_failed=Не вдалося ввімкнути розширення AppIndicator — без нього GNOME не показує значок.
 install.gnome_extension_missing=немає розширення GNOME AppIndicator — встановлення {1}…
 install.gnome_extension_next_login=розширення GNOME AppIndicator увімкнено (діє з наступного входу)
+install.gnome_extension_not_installed=Жоден пакет цього дистрибутива не містить розширення GNOME AppIndicator: установіть AppIndicator and KStatusNotifierItem Support з {1}, потім вийдіть із сеансу й увійдіть знову — без нього GNOME не показує значок.
 install.gnome_without_extensions=GNOME без gnome-extensions — увімкніть розширення AppIndicator, щоб бачити значок.
 install.help_help=Показати цю довідку
 install.help_no_deps=Не встановлювати залежності (ви встановлюєте їх самі)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — перевірка залежн
 install.section_deps_skipped=Залежності пропущено (--no-deps)
 install.section_done=Встановлення завершено
 install.section_files=Встановлення файлів
+install.section_focus=Активна програма у Wayland (GNOME, KDE)
 install.section_lua_deps=Необов’язкові залежності Lua (цикл подій, таймери, webview, сигнали)
 install.section_permissions=Права на введення (потрібен sudo)
 install.section_services=Створення користувацьких служб systemd
@@ -63,6 +70,7 @@ install.section_tray=Значок у системному лотку та вік
 install.security_warning_body=Членство в групі «input» дає змогу читати ВСІ натискання клавіш у сеансі, зокрема паролі, введені в будь-якому застосунку. Саме це потрібно рушію хотстрингів, і так само працюють keyd і xremap.
 install.security_warning_title=ПОПЕРЕДЖЕННЯ ПРО БЕЗПЕКУ
 install.service_started=службу ergopti-hotstrings увімкнено та запущено
+install.session_without_graphical_target=Цей сеанс ніколи не запускає graphical-session.target systemd (i3, Openbox, Xfce, sway без менеджера сеансів), тож користувацький юніт ніколи б не запустився: натомість Ergopti+ запускається із запису автозапуску XDG під час наступного входу. Віконному менеджеру, що ігнорує автозапуск XDG (i3, sway), потрібен рядок exec {1} у його конфігурації.
 install.source_toolchain_unavailable=встановлений компілятор не може зібрати нативний модуль архівів.
 install.startup_choice_unreadable=Не вдалося прочитати вибір автозапуску.
 install.summary_config=Налаштування: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=автозапуск XDG: {1}
 launch.already_running=Ergopti+ уже запущено в цьому сеансі ({1} зайнятий); цей запуск відхилено.
 launch.authorization_failed=Авторизацію доступу до введення скасовано або вона не вдалася.
 launch.groups_unavailable=Сеанс не зміг отримати налаштовані групи введення.
+launch.restarting=Ergopti+ уже запущено в цьому сеансі; йому надіслано запит на завершення, потім його буде перезапущено.
+launch.session_lock_invalid=Папка блокування сеансу має бути абсолютним шляхом.
 launcher.dependencies_installed=Залежності встановлено.
 launcher.driver_missing=Помилка: каталог драйвера Linux не знайдено: {1}
 launcher.install_deps_hint=Виконайте: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=Шлях встановлення проходить �
 uninstall.system_prefix=Системний префікс встановлення відхилено.
 uninstall.unsafe_path=Небезпечний шлях володіння.
 uninstall.unsupported_argument=Непідтримуваний аргумент видалення: {1}
+xkb_helpers.not_found=Файли встановлення розкладок клавіатури не знайдено ні поруч із {1}, ні в {2}: без них не можна встановити жодну розкладку.

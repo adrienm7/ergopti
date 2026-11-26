@@ -3,6 +3,8 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title data-i18n="editor.hotstrings.window_title"></title>
+		<script src="../a11y_prefs.js"></script>
+		<script src="../page_locale.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
 		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css?v=10" />
@@ -11,13 +13,11 @@
 		<script src="../dom_utils.js"></script>
 	</head>
 	<body>
-		<div id="loading">
-			<div class="spinner"></div>
-			<span data-i18n="common.loading"></span>
-		</div>
+		<!-- The spinner is drawn before the words; both say the page is loading. -->
+		<p id="loading" role="status" data-i18n="common.loading"></p>
 
-		<div id="app" style="display: none">
-			<div id="hdr">
+		<main id="app" style="display: none">
+			<header id="hdr">
 				<h1 data-i18n="editor.hotstrings.page_title"></h1>
 				<button id="compact-btn" class="btn btn-sm btn-s" onclick="toggleCompact()"></button>
 				<button
@@ -25,100 +25,116 @@
 					onclick="showAddSec()"
 					data-i18n="editor.hotstrings.btn_add_section"
 				></button>
-			</div>
-			<div id="search-bar">
-				<span class="search-icon">⌕</span>
+			</header>
+			<search id="search-bar" aria-labelledby="search-label">
+				<label
+					id="search-label"
+					class="theme-sr-only"
+					for="search-input"
+					data-i18n="editor.hotstrings.search_placeholder"
+				></label>
 				<input
 					id="search-input"
 					class="search-input"
 					type="text"
 					autocomplete="off"
 					spellcheck="false"
-					placeholder="Rechercher un déclencheur ou un texte…"
+					data-i18n-placeholder="editor.hotstrings.search_placeholder"
 					oninput="onSearch(this.value)"
 				/>
 				<button
 					id="search-clear"
 					class="search-clear"
 					type="button"
-					title="Effacer"
+					data-i18n-title="editor.hotstrings.search_clear"
 					onclick="clearSearch()"
 					style="display: none"
-				>
-					✕
-				</button>
-			</div>
+				></button>
+			</search>
 			<div id="content">
-				<div id="secs-container"></div>
-				<div
+				<!-- The sections in their order, which the user changes. -->
+				<ol id="secs-container"></ol>
+				<p
 					id="empty"
 					class="empty"
 					style="display: none"
 					data-i18n="editor.hotstrings.empty_hint"
-				></div>
-				<div id="no-results" class="empty" style="display: none">
-					Aucun résultat pour cette recherche.
-				</div>
+				></p>
+				<p
+					id="no-results"
+					class="empty"
+					style="display: none"
+					data-i18n="editor.hotstrings.no_results"
+				></p>
 			</div>
-		</div>
+			<!-- Says where a section moved by the keyboard now stands. -->
+			<p id="move-status" class="theme-sr-only" role="status"></p>
+		</main>
 
-		<div id="bulk-bar">
-			<span id="bulk-cnt" class="bulk-cnt"></span>
-			<div class="bulk-sep"></div>
+		<aside id="bulk-bar" aria-labelledby="bulk-cnt">
+			<output id="bulk-cnt" class="bulk-cnt" aria-live="polite"></output>
+			<hr class="bulk-sep" />
 			<select
 				id="bulk-sec-sel"
 				class="btn btn-s"
-				style="margin: 0; outline: none; font-weight: normal"
+				style="margin: 0; font-weight: normal"
 				onchange="if(this.value!=='') bulkMove()"
 			>
 				<option value="" data-i18n="editor.hotstrings.bulk_move_placeholder"></option>
 			</select>
 			<button
-				class="btn btn-sm"
-				style="background: var(--theme-hue-ffe5e3); color: var(--danger)"
+				class="btn btn-sm btn-bulk-del"
 				onclick="bulkDel()"
 				data-i18n="common.delete"
 			></button>
-			<div class="bulk-sep"></div>
+			<hr class="bulk-sep" />
 			<button
 				class="btn btn-sm btn-s"
 				style="background: transparent; padding: 4px 8px"
 				onclick="clearBulk()"
 				data-i18n="common.cancel"
 			></button>
-		</div>
+		</aside>
 
-		<div id="save-toast" data-i18n="common.saved"></div>
-		<div id="ac-popup"></div>
+		<output id="save-toast" data-i18n="common.saved"></output>
+		<!-- The suggestions for the token being typed in the output. -->
+		<ul id="ac-popup" role="listbox" aria-labelledby="e-out-label"></ul>
 
 		<div class="overlay" id="msg-modal">
-			<div class="modal">
+			<section class="modal" role="alertdialog" aria-modal="true" aria-describedby="msg-text">
 				<p id="msg-text"></p>
-				<div class="modal-foot" style="justify-content: flex-end">
+				<footer class="modal-foot" style="justify-content: flex-end">
 					<button
 						class="btn btn-p"
 						onclick="closeModal('msg-modal')"
 						data-i18n="common.ok"
 					></button>
-				</div>
-			</div>
+				</footer>
+			</section>
 		</div>
 		<div class="overlay" id="confirm-modal">
-			<div class="modal">
-				<div id="confirm-text"></div>
-				<div class="modal-foot">
+			<section
+				class="modal"
+				role="alertdialog"
+				aria-modal="true"
+				aria-labelledby="confirm-title"
+				aria-describedby="confirm-text"
+			>
+				<h2 id="confirm-title" class="confirm-title" hidden></h2>
+				<p id="confirm-text" class="confirm-text"></p>
+				<footer class="modal-foot">
 					<button class="btn btn-s" id="confirm-cancel" data-i18n="common.cancel"></button>
 					<button class="btn btn-p" id="confirm-ok" data-i18n="common.ok"></button>
-				</div>
-			</div>
+				</footer>
+			</section>
 		</div>
 		<div class="overlay" id="sec-modal">
-			<div class="modal">
+			<section class="modal" role="dialog" aria-modal="true" aria-labelledby="sec-modal-title">
 				<h2 id="sec-modal-title" data-i18n="editor.hotstrings.sec_modal_title_new"></h2>
-				<div class="fg">
-					<label>
+				<p class="fg">
+					<label for="sec-id">
 						<span data-i18n="editor.hotstrings.sec_id_label"></span>
-						<span class="hint" data-i18n="editor.hotstrings.sec_id_hint"></span>
+						<small class="hint" data-i18n="editor.hotstrings.sec_id_hint"></small>
 					</label>
 					<input
 						id="sec-id"
@@ -127,110 +143,150 @@
 						autocomplete="off"
 						spellcheck="false"
 					/>
-					<div class="field-error-msg" id="sec-id-err"></div>
-				</div>
-				<div class="fg">
-					<label>
+					<output class="field-error-msg" id="sec-id-err" for="sec-id"></output>
+				</p>
+				<p class="fg">
+					<label for="sec-desc">
 						<span data-i18n="editor.hotstrings.sec_desc_label"></span>
-						<span class="hint" data-i18n="editor.hotstrings.sec_desc_hint"></span>
+						<small class="hint" data-i18n="editor.hotstrings.sec_desc_hint"></small>
 					</label>
 					<input
 						id="sec-desc"
 						type="text"
 						data-i18n-placeholder="editor.hotstrings.sec_desc_placeholder"
 					/>
-				</div>
-				<div class="modal-foot">
-					<span></span>
-					<div class="foot-btns">
-						<button
-							class="btn btn-s"
-							onclick="closeModal('sec-modal')"
-							data-i18n="common.cancel"
-						></button>
-						<button class="btn btn-p" onclick="saveSec()" data-i18n="common.save"></button>
-					</div>
-				</div>
-			</div>
+				</p>
+				<footer class="modal-foot">
+					<menu class="foot-btns">
+						<li>
+							<button
+								class="btn btn-s"
+								onclick="closeModal('sec-modal')"
+								data-i18n="common.cancel"
+							></button>
+						</li>
+						<li>
+							<button class="btn btn-p" onclick="saveSec()" data-i18n="common.save"></button>
+						</li>
+					</menu>
+				</footer>
+			</section>
 		</div>
 		<div class="overlay" id="entry-modal">
-			<div class="modal">
+			<section class="modal" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
 				<h2 id="entry-modal-title" data-i18n="editor.hotstrings.entry_modal_title_new"></h2>
 				<div class="fg">
-					<label
-						><span data-i18n="editor.hotstrings.trigger_label"></span>
-						<span class="hint" id="trig-hint"></span
-					></label>
+					<label id="e-trig-label"><span data-i18n="editor.hotstrings.trigger_label"></span></label>
 					<div class="trig-row">
 						<div
 							id="e-trig"
 							class="trig-editor"
 							contenteditable="true"
+							role="textbox"
+							aria-labelledby="e-trig-label"
 							spellcheck="false"
 							data-i18n-placeholder="editor.hotstrings.trigger_placeholder"
 						></div>
 						<button class="magic-btn" id="magic-btn" onclick="insertMagicKey()"></button>
 					</div>
-					<div class="field-error-msg" id="trig-err"></div>
+					<output class="field-error-msg" id="trig-err" for="e-trig"></output>
 				</div>
 				<div class="fg">
-					<label data-i18n="editor.hotstrings.replacement_label"></label>
+					<label id="e-out-label" data-i18n="editor.hotstrings.replacement_label"></label>
 					<div class="editor-wrap">
-						<div
+						<p
 							id="e-out-ph"
 							class="ph-overlay"
 							data-i18n="editor.hotstrings.replacement_placeholder"
+						></p>
+						<!-- The rich editors are not form fields: a role and their label
+						     name them for assistive technology (WCAG 1.3.1, 4.1.2). -->
+						<div
+							id="e-out"
+							class="output-editor"
+							contenteditable="true"
+							spellcheck="false"
+							role="textbox"
+							aria-multiline="true"
+							aria-labelledby="e-out-label"
+							aria-controls="ac-popup"
+							aria-autocomplete="list"
 						></div>
-						<div id="e-out" class="output-editor" contenteditable="true" spellcheck="false"></div>
 					</div>
-					<div class="field-error-msg" id="out-err"></div>
+					<output class="field-error-msg" id="out-err" for="e-out"></output>
 				</div>
 				<details class="cmd-help" id="cmd-help">
 					<summary data-i18n="editor.hotstrings.special_cmds_summary"></summary>
-					<div class="cmd-block" id="cmd-block"></div>
+					<section class="cmd-block" id="cmd-block"></section>
 				</details>
-				<div class="cbs">
-					<label class="cb-item">
-						<div class="cb-row">
-							<input type="checkbox" id="cb-word" onchange="updateCbDescs()" /><span
-								class="cb-label"
-								data-i18n="editor.hotstrings.cb_word"
+				<ul class="cbs">
+					<li>
+						<label class="cb-item">
+							<span class="cb-row"
+								><input type="checkbox" id="cb-word" onchange="updateCbDescs()" /><span
+									class="cb-label"
+									data-i18n="editor.hotstrings.cb_word"
+								></span
 							></span>
-						</div>
-						<span class="cb-desc" id="desc-word"></span>
-					</label>
-					<label class="cb-item">
-						<div class="cb-row">
-							<input type="checkbox" id="cb-auto" onchange="updateCbDescs()" /><span
-								class="cb-label"
-								data-i18n="editor.hotstrings.cb_auto"
+							<small class="cb-desc" id="desc-word"></small>
+						</label>
+					</li>
+					<li>
+						<label class="cb-item">
+							<span class="cb-row"
+								><input type="checkbox" id="cb-auto" onchange="updateCbDescs()" /><span
+									class="cb-label"
+									data-i18n="editor.hotstrings.cb_auto"
+								></span
 							></span>
-						</div>
-						<span class="cb-desc" id="desc-auto"></span>
-					</label>
-					<label class="cb-item">
-						<div class="cb-row">
-							<input type="checkbox" id="cb-case" onchange="updateCbDescs()" /><span
-								class="cb-label"
-								data-i18n="editor.hotstrings.cb_case"
+							<small class="cb-desc" id="desc-auto"></small>
+						</label>
+					</li>
+					<li>
+						<label class="cb-item">
+							<span class="cb-row"
+								><input type="checkbox" id="cb-case" onchange="updateCbDescs()" /><span
+									class="cb-label"
+									data-i18n="editor.hotstrings.cb_case"
+								></span
 							></span>
-						</div>
-						<span class="cb-desc" id="desc-case"></span>
-					</label>
-					<label class="cb-item">
-						<div class="cb-row">
-							<input type="checkbox" id="cb-final" onchange="updateCbDescs()" /><span
-								class="cb-label"
-								data-i18n="editor.hotstrings.cb_final"
+							<small class="cb-desc" id="desc-case"></small>
+						</label>
+					</li>
+					<li>
+						<label class="cb-item">
+							<span class="cb-row"
+								><input type="checkbox" id="cb-final" onchange="updateCbDescs()" /><span
+									class="cb-label"
+									data-i18n="editor.hotstrings.cb_final"
+								></span
 							></span>
-						</div>
-						<span class="cb-desc" id="desc-final"></span>
-					</label>
-				</div>
-				<div class="fg fg-prio">
-					<label
+							<small class="cb-desc" id="desc-final"></small>
+						</label>
+					</li>
+				</ul>
+				<!-- An action instead of, or besides, the replacement: a built-in
+				     action or one of the user's workflows (action_entry.lua). -->
+				<fieldset class="fg fg-action" id="action-box" hidden>
+					<legend data-i18n="editor.hotstrings.action_legend"></legend>
+					<p>
+						<label for="e-action" data-i18n="editor.hotstrings.action_label"></label>
+						<select id="e-action" onchange="updateActionFields()"></select>
+					</p>
+					<p id="erase-row">
+						<input type="checkbox" id="cb-erase" checked />
+						<label for="cb-erase" data-i18n="editor.hotstrings.cb_erase_trigger"></label>
+					</p>
+					<small
+						class="hint"
+						id="erase-desc"
+						data-i18n="editor.hotstrings.cb_erase_trigger_desc"
+					></small>
+				</fieldset>
+				<p class="fg fg-prio">
+					<label for="e-prio"
 						><span data-i18n="editor.hotstrings.priority_label"></span>
-						<span class="hint" data-i18n="editor.hotstrings.priority_hint"></span
+						<small class="hint" data-i18n="editor.hotstrings.priority_hint"></small
 					></label>
 					<input
 						id="e-prio"
@@ -241,19 +297,23 @@
 						inputmode="numeric"
 						autocomplete="off"
 					/>
-				</div>
-				<div class="modal-foot">
-					<span class="foot-kbd" data-i18n="editor.hotstrings.kbd_help"></span>
-					<div class="foot-btns">
-						<button
-							class="btn btn-s"
-							onclick="closeModal('entry-modal')"
-							data-i18n="common.cancel"
-						></button>
-						<button class="btn btn-p" onclick="saveEntry(false)" data-i18n="common.save"></button>
-					</div>
-				</div>
-			</div>
+				</p>
+				<footer class="modal-foot">
+					<p class="foot-kbd" data-i18n="editor.hotstrings.kbd_help"></p>
+					<menu class="foot-btns">
+						<li>
+							<button
+								class="btn btn-s"
+								onclick="closeModal('entry-modal')"
+								data-i18n="common.cancel"
+							></button>
+						</li>
+						<li>
+							<button class="btn btn-p" onclick="saveEntry(false)" data-i18n="common.save"></button>
+						</li>
+					</menu>
+				</footer>
+			</section>
 		</div>
 
 		<script src="script.js?v=3"></script>

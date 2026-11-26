@@ -18,14 +18,14 @@ local FOREIGN_PID = 8002
 --- Loads fresh production provenance and transaction adapters.
 --- @return table fixture
 local function load_fixture()
-	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
-	local provenance = helpers.load_with_stubs("adapters.event_provenance", {
+	package.loaded["platform.input.synthetic_input"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	local provenance = helpers.load_with_stubs("diagnostics.adapters.event_provenance", {
 		processInfo = { processID = CURRENT_PID },
 	})
 	return {
 		provenance = provenance,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		hs = require("hs"),
 	}
 end
@@ -151,10 +151,10 @@ helpers.describe("event provenance: explicit tags are the only ownership authori
 				eventtap.event.properties[key] = value
 			end
 		end
-		package.loaded["adapters.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		local ok, err = pcall(helpers.load_with_stubs,
-			"adapters.event_provenance", { eventtap = eventtap })
+			"diagnostics.adapters.event_provenance", { eventtap = eventtap })
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(tostring(err):find("eventSourceUserData", 1, true) ~= nil,
 			"the fail-fast error must identify the missing immutable-tag contract")

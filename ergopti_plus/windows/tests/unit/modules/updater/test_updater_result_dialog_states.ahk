@@ -135,7 +135,7 @@ Test("update check: an offered release seeds the page's notes with the repositor
 	_TUCD_ReleaseNotesSeed)
 
 ; A clicked link is served only for the offered release, reaches the allowlisted
-; opener with the URL as sent, and is refused while paused (PAR-52).
+; opener with the URL as sent, and opens while paused too (PAR-52, UPD-2).
 _TUCD_OpenUrlAction() {
 	_TUCD_Run(_TUCD_OpenUrlActionCase)
 }
@@ -157,14 +157,14 @@ _TUCD_OpenUrlActionCase() {
 		Release := { Tag: "v0.0.0-dev.150", RawJson: "{}", Body: "" }
 		UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
 			"latest", Release.Tag, "others", [], "release", Release))
-		_UpdateCheck_HandleMessage(Epoch, Message, true, Effects)
-		AssertEqual(0, _TUCD_Effects.Links.Length, "no link opens while paused")
-		AssertEqual(1, Refusals.Length, "the paused link is refused visibly")
 		_UpdateCheck_HandleMessage(Epoch, '{"action":"open_url","url":1}', false, Effects)
 		AssertEqual(0, _TUCD_Effects.Links.Length, "a URL that is not a string is refused")
 		_UpdateCheck_HandleMessage(Epoch, Message, false, Effects)
 		AssertEqual(1, _TUCD_Effects.Links.Length, "the offered release's link is served")
 		AssertEqual(Link, _TUCD_Effects.Links[1])
+		_UpdateCheck_HandleMessage(Epoch, Message, true, Effects)
+		AssertEqual(2, _TUCD_Effects.Links.Length, "the link opens while paused too (UPD-2)")
+		AssertEqual(0, Refusals.Length, "a paused link is not refused")
 		AssertEqual(0, _TUCD_Effects.Closes, "opening a link leaves the window open")
 	} finally {
 		_UC_ResetDone := true
@@ -261,7 +261,9 @@ Test("update check: the actions act only on the answer the window holds (update-
 	_TUCD_Actions)
 
 ; A page message and a native click bypass native Suspend: a click that arrives
-; while the driver is paused drives no updater action, and says so.
+; while the driver is paused runs its action (UPD-2), except an install, which
+; the self-update transaction cannot carry through a pause: it is refused and
+; says so.
 _TUCD_PausedClicks() {
 	_TUCD_Run(_TUCD_PausedClicksCase)
 }
@@ -275,12 +277,20 @@ _TUCD_PausedClicksCase() {
 		"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
 	Effects := _TUCD_NewEffects()
 	Effects["refuse_paused"] := () => Refusals.Push(true)
-	for Name, Channel in Map("update", "", "whats_new", "", "switch_channel", "main")
-		AssertFalse(UpdateCheck_Perform(Name, Channel, Effects, true)["ok"], Name . " is refused while paused")
-	AssertEqual(3, Refusals.Length, "each refusal tells the user the driver is paused")
+	AssertFalse(UpdateCheck_Perform("update", "", Effects, true)["ok"], "an install is refused while paused")
+	AssertEqual(1, Refusals.Length, "the refusal tells the user the driver is paused")
 	AssertEqual(0, _TUCD_Effects.Installs.Length, "nothing installs while paused")
-	AssertEqual(0, _TUCD_Effects.Changelogs.Length, "the Versions window stays closed while paused")
-	AssertEqual(0, _TUCD_Effects.Switches.Length, "the channel stays while paused")
+	AssertTrue(UpdateCheck_Perform("whats_new", "", Effects, true)["ok"], "the Versions window opens while paused")
+	AssertEqual(1, _TUCD_Effects.Changelogs.Length, "the Versions window opens once")
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+		"latest", Release.Tag, "others", [Map("channel", "main", "tag", "v1.0.0")], "release", Release))
+	AssertTrue(UpdateCheck_Perform("switch_channel", "main", Effects, true)["ok"], "the channel switches while paused")
+	AssertEqual(1, _TUCD_Effects.Switches.Length, "the channel owner is reached once")
+	AssertEqual(1, Refusals.Length, "only the install was refused")
+	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
+	UpdateCheck_ShowResult(Request, Map("state", "available", "current", "v0.0.0-dev.144",
+		"latest", Release.Tag, "others", [], "release", Release))
 	AssertTrue(UpdateCheck_Perform("close", "", Effects, true)["closed"], "the window still closes while paused")
 
 	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
@@ -288,52 +298,61 @@ _TUCD_PausedClicksCase() {
 		"reason", "no_connection", "detail", "GitHub could not be reached"))
 	AssertTrue(UpdateCheck_Perform("report", "", Effects, true)["ok"], "a failure is still reported while paused")
 	AssertTrue(UpdateCheck_Perform("open_log", "", Effects, true)["ok"], "the log still opens while paused")
-	AssertEqual(3, Refusals.Length, "the error window's actions are not refused")
+	AssertEqual(1, Refusals.Length, "the error window's actions are not refused")
 }
-Test("update check: a click while paused drives no updater action (update-check-window)",
+Test("update check: a click while paused runs its action, an install excepted (upd-2-manual-check-while-paused)",
 	_TUCD_PausedClicks)
 
-; WebView2 can fail to start (no Evergreen runtime, a boot timeout, another
-; window booting the shared environment): the window falls back to its native
-; form, and the check's answer still reaches it.
-_TUCD_WebViewFailure() {
-	_TUCD_Run(_TUCD_WebViewFailureCase)
+; Every top-level window this process owns, hidden ones included.
+_TUCD_OwnWindows() {
+	PreviousDetect := DetectHiddenWindows(true)
+	try return WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . ProcessExist())
+	finally DetectHiddenWindows(PreviousDetect)
 }
-_TUCD_WebViewFailureCase() {
-	global _UC_ResetDone, _UC_WindowEpoch, _UC_Native, _UC_Gui
-	Request := _TUCD_Request()
-	Built := []
-	UpdateCheck_Begin(Request, "v0.0.0-dev.144")
-	_UC_WindowEpoch += 1
-	Epoch := _UC_WindowEpoch
-	_UC_ResetDone := false
-	Host := _UpdateCheck_NewWindow()
-	_UC_Gui := Host
-	try {
-		AssertTrue(_UpdateCheck_FallBackToNative(Epoch, Host, () => Built.Push(true)),
-			"a WebView2 failure opens the native window")
-		AssertEqual(1, Built.Length, "the native window is built once")
-		AssertTrue(_UC_Native, "the window is native from then on")
-		AssertFalse(IsSet(_UC_Gui), "the WebView2 host is gone")
-		AssertTrue(UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
-			"latest", "v0.0.0-dev.144", "others", [])), "the check's answer still reaches the window")
-		AssertEqual("up_to_date", _TUCD_Last()["state"])
 
-		_UC_WindowEpoch += 1
-		Stale := _UC_WindowEpoch
-		_UC_ResetDone := true
-		Closed := _UpdateCheck_NewWindow()
-		AssertFalse(_UpdateCheck_FallBackToNative(Stale, Closed, () => Built.Push(true)),
-			"a window closed while WebView2 was starting stays closed")
-		AssertEqual(1, Built.Length, "no native window replaces a closed one")
-	} finally {
-		_UC_Native := false
-		_UC_ResetDone := true
-		_UC_Gui := unset
-	}
+; There is no native update-check window (maintainer decision 2026-11-21): the
+; suite never loads the vendored binding, so a manual check refuses in words,
+; builds nothing, and drops its check so a late answer cannot refuse again.
+_TUCD_WebViewUnavailable() {
+	_TUCD_Run(_TUCD_WebViewUnavailableCase)
 }
-Test("update check: a WebView2 failure falls back to the native window (update-check-window)",
-	_TUCD_WebViewFailure)
+_TUCD_WebViewUnavailableCase() {
+	global _UC_PresentFn, _UC_ResetDone, _UC_RequestId, _LOGGER_TEST_SINK
+	_UC_PresentFn := 0
+	Shown := [], Logs := [], Before := Map()
+	for Hwnd in _TUCD_OwnWindows()
+		Before[Hwnd] := true
+	PreviousSink := _LOGGER_TEST_SINK
+	try {
+		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Text), ""))
+		_LoggerFlushRepeats(true)
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		Request := _TUCD_Request()
+		AssertFalse(UpdateCheck_Begin(Request, "v0.0.0-dev.144"), "nothing opens without WebView2")
+		AssertFalse(UpdateCheck_ShowResult(Request, Map("state", "up_to_date", "current", "v0.0.0-dev.144",
+			"latest", "v0.0.0-dev.144", "others", [])), "the dropped check's late answer is discarded")
+		_LoggerFlushRepeats(true)
+	} finally {
+		LoggerSetTestSink(PreviousSink)
+		TestMsgBoxResponder("")
+		_UC_ResetDone := true
+	}
+	Created := 0
+	for Hwnd in _TUCD_OwnWindows()
+		if !Before.Has(Hwnd)
+			Created += 1
+	AssertEqual(0, Created, "no native update-check window may be built")
+	AssertEqual(0, _UC_RequestId, "the refused window drops its check")
+	AssertEqual(1, Shown.Length, "the user is told exactly once, not again at the answer")
+	AssertEqual(t("webview.required"), Shown[1], "the message is the shared WebView2-required text")
+	Errors := 0
+	for Line in Logs
+		if InStr(Line, "[ERROR]") && InStr(Line, "The update-check window cannot open: WebView2 is required")
+			Errors += 1
+	AssertEqual(1, Errors, "the refusal is logged once at ERROR")
+}
+Test("update check: an absent WebView2 refuses once and builds no native window (updater-webview-only)",
+	_TUCD_WebViewUnavailable)
 
 ; The page's messages reach the actions only for the open window, as actions,
 ; and a paused click is refused there too; a cancelled check closes only the
@@ -362,10 +381,8 @@ _TUCD_PageMessagesCase() {
 		_UpdateCheck_HandleMessage(Epoch, '{"action":"switch_channel","channel":1}', false, Effects)
 		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that is not an action does nothing")
 		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, true, Effects)
-		AssertEqual(0, _TUCD_Effects.Switches.Length, "a message that arrived while paused switches nothing")
-		AssertEqual(1, Refusals.Length, "the paused switch is refused visibly")
-		_UpdateCheck_HandleMessage(Epoch, SwitchMessage, false, Effects)
-		AssertEqual(1, _TUCD_Effects.Switches.Length, "the page's switch reaches the channel owner")
+		AssertEqual(1, _TUCD_Effects.Switches.Length, "a switch that arrived while paused reaches the channel owner (UPD-2)")
+		AssertEqual(0, Refusals.Length, "the paused switch is not refused")
 		AssertEqual("main", _TUCD_Effects.Switches[1])
 
 		UpdateCheck_Abandon(_TUCD_Request())
@@ -381,29 +398,12 @@ _TUCD_PageMessagesCase() {
 Test("update check: the page's messages act only for the open window (update-check-window)",
 	_TUCD_PageMessages)
 
-_TUCD_NativeTexts() {
-	Label := _Updater_ChannelLabel("dev")
-	Texts := _UpdateCheck_NativeTexts(Map("state", "up_to_date", "channel", "dev",
-		"current", "v0.0.0-dev.144", "latest", "v0.0.0-dev.144", "others", [Map("channel", "main", "tag", "v1.0.0")]))
-	AssertEqual("v0.0.0-dev.144", Texts["line1"], "up to date leads with the version")
-	AssertEqual(StrReplace(t("update_check.is_latest"), "{channel}", Label), Texts["line2"])
-	AssertEqual(1, Texts["others"].Length)
-	AssertEqual("main", Texts["others"][1].channel)
-	AssertContains(Texts["others"][1].text, "v1.0.0")
-	AssertEqual(0, InStr(Texts["others"][1].text, "{"), "no placeholder is left in a line")
-	Checking := _UpdateCheck_NativeTexts(Map("state", "checking", "channel", "dev", "current", "", "others", []))
-	AssertEqual(StrReplace(t("update_check.checking"), "{channel}", Label), Checking["line1"])
-	Failure := _UpdateCheck_NativeTexts(Map("state", "error", "channel", "dev", "current", "v0.0.0-dev.144",
-		"latest", "", "others", [], "reason_key", "updater.no_connection", "log_path", "C:\logs\today.log"))
-	AssertEqual(t("update_check.error_heading"), Failure["line1"])
-	AssertEqual(t("updater.no_connection"), Failure["line2"])
-	AssertContains(Failure["logged"], "C:\logs\today.log")
-	AssertEqual(0, Failure["others"].Length, "a failure lists no other channel")
+_TUCD_WindowTitle() {
 	Window := _UpdateCheck_NewWindow()
 	try AssertEqual("ErgoptiPlus — " . t("update_check.window_title"), Window.Title, "one product prefix")
 	finally Window.Destroy()
 }
-Test("update check: the native window reads like the page (update-check-window)", _TUCD_NativeTexts)
+Test("update check: the window host carries one product prefix (update-check-window)", _TUCD_WindowTitle)
 
 _TUCD_OtherChannelsOnManualChecks() {
 	_TUCD_Run(_TUCD_OtherChannelsCase)
@@ -427,4 +427,92 @@ _TUCD_OtherChannelsCase() {
 Test("update check: a manual check keeps the other channels with a newer release (update-check-window)",
 	_TUCD_OtherChannelsOnManualChecks)
 
-#Include test_update_check_native_consent.ahk
+#Include test_update_check_geometry_startup.ahk
+
+
+class _TUCD_RetiredGui {
+	__New(Events, Name) {
+		this.Events := Events, this.Name := Name
+	}
+	Destroy() => this.Events.Push("destroy-" . this.Name)
+}
+class _TUCD_RetiredSubscription {
+	__New(Events) => this.Events := Events
+	__Delete() => this.Events.Push("unsubscribe")
+}
+class _TUCD_RetiredController {
+	__New(Events, Epoch, Replace := false) {
+		this.Events := Events, this.Epoch := Epoch, this.Replace := Replace
+		this.Calls := 0, this.Fail := false
+		this.CallerCritical := A_IsCritical
+	}
+	Close() {
+		global _UC_Controller, _UC_Gui, _UC_WindowEpoch, _UC_RequestId, _UC_ResetDone, _UC_State
+		AssertEqual(this.CallerCritical, A_IsCritical, "native Close must run after restoring the caller's thread mode")
+		this.Calls += 1
+		this.Events.Push("close")
+		if this.Fail
+			throw Error("injected retirement refusal")
+		if this.Replace {
+			_UC_WindowEpoch += 1
+			_UC_RequestId := 202
+			_UC_ResetDone := false
+			_UC_State := Map("state", "checking")
+			_UC_Gui := _TUCD_RetiredGui(this.Events, "B")
+			_UC_Controller := _TUCD_RetiredController(this.Events, _UC_WindowEpoch)
+		}
+		if this.Replace
+			_UpdateCheck_CloseWindow(this.Epoch)
+		else
+			_UpdateCheck_CloseWindow()
+	}
+}
+
+_TUCD_ReentrantRetirement(Replace := false, Refuse := false) {
+	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_WindowEpoch, _UC_RequestId
+	global _UC_ResetDone, _UC_State, _UC_Release, _UC_RetiredHosts
+	AssertFalse(IsSet(_UC_Gui) || IsSet(_UC_Controller) || IsSet(_UC_MsgSub) || IsSet(_UC_WebView),
+		"the passive retirement fixture must not replace a live native host")
+	AssertEqual(0, _UC_RetiredHosts.Length, "the passive fixture must not replace existing cleanup debt")
+	Saved := [_UC_WindowEpoch, _UC_RequestId, _UC_ResetDone, _UC_State, _UC_Release]
+	Events := []
+	try {
+		_UC_WindowEpoch += 1
+		Epoch := _UC_WindowEpoch
+		_UC_RequestId := 101
+		_UC_ResetDone := false
+		_UC_State := Map("state", "checking")
+		_UC_Gui := _TUCD_RetiredGui(Events, "A")
+		Controller := _TUCD_RetiredController(Events, Epoch, Replace)
+		Controller.Fail := Refuse
+		_UC_Controller := Controller
+		_UC_MsgSub := _TUCD_RetiredSubscription(Events)
+		AssertEqual(!Refuse, _UpdateCheck_CloseWindow(Epoch))
+		AssertEqual("unsubscribe", Events[1], "unsubscribe must precede native controller closure")
+		if Refuse {
+			AssertEqual(2, Events.Length, "a refused controller must retain its undestroyed host")
+			AssertEqual(1, _UC_RetiredHosts.Length)
+			Controller.Fail := false
+			AssertTrue(_UpdateCheck_CloseWindow(), "detached cleanup debt remains retryable")
+			AssertEqual(2, Controller.Calls, "the refused attempt is retried exactly once")
+		} else
+			AssertEqual(1, Controller.Calls, "reentrant closure cannot close the old controller twice")
+		AssertEqual("destroy-A", Events[Events.Length], "host destruction follows successful controller closure")
+		AssertEqual(0, _UC_RetiredHosts.Length)
+		if Replace {
+			AssertEqual(202, _UC_RequestId, "the retired stack preserves the replacement request")
+			AssertFalse(_UC_ResetDone)
+			AssertTrue(_UC_Controller != Controller, "the replacement controller remains owned")
+		}
+	} finally {
+		Controller.Fail := false
+		_UpdateCheck_CloseWindow()
+		_UC_WindowEpoch := Saved[1], _UC_RequestId := Saved[2], _UC_ResetDone := Saved[3]
+		_UC_State := Saved[4], _UC_Release := Saved[5]
+	}
+}
+Test("update check: reentrant Close retires once (update-check-retirement-owner)", _TUCD_ReentrantRetirement)
+Test("update check: retirement preserves a replacement (update-check-retirement-owner)",
+	_TUCD_ReentrantRetirement.Bind(true))
+Test("update check: refused retirement keeps retry ownership (update-check-retirement-owner)",
+	_TUCD_ReentrantRetirement.Bind(false, true))

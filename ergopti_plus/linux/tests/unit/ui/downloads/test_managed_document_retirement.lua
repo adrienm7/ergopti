@@ -9,7 +9,14 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.document_fixture")
 local function run(body)
-	local c = Fixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, {})
+	local control = {}
+	local gate = { release = function(...)
+		if control.release then return control.release(...) end
+		return true
+	end, release_all = function() return true end }
+	local c = Fixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end },
+		{ input_capture_gate = gate })
+	c.set_gate_release = function(callback) control.release = callback end
 	local called, failure = pcall(body, c)
 	local closed, cleanup = pcall(c.close)
 	if not called then error(failure, 0) end
@@ -60,11 +67,11 @@ helpers.describe("managed document and native retirement join", function()
 		run(function(c)
 			local old = c.start_load()
 			local epoch, admitted, closes = c.manager.current_epoch("changelog"), false, 0
-			c.state.input_capture_gate = { release = function(app, supplied_epoch)
+			c.set_gate_release(function(app, supplied_epoch)
 				helpers.assert_eq(app, "changelog")
 				helpers.assert_eq(supplied_epoch, epoch)
 				return admitted
-			end }
+			end)
 			c.on_cancel = function()
 				c.on_cancel = nil
 				closes = closes + 1
@@ -82,7 +89,7 @@ helpers.describe("managed document and native retirement join", function()
 			helpers.assert_eq(closes, 1)
 			helpers.assert_true(c.manager.current_epoch("changelog") ~= epoch)
 			helpers.assert_true(c.manager.is_visible("changelog"))
-			c.state.input_capture_gate = nil
+			c.set_gate_release(nil)
 		end)
 	end)
 	helpers.it("late old timer ACK cannot clear the admitted replacement", function()
@@ -143,7 +150,7 @@ helpers.describe("managed document and native retirement join", function()
 			local view = c.start_load()
 			local window, epoch = c.windows[1], c.manager.current_epoch("changelog")
 			local destroy, admitted, closes = window.destroy, false, 0
-			c.state.input_capture_gate = { release = function() return admitted end }
+			c.set_gate_release(function() return admitted end)
 			c.on_cancel = function() c.on_cancel = nil; closes = closes + 1 end
 			window.destroy = function() return false end
 			view:destroy()
@@ -160,7 +167,7 @@ helpers.describe("managed document and native retirement join", function()
 			admitted = true
 			helpers.assert_true(c.manager.hide("changelog", epoch))
 			helpers.assert_eq(closes, 1)
-			c.state.input_capture_gate = nil
+			c.set_gate_release(nil)
 		end)
 	end)
 	helpers.it("external window destruction retains timer close until the exact child and input ACKs", function()
@@ -168,7 +175,7 @@ helpers.describe("managed document and native retirement join", function()
 			local view = c.start_load()
 			local window, epoch = c.windows[1], c.manager.current_epoch("changelog")
 			local destroy, admitted, closes = view.destroy, false, 0
-			c.state.input_capture_gate = { release = function() return admitted end }
+			c.set_gate_release(function() return admitted end)
 			c.on_cancel = function() c.on_cancel = nil; closes = closes + 1 end
 			view.destroy = function() return false end
 			window:destroy()
@@ -186,7 +193,7 @@ helpers.describe("managed document and native retirement join", function()
 			admitted = true
 			helpers.assert_true(c.manager.hide("changelog", epoch))
 			helpers.assert_eq(closes, 1)
-			c.state.input_capture_gate = nil
+			c.set_gate_release(nil)
 		end)
 	end)
 	helpers.it("renderer crash revokes consent without manufacturing native or input retirement", function()
@@ -194,7 +201,7 @@ helpers.describe("managed document and native retirement join", function()
 			local view = c.start_load()
 			local epoch, destroy = c.manager.current_epoch("changelog"), view.destroy
 			local admitted, closes = false, 0
-			c.state.input_capture_gate = { release = function() return admitted end }
+			c.set_gate_release(function() return admitted end)
 			c.on_cancel = function() c.on_cancel = nil; closes = closes + 1 end
 			view.destroy = function() return false end
 			view.on_web_process_terminated()
@@ -212,7 +219,7 @@ helpers.describe("managed document and native retirement join", function()
 			admitted = true
 			helpers.assert_true(c.manager.hide("changelog", epoch))
 			helpers.assert_eq(closes, 1)
-			c.state.input_capture_gate = nil
+			c.set_gate_release(nil)
 		end)
 	end)
 

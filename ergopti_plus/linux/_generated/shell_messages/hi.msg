@@ -1,19 +1,25 @@
 # linux/_generated/shell_messages/hi.msg
-# AUTO-GENERATED from _shared/data/locales/hi.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/hi.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT नेटवर्किंग मॉड्यूल स्रोत से बनाया गया।
 build_luv.recipe_required=नेटिव luv बिल्ड को उसकी स्रोत रेसिपी चाहिए।
 install.already_installed={1} — पहले से इंस्टॉल है
 install.archive_digest_unavailable=बनाए रखे गए डिस्क्रिप्टर वाले अपडेट के लिए वास्तविक OpenSSL3 रनटाइम आवश्यक है; क्षमता अनुपलब्ध रहती है।
+install.bytecode_skipped=पूर्व-संकलित मॉड्यूल नहीं बनाए जा सके — Ergopti स्रोत कोड से, थोड़ा धीमे शुरू होता है।
 install.capability_verified={1} — क्षमता सत्यापित
 install.command_still_missing={1} इंस्टॉल हो गया, लेकिन '{2}' अभी भी नहीं मिला।
 install.daemon_manual=डेमॉन को मैन्युअल रूप से शुरू करने के लिए:
 install.daemon_running=डेमॉन पृष्ठभूमि में चलता है। इसकी स्थिति जाँचने के लिए:
+install.focus_integration_enabled={1} फ़ोकस एकीकरण सक्षम किया गया
+install.focus_integration_failed={1} फ़ोकस एकीकरण सक्षम नहीं किया जा सका — इस डेस्कटॉप पर प्रति-ऐप्लिकेशन नियम निष्क्रिय रहेंगे।
+install.focus_integration_next_login={1} फ़ोकस एकीकरण इंस्टॉल किया गया (अगले लॉगिन से प्रभावी)
+install.focus_integration_updated={1} फ़ोकस एकीकरण अपडेट किया गया
 install.gnome_extension_active=GNOME AppIndicator एक्सटेंशन — पहले से सक्रिय
 install.gnome_extension_enabled=GNOME AppIndicator एक्सटेंशन सक्षम किया गया
 install.gnome_extension_failed=AppIndicator एक्सटेंशन सक्षम नहीं हो सका — इसके बिना GNOME आइकन नहीं दिखाता।
 install.gnome_extension_missing=GNOME AppIndicator एक्सटेंशन अनुपलब्ध — {1} इंस्टॉल किया जा रहा है…
 install.gnome_extension_next_login=GNOME AppIndicator एक्सटेंशन सक्षम किया गया (अगले लॉगिन से प्रभावी)
+install.gnome_extension_not_installed=इस डिस्ट्रीब्यूशन का कोई भी पैकेज GNOME AppIndicator एक्सटेंशन नहीं देता: {1} से AppIndicator and KStatusNotifierItem Support इंस्टॉल करें, फिर लॉग आउट करके दोबारा लॉग इन करें — इसके बिना GNOME आइकन नहीं दिखाता।
 install.gnome_without_extensions=gnome-extensions के बिना GNOME — आइकन देखने के लिए कोई AppIndicator एक्सटेंशन सक्षम करें।
 install.help_help=यह सहायता संदेश दिखाता है
 install.help_no_deps=कोई निर्भरता इंस्टॉल नहीं करता (आपकी ज़िम्मेदारी)
@@ -56,6 +62,7 @@ install.section_dependency_check=Ergopti {1} — निर्भरता जा
 install.section_deps_skipped=निर्भरताएँ छोड़ी गईं (--no-deps)
 install.section_done=इंस्टॉलेशन पूरा हुआ
 install.section_files=फ़ाइलें इंस्टॉल की जा रही हैं
+install.section_focus=Wayland में सक्रिय ऐप्लिकेशन (GNOME, KDE)
 install.section_lua_deps=वैकल्पिक Lua निर्भरताएँ (इवेंट लूप, टाइमर, वेबव्यू, सिग्नल)
 install.section_permissions=इनपुट अनुमतियाँ (sudo आवश्यक)
 install.section_services=systemd उपयोगकर्ता सेवाएँ बनाई जा रही हैं
@@ -63,6 +70,7 @@ install.section_tray=सिस्टम ट्रे आइकन और वि�
 install.security_warning_body='input' समूह का सदस्य होने से सत्र की हर कुंजी-दबाव पढ़ी जा सकती है, किसी भी ऐप्लिकेशन में टाइप किए गए पासवर्ड सहित। hotstring इंजन को ठीक यही चाहिए, और keyd तथा xremap भी यही करते हैं।
 install.security_warning_title=सुरक्षा चेतावनी
 install.service_started=ergopti-hotstrings सेवा सक्षम और प्रारंभ की गई
+install.session_without_graphical_target=यह सत्र systemd का graphical-session.target कभी शुरू नहीं करता (i3, Openbox, Xfce, सत्र प्रबंधक के बिना sway), इसलिए उपयोगकर्ता यूनिट कभी नहीं चलेगी: Ergopti+ इसके बजाय अगले लॉगिन पर XDG ऑटोस्टार्ट प्रविष्टि से शुरू होता है। जो विंडो मैनेजर XDG ऑटोस्टार्ट को अनदेखा करता है (i3, sway), उसके कॉन्फ़िगरेशन में exec {1} पंक्ति चाहिए।
 install.source_toolchain_unavailable=इंस्टॉल किया गया कंपाइलर नेटिव आर्काइव बैकएंड नहीं बना सकता।
 install.startup_choice_unreadable=स्टार्टअप विकल्प पढ़ा नहीं जा सका।
 install.summary_config=कॉन्फ़िगरेशन: {1}
@@ -79,6 +87,8 @@ install.xdg_autostart=XDG ऑटोस्टार्ट: {1}
 launch.already_running=Ergopti+ इस सत्र में पहले से चल रहा है ({1} लॉक है); यह लॉन्च अस्वीकार किया गया।
 launch.authorization_failed=इनपुट अनुमति प्राधिकरण रद्द हुआ या विफल रहा।
 launch.groups_unavailable=सत्र अपने कॉन्फ़िगर किए गए इनपुट समूह प्राप्त नहीं कर सका।
+launch.restarting=Ergopti+ इस सत्र में पहले से चल रहा है; उसे बंद होने के लिए कहा जा रहा है, फिर उसे दोबारा शुरू किया जाएगा।
+launch.session_lock_invalid=सत्र लॉक का फ़ोल्डर एक निरपेक्ष पथ होना चाहिए।
 launcher.dependencies_installed=निर्भरताएँ इंस्टॉल हो गईं।
 launcher.driver_missing=त्रुटि: Linux ड्राइवर फ़ोल्डर नहीं मिला: {1}
 launcher.install_deps_hint=चलाएँ: ergopti-hotstrings --install-deps
@@ -123,3 +133,4 @@ uninstall.symlink_in_path=इंस्टॉलेशन पथ एक सिम
 uninstall.system_prefix=सिस्टम इंस्टॉलेशन प्रीफ़िक्स अस्वीकार किया गया।
 uninstall.unsafe_path=असुरक्षित स्वामित्व पथ।
 uninstall.unsupported_argument=असमर्थित अनइंस्टॉल तर्क: {1}
+xkb_helpers.not_found=कीबोर्ड लेआउट इंस्टॉल करने की फ़ाइलें न {1} के पास मिलीं, न {2} में: इनके बिना कोई लेआउट इंस्टॉल नहीं हो सकता।

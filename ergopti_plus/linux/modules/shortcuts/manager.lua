@@ -32,31 +32,32 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local Paths  = require("infra.paths")
-local Manifest = require("infra.manifest_reader")
-local TextCase = require("unicode_case")
-local WrapPair = require("wrap_pair")
-local SendInput = require("send_input")
-local TomlCodec = require("toml_codec")
-local Clipboard = require("adapters.clipboard")
-local EventLoop = require("adapters.event_loop")
-local ComboEmitter = require("modules.gestures.combo_emitter")
-local Injector = require("modules.hotstrings.injector")
-local EvdevCodes = require("infra.evdev_codes")
-local Monotonic = require("infra.monotonic")
-local CapsWordPolicy = require("caps_word.auto_off")
+local Logger = require("core.logger.engine.shim")
+local Paths  = require("core.fs.engine.paths")
+local Manifest = require("menu.engine.manifest_reader")
+local TextCase = require("core.text.engine.unicode_case")
+local WrapPair = require("keyboard.engine.wrap_pair")
+local WrapSettings = require("modules.shortcuts.wrap_symbol_settings")
+local SendInput = require("platform.input.send_input")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Clipboard = require("clipboard.adapters.clipboard")
+local EventLoop = require("core.events.loop")
+local ComboEmitter = require("gestures.engine.combo_emitter")
+local Injector = require("hotstrings.engine.injector")
+local EvdevCodes = require("platform.input.evdev_codes")
+local Monotonic = require("core.logger.engine.monotonic")
+local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
 local _capture_text_owner = nil
 local ENABLED_PATH = ConfigKeys.KEY.SHORTCUTS_ENABLED
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
-local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
+local SEND_KEYS_REL_PATH = "shortcuts/data/actions/send_keys.json"
 local _send_vocabulary = nil
 
 -- The keys that select the level keyboard_layout reports a character on, for a
@@ -72,7 +73,7 @@ if type(DEFAULT_ENABLED) ~= "boolean" then
 	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
 end
 
-local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+local _writer_ok, TomlWriter = pcall(require, "core.text.engine.toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
 local collision_read = TomlWriter and TomlWriter.read_classified
 local collision_decode, collision_shared = TomlCodec.decode, Paths.shared
@@ -135,7 +136,7 @@ local function record(key)
 	local ok, keystats = pcall(require, "modules.keystats.keystats")
 	if not ok or type(keystats.record_shortcut) ~= "function" then return end
 	local app = "unknown"
-	local ok_win, WindowInfo = pcall(require, "adapters.window_info")
+	local ok_win, WindowInfo = pcall(require, "platform.focus.window_info")
 	if ok_win and type(WindowInfo.focused_app_id) == "function" then
 		local ok_id, id = pcall(WindowInfo.focused_app_id)
 		if ok_id and type(id) == "string" and id ~= "" then app = id end
@@ -152,7 +153,7 @@ end
 -- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
 -- the single source of truth shared with the AHK and macOS drivers — never
 -- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
-local WRAP_SYMBOLS_REL_PATH = "modules/wrap_symbols/wrap_symbols.json"
+local WRAP_SYMBOLS_REL_PATH = "keyboard/data/wrap_symbols/wrap_symbols.json"
 
 -- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
 local UTF8_BOM = "\239\187\191"
@@ -180,28 +181,29 @@ end
 local function load_wrap_pairs()
 	local lookup = {}
 	local ordered = {}
+	local groups = {}
 
-	local ok_json, json = pcall(require, "json")
+	local ok_json, json = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	local path = resolve_wrap_symbols_path()
 	if path == "" then
 		Logger.error(LOG, "Could not resolve the shared wrap-symbols path — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	if type(collision_read) ~= "function" then
 		Logger.error(LOG, "Shared wrap-symbols reader unavailable — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 	collision_json, collision_json_decode = json, json.decode
 	local content, status = collision_read(path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 	local original_content = content
 
@@ -212,19 +214,21 @@ local function load_wrap_pairs()
 	local ok, data = pcall(collision_json_decode, content)
 	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
-		return lookup, ordered
+		return lookup, ordered, groups
 	end
 
 	for _, group in ipairs(data.groups) do
+		local listed = { i18n = type(group.i18n) == "string" and group.i18n or nil, pairs = {} }
+		groups[#groups + 1] = listed
 		for _, pair in ipairs(group.pairs or {}) do
 			if type(pair) == "table"
 					and type(pair.left) == "string" and pair.left ~= ""
 					and type(pair.right) == "string" and pair.right ~= "" then
 				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
-				lookup[pair.left] = { left = pair.left, right = pair.right }
-				if pair.right ~= pair.left then
-					lookup[pair.right] = { left = pair.left, right = pair.right }
-				end
+				listed.pairs[#listed.pairs + 1] = { left = pair.left, right = pair.right }
+				-- Every trigger form of each end, so the bare typed guillemet reaches
+				-- the catalogue's spaced pair; the output keeps its delimiters.
+				WrapPair.register(lookup, pair)
 			end
 		end
 	end
@@ -232,14 +236,20 @@ local function load_wrap_pairs()
 	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", TableUtil.count(lookup))
 
 	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
-	return lookup, ordered
+	return lookup, ordered, groups
 end
 
 --- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
 --- single source of truth (never hardcoded here). Each entry maps a trigger
 --- character to its { left, right } wrapping symbols; WRAP_PAIR_LIST keeps the
 --- catalogue order.
-local WRAP_PAIRS, WRAP_PAIR_LIST = load_wrap_pairs()
+local WRAP_PAIRS, WRAP_PAIR_LIST, WRAP_GROUPS = load_wrap_pairs()
+
+-- The pairs that wrap now: the catalogue filtered by the user's choices, plus
+-- the pairs the user added (modules/shortcuts/wrap_symbol_settings). Read at
+-- init, at each applied configuration and after each menu change, never on a
+-- keystroke.
+local _active_wrap_pairs = WRAP_PAIRS
 
 --- Checks whether a character is a wrap-pair trigger.
 --- @param ch string Single character.
@@ -248,13 +258,25 @@ function M.get_wrap_pair(ch)
 	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
 	-- the catalogue too, and a byte test made every one of them unmatched.
 	if not TextCase.is_single_character(ch) then return nil end
-	return WRAP_PAIRS[ch]
+	return _active_wrap_pairs[ch]
 end
 
 --- Returns the full wrap-pairs catalogue.
 --- @return table
 function M.get_wrap_pairs()
 	return WRAP_PAIRS
+end
+
+--- The catalogue groups in order, as a copy: each { i18n, pairs }.
+--- @return table
+function M.get_wrap_groups()
+	local groups = {}
+	for index, group in ipairs(WRAP_GROUPS) do
+		local copy = { i18n = group.i18n, pairs = {} }
+		for position, pair in ipairs(group.pairs) do copy.pairs[position] = { left = pair.left, right = pair.right } end
+		groups[index] = copy
+	end
+	return groups
 end
 
 --- The built-in pairs in catalogue order, as a copy.
@@ -268,7 +290,7 @@ function M.get_wrap_pair_list()
 end
 
 --- The left and right symbols a wrap_selection parameter names: a catalogue
---- symbol or a custom left|right pair (_shared/lua/wrap_pair).
+--- symbol or a custom left|right pair (_shared/keyboard/engine).
 --- @param value any The stored parameter.
 --- @return string|nil left
 --- @return string|nil right Both nil when the value names no pair.
@@ -276,31 +298,35 @@ function M.resolve_wrap_pair(value)
 	return WrapPair.parse(value, WRAP_PAIR_LIST)
 end
 
---- Types a text at the text destination focused now, as send_text does: the
---- run_command and its output use it once their child has finished.
+--- Retains the current destination for an asynchronous text producer.
+--- @return table|nil publication
+function M.capture_text_destination() return capture_text_destination() end
+
+--- Types text at the retained destination, or captures the current one for a
+--- synchronous caller.
 --- @param text string Text to type.
 --- @param publication table|nil A destination already captured (send_text).
 --- @return boolean typed
 function M.insert_text(text, publication)
 	publication = publication or capture_text_destination()
 	if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Text can be arbitrary command output or configured user content.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
 --- The vocabulary of the send_text, send_key and send_shortcut parameters,
---- read once from _shared/modules/actions/send_keys.json. A missing or
+--- read once from _shared/shortcuts/data/actions/send_keys.json. A missing or
 --- malformed file raises: every send_* binding would otherwise refuse its value
 --- with no explanation.
 --- @return table The decoded vocabulary.
 function M.send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
 	local path = Paths.shared(SEND_KEYS_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("shortcuts: cannot read " .. tostring(path)) end
-	local body = handle:read("*a")
-	handle:close()
-	local ok, parsed = pcall(require("json").decode, body)
+	local body, status
+	if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("shortcuts: cannot read " .. tostring(path)) end
+	local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
 		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
 		error("shortcuts: " .. tostring(path) .. " is not a send-input vocabulary")
@@ -309,7 +335,7 @@ function M.send_vocabulary()
 	return parsed
 end
 
---- Parses a send_* parameter (_shared/lua/send_input over the vocabulary).
+--- Parses a send_* parameter (_shared/platform/input over the vocabulary).
 --- @param kind string "text", "key" or "shortcut".
 --- @param value any The stored parameter.
 --- @return table|nil The parse, or nil when the value is invalid.
@@ -399,9 +425,16 @@ end
 -- =========================================
 
 local _caps_word_active = false
+-- Hook control-key names (infra/evdev_codes CONTROL_NAME_OF) spelled apart from
+-- the shared CapsWord fixed-exit names.
+local CAPS_WORD_HOOK_KEY_NAMES = { pageup = "page_up", pagedown = "page_down" }
 -- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
--- compiled when it was switched on; nil while CapsWord is off.
+-- compiled when it was switched on and replaced by every acknowledged menu change
+-- (M.caps_word_policy_published); nil while CapsWord is off.
 local _caps_word_policy = nil
+-- Bumped whenever the idle check chain is replaced (a new delay mid-session), so
+-- the chain of the old delay never ends the session early or late.
+local _caps_word_idle_chain = 0
 -- Monotonic time of the last keystroke of the session, for the idle delay.
 local _caps_word_last_ms = nil
 -- Bumped by every session start and stop, so a queued idle check of an earlier
@@ -441,7 +474,7 @@ local function end_caps_word(reason)
 	if not _caps_word_active then return end
 	clear_caps_word(reason)
 	-- The hook logs an unlock it could not emit; the session is over either way.
-	require("adapters.keyboard_hook").release_caps_word_lock()
+	require("platform.input.keyboard_hook").release_caps_word_lock()
 end
 
 --- Queues the idle check of one session on the daemon loop: it ends the
@@ -450,8 +483,10 @@ end
 --- @param session integer Session the check belongs to.
 --- @param delay_ms number Milliseconds until the earliest possible expiry.
 local function schedule_idle_check(session, delay_ms)
+	local chain = _caps_word_idle_chain
 	local queued = EventLoop.defer(function()
-		if session ~= _caps_word_session or not _caps_word_active or not _caps_word_policy then return end
+		if session ~= _caps_word_session or chain ~= _caps_word_idle_chain or not _caps_word_active
+			or not _caps_word_policy then return end
 		local now = Monotonic.now_ms()
 		if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
 			end_caps_word("no keystroke for the configured delay")
@@ -479,7 +514,7 @@ local function start_caps_word()
 	-- level types. The hook ends the hold itself when the user presses
 	-- CapsLock, when it stops and before a dialog takes the keyboard.
 	local session = _caps_word_session + 1
-	local locked, refusal = require("adapters.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
+	local locked, refusal = require("platform.input.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
 		if session == _caps_word_session and _caps_word_active then clear_caps_word(reason) end
 	end)
 	if not locked then
@@ -493,6 +528,23 @@ local function start_caps_word()
 	if delay then schedule_idle_check(_caps_word_session, delay) end
 	Logger.info(LOG, "CapsWord: ON (idle delay %s).", delay and (delay .. " ms") or "never")
 	return true
+end
+
+--- Applies an acknowledged CapsWord setting change to the running session from
+--- its next event, as macOS does (decision of 2026-11-06): the delimiters and
+--- pointer kinds are read from the new policy, and the idle check is re-armed
+--- for the new delay counted from the last keystroke (none when it is 0). A hand
+--- edit of config.toml still waits for the next activation, which refreshes.
+--- @param policy table The newly published compiled policy.
+function M.caps_word_policy_published(policy)
+	if not _caps_word_active then return end
+	-- Validates the policy before any session state changes.
+	local delay = CapsWordPolicy.idle_delay_ms(policy)
+	_caps_word_policy = policy
+	_caps_word_idle_chain = _caps_word_idle_chain + 1
+	if delay then schedule_idle_check(_caps_word_session, delay - (Monotonic.now_ms() - _caps_word_last_ms)) end
+	Logger.info(LOG, "CapsWord: running session follows the new settings (idle delay %s).",
+		delay and (delay .. " ms") or "never")
 end
 
 --- Toggles CapsWord on/off via the menu.
@@ -541,6 +593,13 @@ end
 --- @return boolean ended
 function M.caps_word_observe_control(key_name)
 	if not observe_caps_word_keystroke() then return false end
+	-- Escape, Delete, the arrows, Home/End, Page Up/Down and F1-F12 always end it,
+	-- as macOS's fixed exits do; the hook spells two of them without the underscore.
+	local neutral = CAPS_WORD_HOOK_KEY_NAMES[key_name] or key_name
+	if CapsWordPolicy.is_fixed_exit_key(neutral) then
+		end_caps_word("editing key " .. key_name)
+		return true
+	end
 	if CapsWordPolicy.is_terminator_key(key_name) and CapsWordPolicy.ends_on_key(_caps_word_policy, key_name) then
 		end_caps_word("delimiter key " .. key_name)
 		return true
@@ -563,7 +622,8 @@ end
 --- Ends CapsWord on a native pointer event of a checked kind, named here so
 --- the daemon's main() captures no pointer-kind table of its own (it sits at
 --- LuaJIT's 60-upvalue limit).
---- @param kind_of_event string "press" (a button) or "motion" (an EV_REL report).
+--- @param kind_of_event string "press" (a button), "motion" (an EV_REL report) or
+--- "absolute_motion" (a changed EV_ABS coordinate).
 --- @param code integer The button's evdev code for a press.
 --- @return boolean ended
 function M.caps_word_observe_pointer_event(kind_of_event, code)
@@ -675,8 +735,56 @@ function M.paste_plain()
 		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
 		return false
 	end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Clipboard text can contain private user data and must not enter TRACE.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
+end
+
+--- Arms the one-shot Shift from an origin without a key frame, a gesture or a
+--- pointer button, through the hook's installed tap-hold engine (decision of
+--- 2026-11-06, as Windows' and macOS' catalogue action). The next key typed
+--- spends it, as a tapped one-shot Shift.
+--- @return boolean armed
+function M.arm_one_shot_shift()
+	record("one_shot_shift")
+	local armed, refusal = require("platform.input.keyboard_hook").arm_action_one_shot()
+	if not armed then Logger.warn(LOG, "One-shot Shift not armed: %s.", tostring(refusal)) end
+	return armed == true
+end
+
+-- The modifier names each token of a sticky_* action id holds, as the
+-- catalogue spells them on every driver: cmd is Super, option is Alt.
+local STICKY_TOKENS = { cmd = { "super" }, option = { "alt" }, ctrl = { "ctrl" }, shift = { "shift" },
+	altgr = { "altgr" }, hyper = { "ctrl", "alt", "shift", "super" } }
+
+--- The engine's modifier codes for a sticky_* action id; fails fast on an
+--- unknown token rather than arming a partial set.
+--- @param action_id string A sticky_* action id.
+--- @return table codes
+function M.sticky_codes(action_id)
+	local rest = type(action_id) == "string" and action_id:match("^sticky_(.+)$")
+	if not rest then error("not a sticky action: " .. tostring(action_id), 2) end
+	local Codes = require("platform.remap.tap_hold_engine").STICKY_MODIFIER_CODES
+	local codes = {}
+	for token in rest:gmatch("[^_]+") do
+		local names = STICKY_TOKENS[token]
+		if not names then error("unknown sticky modifier " .. token .. " in " .. action_id, 2) end
+		for _, name in ipairs(names) do codes[#codes + 1] = assert(Codes[name], name) end
+	end
+	return codes
+end
+
+--- Arms a sticky_* action's modifiers for the next key, through the hook's
+--- installed tap-hold engine (maintainer decision of 2026-11-13: every
+--- one-shot on every OS), as Windows' StickyModifier and macOS' sticky
+--- modifiers do.
+--- @param action_id string A sticky_* action id.
+--- @return boolean armed
+function M.arm_sticky(action_id)
+	record(action_id)
+	local armed, refusal = require("platform.input.keyboard_hook").arm_action_sticky(M.sticky_codes(action_id))
+	if not armed then Logger.warn(LOG, "Sticky modifiers %s not armed: %s.", action_id, tostring(refusal)) end
+	return armed == true
 end
 
 --- The catalogue actions this module performs, by action id, for the gesture
@@ -692,6 +800,23 @@ function M.action_handlers()
 		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
 		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
 		["caps_word"] = function() return M.toggle_caps_word() end,
+		["one_shot_shift"] = function() return M.arm_one_shot_shift() end,
+		["sticky_ctrl"] = function() return M.arm_sticky("sticky_ctrl") end,
+		["sticky_cmd"] = function() return M.arm_sticky("sticky_cmd") end,
+		["sticky_option"] = function() return M.arm_sticky("sticky_option") end,
+		["sticky_cmd_shift"] = function() return M.arm_sticky("sticky_cmd_shift") end,
+		["sticky_cmd_option"] = function() return M.arm_sticky("sticky_cmd_option") end,
+		["sticky_cmd_ctrl"] = function() return M.arm_sticky("sticky_cmd_ctrl") end,
+		["sticky_option_shift"] = function() return M.arm_sticky("sticky_option_shift") end,
+		["sticky_option_ctrl"] = function() return M.arm_sticky("sticky_option_ctrl") end,
+		["sticky_ctrl_shift"] = function() return M.arm_sticky("sticky_ctrl_shift") end,
+		["sticky_cmd_option_shift"] = function() return M.arm_sticky("sticky_cmd_option_shift") end,
+		["sticky_cmd_option_ctrl"] = function() return M.arm_sticky("sticky_cmd_option_ctrl") end,
+		["sticky_cmd_shift_ctrl"] = function() return M.arm_sticky("sticky_cmd_shift_ctrl") end,
+		["sticky_option_shift_ctrl"] = function() return M.arm_sticky("sticky_option_shift_ctrl") end,
+		["sticky_hyper"] = function() return M.arm_sticky("sticky_hyper") end,
+		["sticky_altgr"] = function() return M.arm_sticky("sticky_altgr") end,
+		["sticky_altgr_shift"] = function() return M.arm_sticky("sticky_altgr_shift") end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
@@ -878,6 +1003,45 @@ function M.mark_config_reads(config, mark)
 	end
 end
 
+--- Rebuilds the active wrap table from config.toml's wrap-symbol choices.
+--- An unreadable choice fails closed: no pair wraps until the file is fixed,
+--- rather than wrapping with pairs the user may have switched off.
+local function refresh_wrap_pairs()
+	if not _persist or not _config_path then
+		_active_wrap_pairs = WRAP_PAIRS
+		return
+	end
+	local ok, view = pcall(function() return (WrapSettings.read(_config_path)) end)
+	if not ok then
+		Logger.error(LOG, "Wrap-symbol choices unreadable — no pair wraps: %s.", tostring(view))
+		_active_wrap_pairs = {}
+		return
+	end
+	_active_wrap_pairs = WrapSettings.active_pairs(WRAP_PAIR_LIST, view)
+end
+
+--- The user's wrap-symbol choices as stored now.
+--- @return table|nil view { states, custom }, nil when unreadable or not persisted.
+function M.get_wrap_choices()
+	if not _persist or not _config_path then return nil end
+	local ok, view = pcall(function() return (WrapSettings.read(_config_path)) end)
+	return ok and view or nil
+end
+
+--- Publishes one change to the wrap-symbol choices, then applies it.
+--- @param mutate function mutate(candidate) -> boolean (wrap_symbol_settings.commit).
+--- @return boolean committed
+--- @return string|nil reason
+function M.commit_wrap_choices(mutate)
+	if _configuration_owner ~= nil or not _persist or not _config_path then return false, "configuration_busy" end
+	local committed, reason = WrapSettings.commit(_config_path, mutate)
+	if committed then
+		refresh_wrap_pairs()
+		collision_generation = collision_generation + 1
+	end
+	return committed, reason
+end
+
 --- Initialises the shortcuts module.
 --- @param opts table|nil { enabled?, persist?, config_path?, capture_text_owner? }
 function M.init(opts)
@@ -894,7 +1058,7 @@ function M.init(opts)
 	end_caps_word("shortcuts re-initialised")
 	_caps_word_policy, _caps_word_last_ms = nil, nil
 	_caps_word_session = _caps_word_session + 1
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_persist = opts.persist == true
 
 	local enabled = DEFAULT_ENABLED
@@ -938,6 +1102,7 @@ function M.init(opts)
 	_enabled = enabled
 	_wrap_on_type = wrap_on_type
 	collision_generation = collision_generation + 1
+	refresh_wrap_pairs()
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
 		tostring(_enabled), tostring(_wrap_on_type))
 end
@@ -1004,6 +1169,8 @@ function M.apply_configuration(owner, state)
 	collision_generation = collision_generation + 1
 	_enabled, _wrap_on_type = state.enabled, state.wrap
 	if not state.caps_word_active then end_caps_word("shortcut configuration applied") end
+	-- A restore or a reload may have changed the wrap-symbol choices too.
+	refresh_wrap_pairs()
 	return true
 end
 
@@ -1016,7 +1183,7 @@ local collision_admitted = M.configuration_admitted
 --- @return table|nil frame Original source/runtime guards and detached claims.
 function M.capture_collision_inventory()
 	if not collision_initialized or not _persist or _configuration_owner ~= nil or not wrap_source then return nil end
-	local Routes = require("infra.config_paths")
+	local Routes = require("settings.engine.paths")
 	local route = Routes.config
 	local path, epoch, enabled, wrap = _config_path, collision_generation, _enabled, _wrap_on_type
 	local source = wrap_source
@@ -1025,16 +1192,16 @@ function M.capture_collision_inventory()
 			and _configuration_owner == nil and collision_initialized and _persist and _config_path == path
 			and collision_generation == epoch and _enabled == enabled and _wrap_on_type == wrap
 			and rawequal(wrap_source, source) and wrap_pairs_equal(WRAP_PAIRS, source.pairs)
-			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
-			and rawequal(package.loaded["infra.paths"], Paths) and Paths.shared == collision_shared
-			and rawequal(package.loaded["toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
-			and rawequal(package.loaded["toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
-			and rawequal(package.loaded["json"], collision_json) and collision_json.decode == collision_json_decode
+			and rawequal(package.loaded["settings.engine.paths"], Routes) and Routes.config == route
+			and rawequal(package.loaded["core.fs.engine.paths"], Paths) and Paths.shared == collision_shared
+			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
+			and rawequal(package.loaded["core.text.engine.toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
+			and rawequal(package.loaded["core.text.engine.json"], collision_json) and collision_json.decode == collision_json_decode
 			and M.configuration_candidate == collision_candidate and M.init == collision_init
 			and M.get_wrap_pair == collision_get_pair and M.is_enabled == collision_enabled
 			and M.is_wrap_on_type_enabled == collision_wrap_enabled and M.configuration_admitted == collision_admitted
 			and TextCase.is_single_character == collision_single_character
-			and rawequal(package.loaded["unicode_case"], TextCase)
+			and rawequal(package.loaded["core.text.engine.unicode_case"], TextCase)
 			and M.capture_collision_inventory == collision_factory
 	end
 	if not runtime() or route("config.toml") ~= path then return nil end

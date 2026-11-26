@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 -- LuaSkin encodes an empty table as NSArray; the shared encoder chooses an object.
@@ -66,7 +66,7 @@ helpers.describe("changelog release response schema", function()
 					hs.json.decode = json.decode
 					hs.json.encode = native_encode
 					local warnings = {}
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					helpers.assert_true(window.open({ channel = channel }))
@@ -90,7 +90,7 @@ helpers.describe("changelog release response schema", function()
 					hs.json.decode = json.decode
 					hs.json.encode = native_encode
 					local warnings = {}
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					helpers.assert_true(window.open({ channel = channel }))

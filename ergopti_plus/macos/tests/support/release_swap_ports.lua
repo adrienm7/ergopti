@@ -12,7 +12,7 @@ local M = {}
 --- Returns the explicit test-only native rename port, never a production fallback.
 --- @return string command Shell-quoted command retaining actual host syscalls.
 function M.command()
-	local quote = require("infra.text_utils").shell_quote
+	local quote = require("core.text.engine.utils").shell_quote
 	return "python3 -B " .. quote(require("tests.helpers").driver_root() .. "tests/support/release_rename_physical_port.py")
 end
 
@@ -21,7 +21,7 @@ end
 --- @param dir string Exact scenario-owned directory for the executable port.
 --- @return string script Program retaining the production filesystem checks.
 function M.observe(script, dir)
-	local quote = require("infra.text_utils").shell_quote
+	local quote = require("core.text.engine.utils").shell_quote
 	local executable = dir .. "/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 	assert(os.execute("mkdir -p " .. quote(dir .. "/ErgoptiPlus.app/Contents/MacOS")))
 	local launcher = assert(io.open(executable, "wb"))

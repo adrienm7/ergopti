@@ -16,8 +16,12 @@
  * disappears reads as a bug — and it can be neither highlighted nor confirmed.
  *
  * UX: type to filter, ↑/↓ to move the highlight, Enter to confirm, Esc to cancel,
- * click a row to pick it. Headings render as h1/h2/h3… by their level, fold their
- * descendants on click, and a table-of-contents button jumps to any heading.
+ * click a row to pick it. Headings render as h2/h3… under the window's h1 by
+ * their level, each holding a button that folds its descendants, and a
+ * table-of-contents button jumps to any heading. The search field is a
+ * combobox: each run of actions under a heading is a list box of options, and
+ * the field names the highlighted option as its active descendant, so a
+ * screen reader announces the highlight as the arrows move it.
  *
  * An action whose `parameter` is text, key or shortcut is not confirmed at once:
  * the page opens its own editor (a text field, a key capture, a shortcut
@@ -73,12 +77,29 @@ const collapsed = new Set();
 // Visible (rendered + focusable) action rows in display order: {id, el}.
 let visible = [];
 let activeIndex = 0;
+// Ids of the rendered list boxes and options, numbered afresh by each render.
+let listboxIds = [];
+let optionCount = 0;
 
 let currentId = 'none';
+// The name of the list box of the actions shown above any heading.
+let listLabel = '';
 let strings = { noResults: 'No matching action' };
+// Ready and navigation completion can both push the same document payload.
+let initialized = false;
+// Delay of the search field's second focus try, for a host that gives the
+// view focus late; the app windows' keyboard-fold state waits past it.
+const FOCUS_RETRY_MS = 60;
 
 function el(id) {
 	return document.getElementById(id);
+}
+
+// A page string from the shared catalogue i18n.js applies; empty until it has
+// (the page renders again once the strings land).
+function pageString(key) {
+	const strings = window._i18n_strings || {};
+	return typeof strings[key] === 'string' ? strings[key] : '';
 }
 
 // ============================================================
@@ -86,12 +107,23 @@ function el(id) {
 // ============================================================
 
 function init(data) {
+	if (initialized) return;
 	data = data || {};
 	strings.noResults = data.noResults || 'No matching action';
 
 	el('title').textContent = data.title || '';
+	// The parameter editor's heading names the picked action once one is
+	// picked; until then it holds the window's title, never an empty heading.
+	el('param-title').textContent = data.title || '';
+	listLabel = data.title || '';
+	// The window's title for assistive technology too: the native title bar is
+	// the host's, the document's own title is what a screen reader names.
+	document.title = data.title || '';
 	el('subtitle').textContent = data.label || '';
 	el('search').placeholder = data.searchPlaceholder || '';
+	// A placeholder vanishes once the user types and is no label (WCAG 1.3.1,
+	// 4.1.2): the same text names the field for assistive technology.
+	if (data.searchPlaceholder) el('search').setAttribute('aria-label', data.searchPlaceholder);
 	if (typeof data.cancelLabel !== 'string' || data.cancelLabel === '')
 		throw new Error('action picker init needs the translated cancelLabel');
 	el('btn-cancel').textContent = data.cancelLabel;
@@ -163,6 +195,7 @@ function init(data) {
 	collapsed.clear();
 	render();
 	updateEditCurrent(data.editCurrentLabel || '');
+	initialized = true;
 	focusSearch();
 }
 
@@ -196,9 +229,11 @@ function focusSearch() {
 	const s = el('search');
 	if (!s) return;
 	s.focus();
+	// The second try is for a host that has not given the view focus yet; it
+	// must not take the focus back from a control the user moved to meanwhile.
 	setTimeout(function () {
-		s.focus();
-	}, 60);
+		if (document.activeElement === document.body || document.activeElement === null) s.focus();
+	}, FOCUS_RETRY_MS);
 }
 
 // ============================================================
@@ -237,8 +272,14 @@ function render() {
 	const list = el('list');
 	list.innerHTML = '';
 	visible = [];
+	listboxIds = [];
+	optionCount = 0;
+	// The list box the next action joins: a heading closes it, the next action
+	// under that heading opens one named by it.
+	let listbox = null;
+	let listboxLabel = listLabel;
 
-	const q = el('search').value.trim().toLowerCase();
+	const q = el('search').value.trim().toLowerCase().normalize('NFC');
 	const searching = q !== '';
 
 	// When searching, mark headings that have at least one matching descendant.
@@ -256,6 +297,7 @@ function render() {
 		}
 	}
 
+	let renderedActions = 0;
 	let curLevel = 0; // depth of the last rendered heading → indent of its actions
 	for (let i = 0; i < entries.length; i++) {
 		const e = entries[i];
@@ -267,6 +309,8 @@ function render() {
 			}
 			curLevel = Math.min(e.level, 4);
 			list.appendChild(buildHeadingRow(i, e));
+			listbox = null;
+			listboxLabel = e.text;
 		} else {
 			if (searching) {
 				if (!matches(e, q)) continue;
@@ -274,16 +318,29 @@ function render() {
 				continue;
 			}
 			const row = buildActionRow(e, e.special ? 0 : curLevel);
-			list.appendChild(row);
+			if (listbox === null) {
+				listbox = document.createElement('ul');
+				listbox.className = 'options';
+				listbox.id = 'ap-listbox-' + listboxIds.length;
+				listbox.setAttribute('role', 'listbox');
+				listbox.setAttribute('aria-label', listboxLabel);
+				listboxIds.push(listbox.id);
+				list.appendChild(listbox);
+			}
+			listbox.appendChild(row);
+			renderedActions++;
 			// A greyed row is shown but never focusable, so neither the arrows nor
 			// Enter can land on an action this machine cannot run.
 			if (!e.disabled) visible.push({ id: e.id, el: row });
 		}
 	}
 
-	el('empty').hidden = visible.length > 0;
+	el('empty').hidden = renderedActions > 0;
 	if (!el('empty').hidden) el('empty').textContent = strings.noResults;
 	el('count').textContent = visible.length ? String(visible.length) : '';
+	el('search').setAttribute('aria-controls', listboxIds.join(' '));
+	// No option to name while nothing is pickable.
+	if (!visible.length) el('search').setAttribute('aria-activedescendant', '');
 
 	let start = 0;
 	for (let k = 0; k < visible.length; k++) {
@@ -296,7 +353,7 @@ function render() {
 }
 
 function matches(actionEntry, q) {
-	return (actionEntry.label || '').toLowerCase().indexOf(q) !== -1;
+	return (actionEntry.label || '').toLowerCase().normalize('NFC').indexOf(q) !== -1;
 }
 
 // The action entry an id names, or null.
@@ -317,70 +374,76 @@ function isConfirmable(id) {
 }
 
 function buildHeadingRow(i, e) {
-	const row = document.createElement('div');
+	// Folding is a fold of the live tree, so it is disabled while searching
+	// (search already expands only the relevant matches). A foldable heading
+	// holds a button that folds it, so the keyboard folds it as the mouse does
+	// (WCAG 2.1.1); the button carries the row's look, the heading its place in
+	// the outline (h2 for a level-1 heading, under the window's h1).
+	const searching = el('search').value.trim() !== '';
 	const lvl = Math.min(e.level, 4);
-	row.className = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
-	row.style.paddingLeft = 8 + (lvl - 1) * 16 + 'px';
+	const heading = document.createElement('h' + (lvl + 1));
+	heading.dataset.entry = String(i);
+	const face = searching ? heading : document.createElement('button');
+	const look = 'heading lvl' + lvl + (collapsed.has(i) ? ' collapsed' : '');
+	heading.className = searching ? 'heading-row ' + look + ' static' : 'heading-row';
+	face.style.paddingInlineStart = 8 + (lvl - 1) * 16 + 'px';
 
-	const caret = document.createElement('span');
-	caret.className = 'caret';
-	caret.textContent = '▾';
-	const txt = document.createElement('span');
+	// The caret is drawn by the stylesheet; the heading's own words are of the
+	// host's language, isolated from the layout's direction.
+	const txt = document.createElement('bdi');
 	txt.className = 'heading-text';
 	txt.textContent = e.text;
-	row.appendChild(caret);
-	row.appendChild(txt);
+	face.appendChild(txt);
 
-	// Folding is a fold of the live tree, so it is disabled while searching
-	// (search already expands only the relevant matches).
-	const searching = el('search').value.trim() !== '';
 	if (!searching) {
-		row.addEventListener('click', function () {
+		face.className = look;
+		face.dataset.entry = String(i);
+		face.type = 'button';
+		face.setAttribute('aria-expanded', collapsed.has(i) ? 'false' : 'true');
+		face.addEventListener('click', function () {
 			toggleFold(i);
 		});
-	} else {
-		row.classList.add('static');
+		heading.appendChild(face);
 	}
-	return row;
+	return heading;
 }
 
 function buildActionRow(e, depth) {
-	const row = document.createElement('div');
+	// An option of its heading's list box. The list itself takes the clicks
+	// and the pointer's highlight (see Events): the keyboard reaches every
+	// option from the search field, which names the highlighted one.
+	const row = document.createElement('li');
 	row.className =
 		'row' +
 		(e.special ? ' special' : '') +
 		(e.id === currentId ? ' current' : '') +
 		(e.disabled ? ' disabled' : '');
+	row.id = 'ap-option-' + optionCount++;
+	row.setAttribute('role', 'option');
+	row.setAttribute('aria-selected', 'false');
 	row.dataset.id = e.id;
-	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
+	row.style.paddingInlineStart = 12 + (depth || 0) * 16 + 'px';
 
-	const tick = document.createElement('span');
-	tick.className = 'row-tick';
-	tick.textContent = '✓';
-	const label = document.createElement('span');
+	// The tick of the current action is drawn by the stylesheet; its words are
+	// for a screen reader, so the current action is not told by a glyph alone.
+	const label = document.createElement('bdi');
 	label.className = 'row-label';
 	label.textContent = e.label;
-	row.appendChild(tick);
 	row.appendChild(label);
+	if (e.id === currentId) {
+		const current = document.createElement('small');
+		current.className = 'theme-sr-only';
+		current.textContent = pageString('dialog.action_picker.current');
+		row.appendChild(current);
+	}
 	if (e.hint) {
-		const hint = document.createElement('span');
+		const hint = document.createElement('small');
 		hint.className = 'row-hint';
 		hint.textContent = e.hint;
 		row.appendChild(hint);
 		row.title = e.hint;
 	}
-	if (e.disabled) {
-		row.setAttribute('aria-disabled', 'true');
-		return row;
-	}
-
-	const idx = visible.length;
-	row.addEventListener('click', function () {
-		doConfirm(e.id);
-	});
-	row.addEventListener('mousemove', function () {
-		setActive(idx);
-	});
+	if (e.disabled) row.setAttribute('aria-disabled', 'true');
 	return row;
 }
 
@@ -388,17 +451,29 @@ function setActive(idx, instant) {
 	if (idx < 0 || idx >= visible.length) return;
 	if (visible[activeIndex] && visible[activeIndex].el) {
 		visible[activeIndex].el.classList.remove('active');
+		visible[activeIndex].el.setAttribute('aria-selected', 'false');
 	}
 	activeIndex = idx;
 	const row = visible[activeIndex].el;
 	row.classList.add('active');
+	row.setAttribute('aria-selected', 'true');
+	el('search').setAttribute('aria-activedescendant', row.id);
 	row.scrollIntoView({ block: 'nearest' });
 }
 
 function toggleFold(i) {
 	if (collapsed.has(i)) collapsed.delete(i);
 	else collapsed.add(i);
+	const refocus = document.activeElement && document.activeElement.dataset.entry === String(i);
 	render();
+	// render() rebuilds the rows: the keyboard stays on the heading it folded.
+	if (refocus) focusHeading(i);
+}
+
+// Focuses the rendered heading button of entry i, when it is shown.
+function focusHeading(i) {
+	const row = el('list').querySelector('button.heading[data-entry="' + i + '"]');
+	if (row) row.focus();
 }
 
 // ============================================================
@@ -406,13 +481,24 @@ function toggleFold(i) {
 // ============================================================
 
 function toggleToc() {
-	const toc = el('toc');
-	if (toc.hidden) {
-		buildToc();
-		toc.hidden = false;
-	} else {
-		toc.hidden = true;
-	}
+	if (el('toc').hidden) openToc();
+	else closeToc(true);
+}
+
+// Opens the drawer with the keyboard on its first heading.
+function openToc() {
+	buildToc();
+	el('toc').hidden = false;
+	el('toc-btn').setAttribute('aria-expanded', 'true');
+	const first = el('toc-inner').querySelector('.toc-item');
+	if (first) first.focus();
+}
+
+// Closes the drawer; returnFocus puts the keyboard back on its button.
+function closeToc(returnFocus) {
+	el('toc').hidden = true;
+	el('toc-btn').setAttribute('aria-expanded', 'false');
+	if (returnFocus) el('toc-btn').focus();
 }
 
 function buildToc() {
@@ -422,14 +508,17 @@ function buildToc() {
 		const e = entries[i];
 		if (e.kind !== 'heading') continue;
 		const lvl = Math.min(e.level, 4);
-		const a = document.createElement('div');
+		const item = document.createElement('li');
+		const a = document.createElement('button');
+		item.appendChild(a);
+		a.type = 'button';
 		a.className = 'toc-item lvl' + lvl;
-		a.style.paddingLeft = 10 + (lvl - 1) * 16 + 'px';
+		a.style.paddingInlineStart = 10 + (lvl - 1) * 16 + 'px';
 		a.textContent = e.text;
 		a.addEventListener('click', function () {
 			tocGoto(i);
 		});
-		inner.appendChild(a);
+		inner.appendChild(item);
 	}
 }
 
@@ -437,33 +526,11 @@ function tocGoto(i) {
 	// Expand every ancestor so the heading is visible, then scroll to it.
 	for (const h of ancestorsOf(i)) collapsed.delete(h);
 	el('search').value = '';
-	el('toc').hidden = true;
+	closeToc(false);
 	render();
-	// Find the heading row by re-walking; headings carry no id, so match by order.
-	const rows = el('list').children;
-	let seen = -1;
-	for (let r = 0; r < rows.length; r++) {
-		if (rows[r].classList.contains('heading')) {
-			seen++;
-			if (headingDomToEntry(seen) === i) {
-				rows[r].scrollIntoView({ block: 'start' });
-				break;
-			}
-		}
-	}
-}
-
-// Maps the Nth rendered heading (DOM order) back to its entry index. Rebuilt
-// each call from the current fold state so it always matches what is on screen.
-function headingDomToEntry(nth) {
-	let seen = -1;
-	for (let i = 0; i < entries.length; i++) {
-		if (entries[i].kind !== 'heading') continue;
-		if (hiddenByFold(i)) continue;
-		seen++;
-		if (seen === nth) return i;
-	}
-	return -1;
+	focusHeading(i);
+	const heading = el('list').querySelector('.heading-row[data-entry="' + i + '"]');
+	if (heading) heading.scrollIntoView({ block: 'start' });
 }
 
 // ============================================================
@@ -483,7 +550,7 @@ const EDITABLE_KINDS = new Set([
 ]);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
-// Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
+// Host-supplied: the decoded _shared/shortcuts/data/actions/send_keys.json, the
 // host's capabilities (the executable path syntax of a program parameter,
 // "windows" or "posix", and whether Command is the primary modifier), and the
 // localized strings of the editor ({ save, back, captureKey, captureShortcut,
@@ -505,6 +572,8 @@ let defaultCount = null;
 // Host-supplied for llm_vision: the vision backends a binding may use
 // ([{value: id, label, defaultModel}], defaultModel "" when it needs one).
 let visionChoices = null;
+let visionModelDrafts = new Map();
+let visionModelOwner = null;
 
 // Host-supplied for llm_language: the target languages a binding may name
 // ([{value, label}]: "ui" for the interface language, then every locale).
@@ -577,10 +646,15 @@ function parseSendShortcut(value) {
 }
 
 // The rules pinned by _shared/tests/corpus/action_parameters/llm_prompt_vectors.json:
-// "<profile_id>" or "<profile_id>|<count>", the count from 1 to 10.
+// "<profile_id>" or "<profile_id>|<count>", the count within the AI menu's
+// setting, declared once in the shared value schema (llm.profiles.num_predictions).
 const LLM_PROMPT_MAX_ID_LENGTH = 128;
-const LLM_PROMPT_MIN_PREDICTIONS = 1;
-const LLM_PROMPT_MAX_PREDICTIONS = 10;
+const LLM_PROMPT_PREDICTIONS = window.ErgoptiValueCheck.entryFor(
+	window.ErgoptiValueCheck.SCHEMA,
+	window.ErgoptiValueCheck.KEY.LLM_PROFILES_NUM_PREDICTIONS
+);
+const LLM_PROMPT_MIN_PREDICTIONS = LLM_PROMPT_PREDICTIONS.min;
+const LLM_PROMPT_MAX_PREDICTIONS = LLM_PROMPT_PREDICTIONS.max;
 
 // {profileId, numPredictions (null = the menu's count)}, or null when invalid.
 function parseLlmPrompt(value) {
@@ -722,6 +796,14 @@ function fillPromptChoices(value) {
 		appendOption(profile, choice.value, choice.label);
 		if (current && choice.value === current.profileId) selected = choice.value;
 	}
+	// A per-binding translation is valid even though it is not a catalogued profile.
+	if (
+		current?.translationTarget &&
+		!promptChoices.some((choice) => choice.value === current.profileId)
+	) {
+		appendOption(profile, current.profileId, current.profileId + ' — ' + current.translationTarget);
+		selected = current.profileId;
+	}
 	profile.value = selected;
 	const defaultLabel = (paramStrings.countDefault || '{1}').replace('{1}', String(defaultCount));
 	appendOption(count, '', defaultLabel);
@@ -756,7 +838,22 @@ function fillVisionChoices(value) {
 		if (current && choice.value === current.backend) selected = choice.value;
 	}
 	provider.value = selected;
-	el('param-vision-model').value = current && current.model !== null ? current.model : '';
+	visionModelDrafts = new Map();
+	visionModelOwner = selected;
+	const model =
+		current && current.backend === selected && current.model !== null ? current.model : '';
+	visionModelDrafts.set(selected, model);
+	el('param-vision-model').value = model;
+	updateVisionModelHint();
+}
+
+// Models belong to a backend. Keep unsaved drafts when switching back, but
+// never submit one provider's model name to a newly selected provider.
+function changeVisionProvider() {
+	const model = el('param-vision-model');
+	if (visionModelOwner !== null) visionModelDrafts.set(visionModelOwner, model.value);
+	visionModelOwner = el('param-vision-provider').value;
+	model.value = visionModelDrafts.get(visionModelOwner) || '';
 	updateVisionModelHint();
 }
 
@@ -787,7 +884,14 @@ function fillLanguageChoices(value) {
 // The value the prompt choices describe.
 function promptChoiceValue() {
 	const count = el('param-count').value;
-	return count === '' ? el('param-profile').value : el('param-profile').value + '|' + count;
+	const profile = el('param-profile').value;
+	const initial = parseLlmPrompt(editing?.parameterValue || '');
+	if (profile === 'translate' && initial?.profileId === profile && initial.translationTarget) {
+		// A target is representable only alongside an explicit count.
+		if (count === '') return null;
+		return profile + '|' + count + '|' + initial.translationTarget;
+	}
+	return count === '' ? profile : profile + '|' + count;
 }
 
 function openParamEditor(entry) {
@@ -929,7 +1033,7 @@ function updateAutomationProviders(packet) {
 }
 
 function appendProgramArgument(value) {
-	const row = document.createElement('div');
+	const row = document.createElement('li');
 	row.className = 'program-argument';
 	const input = document.createElement('textarea');
 	input.value = value;
@@ -1109,6 +1213,23 @@ document.addEventListener('DOMContentLoaded', function () {
 	el('search').addEventListener('input', function () {
 		render();
 	});
+	// One listener for every option: a click picks it, the pointer moves the
+	// highlight onto it, as the arrows do from the search field.
+	el('list').addEventListener('click', function (event) {
+		const row = event.target.closest('[role="option"]');
+		if (row && !row.classList.contains('disabled')) doConfirm(row.dataset.id);
+	});
+	el('list').addEventListener('mousemove', function (event) {
+		const row = event.target.closest('[role="option"]');
+		if (!row) return;
+		const index = visible.findIndex((each) => each.el === row);
+		if (index !== -1 && index !== activeIndex) setActive(index);
+	});
+	// The current action's words for a screen reader come from the page's own
+	// strings, which may land after the host's init.
+	document.addEventListener('i18n:applied', function () {
+		if (initialized) render();
+	});
 	el('param-back').addEventListener('click', function () {
 		closeParamEditor();
 	});
@@ -1123,10 +1244,12 @@ document.addEventListener('DOMContentLoaded', function () {
 		editCurrent();
 	});
 	el('param-vision-provider').addEventListener('change', function () {
-		updateVisionModelHint();
+		changeVisionProvider();
 	});
 
 	document.addEventListener('keydown', function (e) {
+		// Let the focused button handle Enter itself, including Back and Cancel.
+		if (e.key === 'Enter' && e.target?.tagName === 'BUTTON') return;
 		// While a value is being edited every key belongs to the editor: Escape
 		// and Enter can be keys to capture there, never a cancel or a pick.
 		if (onParamKeydown(e)) return;
@@ -1142,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
 			if (!el('toc').hidden) {
-				el('toc').hidden = true;
+				closeToc(true);
 				return;
 			}
 			doCancel();

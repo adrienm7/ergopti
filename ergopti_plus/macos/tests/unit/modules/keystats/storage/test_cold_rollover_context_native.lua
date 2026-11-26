@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 
 helpers.describe("native cold cache rollover context", function()
 	helpers.it("keeps the healthy context after actual cache loss (cold-rollover-context)", function()

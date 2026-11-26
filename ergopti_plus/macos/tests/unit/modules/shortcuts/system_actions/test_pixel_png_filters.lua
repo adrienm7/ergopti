@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local quote = require("infra.text_utils").shell_quote
+local quote = require("core.text.engine.utils").shell_quote
 
 
 --- Delivers real decoded PNG output through the public two-phase action.
@@ -20,12 +20,12 @@ local function copy_capture(mode)
 	local copied, decoder_status
 	local notices = {}
 	helpers.with_stub_scope({
-		"modules.shortcuts.actions.system_pixel", "adapters.task_lifecycle",
-		"adapters.file_system", "infra.notifications", "infra.i18n", "infra.logger",
+		"modules.shortcuts.actions.system_pixel", "core.process.adapters.task_lifecycle",
+		"core.fs.adapters.file_system", "core.ui.engine.notifications", "core.i18n.engine.i18n", "core.logger.engine.logger",
 		"modules.shortcuts.actions.screen_capture_flow",
 	}, function()
 		local tasks = {}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, callback, arguments)
 				local task = { label = label, executable = executable, arguments = arguments,
 					callback = callback, running = false }
@@ -37,16 +37,16 @@ local function copy_capture(mode)
 			end,
 			start = function(task) return task:start() == task end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function() return "/private/tmp/pixel-png-capture" end,
 			remove_exact = function() return true end,
 			classify_no_follow = function() return nil, "absent" end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(_, _, level) notices[#notices + 1] = level end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.shortcuts.actions.screen_capture_flow"] = {
 			ensure_permission = function() return true end,
 		}

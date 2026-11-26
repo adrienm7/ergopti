@@ -263,7 +263,7 @@ while True: time.sleep(1)
 """)
         lua = root / "hang.lua"
         lua.write_text("""local uv = require("luv")
-local Runner = require("adapters.program_runner")
+local Runner = require("core.process.adapters.program_runner")
 local handles = {}
 for i = 1, 2 do
     local h = assert(Runner.spawn(arg[1], {arg[2], arg[3] .. "/" .. i}, function() end, function() return true end))

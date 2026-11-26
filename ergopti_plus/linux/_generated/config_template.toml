@@ -1,13 +1,15 @@
 # _generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# AUTO-GENERATED from _shared/settings/data/features/manifest.toml.
 # DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 # This is the default v2 config copied into config/ergopti_plus/linux/
 # on first boot. After that, the user owns the copy.
 
 [script]
-locale = "fr"
+locale = ""
 log_level = "INFO"
 show_error_dialog = true
+reading_font = "default"
+reading_spacing = "default"
 
 
 
@@ -54,7 +56,6 @@ time_activation_seconds = 0.5
 
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
-pattern_max_length = 1
 
 
 
@@ -62,8 +63,9 @@ pattern_max_length = 1
 
 [hotstrings]
 trigger_char = "★"
-magic_key_source = "auto"
 repeat_key_enabled = false
+backspace_restore_enabled = true
+backspace_restore_window_ms = 500
 idle_reset_seconds = 3
 click_resets_word = true
 arrow_resets_word = true
@@ -74,6 +76,8 @@ expansion_delay = 0.75
 preview_ai_enabled = true
 preview_autocorrect_enabled = true
 preview_colored_tooltips = true
+preview_category_glyphs = true
+preview_announcements = true
 preview_star_enabled = true
 
 
@@ -221,16 +225,6 @@ enabled = false
 
 
 
-[hotstrings.rolls.chevron_greater]
-enabled = false
-
-
-
-[hotstrings.rolls.chevron_less]
-enabled = false
-
-
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = false
 time_activation_seconds = 0.5
@@ -293,11 +287,6 @@ enabled = false
 
 
 [hotstrings.rolls.paren_quote]
-enabled = false
-
-
-
-[hotstrings.magic_key.replace]
 enabled = false
 
 
@@ -480,6 +469,7 @@ min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
 while_hotstring_tooltip = "wait"
+inline_autotype = false
 secure_filter_enabled = true
 url_bar_filter_enabled = false
 
@@ -517,6 +507,36 @@ wrap_text_if_selected = false
 
 
 
+[shortcuts.a_grave]
+enabled = false
+letter = "v"
+
+
+
+[shortcuts.star]
+enabled = false
+letter = "s"
+
+
+
+[shortcuts.e_acute]
+enabled = false
+letter = "c"
+
+
+
+[shortcuts.e_circ]
+enabled = false
+letter = "x"
+
+
+
+[shortcuts.e_grave]
+enabled = false
+letter = "z"
+
+
+
 [shortcuts.key_combination_taps]
 alt_gr_then_left_alt = "none"
 alt_gr_then_caps_lock = "none"
@@ -542,7 +562,7 @@ script_altgr_escape = "script_quit"
 
 
 [shortcuts.keyboard]
-magic_editor = "open_hotstrings_editor"
+meta_star = "open_hotstrings_editor"
 
 
 
@@ -615,14 +635,106 @@ tap_5 = "none"
 
 
 
+[gestures.modes]
+swipe_2_left = "x1"
+swipe_2_right = "x1"
+swipe_2_up = "x1"
+swipe_2_down = "x1"
+swipe_2_left_down = "x1"
+swipe_2_left_up = "x1"
+swipe_2_right_down = "x1"
+swipe_2_right_up = "x1"
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
+swipe_3_left_down = "incremental"
+swipe_3_left_up = "incremental"
+swipe_3_right_down = "incremental"
+swipe_3_right_up = "incremental"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+swipe_4_left_down = "x1"
+swipe_4_left_up = "x1"
+swipe_4_right_down = "x1"
+swipe_4_right_up = "x1"
+swipe_5_left = "incremental"
+swipe_5_right = "incremental"
+swipe_5_up = "x1"
+swipe_5_down = "x1"
+swipe_5_left_down = "incremental"
+swipe_5_left_up = "incremental"
+swipe_5_right_down = "incremental"
+swipe_5_right_up = "incremental"
+swipe_3_horiz = "x1"
+swipe_4_horiz = "x1"
+swipe_5_horiz = "x1"
+
+
+
+[gestures.sensitivities]
+swipe_2_left = 3.5
+swipe_2_right = 3.5
+swipe_2_up = 3.5
+swipe_2_down = 3.5
+swipe_2_left_down = 3.5
+swipe_2_left_up = 3.5
+swipe_2_right_down = 3.5
+swipe_2_right_up = 3.5
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 25
+swipe_3_down = 25
+swipe_3_left_down = 3.5
+swipe_3_left_up = 3.5
+swipe_3_right_down = 3.5
+swipe_3_right_up = 3.5
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+swipe_4_left_down = 3.5
+swipe_4_left_up = 3.5
+swipe_4_right_down = 3.5
+swipe_4_right_up = 3.5
+swipe_5_left = 3.5
+swipe_5_right = 3.5
+swipe_5_up = 3.5
+swipe_5_down = 3.5
+swipe_5_left_down = 3.5
+swipe_5_left_up = 3.5
+swipe_5_right_down = 3.5
+swipe_5_right_up = 3.5
+swipe_3_horiz = 3.5
+swipe_4_horiz = 3.5
+swipe_5_horiz = 3.5
+
+
+
 
 
 [layout]
+ergopti_base = true
 direct_access_digits = "native"
 number_row_reorder_edges = false
+ergopti_alt_gr = true
+ergopti_variant = "none"
+emulate_number_row = true
+emulate_top_row = true
+emulate_home_row = true
+emulate_bottom_row = true
+emulated_layout = ""
+emulated_layout_recents = []
+game_keys = "physical"
 pause_switch_enabled = false
 on_pause = ""
 on_resume = ""
+
+
+
+[layout.game_keys_apps]
 
 
 
@@ -638,3 +750,4 @@ key_combinations = true
 [tap_holds]
 enabled = false
 lone_modifier_tap_max_ms = 1000
+sticky_timeout_ms = 2000

@@ -172,9 +172,9 @@
 		},
 		{
 			"id": "undeclared_section_reads_its_file",
-			"description": "A section whose row declares no delay (magic_key.replace) waits its category file.",
+			"description": "A section no manifest row declares, hence with no delay, waits its category file.",
 			"category": "magickey",
-			"section": "replace",
+			"section": "undeclared_section",
 			"toml_category": { "delay": 1, "color": "#444444", "show_tooltip": true, "priority": 14 },
 			"expected": {
 				"delay": 1,

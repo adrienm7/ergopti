@@ -60,12 +60,12 @@ _OWFL_Run(Mode) {
 		OldGui: _OWFL_Gui(), NextGui: _OWFL_Gui(),
 		OldQueue: ["original.one", "original.two"], NextQueue: ["successor.one", "successor.two"]}
 	_OWFL_World := World
-	DirCreate(_SharedDir . "\data\locales")
-	_OWFL_Require(!FileExist(_SharedDir . "\data\locales\missing.json"),
+	DirCreate(_SharedDir . "\core\i18n\data\locales")
+	_OWFL_Require(!FileExist(_SharedDir . "\core\i18n\data\locales\missing.json"),
 		"the diagnostic fixture must genuinely lack its private locale file")
 	if Mode == "current-locale" {
 		_I18nLocale := "fixture"
-		FileAppend('{"label":"locale 😀"}', _SharedDir . "\data\locales\fixture.json", "UTF-8-RAW")
+		FileAppend('{"label":"locale 😀"}', _SharedDir . "\core\i18n\data\locales\fixture.json", "UTF-8-RAW")
 		Expected := 'window._i18n_strings={"label":"locale 😀"};if(typeof window.i18n_apply===' . "'function'"
 			. ')window.i18n_apply(window._i18n_strings);'
 		_OWFL_Require(OllamaWV_I18nApplyScript(_I18nLocale) == Expected,

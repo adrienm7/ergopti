@@ -10,6 +10,15 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import tomllib
+
+# The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
+# boot creates it and the updater only sends conditional requests when it exists.
+FOLDER = tomllib.loads(
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
+)["app"]["linux_folder_name"]
 
 
 def main():
@@ -17,7 +26,7 @@ def main():
     os.umask(0o077)
     with tempfile.TemporaryDirectory(prefix="ergopti-updater-release-tags-") as folder:
         root = pathlib.Path(folder)
-        (root / ".cache").mkdir()
+        (root / "cache" / FOLDER).mkdir(parents=True)
         cert, key = root / "cert.pem", root / "key.pem"
         subprocess.run(
             [
@@ -51,16 +60,26 @@ def main():
         origin = "https://127.0.0.1:" + str(listener.getsockname()[1])
         responses = []
         for index in range(1, 11):
-            assets = [
-                {
-                    "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
-                },
-                {
-                    "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
-                },
-            ]
+
+            def assets_for(tag):
+                # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
+                return [
+                    {
+                        "name": "ergopti-plus-linux.tar.gz",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz",
+                    },
+                    {
+                        "name": "ergopti-plus-linux.tar.gz.sha256",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz.sha256",
+                    },
+                ]
+
             release = {}
             if index in (4, 9, 10):
                 release["author"] = {"login": "fixture-author", "tag_name": "v9.9.9"}
@@ -71,7 +90,7 @@ def main():
                     "draft": False,
                     "prerelease": False,
                     "body": "Ordinary notes",
-                    "assets": assets,
+                    "assets": assets_for("v1.2.0"),
                     "published_at": "2026-10-01T00:00:00Z",
                 }
             )
@@ -90,6 +109,7 @@ def main():
                 later = dict(release)
                 later["tag_name"] = "v1.3.0" if index == 7 else "v9.9.0-beta.1"
                 later["prerelease"] = index == 8
+                later["assets"] = assets_for(later["tag_name"])
                 releases.append(later)
                 if index == 7:
                     expected_tag = "v1.3.0"

@@ -14,7 +14,7 @@
 #Requires Autohotkey v2.0+
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
-#Include ../../infra/menu_row_order.ahk
+#Include ../../menu/engine/row_order.ahk
 
 
 
@@ -28,10 +28,12 @@
 
 class WPMWidgetConst {
     ; ── Loaded at runtime by WPMWidget_LoadSharedConst() ─────────────────────────
-    ; From _shared/modules/wpm_widget/constants.toml (the canon every driver
-    ; reads) and _shared/modules/timings/constants.toml. Zero here, never a
+    ; From _shared/metrics/data/wpm_widget/constants.toml (the canon every driver
+    ; reads) and _shared/core/timing/data/constants.toml. Zero here, never a
     ; copied default: a key missing from the canon keeps the widget off.
     ; [compact]
+    ; [typing_burst]: scan code name ("SC14B") → "ends", "modifier" or "neutral".
+    static BURST              := 0
     static W                  := 0
     static H                  := 0
     static H_NUMBER           := 0
@@ -71,12 +73,20 @@ class WPMWidgetConst {
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
+    ; [menubar] — the notification-area readout (wpm_tray_readout.ahk); hex
+    ; strings without the leading '#'.
+    static MENUBAR_ALPHA      := 0.0
+    static MENUBAR_TEXT       := ""
+    static MENUBAR_NEUTRAL_BG := ""
     ; Timings: [ui] and [keystats].
     static IDLE_HIDE_MS       := 0
     static COLOR_HOLD_MS      := 0
     static TICK_MS            := 0
+    static MENUBAR_TICK_MS    := 0
     static WINDOW_MS          := 0
     static WPM_MIN_DURATION_MS := 0
+    ; IDLE_RESET_MS has no placeholder: WPMWidget_LoadSharedConst creates it from
+    ; timings [keystats] wpm_idle_reset_ms, and a read before that raises.
 
     ; ── Windows-only: no counterpart on the other drivers ────────────────────────
     ; Fast cursor-movement poll (ms). The display tick is too coarse to get the
@@ -92,10 +102,10 @@ class WPMWidgetConst {
     ; window-allocation cost is not absorbed by a tooltip render when the widget
     ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
-    ; Storage keys of the saved position, from the shared canon ([position]
-    ; storage_x / storage_y): the same two keys the other drivers use.
-    static STORE_X            := ""
-    static STORE_Y            := ""
+    ; Storage key of the saved position, from the shared canon ([position]
+    ; storage_pair): one [x, y] value, so the registry publishes the pair in a
+    ; single atomic write (WCF-001).
+    static STORE_PAIR         := ""
     ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := ConfigLeaf.WPM_WIDGET_VISIBLE
     static CFG_COLORS         := ConfigLeaf.WPM_WIDGET_COLORS
@@ -144,10 +154,14 @@ class WPMWidget {
     static _gdip_font        := 0
     static _gdip_fmt         := 0
     static _gdip_frame_rendering := false
+    ; True while the last graph frame upload was refused by the native bitmap owner,
+    ; so a persistent refusal is logged once instead of on every 200 ms tick.
+    static _graph_upload_refused := false
     static _gdip_frame_cleanup_debt := 0
 
     ; Visibility + position.
     static visible        := false
+    static _visibility_revision := 0
     static pos_x          := -1         ; -1 = auto-position on first show
     static pos_y          := -1
 
@@ -191,6 +205,13 @@ class WPMWidget {
     ; Idle-hide state: wall clock of the last keyboard event seen by the widget.
     static _last_input_ms := 0
 
+    ; Typing burst (TWD-2): tick of the last burst end (shortcut, ending key,
+    ; modifier tapped alone, focus change), the scan code of a modifier pressed
+    ; with no key since, and the foreground window the last tick saw.
+    static _last_break_ms := 0
+    static _lone_modifier := 0
+    static _last_foreground := 0
+
     ; Last observed cursor position for the fast mouse-watch hide. Seeded in
     ; WPMWidget_Show so the very first poll never fires a spurious hide.
     static _last_mouse_x  := 0
@@ -213,30 +234,61 @@ _WPMWidget_NeutralCategory(category) {
     return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
+; Whether a readout needs the ring: the floating widget or the notification-area
+; readout, which draw from the same keystrokes. Neither costs anything when off.
+_WPMWidget_Collecting() {
+	return WPMWidget.visible || (IsSet(WPMTrayReadout) && WPMTrayReadout.running)
+}
+
+; Which sources still colour the readouts: each held for COLOR_HOLD_MS after
+; its last keystroke, as Model.active_source holds the last one on macOS and
+; Linux. The watermarks are sampled together under Critical, RAM-only.
+; @returns {Map} has_hs, has_ai, has_ac (Booleans).
+WPMWidget_ActiveSources() {
+	StampCritical := Critical("On")
+	try {
+		now := A_TickCount
+		last_hs := WPMWidget._last_hs_tick
+		last_ai := WPMWidget._last_ai_tick
+		last_ac := WPMWidget._last_ac_tick
+	} finally {
+		Critical(StampCritical)
+	}
+	return Map("has_hs", _WPMWidget_SourceHeld(now, last_hs), "has_ai", _WPMWidget_SourceHeld(now, last_ai),
+		"has_ac", _WPMWidget_SourceHeld(now, last_ac))
+}
+
+; Zero means no source event, not an event in a later UInt32 era.
+_WPMWidget_SourceHeld(Now, Last) {
+	return Last is Integer && Last > 0 && Last <= Now
+		&& _WPMWidget_TickDelta(Now, Last) < WPMWidgetConst.COLOR_HOLD_MS
+}
+
 ; Called by the keystats hook after each accepted keystroke.
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+;   NowTick: the sample's tick, A_TickCount when unset (tests replay a clock).
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "", NowTick := unset) {
 	; WPM pushes can originate from the deferred fire-log timer, which native
 	; Suspend does not disarm. Guard before the ring/timestamp mutations so a
 	; stale callback cannot repaint pre-pause activity after resume.
 	if A_IsSuspended
 		return
-	if !WPMWidget.visible
+	if !_WPMWidget_Collecting()
 		return
 	; Neutral categories count as keystrokes but must not trigger HS color.
 	if (is_hs and _WPMWidget_NeutralCategory(category))
 		is_hs := false
 	cap := WPMWidgetConst.RING_CAP
-	now_t := A_TickCount
+	now_t := IsSet(NowTick) ? NowTick : A_TickCount
 	entry := Map("t", now_t, "hs", is_hs, "ai", is_ai, "ac", is_ac)
 	; Pair the second pause check with every ring/timestamp mutation. Helpers above
 	; may yield, while this region contains no Send/Sleep/I/O/logger call and stays
 	; bounded regardless of replacement length.
 	RingCritical := Critical("On")
 	try {
-		if A_IsSuspended or !WPMWidget.visible
+		if A_IsSuspended or !_WPMWidget_Collecting()
 			return
 		head := WPMWidget._ring_head
 		if (WPMWidget._ring.Length < cap)
@@ -246,6 +298,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 		WPMWidget._ring_head := Mod(head + 1, cap)
 		WPMWidget._last_tick := now_t
 		WPMWidget._last_input_ms := now_t
+		WPMWidget._lone_modifier := 0
 		WPMWidget._last_hs := is_hs
 		WPMWidget._last_ai := is_ai
 		WPMWidget._last_ac := is_ac
@@ -271,9 +324,30 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 }
 
 
+; Takes back Count characters a producer erased (a hotstring's trigger, the
+; text an AI rewrite replaced): the newest samples at or before NowTick leave
+; the window, so the live speed counts the produced text, not the keys pressed
+; (maintainer decision MET-17, 21 November 2026, macOS's rule; vectors in
+; _shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json).
+; @param Count {Integer} Characters the producer erased.
+; @param NowTick {Integer} The producer's tick; A_TickCount when unset.
+WPMWidget_Retract(Count, NowTick := unset) {
+	if A_IsSuspended || !(Count is Integer) || Count <= 0
+		return
+	now_t := IsSet(NowTick) ? NowTick : A_TickCount
+	RingCritical := Critical("On")
+	try {
+		WPMRing_Retract(WPMWidget._ring, WPMWidget._ring_head, WPMWidgetConst.RING_CAP, Count, now_t)
+	} finally {
+		Critical(RingCritical)
+	}
+}
+
+
 ; Compute current WPM from the ring buffer.
-WPMWidget_Calc() {
-    now      := A_TickCount
+; @param NowTick {Integer} The reading's tick; A_TickCount when unset.
+WPMWidget_Calc(NowTick := unset) {
+    now      := IsSet(NowTick) ? NowTick : A_TickCount
     count    := 0
     has_hs   := false
     has_ai   := false
@@ -290,7 +364,8 @@ WPMWidget_Calc() {
             ; A producer may run after this frame sampled now. Such a future
             ; row is not yet part of this calculation; malformed ticks refuse.
             if (!(EventTick is Integer) || EventTick < 0 || EventTick > now
-                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS)
+                    || _WPMWidget_TickDelta(now, EventTick) > WPMWidgetConst.WINDOW_MS
+                    || ev.Has("retracted"))
                 continue
             count++
             if ev["hs"]
@@ -307,7 +382,10 @@ WPMWidget_Calc() {
     } finally {
         Critical(RingCritical)
     }
-    if (count < 2)
+    ; After timings [keystats] wpm_idle_reset_ms without a character the speed
+    ; reads 0, as on macOS and Linux (MET-01): the decaying 15 s window alone
+    ; kept the tray readout showing a falling number for 15 s after a burst.
+    if (count < 2 || _WPMWidget_TickDelta(now, latest) > WPMWidgetConst.IDLE_RESET_MS)
         return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
     ; last keystroke the window grows and WPM decays naturally to 0.
@@ -455,7 +533,7 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 _WPMWidget_ApplySurfaceGeometry(gui_ref) {
     if !gui_ref
         return
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+    if _WPMWidget_IsAutoPosition(WPMWidget.pos_x, WPMWidget.pos_y) {
         WPMWidget_DefaultPos(&def_x, &def_y)
         WPMWidget.pos_x := def_x
         WPMWidget.pos_y := def_y
@@ -500,14 +578,39 @@ WPMWidget_PrewarmGraph() {
         ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
         _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
-        GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+        Uploaded := GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
         GR_Hide(g.Hwnd)
+        if Uploaded != true
+            throw Error("the native bitmap upload was refused")
         LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
     } catch as e {
         LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
     }
 }
 
+
+; The typing burst rule (TWD-2, decided by the maintainer on 2026-11-16), the
+; same as macOS and Linux: the widget shows only while text is typed. A key that
+; is not text by itself goes through here; text arrives through WPMWidget_Push.
+; @param Sc {Integer} The key's scan code.
+; @param IsShortcut {Boolean} A Ctrl, Alt or Win chord.
+; @param Now {Integer} A_TickCount of the press.
+WPMWidget_ObserveKey(Sc, IsShortcut, Now := A_TickCount) {
+	if !_WPMWidget_Collecting()
+		return
+	Role := WPMWidget_BurstRole(WPMWidgetConst.BURST, Sc)
+	; The layout's own AltGr key, wherever it sits, is a level modifier too.
+	try if Sc == KS_AltGrScanCode()
+		Role := "level"
+	WPMWidget_BurstObserveKey(WPMWidget, Role, Sc, IsShortcut, Now)
+}
+
+; A modifier released with no other key since its press ends the burst.
+; @param Sc {Integer} The released key's scan code.
+; @param Now {Integer} A_TickCount of the release.
+WPMWidget_ObserveKeyUp(Sc, Now := A_TickCount) {
+	WPMWidget_BurstObserveKeyUp(WPMWidget, Sc, Now)
+}
 
 ; Clears the rolling WPM state (keystroke ring, history, input/category
 ; timestamps). Called by WPMWidget_Show so keystrokes typed during boot/reload --
@@ -523,6 +626,9 @@ _WPMWidget_ResetRolling() {
     }
     WPMWidget._graph_hist    := []
     WPMWidget._last_input_ms := 0
+    WPMWidget._last_break_ms := 0
+    WPMWidget._lone_modifier := 0
+    WPMWidget._last_foreground := 0
     WPMWidget._last_hs_tick  := 0
     WPMWidget._last_ai_tick  := 0
     WPMWidget._last_ac_tick  := 0
@@ -530,7 +636,13 @@ _WPMWidget_ResetRolling() {
 }
 
 
-WPMWidget_Show() {
+WPMWidget_Show(ExpectedRevision := unset) {
+    PreviousCritical := Critical("On")
+    try {
+        if IsSet(ExpectedRevision) && WPMWidget._visibility_revision != ExpectedRevision
+            return false
+        Revision := ++WPMWidget._visibility_revision
+    } finally Critical(PreviousCritical)
     LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
         WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
     if WPMWidget.show_graph {
@@ -541,7 +653,12 @@ WPMWidget_Show() {
             WPMWidget_BuildCompact()
     }
 
-    WPMWidget.visible := true
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision
+            return false
+        WPMWidget.visible := true
+    } finally Critical(PreviousCritical)
 
     ; Start from a clean slate -- discard any keystrokes counted during boot or
     ; reload so the surface stays hidden until the user types AFTER it is shown.
@@ -556,28 +673,50 @@ WPMWidget_Show() {
     ; Compact mode uses the same "Hide" approach — no flash on startup.
     _WPMWidget_ApplySurfaceGeometry(gui_ref)
 
-    SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-
-    ; Seed the cursor position and arm the fast mouse-watch so the widget hides the
-    ; instant the cursor moves — it must never cover text the user wants to read.
+    ; Seed outside the RAM claim; an intervening Hide revokes both timer arms.
     MouseGetPos(&_seed_mx, &_seed_my)
-    WPMWidget._last_mouse_x := _seed_mx
-    WPMWidget._last_mouse_y := _seed_my
-    SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision || !WPMWidget.visible
+            return false
+        WPMWidget._last_mouse_x := _seed_mx
+        WPMWidget._last_mouse_y := _seed_my
+        SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
+        SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    } finally Critical(PreviousCritical)
 
     LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
+; Deferred boot Show, armed once the tray is ready. WPMWidget_Show forces
+; WPMWidget.visible := true, which is right for a user activation but wrong for
+; this timer: the user can disable the widget during the post-ready delay, and a
+; stale Show would then restore it and re-arm both display timers against the
+; committed preference. The preference is read when the timer fires.
+WPMWidget_BootShow() {
+    if !WPMWidget.visible {
+        LoggerDebug("WPMWidget", "Boot Show skipped: the widget was disabled before it ran.")
+        return
+    }
+    WPMWidget_Show()
+}
+
 WPMWidget_Hide() {
-    WPMWidget.visible := false
-    SetTimer(WPMWidget_Tick, 0)
-    SetTimer(WPMWidget_MouseWatch, 0)
-    if WPMWidget._gui
-        try WPMWidget._gui.Hide()
-    if WPMWidget._graph_gui
-        try WPMWidget._graph_gui.Hide()
+    PreviousCritical := Critical("On")
+    try {
+        Revision := ++WPMWidget._visibility_revision
+        WPMWidget.visible := false
+        Compact := WPMWidget._gui, Graph := WPMWidget._graph_gui
+        SetTimer(WPMWidget_Tick, 0)
+        SetTimer(WPMWidget_MouseWatch, 0)
+    } finally Critical(PreviousCritical)
+    if Compact && WPMWidget._visibility_revision == Revision
+        try Compact.Hide()
+    if Graph && WPMWidget._visibility_revision == Revision
+        try Graph.Hide()
     try LoggerDone("WPMWidget", "Widget hidden.")
+    return Revision
 }
 
 
@@ -589,6 +728,58 @@ WPMWidget_Hide() {
 ; ======= 7/ Tick — refresh display =======
 ; =========================================
 ; =========================================
+
+; Retire only the exact failed surface; a replacement owns its own references.
+_WPMWidget_DiscardSurface(Candidate, Graph) {
+    PreviousCritical := Critical("On")
+    try {
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current == Candidate {
+            if Graph
+                WPMWidget._graph_gui := false
+            else {
+                WPMWidget._gui := false
+                WPMWidget._lbl_wpm := false
+                WPMWidget._lbl_unit := false
+                WPMWidget._lbl_strip := false
+            }
+        }
+    } finally Critical(PreviousCritical)
+    if Candidate
+        try Candidate.Destroy()
+}
+
+; A missing surface remains retryable until both construction and geometry succeed.
+; This does not reset the admitted rolling samples or start another display timer.
+_WPMWidget_RebuildSurface() {
+    if !WPMWidget.visible || A_IsSuspended
+        return false
+    Graph := WPMWidget.show_graph
+    Existing := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if Existing
+        return true
+    Candidate := 0
+    try {
+        Candidate := Graph ? WPMWidget_BuildGraph() : WPMWidget_BuildCompact()
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if !Candidate || Current != Candidate || Graph != WPMWidget.show_graph
+                || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        _WPMWidget_ApplySurfaceGeometry(Candidate)
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current != Candidate || Graph != WPMWidget.show_graph || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        return true
+    } catch as Err {
+        _WPMWidget_DiscardSurface(Candidate, Graph)
+        try LoggerError("WPMWidget", "Surface reconstruction failed; a later display tick will retry: {1}.", Err.Message)
+        return false
+    }
+}
 
 WPMWidget_Tick() {
     if !WPMWidget.visible
@@ -615,6 +806,13 @@ WPMWidget_Tick() {
         last_ai := WPMWidget._last_ai_tick
         last_ac := WPMWidget._last_ac_tick
         last_input := WPMWidget._last_input_ms
+        ; A focus change ends the typing burst, as on macOS and Linux.
+        ; WinExist("A") is AHK's own foreground lookup (0 when none): no DllCall in ui/.
+        Foreground := WinExist("A")
+        if WPMWidget._last_foreground != 0 && Foreground != WPMWidget._last_foreground
+            WPMWidget._last_break_ms := now
+        WPMWidget._last_foreground := Foreground
+        last_break := WPMWidget._last_break_ms
     } finally {
         Critical(StampCritical)
     }
@@ -631,21 +829,21 @@ WPMWidget_Tick() {
     while (WPMWidget._graph_hist.Length > WPMWidgetConst.GRAPH_HISTORY)
         WPMWidget._graph_hist.RemoveAt(1)
 
-    ; Hide after IDLE_HIDE_MS of keyboard inactivity.
-    keyboard_idle := !(last_input is Integer) || last_input < 0 || last_input > now
-        || (last_input > 0 && _WPMWidget_TickDelta(now, last_input) > WPMWidgetConst.IDLE_HIDE_MS)
-    ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
-    ; A_TimeIdleMouse is built into AHK and requires no hook install.
-    mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
-    should_show   := _WPMWidget_TooltipUp()
-        || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
+    ; The shared rule: during a typing burst, the first text key included, or
+    ; while a preview is up. A_TimeIdleMouse is built into AHK and requires no
+    ; hook install.
+    should_show := WPMWidget_ShouldShow(_WPMWidget_TooltipUp(), now, last_input, last_break,
+        WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-    if !gui_ref
-        return
-
     if !should_show {
-        try _WPMWidget_HideSurface(gui_ref)
+        if gui_ref
+            try _WPMWidget_HideSurface(gui_ref)
         return
+    }
+    if !gui_ref {
+        if !_WPMWidget_RebuildSurface()
+            return
+        gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     }
 
     is_idle := false
@@ -662,6 +860,8 @@ WPMWidget_Tick() {
             if !WPMWidget_RenderGraph(label, accent)
                 return
             GR_Show(WPMWidget._graph_gui.Hwnd)
+            ; Named only once shown: a surface the catch below discards has no window.
+            _WPMWidget_NameForReaders(WPMWidget._graph_gui, wpm_str)
         } catch as _e {
             ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
             ; A bare catch that only dropped the handle left the widget dead until
@@ -669,13 +869,8 @@ WPMWidget_Tick() {
             ; to say a render had thrown — the two branches of the same tick
             ; behaved differently for no reason anyone chose.
             try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._graph_gui := false
-            try WPMWidget_BuildGraph()
-            ; The builder only constructs. Without the geometry the rebuilt Gui
-            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
-            ; tick and the "recovery" leaves the widget exactly as dead as the bare
-            ; catch it replaced — just with one ERROR line to show for it.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
+            _WPMWidget_DiscardSurface(gui_ref, true)
+            _WPMWidget_RebuildSurface()
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
@@ -694,17 +889,11 @@ WPMWidget_Tick() {
                 WPMWidget._lbl_wpm.SetFont("c" . txt_col)
             if WPMWidget._lbl_unit
                 WPMWidget._lbl_unit.SetFont("c" . txt_col)
+            _WPMWidget_NameForReaders(WPMWidget._gui, wpm_str)
         } catch as _e {
             try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._gui       := false
-            WPMWidget._lbl_wpm   := false
-            WPMWidget._lbl_unit  := false
-            WPMWidget._lbl_strip := false
-            try WPMWidget_BuildCompact()
-            ; Same reason as the graph sibling above: the next tick reveals this
-            ; window with a bare Show("NoActivate"), which would put the rebuilt
-            ; widget at the OS default position instead of the user's corner.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
+            _WPMWidget_DiscardSurface(gui_ref, false)
+            _WPMWidget_RebuildSurface()
         }
     }
     WPMWidget._last_wpm := wpm
@@ -749,6 +938,10 @@ WPMWidget_MouseWatch() {
         return
     WPMWidget._last_mouse_x := mx
     WPMWidget._last_mouse_y := my
+    ; A move the driver made itself (a cursor restore, a pointer action) is no
+    ; physical input: the physical idle clocks tell them apart (TWD-2).
+    if !WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)
+        return
     ; The tick keeps the widget up while a preview is on screen; hiding it here
     ; would only make it flicker back.
     if _WPMWidget_TooltipUp()

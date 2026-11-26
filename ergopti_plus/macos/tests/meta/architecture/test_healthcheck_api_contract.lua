@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Diagnostic API Contract
 --- DESCRIPTION:
 --- Pins every external module symbol that the diagnostics collectors, probes
---- and actions call (ui/healthcheck/helpers.lua, probes.lua, report.lua), so a
+--- and actions call (diagnostics/ui/healthcheck/helpers.lua, probes.lua, report.lua), so a
 --- renamed or removed API fails CI here instead of silently degrading the
 --- user-facing diagnostic.
 ---
@@ -28,42 +28,42 @@ local helpers = require("tests.helpers")
 -- The exact external surface the diagnostics window relies on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
-	{ mod = "infra.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
+	{ mod = "core.logger.engine.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
 		"logs_dir", "today_log_path", "today_errors_path", "crash_reports_dir" } },
-	{ mod = "infra.config_paths",               fns = { "is_initialized", "get_config_dir" } },
-	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
-	{ mod = "modules.diagnostics.crash_reporter", fns = { "reports_dir" } },
-	{ mod = "adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
-	{ mod = "adapters.system_info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
+	{ mod = "settings.engine.paths",               fns = { "is_initialized", "get_config_dir" } },
+	{ mod = "diagnostics.engine.reports.snapshot",        fns = { "resolve_commit" } },
+	{ mod = "diagnostics.engine.reports.crash_reporter", fns = { "reports_dir" } },
+	{ mod = "diagnostics.adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
+	{ mod = "platform.system.info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
 		"elevated" } },
 	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
 	{ mod = "platform.remap.ke_paths",          constants = { "CLI" } },
-	{ mod = "adapters.file_system",             fns = { "exists" } },
+	{ mod = "core.fs.adapters.file_system",             fns = { "exists" } },
 	{ mod = "modules.shortcuts.script_control", fns = { "is_paused" } },
-	{ mod = "adapters.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
+	{ mod = "platform.input.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
 	{ mod = "platform.remap.lease_controller",  fns = { "status" } },
-	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
+	{ mod = "ai.engine",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
 		"get_active_profile" } },
-	{ mod = "modules.llm.api_ollama",           fns = { "get_base_url" } },
-	{ mod = "modules.llm.api_mlx",              fns = { "get_base_url" } },
+	{ mod = "ai.engine.api.ollama",           fns = { "get_base_url" } },
+	{ mod = "ai.engine.api.mlx",              fns = { "get_base_url" } },
 	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
-	{ mod = "adapters.screen_capture",          fns = { "permission_state" } },
-	{ mod = "adapters.http_client",             fns = { "new" } },
-	{ mod = "adapters.shell_runner",            fns = { "spawn" } },
-	{ mod = "adapters.json_codec",              fns = { "decode" } },
-	{ mod = "adapters.clipboard",               fns = { "write" } },
-	{ mod = "adapters.notifier",                fns = { "send" } },
-	{ mod = "infra.locale",                     fns = { "all" } },
-	{ mod = "infra.manifest_reader",            fns = { "coverage_gaps" } },
-	{ mod = "adapters.network_info",            fns = { "getSignalStrength" } },
-	{ mod = "ui.ui_builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",
+	{ mod = "platform.system.screen_capture",          fns = { "permission_state" } },
+	{ mod = "core.network.adapters.http_client",             fns = { "new" } },
+	{ mod = "core.process.adapters.shell_runner",            fns = { "spawn" } },
+	{ mod = "core.fs.adapters.json_codec",              fns = { "decode" } },
+	{ mod = "clipboard.adapters.clipboard",               fns = { "write" } },
+	{ mod = "platform.system.notifier",                fns = { "send" } },
+	{ mod = "core.i18n.engine.locale",                     fns = { "all" } },
+	{ mod = "menu.engine.manifest_reader",            fns = { "coverage_gaps" } },
+	{ mod = "core.network.adapters.info",            fns = { "getSignalStrength" } },
+	{ mod = "core.ui.ui.builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",
 		"window_chrome_steps", "force_focus", "open_http_url" } },
 }
 
 -- The adapters that capture the hs global when they load: reloaded inside
 -- the fixture so they read its answers
 local HS_READERS = {
-	"adapters.key_state", "adapters.accessibility_permission", "adapters.screen_capture", "adapters.system_info",
+	"platform.input.key_state", "adapters.accessibility_permission", "platform.system.screen_capture", "platform.system.info",
 }
 
 --- Answers the Hammerspoon queries the collectors make, as a Mac would.
@@ -97,7 +97,7 @@ helpers.describe("meta: healthcheck diagnostic API contract", function()
 			-- Build the hs/lib stub environment, then force a REAL require of the
 			-- target module. Clear the exact canonical key so no partial subject
 			-- stub left by an earlier test can satisfy this API contract.
-			helpers.load_with_stubs("infra.logger")
+			helpers.load_with_stubs("core.logger.engine.logger")
 			package.loaded[entry.mod] = nil
 			local ok, mod = pcall(require, entry.mod)
 			helpers.assert_true(ok and type(mod) == "table",
@@ -135,18 +135,18 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	local failures = {}
 	local ok_run, snap
 	local scope = {
-		"infra.logger", "logger", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.logger.engine", "ai.engine", "diagnostics.ui.healthcheck", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers",
 	}
 	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
 	helpers.with_stub_scope(scope, function()
-		local Logger = helpers.load_with_stubs("infra.logger")
+		local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 		answer_as_a_mac(hs)
 		for _, name in ipairs(HS_READERS) do package.loaded[name] = nil end
 		-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
-		package.loaded["modules.llm"] = nil
-		package.loaded["ui.healthcheck"] = nil
-		package.loaded["ui.healthcheck.core"] = nil
-		package.loaded["ui.healthcheck.helpers"] = nil
+		package.loaded["ai.engine"] = nil
+		package.loaded["diagnostics.ui.healthcheck"] = nil
+		package.loaded["diagnostics.ui.healthcheck.core"] = nil
+		package.loaded["diagnostics.ui.healthcheck.helpers"] = nil
 		local orig_warn, orig_error = Logger.warn, Logger.error
 		local function capture(original)
 			return function(tag, fmt, ...)
@@ -159,7 +159,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 			end
 		end
 		Logger.warn, Logger.error = capture(orig_warn), capture(orig_error)
-		ok_run, snap = pcall(function() return require("ui.healthcheck").run({ detailed = true }) end)
+		ok_run, snap = pcall(function() return require("diagnostics.ui.healthcheck").run({ detailed = true }) end)
 		Logger.warn, Logger.error = orig_warn, orig_error
 	end)
 

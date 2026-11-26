@@ -76,15 +76,33 @@ _KIER_EncryptionRetry(Mode) {
 		}
 		JournalBeforeRetry := FileRead(Keystats.today_log_path, "UTF-8")
 		JournalRead := _KL_JournalReadLines(Keystats.today_log_path, 0, 10, KL_JsonDecode)
-		AssertEqual(Mode = "mixed" ? 2 : 1, JournalRead["entries"].Length,
-			"the synthetic journal must retain every refused event: " . JournalBeforeRetry)
-		AssertEqual(0, Keystats._pending_entries.Length,
-			"durably journaled rows must not also be requeued")
+		if Mode = "pending" {
+			; The journal seals typed text with the same key as data.sql
+			; (KL_JournalSealEntry): a RAM-only typing row that cannot be sealed is
+			; never written there in plaintext, so it stays queued in RAM instead.
+			AssertEqual("today_log_append_failed", Refused["reason"],
+				"the unsealable pending row refuses its journal append")
+			AssertEqual(0, JournalRead["entries"].Length, "no plaintext typing row reaches the journal")
+			AssertEqual(1, Keystats._pending_entries.Length, "the refused RAM-only row stays queued for the retry")
+		} else {
+			AssertEqual(Mode = "mixed" ? 2 : 1, JournalRead["entries"].Length,
+				"the synthetic journal must retain every refused event: " . JournalBeforeRetry
+				. " (refusal=" . Refused.Get("reason", "") . ", requeued=" . Keystats._pending_entries.Length . ")")
+			AssertEqual(0, Keystats._pending_entries.Length,
+				"durably journaled rows must not also be requeued")
+		}
 		KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 		Accepted := KL_IngestOnce(true, true)
 		AssertTrue(Accepted["ok"])
 		AssertEqual(FileGetSize(Keystats.today_log_path), Keystats.today_log_offset)
-		AssertEqual(JournalBeforeRetry, FileRead(Keystats.today_log_path, "UTF-8"))
+		if Mode = "pending" {
+			Journal := FileRead(Keystats.today_log_path, "UTF-8")
+			AssertEqual(1, _KL_JournalReadLines(Keystats.today_log_path, 0, 10, KL_JsonDecode)["entries"].Length,
+				"the retry journals the queued row once")
+			Assert(!InStr(Journal, Entry["text"]), "the retried journal row is sealed, never plaintext")
+			AssertEqual(0, Keystats._pending_entries.Length, "the journaled row leaves the RAM queue")
+		} else
+			AssertEqual(JournalBeforeRetry, FileRead(Keystats.today_log_path, "UTF-8"))
 		Sql := FileRead(Keystats.data_sql_path, "UTF-8")
 		Assert(!InStr(Sql, Entry["text"]), "successful retry must still encrypt typing text")
 		Db := _WJFM_OpenMemory()

@@ -35,7 +35,7 @@ local function controller_with(state)
 		read_primary = function()
 			log.reads = log.reads + 1
 			if state.on_read then state.on_read(controller, log, state) end
-			return true, state.primary or ""
+			return state.read_ok ~= false, state.primary or ""
 		end,
 		type_text = function(text)
 			if state.type_ok == false then return false end
@@ -56,6 +56,66 @@ local function symbol(char, mods)
 end
 
 helpers.describe("wrap on type (linux): the decision", function()
+	helpers.it("consumes the symbol after a partial replacement attempt", function()
+		local primary, emitted = "old", ""
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(text) emitted = text:sub(1, 1); return false, true end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(emitted, "(", "the replacement already reached the destination")
+		helpers.assert_true(consumed, "passing the physical symbol would add it after the partial replacement")
+	end)
+
+	helpers.it("consumes the symbol when output raises after its attempt receipt", function()
+		local primary = "old"
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(_, _, mark_attempt) mark_attempt(); error("after attempted output") end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		helpers.assert_true(controller.on_key(symbol("(")))
+	end)
+
+	helpers.it("requires an acknowledged selected PRIMARY read before replacing text (wrap-primary-receipt)", function()
+		local reads, typed = 0, {}
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function()
+				reads = reads + 1
+				if reads == 1 then return true, "old" end
+				return "unacknowledged", "selected"
+			end,
+			type_text = function(text) typed[#typed + 1] = text; return true end,
+		})
+		controller.on_pointer_down()
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(consumed, false)
+		helpers.assert_eq(typed, {}, "a non-boolean read result cannot authorize replacement")
+	end)
+	for _, boundary in ipairs({ "baseline", "selected" }) do
+		helpers.it("passes input through when the " .. boundary .. " PRIMARY read raises (wrap-primary-exception)", function()
+			local controller, log, state = controller_with({ primary = "old", on_read = function(_, observed)
+				if observed.reads == (boundary == "baseline" and 1 or 2) then error("controlled PRIMARY failure") end
+			end })
+			local clicked = pcall(controller.on_pointer_down)
+			state.primary = "selected"
+			local called, consumed = pcall(controller.on_key, symbol("("))
+			helpers.assert_true(clicked, "pointer handling must not stop capture")
+			helpers.assert_true(called, "the symbol must remain deliverable")
+			helpers.assert_eq(consumed, false)
+			helpers.assert_eq(log.typed, {})
+			helpers.assert_eq(controller.selection_window_open(), false)
+		end)
+	end
 	helpers.it("wraps a mouse selection and swallows the symbol", function()
 		local controller, log, state = controller_with({ primary = "old" })
 		controller.on_pointer_down()
@@ -84,6 +144,14 @@ helpers.describe("wrap on type (linux): the decision", function()
 		controller.on_pointer_down()
 		helpers.assert_true(not controller.on_key(symbol("(")),
 			"PRIMARY unchanged since the click is an old selection, not a live one")
+		helpers.assert_eq(log.typed, {})
+	end)
+
+	helpers.it("does not wrap stale PRIMARY after its baseline could not be read", function()
+		local controller, log, state = controller_with({ primary = "stale", read_ok = false })
+		controller.on_pointer_down()
+		state.read_ok = true
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
 		helpers.assert_eq(log.typed, {})
 	end)
 
@@ -241,7 +309,7 @@ end)
 
 helpers.describe("wrap on type (linux): the probe never types into the window", function()
 	helpers.it("reads PRIMARY with no key sent and no clipboard write", function()
-		local names = { shell = "adapters.shell_runner", display = "infra.display_server", clip = "adapters.clipboard" }
+		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "clipboard.adapters.clipboard" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {}, writes = 0 }
@@ -279,9 +347,9 @@ helpers.describe("wrap on type (linux): the tray row", function()
 	helpers.it("draws the wrap-on-type toggle in the shortcuts submenu", function()
 		local shortcuts = helpers.load_module("modules.shortcuts.manager")
 		shortcuts.init({ enabled = true, persist = false })
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local items = mb.build({ _version = "0.0.0-dev.12", shortcuts = shortcuts, on_quit = function() end })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local title = i18n.get("menu.shortcuts.title")
 		local label = i18n.get("shortcuts.label_wrap_text")
 		local row = nil
@@ -313,11 +381,11 @@ end)
 --- Exercises the real preference owner and shared feature row on a private file.
 --- @param body function Receives manager, row finder, and external observations.
 local function with_wrap_feature(body)
-	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.builder"
+	local manager_name, builder_name = "modules.shortcuts.manager", "menu.ui.builder.builder"
 	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	local original_batch = writer.batch_write
-	local sandbox = require("test.config_unused_keys_contract").sandbox
+	local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local ok, err = pcall(function()
 		sandbox.with_config('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[foreign]\nvalue = "keep"\n',
 			function(path)
@@ -338,7 +406,7 @@ local function with_wrap_feature(body)
 						on_quit = function() end,
 						on_menu_changed = function() observed.changed = observed.changed + 1 end,
 					})
-					local label = require("infra.i18n").get("shortcuts.label_wrap_text")
+					local label = require("core.i18n.engine.i18n").get("shortcuts.label_wrap_text")
 					for _, item in ipairs(rows) do
 						for _, child in ipairs(item.menu or {}) do
 							if child.title == label then return child end
@@ -360,7 +428,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(held(), true)
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
 			helpers.assert_eq(observed.changed, 1)
-			local parsed = require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			local parsed = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 			helpers.assert_eq(parsed.shortcuts.wrap_text_if_selected, true)
 			helpers.assert_eq(parsed.foreign.value, "keep")
 			helpers.assert_eq(held(), true)
@@ -378,7 +446,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
 			helpers.assert_eq(observed.desired, false)
 			helpers.assert_eq(observed.changed, 1)
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 				.shortcuts.wrap_text_if_selected, false)
 		end)
 	end)
@@ -512,20 +580,20 @@ end)
 --- Keeps the real source readers/decoder and controls only private file routing.
 local function with_wrap_inventory(body, options)
 	options = options or {}
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Routes, Paths = require("infra.config_paths"), require("infra.paths")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Routes, Paths = require("settings.engine.paths"), require("core.fs.engine.paths")
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()
 	local release_source = function() end
-	local original = assert(open(shared("modules/wrap_symbols/wrap_symbols.json"), "rb"))
+	local original = assert(open(shared("keyboard/data/wrap_symbols/wrap_symbols.json"), "rb"))
 	local original_bytes = assert(original:read("*a")); assert(original:close() == true)
 	Sandbox.write_bytes(catalogue_path, original_bytes)
 	local passed, failure = pcall(function()
 		Sandbox.with_config(options.source or '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 			Routes.config = function(file) assert(file == "config.toml"); return path end
 			Paths.shared = function(relative)
-				if relative == "modules/wrap_symbols/wrap_symbols.json" then return catalogue_path end
+				if relative == "keyboard/data/wrap_symbols/wrap_symbols.json" then return catalogue_path end
 				return shared(relative)
 			end
 			if options.close_target then
@@ -690,42 +758,50 @@ local function with_daemon_wrap(body, options)
 		end
 		return chunk()
 	end
-	local manager_name, clipboard_name = "modules.shortcuts.manager", "adapters.clipboard"
+	local manager_name, clipboard_name = "modules.shortcuts.manager", "clipboard.adapters.clipboard"
 	local previous_manager, previous_clipboard = package.loaded[manager_name], package.loaded[clipboard_name]
 	local ok, err = pcall(function()
-		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0 }
+		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0,
+			roi_discards = 0 }
 		local shortcuts = helpers.load_module(manager_name)
 		shortcuts.init(options and options.manager_init or { enabled = true, persist = false })
 		assert(shortcuts.set_wrap_on_type_enabled(true))
 		local noop = function() end
 		local env = {
-			type = type, math = math, tostring = tostring, require = require, package = { loaded = {} },
+			type = type, math = math, tostring = tostring, pcall = pcall, error = error,
+			require = require, package = { loaded = {} },
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
-			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
-			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
+			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("platform.input.capture_gate"),
+			keystats = { cancel_hold_intervals = noop, set_private_window = noop, end_typing_burst = noop,
+				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
+				withdraw_for_pointer = function(withdraw) withdraw() end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end
 				end },
-			MagicKeySource = { cancel_capture = noop, on_key = function()
-				state.automation = state.automation + 1; return false
+			TapHold = { set_paused = noop, observe_copy_activity = noop }, shutdown = { request = noop }, perform_reload = noop,
+			engine = { reset = function()
+				if state.on_reset then state.on_reset() end
+				state.resets = state.resets + 1
 			end },
-			TapHold = { set_paused = noop }, shutdown = { request = noop }, perform_reload = noop,
-			engine = { reset = function() state.resets = state.resets + 1 end },
 			Monotonic = { now_ms = function() return 1000 end },
 			WordReset = { click_resets_word = function() return true end },
 			-- The span installs the CapsWord output observer; no CapsWord runs here.
 			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end,
 				set_output_observer = function() return true end },
-			script_chords = { on_key = function() return false end },
+			-- The first automated consumer the consumption callback reaches.
+			script_chords = { on_key = function() state.automation = state.automation + 1; return false end },
 			tap_keys = { on_key = function() return false end }, consume_bound_chord = function() return false end,
 		}
 		env.script_actions = evaluate(span("local script_actions = ScriptActions.new({", "\n\t-- A control can change")
 			.. "\nreturn script_actions", env)
 		local reset = assert(source:match("reset_text = function(.-)\n\t\tend,"))
 		local reset_text = evaluate("return function" .. reset .. "\nend", env)
+		state.reset_text = reset_text
+		env._polled_window = {}
 		env.secure_focus_guard = { blocks_text = function() return false end, prime = reset_text,
+			text_automation = function() return true, "field", "field_admitted" end, window_changed = function() end,
 			capture_text_owner = function() return { current = function() return true end, cached = function() return true end } end,
 			invalidate = function() state.invalidations = state.invalidations + 1; reset_text() end }
 		evaluate(span("input_capture_gate = InputCaptureGate.new({", "\n\tlocal on_char"), env)
@@ -745,7 +821,7 @@ local function with_daemon_wrap(body, options)
 			"\n\t-- The script-management chords") .. "\nreturn wrap_on_type", env)
 		local focus = assert(source:match("process_lifecycle%.onFocusChange%((function%(appName, windowTitle%).-\n\t\tend)%)"))
 		state.focus = evaluate("return " .. focus, env)
-		state.click = evaluate(span("local function on_click()", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
+		state.click = evaluate(span("local function on_click(code)", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
 		state.consume = evaluate(span("local on_consume = input_capture_gate.guard(function(detail)",
 			"\n\t-- Bind the same privacy owner") .. "\nreturn on_consume", env)
 		state.wrap, state.actions, state.gate, state.shortcuts = env.wrap_on_type, env.script_actions, env.input_capture_gate, shortcuts
@@ -761,6 +837,14 @@ helpers.describe("wrap on type: genuine daemon lifetime wiring", function()
 			state.click()
 			helpers.assert_eq(state.invalidations, 1)
 			helpers.assert_true(state.resets >= 1)
+			local discarded, resets = state.roi_discards, state.resets
+			state.on_reset = function()
+				helpers.assert_eq(state.roi_discards, discarded + 1, "privacy retires ROI before resetting the hotstring buffer")
+			end
+			state.reset_text()
+			state.on_reset = nil
+			helpers.assert_eq(state.resets, resets + 1, "the real privacy callback crosses the observed reset boundary")
+			helpers.assert_eq(state.roi_discards, discarded + 1, "one privacy reset retires the ROI fragment once")
 			helpers.assert_true(state.wrap.selection_window_open())
 			state.primary = "selected"
 			helpers.assert_true(state.consume(symbol("(")))
@@ -837,7 +921,7 @@ end)
 
 helpers.describe("wrap on type: committed shortcut context epochs", function()
 	local function with_persisted_wrap(body)
-		require("test.config_unused_keys_contract").sandbox.with_config(
+		require("tests.lua.settings.unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 				with_daemon_wrap(body, { manager_init = { persist = true, config_path = path } })
 			end)
@@ -924,7 +1008,7 @@ helpers.describe("wrap on type: committed shortcut context epochs", function()
 			local read_ok, current = pcall(state.shortcuts.wrap_selection_epoch)
 			io.open, io.popen = open_file, process
 			helpers.assert_true(read_ok); helpers.assert_eq(current, epoch)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local write = writer.batch_write
 			writer.batch_write = function() return false, "controlled durable refusal" end
 			local ok, err = pcall(function()

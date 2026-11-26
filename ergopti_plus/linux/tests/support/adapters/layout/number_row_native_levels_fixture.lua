@@ -10,7 +10,7 @@
 
 local h = require('tests.helpers')
 
-local Native = require('layout.number_row_native')
+local Native = require('layouts.engine.layout.number_row_native')
 
 local codes = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }
 

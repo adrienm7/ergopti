@@ -80,11 +80,11 @@ helpers.describe("native navigation layer bindings", function()
 end)
 
 helpers.describe("native navigation source capabilities", function()
-	local Layers = require("keymap.layers")
-	local Toml = require("toml_codec")
+	local Layers = require("layouts.engine.layers.layers")
+	local Toml = require("core.text.engine.toml_codec")
 	local ctx = Layers.load_context({
 		shared_root = helpers.driver_root() .. "/../_shared",
-		json_decode = require("json").decode, toml_decode = Toml.decode,
+		json_decode = require("core.text.engine.json").decode, toml_decode = Toml.decode,
 		read_file = function(path)
 			local file = assert(io.open(path, "rb"))
 			local text = file:read("*a")
@@ -97,19 +97,19 @@ helpers.describe("native navigation source capabilities", function()
 			"linux", ctx, Toml.decode)
 		helpers.assert_eq(result.ok, true)
 		local native = require("platform.remap.nav_layer").compile(result.layers.nav, ctx.registry)
-		local code = require("infra.input_event").wheel_layer_code("vertical", 1)
+		local code = require("platform.input.event").wheel_layer_code("vertical", 1)
 		helpers.assert_eq(native[code].chords[1].keys[1], 115, "WheelUp is KEY_VOLUMEUP")
 		-- engine() holds the layer key: one notch is one volume-up press and release.
 		helpers.assert_eq(trail(engine(native):wheel("vertical", 1)), "115:1 115:0")
 		helpers.assert_eq(engine(native):wheel("vertical", -1), nil, "an unbound direction still scrolls")
 	end)
-	for _, code in ipairs({ "MouseLeft", "MouseMiddle" }) do
-		helpers.it("refuses observed pointer input " .. code .. " with a localized reason", function()
+	for code, evdev in pairs({ MouseLeft = 272, MouseMiddle = 274 }) do
+		helpers.it("(layer-mouse-button-linux) binds pointer input " .. code .. " under its button code", function()
 			local text = '[_meta]\nschema_version = 1\n[layers.nav.linux]\n"' .. code .. '" = "none"\n'
 			local result = Layers.load(text, "linux", ctx, Toml.decode)
-			helpers.assert_eq(result.ok, false)
-			helpers.assert_eq(result.errors[1].code, "unavailable_on_os")
-			helpers.assert_true(type(result.errors[1].reason_key) == "string")
+			helpers.assert_eq(result.ok, true, "a mouse button is a Linux layer source, as on Windows")
+			local native = require("platform.remap.nav_layer").compile(result.layers.nav, ctx.registry)
+			helpers.assert_eq(native[evdev], { mods = {}, keys = {} })
 		end)
 	end
 	helpers.it("compiles numpad input and output through the physical registry", function()

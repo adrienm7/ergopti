@@ -11,10 +11,10 @@
 -- Read-only native callback contract audit. Caller exceptions are deliberate;
 -- all HTTP, curl, timers, pipes, TLS and event-loop settlement are real.
 local uv = require('luv')
-local Remote = require('modules.llm.api_remote')
-local VisionRequest = require('modules.llm.vision_request')
-local Vision = require('llm.vision')
-local Http = require('adapters.http_client')
+local Remote = require('ai.engine.api.api_remote')
+local VisionRequest = require('ai.engine.prediction.vision_request')
+local Vision = require('ai.engine.prediction.vision')
+local Http = require('core.network.adapters.http_client')
 local origin = assert(os.getenv('LLM_CALLBACK_ORIGIN'))
 
 -- Capture the actual callback arity and values before protected caller assertions.

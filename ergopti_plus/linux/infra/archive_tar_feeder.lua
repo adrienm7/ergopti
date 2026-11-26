@@ -20,8 +20,8 @@ function M.new(backend, listing_max_output_bytes, ollama_zstd)
 	elseif type(listing_max_output_bytes) ~= "number" or listing_max_output_bytes <= 0
 		or listing_max_output_bytes % 1 ~= 0 then return nil end
 	local uv = require("luv")
-	local Deadline = require("infra.managed_http_deadline")
-	local Process = require("adapters.owned_process")
+	local Deadline = require("core.network.engine.managed_http_deadline")
+	local Process = require("core.process.adapters.owned_process")
 	local native = {}
 	for _, name in ipairs({ "new_pipe", "fs_read", "fs_close", "write", "shutdown", "hrtime" }) do
 		native[name] = uv[name]
@@ -50,7 +50,7 @@ function M.new(backend, listing_max_output_bytes, ollama_zstd)
 		if ollama_zstd == true then
 			if mode ~= "extract" or type(work_dir) ~= "string" or work_dir:sub(1, 1) ~= "/"
 				or work_dir:find("\0", 1, true) then return nil end
-			local zstd = require("infra.owned_programs").zstd_tar_option()
+			local zstd = require("settings.engine.preferences.owned_programs").zstd_tar_option()
 			if not zstd then return nil end
 			args = { zstd, "--extract", "--file", "-", "--directory", work_dir,
 				"--no-same-owner", "--no-same-permissions" }

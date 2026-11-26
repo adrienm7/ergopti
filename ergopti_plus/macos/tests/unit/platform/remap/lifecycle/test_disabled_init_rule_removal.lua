@@ -20,11 +20,11 @@ local OWNED_MODULES = {
 	"platform.remap.lease_controller",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
-	"infra.timings",
-	"infra.config_paths",
+	"platform.input.hotkey_registrar",
+	"core.timing.engine.timings",
+	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"platform.remap",
 }
 
@@ -69,6 +69,7 @@ local function run_disabled_init(removal_succeeds)
 			compute_non_canonical_combos = function() return {} end,
 			load_user_config = function()
 				return {
+					runtime = "shared",
 					enabled = false,
 					tap_hold_config = { left_shift = { tap = "none", hold = "none" } },
 					mod_combos_config = {},
@@ -129,13 +130,13 @@ local function run_disabled_init(removal_succeeds)
 			stop_input_source_watcher = function() return true end,
 			stop_alt_tab_apps_tracker = function() return true end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = { unbind = function() end }
-		package.loaded["infra.timings"] = { sec = function() return 0.01 end }
-		package.loaded["infra.config_paths"] = { get = function() return "existing-config.toml" end }
+		package.loaded["platform.input.hotkey_registrar"] = { unbind = function() end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
+		package.loaded["settings.engine.paths"] = { get = function() return "existing-config.toml" end }
 		package.loaded["modules.keystats.kc_bridge"] = {
 			refresh_managed_set = function() return true end,
 		}
-		package.loaded["modules.gestures.engine"] = {}
+		package.loaded["gestures.engine.engine"] = {}
 		package.loaded["platform.remap"] = nil
 
 		local remap = helpers.load_with_stubs("platform.remap", {

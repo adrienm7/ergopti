@@ -11,7 +11,7 @@
 --- Actual curl owned POST bytes, source fencing, close ACKs and group retirement.
 local driver,shared,descendant_marker=assert(arg[1]),assert(arg[2]),arg[3]
 package.path=driver..'/?.lua;'..driver..'/?/init.lua;'..shared..'/?.lua;'..shared..'/?/init.lua;'..package.path
-local uv=require('luv');require('compat.utf8').install()
+local uv=require('luv');require('core.lifecycle.engine.compat.utf8').install()
 local holds,acks,spawned,pids={}, {},0,{}
 local native_exits = {}
 local port_failure
@@ -50,7 +50,7 @@ proxy.kill=function(pid,signal)
  return uv.kill(pid,signal)
 end
 package.loaded.luv=proxy
-local Http=require('adapters.http_client')
+local Http=require('core.network.adapters.http_client')
 package.loaded.luv=uv
 local server=assert(uv.new_tcp());assert(server:bind('127.0.0.1',0));local sockets,requests,timers={}, {},{}
 local slow_socket

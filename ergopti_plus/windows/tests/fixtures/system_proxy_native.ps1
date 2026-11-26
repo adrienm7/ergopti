@@ -195,8 +195,8 @@ try {
     $ProxyEntrySite='paths'
     $VendorRoot=Split-Path -Parent ([IO.Path]::GetFullPath($WorkerPath))
     $SharedRoot=Join-Path (Split-Path -Parent (Split-Path -Parent $VendorRoot)) '_shared'
-    $PolicyPath=Join-Path $SharedRoot 'modules/network/proxy_policy.json'
-    $DefaultsPath=Join-Path $SharedRoot 'modules/updater/defaults.json'
+    $PolicyPath=Join-Path $SharedRoot 'core/network/data/proxy_policy.json'
+    $DefaultsPath=Join-Path $SharedRoot 'updater/data/defaults.json'
     $ProxyEntrySite='defaults_read'
     $Defaults=Get-Content -LiteralPath $DefaultsPath -Raw -Encoding UTF8|ConvertFrom-Json
     $LookupSeconds=$Defaults.release_sources.proxy_resolve_timeout_sec

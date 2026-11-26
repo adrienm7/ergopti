@@ -10,12 +10,13 @@
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 local function with_save(mode, callback)
 	local previous_open, previous_rename, previous_remove = io.open, os.rename, os.remove
 	local ok, err = xpcall(function()
 		Scope.run(function()
-			package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
+			package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
 			package.loaded["modules.keystats.sqlite_reader"] = {}
 			local pending, warnings = {}, {}
 			local dashboard, window = load_dashboard({
@@ -33,8 +34,9 @@ local function with_save(mode, callback)
 				state.codes[#state.codes + 1] = code
 				return self
 			end
-			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
-			package.loaded["infra.logger"].warn = function(_, message, ...)
+			-- A present, empty store: a missing one is an incomplete read, never saved
+			EmptyStore.install()
+			package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end
 			os.remove = function() state.unlinks = state.unlinks + 1; return true end
@@ -55,7 +57,7 @@ local function with_save(mode, callback)
 				return {
 					write = function(self, header, payload)
 						state.writes = state.writes + 1
-						helpers.assert_true(header:find("^ERGOPTI_TYPING_METRICS_SNAPSHOT 2 %d+ " .. #payload .. "\n$") ~= nil,
+						helpers.assert_true(header:find("^ERGOPTI_TYPING_METRICS_SNAPSHOT 3 %d+ " .. #payload .. "\n$") ~= nil,
 							"the header carries the format version, the time and the payload length")
 						helpers.assert_eq(payload:sub(1, 12), '{"manifest":')
 						if state.mode == "write_throw" then error("PRIVATE_PAYLOAD") end

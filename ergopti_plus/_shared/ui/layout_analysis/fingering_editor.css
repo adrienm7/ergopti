@@ -1,0 +1,158 @@
+/* _shared/ui/layout_analysis/fingering_editor.css */
+
+/*
+ * ==============================================================================
+ * MODULE: Fingering Editor Style
+ * DESCRIPTION:
+ * The look of the fingering editor (fingering_editor.js) and of the « Undo »
+ * line of the Studio's restore buttons (undo_offer.js) wherever they are
+ * mounted: the Comparer and the layout editor's analysis panel, on the site
+ * and in the app's Studio window. Theme tokens only (theme.css), so it needs
+ * no page's own variables; the key rules sit under the map, so a page's own
+ * button rules never repaint the fingers.
+ * ==============================================================================
+ */
+
+.la-fingering-row {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+/* The board keeps its key size and scrolls inside this box, never the page
+   (WCAG 1.4.10 reflow at 320 px). */
+.la-fingering-scroll {
+	margin: 8px 0;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+/* A file input shows the browser's own words (« Choose File », « No file
+   chosen ») in its language, not the page's: it is hidden, kept inside its
+   label so a click or a key opens the picker, and the label is the button.
+   Here, not in the Comparer's stylesheet, because the editor's analysis panel
+   draws one too (« Import a fingering »): there the native control showed
+   beside the button and, at 200 % text on a phone, made the page scroll
+   sideways. The hidden control keeps its 1 px, so the label carries the
+   44 px target (theme.css). */
+.la-file {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+	max-width: 100%;
+	min-height: var(--theme-target-min);
+	position: relative;
+}
+
+.la-file input[type='file'] {
+	border: 0;
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	min-block-size: 0;
+	min-inline-size: 0;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-file-button {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	cursor: pointer;
+	padding: 5px 8px;
+}
+
+.la-file-button:hover {
+	background: var(--theme-accent-soft);
+}
+
+.la-file:focus-within {
+	outline: 2px solid var(--theme-accent);
+	outline-offset: 1px;
+}
+
+/* The reset, export and import buttons: a paragraph spaced as the row it replaced. */
+.la-fingering-actions {
+	margin: 0;
+}
+
+.la-fingering-map {
+	flex: none;
+	position: relative;
+}
+
+.la-fingering-map .la-fingering-key {
+	align-items: center;
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	color: var(--theme-text);
+	cursor: pointer;
+	display: flex;
+	font-size: 0.75em;
+	font-weight: 600;
+	height: 36px;
+	justify-content: center;
+	padding: 0;
+	position: absolute;
+	width: 36px;
+}
+
+/* One hue per finger, the same on both hands, thumbs neutral: the chart
+   look's categorical hues in their fixed order from the pinky (theme.css),
+   validated in light and dark. The full hue is the key's edge; the key's
+   tint keeps its printed finger at text contrast; the finger is printed on
+   every key, so the colour is never the only cue. */
+.la-fingering-map .la-fingering-key[data-finger] {
+	background: color-mix(in oklab, var(--la-finger, var(--theme-surface)) 22%, var(--theme-surface));
+	border: 2px solid var(--la-finger, var(--theme-separator));
+}
+
+.la-fingering-map .la-fingering-key[data-finger='lp'],
+.la-fingering-map .la-fingering-key[data-finger='rp'] {
+	--la-finger: var(--theme-chart-cat-1);
+}
+
+.la-fingering-map .la-fingering-key[data-finger='lr'],
+.la-fingering-map .la-fingering-key[data-finger='rr'] {
+	--la-finger: var(--theme-chart-cat-2);
+}
+
+.la-fingering-map .la-fingering-key[data-finger='lm'],
+.la-fingering-map .la-fingering-key[data-finger='rm'] {
+	--la-finger: var(--theme-chart-cat-3);
+}
+
+.la-fingering-map .la-fingering-key[data-finger='li'],
+.la-fingering-map .la-fingering-key[data-finger='ri'] {
+	--la-finger: var(--theme-chart-cat-4);
+}
+
+.la-fingering-map .la-fingering-home {
+	box-shadow: inset 0 -4px 0 var(--theme-text);
+	font-weight: 700;
+}
+
+.la-fingering-map .la-fingering-key.la-selected {
+	outline: 2px solid var(--theme-accent);
+}
+
+/* The « Undo » line after a restore: no room taken while empty, but kept in
+   the page so a screen reader hears it when it is filled. */
+.la-undo {
+	color: var(--theme-text);
+	margin: 4px 0;
+}
+
+.la-undo:empty {
+	margin: 0;
+}
+
+.la-undo .la-undo-button {
+	margin-inline-start: 4px;
+}

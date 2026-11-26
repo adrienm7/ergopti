@@ -40,10 +40,10 @@
 			"enable",
 			"disable",
 			"separator",
-			"sfbsreduction (5)",
+			"SFB reduction (5)",
 			"Rolls (7)",
 			"separator",
-			"repeat_corrections (14)"
+			"Repeat corrections (14)"
 		]
 	},
 	"bulk_checked": true,

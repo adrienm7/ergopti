@@ -52,12 +52,6 @@ _KLWVE_SenderIdentityContract(Bridge, Identity, OwnsMessage, Ollama) {
 	IdentityCode := _DriverMaskNonCode(&Identity)
 	OwnsCode := _DriverMaskNonCode(&OwnsMessage)
 	OllamaCode := _DriverMaskNonCode(&Ollama)
-	; No unconditional positive return can bypass native identity admission.
-	TrueReturns := 0, Position := 1
-	while RegExMatch(IdentityCode, "\breturn[ `t]+true\b", &Found, Position) {
-		TrueReturns += 1
-		Position := Found.Pos + Found.Len
-	}
 	UnknownDeclaration := 'IUnknown := "{00000000-0000-0000-C000-000000000046}"'
 	UnknownPosition := InStr(IdentityCode, "IUnknown :=")
 	SenderCheck := InStr(BridgeCode, "if !WebView_SameCore(sender, View)")
@@ -67,10 +61,12 @@ _KLWVE_SenderIdentityContract(Bridge, Identity, OwnsMessage, Ollama) {
 	OllamaCheck := InStr(OllamaCode, "if !WebView_SameCore(sender, captured_view)")
 	OllamaRead := InStr(Ollama, "args.TryGetWebMessageAsString()")
 	OllamaFence := InStr(Ollama, "captured_epoch != _OllamaWV_Epoch", , OllamaCheck + 1)
+	; No unconditional positive return can bypass native identity admission; the
+	; planted `return true` mutant below proves the pattern of that check can match.
 	return InStr(Bridge, "KLWV_IsCurrent(which, Epoch)") > 0
 		&& CapturedView > 0 && SenderCheck > CapturedView
 		&& Recheck > SenderCheck && SourceRead > Recheck
-		&& TrueReturns == 0
+		&& !RegExMatch(IdentityCode, "\breturn[ `t]+true\b")
 		&& RegExMatch(IdentityCode, "m)^[ `t]*if !SenderIsCore && !ExpectedIsCore\R[ `t]+return Sender == Expected[ `t]*$")
 		&& InStr(IdentityCode, "Sender is WebView2.Core") > 0
 		&& InStr(IdentityCode, "Expected is WebView2.Core") > 0

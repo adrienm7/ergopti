@@ -21,19 +21,20 @@ end
 
 
 local function fresh_apps()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
-		"adapters.app_launcher",
-		"adapters.window_info",
-		"adapters.window_manager",
-		"adapters.synthetic_input",
-		"infra.logger",
-		"infra.notifications",
-		"infra.i18n",
-		"infra.text_utils",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
+		"apps.adapters.launcher",
+		"platform.focus.window_info",
+		"platform.focus.window_manager",
+		"platform.input.synthetic_input",
+		"clipboard.adapters.clipboard",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
+		"core.text.engine.utils",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -143,7 +144,12 @@ local function fresh_apps()
 		runningApplications = function() return {} end,
 		frontmostApplication = function() return front_app end,
 	}
+	local clipboard_generation = 0
 	hs_stub.pasteboard = {
+		changeCount = function() return clipboard_generation end,
+		allContentTypes = function()
+			local types = {}; for uti in pairs(fixture.clipboard) do types[#types + 1] = uti end; return { types }
+		end,
 		readAllData = function()
 			fixture.read_all_calls = fixture.read_all_calls + 1
 			if type(fixture.read_all_hook) == "function" then fixture.read_all_hook() end
@@ -151,7 +157,7 @@ local function fresh_apps()
 		end,
 		clearContents = function()
 			fixture.clear_calls = fixture.clear_calls + 1
-			fixture.clipboard = {}
+			fixture.clipboard = {}; clipboard_generation = clipboard_generation + 1
 			return nil
 		end,
 		getContents = function()
@@ -167,7 +173,7 @@ local function fresh_apps()
 			if mode == "false" then return false end
 			if mode == "nil" then return nil end
 			if mode == "throw" then error("clipboard restore exploded") end
-			fixture.clipboard = clone(snapshot)
+			fixture.clipboard = clone(snapshot); clipboard_generation = clipboard_generation + 1
 			return true
 		end,
 	}
@@ -240,20 +246,20 @@ local function fresh_apps()
 		return true, handle
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		open = function(target, callback) return start_shell("open", target, callback) end,
 		applescript = function(script, callback)
 			return start_shell("applescript", script, callback)
 		end,
 	}
-	package.loaded["adapters.app_launcher"] = {
+	package.loaded["apps.adapters.launcher"] = {
 		launch = function(name)
 			fixture.launched[#fixture.launched + 1] = name
 			return fixture.launch_result
 		end,
 	}
-	package.loaded["adapters.window_manager"] = { activate = function() return false end }
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_manager"] = { activate = function() return false end }
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = fixture.focused_app_id } end,
 	}
 	local function complete(tx, status)
@@ -262,7 +268,7 @@ local function fresh_apps()
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)
@@ -285,15 +291,15 @@ local function fresh_apps()
 		end,
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(...)
 			fixture.notifications[#fixture.notifications + 1] = table.pack(...)
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(template, value)
 			return (template:gsub("%%s", value))
 		end,
@@ -301,10 +307,10 @@ local function fresh_apps()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.apps"] = nil
 	fixture.subject = require("modules.shortcuts.actions.apps")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 
@@ -627,5 +633,21 @@ helpers.describe("Apps composite owner: parent scopes", function()
 		helpers.assert_eq(f.subject.has_pending_apps_action(), true)
 		helpers.assert_eq(f.subject.resume_apps_actions("gestures"), true)
 		helpers.assert_eq(f.subject.open_settings("gestures"), true)
+	end)
+end)
+
+helpers.describe("ChatGPT URL diagnostics", function()
+	helpers.it("opens the exact conversation URL without logging it", function()
+		local fixture = fresh_apps()
+		local logger = require("core.logger.engine.logger")
+		local original, logs = logger.debug, {}
+		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
+		local ok, result = pcall(fixture.subject.open_chatgpt, url)
+		logger.debug = original
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(fixture.urls[1], url)
+		helpers.assert_true(not table.concat(logs, " "):find("private", 1, true))
 	end)
 end)

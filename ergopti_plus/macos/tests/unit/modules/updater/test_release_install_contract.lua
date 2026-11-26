@@ -9,16 +9,16 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must decode")
 handle:close()
 
-require("test.config_backup_contract").register(helpers, { defaults = defaults })
-require("test.release_install_contract").register(helpers)
+require("tests.lua.settings.backup_contract").register(helpers, { defaults = defaults })
+require("tests.lua.updater.release_install_contract").register(helpers)
 
-local policy_handle = assert(io.open(helpers.shared("modules/network/managed_network.json"), "rb"))
+local policy_handle = assert(io.open(helpers.shared("core/network/data/managed_network.json"), "rb"))
 local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
 policy_handle:close()
-require("test.release_install_network_contract").register(helpers, policy)
+require("tests.lua.updater.release_install_network_contract").register(helpers, policy)

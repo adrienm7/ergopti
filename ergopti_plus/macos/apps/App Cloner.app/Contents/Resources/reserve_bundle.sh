@@ -128,6 +128,9 @@ write_bundle_receipt() {
 		printf 'Error: one bundle receipt path is required\n' >&2
 		return 1
 	fi
+	# A closed stdout is refused before writing: uutils cat (Ubuntu 26.04)
+	# exits 0 on EBADF, which BSD and GNU cat report.
+	{ :; } 2>/dev/null 3>&1 || return 1
 	/bin/cat <<ERGOPTI_BUNDLE_RECEIPT
 $1
 ERGOPTI_BUNDLE_RECEIPT

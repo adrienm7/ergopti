@@ -4,14 +4,14 @@
 --- MODULE: Script-Management Chords (Linux)
 --- DESCRIPTION:
 --- AltGr with Enter, Backspace, Delete or Escape, the four chords every driver
---- shares (_shared/modules/actions/script_chords.json), each running the action
+--- shares (_shared/shortcuts/data/actions/script_chords.json), each running the action
 --- of its slot of [shortcuts.script_control]: by default pause, reload, open
 --- the personal shortcuts and quit. The submenu's switch (chords_enabled) turns
 --- them all off and keeps every slot's action.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A chord belongs to the daemon only while its slot runs an action
----    (_shared/lua/script_chords.lua): an unassigned slot, every slot while the
+---    (_shared/keyboard/engine/layers/script_chords.lua): an unassigned slot, every slot while the
 ---    switch is off, and while paused every action outside script management
 ---    reach the application untouched, as on Windows and macOS.
 --- 2. Decided in the keyboard hook's consumption callback, the one place this
@@ -24,20 +24,27 @@
 --- 4. A missing key is the slot's preset (the maintainer's decision of
 ---    2026-09-30), so a clear writes "none" explicitly; the Shortcuts scope
 ---    owns restore and clear through the configuration_* ports below.
+--- 5. A change made while paused is saved at once and runs from the resume:
+---    the chords live at pause time keep answering until then, so the chord
+---    that resumes cannot move away under a paused daemon.
+--- 6. A chord is a sequence: AltGr pressed, then the slot's key, with no other
+---    key pressed between (the hook's prior_role). Typing AltGr symbols then
+---    Enter or Backspace before AltGr is up is text: on Ergopti+ a fast « (# »
+---    then Enter paused the driver (the maintainer, 2026-11-17), as on Windows.
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Logger = require("logger.shim")
-local ShortcutCatalogue = require("shortcuts.catalogue")
-local ConfigOutdated = require("config_outdated")
-local Paths = require("infra.paths")
-local Manifest = require("infra.manifest_reader")
-local ScriptChords = require("script_chords")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ConfigKeys = require("config_keys")
+local Logger = require("core.logger.engine.shim")
+local ShortcutCatalogue = require("shortcuts.engine.catalogue")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Paths = require("core.fs.engine.paths")
+local Manifest = require("menu.engine.manifest_reader")
+local ScriptChords = require("keyboard.engine.layers.script_chords")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.script_chords"
 
@@ -50,7 +57,7 @@ local SWITCH_KEY = "chords_enabled"
 local BINDING_PREFIX = "script__"
 
 -- The shared catalogue, relative to the shared tree.
-local CATALOGUE_REL_PATH = "modules/actions/script_chords.json"
+local CATALOGUE_REL_PATH = "shortcuts/data/actions/script_chords.json"
 
 -- A chord is AltGr with the slot's key. Shift may ride along, as on Windows;
 -- any other modifier makes it another chord, which stays the application's.
@@ -69,9 +76,16 @@ local _chords_on = nil
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _defer = nil
+local _pause_epoch = nil
 
 local _configuration_owner = nil
 local _dispatch_generation = 0
+
+-- The chords live when the pause began, kept while the menu changes them during
+-- that pause (the maintainer's decision of 2026-11-14): a change is saved at
+-- once and takes effect on resume, so the chord that resumes stays the one
+-- active at pause time. { epoch, assignments, chords_on }, or nil.
+local _paused_live = nil
 
 --- Exclusively owns mutations and cancels previously queued actions.
 --- @param owner table Exact token retained through runtime compensation.
@@ -108,14 +122,10 @@ end
 function M.catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared(CATALOGUE_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("script_chords: cannot read " .. tostring(path)) end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-		error("script_chords: cannot complete read of " .. tostring(path))
-	end
-	local ok, parsed = pcall(require("json").decode, body)
+	local body, status
+	if path then body, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("script_chords: cannot read " .. tostring(path)) end
+	local ok, parsed = pcall(require("core.text.engine.json").decode, body)
 	if not ok or type(parsed) ~= "table" then
 		error("script_chords: " .. tostring(path) .. " is malformed")
 	end
@@ -127,7 +137,7 @@ function M.catalogue()
 	local catalogue = ScriptChords.catalogue(parsed)
 	local binding = { prefix = "script__", slots = {} }
 	for _, slot in ipairs(catalogue.slots) do binding.slots[slot.id] = true end
-	require("config_binding_identity").script_binding_fits("script__", binding)
+	require("settings.engine.publication.binding_identity").script_binding_fits("script__", binding)
 	_catalogue, _binding_catalogue = catalogue, binding
 	return _catalogue
 end
@@ -238,7 +248,7 @@ end
 --- Reads every slot and the switch from config.toml, or the manifest defaults.
 local function load_assignments()
 	if _assignments then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("script_chords: cannot read configuration: " .. tostring(detail))
@@ -270,15 +280,62 @@ function M.chords_enabled()
 	return _chords_on
 end
 
+--- The pause lifetime a snapshot belongs to, nil without an epoch reader.
+--- @return any epoch
+local function current_pause_epoch()
+	if not _pause_epoch then return nil end
+	local called, value = pcall(_pause_epoch)
+	return called and value or nil
+end
+
+--- Keeps the chords live at pause time before a paused change replaces them.
+local function keep_live_chords_for_pause()
+	if not _is_paused() then return end
+	local epoch = current_pause_epoch()
+	if _paused_live and _paused_live.epoch == epoch then return end
+	local copy = {}
+	for id, action in pairs(_assignments) do copy[id] = action end
+	_paused_live = { epoch = epoch, assignments = copy, chords_on = _chords_on }
+end
+
+--- The chords a press runs now: those live at pause time while that pause
+--- lasts, the configured ones otherwise.
+--- @return table assignments, boolean chords_on
+local function live_chords()
+	if _paused_live then
+		if _is_paused() and _paused_live.epoch == current_pause_epoch() then
+			return _paused_live.assignments, _paused_live.chords_on
+		end
+		_paused_live = nil
+	end
+	return _assignments, _chords_on
+end
+
 --- Persists one row, deleting it when it equals the manifest default.
 --- @param key string Slot id or the switch.
 --- @param value any
 --- @return boolean committed
 local function persist(key, value)
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
+	local assignments, enabled, generation = _assignments, _chords_on, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or ""))
+	end)
+	if not ok or type(expected) ~= "table" or type(expected.assignments) ~= "table"
+		or _assignments ~= assignments or _chords_on ~= enabled or _dispatch_generation ~= generation
+		or _configuration_owner ~= nil then return false end
+	local same = expected.chords_on == enabled
+	for id, action in pairs(assignments) do if expected.assignments[id] ~= action then same = false end end
+	for id, action in pairs(expected.assignments) do if assignments[id] ~= action then same = false end end
+	if not same then
+		Logger.warn(LOG, "Script chord configuration changed externally; reload shortcuts before editing.")
+		return false
+	end
 	local committed, detail = TomlWriter.batch_write(path, {
 		Manifest.sparse_operation(SECTION .. "." .. key, value),
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "Could not persist script chord '%s': %s.", key, tostring(detail))
 		return false
@@ -304,6 +361,7 @@ function M.set_action(slot_id, action_id)
 		return false
 	end
 	if not persist(slot_id, action_id) then return false end
+	keep_live_chords_for_pause()
 	_assignments[slot_id] = action_id
 	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Script chord '%s' → '%s'.", slot_id, action_id)
@@ -322,6 +380,7 @@ function M.set_chords_enabled(on)
 	end
 	load_assignments()
 	if not persist(SWITCH_KEY, on) then return false end
+	keep_live_chords_for_pause()
 	_chords_on = on
 	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Script chords switched %s.", on and "on" or "off")
@@ -335,7 +394,18 @@ end
 function M.slot_runs(slot_id, paused)
 	load_assignments()
 	if paused == nil then paused = _is_paused() end
-	return ScriptChords.runs(M.catalogue(), _assignments[slot_id], _chords_on, paused)
+	local assignments, chords_on = live_chords()
+	return ScriptChords.runs(M.catalogue(), assignments[slot_id], chords_on, paused)
+end
+
+--- The slot whose chord the tray shows beside an action's row: the first slot
+--- whose live chord runs it (the shared rule, ScriptChords.hint_slot).
+--- @param action string The tray row's action id.
+--- @return string|nil slot_id Nil when no chord runs it.
+function M.hint_slot(action)
+	load_assignments()
+	local assignments, chords_on = live_chords()
+	return ScriptChords.hint_slot(M.catalogue(), assignments, chords_on, action)
 end
 
 
@@ -350,13 +420,18 @@ end
 
 --- Wires the daemon's state in.
 --- @param opts table { is_paused = fn() -> boolean, defer = fn(fn) -> boolean }
+---   Optional pause_epoch = fn() -> number identifies the active pause lifetime.
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_paused) ~= "function" or type(opts.defer) ~= "function" then
 		error("script_chords.init() needs is_paused and defer functions")
 	end
+	if opts.pause_epoch ~= nil and type(opts.pause_epoch) ~= "function" then
+		error("script_chords.init() pause_epoch must be a function")
+	end
 	_is_paused = opts.is_paused
 	_defer = opts.defer
+	_pause_epoch = opts.pause_epoch
 	-- Read at boot, not at the first AltGr chord: a malformed catalogue stops
 	-- the daemon instead of a key press.
 	M.catalogue()
@@ -364,7 +439,7 @@ function M.init(opts)
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
---- @param detail table { code, mods } as the hook reports it.
+--- @param detail table { code, mods, prior_role } as the hook reports it.
 --- @return boolean consumed True when the press is a chord whose slot runs an
 ---   action; it then never reaches the application.
 function M.on_key(detail)
@@ -372,6 +447,8 @@ function M.on_key(detail)
 	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
 	local mods = type(detail.mods) == "table" and detail.mods or {}
 	if not mods.altgr then return false end
+	-- Only right after AltGr itself: « (# » then Enter while AltGr is held is text.
+	if detail.prior_role ~= "altgr" then return false end
 	for _, name in ipairs(BLOCKING_MODIFIERS) do
 		if mods[name] then return false end
 	end
@@ -384,14 +461,27 @@ function M.on_key(detail)
 		Logger.error(LOG, "Script chord '%s' pressed before init() — the key goes to the application.", slot_id)
 		return false
 	end
-	local generation, paused, runs = _dispatch_generation, _is_paused, M.slot_runs
-	local action = _assignments[slot_id]
+	local generation, paused, runs, epoch_reader = _dispatch_generation, _is_paused, M.slot_runs, _pause_epoch
+	local action = (live_chords())[slot_id]
+	local script_action = require("modules.shortcuts.script_actions").runs_while_paused(action)
+	local epoch
+	if epoch_reader and not script_action then
+		local called, value = pcall(epoch_reader)
+		if not called or type(value) ~= "number" then return false end
+		epoch = value
+	end
+	local function epoch_current()
+		if _pause_epoch ~= epoch_reader then return false end
+		if script_action or not epoch_reader then return true end
+		local called, value = pcall(epoch_reader)
+		return called and value == epoch and _pause_epoch == epoch_reader
+	end
 	local function current()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation
-			or _is_paused ~= paused or M.slot_runs ~= runs then return false end
+			or _is_paused ~= paused or M.slot_runs ~= runs or not epoch_current() then return false end
 		local admitted = runs(slot_id)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation
-			and _is_paused == paused and M.slot_runs == runs
+			and _is_paused == paused and M.slot_runs == runs and epoch_current()
 	end
 	local queued = _defer(function()
 		-- A pause that began after the press: the chord was taken, and only a
@@ -423,8 +513,10 @@ function M._reset()
 	_binding_catalogue = nil
 	_assignments = nil
 	_chords_on = nil
+	_paused_live = nil
 	_is_paused = NEVER_PAUSED
 	_defer = nil
+	_pause_epoch = nil
 end
 
 
@@ -487,6 +579,8 @@ function M.apply_configuration(owner, state)
 		slots[slot.id], copy[slot.id] = true, action
 	end
 	for id in pairs(state.assignments) do if not slots[id] then return false end end
+	load_assignments()
+	keep_live_chords_for_pause()
 	_assignments, _chords_on = copy, state.chords_on
 	_dispatch_generation = _dispatch_generation + 1
 	return true

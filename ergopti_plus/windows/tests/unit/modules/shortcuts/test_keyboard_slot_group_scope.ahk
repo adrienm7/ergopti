@@ -14,8 +14,7 @@
 
 #Requires AutoHotkey v2.0
 
-; Every bindable group of the tray opens with its restore, clear and separator;
-; the contextual group keeps its one slot and nothing else.
+; Every group of the tray opens with its restore, clear and separator.
 _KGS_RowsOpenWithRestoreAndClear() {
 	global KeyboardShortcutAssignments, KEYBOARD_SLOT_GROUPS
 	Had := IsSet(KeyboardShortcutAssignments)
@@ -27,11 +26,6 @@ _KGS_RowsOpenWithRestoreAndClear() {
 		Bindable := 0
 		for Index, Row in Rows {
 			Items := Row["items"]
-			if KEYBOARD_SLOT_GROUPS[Index]["prefix"] == "magic_" {
-				Assert(Items[1].Get("label", "") != t("common.restore_recommended"),
-					"the contextual slot has no modifier group to restore")
-				continue
-			}
 			Bindable += 1
 			Assert(Items.Length >= 4, Row["label"] . " holds its scope rows and its Add row")
 			AssertEqual(t("common.restore_recommended"), Items[1]["label"], Row["label"] . " opens with its restore")
@@ -54,6 +48,22 @@ _KGS_RowsOpenWithRestoreAndClear() {
 					"a group caption reads as text: " . Text)
 		}
 		AssertEqual(4, Bindable, "the four modifier groups carry the scope rows")
+		; The ★ key's slot is an ordinary row of the Win group (2026-11-21), no
+		; separate contextual group: the user deletes it like any other slot.
+		StarRows := 0
+		for Index, Row in Rows {
+			for Item in Row["items"] {
+				if InStr(Item.Get("label", ""), StarSlotLabel()) == 1 {
+					AssertEqual("meta_", KEYBOARD_SLOT_GROUPS[Index]["prefix"], "the star row sits under Win")
+					StarRows += 1
+				}
+			}
+		}
+		AssertEqual(1, StarRows, "the shipped Win+star default is listed once")
+		KeyboardShortcutAssignments["meta_star"] := "none"
+		for Row in KeyboardSlotRows()
+			for Item in Row["items"]
+				AssertFalse(InStr(Item.Get("label", ""), StarSlotLabel()) == 1, "a cleared star slot leaves the menu")
 	} finally {
 		if Had
 			KeyboardShortcutAssignments := Saved
@@ -117,7 +127,7 @@ _KGS_ScopeTouchesOneGroup() {
 		try KeyboardSlotGroupScopeRows("magic_", "clear")
 		catch ValueError
 			Threw := true
-		Assert(Threw, "the contextual group has no modifier scope")
+		Assert(Threw, "the retired contextual group has no modifier scope")
 	} finally {
 		GestureActionParameters := SavedParameters
 		if HadAssignments

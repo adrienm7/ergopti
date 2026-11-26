@@ -40,14 +40,18 @@ _CTIS_TypedCorpus() {
 _CTIS_Difference(Vector, Typed) {
 	Expect := Vector["expect"]
 	Rows := _TCV_Rows(Vector["rows"], Typed["rows"])
-	Refused := "", Content := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; refusal, and a message sentinel read it as an accepted batch.
+	Refused := false, Refusal := "", Content := ""
 	try Content := TOML_BuildConfigDocumentCandidate(Vector["source"], Rows, [])["content"]
-	catch Error as Err
-		Refused := Err.Message
+	catch Error as Err {
+		Refused := true
+		Refusal := Type(Err) . ": " . Err.Message
+	}
 	if !Expect["ok"]
-		return Refused != "" ? "" : "the batch must be refused, the writer accepted it"
-	if Refused != ""
-		return "the batch must be accepted, the writer refused: " . Refused
+		return Refused ? "" : "the batch must be refused, the writer accepted it"
+	if Refused
+		return "the batch must be accepted, the writer refused: " . Refusal
 	Difference := _TCV_CandidateDifference(Content, Vector["source"], Expect, Typed["expect"])
 	if Difference != "" || !Expect.Has("idempotent") || !Expect["idempotent"]
 		return Difference

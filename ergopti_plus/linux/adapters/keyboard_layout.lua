@@ -37,22 +37,23 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local Shell = require("adapters.shell_runner")
-local DisplayServer = require("infra.display_server")
+local Logger = require("core.logger.engine.shim")
+local Shell = require("core.process.adapters.shell_runner")
+local DisplayServer = require("core.ui.engine.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
-local Keysym = require("infra.keysym")
+local Keysym = require("platform.input.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local inverse_republish = XkbCapture.inverse_republish
 local inverse_retarget = XkbCapture.inverse_retarget
 local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
-local ConfigPaths = require("infra.config_paths")
-local EvdevCodes = require("infra.evdev_codes")
-local Utf8 = require("compat.utf8")
+local ConfigPaths = require("settings.engine.paths")
+local EvdevCodes = require("platform.input.evdev_codes")
+local Timings = require("core.timing.engine.timings")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"
 
@@ -70,9 +71,16 @@ local LOG = "adapters.keyboard_layout"
 --     Every LTS distribution shipped such a libxkbcommon when this was written
 --     (Ubuntu 24.04: 1.6), and without these two fallbacks the daemon refused
 --     the keyboard and exited on their default Wayland session.
-local WAYLAND_DUMP = "xkbcli dump-keymap-wayland 2>/dev/null"
+-- Bounded: the dump waits for a wl_keyboard keymap event, which a seat with no
+-- keyboard never sends, and an unbounded wait hung the daemon's start-up
+-- (libxkbcommon 1.13, sway headless). `timeout` takes whole seconds everywhere,
+-- BusyBox included.
+local WAYLAND_DUMP = string.format("timeout %d xkbcli dump-keymap-wayland 2>/dev/null",
+	math.ceil(Timings.ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000))
 local X11_DUMP     = "xkbcli dump-keymap-x11 2>/dev/null"
 local X11_FALLBACK = "xkbcomp -xkb \"$DISPLAY\" - 2>/dev/null"
+-- The log name of the in-process X11 dump (adapters/xkb_source_probe.dump_keymap).
+local NATIVE_X11_DUMP = "libxkbcommon-x11 (in process)"
 
 -- Where each desktop keeps the layout names, read in this order. GNOME's most
 -- recently used source is the active one; `sources` is only its fallback when
@@ -81,6 +89,14 @@ local GNOME_MRU     = "gsettings get org.gnome.desktop.input-sources mru-sources
 local GNOME_SOURCES = "gsettings get org.gnome.desktop.input-sources sources 2>/dev/null"
 local GNOME_OPTIONS = "gsettings get org.gnome.desktop.input-sources xkb-options 2>/dev/null"
 local LOCALECTL     = "localectl status 2>/dev/null"
+-- The active layout of a KDE Plasma session (the keyboard daemon, Plasma 5.21
+-- and later), as a 0-based index into the layouts KWin compiled into the one
+-- keymap it sends. KWin switches the group itself, so the dumped keymap says
+-- nothing about which layout is active. GNOME needs no such question: Mutter
+-- compiles the current input source alone (plus a Latin fallback after it for
+-- a non-Latin source), so its first group is the active one.
+local KDE_ACTIVE_LAYOUT = "gdbus call --session --dest org.kde.keyboard --object-path /Layouts"
+	.. " --method org.kde.KeyboardLayouts.getLayout 2>/dev/null"
 local KEYBOARD_DEFAULTS = { "/etc/default/keyboard", "/etc/vconsole.conf" }
 
 -- A parsed keymap with fewer entries than this is a parse that went wrong, not a
@@ -100,6 +116,10 @@ local _source = nil
 
 -- evdev keycode → its level-1 keysym, from the same dump. nil until built.
 local _base = nil
+
+-- The name the loaded keymap gives its active group ("French (Ergopti)"),
+-- for diagnostics; nil until built or when the dump names no group.
+local _layout_name = nil
 
 -- The spacing symbol of each dead keysym a layout puts on a key, for a label:
 -- a dead key types nothing on its own, so Keysym.to_char has no character for
@@ -165,8 +185,11 @@ local function publish(built, receipt)
 end
 
 
--- Only new typing requests may renew a different native X11 group. Existing
--- plan checks, readiness and explicit overrides keep their old refusal contract.
+-- New typing requests and readiness may renew the inverse after a native X11
+-- source change: a different group, or the same group with an identical
+-- server keymap (a slave-keyboard switch's new-keyboard notify, decided by the
+-- maintainer on 2026-11-11). Existing plan checks and explicit overrides keep
+-- their old refusal contract.
 local typing_lookup = false
 local function typing_cohort()
 	if typing_lookup then return nil end
@@ -178,7 +201,7 @@ local function typing_cohort()
 			and rawequal(_base, base) and _selection_override == selection
 			and previous ~= nil and rawequal(_table, previous.built)
 			and rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
-			and rawequal(package.loaded["infra.display_server"], DisplayServer)
+			and rawequal(package.loaded["core.ui.engine.display_server"], DisplayServer)
 			and rawequal(DisplayServer.is_x11, retarget_is_x11)
 			and rawequal(XkbCapture.inverse_retarget, inverse_retarget)
 			and rawequal(XkbCapture.inverse_table, inverse_table) and rawequal(XkbCapture.inverse_current, inverse_current)
@@ -218,10 +241,11 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "r")
+	local fh = require("core.fs.engine.regular_file_reader").open_source(path)
 	if not fh then return nil end
 	local text = fh:read("*a")
-	fh:close()
+	local closed = fh:close()
+	if type(text) ~= "string" or not closed then return nil end
 	return text
 end
 
@@ -264,10 +288,36 @@ local function session_layout_names()
 	return nil
 end
 
+--- The 0-based layout the desktop reports as active, for a session whose
+--- compositor switches the keymap's group itself (KDE Plasma on Wayland).
+--- @param source string What produced the keymap.
+--- @return integer|nil group nil when the desktop is not asked.
+--- @return string|nil problem Why the desktop could not answer.
+local function desktop_active_group(source)
+	if source == "override" or not DisplayServer.is_wayland() or not DisplayServer.desktop_is("kde") then
+		return nil, nil
+	end
+	if not Shell.has_command("gdbus") then return nil, "gdbus is not installed" end
+	local ok, out = Shell.exec_checked(KDE_ACTIVE_LAYOUT)
+	local index = ok and require("adapters.input_source_switch").parse_kde_index(out) or nil
+	if index == nil then return nil, "the KDE keyboard daemon did not report its active layout" end
+	return index, nil
+end
+
 --- Runs the dump command appropriate to this session.
 --- @return string|nil The keymap text, or nil when nothing could produce one.
 --- @return string|nil The command that produced it, for the log.
 local function dump_keymap()
+	-- X11 first in process: the source probe serializes the server keymap
+	-- through libxkbcommon-x11, the text `xkbcli dump-keymap-x11` prints,
+	-- without forking a dump tool (about 40 ms a resolve through xkbcomp,
+	-- which Ubuntu 24.04's libxkbcommon 1.6 left as the only X11 dump). The
+	-- commands below remain the route when the native libraries are absent.
+	if DisplayServer.is_x11() then
+		local text, reason = require("adapters.xkb_source_probe").dump_keymap()
+		if text and text:find("xkb_keymap", 1, true) then return text, NATIVE_X11_DUMP end
+		Logger.debug(LOG, "In-process X11 keymap dump unavailable (%s); trying the dump tools.", tostring(reason))
+	end
 	local candidates = {}
 	if DisplayServer.is_wayland() then
 		candidates[#candidates + 1] = WAYLAND_DUMP
@@ -306,13 +356,11 @@ end
 --- @return string|nil
 local function read_override(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then
-		Logger.warn(LOG, "Keymap override '%s' is not readable — ignoring it.", path)
+	local text = read_file(path)
+	if not text then
+		Logger.error(LOG, "Keymap override '%s' is not readable.", path)
 		return nil
 	end
-	local text = fh:read("*a")
-	fh:close()
 	return text
 end
 
@@ -370,8 +418,12 @@ end
 
 --- Re-publishes the selected inverse after the hook resets its capture state.
 --- Keeps the current capture state, including the CapsLock seed, unchanged.
+--- A receipt still current needs no republication: a tray layout change
+--- refreshes the map and then asks this same publisher with no capture reset
+--- between them, and republishing refused the fresh receipt's provenance, so
+--- the legitimate change was reported as refused.
 --- @param override_path string|nil The unchanged selected keymap override route.
---- @return boolean True only when a fresh genuine inverse receipt is published.
+--- @return boolean True only when the published inverse holds a current genuine receipt.
 function M.publish_current_capture(override_path)
 	local cohort, epoch, source, base = _cohort, _refresh_epoch, _source, _base
 	if not cohort or not cohort.receipt or type(inverse_republish) ~= "function"
@@ -384,6 +436,12 @@ function M.publish_current_capture(override_path)
 			and XkbCapture.inverse_republish == inverse_republish
 	end
 	if not same_selection() then return false end
+	local live_checked, live = pcall(inverse_current, cohort.receipt)
+	if not same_selection() then return false end
+	if live_checked and live == true then
+		Logger.debug(LOG, "Current capture inverse already published; nothing to republish.")
+		return true
+	end
 	local ok, built, reason, receipt = pcall(inverse_republish, cohort.receipt, require_source)
 	if not same_selection() then return false end
 	if not ok or not built or not receipt then
@@ -411,10 +469,11 @@ function M.refresh(override_path)
 	_selection_override = override_path
 	_refresh_epoch = _refresh_epoch + 1
 	local epoch = _refresh_epoch
-	_table, _base, _cohort = nil, nil, nil
+	_table, _base, _cohort, _layout_name = nil, nil, nil, nil
 	Logger.start(LOG, "Resolving the active keyboard layout…")
 
 	local text, source = read_override(override_path), "override"
+	if not text and type(override_path) == "string" and override_path ~= "" then return false end
 	if not text then text, source = dump_keymap() end
 
 	if not text then
@@ -422,9 +481,8 @@ function M.refresh(override_path)
 		if not _reported_absent then
 			_reported_absent = true
 			Logger.error(LOG,
-				"No keymap available (%s session) — characters cannot be typed as "
-					.. "keystrokes. Install libxkbcommon-tools, or expansions will go "
-					.. "through the clipboard.",
+				"No keymap available (%s session) — keys cannot be captured or typed. "
+					.. "Install libxkbcommon-tools (xkbcli) or check the compositor's keymap.",
 				DisplayServer.kind())
 		end
 		return false
@@ -443,6 +501,22 @@ function M.refresh(override_path)
 		Logger.error(LOG, "Active keymap cannot initialise XKB capture via %s — %s.",
 			tostring(source), tostring(capture_err))
 		return false
+	end
+
+	-- The dumped keymap's fresh state sits in group 1; KWin may have another
+	-- layout active, and capture and injection must both read that one.
+	local desktop_group, group_problem = desktop_active_group(source)
+	if group_problem then
+		Logger.warn(LOG, "The active layout is unknown (%s); the keymap's first layout is used.", group_problem)
+	elseif desktop_group ~= nil then
+		local selected, select_err = XkbCapture.select_group(desktop_group)
+		if _refresh_epoch ~= epoch then return false end
+		if not selected then
+			_table, _base, _cohort = nil, nil, nil
+			Logger.error(LOG, "The desktop's active layout %d cannot be followed via %s — %s.",
+				desktop_group + 1, tostring(source), tostring(select_err))
+			return false
+		end
 	end
 
 	-- Asked of libxkbcommon on the keymap capture just validated, not parsed
@@ -479,15 +553,41 @@ function M.refresh(override_path)
 		return false
 	end
 	local base = M.build_base(text, group)
+	local names = XkbKeymap.group_names(text)
 	local check = inverse_current
 	local ok, current = pcall(check, receipt)
 	if _refresh_epoch ~= epoch or XkbCapture.inverse_current ~= check or not ok or current ~= true then return false end
 	publish(built, receipt)
 	_source = source
 	_base = base
+	_layout_name = names[group]
 	_reported_absent = false
-	Logger.success(LOG, "Layout resolved: %d typable character(s) via %s.", count, tostring(source))
+	Logger.success(LOG, "Layout resolved: \"%s\" (group %d of %d), %d typable character(s) via %s.",
+		_layout_name or "unnamed", group, math.max(TableUtil.count(names), group), count, tostring(source))
 	return true
+end
+
+--- Resolves the layout again unless the published one is provably current.
+--- Current means bound to the desktop's XKB source (X11's native probe), whose
+--- keymap and group notifications revoke it, and still live by that check. Any
+--- other source (a Wayland dump, an override file) cannot prove it and is
+--- dumped again, as refresh() always did.
+--- @param override_path string|nil The same override refresh() takes.
+--- @return boolean True when a usable table is loaded.
+function M.refresh_unless_current(override_path)
+	local cohort = override_path == nil and _source ~= "override" and current_cohort() or nil
+	if cohort and cohort.receipt and XkbCapture.inverse_receipt_watched(cohort.receipt) then
+		Logger.debug(LOG, "Layout still current on the desktop source; not dumped again.")
+		return true
+	end
+	return M.refresh(override_path)
+end
+
+--- The name the loaded keymap gives its active group, or nil when none is
+--- loaded or the dump names no group (diagnostics only).
+--- @return string|nil
+function M.layout_name()
+	return current_cohort() and _layout_name or nil
 end
 
 --- What produced the loaded keymap, or nil when none is loaded.
@@ -533,7 +633,7 @@ end
 --- True when a layout table is loaded.
 --- @return boolean
 function M.is_ready()
-	return current_cohort() ~= nil
+	return current_cohort() ~= nil or typing_cohort() ~= nil
 end
 
 --- Resolves one character to the keystroke that produces it.

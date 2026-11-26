@@ -10,12 +10,12 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
-local ConfigPaths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Manifest = require("menu.engine.manifest_reader")
+local ConfigPaths = require("settings.engine.paths")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local LOG = "infra.metrics_preferences"
 local _scope_owner = nil
 
@@ -113,18 +113,29 @@ end
 --- Reads validated values and their exact source for conditional publication.
 --- @return table values Canonical effective preferences.
 --- @return table source Classified source bytes.
+--- @return table config Decoded source before neutral defaults are resolved.
+--- @return table shapes Canonical source array/map evidence.
 function M.snapshot()
 	local bytes, status, detail = Writer.read_classified(ConfigPaths.config("config.toml"))
 	assert(status == "ok" or status == "absent", "metrics preferences are unreadable: " .. tostring(detail))
-	return M.resolve(Codec.decode(bytes or "")), { status = status, content = bytes }
+	local config, shapes = Codec.decode_with_shapes(bytes or "")
+	return M.resolve(config), { status = status, content = bytes }, config, shapes
 end
 
 --- Reads one declared boolean without creating a file or caching a refusal.
 --- @param path string Canonical manifest path.
---- @return boolean value
-function M.get(path)
-	owned(path)
-	return M.snapshot()[path]
+--- @param require_valid_type boolean|nil Reject malformed source instead of its neutral default.
+--- @return boolean|nil value Nil means unknown when strict source admission is requested.
+function M.get(path, require_valid_type)
+	local key = owned(path)
+	local values, _, config, shapes = M.snapshot()
+	if require_valid_type == true then
+		local metrics = config.metrics
+		if metrics ~= nil and (type(metrics) ~= "table" or shapes.arrays[metrics]) then return nil end
+		local value = metrics and metrics[key]
+		if value ~= nil and type(value) ~= "boolean" then return nil end
+	end
+	return values[path]
 end
 
 --- Reads one declared list of strings without creating a file.

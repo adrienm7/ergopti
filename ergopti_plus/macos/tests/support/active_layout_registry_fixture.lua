@@ -12,7 +12,7 @@
 
 local M = {}
 local SourceFile = require("tests.support.source_file")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Creates a detached registry owner for one explicitly selected real entry.
 --- @param active_id string Shipped registered layout identity.
@@ -23,7 +23,7 @@ function M.new(active_id, expected_form)
 	assert(expected_form == "ansi" or expected_form == "iso", "fixture requires an explicit convention")
 	local source = SourceFile.read(require("tests.helpers").shared("../../layouts/registry/index.json"))
 	local index = assert(Json.decode(source), "the shipped registry index must decode")
-	local entry = require("layouts.registry").find_entry(index, active_id)
+	local entry = require("layouts.engine.registry.registry_core").find_entry(index, active_id)
 	assert(entry and entry.keycode_convention == expected_form, "the fixture must follow the actual declared source")
 	return { snapshot = function()
 		return { active = active_id, installed = {}, index = assert(Json.decode(source)), source = "bundled" }

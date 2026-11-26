@@ -18,6 +18,9 @@
 ;    heavy tables (penta/hexa/hepta) and caps each table at KLR_FAST_LIMIT rows.
 ; 4. KLR_ReadRangeSplitToday: full first-paint path that splits the result into
 ;    { historical (before today), today (per-app bucket) }.
+; 5. Ergopti Studio's « My typing »: KLR_BuildStudioNgramsJson projects it,
+;    KLR_StudioStoreStamp versions the store, and KLR_StudioSnapshot* keep the
+;    last complete read in the cache folder so the Studio shows it at once.
 ; ==============================================================================
 
 
@@ -55,12 +58,14 @@ global KLR_NGRAM_LIVE_TABLE := Map(
 		"w_bg", "ngram_word_bigrams"
 )
 
-KLR_BuildNgramFilter(start_date, end_date, selected_apps := unset) {
+KLR_BuildNgramFilter(start_date, end_date, selected_apps := unset, exclude_date := "") {
 		clauses := []
 		if (start_date != "")
 				clauses.Push("date >= " . SQLite_Q(start_date))
 		if (end_date != "")
 				clauses.Push("date <= " . SQLite_Q(end_date))
+		if (exclude_date != "")
+				clauses.Push("date <> " . SQLite_Q(exclude_date))
 		if IsSet(selected_apps) {
 				app_predicate := KLR_BuildNgramAppPredicate(selected_apps)
 				if (app_predicate != "")
@@ -136,10 +141,10 @@ KLR_NewNgramItem(c, t, e, hs := 0, llm := 0, other := 0) {
 
 ; Both serializers consume these exact grouped rows: limits apply only to the
 ; nine text tables, never to shortcuts or the keyboard heatmaps.
-KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset) {
+KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset, exclude_date := "") {
 		where := IsSet(selected_apps)
-				? KLR_BuildNgramFilter(start_date, end_date, selected_apps)
-				: KLR_BuildNgramFilter(start_date, end_date)
+				? KLR_BuildNgramFilter(start_date, end_date, selected_apps, exclude_date)
+				: KLR_BuildNgramFilter(start_date, end_date, , exclude_date)
 		queries := Map()
 		for code, tbl in KLR_NGRAM_TYPE_TABLE {
 				queries[code] := "SELECT token,"
@@ -160,13 +165,13 @@ KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset) {
 		return queries
 }
 
-KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
+KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset, exclude_date := "") {
 		out := KLR_NewTodayBucket()
 		if !db
 				return out
 		queries := IsSet(selected_apps)
-				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
-				: KLR_NgramProjectionQueries(start_date, end_date)
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps, exclude_date)
+				: KLR_NgramProjectionQueries(start_date, end_date, , exclude_date)
 		for code, sql in queries {
 				for r in KLR_ProjectionQuery(db, sql, "range", "historical " . code)
 						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
@@ -183,10 +188,10 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
  * @param selected_apps Optional application selection, including the Unknown bucket.
  * @returns {String} Complete JSON object with the same shape as KLR_ReadNgrams.
  */
-KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset) {
+KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset, exclude_date := "") {
 		queries := db ? (IsSet(selected_apps)
-				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
-				: KLR_NgramProjectionQueries(start_date, end_date)) : Map()
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps, exclude_date)
+				: KLR_NgramProjectionQueries(start_date, end_date, , exclude_date)) : Map()
 		out := "{"
 		for code, _ in KLR_NewTodayBucket() {
 				fragment := "{}"
@@ -200,6 +205,243 @@ KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset
 				out .= (out = "{" ? "" : ",") . JsonStringLiteral(code) . ":" . fragment
 		}
 		return out . "}"
+}
+
+/**
+ * Reads Ergopti Studio's contract (_shared/metrics/data/studio_ngrams.json):
+ * the payload schema, its families and the refusal codes, shared with the Lua
+ * hosts and the page.
+ * @returns {Map} The decoded contract.
+ */
+KLR_StudioContract() {
+		global _SharedDir
+		Path := _SharedDir . "\metrics\data\studio_ngrams.json"
+		Text := FSRead(Path)
+		if !(Text is String)
+				throw Error("The Ergopti Studio n-gram contract is missing: " . Path)
+		Contract := JsonParse(Text)
+		if !(Contract is Map) || !Contract.Has("schema") || !Contract.Has("families") || !Contract.Has("codes") || !Contract.Has("snapshot")
+				|| !Contract.Has("final_field") || !(Contract["final_field"] is String) || Contract["final_field"] = ""
+				throw Error("The Ergopti Studio n-gram contract is malformed.")
+		return Contract
+}
+
+/**
+ * A version stamp of the keystats folder: every file's path, size and
+ * modification time, hashed. An ingest appends to a journal, so the stamp
+ * changes with every new keystroke written; Ergopti Studio keeps its
+ * projection while it does not. The cache folder is left out: it holds only
+ * projections derived from the journals (the reader image, the saved Studio
+ * read), and saving one must not make the read it came from look stale.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {String} The stamp, or "" for a folder without any file.
+ */
+KLR_StudioStoreStamp(MetricsDir) {
+		Derived := _KLR_StudioCacheDir(MetricsDir)
+		Entries := []
+		Loop Files, RTrim(MetricsDir, "\/") . "\*", "FR" {
+				; A_LoopFilePath keeps the folder as Derived spells it (trimmed, then
+				; one separator); A_LoopFileFullPath expands 8.3 names (a CI runner's
+				; RUNNER~1 temp folder) and separators, and then no cache file matched.
+				if (SubStr(A_LoopFilePath, 1, StrLen(Derived)) = Derived)
+						continue
+				Entries.Push(A_LoopFileFullPath . "|" . A_LoopFileSize . "|" . A_LoopFileTimeModified)
+		}
+		if !Entries.Length
+				return ""
+		Sorted := ""
+		for Entry in Entries
+				Sorted .= Entry . "`n"
+		Sorted := Sort(Sorted)
+		return CryptoSha256(Sorted)
+}
+
+/**
+ * The saved Studio read's file name and header prefix, from the contract
+ * (snapshot): one header line (the format, a space, then the store stamp it
+ * was read at), then the projection JSON exactly as the worker staged it.
+ * @returns {Map} Map("file", String, "header", String).
+ * @throws {Error} When the contract does not name the saved read.
+ */
+_KLR_StudioSnapshotFormat() {
+		static Format := 0
+		if IsObject(Format)
+				return Format
+		Snapshot := KLR_StudioContract()["snapshot"]
+		if !(Snapshot is Map) || !Snapshot.Has("file") || !Snapshot.Has("format")
+				|| (Snapshot["file"] == "") || (Snapshot["format"] == "")
+				throw Error("The Ergopti Studio n-gram contract does not name its saved read.")
+		Format := Map("file", Snapshot["file"], "header", Snapshot["format"] . " ")
+		return Format
+}
+
+; The keystats cache folder, from a metrics folder given with or without its
+; trailing separator (KL_MetricsDirFor gives none, KLR_CacheDir expects one).
+_KLR_StudioCacheDir(MetricsDir) {
+		return KLR_CacheDir(RTrim(MetricsDir, "\/") . "\")
+}
+
+/**
+ * Where the resident keeps the last complete Studio read: beside the reader
+ * image, which already holds the same n-gram counts in clear (the at-rest
+ * encryption covers typed text, never these aggregates), in the folder its
+ * ignore rule keeps out of any sync.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {String} The file path.
+ */
+KLR_StudioSnapshotPath(MetricsDir) {
+		return _KLR_StudioCacheDir(MetricsDir) . _KLR_StudioSnapshotFormat()["file"]
+}
+
+/**
+ * Reads the last complete Studio read the resident saved.
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {Map|Integer} Map("stamp", String, "json", String), or 0 when none is saved.
+ * @throws {Error} When a saved file cannot be read or is not that format.
+ */
+KLR_StudioSnapshotRead(MetricsDir) {
+		Path := KLR_StudioSnapshotPath(MetricsDir)
+		if !FSExists(Path)
+				return 0
+		Text := FSRead(Path)
+		if !(Text is String)
+				throw Error("The saved Ergopti Studio read cannot be read: " . Path)
+		try return KLR_StudioSnapshotDecode(Text)
+		catch as Err
+				throw Error(Err.Message . " " . Path)
+}
+
+/**
+ * Whether a projection JSON is one of the contract's: its top-level schema and
+ * source. A token is at most three characters, so neither key can be one.
+ * @param Json {String} The projection JSON object.
+ * @returns {Boolean}
+ */
+_KLR_StudioSnapshotFits(Json) {
+		Contract := KLR_StudioContract()
+		if !RegExMatch(Json, '"schema":(\d+)[,}]', &Schema) || (Integer(Schema[1]) != Contract["schema"])
+				return false
+		Source := '"source":' . JsonStringLiteral(Contract["source"])
+		At := InStr(Json, Source, true)
+		return At && InStr(",}", SubStr(Json, At + StrLen(Source), 1)) ? true : false
+}
+
+/**
+ * Reads one saved Studio read's text, failing fast on any other: a corrupt or
+ * mismatched read is never shown (the vectors of
+ * _shared/tests/corpus/metrics/studio_ngrams_snapshot_vectors.json).
+ * @param Text {String} The file's content.
+ * @returns {Map} Map("stamp", String, "json", String).
+ * @throws {Error} When the text is not that format, schema or source.
+ */
+KLR_StudioSnapshotDecode(Text) {
+		LineEnd := InStr(Text, "`n")
+		Header := LineEnd ? SubStr(Text, 1, LineEnd - 1) : ""
+		Json := LineEnd ? SubStr(Text, LineEnd + 1) : ""
+		Prefix := _KLR_StudioSnapshotFormat()["header"]
+		if (SubStr(Header, 1, StrLen(Prefix)) !== Prefix) || (StrLen(Header) = StrLen(Prefix)) || InStr(Header, "`r")
+				|| (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
+				throw Error("The saved Ergopti Studio read is not in its format.")
+		if !_KLR_StudioSnapshotFits(Json)
+				throw Error("The saved Ergopti Studio read is not of this schema or source.")
+		return Map("stamp", SubStr(Header, StrLen(Prefix) + 1), "json", Json)
+}
+
+/**
+ * The text of one saved Studio read: the header line, then the projection JSON.
+ * @param Stamp {String} KLR_StudioStoreStamp at the read's request, never "".
+ * @param Json {String} The projection JSON object.
+ * @returns {String}
+ * @throws {ValueError} Without a stamp, or for another JSON than a projection.
+ */
+KLR_StudioSnapshotEncode(Stamp, Json) {
+		if !(Stamp is String) || (Stamp == "") || InStr(Stamp, "`n") || InStr(Stamp, "`r")
+				throw ValueError("A saved Ergopti Studio read needs its store stamp.")
+		if !(Json is String) || (SubStr(Json, 1, 1) != "{") || (SubStr(Json, -1) != "}")
+				throw ValueError("A saved Ergopti Studio read is one JSON object.")
+		if !_KLR_StudioSnapshotFits(Json)
+				throw ValueError("A saved Ergopti Studio read is one payload of the contract.")
+		return _KLR_StudioSnapshotFormat()["header"] . Stamp . "`n" . Json
+}
+
+/**
+ * Saves one complete Studio read, atomically (KLPF_WriteAtomic): a failed save
+ * leaves the previous file whole.
+ * @param MetricsDir {String} The keystats folder.
+ * @param Stamp {String} KLR_StudioStoreStamp at the read's request, never "".
+ * @param Json {String} The projection JSON object.
+ * @returns {Boolean} Whether the file now holds this read.
+ */
+KLR_StudioSnapshotWrite(MetricsDir, Stamp, Json) {
+		Text := KLR_StudioSnapshotEncode(Stamp, Json)
+		if !KLR_CacheEnsureDir(RTrim(MetricsDir, "\/") . "\")
+				return false
+		return KLPF_WriteAtomic(KLR_StudioSnapshotPath(MetricsDir), Text)
+}
+
+/**
+ * Removes the saved Studio read (a metrics purge, a dashboard cache reset).
+ * @param MetricsDir {String} The keystats folder.
+ * @returns {Boolean} True when no saved read remains.
+ */
+KLR_StudioSnapshotRetire(MetricsDir) {
+		return FSDelete(KLR_StudioSnapshotPath(MetricsDir)) ? true : false
+}
+
+/**
+ * Projects Ergopti Studio's « My typing » payload in SQLite: for each family
+ * of the contract, the all-time count of each token, every device and app
+ * summed, in two texts. The top-level tables hold what the user typed on the
+ * keyboard: synthetic sources (hotstrings, AI, other synthetic labels;
+ * KLR_NgramSourceProjection) are subtracted. The contract's final_field holds
+ * the same families with every source counted, the final text (schema 2).
+ * _shared/metrics/engine/view/studio_ngrams.lua does the same on macOS and
+ * Linux. No LIMIT: a truncated table would be shown as the user's data.
+ * @param db Open SQLite handle.
+ * @param Contract {Map} KLR_StudioContract().
+ * @param Query {Func} (db, Sql) => rows, SQLite_Query by default (the tests count the queries).
+ * @returns {String} {"schema", "source", <field>: {token: count}…, "total",
+ *     <final_field>: {<field>: {token: count}…, "total"}}.
+ */
+KLR_BuildStudioNgramsJson(db, Contract, Query := SQLite_Query) {
+		if !db
+				throw Error("Ergopti Studio needs an open keystats database.")
+		Typed := ""
+		Final := ""
+		Totals := Map("typed", 0, "final", 0)
+		; One grouping per family gives both texts: the keys typed (each count
+		; without its synthetic sources) and the final text (every source). Two
+		; passes grouped the whole table twice: 3.0 s against 1.55 s on the
+		; maintainer's 1.1 GB reader image (2026-11-18).
+		for Family in Contract["families"] {
+				Agg := KLR__StudioFamily(db, Family["table"], Query)
+				Typed .= "," . JsonStringLiteral(Family["field"]) . ":" . Agg["typed"]
+				Final .= "," . JsonStringLiteral(Family["field"]) . ":" . Agg["final"]
+				if Family["code"] = "c"
+						Totals["typed"] := Agg["typed_total"], Totals["final"] := Agg["final_total"]
+		}
+		return '{"schema":' . Contract["schema"] . ',"source":' . JsonStringLiteral(Contract["source"])
+				. Typed . ',"total":' . Totals["typed"]
+				. "," . JsonStringLiteral(Contract["final_field"]) . ":{" . SubStr(Final, 2)
+				. ',"total":' . Totals["final"] . "}}"
+}
+
+; Both texts of one family from one grouping of its table: each token's count
+; without its synthetic sources (typed) and with them (final), a text keeping
+; only its positive counts.
+KLR__StudioFamily(db, Table, Query) {
+		TypedN := "CASE WHEN typed > 0 THEN typed END"
+		FinalN := "CASE WHEN final > 0 THEN final END"
+		sql := "SELECT " . KLR_SqlJsonObjectAgg("token", TypedN) . " AS typed,"
+				. " COALESCE(SUM(" . TypedN . "), 0) AS typed_total,"
+				. " " . KLR_SqlJsonObjectAgg("token", FinalN) . " AS final,"
+				. " COALESCE(SUM(" . FinalN . "), 0) AS final_total"
+				. " FROM (SELECT token, c - hs - llm - o AS typed, c AS final FROM (SELECT token, SUM(c) AS c,"
+				. KLR_NgramSourceProjection() . " FROM " . Table . " GROUP BY token) WHERE token <> '')"
+		rows := Query.Call(db, sql)
+		if rows.Length != 1 || !rows[1].Has("typed") || !rows[1].Has("final")
+				throw Error("The Ergopti Studio projection returned no aggregate for " . Table)
+		return rows[1]
 }
 
 ; One historical type's aggregate. A missing aggregate row is a reader defect,
@@ -326,7 +568,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
  * Serializes a complete range snapshot using one captured calendar boundary.
  * @param db Open SQLite handle, or zero for empty historical and today buckets.
  * @param start_date Inclusive historical lower date bound, or an empty string.
- * @param end_date Historical upper bound, capped before the snapshot day.
+ * @param end_date Inclusive upper bound; explicit later days exclude the snapshot day.
  * @param selected_apps Optional application selection, including Unknown.
  * @param SnapshotDay Optional captured date in yyyy-MM-dd format.
  * @returns {String} Historical type index and complete per-app today index as JSON.
@@ -335,10 +577,13 @@ KLR_BuildRangeSplitTodayJson(db, start_date := "", end_date := "", selected_apps
 		SnapshotDay := "") {
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 		yesterday := KLR_PrevDay(today)
-		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+		future := (end_date != "" && StrCompare(end_date, today) > 0)
+				|| (start_date != "" && StrCompare(start_date, today) > 0 && end_date = "")
+		hist_end := future ? end_date : ((end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday)
+		exclude_date := future ? today : ""
 		historical := IsSet(selected_apps)
-				? KLR_BuildNgramsJson(db, start_date, hist_end, selected_apps)
-				: KLR_BuildNgramsJson(db, start_date, hist_end)
+				? KLR_BuildNgramsJson(db, start_date, hist_end, selected_apps, exclude_date)
+				: KLR_BuildNgramsJson(db, start_date, hist_end, , exclude_date)
 		today_json := IsSet(selected_apps)
 				? KLR_BuildTodayIdxJson(db, selected_apps, true, today)
 				: KLR_BuildTodayIdxJson(db, , true, today)
@@ -455,14 +700,18 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset, SnapshotDay := "") {
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 
-		; Historical: everything strictly before today.
+		; A requested later day can already hold events after a clock rollback.
+		; Keep today's per-app projection separate from the other selected days.
 		yesterday := KLR_PrevDay(today)
 		; AHK v2 throws « Expected a Number but got a String » when comparing
 		; two strings with `<`. Use StrCompare for the lexicographic test.
-		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+		future := (end_date != "" && StrCompare(end_date, today) > 0)
+				|| (start_date != "" && StrCompare(start_date, today) > 0 && end_date = "")
+		hist_end := future ? end_date : ((end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday)
+		exclude_date := future ? today : ""
 		historical := IsSet(selected_apps)
-				? KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
-				: KLR_ReadNgrams(db, start_date, hist_end)
+				? KLR_ReadNgrams(db, start_date, hist_end, selected_apps, exclude_date)
+				: KLR_ReadNgrams(db, start_date, hist_end, , exclude_date)
 
 		; Today: per-app n-gram dict for each app touched today.
 		today_idx := Map()
