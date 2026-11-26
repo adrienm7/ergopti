@@ -536,11 +536,40 @@ GetCategoryTitle(Category) {
 			if (Cat["v1"] != Category)
 				continue
 			Stem := SubStr(Cat["v2"], StrLen(Pack["id"]) + 2)
-			for NeutralV1, NeutralV2 in _V1CatToV2CatMap {
-				if (StrReplace(NeutralV2, "_") == Stem)
-					return GetCategoryTitle(NeutralV1)
-			}
+			Title := _CategoryTitleOfNeutralStem(Stem)
+			if (Title != "")
+				return Title
 		}
+	}
+	; A language category an extension supplies has no file in its language
+	; pack (Ergopti+'s suffixes_a.toml is « french_distancesreduction »), so
+	; the loop above misses it and its row read « (0) » with no name. The menu
+	; manifest names its group, which carries the neutral stem the same way.
+	for GateName, Group in _MG_LoadSubCategories() {
+		if (GateName != Category)
+			continue
+		for _, Pack in HotstringsLanguagePacks() {
+			Prefix := Pack["id"] . "_"
+			if (SubStr(Group, 1, StrLen(Prefix)) != Prefix)
+				continue
+			Title := _CategoryTitleOfNeutralStem(SubStr(Group, StrLen(Prefix) + 1))
+			if (Title != "")
+				return Title
+		}
+	}
+	; Never an empty row nor the id: a translated « no name » and one error
+	; naming the category, as the Lua drivers do (menu.hotstrings.unnamed_entry).
+	try LoggerError("Menu", "Hotstring category '{1}' has no title; the tray names it as unnamed.", Category)
+	return t("menu.hotstrings.unnamed_entry")
+}
+
+; The title of the neutral category whose v2 id, without its underscores, is
+; ``Stem`` (« distancesreduction » is « Réduction des distances »), or "".
+_CategoryTitleOfNeutralStem(Stem) {
+	global _V1CatToV2CatMap
+	for NeutralV1, NeutralV2 in _V1CatToV2CatMap {
+		if (StrReplace(NeutralV2, "_") == Stem)
+			return GetCategoryTitle(NeutralV1)
 	}
 	return ""
 }

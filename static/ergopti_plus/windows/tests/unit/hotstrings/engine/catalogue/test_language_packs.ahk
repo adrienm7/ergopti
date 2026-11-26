@@ -92,3 +92,17 @@ _HLP_EverySectionShipsDisabled() {
 	AssertTrue(Checked > 50, "the opt-in contract must be checked over the whole corpus")
 }
 Test("hotstring languages: every bundled hotstring section ships disabled (hs-language-packs)", _HLP_EverySectionShipsDisabled)
+
+; Ergopti+ supplies « french_distancesreduction » (suffixes_a.toml) while the
+; French pack ships no distancesreduction.toml: its tray row read « (0) », an
+; empty name, in the Windows tray walk.
+_HLP_ExtensionLanguageCategoryHasATitle() {
+	AssertEqual(t("category.distances_reduction"), GetCategoryTitle("FrenchDistancesReduction"),
+		"a language category an extension supplies takes its neutral category's title")
+	AssertEqual(t("category.autocorrection"), GetCategoryTitle("FrenchAutocorrection"),
+		"a language category of the pack keeps its title")
+	AssertEqual(t("menu.hotstrings.unnamed_entry"), GetCategoryTitle("NoSuchCategory"),
+		"an unknown category is named as unnamed, never an empty row")
+}
+Test("hotstring languages: every language category the tray draws has a title (hs-language-packs)",
+	_HLP_ExtensionLanguageCategoryHasATitle)
