@@ -2636,7 +2636,7 @@ end
 --- @return string
 local function fold_row_head(row)
 	local title = tostring(row.title or "")
-	return (title:match("^(.-) → ") or title):gsub("^%s+", "")
+	return ((title:match("^(.-) → ") or title):gsub("^%s+", ""))
 end
 
 --- Whether a row is the indented reason line drawn below a greyed row: it
