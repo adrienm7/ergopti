@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local with_changelog = require("tests.support.changelog_fixture").with_changelog
 
 -- The feed of a stable release published after the newest dev build.
-local FEED_TAGS = { "v1.4.0", "v0.0.0-dev.142", "v1.3.0", "v0.0.0-dev.141", "v0.0.0-dev.140" }
+local FEED_TAGS = { "v1.4.0", "v1.4.1-dev.142", "v1.3.0", "v1.4.1-dev.141", "v1.4.1-dev.140" }
 
 --- An Atom feed of FEED_TAGS on the repository the shared defaults name.
 --- @return string
@@ -59,7 +59,7 @@ local function owners(opts)
 	return {
 		updater = {
 			is_local_source = function() return false end,
-			current_version = function() return opts.current or "0.0.0-dev.140" end,
+			current_version = function() return opts.current or "1.4.1-dev.140" end,
 			installed_channel = function() return "dev" end,
 		},
 		backup = { owner = function() return { latest = function() return nil end } end },
@@ -99,7 +99,7 @@ helpers.describe("Versions window feed-only hand-off to Sparkle (macOS)", functi
 			local deps, checks = owners()
 			open_on_feed(changelog, state, post, deps)
 			post({ action = "fetch", channel = "dev" })
-			post({ action = "install_through_updater", tag = "v0.0.0-dev.142", channel = "dev" })
+			post({ action = "install_through_updater", tag = "v1.4.1-dev.142", channel = "dev" })
 			helpers.assert_eq(#checks, 0)
 			helpers.assert_true(last_install_message(state):find("changelog_window.install_error_unknown_release", 1, true) ~= nil)
 		end)
@@ -117,11 +117,11 @@ helpers.describe("Versions window feed-only hand-off to Sparkle (macOS)", functi
 		with_changelog(function(changelog, state, post)
 			local deps, checks = owners()
 			open_on_feed(changelog, state, post, deps)
-			post({ action = "install_through_updater", tag = "v0.0.0-dev.142", channel = "dev" })
+			post({ action = "install_through_updater", tag = "v1.4.1-dev.142", channel = "dev" })
 			helpers.assert_eq(table.concat(checks, ","), "dev", "Sparkle checks the dev appcast once")
 			local message = last_install_message(state)
 			helpers.assert_true(message:find('"phase":"handed_off"', 1, true) ~= nil, message)
-			helpers.assert_true(message:find('"tag":"v0.0.0-dev.142"', 1, true) ~= nil, message)
+			helpers.assert_true(message:find('"tag":"v1.4.1-dev.142"', 1, true) ~= nil, message)
 		end)
 	end)
 
@@ -129,7 +129,7 @@ helpers.describe("Versions window feed-only hand-off to Sparkle (macOS)", functi
 		with_changelog(function(changelog, state, post)
 			local deps, checks = owners()
 			open_on_feed(changelog, state, post, deps)
-			for _, tag in ipairs({ "v0.0.0-dev.141", "v0.0.0-dev.140", "v1.4.0" }) do
+			for _, tag in ipairs({ "v1.4.1-dev.141", "v1.4.1-dev.140", "v1.4.0" }) do
 				post({ action = "install_through_updater", tag = tag, channel = "dev" })
 				local message = last_install_message(state)
 				helpers.assert_true(message:find('"phase":"failed"', 1, true) ~= nil, tag .. ": " .. message)
@@ -153,9 +153,9 @@ helpers.describe("Versions window feed-only hand-off to Sparkle (macOS)", functi
 
 	helpers.it("refuses when the installed build is already the channel's newest", function()
 		with_changelog(function(changelog, state, post)
-			local deps, checks = owners({ current = "0.0.0-dev.142" })
+			local deps, checks = owners({ current = "1.4.1-dev.142" })
 			open_on_feed(changelog, state, post, deps)
-			post({ action = "install_through_updater", tag = "v0.0.0-dev.142", channel = "dev" })
+			post({ action = "install_through_updater", tag = "v1.4.1-dev.142", channel = "dev" })
 			helpers.assert_eq(#checks, 0)
 			helpers.assert_true(last_install_message(state):find('"phase":"failed"', 1, true) ~= nil)
 		end)
@@ -165,7 +165,7 @@ helpers.describe("Versions window feed-only hand-off to Sparkle (macOS)", functi
 		with_changelog(function(changelog, state, post)
 			local deps, checks = owners({ sent = false })
 			open_on_feed(changelog, state, post, deps)
-			post({ action = "install_through_updater", tag = "v0.0.0-dev.142", channel = "dev" })
+			post({ action = "install_through_updater", tag = "v1.4.1-dev.142", channel = "dev" })
 			helpers.assert_eq(#checks, 1)
 			local message = last_install_message(state)
 			helpers.assert_true(message:find('"phase":"failed"', 1, true) ~= nil, message)
