@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Skærmoptagelse er ikke tilladt for Ergopti: tillad det i Systemindstillinger › Anonymitet og sikkerhed",
 	"keepawake.reason.capture_unavailable": "Skærmen kan ikke læses her",
 	"keepawake.reason.ocr_engine_missing": "Ingen tekstgenkendelse er tilgængelig (installer tesseract på Linux); billedmål virker stadig",
-	"keepawake.reason.ocr_language_missing": "Intet sprog til tekstgenkendelse er installeret for dine sprog"
+	"keepawake.reason.ocr_language_missing": "Intet sprog til tekstgenkendelse er installeret for dine sprog",
+	"menu.layout.game_keys": "Spiltaster",
+	"menu.layout.game_keys_apps": "Spiltaster pr. program",
+	"menu.layout.game_keys.physical": "Bliver på deres fysiske plads",
+	"menu.layout.game_keys.letters": "Følger Ergopti-bogstaverne",
+	"menu.layout.game_keys_app": "For {1}",
+	"menu.layout.game_keys_app_default": "Som de andre programmer",
+	"menu.layout.game_keys_no_app": "Pr. program: skriv først i spillet",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Ikke tilgængelig: under Linux har en tast kun én kode. For at beholde den fysiske plads og samtidig skrive Ergopti skal du installere Ergopti-layoutet i systemet: et spil skifter så til det.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Ikke tilgængelig: med Ergopti-layoutet installeret afgør systemet, hvilken tast et spil læser. For at spiltasterne følger bogstaverne skal du vælge et QWERTY- eller AZERTY-layout og vælge Ergopti som layout der skal emuleres.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Nogle spil (Unreal Engine…) læser bogstavet, ikke pladsen: deres taster følger Ergopti-bogstaverne.",
+	"platform_reason.game_keys_hid_games_are_physical": "Spil, der læser det fysiske tastatur (GameController), beholder altid den fysiske plads."
 }

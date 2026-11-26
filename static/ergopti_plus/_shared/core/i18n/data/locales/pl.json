@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Nagrywanie ekranu nie jest dozwolone dla Ergopti: zezwól na nie w Ustawieniach systemowych › Prywatność i ochrona",
 	"keepawake.reason.capture_unavailable": "Nie można tu odczytać ekranu",
 	"keepawake.reason.ocr_engine_missing": "Rozpoznawanie tekstu jest niedostępne (w Linuksie zainstaluj tesseract); cele obrazowe nadal działają",
-	"keepawake.reason.ocr_language_missing": "Nie zainstalowano języka rozpoznawania tekstu dla Twoich języków"
+	"keepawake.reason.ocr_language_missing": "Nie zainstalowano języka rozpoznawania tekstu dla Twoich języków",
+	"menu.layout.game_keys": "Klawisze gier",
+	"menu.layout.game_keys_apps": "Klawisze gier dla aplikacji",
+	"menu.layout.game_keys.physical": "Zostają na swoim fizycznym miejscu",
+	"menu.layout.game_keys.letters": "Podążają za literami Ergopti",
+	"menu.layout.game_keys_app": "Dla {1}",
+	"menu.layout.game_keys_app_default": "Jak pozostałe aplikacje",
+	"menu.layout.game_keys_no_app": "Dla aplikacji: najpierw pisz w grze",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Niedostępne: w Linuksie klawisz ma tylko jeden kod. Aby zachować fizyczne miejsce, pisząc w Ergopti, zainstaluj układ Ergopti w systemie: gra przełączy się wtedy na niego.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Niedostępne: przy zainstalowanym układzie Ergopti system decyduje, który klawisz odczytuje gra. Aby klawisze gier podążały za literami, wybierz układ QWERTY lub AZERTY i wybierz Ergopti jako układ do emulacji.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Niektóre gry (Unreal Engine…) odczytują literę, a nie miejsce: ich klawisze podążają za literami Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "Gry odczytujące fizyczną klawiaturę (GameController) zawsze zachowują fizyczne miejsce."
 }

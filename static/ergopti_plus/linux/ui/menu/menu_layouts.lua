@@ -106,9 +106,13 @@ local function _build_layouts(ctx)
 	end
 	-- One read of config.toml per build: the choice rows and the six switch
 	-- rows each read and decoded it, seven times per tray rebuild.
-	local emulation_settings = nil
+	local emulation_settings, layout_config = nil, nil
+	local function current_layout_config()
+		layout_config = layout_config or (require("infra.layout_emulation_preferences").snapshot())
+		return layout_config
+	end
 	local function current_emulation_settings()
-		emulation_settings = emulation_settings or require("infra.layout_emulation_preferences").settings()
+		emulation_settings = emulation_settings or require("infra.layout_emulation_preferences").settings(current_layout_config())
 		return emulation_settings
 	end
 	providers["layout_emulation"] = function()
@@ -198,6 +202,40 @@ local function _build_layouts(ctx)
 			get_edges = function() return stored.edges end,
 			set_order = function(value) return NumberRowLive.set("order", value, applied) end,
 			set_edges = function(value) return NumberRowLive.set("edges", value, applied) end,
+		})
+	end
+	-- « Touches de jeu »: the global choice and the focused application's own,
+	-- greyed with why where this session cannot honour one
+	-- (modules/keymap/game_keys_focus.lua decides the switch on a focus change).
+	providers["layout_game_keys"] = function()
+		local Preferences = require("infra.layout_emulation_preferences")
+		local Focus = require("modules.keymap.game_keys_focus")
+		local GameKeys = require("layouts.engine.emulation.game_keys")
+		local settings = Preferences.game_keys(current_layout_config())
+		local app = Focus.is_initialised() and Focus.current_app() or nil
+		local own, overridden = GameKeys.choice_for(settings, "linux", app)
+		local function changed(committed)
+			if not committed then show_error(i18n_safe("menu.layout.emulation_not_saved")) end
+			-- The focused application takes its new keys at once.
+			if committed and Focus.is_initialised() then Focus.on_focus(Focus.current_app()) end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return EmulationRows.game_keys_rows({
+			t = i18n_safe,
+			settings = settings,
+			app = app,
+			app_choice = overridden and own or nil,
+			route = function(choice, game)
+				if not Focus.is_initialised() then
+					return GameKeys.route("linux", require("modules.keymap.layout_emulation").status().active
+						and GameKeys.MODE_EMULATION or GameKeys.MODE_SYSTEM, choice, {})
+				end
+				local caps, mode = Focus.caps(app, settings)
+				caps.game = game
+				return GameKeys.route("linux", mode, choice, caps)
+			end,
+			choose = function(choice) changed(Preferences.set_game_keys(nil, choice)) end,
+			choose_app = function(choice) changed(Preferences.set_game_keys(app, choice)) end,
 		})
 	end
 	-- Layout on pause / resume: the shared frames macOS draws, listing the

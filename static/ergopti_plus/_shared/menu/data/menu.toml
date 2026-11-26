@@ -2572,6 +2572,20 @@ i18n = "menu.layout.emulate_bottom_row"
 type = "list"
 id = "number_row_policy"
 
+# « Touches de jeu » (maintainer decision of 2026-11-26): which key identity a
+# game reads while Ergopti types, over the system layout or the emulated one.
+# One submenu: the global choice (layout.game_keys) as a single-choice group,
+# then the front application's own choice (layout.game_keys_apps), which makes
+# it a game. A choice the OS cannot honour there is greyed with its reason
+# (_shared/layouts/engine/emulation/game_keys.lua route); the checked choice's
+# limit (Unreal games follow the letters on Windows, GameController games keep
+# the physical place on macOS) is a greyed row beneath. Same rows on the three
+# OS (layouts/engine/emulation/menu.lua game_keys_rows, Windows
+# ui/menu/menu_layout.ahk _LAY_GameKeysRows).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_game_keys"
+
 # Works on every layout since 2026-09-21: the chords follow the key that types
 # the accented letter (or ★, since 2026-11-21) directly in the user's own
 # layout, not Ergopti's positions.

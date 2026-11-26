@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Ergopti के लिए स्क्रीन रिकॉर्डिंग की अनुमति नहीं है: इसे सिस्टम सेटिंग्स › गोपनीयता और सुरक्षा में अनुमति दें",
 	"keepawake.reason.capture_unavailable": "यहाँ स्क्रीन पढ़ी नहीं जा सकती",
 	"keepawake.reason.ocr_engine_missing": "टेक्स्ट पहचान उपलब्ध नहीं है (Linux पर tesseract इंस्टॉल करें); छवि लक्ष्य अब भी काम करते हैं",
-	"keepawake.reason.ocr_language_missing": "आपकी भाषाओं के लिए कोई टेक्स्ट पहचान भाषा इंस्टॉल नहीं है"
+	"keepawake.reason.ocr_language_missing": "आपकी भाषाओं के लिए कोई टेक्स्ट पहचान भाषा इंस्टॉल नहीं है",
+	"menu.layout.game_keys": "गेम कुंजियाँ",
+	"menu.layout.game_keys_apps": "ऐप्लिकेशन के अनुसार गेम कुंजियाँ",
+	"menu.layout.game_keys.physical": "अपनी भौतिक जगह पर रहती हैं",
+	"menu.layout.game_keys.letters": "Ergopti अक्षरों का अनुसरण करती हैं",
+	"menu.layout.game_keys_app": "{1} के लिए",
+	"menu.layout.game_keys_app_default": "दूसरे ऐप्लिकेशन की तरह",
+	"menu.layout.game_keys_no_app": "ऐप्लिकेशन के अनुसार: पहले गेम में टाइप करें",
+	"platform_reason.game_keys_physical_needs_installed_layout": "अनुपलब्ध: Linux पर किसी कुंजी का केवल एक कोड होता है। Ergopti टाइप करते हुए भौतिक जगह बनाए रखने के लिए सिस्टम में Ergopti लेआउट इंस्टॉल करें: तब गेम उस पर स्विच हो जाता है।",
+	"platform_reason.game_keys_letters_needs_base_layout": "अनुपलब्ध: Ergopti लेआउट इंस्टॉल होने पर सिस्टम तय करता है कि गेम कौन-सी कुंजी पढ़े। गेम कुंजियों को अक्षरों का अनुसरण कराने के लिए QWERTY या AZERTY लेआउट चुनें और अनुकरण के लिए लेआउट के रूप में Ergopti चुनें।",
+	"platform_reason.game_keys_vk_games_follow_letters": "कुछ गेम (Unreal Engine…) जगह नहीं, अक्षर पढ़ते हैं: उनकी कुंजियाँ Ergopti अक्षरों का अनुसरण करती हैं।",
+	"platform_reason.game_keys_hid_games_are_physical": "हार्डवेयर कीबोर्ड पढ़ने वाले गेम (GameController) हमेशा भौतिक जगह बनाए रखते हैं।"
 }

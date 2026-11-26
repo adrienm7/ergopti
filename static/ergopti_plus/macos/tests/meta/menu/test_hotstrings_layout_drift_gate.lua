@@ -172,6 +172,7 @@ local CANONICAL_LAYOUT_MENU = {
 	"list:layout_features_altgr",
 	"group:layout_emulated_rows",
 	"list:number_row_policy",
+	"list:layout_game_keys",
 	"---",
 	-- UPDATED 2026-10-23: the Karabiner virtual keyboard type (Automatic, ISO,
 	-- ANSI) that menu_keyboard_layout.lua registers as a choice command. It

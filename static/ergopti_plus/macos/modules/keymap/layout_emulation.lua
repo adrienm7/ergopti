@@ -42,9 +42,17 @@
 ---    cleared, so no application and no Option level sees it. Caps Lock cannot
 ---    hold one: an event tap sees only the lock flag change on a press, never
 ---    the release, after the system has toggled the lock (platform_parity.toml).
+--- 8. « Touches de jeu » (maintainer decision of 2026-11-26): the event keeps
+---    its physical key code by default ("physical"); "letters" rewrites the key
+---    code of the down, its repeats and its up to the key the input source
+---    types the character with, the string staying Ergopti's, over the emulation
+---    and over the installed Ergopti layout alike (US positions there). A game
+---    reading the hardware (GameController) sees the physical key whatever the
+---    choice.
 --- ==============================================================================
 
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
+local GameKeys = require("layouts.engine.emulation.game_keys")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
 local Settings = require("layouts.engine.emulation.settings")
 local Logger = require("core.logger.engine.logger")
@@ -62,6 +70,7 @@ local _status = { active = false, id = nil, error = nil }
 local _extras = nil     -- the layout source emulation session, nil without a table
 local _virtual = {}     -- built-in modifiers a tap-hold holds for the user (engine ids)
 local _rewritten = {}   -- physical key code -> the key code its key-down was rewritten to
+local _game_keys = nil  -- the « Touches de jeu » settings of the last reload
 
 -- The engine's built-in modifier ids and the event flags they are.
 local FLAG_OF = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "alt", meta = "cmd" }
@@ -73,7 +82,7 @@ end
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "keyboard_type",
 	"physical_code", "keycode_for_char", "is_active", "autorepeat", "now_ms", "post",
-	"option_sides", "typed_text" }
+	"option_sides", "typed_text", "frontmost_app", "ergopti_source_selected" }
 
 -- Right Option (kVK_RightOption) and the key the source emulation names it.
 local RIGHT_OPTION_KEY_CODE = 61
@@ -96,7 +105,9 @@ local ALTGR = "AltRight"
 ---   { type = "key", key_code, flags } after the callback, in order, option_sides(event) ->
 ---   { left = boolean, right = boolean } the Option keys an event's device flags hold,
 ---   typed_text() the text typed so far (the hotstrings' buffer), which a layout's own
----   repeat and magic keys read }
+---   repeat and magic keys read, frontmost_app() the front application's bundle
+---   identifier, ergopti_source_selected() whether the selected input source is the
+---   installed Ergopti layout }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -131,7 +142,9 @@ end
 --- @return boolean ok False when the chosen layout cannot be emulated (logged).
 function M.reload()
 	if _deps == nil then error("layout_emulation.reload needs M.init first", 2) end
-	local settings = Settings.resolve(_deps.read_config(), _deps.default_for, _deps.report_outdated)
+	local config = _deps.read_config()
+	local settings = Settings.resolve(config, _deps.default_for, _deps.report_outdated)
+	_game_keys = GameKeys.resolve(config, _deps.default_for, _deps.report_outdated)
 	if _extras ~= nil then M.reset() end
 	_extras = nil
 	if not Settings.active(settings) then
@@ -248,6 +261,32 @@ local function physical(e, key_code)
 		if _deps.physical_code(candidate.entry, keyboard_type) == key_code then return candidate.code end
 	end
 	return nil
+end
+
+--- The key code a press's character goes out on under « letters », nil to keep
+--- the physical one. Only a configuration that chose the letters somewhere
+--- reads the front application, so the default costs no lookup per key.
+--- @param text string The character the event carries.
+--- @param installed boolean True over the installed Ergopti layout (US positions).
+--- @return integer|nil key_code
+local function letters_keycode(text, installed)
+	if _game_keys == nil or type(text) ~= "string" or text == "" then return nil end
+	local any = _game_keys.choice == GameKeys.LETTERS
+	for _, choice in pairs(_game_keys.apps) do any = any or choice == GameKeys.LETTERS end
+	if not any then return nil end
+	if GameKeys.choice_for(_game_keys, "macos", _deps.frontmost_app()) ~= GameKeys.LETTERS then return nil end
+	local char = text:match("^%a$") and text:lower() or text
+	if installed then return M.us_keycode(char, _deps.keycodes()) end
+	local target = _deps.keycode_for_char(char)
+	return type(target) == "number" and target or nil
+end
+
+--- Rewrites a down's key code under « letters », its up following (M.key_up).
+local function rewrite_identity(e, key_code, text, installed)
+	local target = letters_keycode(text, installed)
+	if target == nil or target == key_code then return end
+	e:setKeyCode(target)
+	_rewritten[key_code] = target
 end
 
 --- The event flags with the modifiers a tap-hold holds for the user.
@@ -420,7 +459,15 @@ end
 --- @return boolean consume True when the event must be deleted (a pending dead key).
 function M.key_down(e, key_code)
 	local session = _session
-	if session == nil then return false end
+	if session == nil then
+		-- The installed Ergopti layout types the character; « letters » moves
+		-- the identity to its US key, as a game names keys there.
+		if _deps ~= nil and _deps.is_active() == true and _deps.ergopti_source_selected() == true then
+			local flags = e:getFlags()
+			if flags.cmd ~= true and flags.ctrl ~= true then rewrite_identity(e, key_code, e:getCharacters(false), true) end
+		end
+		return false
+	end
 	local code = physical(e, key_code)
 	if code == nil or _deps.is_active() ~= true then return false end
 	clear_held_altgr(e)
@@ -480,6 +527,7 @@ function M.key_down(e, key_code)
 		for name, held in pairs(flags) do if name ~= "alt" then cleared[name] = held end end
 		e:setFlags(cleared)
 	end
+	rewrite_identity(e, key_code, text, false)
 	e:setUnicodeString(text)
 	return false
 end
@@ -564,6 +612,16 @@ function M.start(ports)
 		is_active = function() return not ports.is_paused() end,
 		-- A layout's own repeat and magic keys type from the text typed before them.
 		typed_text = ports.typed_text,
+		-- « Touches de jeu »: the front application's own choice, read from NSWorkspace.
+		frontmost_app = function()
+			local front = require("platform.focus.window_info").frontmost_application()
+			return front and front.bundle_id or nil
+		end,
+		-- The selected input source's TIS identity names the Ergopti bundle.
+		ergopti_source_selected = function()
+			local current = require("adapters.keyboard_source_probe").current_source_id()
+			return type(current) == "string" and current:lower():find("ergopti", 1, true) ~= nil
+		end,
 		autorepeat = function(e)
 			local value = e:getProperty(hs.eventtap.event.properties.keyboardEventAutorepeat)
 			return value ~= nil and value ~= 0

@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "未允许 Ergopti 录制屏幕：请在系统设置 › 隐私与安全性中允许",
 	"keepawake.reason.capture_unavailable": "此处无法读取屏幕",
 	"keepawake.reason.ocr_engine_missing": "无法使用文字识别（Linux 上请安装 tesseract）；图像目标仍可使用",
-	"keepawake.reason.ocr_language_missing": "未安装适用于您语言的文字识别语言"
+	"keepawake.reason.ocr_language_missing": "未安装适用于您语言的文字识别语言",
+	"menu.layout.game_keys": "游戏按键",
+	"menu.layout.game_keys_apps": "按应用设置游戏按键",
+	"menu.layout.game_keys.physical": "保持在物理位置",
+	"menu.layout.game_keys.letters": "跟随 Ergopti 字母",
+	"menu.layout.game_keys_app": "用于 {1}",
+	"menu.layout.game_keys_app_default": "与其他应用相同",
+	"menu.layout.game_keys_no_app": "按应用：请先在游戏中输入",
+	"platform_reason.game_keys_physical_needs_installed_layout": "不可用：在 Linux 上一个键只有一个代码。若要在输入 Ergopti 的同时保持物理位置，请在系统中安装 Ergopti 布局：游戏随后会切换到它。",
+	"platform_reason.game_keys_letters_needs_base_layout": "不可用：安装了 Ergopti 布局时，由系统决定游戏读取哪个键。若要让游戏按键跟随字母，请选择 QWERTY 或 AZERTY 布局，并将 Ergopti 选为要模拟的布局。",
+	"platform_reason.game_keys_vk_games_follow_letters": "部分游戏（Unreal Engine…）读取的是字母而不是位置：它们的按键跟随 Ergopti 字母。",
+	"platform_reason.game_keys_hid_games_are_physical": "读取硬件键盘的游戏（GameController）始终保持物理位置。"
 }

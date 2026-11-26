@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "La registrazione dello schermo non è consentita a Ergopti: consentila in Impostazioni di Sistema › Privacy e sicurezza",
 	"keepawake.reason.capture_unavailable": "Qui non è possibile leggere lo schermo",
 	"keepawake.reason.ocr_engine_missing": "Nessun riconoscimento del testo disponibile (su Linux, installa tesseract); i bersagli immagine funzionano comunque",
-	"keepawake.reason.ocr_language_missing": "Nessuna lingua di riconoscimento del testo è installata per le tue lingue"
+	"keepawake.reason.ocr_language_missing": "Nessuna lingua di riconoscimento del testo è installata per le tue lingue",
+	"menu.layout.game_keys": "Tasti di gioco",
+	"menu.layout.game_keys_apps": "Tasti di gioco per applicazione",
+	"menu.layout.game_keys.physical": "Restano al loro posto fisico",
+	"menu.layout.game_keys.letters": "Seguono le lettere Ergopti",
+	"menu.layout.game_keys_app": "Per {1}",
+	"menu.layout.game_keys_app_default": "Come le altre applicazioni",
+	"menu.layout.game_keys_no_app": "Per applicazione: digita prima nel gioco",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Non disponibile: su Linux un tasto ha un solo codice. Per mantenere il posto fisico digitando Ergopti, installa la disposizione Ergopti nel sistema: un gioco passa allora a essa.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Non disponibile: con la disposizione Ergopti installata, il sistema decide quale tasto legge un gioco. Perché i tasti di gioco seguano le lettere, seleziona una disposizione QWERTY o AZERTY e scegli Ergopti come disposizione da emulare.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Alcuni giochi (Unreal Engine…) leggono la lettera, non il posto: i loro tasti seguono le lettere Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "I giochi che leggono la tastiera fisica (GameController) mantengono sempre il posto fisico."
 }

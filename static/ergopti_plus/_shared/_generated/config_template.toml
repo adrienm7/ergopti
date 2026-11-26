@@ -846,9 +846,14 @@ emulate_home_row = true
 emulate_bottom_row = true
 emulated_layout = ""
 emulated_layout_recents = []
+game_keys = "physical"
 pause_switch_enabled = false
 on_pause = ""
 on_resume = ""
+
+
+
+[layout.game_keys_apps]
 
 
 
@@ -996,6 +1001,7 @@ sections = [
 	"gestures.modes",
 	"gestures.sensitivities",
 	"layout",
+	"layout.game_keys_apps",
 	"category_enabled",
 	"network",
 	"tap_holds",
@@ -1094,6 +1100,7 @@ sections = [
 	"gestures.modes",
 	"gestures.sensitivities",
 	"layout",
+	"layout.game_keys_apps",
 	"category_enabled",
 	"ui",
 	"tap_holds",
@@ -1199,6 +1206,7 @@ sections = [
 	"gestures.modes",
 	"gestures.sensitivities",
 	"layout",
+	"layout.game_keys_apps",
 	"category_enabled",
 	"tap_holds",
 ]

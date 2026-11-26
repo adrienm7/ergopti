@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Skärminspelning är inte tillåten för Ergopti: tillåt det i Systeminställningar › Integritet och säkerhet",
 	"keepawake.reason.capture_unavailable": "Skärmen kan inte läsas här",
 	"keepawake.reason.ocr_engine_missing": "Ingen textigenkänning finns (installera tesseract på Linux); bildmål fungerar fortfarande",
-	"keepawake.reason.ocr_language_missing": "Inget språk för textigenkänning är installerat för dina språk"
+	"keepawake.reason.ocr_language_missing": "Inget språk för textigenkänning är installerat för dina språk",
+	"menu.layout.game_keys": "Speltangenter",
+	"menu.layout.game_keys_apps": "Speltangenter per program",
+	"menu.layout.game_keys.physical": "Stannar på sin fysiska plats",
+	"menu.layout.game_keys.letters": "Följer Ergopti-bokstäverna",
+	"menu.layout.game_keys_app": "För {1}",
+	"menu.layout.game_keys_app_default": "Som de andra programmen",
+	"menu.layout.game_keys_no_app": "Per program: skriv först i spelet",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Inte tillgängligt: i Linux har en tangent bara en kod. För att behålla den fysiska platsen och samtidigt skriva Ergopti, installera Ergopti-layouten i systemet: ett spel byter då till den.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Inte tillgängligt: med Ergopti-layouten installerad avgör systemet vilken tangent ett spel läser. För att speltangenterna ska följa bokstäverna, välj en QWERTY- eller AZERTY-layout och välj Ergopti som layout att emulera.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Vissa spel (Unreal Engine…) läser bokstaven, inte platsen: deras tangenter följer Ergopti-bokstäverna.",
+	"platform_reason.game_keys_hid_games_are_physical": "Spel som läser det fysiska tangentbordet (GameController) behåller alltid den fysiska platsen."
 }

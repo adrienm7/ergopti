@@ -137,6 +137,7 @@ local _engine = nil          -- Built from _loaded; nil when there is nothing to
 local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
 local _enabled = true        -- The runtime feature switch (« Disable all »).
 local _paused = false        -- The daemon's pause.
+local _game = false          -- A game has the focus: its keys skip every tap-hold (« Touches de jeu »).
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
@@ -310,7 +311,7 @@ end
 --- @return boolean
 local function _active()
 	return not _paused and not (_combinations and _combinations.configuration_pending()) and _engine ~= nil and _loaded ~= nil
-		and (_enabled and _loaded.enabled or _combinations and _combinations.has_bindings())
+		and ((_enabled and _loaded.enabled and not _game) or (_combinations and _combinations.has_bindings()))
 end
 
 local function _pair_thresholds(loaded)
@@ -559,7 +560,7 @@ local function _apply()
 		if install(nil) ~= true then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
 		if _engine:configure(configured, _buffered_ports(), projection, roll_ports()) ~= true then return false end
-		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
+		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled and not _game) ~= true then return false end
 	end
 	if _active() then
 		local installed = install(_engine, _run_tap)
@@ -975,6 +976,23 @@ function M.set_paused(paused)
 	if _paused and _tap_copy then _tap_copy:stop() end
 	return _apply()
 end
+
+--- Follows the focused application: a game (an application with its own
+--- « Touches de jeu » choice) skips every tap-hold, so a held key goes out at
+--- once and stays held; the key combinations keep their bindings.
+--- @param game boolean
+--- @return boolean applied
+function M.set_game(game)
+	_require_init()
+	if _game == (game == true) then return true end
+	_game = game == true
+	Logger.info(LOG, "Tap-holds %s: a game %s the focus.", _game and "skipped" or "back", _game and "has" or "left")
+	return _apply()
+end
+
+--- Whether init() ran, for a caller that follows the focus before the remaps start.
+--- @return boolean
+function M.is_initialized() return _initialized end
 
 --- Whether the engine is in the hook right now.
 --- @return boolean

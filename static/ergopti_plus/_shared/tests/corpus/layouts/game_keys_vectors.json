@@ -1,0 +1,391 @@
+{
+	"_comment": "« Touches de jeu » (layout.game_keys, layout.game_keys_apps), replayed by macOS and Linux (_shared/layouts/engine/emulation/game_keys.lua) and Windows (windows/modules/keymap/keylayout/game_keys.ahk) so the three drivers resolve the same choice, take the same route and send the same keys held. resolve: the [layout] table of config.toml and the settings it reads (an outdated value reads as the default). choice_for: the choice in force for an application and whether it is its own. apps_with: the application table once an application's choice is set (null follows the global choice again). routes: per OS, Ergopti mode (emulation, installed, system), choice and capabilities (installed_layout: a listed system layout types what the emulation types; game: the application has its own choice), the strategy and the identity a game reads, and the reason when the choice cannot be honoured. held: whether an emulated text goes out as a held key, from the system layout's keystroke (step, null when it cannot type it) and what the hand holds.",
+	"resolve": [
+		{
+			"name": "an empty configuration keeps the physical place",
+			"layout": {},
+			"expected": { "choice": "physical", "apps": {} }
+		},
+		{
+			"name": "the global choice and the applications are read",
+			"layout": { "game_keys": "letters", "game_keys_apps": { "unciv": "physical" } },
+			"expected": { "choice": "letters", "apps": { "unciv": "physical" } }
+		},
+		{
+			"name": "a choice written in another case takes the manifest spelling",
+			"layout": { "game_keys": "Letters" },
+			"expected": { "choice": "letters", "apps": {} }
+		},
+		{
+			"name": "an unknown choice reads as the default",
+			"layout": { "game_keys": "wasd" },
+			"expected": { "choice": "physical", "apps": {} }
+		},
+		{
+			"name": "an application table holding an unknown choice reads as none",
+			"layout": { "game_keys_apps": { "game.exe": "both" } },
+			"expected": { "choice": "physical", "apps": {} }
+		}
+	],
+	"choice_for": [
+		{
+			"name": "an application without its own choice follows the global one",
+			"platform": "windows",
+			"settings": { "choice": "physical", "apps": { "game.exe": "letters" } },
+			"app": "notepad.exe",
+			"expected": { "choice": "physical", "overridden": false }
+		},
+		{
+			"name": "a Windows executable ignores case",
+			"platform": "windows",
+			"settings": { "choice": "physical", "apps": { "game.exe": "letters" } },
+			"app": "Game.EXE",
+			"expected": { "choice": "letters", "overridden": true }
+		},
+		{
+			"name": "a Linux WM class ignores case",
+			"platform": "linux",
+			"settings": { "choice": "letters", "apps": { "unciv": "physical" } },
+			"app": "Unciv",
+			"expected": { "choice": "physical", "overridden": true }
+		},
+		{
+			"name": "a macOS bundle identifier is exact",
+			"platform": "macos",
+			"settings": { "choice": "physical", "apps": { "com.example.Game": "letters" } },
+			"app": "com.example.game",
+			"expected": { "choice": "physical", "overridden": false }
+		},
+		{
+			"name": "no application follows the global choice",
+			"platform": "linux",
+			"settings": { "choice": "letters", "apps": { "unciv": "physical" } },
+			"app": null,
+			"expected": { "choice": "letters", "overridden": false }
+		}
+	],
+	"apps_with": [
+		{
+			"name": "an application gets its own choice under its stored key",
+			"platform": "windows",
+			"settings": { "choice": "physical", "apps": {} },
+			"app": "Game.exe",
+			"choice": "letters",
+			"expected": { "game.exe": "letters" }
+		},
+		{
+			"name": "a new choice replaces the one stored in another case",
+			"platform": "linux",
+			"settings": { "choice": "physical", "apps": { "Unciv": "letters" } },
+			"app": "unciv",
+			"choice": "physical",
+			"expected": { "unciv": "physical" }
+		},
+		{
+			"name": "following the global choice again removes the entry",
+			"platform": "macos",
+			"settings": {
+				"choice": "physical",
+				"apps": { "com.example.Game": "letters", "com.other": "physical" }
+			},
+			"app": "com.example.Game",
+			"choice": null,
+			"expected": { "com.other": "physical" }
+		}
+	],
+	"routes": [
+		{
+			"platform": "windows",
+			"mode": "emulation",
+			"choice": "letters",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "letters",
+				"strategy": "held_base_key",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": false },
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "split_event",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_vk_games_follow_letters"
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": true, "game": true },
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "switch_to_installed",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_vk_games_follow_letters"
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "installed",
+			"choice": "physical",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_vk_games_follow_letters"
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "installed",
+			"choice": "letters",
+			"caps": { "base_layout": true },
+			"expected": {
+				"available": false,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": "platform_reason.game_keys_letters_needs_base_layout",
+				"note_key": null
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "system",
+			"choice": "letters",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "emulation",
+			"choice": "letters",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "letters",
+				"strategy": "held_base_key",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": false },
+			"expected": {
+				"available": false,
+				"identity": "letters",
+				"strategy": "held_base_key",
+				"reason_key": "platform_reason.game_keys_physical_needs_installed_layout",
+				"note_key": null
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": true, "game": true },
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "switch_to_installed",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": true, "game": false },
+			"expected": {
+				"available": true,
+				"identity": "letters",
+				"strategy": "held_base_key",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "windows",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": { "installed_layout": true, "game": false },
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "split_event",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_vk_games_follow_letters"
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "installed",
+			"choice": "physical",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "linux",
+			"mode": "installed",
+			"choice": "letters",
+			"caps": { "base_layout": false },
+			"expected": {
+				"available": false,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": "platform_reason.game_keys_letters_needs_base_layout",
+				"note_key": null
+			}
+		},
+		{
+			"platform": "macos",
+			"mode": "emulation",
+			"choice": "physical",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": null,
+				"note_key": null
+			}
+		},
+		{
+			"platform": "macos",
+			"mode": "emulation",
+			"choice": "letters",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "letters",
+				"strategy": "rewrite_keycode",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_hid_games_are_physical"
+			}
+		},
+		{
+			"platform": "macos",
+			"mode": "installed",
+			"choice": "letters",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "letters",
+				"strategy": "rewrite_keycode",
+				"reason_key": null,
+				"note_key": "platform_reason.game_keys_hid_games_are_physical"
+			}
+		},
+		{
+			"platform": "macos",
+			"mode": "installed",
+			"choice": "physical",
+			"caps": {},
+			"expected": {
+				"available": true,
+				"identity": "physical",
+				"strategy": "native",
+				"reason_key": null,
+				"note_key": null
+			}
+		}
+	],
+	"held": [
+		{
+			"name": "a letter the system layout types unshifted is held",
+			"text": "e",
+			"step": { "mods": [] },
+			"hand": {},
+			"expected": true
+		},
+		{
+			"name": "a capital typed with the hand's Shift is held",
+			"text": "E",
+			"step": { "mods": ["shift"] },
+			"hand": { "shift": true },
+			"expected": true
+		},
+		{
+			"name": "a character the system layout cannot type keeps the text route",
+			"text": "★",
+			"step": null,
+			"hand": {},
+			"expected": false
+		},
+		{
+			"name": "a character that needs Shift the hand does not hold keeps the text route",
+			"text": "1",
+			"step": { "mods": ["shift"] },
+			"hand": {},
+			"expected": false
+		},
+		{
+			"name": "a character the hand's Shift would change keeps the text route",
+			"text": ";",
+			"step": { "mods": [] },
+			"hand": { "shift": true },
+			"expected": false
+		},
+		{
+			"name": "an AltGr character with AltGr held is held",
+			"text": "€",
+			"step": { "mods": ["altgr"] },
+			"hand": { "altgr": true },
+			"expected": true
+		},
+		{
+			"name": "Caps Lock keeps the text route",
+			"text": "E",
+			"step": { "mods": ["shift"] },
+			"hand": { "caps_lock": true },
+			"expected": false
+		},
+		{
+			"name": "a modifier a tap-hold holds keeps the text route",
+			"text": "E",
+			"step": { "mods": ["shift"] },
+			"hand": { "shift": true, "virtual": true },
+			"expected": false
+		},
+		{
+			"name": "a dead key's leftover and a character keep the text route",
+			"text": "^e",
+			"step": { "mods": [] },
+			"hand": {},
+			"expected": false
+		},
+		{
+			"name": "a multi-byte character is one character",
+			"text": "é",
+			"step": { "mods": [] },
+			"hand": {},
+			"expected": true
+		}
+	]
+}

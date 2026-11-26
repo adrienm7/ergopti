@@ -263,6 +263,17 @@ _LockWorkstationEmit(*) {
 		_ResetPrefixBuffer()
 }
 
+; The plain press of a remapped key: held for as long as the physical key is,
+; on the system layout's key that types the character (« Touches de jeu »,
+; modules/keymap/keylayout/game_keys.ahk), so a game reads a real key it can
+; bind and hold. A character the system layout cannot type as the hand holds
+; keeps the serialized emit.
+_RemapHeldEmit(ScanCode, SendStr, KeyChar, *) {
+	Critical("On")
+	if !GameKeys_TryHold(ScanCode, KeyChar)
+		_RemapEmit(SendStr, KeyChar)
+}
+
 ; A Ctrl or Alt chord of a remapped key: the keyboard slot set on it, else the layout's.
 _RemapChordEmit(Variant, SendStr, KeyChar, *) {
 	if !KeyboardShortcutRunLayoutChord(Variant)
@@ -285,7 +296,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 
 	Hotkey(
 		"*" ScanCode,
-		_RemapEmit.Bind("{Blind}" Character, Character),
+		_RemapHeldEmit.Bind(ScanCode, "{Blind}" Character, Character),
 		InputLevel
 	)
 
@@ -293,7 +304,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	if AlternativeCharacter != "" {
 		Hotkey(
 			ScanCode,
-			_RemapEmit.Bind("{Text}" . AlternativeCharacter, AlternativeCharacter),
+			_RemapHeldEmit.Bind(ScanCode, "{Text}" . AlternativeCharacter, AlternativeCharacter),
 			InputLevel
 		)
 	}

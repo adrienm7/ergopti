@@ -1092,6 +1092,12 @@ M.features = {
 		path = "layout.emulated_layout_recents", id = "emulated_layout_recents", section = "layout", default = {  }, type = "array", description_key = "menu.layout.emulation_recents", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
 	},
 	{
+		path = "layout.game_keys", id = "game_keys", section = "layout", default = "physical", type = "enum", description_key = "menu.layout.game_keys", platforms = { "ahk", "hs", "linux" }, recommended = "physical", family = "setting", enum_values = { "physical", "letters" },
+	},
+	{
+		path = "layout.game_keys_apps", id = "game_keys_apps", section = "layout", default = {  }, type = "map", description_key = "menu.layout.game_keys_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
+	},
+	{
 		path = "category_enabled.hotstrings", section = "category_enabled", platforms = { "ahk" },
 	},
 	{

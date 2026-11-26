@@ -5601,6 +5601,36 @@
 		"reason": null
 	},
 	{
+		"path": "layout.game_keys",
+		"family": "setting",
+		"labels": {
+			"fr": "Touches de jeu",
+			"en": "Game keys"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
+		"path": "layout.game_keys_apps",
+		"family": "setting",
+		"labels": {
+			"fr": "Touches de jeu par application",
+			"en": "Game keys per application"
+		},
+		"platforms": {
+			"windows": true,
+			"macos": true,
+			"linux": true
+		},
+		"reason_key": null,
+		"reason": null
+	},
+	{
 		"path": "category_enabled.hotstrings",
 		"family": "feature",
 		"labels": {

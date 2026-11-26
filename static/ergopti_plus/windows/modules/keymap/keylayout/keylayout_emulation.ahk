@@ -32,6 +32,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\game_keys.ahk
 
 
 
@@ -210,6 +211,10 @@ LayoutRowsAllEmulated(Switches := unset) {
  * @returns {Boolean}
  */
 LayoutRowIsEmulated(Sc) {
+	; « Touches de jeu » at their physical place in a game, with the Ergopti
+	; system layout installed: that layout types there (GameKeys_PassThrough).
+	if GameKeys_PassThrough()
+		return false
 	Switches := LayoutRowSwitches()
 	if LayoutRowsAllEmulated(Switches)
 		return true
@@ -762,7 +767,9 @@ _KLE_Emit(Sc, Shift, Option) {
 	_AtCrit := Critical("On")
 	try {
 		Output := KeylayoutEmulation_Press(Sc, Shift, KS_CapsLockToggleState(), Option)
-		if (Output != "")
+		; Held for as long as the physical key is, when the system layout types
+		; it (« Touches de jeu »); any other text keeps the Unicode route.
+		if (Output != "" && !GameKeys_TryHold(Sc, Output))
 			SendNewResult(Output)
 	} finally {
 		Critical(_AtCrit)

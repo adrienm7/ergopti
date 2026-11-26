@@ -58,6 +58,7 @@ local function started_emulation()
 		is_active = function() return true end,
 		ergopti_family = function() return "ergopti" end,
 		typed_text = function() return "" end,
+		resolve_key = function() return nil end,
 	})
 	return Emulation
 end

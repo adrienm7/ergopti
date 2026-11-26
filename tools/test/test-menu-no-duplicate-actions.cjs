@@ -117,6 +117,7 @@ const LAYOUT_SECTIONS = [
 			'list:layout_features_altgr',
 			'group:layout_emulated_rows',
 			'list:number_row_policy',
+			'list:layout_game_keys',
 			'group:accented_letters',
 			'list:magic_key_source',
 			'feature:layout.ctrl_magic_save'

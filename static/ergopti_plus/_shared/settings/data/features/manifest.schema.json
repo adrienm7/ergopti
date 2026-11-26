@@ -253,7 +253,8 @@
 					"description": "Required with active_by_default, optional on a setting that starts on, forbidden elsewhere: the off value (false, \"none\" or \"\") a clear writes explicitly, because deleting the key restores the preset."
 				},
 				"type": {
-					"enum": ["boolean", "enum", "string", "number", "array", "action", "feature"]
+					"enum": ["boolean", "enum", "string", "number", "array", "map", "action", "feature"],
+					"description": "A map is a table of string keys (an application identity, for instance) to values; its default is an empty table and an absent key reads as the default."
 				},
 				"enum_values": {
 					"type": "array",

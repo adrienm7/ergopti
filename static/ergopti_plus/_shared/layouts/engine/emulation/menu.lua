@@ -6,8 +6,8 @@
 --- The row data macOS and Linux draw for the layout emulation in the Keyboard
 --- layout menu: the « Layout to emulate » submenu (none, the layouts chosen
 --- last, « Others… »), the choices of the picker window « Others… » opens (the
---- built-in Ergopti variants, the registry layouts) and the switch rows of its
---- layers and rows.
+--- built-in Ergopti variants, the registry layouts), the switch rows of its
+--- layers and rows, and the « Touches de jeu » choices.
 --- Pure data: the drivers' renderers materialise the rows and own the writes.
 --- ==============================================================================
 
@@ -128,6 +128,50 @@ function M.picker_choices(opts)
 		end
 	end
 	return result
+end
+
+--- « Touches de jeu » (maintainer decision of 2026-11-26), in the tuning section:
+--- one submenu holding the global choice (one radio row per choice, greyed with
+--- why where the OS cannot honour it, the checked choice's limit beneath) and
+--- the front application's own choice, which makes it a game.
+--- @param opts table { t, settings = game_keys.lua resolve result, route = function(choice, game) ->
+---   game_keys.lua route, app = the front application's identity or nil,
+---   app_choice = its own choice or nil, choose = function(choice), choose_app = function(choice|nil) }
+--- @return table rows One row holding the choices.
+function M.game_keys_rows(opts)
+	if type(opts.choose) ~= "function" or type(opts.choose_app) ~= "function" or type(opts.route) ~= "function" then
+		error("The game keys need their choose, choose_app and route ports.")
+	end
+	local t = opts.t
+	local GameKeys = require("layouts.engine.emulation.game_keys")
+	local function choice_row(choice, checked, game, action)
+		local route = opts.route(choice, game)
+		local row = { label = t("menu.layout.game_keys." .. choice), checked = checked, radio = true, action = action }
+		if route.available ~= true then row.disabled, row.disabled_reason_key = true, route.reason_key end
+		return row, route
+	end
+	local items, note = {}, nil
+	for _, choice in ipairs(GameKeys.CHOICES) do
+		local row, route = choice_row(choice, choice == opts.settings.choice, false, function() opts.choose(choice) end)
+		if row.checked then note = route.note_key end
+		items[#items + 1] = row
+	end
+	if note ~= nil then items[#items + 1] = { label = t(note), disabled = true } end
+	if opts.app == nil then
+		items[#items + 1] = { label = t("menu.layout.game_keys_no_app"), disabled = true }
+	else
+		local own = { { label = t("menu.layout.game_keys_app_default"), checked = opts.app_choice == nil, radio = true,
+			action = function() opts.choose_app(nil) end } }
+		for _, choice in ipairs(GameKeys.CHOICES) do
+			own[#own + 1] = (choice_row(choice, choice == opts.app_choice, true, function() opts.choose_app(choice) end))
+		end
+		local title = t("menu.layout.game_keys_app"):gsub("{1}", function() return opts.app end)
+		local shown = opts.app_choice ~= nil and t("menu.layout.game_keys." .. opts.app_choice)
+			or t("menu.layout.game_keys_app_default")
+		items[#items + 1] = { label = LabelValue.compose(t, title, shown), items = own }
+	end
+	return { { label = LabelValue.compose(t, t("menu.layout.game_keys"), t("menu.layout.game_keys." .. opts.settings.choice)),
+		items = items } }
 end
 
 --- One switch row of the emulation.

@@ -958,6 +958,23 @@ function M.build(ctx)
 			return { emulation_switch(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
 		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
+		-- « Touches de jeu »: the global choice and the front application's own.
+		["layout_game_keys"] = function()
+			local Preferences = require("infra.layout_emulation_preferences")
+			local GameKeys = require("layouts.engine.emulation.game_keys")
+			local settings = Preferences.game_keys(state)
+			local front = require("platform.focus.window_info").frontmost_application()
+			local app = front and front.bundle_id or nil
+			local own, overridden = GameKeys.choice_for(settings, "macos", app)
+			local mode = require("modules.keymap.layout_emulation").status().active and GameKeys.MODE_EMULATION
+				or GameKeys.MODE_INSTALLED
+			return EmulationRows.game_keys_rows({
+				t = i18n.get, settings = settings, app = app, app_choice = overridden and own or nil,
+				route = function(choice, game) return GameKeys.route("macos", mode, choice, { game = game }) end,
+				choose = function(choice) emulation_changed(Preferences.set_game_keys(state, save_prefs, nil, choice)) end,
+				choose_app = function(choice) emulation_changed(Preferences.set_game_keys(state, save_prefs, app, choice)) end,
+			})
+		end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,

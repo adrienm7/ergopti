@@ -63,6 +63,17 @@ _MetaCheckInputSerialization() {
 	; RemapKey must BIND _RemapEmit, not a bare reorder-prone SendEvent lambda.
 	Assert(InStr(Lay, "_RemapEmit.Bind("),
 		"RemapKey must bind _RemapEmit for its remap hotkeys")
+	; The plain press tries the held key first (« Touches de jeu »), under the
+	; same Critical, and falls back to the serialized emit.
+	Assert(InStr(Lay, "_RemapHeldEmit.Bind(ScanCode"),
+		"RemapKey must bind _RemapHeldEmit for its plain-press hotkeys")
+	Held := _DriverFuncBody("_RemapHeldEmit")
+	Assert(Held != "", "layout.ahk must define _RemapHeldEmit(ScanCode, SendStr, KeyChar, *)")
+	HeldCrit := InStr(Held, 'Critical("On")')
+	Assert(HeldCrit > 0 && HeldCrit < InStr(Held, "GameKeys_TryHold("),
+		"_RemapHeldEmit must enter Critical before it sends a held key")
+	Assert(InStr(Held, "_RemapEmit(SendStr, KeyChar)"),
+		"_RemapHeldEmit must fall back to the serialized _RemapEmit")
 	Assert(!InStr(Lay, '(*) => SendEvent("{Blind}"'),
 		"the bare '(*) => SendEvent(...)' per-key remap must be gone -- it reorders under fast typing")
 

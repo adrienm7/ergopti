@@ -134,7 +134,9 @@ LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 	if SHIFTED_LETTERS.Has(SC) {
 		_AtCrit := Critical("On")   ; Serialize the letter emit like _RemapEmit
         try {
-		    SendNewResult(SHIFTED_LETTERS[SC])
+		    ; Held like the base layer's letters (Shift+WASD in a game), else typed.
+		    if !GameKeys_TryHold(SC, SHIFTED_LETTERS[SC])
+		        SendNewResult(SHIFTED_LETTERS[SC])
         } finally {
             Critical(_AtCrit)
         }

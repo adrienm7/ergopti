@@ -171,6 +171,11 @@ local _consumed_down = {}
 -- The release owner a consumer named for its consumed press (a held key of the
 -- layout source emulation), called once on that press's key-up.
 local _consumed_release = {}
+-- The key a consumer holds on the wire in a consumed press's place (the layout
+-- emulation's held key, « Touches de jeu »): { key, code, entry }, entry being
+-- the exact forwarded-down record its down created. Its repeats and its up
+-- follow the physical key's; a reset that already released it leaves no up.
+local _consumed_hold = {}
 local _sync_dropped = {}
 local _forwarded_down = {}
 local _physical_down = {}
@@ -621,6 +626,7 @@ local function _reset_modifier_state()
 	_held.altgr, _held.meta = false, false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
 	_locks.held_modifier_keys = {}
 	_pressed_at = {}
 	_hold_owners = {}
@@ -1335,20 +1341,49 @@ function M.arm_action_sticky(codes)
 	return true
 end
 
+-- The fields a consumption receipt may carry.
+local RECEIPT_FIELDS = { consume = true, repeat_callback = true, release_callback = true,
+	hold_code = true, after_hold = true }
+
 --- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
---- A receipt may also name the owner of the press's release.
+--- A receipt may also name the owner of the press's release, and a key to hold
+--- on the wire in the press's place (hold_code, an evdev code) with the
+--- callback to run once that down is written (after_hold): the press then
+--- behaves like a pass-through of that key, its repeats and its up following.
 --- @param receipt any Consumer result.
 --- @return function|nil callback Exact callback owned by this physical press.
 --- @return function|nil release_callback Called once on the press's key-up.
+--- @return table|nil hold { code, after } The key held in the press's place.
 local function consumed_repeat_callback(receipt)
 	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or receipt.consume ~= true
 		or type(receipt.repeat_callback) ~= "function" then return nil end
 	for key in pairs(receipt) do
-		if key ~= "consume" and key ~= "repeat_callback" and key ~= "release_callback" then return nil end
+		if not RECEIPT_FIELDS[key] then return nil end
 	end
 	local release = receipt.release_callback
 	if release ~= nil and type(release) ~= "function" then return nil end
-	return receipt.repeat_callback, release
+	local hold = nil
+	if receipt.hold_code ~= nil then
+		local code = receipt.hold_code
+		if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > 0x2ff
+			or (receipt.after_hold ~= nil and type(receipt.after_hold) ~= "function") then return nil end
+		hold = { code = code, after = receipt.after_hold }
+	elseif receipt.after_hold ~= nil then
+		return nil
+	end
+	return receipt.repeat_callback, release, hold
+end
+
+--- Writes one edge of a consumed press's held key, only while the down it wrote
+--- is still the wire's: a reset or a stop that released it owes no other edge.
+--- @param held table The _consumed_hold record.
+--- @param value integer InputEvent value.
+--- @param source string Owned device path.
+--- @return boolean delivered
+--- @return table|nil receipt The broker's receipt.
+local function _forward_hold_edge(held, value, source)
+	if _forwarded_down[held.key] ~= held.entry then return false end
+	return _forward_raw({ type = EVDEV_TYPE_KEY, code = held.code, value = value }, source)
 end
 
 --- Detaches the native event identity and its already-published origin epoch.
@@ -1956,10 +1991,17 @@ local function _dispatch_post_remap(ev, source)
 
 	local consumed_key = source_key(source, ev.code)
 	if _consumed_down[consumed_key] then
+		local held = _consumed_hold[consumed_key]
 		if ev.value == InputEvent.VALUE_UP then
 			_consumed_down[consumed_key] = nil
 			local release_callback = _consumed_release[consumed_key]
 			_consumed_release[consumed_key] = nil
+			-- The held key's up first: the wire never keeps a key the hand released.
+			if held ~= nil then
+				_consumed_hold[consumed_key] = nil
+				_forward_hold_edge(held, InputEvent.VALUE_UP, source)
+				if not _running or _capture_session ~= session then return end
+			end
 			if release_callback ~= nil then
 				_call_callback("consumed-key release callback", release_callback,
 					consumption_detail(ev, source, identity, char))
@@ -1969,6 +2011,13 @@ local function _dispatch_post_remap(ev, source)
 			-- included, and the application saw none of them.
 			local compose_cancelled = _withdraw_capture_compose(compose_mark)
 			local repeat_callback = _consumed_down[consumed_key]
+			-- A held key repeats on the wire as a pass-through key does; its
+			-- consumer hears of a repeat the wire took, never of a spent one.
+			if held ~= nil and ev.value == InputEvent.VALUE_REPEAT then
+				local delivered, receipt = _forward_hold_edge(held, InputEvent.VALUE_REPEAT, source)
+				if not _running or _capture_session ~= session then return end
+				if not delivered or (receipt and receipt.native_writes == 0) then repeat_callback = nil end
+			end
 			if ev.value == InputEvent.VALUE_REPEAT and type(repeat_callback) == "function" then
 				local called, acknowledged = false, false
 				if compose_cancelled then
@@ -1991,7 +2040,7 @@ local function _dispatch_post_remap(ev, source)
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
 		local ok_consume, consume, retired = _call_callback("key-consumption callback", _on_consume,
 			consumption_detail(ev, source, identity, char))
-		local repeat_callback, release_callback = consumed_repeat_callback(consume)
+		local repeat_callback, release_callback, hold = consumed_repeat_callback(consume)
 		if not ok_consume then
 			if not retired then return end
 			_number_row.abandon(row_plan, ev, false)
@@ -2013,6 +2062,17 @@ local function _dispatch_post_remap(ev, source)
 				-- Its first output is already consumed; a refused retirement
 				-- cannot leave optional repeats alive for this held press.
 				_consumed_down[consumed_key] = true
+			end
+			if hold ~= nil then
+				-- The held key goes down on the wire now and stays down until this
+				-- physical key's up (« Touches de jeu »): no tap, no wait between.
+				local held_key = source_key(source, hold.code)
+				if not _forward_raw({ type = EVDEV_TYPE_KEY, code = hold.code, value = InputEvent.VALUE_DOWN }, source) then
+					return
+				end
+				if not _running or _capture_session ~= session then return end
+				_consumed_hold[consumed_key] = { key = held_key, code = hold.code, entry = _forwarded_down[held_key] }
+				if hold.after ~= nil then _call_callback("held-key callback", hold.after) end
 			end
 			return
 		end
@@ -4721,6 +4781,7 @@ function M.stop()
 	_running = false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
@@ -4790,6 +4851,7 @@ function M.emergency_stop(reason)
 	_running = false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}

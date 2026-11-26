@@ -511,11 +511,18 @@
 				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_keylayout_emulation.lua",
 				"static/ergopti_plus/_shared/layouts/engine/emulation/recents.lua",
 				"static/ergopti_plus/linux/ui/emulation_picker/bridge.lua",
-				"static/ergopti_plus/linux/tests/unit/menu/structure/test_layout_emulation_choice.lua"
+				"static/ergopti_plus/linux/tests/unit/menu/structure/test_layout_emulation_choice.lua",
+				"static/ergopti_plus/_shared/layouts/engine/emulation/game_keys.lua",
+				"static/ergopti_plus/linux/modules/keymap/game_keys_focus.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_game_keys.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_game_keys_focus.lua",
+				"static/ergopti_plus/linux/tests/unit/platform/input/keyboard_hook/test_consumed_held_key.lua"
 			],
 			"members": [
 				"layout.emulated_layout",
 				"layout.emulated_layout_recents",
+				"layout.game_keys",
+				"layout.game_keys_apps",
 				"layout.ergopti_variant",
 				"layout.ergopti_base",
 				"layout.ergopti_alt_gr",

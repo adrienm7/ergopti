@@ -44,9 +44,18 @@
 ---    hook asks M.on_held_modifier_key before giving either its own role, so
 ---    neither XKB, the Caps Lock lock nor the application sees the key while the
 ---    emulation holds it; any other layout leaves both keys to the hook.
+--- 8. Held keys (« Touches de jeu », maintainer decision of 2026-11-26): a
+---    character the session layout types with exactly the modifiers the hand
+---    holds goes out as that layout's key, held on the wire from the press to
+---    the physical release with its repeats, so a game binds and holds it; the
+---    hook writes every edge (hold_code), the character path hears of the press
+---    once the down is written. Any other character keeps the typed route. A
+---    game whose keys stay at their physical place with the Ergopti layout
+---    installed is left to that layout (modules/keymap/game_keys_focus.lua).
 --- ==============================================================================
 
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
+local GameKeys = require("layouts.engine.emulation.game_keys")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
 local Settings = require("layouts.engine.emulation.settings")
 local Logger = require("core.logger.engine.shim")
@@ -85,7 +94,7 @@ local HOLDABLE_MODIFIER_KEYS = { [EvdevCodes.KEY_CAPSLOCK] = "CapsLock", [EvdevC
 
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
 	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "is_active",
-	"ergopti_family", "typed_text" }
+	"ergopti_family", "typed_text", "resolve_key" }
 
 
 
@@ -103,7 +112,8 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 ---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, is_active,
 ---   ergopti_family (the registry family whose layouts read the accented-letter choices),
 ---   typed_text (the text typed so far, the hotstrings' buffer, which a layout's own
----   repeat and magic keys read) }
+---   repeat and magic keys read), resolve_key(char) -> { keycode, mods } the session
+---   layout's keystroke for a character, nil when it has none }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -168,7 +178,14 @@ function M.reload()
 		return false
 	end
 	_session, _extras = built, extras
-	_status = { active = true, id = settings.id, error = nil }
+	-- Whether the installed Ergopti layout types what this emulation types
+	-- (modules/keymap/game_keys_focus.lua): a layout of the Ergopti family.
+	local family_ok, family = pcall(_deps.ergopti_family)
+	if not family_ok then
+		Logger.warn(LOG, "The Ergopti family is unreadable (%s): the installed layout is not offered to games.", tostring(family))
+	end
+	_status = { active = true, id = settings.id, error = nil,
+		ergopti = family_ok and source.family ~= nil and source.family == family }
 	Logger.info(LOG, "Layout emulation of '%s' on (base %s, AltGr %s, source records %s).", settings.id,
 		tostring(settings.base), tostring(settings.alt_gr), tostring(extras ~= nil))
 	return true
@@ -219,9 +236,9 @@ end
 --- What the emulation does now, for the menu: number_row says whether it types
 --- the number row itself (base layer and number-row switch on), the only case
 --- where the number-row ordering applies through it.
---- @return table status { active, id, error, number_row }
+--- @return table status { active, id, error, number_row, ergopti (a layout of the Ergopti family) }
 function M.status()
-	return { active = _status.active, id = _status.id, error = _status.error,
+	return { active = _status.active, id = _status.id, error = _status.error, ergopti = _status.ergopti == true,
 		number_row = _status.active == true and Emulation.orders_number_row(_session) }
 end
 
@@ -273,6 +290,18 @@ local function type_in_place(text, code)
 	end
 	for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do _deps.dispatch_char(char, code) end
 	return true
+end
+
+--- The session layout's key a press's text is held on, nil for the typed route.
+--- @param text string The emulated text.
+--- @param hand table The modifiers the hand holds (the hook's detail.mods).
+--- @return integer|nil evdev code
+local function held_code(text, hand)
+	local step = _deps.resolve_key(text)
+	local held = { shift = hand.shift == true, altgr = hand.altgr == true,
+		caps_lock = _deps.caps_locked() == true, virtual = next(_virtual) ~= nil }
+	if not GameKeys.held_admissible(text, step, held) then return nil end
+	return step.keycode
 end
 
 --- The hook's modifiers with the ones a tap-hold holds for the user.
@@ -349,6 +378,8 @@ end
 --- @return boolean consumed True when the emulation typed in the key's place.
 --- @return function|nil repeat_callback Owner of the held press's repeats.
 --- @return function|nil release_callback Owner of the press's release (a source emulation key).
+--- @return table|nil hold { code, after }: the session layout's key the hook holds on the
+---   wire in the press's place, and what to run once its down is written.
 function M.on_key(detail)
 	local session = _session
 	if session == nil or type(detail) ~= "table" then return false end
@@ -390,6 +421,19 @@ function M.on_key(detail)
 		end
 		Logger.error(LOG, "The emulated shortcut key could not be pressed — the chord keeps its own key.")
 		return false
+	end
+	if decision == Emulation.TYPE then
+		local hold = held_code(text, hand)
+		if hold ~= nil then
+			-- Held from the press to the release: each repeat the wire takes
+			-- reaches the character path as the application shows it.
+			local pressed = detail.code
+			return true, function(repeat_detail)
+				if type(repeat_detail) ~= "table" or repeat_detail.code ~= pressed or _session ~= session then return false end
+				_deps.dispatch_char(text, pressed)
+				return true
+			end, nil, { code = hold, after = function() _deps.dispatch_char(text, pressed) end }
+		end
 	end
 	if not type_in_place(text, detail.code) then
 		Emulation.reset(session)
@@ -560,9 +604,15 @@ function M.production_deps(ports)
 		end,
 		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
-		is_active = function() return not ports.is_paused() end,
+		-- A game whose keys stay at their place types through the installed
+		-- Ergopti layout while it has the focus (modules/keymap/game_keys_focus.lua).
+		is_active = function()
+			return not ports.is_paused() and not require("modules.keymap.game_keys_focus").passes_through()
+		end,
 		-- A layout's own repeat and magic keys type from the text typed before them.
 		typed_text = ports.typed_text,
+		-- The session layout's keystroke for one character, its held key's source.
+		resolve_key = function(char) return require("adapters.keyboard_layout").resolve(char) end,
 		ergopti_family = function()
 			local settings, settings_err = Registry.settings()
 			if not settings then error("the layout registry settings are unreadable: " .. tostring(settings_err)) end

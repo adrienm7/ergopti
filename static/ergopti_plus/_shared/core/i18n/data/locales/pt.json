@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "A gravação de ecrã não está autorizada para o Ergopti: autorize-a em Definições do Sistema › Privacidade e segurança",
 	"keepawake.reason.capture_unavailable": "O ecrã não pode ser lido aqui",
 	"keepawake.reason.ocr_engine_missing": "Não há reconhecimento de texto disponível (no Linux, instale o tesseract); os alvos de imagem continuam a funcionar",
-	"keepawake.reason.ocr_language_missing": "Nenhum idioma de reconhecimento de texto está instalado para os seus idiomas"
+	"keepawake.reason.ocr_language_missing": "Nenhum idioma de reconhecimento de texto está instalado para os seus idiomas",
+	"menu.layout.game_keys": "Teclas de jogo",
+	"menu.layout.game_keys_apps": "Teclas de jogo por aplicação",
+	"menu.layout.game_keys.physical": "Ficam no seu lugar físico",
+	"menu.layout.game_keys.letters": "Seguem as letras Ergopti",
+	"menu.layout.game_keys_app": "Para {1}",
+	"menu.layout.game_keys_app_default": "Como as outras aplicações",
+	"menu.layout.game_keys_no_app": "Por aplicação: escreva primeiro no jogo",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Indisponível: no Linux uma tecla tem um único código. Para manter o lugar físico ao escrever Ergopti, instale a disposição Ergopti no sistema: um jogo passa então para ela.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Indisponível: com a disposição Ergopti instalada, o sistema decide que tecla um jogo lê. Para que as teclas de jogo sigam as letras, selecione uma disposição QWERTY ou AZERTY e escolha Ergopti como disposição a emular.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Alguns jogos (Unreal Engine…) leem a letra, não o lugar: as suas teclas seguem as letras Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "Os jogos que leem o teclado físico (GameController) mantêm sempre o lugar físico."
 }

@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Ergopti に画面収録が許可されていません。システム設定 › プライバシーとセキュリティで許可してください",
 	"keepawake.reason.capture_unavailable": "ここでは画面を読み取れません",
 	"keepawake.reason.ocr_engine_missing": "文字認識を利用できません（Linux では tesseract をインストール）。画像ターゲットは引き続き動作します",
-	"keepawake.reason.ocr_language_missing": "お使いの言語の文字認識言語がインストールされていません"
+	"keepawake.reason.ocr_language_missing": "お使いの言語の文字認識言語がインストールされていません",
+	"menu.layout.game_keys": "ゲームキー",
+	"menu.layout.game_keys_apps": "アプリごとのゲームキー",
+	"menu.layout.game_keys.physical": "物理的な位置のまま",
+	"menu.layout.game_keys.letters": "Ergopti の文字に従う",
+	"menu.layout.game_keys_app": "{1} の場合",
+	"menu.layout.game_keys_app_default": "ほかのアプリと同じ",
+	"menu.layout.game_keys_no_app": "アプリごと：先にゲームで入力してください",
+	"platform_reason.game_keys_physical_needs_installed_layout": "利用不可：Linux ではキーのコードは 1 つだけです。Ergopti を入力しながら物理的な位置を保つには、システムに Ergopti 配列をインストールしてください。ゲームはその配列に切り替わります。",
+	"platform_reason.game_keys_letters_needs_base_layout": "利用不可：Ergopti 配列をインストールしていると、ゲームがどのキーを読むかはシステムが決めます。ゲームキーを文字に従わせるには、QWERTY または AZERTY 配列を選び、エミュレートする配列として Ergopti を選んでください。",
+	"platform_reason.game_keys_vk_games_follow_letters": "一部のゲーム（Unreal Engine…）は位置ではなく文字を読みます。それらのキーは Ergopti の文字に従います。",
+	"platform_reason.game_keys_hid_games_are_physical": "ハードウェアキーボードを読むゲーム（GameController）は常に物理的な位置のままです。"
 }

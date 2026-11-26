@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Nahrávání obrazovky není pro Ergopti povoleno: povolte jej v Nastavení systému › Soukromí a zabezpečení",
 	"keepawake.reason.capture_unavailable": "Obrazovku zde nelze přečíst",
 	"keepawake.reason.ocr_engine_missing": "Rozpoznávání textu není k dispozici (v Linuxu nainstalujte tesseract); obrázkové cíle stále fungují",
-	"keepawake.reason.ocr_language_missing": "Pro vaše jazyky není nainstalován žádný jazyk rozpoznávání textu"
+	"keepawake.reason.ocr_language_missing": "Pro vaše jazyky není nainstalován žádný jazyk rozpoznávání textu",
+	"menu.layout.game_keys": "Herní klávesy",
+	"menu.layout.game_keys_apps": "Herní klávesy podle aplikace",
+	"menu.layout.game_keys.physical": "Zůstávají na svém fyzickém místě",
+	"menu.layout.game_keys.letters": "Následují písmena Ergopti",
+	"menu.layout.game_keys_app": "Pro {1}",
+	"menu.layout.game_keys_app_default": "Jako ostatní aplikace",
+	"menu.layout.game_keys_no_app": "Podle aplikace: nejdřív pište ve hře",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Nedostupné: v Linuxu má klávesa jen jeden kód. Chcete-li zachovat fyzické místo a přitom psát Ergopti, nainstalujte rozložení Ergopti do systému: hra se na něj pak přepne.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Nedostupné: s nainstalovaným rozložením Ergopti rozhoduje systém, kterou klávesu hra čte. Aby herní klávesy následovaly písmena, vyberte rozložení QWERTY nebo AZERTY a zvolte Ergopti jako rozložení k emulaci.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Některé hry (Unreal Engine…) čtou písmeno, ne místo: jejich klávesy následují písmena Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "Hry, které čtou hardwarovou klávesnici (GameController), si vždy ponechají fyzické místo."
 }

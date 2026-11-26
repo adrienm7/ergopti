@@ -4504,6 +4504,41 @@ family = "setting"
 type = "array"
 description_key = "menu.layout.emulation_recents"
 
+# « Touches de jeu » (maintainer decision of 2026-11-26): which key identity a
+# game reads while Ergopti types, the character staying Ergopti's. "physical"
+# keeps every key at its physical place (WASD stays WASD, the engines' own
+# convention), "letters" makes the key that types an Ergopti letter be that
+# letter's key of the system layout. Every emulated key is sent held, down on
+# press and up on release, in both choices. The shared resolver is
+# _shared/layouts/engine/emulation/game_keys.lua (Windows twin
+# modules/keymap/keylayout/game_keys.ahk), pinned by
+# _shared/tests/corpus/layouts/game_keys_vectors.json.
+[[features.layout]]
+id = "game_keys"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = [], windows = [] }
+default = "physical"
+recommended = "physical"
+family = "setting"
+type = "enum"
+enum_values = ["physical", "letters"]
+description_key = "menu.layout.game_keys"
+
+# The per-application override of game_keys: the application's identity on
+# its OS (executable name on Windows, bundle identifier on macOS, WM class or
+# Wayland app_id on Linux, the identities the other per-application lists use)
+# to "physical" or "letters". An application listed here is a game: its held
+# keys skip the tap-hold delays. Absent, every application follows game_keys.
+[[features.layout]]
+id = "game_keys_apps"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = [], windows = [] }
+default = {}
+recommended = {}
+family = "setting"
+type = "map"
+description_key = "menu.layout.game_keys_apps"
+
 
 
 # ================================

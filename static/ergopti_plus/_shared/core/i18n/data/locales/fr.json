@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "L’enregistrement de l’écran n’est pas autorisé pour Ergopti : autorisez-le dans Réglages Système › Confidentialité et sécurité",
 	"keepawake.reason.capture_unavailable": "L’écran ne peut pas être lu ici",
 	"keepawake.reason.ocr_engine_missing": "Aucune reconnaissance de texte n’est disponible (sous Linux, installez tesseract) ; les cibles en image fonctionnent toujours",
-	"keepawake.reason.ocr_language_missing": "Aucune langue de reconnaissance de texte n’est installée pour vos langues"
+	"keepawake.reason.ocr_language_missing": "Aucune langue de reconnaissance de texte n’est installée pour vos langues",
+	"menu.layout.game_keys": "Touches de jeu",
+	"menu.layout.game_keys_apps": "Touches de jeu par application",
+	"menu.layout.game_keys.physical": "Restent à leur place physique",
+	"menu.layout.game_keys.letters": "Suivent les lettres Ergopti",
+	"menu.layout.game_keys_app": "Pour {1}",
+	"menu.layout.game_keys_app_default": "Comme les autres applications",
+	"menu.layout.game_keys_no_app": "Par application : tapez d’abord dans le jeu",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Indisponible : sous Linux, une touche n’a qu’un code. Pour garder la place physique tout en tapant Ergopti, installez la disposition Ergopti dans le système : un jeu bascule alors dessus.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Indisponible : avec la disposition Ergopti installée, le système décide de la touche qu’un jeu lit. Pour que les touches de jeu suivent les lettres, sélectionnez une disposition QWERTY ou AZERTY et choisissez Ergopti comme disposition à émuler.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Certains jeux (Unreal Engine…) lisent la lettre et non la place : leurs touches suivent les lettres Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "Les jeux qui lisent le clavier matériel (GameController) gardent toujours la place physique."
 }

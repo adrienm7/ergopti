@@ -2933,15 +2933,18 @@ local function main()
 		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
 		if consume_bound_chord(detail) then return true end
 		-- The layout emulation, after the actions the user bound on a key.
-		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
+		local emulated, emulated_repeat, emulated_release, emulated_hold = require("modules.keymap.layout_emulation").on_key(detail)
 		if emulated then
 			-- Typed in the key's place: like a re-emitted key, it ends a selection.
 			wrap_on_type.end_selection_window()
 			if emulated_repeat == nil then return true end
 			-- A held key of the layout source emulation (a custom modifier, a tap-hold)
-			-- owns its release, unguarded: a lost release would leave it held.
+			-- owns its release, unguarded: a lost release would leave it held. A key
+			-- the emulation holds on the wire (« Touches de jeu ») is the hook's to
+			-- release, whatever the gate says.
 			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
-				release_callback = emulated_release }
+				release_callback = emulated_release, hold_code = emulated_hold and emulated_hold.code or nil,
+				after_hold = emulated_hold and input_capture_gate.guard(emulated_hold.after) or nil }
 		end
 		return wrap_on_type.on_key(detail) == true
 	end)
@@ -3659,6 +3662,8 @@ local function main()
 	if window_info and type(window_info.start_compositor_focus) == "function" then window_info.start_compositor_focus() end
 
 	if process_lifecycle then
+		-- « Touches de jeu »: a game's keys follow it from the first focus change.
+		require("modules.keymap.game_keys_focus").start()
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			keystats.discard_roi()
 			wrap_on_type.end_selection_window()
@@ -3674,6 +3679,7 @@ local function main()
 			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			_polled_window.app, _polled_window.title = _cached_app_id, type(windowTitle) == "string" and windowTitle or nil
+			require("modules.keymap.game_keys_focus").follow_focus(_cached_app_id)
 			secure_focus_guard.window_changed()
 			-- Close the previous title using the existing transition policy. The
 			-- privacy fence below retires the tentative new title until admission.
@@ -3699,6 +3705,7 @@ local function main()
 		if not privacy_owners.startup_checkpoint() then return end
 		_cached_app_id = foreground and foreground.appId ~= "" and foreground.appId or nil
 		_polled_window.app = _cached_app_id
+		require("modules.keymap.game_keys_focus").follow_focus(_cached_app_id)
 		_polled_window.title = foreground and foreground.windowTitle or nil
 		keystats.observe_hold_focus(_cached_app_id)
 		keystats.set_private_window(

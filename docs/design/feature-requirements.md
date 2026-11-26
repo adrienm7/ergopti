@@ -373,6 +373,8 @@ two disagree in either direction.
 | `layout.emulate_bottom_row`                                   | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulated_layout`                                      | —               | `evdev`, `uinput`                      | —                    |
 | `layout.emulated_layout_recents`                              | —               | —                                      | —                    |
+| `layout.game_keys`                                            | —               | —                                      | —                    |
+| `layout.game_keys_apps`                                       | —               | —                                      | —                    |
 | `category_enabled.hotstrings`                                 | n/a             | n/a                                    | —                    |
 | `category_enabled.layout`                                     | n/a             | n/a                                    | —                    |
 | `category_enabled.shortcuts`                                  | n/a             | n/a                                    | —                    |

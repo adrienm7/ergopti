@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Ergopti에 화면 기록이 허용되지 않았습니다. 시스템 설정 › 개인정보 보호 및 보안에서 허용하세요",
 	"keepawake.reason.capture_unavailable": "여기에서는 화면을 읽을 수 없습니다",
 	"keepawake.reason.ocr_engine_missing": "텍스트 인식을 사용할 수 없습니다(Linux에서는 tesseract 설치). 이미지 대상은 계속 작동합니다",
-	"keepawake.reason.ocr_language_missing": "사용하는 언어에 맞는 텍스트 인식 언어가 설치되어 있지 않습니다"
+	"keepawake.reason.ocr_language_missing": "사용하는 언어에 맞는 텍스트 인식 언어가 설치되어 있지 않습니다",
+	"menu.layout.game_keys": "게임 키",
+	"menu.layout.game_keys_apps": "앱별 게임 키",
+	"menu.layout.game_keys.physical": "물리적 위치에 그대로",
+	"menu.layout.game_keys.letters": "Ergopti 글자를 따름",
+	"menu.layout.game_keys_app": "{1}에서",
+	"menu.layout.game_keys_app_default": "다른 앱과 같게",
+	"menu.layout.game_keys_no_app": "앱별: 먼저 게임에서 입력하세요",
+	"platform_reason.game_keys_physical_needs_installed_layout": "사용할 수 없음: Linux에서는 키의 코드가 하나뿐입니다. Ergopti로 입력하면서 물리적 위치를 유지하려면 시스템에 Ergopti 배열을 설치하세요. 그러면 게임이 그 배열로 전환됩니다.",
+	"platform_reason.game_keys_letters_needs_base_layout": "사용할 수 없음: Ergopti 배열이 설치되어 있으면 게임이 어떤 키를 읽을지는 시스템이 정합니다. 게임 키가 글자를 따르게 하려면 QWERTY 또는 AZERTY 배열을 선택하고 에뮬레이션할 배열로 Ergopti를 선택하세요.",
+	"platform_reason.game_keys_vk_games_follow_letters": "일부 게임(Unreal Engine…)은 위치가 아니라 글자를 읽습니다. 그 키는 Ergopti 글자를 따릅니다.",
+	"platform_reason.game_keys_hid_games_are_physical": "하드웨어 키보드를 읽는 게임(GameController)은 항상 물리적 위치를 유지합니다."
 }

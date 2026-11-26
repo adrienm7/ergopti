@@ -34,6 +34,8 @@ const SHARED_SEND_INPUT = ROOT + '_shared/platform/input/send_input.lua';
 const STAR_CORE_LUA = ROOT + '_shared/shortcuts/engine/star_slot_core.lua';
 const STAR_CORE_AHK = ROOT + '_shared/shortcuts/data/star_slot.ahk';
 const DEBUG_REPORT = ROOT + '_shared/diagnostics/engine/healthcheck/report.lua';
+const SHARED_EMULATION_MENU = ROOT + '_shared/layouts/engine/emulation/menu.lua';
+const WIN_LAYOUT_MENU = ROOT + 'windows/ui/menu/menu_layout.ahk';
 
 const LINUX_GESTURES = ROOT + 'linux/gestures/engine/manager.lua';
 const LINUX_CONFLICTS = ROOT + 'linux/gestures/ui/conflicts.lua';
@@ -245,6 +247,19 @@ const SEND_INPUT_SPECS = () => [
 ];
 
 module.exports = [
+	{
+		prefix: 'menu.layout.game_keys.',
+		files: [SHARED_EMULATION_MENU, WIN_LAYOUT_MENU],
+		source: 'the choices of layout.game_keys, its enum_values in the features manifest',
+		keys: () => {
+			const entry = []
+				.concat(ctx.toml(FEATURES_MANIFEST).features.layout ?? [])
+				.find((f) => f.id === 'game_keys');
+			if (!entry || !Array.isArray(entry.enum_values) || entry.enum_values.length === 0)
+				throw new Error(`${FEATURES_MANIFEST} declares no layout.game_keys choices`);
+			return ctx.keysOf('menu.layout.game_keys.', entry.enum_values);
+		}
+	},
 	{
 		prefix: 'category.',
 		files: [LINUX_HOTSTRINGS],

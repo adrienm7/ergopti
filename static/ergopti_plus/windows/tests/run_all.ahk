@@ -926,6 +926,7 @@ _LLM_Deps_State := "ready"
 #Include unit/ai/navigation/test_accept_injects_exact_text.ahk
 #Include unit/modules/shortcuts/test_accented_shortcuts.ahk
 #Include unit/modules/keymap/test_keylayout_emulation.ahk
+#Include unit/modules/keymap/test_game_keys.ahk
 #Include unit/modules/keymap/test_keylayout_altgr_characterization.ahk
 #Include unit/modules/keymap/test_keylayout_canonical_source.ahk
 #Include unit/hotstrings/engine/magic_key/test_source_hotkeys.ahk

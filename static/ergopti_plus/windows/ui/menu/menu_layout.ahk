@@ -490,3 +490,103 @@ _LAY_NumberRowEdgesToggle(Value, RefreshFn, *) {
 _LAY_NumberRowChoose(Expected, WriterFn, RefreshFn, NotifyFn, Value) {
 	return _LAY_NumberRowCommit(Expected, Value, WriterFn, RefreshFn, NotifyFn)
 }
+
+
+
+
+; ── « Touches de jeu » ─────────────────────────────────────────────────────────
+
+/**
+ * Layout > « Touches de jeu » (maintainer decision of 2026-11-26): the same rows
+ * as macOS and Linux (_shared/layouts/engine/emulation/menu.lua game_keys_rows):
+ * the global choice as one single-choice group, each choice greyed with its
+ * reason where Windows cannot honour it here and the checked choice's limit
+ * beneath, then the application last typed in and its own choice, which makes
+ * it a game.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Func} WriteFn Port: WriteFn(Path, Value) persists one leaf, true once written.
+ * @param {String} App The application's executable; the one last typed in when omitted.
+ * @param {String} Mode "emulation", "installed" or "system"; read live when omitted.
+ * @param {String} InstalledKlid The installed Ergopti layout's KLID; read live when omitted.
+ * @returns {Array} One submenu row holding the choices.
+ */
+_LAY_GameKeysRows(FeaturesSource := unset, WriteFn := 0, App := unset, Mode := unset, InstalledKlid := unset) {
+	global Features, _GK_Foreground
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !HasMethod(WriteFn, "Call")
+		WriteFn := _LAY_GameKeysWrite
+	if !IsSet(App)
+		App := _GK_Foreground["app"]
+	if !IsSet(InstalledKlid)
+		InstalledKlid := GameKeys_InstalledKlid()
+	if !IsSet(Mode)
+		Mode := _LAY_GameKeysMode(InstalledKlid)
+	Settings := GameKeys_Resolve(FeaturesSource)
+	Installed := InstalledKlid != "" && GameKeys_EmulatesErgopti()
+	Choose(Path, Value) => (*) => WriteFn.Call(Path, Value)
+	; The choice vocabulary's labels, "" being « like the other applications »:
+	; the rows are this list provider's data, as the emulation choices are.
+	Labels := Map("", t("menu.layout.game_keys_app_default"))
+	for Choice in GameKeys_Choices()
+		Labels[Choice] := t("menu.layout.game_keys." . Choice)
+	ChoiceRow(Choice, Checked, Game, Action) {
+		Route := GameKeys_Route("windows", Mode, Choice, Map("installed_layout", Installed, "game", Game))
+		Row := Map("label", Labels[Choice], "checked", Checked, "action", Action, "route", Route)
+		if !Route["available"]
+			Row["disabled"] := true, Row["disabled_reason_key"] := Route["reason_key"]
+		return Row
+	}
+	Items := []
+	Note := ""
+	for Choice in GameKeys_Choices() {
+		Row := ChoiceRow(Choice, Choice == Settings["choice"], false, Choose(ConfigKey.LAYOUT_GAME_KEYS, Choice))
+		if Row["checked"]
+			Note := Row["route"]["note_key"]
+		Row.Delete("route")
+		Items.Push(Row)
+	}
+	if Note != ""
+		Items.Push(Map("label", t(Note), "disabled", true))
+	if App == "" {
+		NoApp := t("menu.layout.game_keys_no_app")
+		Items.Push(Map("label", NoApp, "disabled", true))
+	} else {
+		For := GameKeys_ChoiceFor(Settings, "windows", App)
+		Own := For["overridden"] ? For["choice"] : ""
+		AppItems := [Map("label", Labels[""], "checked", Own == "",
+			"action", Choose(ConfigKey.LAYOUT_GAME_KEYS_APPS, GameKeys_AppsWith(Settings, "windows", App, "")))]
+		for Choice in GameKeys_Choices() {
+			Row := ChoiceRow(Choice, Choice == Own, true,
+				Choose(ConfigKey.LAYOUT_GAME_KEYS_APPS, GameKeys_AppsWith(Settings, "windows", App, Choice)))
+			Row.Delete("route")
+			AppItems.Push(Row)
+		}
+		Shown := Labels[Own]
+		Items.Push(Map("label", LabelValue(Format(t("menu.layout.game_keys_app"), App), Shown), "items", AppItems))
+	}
+	return [Map("label", LabelValue(t("menu.layout.game_keys"), Labels[Settings["choice"]]),
+		"items", Items)]
+}
+
+; Which Ergopti types now: the emulation, the installed Ergopti layout in front, or neither.
+_LAY_GameKeysMode(InstalledKlid) {
+	global Features
+	if KeylayoutEmulation_IsActive() || GameKeys_EmulatesErgopti()
+		return "emulation"
+	if InstalledKlid != "" && KLS_ActiveId() == InstalledKlid
+		return "installed"
+	return "system"
+}
+
+; Persists one « Touches de jeu » leaf, then redraws the menu with it.
+_LAY_GameKeysWrite(Path, Value) {
+	global Features
+	Written := WriteFeatureV2(Features, Path, Value)
+	if !(Written is Integer) || Written != true
+		return false
+	GameKeys_Invalidate()
+	try LoggerInfo("Menu", "Game keys updated ({1}).", Path)
+	RebuildTrayMenu()
+	return true
+}

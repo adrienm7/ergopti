@@ -389,6 +389,11 @@
 				"emulated_layout_recents": {
 					"type": "array",
 					"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+				},
+				"game_keys": { "type": "string", "enum": ["physical", "letters"] },
+				"game_keys_apps": {
+					"type": "object",
+					"additionalProperties": { "type": "string", "enum": ["physical", "letters"] }
 				}
 			}
 		},

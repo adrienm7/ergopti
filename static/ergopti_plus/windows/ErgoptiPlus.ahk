@@ -1434,6 +1434,9 @@ _RegisterScriptAltGrHotkeys()
 ; Update the original static slots in place: creating runtime variants would
 ; move the direct digits behind the static typing tap-hold roll variants.
 DigitRow_RegisterBindings()
+; The release of every key the emulation holds (« Touches de jeu »), before any
+; other release hotkey of those keys: each held down gets its up.
+GameKeys_RegisterReleases()
 ; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.

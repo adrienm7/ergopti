@@ -63,12 +63,14 @@ local function fixture(layout, form, source_override)
 			if form == "iso" then return iso end
 			return entry.hs
 		end,
-		keycode_for_char = function(char) return ({ z = 6, c = 8 })[char] end,
+		keycode_for_char = function(char) return (record.keys or { z = 6, c = 8 })[char] end,
 		is_active = function() return not record.paused end,
 		autorepeat = function(e) return e.autorepeat == true end,
 		now_ms = function() return record.now end,
 		option_sides = function(e) return { left = e.left_option == true, right = e.right_option == true } end,
 		typed_text = function() return record.before or "" end,
+		frontmost_app = function() return record.front end,
+		ergopti_source_selected = function() return record.ergopti_source == true end,
 		post = function(outputs)
 			for _, output in ipairs(outputs) do
 				if output.type == "text" then record.posted[#record.posted + 1] = output.text
@@ -111,6 +113,47 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		local M = fixture({})
 		M.reload()
 		helpers.assert_eq(M.status().number_row, false, "nothing emulated orders nothing")
+	end)
+
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): the key code is
+	-- what a keyCode-reading game binds; only the string was ever rewritten.
+	helpers.it("keeps the physical key code by default and moves it under « letters » (game-keys-letters)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		helpers.assert_true(M.reload(), "the shipped Ergopti layout loads")
+		record.keys = { ["è"] = 33 }
+		local e = event({}, "q")
+		M.key_down(e, KC_Q)
+		helpers.assert_eq(e.unicode, "è")
+		helpers.assert_nil(e.keycode, "physical: the key code stays the physical key's")
+		local L, letters = fixture({ ergopti_base = true, ergopti_variant = "ergopti", game_keys_apps = { ["com.example.Game"] = "letters" } })
+		L.reload()
+		letters.keys = { ["è"] = 33 }
+		letters.front = "com.example.Game"
+		local down = event({}, "q")
+		L.key_down(down, KC_Q)
+		helpers.assert_eq(down.keycode, 33, "letters: the input source's key that types è")
+		helpers.assert_eq(down.unicode, "è", "the character stays Ergopti's")
+		local up = event({}, "q")
+		helpers.assert_true(not L.key_up(up, KC_Q), "the release is kept")
+		helpers.assert_eq(up.keycode, 33, "the release goes out on the same key code")
+		letters.front = "com.apple.TextEdit"
+		local other = event({}, "q")
+		L.key_down(other, KC_Q)
+		helpers.assert_nil(other.keycode, "another application follows the global choice")
+	end)
+
+	helpers.it("moves the key code over the installed Ergopti layout under « letters » (game-keys-letters)", function()
+		local M, record = fixture({ game_keys = "letters" })
+		M.reload()
+		record.ergopti_source = true
+		local e = event({}, "e")
+		helpers.assert_true(not M.key_down(e, KC_D), "the event is kept")
+		helpers.assert_eq(e.keycode, 14, "the US key of e")
+		helpers.assert_nil(e.unicode, "the installed layout's string is untouched")
+		record.ergopti_source = false
+		local plain = event({}, "e")
+		M.key_down(plain, KC_D)
+		helpers.assert_nil(plain.keycode, "another input source is left alone")
 	end)
 
 	helpers.it("rewrites a key-down to the emulated Ergopti text", function()

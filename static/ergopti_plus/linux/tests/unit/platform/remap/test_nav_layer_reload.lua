@@ -628,6 +628,20 @@ helpers.describe("original configured Navigation source reservations", function(
 		end)
 	end)
 
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): a held key in a game
+	-- waited for its tap-hold decision before it reached the game.
+	helpers.it("(game-keys-tap-holds) a game takes the tap-holds out of the hook and gives them back", function()
+		owned(NAV_NONE, nil, function(s)
+			helpers.assert_true(s.start())
+			helpers.assert_true(s.hook.engine ~= nil, "the tap-holds run")
+			helpers.assert_true(s.manager.set_game(true))
+			helpers.assert_nil(s.hook.engine, "a game's keys skip every tap-hold")
+			helpers.assert_true(s.manager.set_game(true), "the same focus changes nothing")
+			helpers.assert_true(s.manager.set_game(false))
+			helpers.assert_true(s.hook.engine ~= nil, "another application gets them back")
+		end)
+	end)
+
 	helpers.it("(nav-configured-reservation) disable and pause revoke the old frame without public delivery authority", function()
 		owned(NAV_NONE, nil, function(s)
 			helpers.assert_true(s.start())

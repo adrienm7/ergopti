@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Screen recording is not allowed for Ergopti: allow it in System Settings › Privacy & Security",
 	"keepawake.reason.capture_unavailable": "The screen cannot be read here",
 	"keepawake.reason.ocr_engine_missing": "No text recognition is available (on Linux, install tesseract); image targets still work",
-	"keepawake.reason.ocr_language_missing": "No text recognition language is installed for your languages"
+	"keepawake.reason.ocr_language_missing": "No text recognition language is installed for your languages",
+	"menu.layout.game_keys": "Game keys",
+	"menu.layout.game_keys_apps": "Game keys per application",
+	"menu.layout.game_keys.physical": "Stay at their physical place",
+	"menu.layout.game_keys.letters": "Follow the Ergopti letters",
+	"menu.layout.game_keys_app": "For {1}",
+	"menu.layout.game_keys_app_default": "Like the other applications",
+	"menu.layout.game_keys_no_app": "Per application: type in the game first",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Unavailable: on Linux a key has a single code. To keep the physical place while typing Ergopti, install the Ergopti layout in the system: a game then switches to it.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Unavailable: with the Ergopti layout installed, the system decides which key a game reads. For game keys to follow the letters, select a QWERTY or AZERTY layout and choose Ergopti as the layout to emulate.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Some games (Unreal Engine…) read the letter, not the place: their keys follow the Ergopti letters.",
+	"platform_reason.game_keys_hid_games_are_physical": "Games that read the hardware keyboard (GameController) always keep the physical place."
 }

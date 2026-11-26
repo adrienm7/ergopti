@@ -209,6 +209,10 @@ local KEY_MAP = {
 	layout_emulate_top_row               = { sec = "layout", key = LEAF.EMULATE_TOP_ROW          },
 	layout_emulate_home_row              = { sec = "layout", key = LEAF.EMULATE_HOME_ROW         },
 	layout_emulate_bottom_row            = { sec = "layout", key = LEAF.EMULATE_BOTTOM_ROW       },
+	-- « Touches de jeu » (layouts/engine/emulation/game_keys.lua): the global choice
+	-- and the bundle identifiers with their own.
+	layout_game_keys                     = { sec = "layout", key = LEAF.GAME_KEYS, enum = true   },
+	layout_game_keys_apps                = { sec = "layout", key = LEAF.GAME_KEYS_APPS           },
 	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
 	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
 	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },

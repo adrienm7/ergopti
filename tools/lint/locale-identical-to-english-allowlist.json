@@ -2101,6 +2101,10 @@
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv"]
 		},
+		"menu.layout.game_keys_app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "no"]
+		},
 		"menu.layout.native_variant_caption": {
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"

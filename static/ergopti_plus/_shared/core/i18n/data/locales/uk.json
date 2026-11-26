@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Запис екрана для Ergopti не дозволено: дозвольте його в Системних параметрах › Приватність і безпека",
 	"keepawake.reason.capture_unavailable": "Тут неможливо прочитати екран",
 	"keepawake.reason.ocr_engine_missing": "Розпізнавання тексту недоступне (у Linux встановіть tesseract); цілі-зображення й далі працюють",
-	"keepawake.reason.ocr_language_missing": "Для ваших мов не встановлено мову розпізнавання тексту"
+	"keepawake.reason.ocr_language_missing": "Для ваших мов не встановлено мову розпізнавання тексту",
+	"menu.layout.game_keys": "Ігрові клавіші",
+	"menu.layout.game_keys_apps": "Ігрові клавіші за застосунками",
+	"menu.layout.game_keys.physical": "Залишаються на своєму фізичному місці",
+	"menu.layout.game_keys.letters": "Слідують літерам Ergopti",
+	"menu.layout.game_keys_app": "Для {1}",
+	"menu.layout.game_keys_app_default": "Як в інших застосунках",
+	"menu.layout.game_keys_no_app": "За застосунком: спершу наберіть текст у грі",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Недоступно: у Linux клавіша має лише один код. Щоб зберегти фізичне місце й друкувати Ergopti, встановіть розкладку Ergopti в систему: гра тоді перемкнеться на неї.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Недоступно: зі встановленою розкладкою Ergopti система вирішує, яку клавішу читає гра. Щоб ігрові клавіші слідували літерам, виберіть розкладку QWERTY або AZERTY і виберіть Ergopti як розкладку для емуляції.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Деякі ігри (Unreal Engine…) читають літеру, а не місце: їхні клавіші слідують літерам Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "Ігри, що читають апаратну клавіатуру (GameController), завжди зберігають фізичне місце."
 }

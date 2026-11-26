@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Schermopname is niet toegestaan voor Ergopti: sta het toe in Systeeminstellingen › Privacy en beveiliging",
 	"keepawake.reason.capture_unavailable": "Het scherm kan hier niet worden gelezen",
 	"keepawake.reason.ocr_engine_missing": "Geen tekstherkenning beschikbaar (installeer tesseract op Linux); afbeeldingsdoelen werken nog wel",
-	"keepawake.reason.ocr_language_missing": "Er is geen tekstherkenningstaal voor uw talen geïnstalleerd"
+	"keepawake.reason.ocr_language_missing": "Er is geen tekstherkenningstaal voor uw talen geïnstalleerd",
+	"menu.layout.game_keys": "Speltoetsen",
+	"menu.layout.game_keys_apps": "Speltoetsen per toepassing",
+	"menu.layout.game_keys.physical": "Blijven op hun fysieke plek",
+	"menu.layout.game_keys.letters": "Volgen de Ergopti-letters",
+	"menu.layout.game_keys_app": "Voor {1}",
+	"menu.layout.game_keys_app_default": "Zoals de andere toepassingen",
+	"menu.layout.game_keys_no_app": "Per toepassing: typ eerst in het spel",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Niet beschikbaar: onder Linux heeft een toets maar één code. Om de fysieke plek te houden terwijl u Ergopti typt, installeert u de Ergopti-indeling in het systeem: een spel schakelt er dan naar over.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Niet beschikbaar: met de Ergopti-indeling geïnstalleerd bepaalt het systeem welke toets een spel leest. Om de speltoetsen de letters te laten volgen, selecteert u een QWERTY- of AZERTY-indeling en kiest u Ergopti als te emuleren indeling.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Sommige spellen (Unreal Engine…) lezen de letter, niet de plek: hun toetsen volgen de Ergopti-letters.",
+	"platform_reason.game_keys_hid_games_are_physical": "Spellen die het fysieke toetsenbord lezen (GameController) houden altijd de fysieke plek."
 }

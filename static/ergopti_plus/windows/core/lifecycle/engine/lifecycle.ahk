@@ -538,6 +538,9 @@ _LifecycleStopUIAWorkerForSuspend() {
 
 Ergopti_OnSuspendEnter() {
 	global _LifecycleKeepAwakeAtPause
+	; A key the emulation holds for a game gets its up now: a paused driver holds nothing.
+	if IsSet(GameKeys_ReleaseAll)
+		GameKeys_ReleaseAll()
 	; Retire RAM-only note continuations before any suspend step can yield.
 	if IsSet(TakeNoteRevokePending)
 		TakeNoteRevokePending()

@@ -62,6 +62,9 @@ local function fixture(layout, overrides)
 		is_active = function() return not record.paused end,
 		ergopti_family = function() return "ergopti" end,
 		typed_text = function() return record.before or "" end,
+		-- The session layout's keys: none unless a case names some, so a press
+		-- keeps the typed route the older cases pin.
+		resolve_key = function(char) return record.session_keys and record.session_keys[char] or nil end,
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
 	M.init(deps)
@@ -79,6 +82,38 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not M.status().active, "nothing is emulated")
 		helpers.assert_true(not press(M, KEY_Q), "the key passes")
 		helpers.assert_eq(#record.typed, 0, "nothing typed")
+	end)
+
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): before it, every
+	-- emulated character was typed as a tap and again on each repeat, so a game
+	-- could neither bind nor hold it.
+	helpers.it("holds the session layout's key that types the character (game-keys-held)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		helpers.assert_true(M.reload(), "the shipped Ergopti layout loads")
+		record.session_keys = { ["è"] = { keycode = 26, mods = {} } }
+		local consumed, repeat_callback, release_callback, hold = press(M, KEY_Q, {}, "q")
+		helpers.assert_true(consumed, "the press is consumed")
+		helpers.assert_eq(#record.typed, 0, "nothing typed: the key itself goes out")
+		helpers.assert_eq(hold and hold.code, 26, "held on the session layout's key that types è")
+		helpers.assert_nil(release_callback, "the hook owns the held key's release")
+		helpers.assert_eq(#record.dispatched, 0, "the character path waits for the down on the wire")
+		hold.after()
+		helpers.assert_eq(record.dispatched, { "è" }, "then sees the character once")
+		helpers.assert_true(repeat_callback({ code = KEY_Q, mods = {}, value = 2 }), "the held key's repeat")
+		helpers.assert_eq(#record.typed, 0, "a repeat is never re-typed")
+		helpers.assert_eq(record.dispatched, { "è", "è" }, "each repeat the wire took reaches the character path")
+		helpers.assert_true(not repeat_callback({ code = KEY_D, mods = {}, value = 2 }), "another key's repeat is refused")
+	end)
+
+	helpers.it("keeps the typed route for a character the session layout cannot type as held (game-keys-text-route)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		M.reload()
+		record.session_keys = { ["È"] = { keycode = 26, mods = { "shift" } } }
+		local consumed, _, _, hold = press(M, KEY_Q, {}, "q")
+		helpers.assert_true(consumed and hold == nil, "è has no key of its own: typed")
+		helpers.assert_eq(record.typed, { "è" })
+		local _, _, _, shifted = press(M, KEY_Q, { shift = true }, "Q")
+		helpers.assert_eq(shifted and shifted.code, 26, "È with the hand's Shift is the same key, held")
 	end)
 
 	helpers.it("types the built-in Ergopti variant in the grabbed key's place", function()

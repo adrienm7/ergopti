@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "Die Bildschirmaufnahme ist für Ergopti nicht erlaubt: erlauben Sie sie unter Systemeinstellungen › Datenschutz & Sicherheit",
 	"keepawake.reason.capture_unavailable": "Der Bildschirm kann hier nicht gelesen werden",
 	"keepawake.reason.ocr_engine_missing": "Keine Texterkennung verfügbar (unter Linux tesseract installieren); Bildziele funktionieren weiterhin",
-	"keepawake.reason.ocr_language_missing": "Für Ihre Sprachen ist keine Texterkennungssprache installiert"
+	"keepawake.reason.ocr_language_missing": "Für Ihre Sprachen ist keine Texterkennungssprache installiert",
+	"menu.layout.game_keys": "Spieltasten",
+	"menu.layout.game_keys_apps": "Spieltasten pro Anwendung",
+	"menu.layout.game_keys.physical": "Bleiben an ihrer physischen Stelle",
+	"menu.layout.game_keys.letters": "Folgen den Ergopti-Buchstaben",
+	"menu.layout.game_keys_app": "Für {1}",
+	"menu.layout.game_keys_app_default": "Wie die anderen Anwendungen",
+	"menu.layout.game_keys_no_app": "Pro Anwendung: zuerst im Spiel tippen",
+	"platform_reason.game_keys_physical_needs_installed_layout": "Nicht verfügbar: Unter Linux hat eine Taste nur einen Code. Um die physische Stelle zu behalten und trotzdem Ergopti zu tippen, installieren Sie das Ergopti-Layout im System: Ein Spiel wechselt dann darauf.",
+	"platform_reason.game_keys_letters_needs_base_layout": "Nicht verfügbar: Mit installiertem Ergopti-Layout entscheidet das System, welche Taste ein Spiel liest. Damit die Spieltasten den Buchstaben folgen, wählen Sie ein QWERTY- oder AZERTY-Layout und Ergopti als zu emulierendes Layout.",
+	"platform_reason.game_keys_vk_games_follow_letters": "Manche Spiele (Unreal Engine…) lesen den Buchstaben, nicht die Stelle: Ihre Tasten folgen den Ergopti-Buchstaben.",
+	"platform_reason.game_keys_hid_games_are_physical": "Spiele, die die Hardware-Tastatur lesen (GameController), behalten immer die physische Stelle."
 }

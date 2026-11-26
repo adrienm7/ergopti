@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "הקלטת מסך אינה מותרת ל-Ergopti: אפשרו אותה בהגדרות המערכת › פרטיות ואבטחה",
 	"keepawake.reason.capture_unavailable": "לא ניתן לקרוא כאן את המסך",
 	"keepawake.reason.ocr_engine_missing": "זיהוי טקסט אינו זמין (בלינוקס התקינו את tesseract); יעדי תמונה עדיין פועלים",
-	"keepawake.reason.ocr_language_missing": "לא הותקנה שפת זיהוי טקסט עבור השפות שלך"
+	"keepawake.reason.ocr_language_missing": "לא הותקנה שפת זיהוי טקסט עבור השפות שלך",
+	"menu.layout.game_keys": "מקשי משחק",
+	"menu.layout.game_keys_apps": "מקשי משחק לפי יישום",
+	"menu.layout.game_keys.physical": "נשארים במקומם הפיזי",
+	"menu.layout.game_keys.letters": "עוקבים אחר אותיות Ergopti",
+	"menu.layout.game_keys_app": "עבור {1}",
+	"menu.layout.game_keys_app_default": "כמו שאר היישומים",
+	"menu.layout.game_keys_no_app": "לפי יישום: הקלידו קודם במשחק",
+	"platform_reason.game_keys_physical_needs_installed_layout": "לא זמין: ב-Linux למקש יש קוד אחד בלבד. כדי לשמור על המקום הפיזי ובכל זאת להקליד Ergopti, התקינו את פריסת Ergopti במערכת: המשחק יעבור אליה אז.",
+	"platform_reason.game_keys_letters_needs_base_layout": "לא זמין: כשפריסת Ergopti מותקנת, המערכת קובעת איזה מקש משחק קורא. כדי שמקשי המשחק יעקבו אחר האותיות, בחרו פריסת QWERTY או AZERTY ובחרו ב-Ergopti כפריסה להדמיה.",
+	"platform_reason.game_keys_vk_games_follow_letters": "יש משחקים (Unreal Engine…) שקוראים את האות ולא את המקום: המקשים שלהם עוקבים אחר אותיות Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "משחקים שקוראים את המקלדת הפיזית (GameController) תמיד שומרים על המקום הפיזי."
 }

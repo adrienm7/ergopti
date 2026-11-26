@@ -6713,5 +6713,16 @@
 	"keepawake.reason.capture_permission_missing": "تسجيل الشاشة غير مسموح لـ Ergopti: اسمح به من إعدادات النظام › الخصوصية والأمن",
 	"keepawake.reason.capture_unavailable": "لا يمكن قراءة الشاشة هنا",
 	"keepawake.reason.ocr_engine_missing": "لا يتوفر التعرف على النص (ثبّت tesseract على Linux)؛ ما تزال أهداف الصور تعمل",
-	"keepawake.reason.ocr_language_missing": "لا توجد لغة تعرّف على النص مثبتة للغاتك"
+	"keepawake.reason.ocr_language_missing": "لا توجد لغة تعرّف على النص مثبتة للغاتك",
+	"menu.layout.game_keys": "مفاتيح الألعاب",
+	"menu.layout.game_keys_apps": "مفاتيح الألعاب حسب التطبيق",
+	"menu.layout.game_keys.physical": "تبقى في مكانها الفعلي",
+	"menu.layout.game_keys.letters": "تتبع حروف Ergopti",
+	"menu.layout.game_keys_app": "لـ {1}",
+	"menu.layout.game_keys_app_default": "مثل التطبيقات الأخرى",
+	"menu.layout.game_keys_no_app": "حسب التطبيق: اكتب في اللعبة أولًا",
+	"platform_reason.game_keys_physical_needs_installed_layout": "غير متاح: في Linux للمفتاح رمز واحد فقط. للإبقاء على المكان الفعلي مع الكتابة بـ Ergopti، ثبّت تخطيط Ergopti في النظام: تنتقل اللعبة إليه حينها.",
+	"platform_reason.game_keys_letters_needs_base_layout": "غير متاح: مع تثبيت تخطيط Ergopti يقرر النظام أي مفتاح تقرؤه اللعبة. لكي تتبع مفاتيح الألعاب الحروف، اختر تخطيط QWERTY أو AZERTY واختر Ergopti كتخطيط للمحاكاة.",
+	"platform_reason.game_keys_vk_games_follow_letters": "بعض الألعاب (Unreal Engine…) تقرأ الحرف لا المكان: مفاتيحها تتبع حروف Ergopti.",
+	"platform_reason.game_keys_hid_games_are_physical": "الألعاب التي تقرأ لوحة المفاتيح الفعلية (GameController) تبقي المكان الفعلي دائمًا."
 }
