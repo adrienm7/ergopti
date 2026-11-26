@@ -147,17 +147,71 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_true(#state.calls > 1, "the install ran: " .. table.concat(state.calls, ","))
 	end)
 
-	helpers.it("(lmh-004-extension-reload) a layout shipping an extension reloads the daemon", function()
+	helpers.it("(lmh-004-extension-reload) a layout shipping an extension drops its hotstrings in place", function()
 		local Bridge, state, daemon_state = bridge()
-		state.daemon_reloads = 0
-		daemon_state.on_reload = function() state.daemon_reloads = state.daemon_reloads + 1; return true end
+		state.restarts, state.in_place = 0, 0
+		daemon_state.on_reload = function() state.restarts = state.restarts + 1; return true end
+		daemon_state.reload_layout_extensions = function() state.in_place = state.in_place + 1; return true end
 		daemon_state.layout_registry.snapshot = function()
 			return { platform = "linux", index = INDEX, installed = { ergol = { id = "ergol", extension = { root = "x" } } }, source = "cache" }
 		end
 		daemon_state.layout_registry.uninstall = function(_, on_done) on_done(true, {}) end
 		Bridge.on_message({ action = "ready" }, daemon_state)
 		helpers.assert_true(Bridge.on_message({ action = "uninstall", id = "ergol" }, daemon_state).handled)
-		helpers.assert_eq(state.daemon_reloads, 1, "the uninstalled extension's hotstrings go through a reload")
+		helpers.assert_eq(state.in_place, 1, "the uninstalled extension's hotstrings drop in this process")
+		helpers.assert_eq(state.restarts, 0, "the daemon is not restarted for a layout removal")
+	end)
+
+	-- Arch field report, 2026-11-25: installing Ergopti from the layout manager
+	-- restarted the daemon (« Reload requested by the paths editor »), which
+	-- closed the window the user was in (maintainer decision: install in place).
+	helpers.it("(layout-install-in-place) an install keeps the daemon and its window, and refreshes the registry and the tray", function()
+		local Bridge, state, daemon_state = bridge()
+		state.restarts, state.in_place, state.rebuilds = 0, 0, 0
+		local installed = {}
+		local extension_index = { layouts = { { id = "ergol", name = "Ergo-L", extension = { id = "ergol" } } } }
+		daemon_state.on_reload = function() state.restarts = state.restarts + 1; return true end
+		daemon_state.restart = function() state.restarts = state.restarts + 1; return true end
+		daemon_state.reload_layout_extensions = function()
+			helpers.assert_true(installed.ergol ~= nil, "the extensions reload after the registry committed the install")
+			state.in_place = state.in_place + 1
+			return true
+		end
+		daemon_state.on_config_changed = function() state.rebuilds = state.rebuilds + 1 end
+		daemon_state.layout_registry.snapshot = function()
+			return { platform = "linux", index = extension_index, installed = installed, source = "cache" }
+		end
+		daemon_state.layout_registry.install = function(id, on_done)
+			installed[id] = { id = id, extension = { id = id } }
+			on_done(true, {})
+		end
+		-- The window's page stays current for the whole install.
+		local epoch = 7
+		daemon_state.webview_manager.page_current = function(app, current) return app == "layout_manager" and current == epoch end
+		local context = { app_name = "layout_manager", epoch = epoch }
+		helpers.assert_true(Bridge.on_message({ action = "ready" }, daemon_state, context).handled)
+		helpers.assert_true(Bridge.on_message({ action = "install", id = "ergol" }, daemon_state, context).handled)
+		helpers.assert_eq(state.restarts, 0, "an install never restarts the daemon")
+		helpers.assert_eq(state.in_place, 1, "the layout's hotstring extension loads in this process")
+		helpers.assert_true(state.rebuilds >= 1, "the tray rows follow the install")
+		helpers.assert_eq(#state.hidden, 0, "the layout manager window stays open")
+		local last = state.pushes[#state.pushes]
+		helpers.assert_eq(last.app, "layout_manager", "the result reaches the same window")
+		helpers.assert_contains(last.js, "window.updateState(")
+		helpers.assert_contains(last.js, '"ergol":{')
+		helpers.assert_contains(last.js, '"action":"install"')
+		helpers.assert_contains(last.js, '"ok":true')
+	end)
+
+	helpers.it("(layout-install-in-place) the daemon reloads a layout's extensions in process, never by a restart", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = file:read("*a")
+		file:close()
+		local wiring = source:match("\n%s*reload_layout_extensions = ([^\n]+)")
+		helpers.assert_true(wiring ~= nil, "the daemon state names reload_layout_extensions")
+		helpers.assert_contains(wiring, "reload_hotstrings(")
+		helpers.assert_true(not wiring:find("perform_reload", 1, true) and not wiring:find("restart", 1, true),
+			"a layout change never restarts the daemon: " .. wiring)
 	end)
 
 	helpers.it("(lmh-005-emulate-tray) emulating without installing rebuilds the tray", function()

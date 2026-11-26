@@ -266,7 +266,7 @@ local function new_window(spec)
 			layout_changed = function(id)
 				if _layout_change_handler then _layout_change_handler(id) end
 			end,
-			reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end,
+			reload_extensions = function(id) return M._reload_extensions(id) end,
 			apply_nav = _nav_applier and function(text, on_done)
 				local applier = _nav_applier
 				if not applier then
@@ -512,6 +512,25 @@ function M.set_extension_reloader(reloader)
 		error("layout_manager.set_extension_reloader: a function or nil is required", 2)
 	end
 	_extension_reloader = reloader
+end
+
+--- Loads or drops a changed layout's extension packs. The packs are discovered
+--- once per boot, so a changed catalogue still reloads the driver, which closes
+--- this window; an install that leaves the packs as they are (an Ergopti layout,
+--- whose pack ships with the app) only applies the layout change in place, and
+--- the window stays open (maintainer decision, 2026-11-25).
+--- @param id string The changed layout's registry id.
+--- @return boolean accepted
+function M._reload_extensions(id)
+	local checked, changed = pcall(require("hotstrings.engine.catalogue.extension_packs").changed_since_boot)
+	if not checked then
+		Logger.error(LOG, "The extension packs could not be compared after '%s' changed; reloading: %s.", id, tostring(changed))
+	elseif changed == false then
+		Logger.info(LOG, "The '%s' layout changed no extension pack: applied without a reload.", id)
+		if _layout_change_handler then _layout_change_handler(id) end
+		return true
+	end
+	return _extension_reloader ~= nil and _extension_reloader(id) == true
 end
 
 --- Opens the layout manager, or focuses it when it is already open. The factory's

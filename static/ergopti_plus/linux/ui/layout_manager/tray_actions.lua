@@ -18,9 +18,9 @@
 ---    success; on failure a persistent notice and a red tray row
 ---    (core/ui/engine/component_status.lua) that leaves once the step's goal
 ---    holds, as the window's result line would have said it.
---- 3. After an install or an uninstall the daemon reloads a layout that ships
----    hotstrings and the emulation follows a changed emulated layout, exactly
----    as the window's controller does (_shared/layouts/engine/manager_bridge.lua).
+--- 3. After an install or an uninstall a layout that ships hotstrings reloads
+---    them in place and the emulation follows a changed emulated layout,
+---    exactly as the window's controller does (ui/layout_manager/layout_change.lua).
 --- ==============================================================================
 
 local M = {}
@@ -228,27 +228,18 @@ local function say_failed(deps, step, code, detail)
 	end
 end
 
---- Reloads what an installed or removed layout changes, as the window does:
---- a layout shipping hotstrings through a daemon reload, else the emulation
---- when it is the emulated layout.
+--- Applies in place what an installed or removed layout changes, as the
+--- window does (ui/layout_manager/layout_change.lua): its hotstring extension
+--- and the emulation when it is the emulated layout, never a daemon restart.
 --- @param deps table
 --- @param extension boolean Whether the layout carries a hotstring extension.
 local function layout_changed(deps, extension)
 	local state = deps.daemon_state
-	if extension then
-		if type(state) ~= "table" or type(state.on_reload) ~= "function" then
-			Logger.error(LOG, "The Ergopti layout's extension changed but the daemon cannot reload.")
-			return
-		end
-		local ok, accepted = pcall(state.on_reload)
-		if not ok or accepted ~= true then
-			Logger.error(LOG, "The reload after the Ergopti layout changed was refused: %s.", tostring(accepted))
-		end
+	if type(state) ~= "table" then
+		Logger.error(LOG, "The Ergopti layout changed but the daemon state is unavailable.")
 		return
 	end
-	local emulation = deps.emulation
-	local ok, status = pcall(emulation.status)
-	if ok and type(status) == "table" and status.id == deps.layout_id then emulation.reload_if_started() end
+	require("ui.layout_manager.layout_change").apply(state, deps.emulation, deps.layout_id, extension)
 end
 
 

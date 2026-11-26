@@ -552,6 +552,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       no `Slow input.char` or `Slow input.dispatch` line of about 20 ms; then Tab into a password field and check that
       a hotstring trigger typed there does not expand. macOS and Windows have no such wait (their key paths read a
       cached field verdict).
+- [ ] **[FIELD] A layout install keeps the layout manager open (maintainer decision, 2026-11-25).** Arch, KDE Plasma
+      Wayland: installing Ergopti from the layout manager restarted the daemon and closed the window, and logged a
+      spurious « WebKit process for 'layout_manager' terminated » ERROR. Linux now reloads the layout's hotstring
+      extension, the emulation and the tray in place (`ui/layout_manager/layout_change.lua`); macOS reloads only when
+      the extension packs on disk changed. Left: (a) on the tester's machine, install then uninstall Ergopti from the
+      layout manager: the window stays open with the result line, the tray follows, Ergopti's hotstrings still expand
+      and the log has no « Restarting the daemon » line; (b) Windows still reloads after installing a layout with an
+      extension or the emulated one (`_LayMgrWeb_After`, `windows/ui/layout_manager/init.ahk`): apply the same rule
+      there (compare the packs found now with `_HotstringExtensionPacks`, reload the emulation in place), which needs
+      a Windows session to run the AHK suite.
 - [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25), field checks.** The code is on
       `dev`: the Windows error and diagnostics delivery without WebView2, its 🔴 keyboard core row for a failed
       `ergopti_nav_owner.dll` (`HealthCheck_FormatPlain`, uncalled, was removed), the macOS red Hotstrings dot for a

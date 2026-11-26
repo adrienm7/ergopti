@@ -194,6 +194,35 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 		Packs._reset()
 	end)
 
+	-- Arch field report, 2026-11-25 (the same flow on macOS): installing the
+	-- Ergopti layout reloaded the driver for an extension pack the app already
+	-- ships, which closed the layout manager window.
+	helpers.it("(layout-install-in-place) tells an install that leaves the packs as they are from one that changes them", function()
+		Packs._reset()
+		local roots = { "/bundled" }
+		local io_fns = {
+			list_dirs = function(root)
+				if root == "/bundled" then return { "/bundled/demo" } end
+				if root == "/installed" then return { "/installed/acme" } end
+				return {}
+			end,
+			list_files = function(dir) return dir:match("/hotstrings$") and { dir .. "/phrases.toml" } or {} end,
+			read_file = function() return '[extension]\nname = "Demo"\n' end,
+		}
+		Packs.discover(roots, io_fns)
+		helpers.assert_eq(Packs.changed_since_boot(roots, io_fns), false, "the same packs need no reload")
+		helpers.assert_eq(Packs.changed_since_boot({ "/bundled", "/installed" }, io_fns), true,
+			"a layout bringing a new pack needs the reload that discovers it")
+		helpers.assert_eq(Packs.changed_since_boot({}, io_fns), true, "a dropped pack needs it too")
+		Packs._reset()
+	end)
+
+	helpers.it("(layout-install-in-place) the macOS host reloads the driver only for a changed pack catalogue", function()
+		local host = assert(helpers.read_module_source("ui.layout_manager"))
+		helpers.assert_contains(host, "reload_extensions = function(id) return M._reload_extensions(id) end")
+		helpers.assert_contains(host, "extension_packs\").changed_since_boot)")
+	end)
+
 	helpers.it("(layout-extension-macos) leaves a broken pack out of the boot catalogue and reports it", function()
 		Packs._reset()
 		local manifests = {

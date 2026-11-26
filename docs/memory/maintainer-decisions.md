@@ -3282,6 +3282,28 @@ the key path; `test_focus_guard_input_latency.lua` refuses one. macOS
 (`km_utils.is_secure_field`, a cached verdict) and Windows (UIA in a worker,
 cached per focus generation) had no per-key wait.
 
+## A layout install keeps the driver running (2026-11-25)
+
+Maintainer decision (Arch, KDE Plasma Wayland field report: installing
+Ergopti from the layout manager restarted the daemon, « Reload requested by
+the paths editor », and closed the window the user was in): an install,
+update or removal reloads only what it changes, so the layout manager window
+stays open and shows the result. Linux
+(`linux/ui/layout_manager/layout_change.lua`, for the window and the tray's
+window-less Ergopti rows): the emulation reloads when the layout is the
+emulated one, a layout shipping a hotstring extension reloads the hotstring
+catalogue in process (the daemon state's `reload_layout_extensions`, which
+discovers the extension roots again), and the tray is rebuilt. macOS discovers
+its packs once per boot: it reloads Hammerspoon only when the packs found on
+disk differ from the boot's catalogue (`extension_packs.changed_since_boot`),
+else applies the change in place; an Ergopti layout's pack is the shipped one,
+so its install never reloads. Windows still reloads in `_LayMgrWeb_After` (AHK
+hotstrings and the emulation are built at load); it is a TODO.md item.
+A web view process that ends with Ergopti's own restart or shutdown logs at
+INFO, not ERROR (`modules/updater/restarter.lua` `own_stop_requested`).
+Action: do not restart a driver for a layout operation that a reload in place
+can carry.
+
 ## One daily log; « Export the logs (zip) » for testers (2026-11-25)
 
 Maintainer decision (QCM, « too many log files; testers must send dozens »):

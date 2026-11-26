@@ -285,6 +285,32 @@ function M.catalogue()
 	return _catalogue
 end
 
+--- A stable text naming each pack's id, folder and files, in catalogue order.
+--- @param packs table Shared extension records.
+--- @return string
+local function signature(packs)
+	local parts = {}
+	for _, pack in ipairs(packs) do
+		parts[#parts + 1] = tostring(pack.id) .. "\0" .. tostring(pack.dir)
+		for _, file in ipairs(pack.toml_files or {}) do parts[#parts + 1] = "t\0" .. tostring(file.path) end
+		for _, file in ipairs(pack.bound_files or {}) do parts[#parts + 1] = "b\0" .. tostring(file.path) end
+	end
+	return table.concat(parts, "\n")
+end
+
+--- Whether the packs found on disk now differ from this boot's catalogue. A
+--- layout install that adds, drops or moves a pack needs the reload that
+--- discovers it; one that leaves the packs as they are needs none, the case of
+--- an Ergopti layout, whose pack is the one the app ships (maintainer decision,
+--- 2026-11-25: a layout install does not restart the driver when it can avoid
+--- it). A pack this boot refused reads as a change, so its reload still runs.
+--- @param roots table|nil Extension roots; defaults to M.roots().
+--- @param io_fns table|nil Scanner collaborators; defaults to this driver's filesystem.
+--- @return boolean changed
+function M.changed_since_boot(roots, io_fns)
+	return signature(M.scan(roots, io_fns)) ~= signature(M.catalogue())
+end
+
 --- The bundled categories this boot's extensions bind to their own files.
 --- @return table Map of category to { path, section_sources }: path replaces the
 ---   bundled file (whole-category binding), section_sources lists { path,

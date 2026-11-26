@@ -167,6 +167,14 @@ local _native_query_generation = 0
 local _shutting_down = false
 local _shutdown_gate_owner = nil
 
+--- Whether this daemon is stopping on its own: the web view manager's
+--- shutdown has begun, or the daemon asked for its own restart
+--- (modules/updater/restarter.lua).
+--- @return boolean
+local function own_stop_in_progress()
+	return _shutting_down or require("modules.updater.restarter").own_stop_requested()
+end
+
 -- Monotonic identity for each newly-created page context. A late blur or crash
 -- callback from an older WebView must not release ownership acquired by its
 -- replacement.
@@ -1488,7 +1496,14 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 				elseif not attempt.acquiring and not attempt.retiring then
 					M._destroy_gtk_window(app_name, window_epoch)
 				end
-				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+				-- Ergopti's own restart or shutdown ends the web processes with
+				-- the daemon (systemd stops the unit's whole cgroup, often before
+				-- this process handles its own TERM): that is no renderer crash.
+				if own_stop_in_progress() then
+					Logger.info(LOG, "WebKit process for '%s' ended with Ergopti's own stop.", app_name)
+				else
+					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+				end
 			end
 		end)
 

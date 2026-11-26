@@ -62,7 +62,7 @@ end
 --- @return table actions, table record
 local function actions(opts)
 	local registry, calls = registry_double(opts)
-	local record = { calls = calls, notices = {}, problems = {}, questions = {}, reloads = 0, rebuilds = 0 }
+	local record = { calls = calls, notices = {}, problems = {}, questions = {}, reloads = 0, restarts = 0, rebuilds = 0 }
 	local deps = {
 		registry = registry,
 		layout_id = ERGOPTI,
@@ -83,7 +83,8 @@ local function actions(opts)
 			return opts.answer
 		end,
 		daemon_state = {
-			on_reload = function() record.reloads = record.reloads + 1; return true end,
+			on_reload = function() record.restarts = record.restarts + 1; return true end,
+			reload_layout_extensions = function() record.reloads = record.reloads + 1; return true end,
 			on_config_changed = function() record.rebuilds = record.rebuilds + 1 end,
 		},
 		emulation = { status = function() return {} end, reload_if_started = function() return true end },
@@ -139,7 +140,8 @@ helpers.describe("layout manager without its window (Linux)", function()
 			local done = notices_of(record, "layouts.linux_ergopti_installed_active")
 			helpers.assert_eq(#done, 1, "the result is said in plain words")
 			helpers.assert_eq(done[1].options.level, "success")
-			helpers.assert_eq(record.reloads, 1, "its hotstring extension loads through a daemon reload")
+			helpers.assert_eq(record.reloads, 1, "its hotstring extension loads in place")
+			helpers.assert_eq(record.restarts, 0, "the daemon is not restarted for a layout install")
 			helpers.assert_eq(#record.problems, 0)
 			for _, line in ipairs(errors) do
 				helpers.assert_true(not line:find("native window acquisition refused", 1, true),
@@ -205,6 +207,7 @@ helpers.describe("layout manager without its window (Linux)", function()
 		helpers.assert_eq(record.problems[1].code, "ergopti_layout_activate_failed")
 		helpers.assert_true(record.problems[1].active(), "the row stays while Ergopti is not the active layout")
 		helpers.assert_eq(record.reloads, 1, "the installed extension still loads")
+		helpers.assert_eq(record.restarts, 0)
 		Actions._set_deps_for_test(nil)
 	end)
 
@@ -240,7 +243,8 @@ helpers.describe("layout manager without its window (Linux)", function()
 		helpers.assert_true(Actions.uninstall(deps))
 		helpers.assert_eq(record.calls, { "uninstall ergopti" })
 		helpers.assert_eq(#notices_of(record, "layouts.linux_ergopti_uninstalled"), 1)
-		helpers.assert_eq(record.reloads, 1)
+		helpers.assert_eq(record.reloads, 1, "its hotstring extension drops in place")
+		helpers.assert_eq(record.restarts, 0, "the daemon is not restarted for a layout removal")
 		helpers.assert_true(record.rebuilds >= 1, "the tray shows the new state")
 		Actions._set_deps_for_test(nil)
 	end)
@@ -252,6 +256,7 @@ helpers.describe("layout manager without its window (Linux)", function()
 		helpers.assert_eq(record.problems[1].body, "t:layouts.linux_ergopti_uninstall_failed")
 		helpers.assert_true(record.problems[1].active())
 		helpers.assert_eq(record.reloads, 0, "nothing changed, nothing reloads")
+		helpers.assert_eq(record.restarts, 0)
 		Actions._set_deps_for_test(nil)
 	end)
 end)

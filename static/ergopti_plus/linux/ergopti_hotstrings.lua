@@ -3518,6 +3518,10 @@ local function main()
 			is_paused = script_actions.is_paused,
 			layout    = opts.layout,
 			on_reload = function() return perform_reload("the paths editor") end,
+			-- A layout install, update or removal changes the extension packs: the
+			-- catalogue reloads in this process, so the layout manager window that
+			-- asked stays open (ui/layout_manager/layout_change.lua).
+			reload_layout_extensions = function() return reload_hotstrings("the layout manager") == true end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

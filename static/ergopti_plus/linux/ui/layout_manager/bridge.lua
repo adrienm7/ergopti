@@ -19,6 +19,7 @@ local Logger        = require("core.logger.engine.shim")
 local Paths         = require("core.fs.engine.paths")
 local FileSystem    = require("core.fs.adapters.file_system")
 local ManagerBridge = require("layouts.engine.manager_bridge")
+local LayoutChange  = require("ui.layout_manager.layout_change")
 
 local LOG = "bridge.layout_manager"
 
@@ -169,6 +170,9 @@ local function new_handler(spec)
 		if keystats_writer and type(keystats_writer.get_revision) ~= "function" then keystats_writer = nil end
 		local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")
 		local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
+		-- A changed layout reloads the emulation whether or not « Emulate without
+		-- installing » is offered.
+		local layout_emulation = emulation
 		if not (preferences and type(preferences.choose) == "function" and emulation
 			and type(emulation.reload_if_started) == "function") then
 			preferences, emulation = nil, nil
@@ -240,18 +244,11 @@ local function new_handler(spec)
 			-- emulation: an uninstalled one stays chosen and stops, a reinstalled one
 			-- resumes (maintainer decision, 2026-11-12), and the tray shows its state
 			-- (LMH-001, LMH-002).
-			layout_changed = function(id)
-				if not emulation or type(emulation.status) ~= "function" or emulation.status().id ~= id then return end
-				emulation.reload_if_started()
-				if type(state.on_config_changed) == "function" then state.on_config_changed() end
-			end,
-			-- The extension catalogue is read once per boot: a layout whose
-			-- extension was installed or removed loads or drops its hotstrings
-			-- through a daemon reload, as Windows' _LayMgrWeb_After does (LMH-004).
-			reload_extensions = function()
-				if type(state.on_reload) ~= "function" then return false end
-				return state.on_reload() == true
-			end,
+			layout_changed = function(id) LayoutChange.apply(state, layout_emulation, id, false) end,
+			-- A layout whose extension was installed or removed loads or drops its
+			-- hotstrings in place, never through a daemon restart, which closed
+			-- this window (LMH-004, maintainer decision of 2026-11-25).
+			reload_extensions = function(id) return LayoutChange.apply(state, layout_emulation, id, true) end,
 			-- The layout editor applies a source's navigation layer through the
 			-- window-free layers.toml save (modules/keymap/nav_layer_save.lua).
 			apply_nav = nav_layer_save and function(text, done)

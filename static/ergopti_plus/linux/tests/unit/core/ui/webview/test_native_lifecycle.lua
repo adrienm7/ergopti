@@ -238,6 +238,24 @@ local run_contract = function(helpers,load_manager,load_host)
     helpers.assert_eq(m.shutdown(),true)
    end)
   end)
+  -- Arch field report, 2026-11-25: the restart Ergopti asked for logged « WebKit
+  -- process for 'layout_manager' terminated » as an ERROR, systemd having
+  -- stopped the web process with the daemon's whole unit.
+  helpers.it('(webview-own-stop) a renderer ending with our own restart is no error, a crash still is',function()
+   fixture(function(m,c)
+    local own=true
+    package.loaded['modules.updater.restarter']={own_stop_requested=function()return own end}
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    local before=#c.logs;c.views[1].on_web_process_terminated()
+    helpers.assert_eq(#c.logs,before,'Our own restart logs no error for the web process it stops')
+    helpers.assert_eq(m.current_epoch('metrics_typing'),nil,'The page is still retired')
+    own=false
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    c.views[2].on_web_process_terminated()
+    helpers.assert_eq(c.logs[#c.logs],"WebKit process for 'metrics_typing' terminated.",'A renderer crash is still an error')
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
   helpers.it('(native-window-owner) renderer retirement refusal retains debt and blocks stale writes',function()
    fixture(function(m,c)
     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')

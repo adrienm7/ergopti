@@ -223,6 +223,17 @@ helpers.describe("updater restart: starting the installed version", function()
 		helpers.assert_true(observed, "a reused pid must not delay the new daemon")
 	end)
 
+	helpers.it("(webview-own-stop) names a requested restart as this process's own stop, never a refused one", function()
+		local Fresh = helpers.fresh_module("modules.updater.restarter")
+		helpers.assert_eq(Fresh.own_stop_requested(), false, "no stop before a restart is asked")
+		helpers.assert_nil(Fresh.restart({ wrapper = "/x", args = {}, cgroup = UNIT_CGROUP, run = function() return false end }))
+		helpers.assert_eq(Fresh.own_stop_requested(), false, "a refused restart stops nothing")
+		helpers.assert_eq(Fresh.restart({ wrapper = "/x", args = {}, cgroup = UNIT_CGROUP, run = function() return true end }), "systemd")
+		helpers.assert_eq(Fresh.own_stop_requested(), true, "the stop systemd now carries out is this process's own")
+		helpers.assert_true(Fresh.cancel("systemd", { run = function() return true end }))
+		helpers.assert_eq(Fresh.own_stop_requested(), true, "a Quit that replaced the restart still stops this process")
+	end)
+
 	helpers.it("asks systemd to restart the unit that runs the daemon", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray" },

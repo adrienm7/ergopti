@@ -318,6 +318,17 @@ end
 local relay_marker, relay_pid
 -- The transient unit watching an updated daemon under systemd, while one is armed.
 local watch_unit, watch_token
+-- How the restart this process requested is carried out ("systemd" or
+-- "relay"). A Quit that cancels it still stops this process: it stays set.
+local requested_how = nil
+
+--- Whether this process asked for its own restart: the stop that follows is
+--- its own, not a failure (a web view's process ending with it). A cancelled
+--- restart is a stop and still counts.
+--- @return boolean
+function M.own_stop_requested()
+	return requested_how ~= nil
+end
 
 --- Cancels the restart that restart() requested, for a Quit that wins over a reload.
 --- Under the unit, a stop job replaces the queued restart job; with a relay, the marker
@@ -491,6 +502,7 @@ function M.restart(opts)
 		if not ok then Logger.error(LOG, "Restart dispatch failed: %s.", tostring(how)) end
 		return nil
 	end
+	requested_how = how
 	return how
 end
 

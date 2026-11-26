@@ -190,9 +190,10 @@ end
 -- (linux/ui/layout_manager/tray_actions.lua).
 M.carries_extension = carries_extension
 
---- Asks the host to reload the driver after a layout's extension changed: the
---- extension catalogue is read once per boot, so only a reload loads or drops
---- its hotstrings, and the reload also restarts the emulation (LMH-004).
+--- Asks the host to load or drop a changed layout's extension packs, in place
+--- of the emulation reload (LMH-004). Linux reloads its hotstring catalogue in
+--- process; macOS reloads the driver only when the pack catalogue changed
+--- (maintainer decision, 2026-11-25: a layout install keeps the window open).
 --- @param deps table
 --- @param id string
 local function reload_extensions(deps, id)
@@ -491,9 +492,10 @@ end
 ---   layout is the emulated one and refreshes its menu (LMH-001, LMH-002). A
 ---   stored emulated layout stays chosen when it is uninstalled (maintainer
 ---   decision, 2026-11-12): the reload stops it, a reinstall resumes it.
---- deps.reload_extensions(id) reloads the driver after a layout that ships a
----   hotstring extension was installed, updated or uninstalled, in place of
----   deps.layout_changed (LMH-004); it returns true when the reload started.
+--- deps.reload_extensions(id) loads or drops the packs of a layout that ships a
+---   hotstring extension after it was installed, updated or uninstalled, in
+---   place of deps.layout_changed, whose emulation reload it includes (LMH-004);
+---   it returns true when the packs were reloaded or their reload started.
 --- deps.open_editor_window() opens (or focuses) the layout editor window; without
 ---   it open_editor is refused.
 --- deps.editor_window is true for the controller of the layout editor window.
