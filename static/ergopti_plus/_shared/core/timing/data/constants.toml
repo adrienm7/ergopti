@@ -1505,6 +1505,10 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: how long the installed Ergopti layout's lookup is trusted before the
+# game keys read the registry again; installing the layout is rare. macOS and
+# Linux ask no registry. AHK: modules/keymap/keylayout/game_keys.ahk.
+game_keys_installed_layout_ttl_ms = 30000
 # Windows: the poll of the keyboard-layout registry watch's change events
 # (RegNotifyChangeKeyValue): a change of the installed layouts is captured
 # within this delay rather than at the next one-second layout poll.

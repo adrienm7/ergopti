@@ -160,6 +160,13 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-game-keys.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/layouts/engine/emulation/game_keys_data.lua',
+			'static/ergopti_plus/windows/_generated/game_keys_names.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-terminators.cjs',
 		outputs: [
 			'static/ergopti_plus/windows/_generated/terminators.ahk',

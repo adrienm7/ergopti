@@ -23,6 +23,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\..\_generated\game_keys_names.ahk
 
 
 
@@ -34,22 +35,9 @@
 ; ======================================
 ; ======================================
 
-global GAME_KEYS_PHYSICAL := "physical"
-global GAME_KEYS_LETTERS := "letters"
-
-; The strategies a driver applies (_shared/layouts/engine/emulation/game_keys.lua).
-global GAME_KEYS_NATIVE := "native"
-global GAME_KEYS_HELD_BASE_KEY := "held_base_key"
-global GAME_KEYS_SPLIT_EVENT := "split_event"
-global GAME_KEYS_SWITCH_TO_INSTALLED := "switch_to_installed"
-global GAME_KEYS_REWRITE_KEYCODE := "rewrite_keycode"
-
-; The reason keys, each shown on the row it greys or notes.
-global GAME_KEYS_REASON := Map(
-	"physical_needs_installed_layout", "platform_reason.game_keys_physical_needs_installed_layout",
-	"letters_needs_base_layout", "platform_reason.game_keys_letters_needs_base_layout",
-	"vk_games_follow_letters", "platform_reason.game_keys_vk_games_follow_letters",
-	"hid_games_are_physical", "platform_reason.game_keys_hid_games_are_physical")
+; The choices, modes, strategies and reason keys are GameKeysName
+; (_generated/game_keys_names.ahk, from _shared/layouts/data/game_keys.json),
+; the names _shared/layouts/engine/emulation/game_keys.lua reads.
 
 /**
  * The choices, in the manifest's order: its enum is the one source.
@@ -227,42 +215,41 @@ _GameKeys_RouteRow(Available, Identity, Strategy, ReasonKey := "", NoteKey := ""
  * @returns {Map} available, identity, strategy, reason_key ("" for none) and note_key.
  */
 GameKeys_Route(Platform, Mode, Choice, Caps) {
-	global GAME_KEYS_REASON
 	if !(Platform == "windows" || Platform == "macos" || Platform == "linux")
 		throw ValueError("Unknown platform for the game keys: " . Platform)
 	if !GameKeys_ValidChoice(Choice)
 		throw ValueError("Not a game-key choice: " . Choice)
 	if !(Caps is Map)
 		Caps := Map()
-	if Mode == "system"
-		return _GameKeys_RouteRow(true, GAME_KEYS_PHYSICAL, GAME_KEYS_NATIVE)
-	if Mode != "emulation" && Mode != "installed"
+	if Mode == GameKeysName.Mode.SYSTEM
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.NATIVE)
+	if Mode != GameKeysName.Mode.EMULATION && Mode != GameKeysName.Mode.INSTALLED
 		throw ValueError("Unknown Ergopti mode: " . Mode)
-	VkNote := Platform == "windows" ? GAME_KEYS_REASON["vk_games_follow_letters"] : ""
+	VkNote := Platform == "windows" ? GameKeysName.Reason.VK_GAMES_FOLLOW_LETTERS : ""
 	if Platform == "macos" {
-		if Choice == GAME_KEYS_LETTERS
-			return _GameKeys_RouteRow(true, GAME_KEYS_LETTERS, GAME_KEYS_REWRITE_KEYCODE, "",
-				GAME_KEYS_REASON["hid_games_are_physical"])
-		return _GameKeys_RouteRow(true, GAME_KEYS_PHYSICAL, GAME_KEYS_NATIVE)
+		if Choice == GameKeysName.Choice.LETTERS
+			return _GameKeys_RouteRow(true, GameKeysName.Choice.LETTERS, GameKeysName.Strategy.REWRITE_KEYCODE, "",
+				GameKeysName.Reason.HID_GAMES_ARE_PHYSICAL)
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.NATIVE)
 	}
-	if Mode == "installed" {
-		if Choice == GAME_KEYS_PHYSICAL
-			return _GameKeys_RouteRow(true, GAME_KEYS_PHYSICAL, GAME_KEYS_NATIVE, "", VkNote)
-		return _GameKeys_RouteRow(false, GAME_KEYS_PHYSICAL, GAME_KEYS_NATIVE,
-			GAME_KEYS_REASON["letters_needs_base_layout"])
+	if Mode == GameKeysName.Mode.INSTALLED {
+		if Choice == GameKeysName.Choice.PHYSICAL
+			return _GameKeys_RouteRow(true, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.NATIVE, "", VkNote)
+		return _GameKeys_RouteRow(false, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.NATIVE,
+			GameKeysName.Reason.LETTERS_NEEDS_BASE_LAYOUT)
 	}
-	if Choice == GAME_KEYS_LETTERS
-		return _GameKeys_RouteRow(true, GAME_KEYS_LETTERS, GAME_KEYS_HELD_BASE_KEY)
+	if Choice == GameKeysName.Choice.LETTERS
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.LETTERS, GameKeysName.Strategy.HELD_BASE_KEY)
 	; A game switches its window to the installed layout: same text, keys at
 	; their place, nothing injected.
 	if Caps.Get("installed_layout", false) && Caps.Get("game", false)
-		return _GameKeys_RouteRow(true, GAME_KEYS_PHYSICAL, GAME_KEYS_SWITCH_TO_INSTALLED, "", VkNote)
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.SWITCH_TO_INSTALLED, "", VkNote)
 	if Platform == "windows"
-		return _GameKeys_RouteRow(true, GAME_KEYS_PHYSICAL, GAME_KEYS_SPLIT_EVENT, "", VkNote)
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.PHYSICAL, GameKeysName.Strategy.SPLIT_EVENT, "", VkNote)
 	if Caps.Get("installed_layout", false)
-		return _GameKeys_RouteRow(true, GAME_KEYS_LETTERS, GAME_KEYS_HELD_BASE_KEY)
-	return _GameKeys_RouteRow(false, GAME_KEYS_LETTERS, GAME_KEYS_HELD_BASE_KEY,
-		GAME_KEYS_REASON["physical_needs_installed_layout"])
+		return _GameKeys_RouteRow(true, GameKeysName.Choice.LETTERS, GameKeysName.Strategy.HELD_BASE_KEY)
+	return _GameKeys_RouteRow(false, GameKeysName.Choice.LETTERS, GameKeysName.Strategy.HELD_BASE_KEY,
+		GameKeysName.Reason.PHYSICAL_NEEDS_INSTALLED_LAYOUT)
 }
 
 /**
@@ -328,8 +315,6 @@ global _GK_InstalledKlid := ""
 ; Keys whose release must never be a hotkey: Backspace, Tab, Enter, Left Ctrl
 ; and Left Shift, which the hand's own state and the hotstrings read.
 global GAME_KEYS_RELEASE_EXCLUDED := Map(0x0E, true, 0x0F, true, 0x1C, true, 0x1D, true, 0x2A, true)
-; How long the installed Ergopti layout's lookup is trusted: installing it is rare.
-global GAME_KEYS_INSTALLED_TTL_MS := 30000
 
 /**
  * The send primitive: SendEvent, or the recorder a test harness installs in
@@ -389,10 +374,13 @@ GameKeys_ForegroundIsGame() {
  * @returns {String}
  */
 GameKeys_InstalledKlid() {
-	; Read at most every GAME_KEYS_INSTALLED_TTL_MS: a press criterion asks it
-	; on a foreground change and must not read the registry each time.
-	static Spec := 0, Klid := "", ReadAt := 0
-	if ReadAt && ((A_TickCount - ReadAt) & 0xFFFFFFFF) < GAME_KEYS_INSTALLED_TTL_MS
+	; Read at most every adapters.game_keys_installed_layout_ttl_ms: a press
+	; criterion asks it on a foreground change and must not read the registry
+	; each time; installing the layout is rare.
+	static Spec := 0, Klid := "", ReadAt := 0, TtlMs := 0
+	if !TtlMs
+		TtlMs := TimingsGet("adapters", "game_keys_installed_layout_ttl_ms")
+	if ReadAt && ((A_TickCount - ReadAt) & 0xFFFFFFFF) < TtlMs
 		return Klid
 	ReadAt := A_TickCount, Klid := ""
 	try {
@@ -420,7 +408,7 @@ GameKeys_EmulationRoute(App, InstalledKlid) {
 	global Features
 	Settings := GameKeys_Resolve(IsSet(Features) && Features is Map ? Features : Map())
 	For := GameKeys_ChoiceFor(Settings, "windows", App)
-	return GameKeys_Route("windows", "emulation", For["choice"],
+	return GameKeys_Route("windows", GameKeysName.Mode.EMULATION, For["choice"],
 		Map("installed_layout", InstalledKlid != "" && GameKeys_EmulatesErgopti(), "game", For["overridden"]))
 }
 
@@ -491,7 +479,7 @@ _GameKeys_HeldState() {
  * @returns {Boolean} True when the key was sent held.
  */
 GameKeys_TryHold(Sc, Text, Ports := 0) {
-	global _GK_Held, _GK_InstalledKlid, _GK_ReleaseScans, GAME_KEYS_HELD_BASE_KEY
+	global _GK_Held, _GK_InstalledKlid, _GK_ReleaseScans
 	; Without its release hotkey a held down would never get its up.
 	if !_GK_ReleaseScans.Count
 		return false
@@ -506,7 +494,7 @@ GameKeys_TryHold(Sc, Text, Ports := 0) {
 	; « physical »: the split event, on its own path. With an Ergopti system
 	; layout to switch to, GameKeys_PassThrough lets the keys through once the
 	; switch applies; the split event covers the presses before it does.
-	if Route["strategy"] != GAME_KEYS_HELD_BASE_KEY
+	if Route["strategy"] != GameKeysName.Strategy.HELD_BASE_KEY
 		Keys .= "sc" . SubStr(Sc, 3)
 	if _GK_Held.Has(Sc) && _GK_Held[Sc]["keys"] != Keys
 		GameKeys_Release(Sc)
@@ -609,7 +597,7 @@ GameKeys_RegisterReleases(HotkeyFn := Hotkey, HotIfFn := HotIf) {
  * @returns {Boolean}
  */
 GameKeys_PassThrough(Ports := 0) {
-	global _GK_Switched, _GK_InstalledKlid, _GK_ReleaseScans, _GK_Pass, GAME_KEYS_SWITCH_TO_INSTALLED
+	global _GK_Switched, _GK_InstalledKlid, _GK_ReleaseScans, _GK_Pass
 	; A driver that holds no key (a test harness before registration) switches nothing.
 	if !_GK_ReleaseScans.Count
 		return false
@@ -621,7 +609,7 @@ GameKeys_PassThrough(Ports := 0) {
 	_GK_Pass["hwnd"] := Hwnd
 	App := Ports.Has("app") ? Ports["app"].Call() : GameKeys_ForegroundApp()
 	_GK_InstalledKlid := Ports.Has("klid") ? Ports["klid"].Call() : GameKeys_InstalledKlid()
-	Passing := GameKeys_EmulationRoute(App, _GK_InstalledKlid)["strategy"] == GAME_KEYS_SWITCH_TO_INSTALLED
+	Passing := GameKeys_EmulationRoute(App, _GK_InstalledKlid)["strategy"] == GameKeysName.Strategy.SWITCH_TO_INSTALLED
 	Select := Ports.Has("select") ? Ports["select"] : KLS_Select
 	if Passing && !_GK_Switched["active"] {
 		Previous := Ports.Has("active") ? Ports["active"].Call() : KLS_ActiveId()

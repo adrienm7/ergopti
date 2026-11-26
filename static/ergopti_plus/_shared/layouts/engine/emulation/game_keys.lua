@@ -33,25 +33,36 @@ local ConfigKeys = require("settings.engine.keys")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local TextUtils = require("core.text.engine.utils_core")
 local Logger = require("core.logger.engine.shim")
+local Names = require("layouts.engine.emulation.game_keys_data")
 
 local M = {}
 
 local LOG = "layouts.game_keys"
 
-M.PHYSICAL = "physical"
-M.LETTERS = "letters"
+--- One name of the generated table; a missing one is a stale generation.
+--- @param group string The table's group.
+--- @param name string The name.
+--- @return string
+local function name_of(group, name)
+	local value = Names[group] and Names[group][name]
+	if type(value) ~= "string" then error("game_keys_data has no " .. group .. "." .. name .. ": run npm run codegen:game-keys") end
+	return value
+end
+
+M.PHYSICAL = name_of("choices", "PHYSICAL")
+M.LETTERS = name_of("choices", "LETTERS")
 
 -- The three Ergopti modes a route is asked for.
-M.MODE_EMULATION = "emulation"
-M.MODE_INSTALLED = "installed"
-M.MODE_SYSTEM = "system"
+M.MODE_EMULATION = name_of("modes", "EMULATION")
+M.MODE_INSTALLED = name_of("modes", "INSTALLED")
+M.MODE_SYSTEM = name_of("modes", "SYSTEM")
 
--- The strategies a driver applies.
-M.NATIVE = "native"                       -- nothing to do: the OS carries the identity
-M.HELD_BASE_KEY = "held_base_key"         -- the system layout's key, held (Windows, Linux)
-M.SPLIT_EVENT = "split_event"             -- one injected event: physical scan code, Ergopti letter's VK (Windows)
-M.SWITCH_TO_INSTALLED = "switch_to_installed" -- the installed Ergopti layout while the app is in front
-M.REWRITE_KEYCODE = "rewrite_keycode"     -- the event's key code rewritten, the string kept (macOS)
+-- The strategies a driver applies (_shared/layouts/data/game_keys.json says what each does).
+M.NATIVE = name_of("strategies", "NATIVE")
+M.HELD_BASE_KEY = name_of("strategies", "HELD_BASE_KEY")
+M.SPLIT_EVENT = name_of("strategies", "SPLIT_EVENT")
+M.SWITCH_TO_INSTALLED = name_of("strategies", "SWITCH_TO_INSTALLED")
+M.REWRITE_KEYCODE = name_of("strategies", "REWRITE_KEYCODE")
 
 local KEY = ConfigKeys.KEY
 
@@ -67,10 +78,10 @@ local PLATFORMS = { windows = true, macos = true, linux = true }
 
 -- The reason keys (platform_reason.*), each shown on the row it greys.
 M.REASON = {
-	physical_needs_installed_layout = "platform_reason.game_keys_physical_needs_installed_layout",
-	letters_needs_base_layout = "platform_reason.game_keys_letters_needs_base_layout",
-	vk_games_follow_letters = "platform_reason.game_keys_vk_games_follow_letters",
-	hid_games_are_physical = "platform_reason.game_keys_hid_games_are_physical",
+	physical_needs_installed_layout = name_of("reasons", "physical_needs_installed_layout"),
+	letters_needs_base_layout = name_of("reasons", "letters_needs_base_layout"),
+	vk_games_follow_letters = name_of("reasons", "vk_games_follow_letters"),
+	hid_games_are_physical = name_of("reasons", "hid_games_are_physical"),
 }
 
 --- Whether a value is one of the choices.
