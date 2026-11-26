@@ -122,9 +122,9 @@
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
 			"element": "div.la-field",
-			"count": 3,
+			"count": 4,
 			"kind": "layout",
-			"reason": "A field grouping a label, its control and a note paragraph (or the label line with its « i »): a p cannot hold a p, so the group is a div. The text mode field: its label, its select and the note paragraph under them; a p cannot hold that note."
+			"reason": "A field grouping a label, its control and a note paragraph (or the label line with its « i »): a p cannot hold a p, so the group is a div. The text mode field: its label, its select and the note paragraph under them; a p cannot hold that note. The Ergopti+ shortcuts field: its checkbox label, its help, source and report paragraphs and the sections and top triggers disclosures; a p cannot hold a p, a details or a list."
 		},
 		{
 			"file": "static/ergopti_plus/_shared/ui/layout_analysis/comparer_page.js",
