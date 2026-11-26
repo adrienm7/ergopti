@@ -8671,7 +8671,11 @@ console.log(
 					locale['menu.configuration.' + id] +
 					(code === 'fr' ? ' : ' : ': ') +
 					locale['menu.configuration.' + id + '.default']
-			)
+			),
+			// The « Anti-veille » submenu, moved from the top level on 2026-11-26.
+			'-',
+			title('header_sleep'),
+			locale['menu.keep_awake.title']
 		]);
 	}
 	function tokenDepths(tokens) {
@@ -8818,7 +8822,7 @@ console.log(
 		const chronology = [
 			`local root, top, section, parent, fields = configuration_source(ManifestMenu, "${driver}")`,
 			`if root == nil then return ${refused} end`,
-			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, ${context})`,
+			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, configuration_groups, ${context})`,
 			`if not configuration_dense(${child}, true) then return ${refused} end`,
 			`local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "${driver}")`,
 			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not configuration_parent_unchanged(parent, fields) then return ${refused} end`,

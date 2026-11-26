@@ -69,7 +69,7 @@ function M.register(helpers, fixture, corpus, platform)
 					local expected_result
 					if platform == "hs" then expected_result = false end
 					-- Each group sits under its « — Title — » header (2026-11-24)
-					for _, header in ipairs({ 1, 5, 10, 13 }) do
+					for _, header in ipairs({ 1, 5, 10, 13, 17 }) do
 						helpers.assert_true(parent.menu[header].disabled == true, "the section header is inert: " .. header)
 						helpers.assert_nil(parent.menu[header].fn, "the section header has no action: " .. header)
 					end

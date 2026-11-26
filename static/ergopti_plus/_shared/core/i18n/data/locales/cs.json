@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Soubory a průvodce",
 	"menu.configuration.header_network": "Síť",
 	"menu.configuration.header_accessibility": "Přístupnost",
+	"menu.configuration.header_sleep": "Uspání",
 	"menu.configuration.reading_font": "Písmo oken a nabídek",
 	"menu.configuration.reading_font_windows_only": "Písmo oken (nabídky se řídí motivem plochy)",
 	"menu.configuration.reading_font.default": "Výchozí",

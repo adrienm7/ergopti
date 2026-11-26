@@ -437,8 +437,10 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 // layout editor, sits right before the layout group (maintainer request of
 // 2026-11-14: « next to the layout and tap-hold sections »; swapped with the
 // layout group on 2026-11-19 at the maintainer's request).
-// The « Anti-veille » submenu (keep_awake) of the anti-sleep presets follows
-// Metrics (maintainer decision of 2026-11-25, docs/memory/maintainer-decisions.md).
+// The « Anti-veille » submenu (keep_awake) of the anti-sleep presets is no
+// top-level row: it followed Metrics from 2026-11-25 and moved into
+// Configuration on 2026-11-26 (maintainer decisions,
+// docs/memory/maintainer-decisions.md).
 // The drivers that ship the bundled apps (App Cloner, Encryptor).
 const APPS_DRIVERS = ['ahk', 'hs', 'linux'];
 
@@ -458,7 +460,6 @@ const APPROVED_TOP_LEVEL = [
 	'keyboard_layout',
 	'hotstrings',
 	'metrics',
-	'keep_awake',
 	SEPARATOR,
 	'llm',
 	'agent',

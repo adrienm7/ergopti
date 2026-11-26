@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "फ़ाइलें और विज़ार्ड",
 	"menu.configuration.header_network": "नेटवर्क",
 	"menu.configuration.header_accessibility": "सुलभता",
+	"menu.configuration.header_sleep": "स्लीप",
 	"menu.configuration.reading_font": "विंडो और मेनू का फ़ॉन्ट",
 	"menu.configuration.reading_font_windows_only": "विंडो का फ़ॉन्ट (मेनू डेस्कटॉप थीम का पालन करते हैं)",
 	"menu.configuration.reading_font.default": "डिफ़ॉल्ट",

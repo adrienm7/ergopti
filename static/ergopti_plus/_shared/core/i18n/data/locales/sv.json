@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Filer och guide",
 	"menu.configuration.header_network": "Nätverk",
 	"menu.configuration.header_accessibility": "Tillgänglighet",
+	"menu.configuration.header_sleep": "Viloläge",
 	"menu.configuration.reading_font": "Teckensnitt i fönster och menyer",
 	"menu.configuration.reading_font_windows_only": "Teckensnitt i fönstren (menyerna följer skrivbordets tema)",
 	"menu.configuration.reading_font.default": "Standard",

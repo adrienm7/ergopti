@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Builds the tray's Configuration submenu from the shared manifest section:
 --- the configuration folders, the global restore and reset commands and their
---- confirmations.
+--- confirmations, and the « Anti-veille » submenu of the anti-sleep presets.
 --- ==============================================================================
 
 local M = {}
@@ -15,6 +15,8 @@ local COMMAND = require("settings.engine.keys").COMMAND
 local ParentSource = require("menu.engine.frames.parent_source")
 local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
+
+local _build_keep_awake = require("menu.ui.builder.keep_awake").build
 
 local _fill = require("menu.ui.builder.dialogs")._fill
 local show_error = require("menu.ui.builder.dialogs").show_error
@@ -150,7 +152,10 @@ local function _build_configuration(ctx)
 		end
 		render_ctx.state_getters[preference.path] = function() return require(preference.module).get() end
 	end
-	local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx)
+	-- The « Anti-veille » submenu hangs here since 2026-11-26 (maintainer);
+	-- its rows are the keep-awake part's, unchanged.
+	local configuration_groups = { keep_awake = function() return _build_keep_awake() end }
+	local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, configuration_groups, render_ctx)
 	if not configuration_dense(rows, true) then return nil end
 	local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "linux")
 	if not rawequal(root, current_root) or not rawequal(top, current_top)

@@ -8,7 +8,9 @@
 --- restore of Ergopti's recommended values and the clear to the system's
 --- behaviour (the first group of every settings menu), a separator, the
 --- config.toml cleanup, a separator, the folders editor and the setup wizard,
---- then a separator and the download proxy (moved from Debug on 2026-11-03).
+--- then a separator and the download proxy (moved from Debug on 2026-11-03),
+--- the windows' reading choices, and the « Anti-veille » submenu (moved from
+--- the top level on 2026-11-26).
 --- Startup and Uninstall moved to Version / Updates
 --- (test_menu_about_uninstall.lua), with no separator left dangling here.
 ---
@@ -39,6 +41,10 @@ local EXPECTED = {
 	"— menu.configuration.header_accessibility —",
 	"menu.configuration.reading_font: menu.configuration.reading_font.default",
 	"menu.configuration.reading_spacing: menu.configuration.reading_spacing.default",
+	-- The « Anti-veille » submenu, moved here from the top level on 2026-11-26.
+	"-",
+	"— menu.configuration.header_sleep —",
+	"menu.keep_awake.title",
 }
 
 -- The rows that rewrite the configuration, and the action each one runs.
@@ -73,7 +79,9 @@ local function configuration_rows(paused, fired)
 	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
-	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused }, {},
+	-- The keep-awake module's rows hang under Configuration's keep_awake group.
+	local menu_mods = { keep_awake = { build = function() return { { title = "keep_awake_row" } } end } }
+	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused }, menu_mods,
 		recording_actions(fired))
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(menu))
 	for _, item in ipairs(menu) do
@@ -177,7 +185,8 @@ local function rows_with_karabiner(enabled, calls)
 		end,
 	}
 	local ctx = { config = { log_level = 2 }, paused = false, karabiner = karabiner, updateMenu = function() end }
-	local ok, menu = pcall(builder.generate, ctx, {}, recording_actions({}))
+	local menu_mods = { keep_awake = { build = function() return { { title = "keep_awake_row" } } end } }
+	local ok, menu = pcall(builder.generate, ctx, menu_mods, recording_actions({}))
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(menu))
 	for _, item in ipairs(menu) do
 		if item.title == "menu.configuration.title" then return item.menu end
@@ -237,7 +246,9 @@ local function configuration_parent_fixture(body)
 		if value ~= nil then getter_observer.calls = getter_observer.calls + 1 end
 		return value
 	end })
-	local function build(paused) return native.generate({ paused = paused }, {}, published_actions) end
+	-- The keep-awake rows hang under Configuration since 2026-11-26.
+	local menu_mods = { keep_awake = { build = function() return { { title = "keep_awake_row" } } end } }
+	local function build(paused) return native.generate({ paused = paused }, menu_mods, published_actions) end
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, getter_observer) end, debug.traceback)
 	locale.set_locale(language)
 	for _, name in ipairs({ "menu.ui.builder.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "menu.engine.manifest_menu" }) do package.loaded[name] = saved[name] end

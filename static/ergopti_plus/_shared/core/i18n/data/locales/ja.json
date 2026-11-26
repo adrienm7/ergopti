@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "ファイルとウィザード",
 	"menu.configuration.header_network": "ネットワーク",
 	"menu.configuration.header_accessibility": "アクセシビリティ",
+	"menu.configuration.header_sleep": "スリープ",
 	"menu.configuration.reading_font": "ウィンドウとメニューのフォント",
 	"menu.configuration.reading_font_windows_only": "ウィンドウのフォント（メニューはデスクトップのテーマに従います）",
 	"menu.configuration.reading_font.default": "既定",

@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "קבצים ואשף",
 	"menu.configuration.header_network": "רשת",
 	"menu.configuration.header_accessibility": "נגישות",
+	"menu.configuration.header_sleep": "שינה",
 	"menu.configuration.reading_font": "הגופן של החלונות והתפריטים",
 	"menu.configuration.reading_font_windows_only": "הגופן של החלונות (התפריטים עוקבים אחר ערכת הנושא של שולחן העבודה)",
 	"menu.configuration.reading_font.default": "ברירת מחדל",

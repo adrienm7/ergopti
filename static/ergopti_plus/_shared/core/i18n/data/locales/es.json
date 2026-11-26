@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Archivos y asistente",
 	"menu.configuration.header_network": "Red",
 	"menu.configuration.header_accessibility": "Accesibilidad",
+	"menu.configuration.header_sleep": "Suspensión",
 	"menu.configuration.reading_font": "Fuente de las ventanas y menús",
 	"menu.configuration.reading_font_windows_only": "Fuente de las ventanas (los menús siguen el tema del escritorio)",
 	"menu.configuration.reading_font.default": "Predeterminada",

@@ -116,9 +116,17 @@ picker, and in the quick rows once chosen.
 Answers to the auto-click questionnaire. The auto-clicker is integrated into
 the existing Ctrl+M anti-sleep action (`sg_actions.activity_simulation`), with
 no shortcut of its own: Ctrl+M still toggles the whole mode, and an
-« Anti-veille » submenu of the tray / menu-bar menu switches its parts, keep
-awake (on by default) and auto-click (off by default), persisted through the
-single defaults source (`_shared/shortcuts/data/auto_click_defaults.json`).
+« Anti-veille » submenu switches its parts, keep awake (on by default) and
+auto-click (off by default), persisted through the single defaults source
+(`_shared/shortcuts/data/auto_click_defaults.json`).
+
+- Placement (2026-11-26, maintainer: « totalement nul » at the top level,
+  answer « Dans Paramètres/Configuration »): the submenu is the `keep_awake`
+  group of `configuration_menu`, under its own « Mise en veille » header after
+  Accessibility, on the three OS; it is no longer a `top_level` row. Each
+  driver's Configuration builder hangs the unchanged keep-awake rows there
+  through a group builder; `test-menu-top-level-parity.cjs` refuses it back at
+  the top level.
 
 - Library: a button image is added by drawing a rectangle on screen (the
   interactive capture flow) or by importing a PNG; a shared window lists the

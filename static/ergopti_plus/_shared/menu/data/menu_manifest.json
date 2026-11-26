@@ -343,13 +343,6 @@
 			"boot_deferred": true
 		},
 		{
-			"type": "group",
-			"id": "keep_awake",
-			"i18n": "menu.keep_awake.title",
-			"rows": [],
-			"boot_deferred": true
-		},
-		{
 			"id": "---"
 		},
 		{
@@ -1354,6 +1347,18 @@
 					"i18n": "menu.configuration.reading_spacing.wide"
 				}
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_sleep"
+		},
+		{
+			"type": "group",
+			"id": "keep_awake",
+			"i18n": "menu.keep_awake.title"
 		}
 	],
 	"debug_menu": [

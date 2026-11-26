@@ -2549,6 +2549,7 @@
 	"menu.configuration.header_files": "Fichiers et assistant",
 	"menu.configuration.header_network": "Réseau",
 	"menu.configuration.header_accessibility": "Accessibilité",
+	"menu.configuration.header_sleep": "Mise en veille",
 	"menu.configuration.reading_font": "Police des fenêtres et menus",
 	"menu.configuration.reading_font_windows_only": "Police des fenêtres (les menus suivent le thème du bureau)",
 	"menu.configuration.reading_font.default": "Par défaut",

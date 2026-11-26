@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Dateien und Assistent",
 	"menu.configuration.header_network": "Netzwerk",
 	"menu.configuration.header_accessibility": "Barrierefreiheit",
+	"menu.configuration.header_sleep": "Ruhezustand",
 	"menu.configuration.reading_font": "Schrift der Fenster und Menüs",
 	"menu.configuration.reading_font_windows_only": "Schrift der Fenster (Menüs folgen dem Desktop-Design)",
 	"menu.configuration.reading_font.default": "Standard",

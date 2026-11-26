@@ -146,7 +146,6 @@ _MI_TopLevelBuilders() {
 		"llm",             _MI_StageLlm,
 		"agent",           _MI_StageAgent,
 		"metrics",         _MI_StageMetrics,
-		"keep_awake",      _MI_StageKeepAwake,
 		"shortcuts",       _MI_StageShortcuts,
 		ConfigLeaf.TAP_HOLDS,       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,
@@ -614,7 +613,9 @@ _MI_StageDebug() {
 ; Every row there is a `command`, so the renderer builds each label and the
 ; separator from the declaration and this driver supplies only what a click
 ; does. It replaced « Actions globales » and the two top-level rows that opened
-; the folders editor and the setup wizard.
+; the folders editor and the setup wizard. The « Anti-veille » submenu hangs
+; in its keep_awake group since 2026-11-26 (maintainer), built unchanged by
+; modules/shortcuts/auto_click.ahk.
 _MI_BuildConfigurationMenu() {
 	Commands := _MI_GlobalScopeCommands()
 	for Id, Callback in Map(
@@ -631,7 +632,8 @@ _MI_BuildConfigurationMenu() {
 	StateGetters := Map(
 		ConfigKey.SCRIPT_READING_FONT,    (*) => ReadingPrefs_Get(ConfigLeaf.READING_FONT),
 		ConfigKey.SCRIPT_READING_SPACING, (*) => ReadingPrefs_Get(ConfigLeaf.READING_SPACING))
-	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands, StateGetters)
+	GroupBuilders := Map("keep_awake", () => _MI_BuildKeepAwakeMenu())
+	return MenuRenderer_Build("configuration_menu", "Configuration", "", GroupBuilders, "", Commands, StateGetters)
 }
 
 

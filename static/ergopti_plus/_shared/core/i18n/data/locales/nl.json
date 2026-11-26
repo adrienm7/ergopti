@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Bestanden en assistent",
 	"menu.configuration.header_network": "Netwerk",
 	"menu.configuration.header_accessibility": "Toegankelijkheid",
+	"menu.configuration.header_sleep": "Slaapstand",
 	"menu.configuration.reading_font": "Lettertype van de vensters en menu's",
 	"menu.configuration.reading_font_windows_only": "Lettertype van de vensters (menu's volgen het bureaubladthema)",
 	"menu.configuration.reading_font.default": "Standaard",

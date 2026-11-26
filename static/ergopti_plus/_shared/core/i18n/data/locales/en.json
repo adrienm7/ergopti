@@ -2549,6 +2549,7 @@
 	"menu.configuration.header_files": "Files and wizard",
 	"menu.configuration.header_network": "Network",
 	"menu.configuration.header_accessibility": "Accessibility",
+	"menu.configuration.header_sleep": "Sleep",
 	"menu.configuration.reading_font": "Font of the windows and menus",
 	"menu.configuration.reading_font_windows_only": "Font of the windows (menus follow the desktop theme)",
 	"menu.configuration.reading_font.default": "Default",

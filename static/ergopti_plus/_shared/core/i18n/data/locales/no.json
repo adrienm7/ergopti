@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Filer og veiviser",
 	"menu.configuration.header_network": "Nettverk",
 	"menu.configuration.header_accessibility": "Tilgjengelighet",
+	"menu.configuration.header_sleep": "Hvilemodus",
 	"menu.configuration.reading_font": "Skrift i vinduer og menyer",
 	"menu.configuration.reading_font_windows_only": "Skrift i vinduene (menyene følger skrivebordstemaet)",
 	"menu.configuration.reading_font.default": "Standard",

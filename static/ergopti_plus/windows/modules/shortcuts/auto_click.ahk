@@ -191,7 +191,9 @@ AutoClickStatusRows() {
 	return Rows
 }
 
-; Builds the « Anti-veille » submenu from the manifest's keep_awake_menu.
+; Builds the « Anti-veille » submenu from the manifest's keep_awake_menu; the
+; Configuration menu hangs it in its keep_awake group. The rows stay live while
+; paused: choosing a preset changes no input.
 _MI_BuildKeepAwakeMenu() {
 	; Windows can always click: the auto-click row is never greyed here.
 	return MenuRenderer_Build("keep_awake_menu", "Anti-veille", "", "", Map(
@@ -203,11 +205,6 @@ _MI_BuildKeepAwakeMenu() {
 		"keep_awake_switch_on", _AutoClickSwitchOn.Bind("keep_awake"),
 		"keep_awake_auto_click_on", _AutoClickSwitchOn.Bind("auto_click"),
 		"keep_awake_auto_click_available", (*) => true))
-}
-
-; The row stays live while paused: choosing a preset changes no input.
-_MI_StageKeepAwake() {
-	TrayMenuStage_Add(t("menu.keep_awake.title"), _MI_BuildKeepAwakeMenu())
 }
 
 

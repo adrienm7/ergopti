@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "파일 및 마법사",
 	"menu.configuration.header_network": "네트워크",
 	"menu.configuration.header_accessibility": "접근성",
+	"menu.configuration.header_sleep": "절전",
 	"menu.configuration.reading_font": "창과 메뉴의 글꼴",
 	"menu.configuration.reading_font_windows_only": "창의 글꼴 (메뉴는 데스크톱 테마를 따릅니다)",
 	"menu.configuration.reading_font.default": "기본값",

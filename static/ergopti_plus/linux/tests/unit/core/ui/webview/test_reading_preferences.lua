@@ -52,9 +52,14 @@ helpers.describe("the Linux windows follow a reading choice at once (reading-pre
 			end,
 			webview = { push_reading_preferences = function() pushes = pushes + 1 end },
 		})
+		-- The reading choices' values; the « Anti-veille » group that closes the
+		-- menu (2026-11-26) holds the keep-awake rows, not reading choices.
+		local keep_awake = require("core.i18n.engine.i18n").get("menu.keep_awake.title")
 		local choices = {}
 		for _, item in ipairs(row.submenu) do
-			for _, choice in ipairs(item.menu or {}) do choices[#choices + 1] = choice end
+			if item.title ~= keep_awake then
+				for _, choice in ipairs(item.menu or {}) do choices[#choices + 1] = choice end
+			end
 		end
 		helpers.assert_eq(#choices, 5, "three fonts and two spacings")
 		choices[3].fn()

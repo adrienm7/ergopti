@@ -325,18 +325,6 @@ rows = []
 checked_when = ["keystats_enabled"]
 boot_deferred = true
 
-# The anti-sleep mode's presets and options (maintainer, 2026-11-25). Ctrl+M
-# toggles the mode with the active preset; this submenu picks the preset and
-# switches its parts. Its rows are runtime data (the user's presets), so both
-# lists are filled by each driver from the shared presets store
-# (_shared/shortcuts/engine/keep_awake/presets.lua) and drawn by the renderer.
-[[menu.top_level]]
-type = "group"
-id = "keep_awake"
-i18n = "menu.keep_awake.title"
-rows = []
-boot_deferred = true
-
 [[menu.top_level]]
 id = "---"
 
@@ -1158,6 +1146,25 @@ i18n = "menu.configuration.reading_spacing"
 path = "script.reading_spacing"
 show_current_choice = true
 current_choice_label_value = true
+
+# The anti-sleep mode's presets and options (maintainer, 2026-11-25), a setting
+# of the session rather than a feature of its own: it moved from the tray's top
+# level into Configuration on 2026-11-26 (maintainer: « totalement nul » at the
+# top level). Ctrl+M toggles the mode with the active preset; this submenu
+# picks the preset and switches its parts. Its rows are runtime data (the
+# user's presets), so each driver's group builder fills keep_awake_menu from
+# the shared presets store (_shared/shortcuts/engine/keep_awake/presets.lua).
+[[menu.configuration_menu]]
+type = "---"
+
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_sleep"
+
+[[menu.configuration_menu]]
+type = "group"
+id = "keep_awake"
+i18n = "menu.keep_awake.title"
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.

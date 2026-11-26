@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "الملفات والمعالج",
 	"menu.configuration.header_network": "الشبكة",
 	"menu.configuration.header_accessibility": "إمكانية الوصول",
+	"menu.configuration.header_sleep": "السكون",
 	"menu.configuration.reading_font": "خط النوافذ والقوائم",
 	"menu.configuration.reading_font_windows_only": "خط النوافذ (القوائم تتبع سمة سطح المكتب)",
 	"menu.configuration.reading_font.default": "الافتراضي",

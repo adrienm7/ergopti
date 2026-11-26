@@ -100,7 +100,8 @@ _MLG_Order(MenuName) {
 ; cleanup, a separator, then configuration windows, then a separator and the
 ; download proxy (moved from Debug on 2026-11-03), with no separator left
 ; dangling at its end, then the windows' reading font and spacing
-; (2026-11-20). The Windows-only touchpad restore was merged into the
+; (2026-11-20), then the « Anti-veille » submenu (moved from the top level on
+; 2026-11-26). The Windows-only touchpad restore was merged into the
 ; Gestures clear (2026-11-03). The macOS-only Karabiner rows left with the owned
 ; runtime default (ADR 011).
 _MLG_ConfigurationRowsInOrder() {
@@ -108,7 +109,8 @@ _MLG_ConfigurationRowsInOrder() {
 	AssertEqual("header menu.configuration.header_reset, scope_restore, scope_clear, ---, "
 		. "header menu.configuration.header_files, clean_unused_keys, config_folder, setup_wizard, ---, "
 		. "header menu.configuration.header_network, proxy_override, ---, "
-		. "header menu.configuration.header_accessibility, reading_font, reading_spacing",
+		. "header menu.configuration.header_accessibility, reading_font, reading_spacing, ---, "
+		. "header menu.configuration.header_sleep, keep_awake",
 		_MLG_Order("configuration_menu"), "configuration_menu must declare its rows in this order")
 	; The download proxy is configuration, not debugging (maintainer, 2026-11-03).
 	AssertFalse(InStr(_MLG_Order("debug_menu"), "proxy_override"), "Debug no longer declares the proxy row")

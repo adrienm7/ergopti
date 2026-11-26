@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Dosyalar ve sihirbaz",
 	"menu.configuration.header_network": "Ağ",
 	"menu.configuration.header_accessibility": "Erişilebilirlik",
+	"menu.configuration.header_sleep": "Uyku",
 	"menu.configuration.reading_font": "Pencerelerin ve menülerin yazı tipi",
 	"menu.configuration.reading_font_windows_only": "Pencerelerin yazı tipi (menüler masaüstü temasını izler)",
 	"menu.configuration.reading_font.default": "Varsayılan",

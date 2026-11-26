@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "文件和向导",
 	"menu.configuration.header_network": "网络",
 	"menu.configuration.header_accessibility": "无障碍",
+	"menu.configuration.header_sleep": "休眠",
 	"menu.configuration.reading_font": "窗口和菜单字体",
 	"menu.configuration.reading_font_windows_only": "窗口字体（菜单跟随桌面主题）",
 	"menu.configuration.reading_font.default": "默认",

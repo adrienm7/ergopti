@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "File e procedura guidata",
 	"menu.configuration.header_network": "Rete",
 	"menu.configuration.header_accessibility": "Accessibilità",
+	"menu.configuration.header_sleep": "Sospensione",
 	"menu.configuration.reading_font": "Carattere delle finestre e dei menu",
 	"menu.configuration.reading_font_windows_only": "Carattere delle finestre (i menu seguono il tema del desktop)",
 	"menu.configuration.reading_font.default": "Predefinito",

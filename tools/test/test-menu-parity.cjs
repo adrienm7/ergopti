@@ -6841,7 +6841,11 @@ function languageParentSource(source, driver) {
 				.replace('{2}', locale['menu.configuration.reading_font.default']),
 			locale['common.label_value']
 				.replace('{1}', locale['menu.configuration.reading_spacing'])
-				.replace('{2}', locale['menu.configuration.reading_spacing.default'])
+				.replace('{2}', locale['menu.configuration.reading_spacing.default']),
+			// The « Anti-veille » submenu, moved from the top level on 2026-11-26.
+			'-',
+			title('header_sleep'),
+			locale['menu.keep_awake.title']
 		]);
 		// Linux draws its tray in the desktop theme's font: its row names the windows alone.
 		const readingFont = (key) =>
@@ -6998,7 +7002,7 @@ function languageParentSource(source, driver) {
 		const chronology = [
 			`local root, top, section, parent, fields = configuration_source(ManifestMenu, "${driver}")`,
 			`if root == nil then return ${refused} end`,
-			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, ${context})`,
+			`local ${child} = ManifestMenu.build("configuration_menu", "Configuration", nil, configuration_groups, ${context})`,
 			`if not configuration_dense(${child}, true) then return ${refused} end`,
 			`local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "${driver}")`,
 			`if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not configuration_parent_unchanged(parent, fields) then return ${refused} end`,

@@ -172,7 +172,6 @@ _LLM_Menu_BackendIsReadyForUse() => false
 _MI_StageLayout() => 0
 _MI_StageHotstrings() => 0
 _MI_StageAgent() => 0
-_MI_StageKeepAwake() => 0
 _MI_StageShortcuts() => 0
 _MI_StageTapHolds() => 0
 _MI_StageGestures() => 0

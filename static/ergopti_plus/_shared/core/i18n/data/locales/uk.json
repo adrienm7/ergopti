@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Файли та майстер",
 	"menu.configuration.header_network": "Мережа",
 	"menu.configuration.header_accessibility": "Доступність",
+	"menu.configuration.header_sleep": "Сплячий режим",
 	"menu.configuration.reading_font": "Шрифт вікон і меню",
 	"menu.configuration.reading_font_windows_only": "Шрифт вікон (меню дотримуються теми робочого столу)",
 	"menu.configuration.reading_font.default": "Типовий",

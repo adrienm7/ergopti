@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Filer og guide",
 	"menu.configuration.header_network": "Netværk",
 	"menu.configuration.header_accessibility": "Tilgængelighed",
+	"menu.configuration.header_sleep": "Dvale",
 	"menu.configuration.reading_font": "Skrifttype i vinduer og menuer",
 	"menu.configuration.reading_font_windows_only": "Skrifttype i vinduerne (menuerne følger skrivebordets tema)",
 	"menu.configuration.reading_font.default": "Standard",

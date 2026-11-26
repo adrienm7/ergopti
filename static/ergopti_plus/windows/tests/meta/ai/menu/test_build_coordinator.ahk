@@ -412,7 +412,6 @@ _MI_StageHotstrings() {
  _LMPC_State["hotstrings_renders"] += 1
 }
 _MI_StageAgent() => 0
-_MI_StageKeepAwake() => 0
 _MI_StageShortcuts() => 0
 _MI_StageTapHolds() => 0
 _MI_StageGestures() => 0

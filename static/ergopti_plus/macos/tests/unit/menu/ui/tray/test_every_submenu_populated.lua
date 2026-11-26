@@ -30,6 +30,7 @@ local MENU_MODULES = {
 	tap_holds       = "ui.menu.menu_tap_holds",
 	gestures        = "gestures.ui.menu.gestures",
 	apps            = "apps.ui.menu.apps",
+	keep_awake      = "menu.ui.builder.keep_awake",
 	about           = "ui.menu.menu_about",
 }
 
@@ -412,12 +413,19 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		-- The windows' reading choices close the submenu, each captioned with its
 		-- current value after its own label.
 		local reading = { "menu.configuration.reading_font", "menu.configuration.reading_spacing" }
-		helpers.assert_eq(#drawn, #expected + #reading, "only the reading choices follow the proxy row")
+		-- Then the « Anti-veille » submenu under its own header (moved from the
+		-- top level on 2026-11-26).
+		local sleep = { "-", header("menu.configuration.header_sleep"), i18n.get("menu.keep_awake.title") }
+		helpers.assert_eq(#drawn, #expected + #reading + #sleep,
+			"only the reading choices and the « Anti-veille » group follow the proxy row")
 		for offset, key in ipairs(reading) do
 			local title = drawn[#expected + offset]
 			local label = i18n.get(key)
 			helpers.assert_eq(title:sub(1, #label), label, "row " .. offset .. " of the reading choices is " .. key)
 		end
+		helpers.assert_eq(table.concat(drawn, " | ", #expected + #reading + 1), table.concat(sleep, " | "))
+		helpers.assert_true(type(rows[#rows].menu) == "table" and #rows[#rows].menu > 0,
+			"the « Anti-veille » row opens its submenu")
 	end)
 
 	-- Uninstall moved from the bottom of Configuration to the bottom of the

@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Файлы и мастер",
 	"menu.configuration.header_network": "Сеть",
 	"menu.configuration.header_accessibility": "Специальные возможности",
+	"menu.configuration.header_sleep": "Спящий режим",
 	"menu.configuration.reading_font": "Шрифт окон и меню",
 	"menu.configuration.reading_font_windows_only": "Шрифт окон (меню следуют теме рабочего стола)",
 	"menu.configuration.reading_font.default": "По умолчанию",

@@ -61,7 +61,6 @@ const ROOT_SUBMENUS = {
 	keyboard_layout: 'layout_menu',
 	hotstrings: 'hotstrings_menu',
 	metrics: 'metrics_menu',
-	keep_awake: 'keep_awake_menu',
 	llm: 'llm_menu',
 	agent: 'agent_menu',
 	apps: 'apps_menu',
@@ -69,6 +68,12 @@ const ROOT_SUBMENUS = {
 	configuration: 'configuration_menu',
 	language: 'language_menu',
 	debug: 'debug_menu'
+};
+
+// A nested group whose rows live in a named menu rather than `<id>_group`:
+// « Anti-veille » hangs in Configuration since 2026-11-26.
+const NESTED_SUBMENUS = {
+	keep_awake: 'keep_awake_menu'
 };
 
 // A menu's own restore and clear: one per menu, each acting on that menu's scope.
@@ -197,7 +202,7 @@ function menuRows(key, platform, trail = []) {
 	for (const row of rows) {
 		if (!row || row.type === SEPARATOR || row.id === SEPARATOR || !drawn(row, platform)) continue;
 		out.push({ row, menu: where });
-		const nested = `${row.id}_group`;
+		const nested = NESTED_SUBMENUS[row.id] || `${row.id}_group`;
 		if (row.type === 'group' && Array.isArray(manifest[nested]) && !trail.includes(nested))
 			out.push(...menuRows(nested, platform, trail.concat(key)));
 	}

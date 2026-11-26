@@ -2554,6 +2554,7 @@
 	"menu.configuration.header_files": "Arquivos e assistente",
 	"menu.configuration.header_network": "Rede",
 	"menu.configuration.header_accessibility": "Acessibilidade",
+	"menu.configuration.header_sleep": "Suspensão",
 	"menu.configuration.reading_font": "Tipo de letra das janelas e menus",
 	"menu.configuration.reading_font_windows_only": "Tipo de letra das janelas (os menus seguem o tema do ambiente de trabalho)",
 	"menu.configuration.reading_font.default": "Predefinido",
