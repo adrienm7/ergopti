@@ -3,8 +3,7 @@
 --- ==============================================================================
 --- MODULE: Resident Native Text Destination Tests
 --- DESCRIPTION:
---- Keeps AI target reads on the resident receipt, with no barrier (a key never
---- waits for the focus worker, decided 2026-11-25), and fences the exact joined
+--- Keeps AI target reads on one fresh resident barrier and fences the exact joined
 --- field, context generation and detector epoch across reentrant callbacks.
 --- ==============================================================================
 
@@ -17,7 +16,7 @@ local function fixture(body, asynchronous)
 	local called, detail = pcall(function()
 		local detector = require(name)
 		local state = { bus = ":1.10", path = "/field/one", role = 61,
-			barriers = 0, reads = 0, captures = 0, protected = false, now = 1000 }
+			barriers = 0, captures = 0, protected = false, now = 1000 }
 		local listener, guard
 		local function snapshot()
 			if state.unknown then return nil end
@@ -30,11 +29,6 @@ local function fixture(body, asynchronous)
 			barrier = function()
 				state.barriers = state.barriers + 1
 				if state.barrier then state.barrier(guard, state) end
-				return snapshot()
-			end,
-			snapshot = function()
-				state.reads = state.reads + 1
-				if state.read then state.read(guard, state) end
 				return snapshot()
 			end,
 		}
@@ -70,7 +64,7 @@ local function fixture(body, asynchronous)
 			guard.prime(); state.complete()
 			helpers.assert_true(guard.refresh(true))
 		else helpers.assert_true(guard.prime()) end
-		state.barriers, state.reads = 0, 0
+		state.barriers = 0
 		body(guard, state)
 	end)
 	package.loaded[name] = previous
@@ -78,18 +72,17 @@ local function fixture(body, asynchronous)
 end
 
 helpers.describe("Resident native AI text destination", function()
-	helpers.it("(resident-text-target) reads the resident receipt without a barrier or another context", function()
+	helpers.it("(resident-text-target) uses one fresh barrier without capturing another context", function()
 		fixture(function(guard, state)
 			helpers.assert_eq(guard.focused_text_identity(), "atspi::1.10:/field/one")
-			helpers.assert_eq(state.barriers, 0, "a key's read never waits for the worker")
-			helpers.assert_eq(state.reads, 1)
+			helpers.assert_eq(state.barriers, 1)
 			helpers.assert_eq(state.captures, 1)
 		end)
 	end)
 	helpers.it("(resident-text-target) admits the physically settled asynchronous context join", function()
 		fixture(function(guard, state)
 			helpers.assert_eq(guard.focused_text_identity(), "atspi::1.10:/field/one")
-			helpers.assert_eq(state.barriers, 0)
+			helpers.assert_eq(state.barriers, 1)
 			helpers.assert_eq(state.captures, 1)
 		end, true)
 	end)
@@ -125,7 +118,7 @@ helpers.describe("Resident native AI text destination", function()
 			helpers.assert_eq(guard.focused_text_identity(), nil)
 		end)
 	end)
-	for _, boundary in ipairs({ "pump", "read", "policy" }) do
+	for _, boundary in ipairs({ "pump", "barrier", "policy" }) do
 		helpers.it("(resident-text-target) refuses reentrant invalidation during " .. boundary, function()
 			fixture(function(guard, state)
 				state[boundary] = function(owner)
@@ -139,17 +132,17 @@ helpers.describe("Resident native AI text destination", function()
 	end
 	helpers.it("(resident-text-target) fences an A to B to A native transition", function()
 		fixture(function(guard, state)
-			state.read = function()
-				state.read = nil
+			state.barrier = function()
+				state.barrier = nil
 				state.path = "/field/two"; state.signal()
 				state.path = "/field/one"; state.signal()
 			end
 			helpers.assert_eq(guard.focused_text_identity(), nil)
 		end)
 	end)
-	helpers.it("(resident-text-target) refuses a failed resident read", function()
+	helpers.it("(resident-text-target) refuses a failed native barrier", function()
 		fixture(function(guard, state)
-			state.read = function() error("controlled resident read failure") end
+			state.barrier = function() error("controlled resident barrier failure") end
 			helpers.assert_eq(guard.focused_text_identity(), nil)
 		end)
 	end)
@@ -163,14 +156,13 @@ helpers.describe("Resident native AI text destination", function()
 			end)
 		end)
 	end
-	helpers.it("(resident-text-target) refuses a nested identity reader without another read", function()
+	helpers.it("(resident-text-target) refuses a nested identity reader without another barrier", function()
 		fixture(function(guard, state)
-			state.read = function()
-				state.read = nil
+			state.barrier = function()
 				helpers.assert_eq(guard.focused_text_identity(), nil)
 			end
 			helpers.assert_eq(guard.focused_text_identity(), "atspi::1.10:/field/one")
-			helpers.assert_eq(state.reads, 1)
+			helpers.assert_eq(state.barriers, 1)
 		end)
 	end)
 	helpers.it("(resident-text-target) cannot borrow a reentrant replacement join for the same field", function()
