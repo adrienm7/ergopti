@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the installed-source Lua module that ErgoptiPlus.app loads.
+"""Compile the installed-source Lua module that the macOS app loads.
 
 adapters/installed_physical_source.lua loads it from the app bundle with
 package.loadlib; without it the owned runtime's capture never starts and the

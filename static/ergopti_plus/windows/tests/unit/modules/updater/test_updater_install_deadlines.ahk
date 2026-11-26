@@ -51,9 +51,12 @@ _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 	AssertEqual(false, ShouldOffer.Call(
 		DevCandidate, "1.0.0", "main", "main"),
 		"ordinary same-channel checks must retain strict semver ordering")
-	AssertEqual(false, ShouldOffer.Call(
+	AssertEqual(true, ShouldOffer.Call(
 		"v1.1.0", "1.0.0", "dev", "main"),
-		"a stable candidate must never satisfy a selected dev channel")
+		"the dev view lists main's releases, so a newer stable is offered on dev")
+	AssertEqual(false, ShouldOffer.Call(
+		"v1.0.0", "1.0.1-dev.117", "dev", "dev"),
+		"a stable seen through the dev view never downgrades a newer dev build")
 	AssertEqual(true, ShouldOffer.Call(
 		"v1.1.0", "0.0.0-dev.117", "main", "dev"),
 		"an explicit dev-to-stable transition must offer a stable candidate")
