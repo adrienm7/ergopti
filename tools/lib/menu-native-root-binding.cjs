@@ -362,7 +362,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		return false;
 	const rebuild = body(start.source, 'local function rebuild_menu_cache()');
 	const generate = body(builder, 'function M.generate(ctx, menu_mods, actions)');
-	const prepend = body(badge, 'function M.prepend_to(items, ctx, on_click)');
+	const prepend = body(badge, 'function M.prepend_to(items, ctx, on_click, drawn_titles)');
 	const release = body(badge, 'local function release_canvas()');
 	const publish = body(start.source, 'push_static_menu = function(items)');
 	const loadRoot = body(builder, 'local function load_manifest()');

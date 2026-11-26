@@ -10076,7 +10076,10 @@ console.log(
 			'macos/menu/ui/builder/builder.lua',
 			'pcall(CanvasBadge.prepend_to, rendered, ctx, function()'
 		],
-		['macos/menu/ui/builder/canvas_badge.lua', 'function M.prepend_to(items, ctx, on_click)'],
+		[
+			'macos/menu/ui/builder/canvas_badge.lua',
+			'function M.prepend_to(items, ctx, on_click, drawn_titles)'
+		],
 		[
 			'macos/menu/ui/builder/canvas_badge.lua',
 			'local ManifestMenu = require("menu.engine.manifest_menu")'

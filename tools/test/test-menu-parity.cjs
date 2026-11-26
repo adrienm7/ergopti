@@ -3238,6 +3238,25 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		) {
 			return { ...control, before: 'return item', after: 'item.fn = function() end\nreturn item' };
 		}
+		// The badge measures each root row by the title the menu finally draws.
+		if (control.path === 'macos/menu/ui/builder/canvas_badge.lua') {
+			const drawn = (text) =>
+				text
+					.replaceAll(
+						'prepend_to(items, ctx, on_click)',
+						'prepend_to(items, ctx, on_click, drawn_titles)'
+					)
+					.replaceAll(
+						'\t\tlocal width = title_width(item.title)\n',
+						'\t\tlocal drawn = type(drawn_titles) == "table" and drawn_titles[item] or nil\n' +
+							'\t\tlocal width = title_width(drawn ~= nil and drawn or item.title)\n'
+					)
+					.replaceAll(
+						'geometry.pill_x\n\tlocal pad_y',
+						'geometry.pill_x\n\tlocal text_x, text_box_w = geometry.text_x, geometry.text_w\n\tlocal pad_y'
+					);
+			return { ...control, before: drawn(control.before), after: drawn(control.after) };
+		}
 		if (control.path !== 'macos/menu/ui/builder/builder.lua') return control;
 		const forward = (text) =>
 			text
@@ -3254,6 +3273,10 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 				.replaceAll(
 					'boot_deferred = entry.boot_deferred == true }',
 					'boot_deferred = entry.boot_deferred == true, declared_entry = entry }'
+				)
+				.replaceAll(
+					'pcall(ctx.script_control.toggle) end\n\t\tend\n\tend)',
+					'pcall(ctx.script_control.toggle) end\n\t\tend\n\tend, drawn_titles)'
 				);
 		return { ...control, before: forward(control.before), after: forward(control.after) };
 	};
