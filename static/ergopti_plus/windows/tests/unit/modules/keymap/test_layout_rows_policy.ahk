@@ -131,6 +131,12 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
 	Code .= "#Include " . Owner . "`n"
+	; LayoutRowIsEmulated asks the game keys first and LayerDispatch holds its
+	; letters through them: the genuine module, whose unregistered release
+	; hotkeys leave every row to the emulation and every letter to its text.
+	GameKeysOwner := _DriverProductionFileForSymbol("GameKeys_PassThrough")
+	AssertTrue(GameKeysOwner != "", "the genuine game keys must have one production owner")
+	Code .= "#Include " . GameKeysOwner . "`n"
 	for Name in ["LayoutEmulationRows", "LayoutRowOf", "LayoutRowSwitches",
 		"LayoutRowsAllEmulated", "LayoutRowIsEmulated"] {
 		Definition := _DriverFuncBody(Name)
@@ -222,6 +228,7 @@ _LRPW_ChildSource() {
 	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
 		"#Include " . _DriverDir . "\infra\star_slot.ahk`n" . Definition . "`n"
 		. _DriverFuncBody("_RemapWinCriterion") . "`n"
+		. _DriverFuncBody("_RemapHeldEmit") . "`n"
 		. _DriverFuncBody("_RemapChordEmit") . "`nKeyboardShortcutRunLayoutChord(*) => false`n")
 }
 
@@ -309,7 +316,7 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 _LRPN_RemapSource(BodyName, AdditionalSource := "") {
 	global _DriverDir
 	Extra := "#Include " . _DriverDir . "\infra\star_slot.ahk`n"
-	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapChordEmit"] {
+	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapHeldEmit", "_RemapChordEmit"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine remap dependency must exist: " . Name)
 		Extra .= Definition . "`n"
