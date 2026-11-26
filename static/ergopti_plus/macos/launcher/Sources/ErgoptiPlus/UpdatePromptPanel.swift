@@ -95,6 +95,9 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 			message.stringValue = text.message
 			indicator.setAccessibilityLabel(text.message)
 			apply(fraction: fraction, to: indicator)
+			// The window was sized for the first step's message: a longer one
+			// (« installing » after « checking ») ran past the right edge.
+			if changed { fit(panel) }
 			// A screen reader does not read a label that changes under it:
 			// the new step (checking, downloading, installing) is announced.
 			if changed {
@@ -108,7 +111,10 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 		}
 		closeAll()
 
-		let message = NSTextField(labelWithString: text.message)
+		// Wraps within the bar's width, so a step's message never widens the
+		// window past its margin, whatever the locale.
+		let message = NSTextField(wrappingLabelWithString: text.message)
+		message.preferredMaxLayoutWidth = Self.contentWidth
 		let indicator = NSProgressIndicator()
 		indicator.style = .bar
 		indicator.minValue = 0
@@ -180,6 +186,18 @@ final class UpdatePromptPanel: NSObject, UpdatePromptPresenting, NSWindowDelegat
 			indicator.isIndeterminate = true
 			indicator.startAnimation(nil)
 		}
+	}
+
+	/// Resizes the window to its content after a row changed, keeping its
+	/// top-left corner where the user sees it.
+	private func fit(_ panel: NSPanel) {
+		guard let content = panel.contentView else { return }
+		content.layoutSubtreeIfNeeded()
+		let size = content.fittingSize
+		let frame = panel.frame
+		let target = panel.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+		panel.setFrame(NSRect(x: frame.minX, y: frame.maxY - target.height,
+							  width: target.width, height: target.height), display: true)
 	}
 
 	private func show(title: String, rows: [NSView], activate: Bool) {

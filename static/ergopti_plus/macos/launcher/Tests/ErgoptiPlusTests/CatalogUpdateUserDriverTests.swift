@@ -359,6 +359,12 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			let progressPanel = try newNativePanel(since: previous)
 			XCTAssertEqual(progressPanel.title, try Self.nativeCaption(bareProgress), "\(code) native progress caption")
 			try assertMargins(of: progressPanel, "\(code) progress")
+			// The same window shows every later step: a message longer than the
+			// first one ran past the right edge (field report, 2026-11-26).
+			presenter.showProgress(texts.downloading(), fraction: 0.5, onCancel: {}, onClose: nil)
+			try assertMargins(of: progressPanel, "\(code) downloading")
+			presenter.showProgress(texts.installing(), fraction: nil, onCancel: nil, onClose: nil)
+			try assertMargins(of: progressPanel, "\(code) installing")
 			presenter.closeAll()
 		}
 		XCTAssertTrue(answers.isEmpty, "caption updates and programmatic closes never consent to a download")
