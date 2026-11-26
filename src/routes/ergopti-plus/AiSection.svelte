@@ -418,6 +418,10 @@ FEATURES & RATIONALE:
 		font: inherit;
 		font-size: 0.85rem;
 		font-weight: 600;
+		/* Never narrower than its name: the 44 px minimum of accessibility.css
+		   replaces a flex item's own minimum, and at 200 % text « Correction »
+		   ran over « Prediction ». */
+		min-inline-size: min-content;
 		padding: 7px 16px;
 		transition:
 			background-color 0.25s var(--ease),

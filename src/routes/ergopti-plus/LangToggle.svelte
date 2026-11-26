@@ -41,15 +41,21 @@ language never requires touching this component.
 </div>
 
 <style>
+	/* One equal column per language, as wide as the widest label or the 44 px
+	   target (accessibility.css), whichever is larger: a fixed width held two
+	   44 px buttons in 84 px, so they ran past the border and, at 200 % text,
+	   each label ran over its neighbour. The slider's width and step read
+	   these equal columns. */
 	.lang-toggle {
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 999px;
-		display: inline-flex;
+		display: inline-grid;
 		gap: 0;
+		grid-auto-columns: 1fr;
+		grid-auto-flow: column;
 		padding: 3px;
 		position: relative;
-		width: calc(46px * var(--n, 2));
 	}
 
 	.lang-slider {
@@ -71,12 +77,11 @@ language never requires touching this component.
 		border-radius: 999px;
 		color: var(--ink-soft);
 		cursor: pointer;
-		flex: 1;
 		font: inherit;
 		font-size: 0.78rem;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		padding: 5px 0;
+		padding: 5px 8px;
 		position: relative;
 		transition: color 0.25s var(--ease, ease);
 		z-index: 1;
