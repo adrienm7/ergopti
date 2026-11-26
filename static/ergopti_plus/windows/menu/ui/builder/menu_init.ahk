@@ -227,7 +227,6 @@ _MI_StageLayout() {
 		throw Error("The declared keyboard_layout feature parent was refused before native construction.")
 	LayoutListProviders := Map(
 		"number_row_policy",      (*) => _LAY_NumberRowRows(),
-		"layout_game_keys",       (*) => _LAY_GameKeysRows(),
 		"layout_emulation",       (*) => _LAY_EmulationChoiceRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
@@ -256,10 +255,16 @@ global _MI_LayoutDeferred := 0
 ; manager and the layout editor save while paused (EDD-1).
 ; @param Target {Menu} The empty submenu.
 ; @param GroupBuilders {Map} Its group builders.
-; @param ListProviders {Map} Its list providers.
+; @param ListProviders {Map} Its list providers; the « Touches de jeu » rows
+;   join them here, so the staged root builder keeps the exact shape the menu
+;   drift gate pins (test_top_level_drift_gate.ahk).
 _LAY_BuildLayoutMenu(Target, GroupBuilders, ListProviders) {
+	if ListProviders.Has("layout_game_keys")
+		throw Error("The layout_game_keys rows are provided by the Layout menu build alone.")
+	Providers := ListProviders.Clone()
+	Providers["layout_game_keys"] := (*) => _LAY_GameKeysRows()
 	MenuRenderer_Build("layout_menu", "Layout", "", GroupBuilders,
-		ListProviders, _LAY_ScopeCommands(),
+		Providers, _LAY_ScopeCommands(),
 		Map("layout_enabled", () => IsCategoryGated("Layout")), Target)
 }
 
