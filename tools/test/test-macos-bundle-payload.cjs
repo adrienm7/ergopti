@@ -1367,29 +1367,37 @@ try {
 			JSON.stringify([moduleExternal?.target]),
 		'the v1.0.10 layout, without the installed source module, must be reported missing exactly it'
 	);
-	// The release producer itself refuses that bundle before any native tool.
-	fs.writeFileSync(
-		path.join(app, 'Contents', 'Info.plist'),
-		'<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict/></plist>\n'
+	// The builders refuse that bundle before the release producer archives or
+	// receipts it (the producer itself also serves the launcher's fixture apps).
+	const guard = spawnSync(
+		process.execPath,
+		[path.join(ROOT, 'tools/build/macos-bundle-payload.cjs'), 'require-externals', ROOT, app],
+		{ encoding: 'utf8' }
 	);
-	const archives = path.join(outputs, 'archives');
-	fs.mkdirSync(archives);
-	for (const args of [
-		[app, archives],
-		['--ci-receipt', app, archives]
-	]) {
-		const producer = spawnSync(
-			process.execPath,
-			[path.join(ROOT, 'tools/build/macos-release-archives.cjs'), ...args],
-			{ encoding: 'utf8' }
-		);
-		check(
-			producer.status !== 0 &&
-				producer.stderr.includes(moduleExternal?.target ?? '<no module entry>') &&
-				fs.readdirSync(archives).length === 0,
-			`macos-release-archives.cjs ${args[0]}: a bundle without the installed source module must be refused before archiving, got ${producer.status}: ${producer.stderr.trim().split('\n').slice(-3).join(' | ')}`
-		);
-	}
+	check(
+		guard.status !== 0 && guard.stderr.includes(moduleExternal?.target ?? '<no module entry>'),
+		`macos-bundle-payload.cjs require-externals: a bundle without the installed source module must be refused, got ${guard.status}: ${guard.stderr.trim().split('\n').slice(-3).join(' | ')}`
+	);
+	const guardCall =
+		'tools/build/macos-bundle-payload.cjs" require-externals "$REPO_ROOT" "$APP_PATH"';
+	const builder = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
+	const archiveCall = builder.indexOf(
+		'tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"'
+	);
+	check(
+		builder.split(guardCall).length === 2 &&
+			archiveCall > 0 &&
+			builder.indexOf(guardCall) < archiveCall,
+		'build_macos_app.sh must refuse a bundle missing a required output before archiving it'
+	);
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8');
+	const receiptGuard =
+		'node tools/build/macos-bundle-payload.cjs require-externals "$PWD" "$PWD/build/macos/ErgoptiPlus.app"\n' +
+		'          node tools/build/macos-release-archives.cjs --ci-receipt';
+	check(
+		workflow.split(receiptGuard).length === 2,
+		'the CI receipt step must refuse a bundle missing a required output before receipting it'
+	);
 } finally {
 	fs.rmSync(outputs, { recursive: true, force: true });
 }

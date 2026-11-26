@@ -470,13 +470,22 @@ if (require.main === module) {
 		requireTrackedPayload(rootArgument, loadManifest(rootArgument));
 		const count = stage(rootArgument, staticRootArgument);
 		console.error(`[macos-bundle-payload] staged ${count} files into ${staticRootArgument}`);
+	} else if (
+		command === 'require-externals' &&
+		rootArgument &&
+		staticRootArgument &&
+		rest.length === 0
+	) {
+		// The builders run it on the real application before archiving or
+		// receipting it: v1.0.10 shipped without the owned runtime's capture module.
+		requireExternals(rootArgument, staticRootArgument);
 	} else if (command === 'list' && rootArgument && staticRootArgument === undefined) {
 		const manifest = loadManifest(rootArgument);
 		const { files } = resolvePayload(manifest, trackedFiles(rootArgument, manifest));
 		process.stdout.write(files.map((file) => `${file.target}\n`).join(''));
 	} else {
 		console.error(
-			'Usage: macos-bundle-payload.cjs stage <repo-root> <static-root> | list <repo-root>'
+			'Usage: macos-bundle-payload.cjs stage <repo-root> <static-root> | require-externals <repo-root> <app> | list <repo-root>'
 		);
 		process.exit(2);
 	}

@@ -214,6 +214,12 @@ zip_app() { record zip; }
 # The full app now delegates both archives to one producer. This isolated
 # signing replay accepts only that exact boundary; it does not create archives.
 node() {
+	# The required-outputs guard on the signed app, just before the producer.
+	if [ "$#" -eq 4 ] && [ "$1" = "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" ] && \
+		[ "$2" = require-externals ] && [ "$3" = "$REPO_ROOT" ] && [ "$4" = "$APP_PATH" ]; then
+		record externals-guard
+		return 0
+	fi
 	[ "$#" -eq 3 ] && [ "$1" = "$REPO_ROOT/tools/build/macos-release-archives.cjs" ] && \
 		[ "$2" = "$APP_PATH" ] && [ "$3" = "$BUILD_DIR" ] || fail "Unexpected archive producer invocation."
 	record archive-producer "$@"

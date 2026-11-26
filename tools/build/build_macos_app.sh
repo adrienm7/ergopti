@@ -1070,6 +1070,9 @@ main() {
 		log "  Lua source : $REPO_ROOT/static/ergopti_plus/macos"
 		return
 	fi
+	# Nothing is archived without every build output the payload manifest
+	# requires: v1.0.10 shipped without the owned runtime's capture module.
+	node "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" require-externals "$REPO_ROOT" "$APP_PATH"
 	node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"
 
 	log "Done."

@@ -2763,9 +2763,9 @@ jobs:
       - name: Record signed CI archive source
         if: ${{ steps.stage-admission.outcome == 'success' }}
         shell: bash
-        run: >
-          node tools/build/macos-release-archives.cjs --ci-receipt
-          "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
+        run: |
+          node tools/build/macos-bundle-payload.cjs require-externals "$PWD" "$PWD/build/macos/ErgoptiPlus.app"
+          node tools/build/macos-release-archives.cjs --ci-receipt "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
 
       # The one test Build keeps: a release archive that crashes on launch is
       # never signed. The cold MLX bootstrap of the build host runs in the
