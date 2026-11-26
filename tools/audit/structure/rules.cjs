@@ -220,7 +220,7 @@ const LOGIC_FEATURES = [
 	],
 	[
 		'layouts',
-		/^(layout|keyboard_layout|keylayout|hyprland_|kde_layout|xkb_|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|emulation|managed_python)/
+		/^(layout|keyboard_layout|keylayout|hyprland_|kde_layout|xkb_|composer_check|input_sources|pending_layout|number_row|pause_layout|x11_layout|system_layout|emulation|game_keys|managed_python)/
 	],
 	[
 		'hotstrings',
