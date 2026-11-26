@@ -53,7 +53,7 @@ _GKT_ReplaysVectors() {
 	}
 	for Vector in Vectors["apps_with"]
 		AssertEqual(_GKT_Render(Vector["expected"]), _GKT_Render(GameKeys_AppsWith(Vector["settings"], Vector["platform"],
-			Vector["app"], _GKT_Value(Case.Get("choice", JSON_NULL)))), Vector["name"])
+			Vector["app"], _GKT_Value(Vector.Get("choice", JSON_NULL)))), Vector["name"])
 	for Vector in Vectors["routes"] {
 		Name := Vector["platform"] . " " . Vector["mode"] . " " . Vector["choice"]
 		Route := GameKeys_Route(Vector["platform"], Vector["mode"], Vector["choice"], Vector["caps"])

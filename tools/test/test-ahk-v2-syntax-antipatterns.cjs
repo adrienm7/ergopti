@@ -381,6 +381,18 @@ for (const file of files) {
 			);
 		}
 
+		// And as an object read (`Case.Get(...)`), which AHK rejects at
+		// load as a variable name the same way.
+		const member = stripped.match(/(?:^|[^\w.])([A-Za-z]+)\.\w/g) || [];
+		for (const hit of member) {
+			const name = hit.replace(/^[^A-Za-z]+/, '').replace(/\.\w$/, '');
+			if (RESERVED_LOWER.has(name.toLowerCase()) && !/^(loop|static|global|local)$/i.test(name))
+				errors.push(
+					`${rel}:${i + 1}: "${name}" is an AHK v2 reserved word read as a variable — ` +
+						'this fails at LOAD time with a modal dialog. Rename the variable.'
+				);
+		}
+
 		// And as an assignment target, which AHK rejects the same way.
 		const assign = stripped.match(/(?:^|[\s(,])(\w+)\s*:=/);
 		if (assign && RESERVED_LOWER.has(assign[1].toLowerCase())) {
