@@ -215,6 +215,21 @@ function M.register(helpers, options)
 				helpers.assert_not_nil(reloaded, vector.id .. " the edited document reloads")
 			end)
 		end
+		for _, vector in ipairs(presets_corpus.loads) do
+			helpers.it("presets load " .. vector.id, function()
+				local doc = assert(Presets.load(starters, vector.saved))
+				helpers.assert_eq(doc.active, vector.expect_active, vector.id .. " active")
+				local ids = {}
+				for _, preset in ipairs(doc.presets) do ids[#ids + 1] = preset.id end
+				helpers.assert_eq(table.concat(ids, ","), table.concat(vector.expect_ids, ","), vector.id .. " ids")
+				for _, expected in ipairs(vector.expect_names) do
+					local preset = Presets.get(doc, expected.id)
+					helpers.assert_eq(preset.name, expected.name, vector.id .. " " .. expected.id .. " name")
+					helpers.assert_eq(preset.name_key, expected.name_key, vector.id .. " " .. expected.id .. " name_key")
+				end
+				helpers.assert_not_nil(Presets.load(starters, doc), vector.id .. " the loaded document reloads")
+			end)
+		end
 		for _, vector in ipairs(presets_corpus.plans) do
 			helpers.it("plan " .. vector.id, function()
 				local doc = assert(Presets.load(starters, nil))

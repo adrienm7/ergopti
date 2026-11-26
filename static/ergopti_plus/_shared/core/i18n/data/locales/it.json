@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "Libreria…",
 	"keepawake.preset.simple": "Anti-sospensione semplice",
 	"keepawake.preset.vscode": "Anti-sospensione in VS Code",
-	"keepawake.preset.teams": "Anti-sospensione in Teams",
 	"keepawake.preset_empty": "Questa preimpostazione non impedisce la sospensione né fa clic: attiva una delle sue opzioni nel menu « Anti-sospensione ».",
 	"keepawake.auto_click_refused": "Impossibile avviare i clic automatici: il menu « Anti-sospensione » ne indica il motivo.",
 	"keepawake.auto_click_unavailable": "Non disponibile in questa sessione: la riga rossa qui sotto spiega perché.",

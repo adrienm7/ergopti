@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "Bibliotek…",
 	"keepawake.preset.simple": "Enkel hold våken",
 	"keepawake.preset.vscode": "Hold våken i VS Code",
-	"keepawake.preset.teams": "Hold våken i Teams",
 	"keepawake.preset_empty": "Denne forhåndsinnstillingen hindrer ikke dvale og klikker ikke: slå på ett av valgene i menyen « Hold våken ».",
 	"keepawake.auto_click_refused": "Automatiske klikk kunne ikke starte: menyen « Hold våken » viser hvorfor.",
 	"keepawake.auto_click_unavailable": "Ikke tilgjengelig i denne økten: den røde linjen nedenfor sier hvorfor.",

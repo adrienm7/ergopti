@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "Library…",
 	"keepawake.preset.simple": "Plain keep-awake",
 	"keepawake.preset.vscode": "Keep awake in VS Code",
-	"keepawake.preset.teams": "Keep awake in Teams",
 	"keepawake.preset_empty": "This preset neither prevents sleep nor clicks anything: turn one of its options on in the « Keep awake » menu.",
 	"keepawake.auto_click_refused": "Automatic clicks could not start: the « Keep awake » menu says why.",
 	"keepawake.auto_click_unavailable": "Not available in this session: the red row below says why.",

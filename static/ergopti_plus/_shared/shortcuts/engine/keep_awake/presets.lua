@@ -13,7 +13,9 @@
 --- 1. Persisted, never rebuilt: the user's document (auto_click/presets.json
 ---    in the configuration folder) starts as a copy of the starters
 ---    (_shared/shortcuts/data/keep_awake_presets.json) and every change is an
----    edit of that document, so a Ctrl+M never resets a library.
+---    edit of that document, so a Ctrl+M never resets a library. A starter
+---    later removed from the starters file stays in the documents that copied
+---    it, named after its id once its translated name is gone.
 --- 2. Every edit validates first and changes nothing on a refusal, which it
 ---    returns as a reason; the caller writes the document only after a success.
 --- 3. The last preset cannot be deleted, and deleting the active one makes the
@@ -129,6 +131,16 @@ function M.load(starters, saved)
 		seen[preset.id] = true
 	end
 	local doc = copy(saved)
+	-- A copy of a starter the starters file no longer ships (« teams », removed
+	-- 2026-11-26) is the user's data and stays, active or not; only its name
+	-- pointed at shipped text, whose key is gone, so it takes its id as its name.
+	local shipped = {}
+	for _, preset in ipairs(starters.presets) do shipped[preset.name_key] = true end
+	for _, preset in ipairs(doc.presets) do
+		if preset.name == nil and not shipped[preset.name_key] then
+			preset.name, preset.name_key = preset.id, nil
+		end
+	end
 	if not index_of(doc, doc.active) then doc.active = doc.presets[1].id end
 	return doc
 end

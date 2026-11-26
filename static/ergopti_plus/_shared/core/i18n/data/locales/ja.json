@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "ライブラリ…",
 	"keepawake.preset.simple": "シンプルなスリープ防止",
 	"keepawake.preset.vscode": "VS Code でスリープ防止",
-	"keepawake.preset.teams": "Teams でスリープ防止",
 	"keepawake.preset_empty": "このプリセットはスリープを防がず、何もクリックしません。« スリープ防止 » メニューでいずれかのオプションをオンにしてください。",
 	"keepawake.auto_click_refused": "自動クリックを開始できませんでした。理由は « スリープ防止 » メニューに表示されます。",
 	"keepawake.auto_click_unavailable": "このセッションでは利用できません：理由は下の赤い行に表示されます。",

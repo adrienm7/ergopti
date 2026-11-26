@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "库…",
 	"keepawake.preset.simple": "简单防休眠",
 	"keepawake.preset.vscode": "在 VS Code 中防休眠",
-	"keepawake.preset.teams": "在 Teams 中防休眠",
 	"keepawake.preset_empty": "此预设既不阻止休眠也不点击任何内容：请在 « 防止休眠 » 菜单中开启其中一个选项。",
 	"keepawake.auto_click_refused": "无法启动自动点击：原因见 « 防止休眠 » 菜单。",
 	"keepawake.auto_click_unavailable": "此会话中不可用：下方红色行说明原因。",

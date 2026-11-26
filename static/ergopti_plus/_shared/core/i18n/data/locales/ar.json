@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "المكتبة…",
 	"keepawake.preset.simple": "منع السكون البسيط",
 	"keepawake.preset.vscode": "منع السكون في VS Code",
-	"keepawake.preset.teams": "منع السكون في Teams",
 	"keepawake.preset_empty": "هذا الإعداد المسبق لا يمنع السكون ولا ينقر على شيء: فعّل أحد خياراته من قائمة « منع السكون ».",
 	"keepawake.auto_click_refused": "تعذّر بدء النقرات التلقائية: تجد السبب في قائمة « منع السكون ».",
 	"keepawake.auto_click_unavailable": "غير متاح في هذه الجلسة: يوضح السطر الأحمر أدناه السبب.",

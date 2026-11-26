@@ -6662,7 +6662,6 @@
 	"menu.keep_awake.library": "Бібліотека…",
 	"keepawake.preset.simple": "Простий режим без сну",
 	"keepawake.preset.vscode": "Без сну у VS Code",
-	"keepawake.preset.teams": "Без сну в Teams",
 	"keepawake.preset_empty": "Ця передустановка не заважає сну й нічого не натискає: увімкніть один із її параметрів у меню « Без сну ».",
 	"keepawake.auto_click_refused": "Не вдалося запустити автоматичні клацання: причину вказано в меню « Без сну ».",
 	"keepawake.auto_click_unavailable": "Недоступно в цьому сеансі: причину вказано в червоному рядку нижче.",
