@@ -45,7 +45,12 @@ _L4M_MenuDesired() {
 			Rows := %RowsFn%(Fixture.options)
 			FileRow := Rows[1]["items"][1]
 			FileMenu := FileRow["submenu"]
-			Assert(FileRow["checked"], "the category title retains desired state under master OFF")
+			; No section of the pack is wanted, so its title counts 0 and is never
+			; drawn « checked (0) »; the desired group gate survives master OFF.
+			AssertEqual("words (0)", FileRow["label"])
+			AssertEqual(false, FileRow["checked"],"a pack title with no active hotstring is unchecked")
+			Assert(ReadFeatureStateV2("hotstrings.groups.ext:sample:words")["enabled"],
+				"the pack keeps its desired group gate under master OFF")
 			AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(FileMenu, 0))
 			AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(FileMenu, 1))
 			AssertEqual(0, _CTC_CountLabel(FileMenu, t("menu.hotstrings.category_enable")))
