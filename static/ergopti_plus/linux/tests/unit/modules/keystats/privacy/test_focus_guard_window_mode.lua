@@ -27,6 +27,7 @@ local function fixture(overrides)
 		invalidate = function() listener(nil) end,
 		pump = function() end,
 		barrier = function() return state.field end,
+		snapshot = function() return state.field end,
 		authority = function() return state.field and "field" or state.authority end,
 	}
 	local window_policy = nil

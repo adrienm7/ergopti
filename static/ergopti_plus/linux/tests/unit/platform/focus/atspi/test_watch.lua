@@ -470,14 +470,19 @@ helpers.describe("AT-SPI focus watcher: causal input barrier", function()
 		state.answer = true
 		assert_false(guard.blocks_text())
 		assert_false(metric_secure)
-		local before = resets
+		local before, requested = resets, state.request
+		-- The worker's listener reports the programmatic move by itself: an
+		-- unknown frame at the focus event, then the new field's receipt.
 		state.role, state.path = 40, "/field/password"
+		state.message("unknown"); state.message("snapshot")
 		helpers.assert_true(guard.blocks_text())
 		helpers.assert_true(metric_secure)
 		helpers.assert_true(resets > before)
 		state.role, state.path = 61, "/field/two"
+		state.message("unknown"); state.message("snapshot")
 		assert_false(guard.blocks_text())
 		assert_false(metric_secure)
+		helpers.assert_eq(state.request, requested, "a key's check sends the worker no query")
 	end)
 end)
 

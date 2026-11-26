@@ -32,6 +32,7 @@ local function fixture(initial_role)
 			listener(receipt)
 			return receipt
 		end,
+		snapshot = function() return { role = role, bus = ":1.1", path = "/owned/field" } end,
 	}
 	local engine, output = Engine.new(), {}
 	local guard = Guard.new({ detector = detector, watch = watch,

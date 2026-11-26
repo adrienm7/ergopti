@@ -38,7 +38,10 @@ function M.with(body)
 				listener(state.receipt)
 				return state.receipt
 			end,
-			snapshot = function() return state.receipt end,
+			snapshot = function()
+				if state.on_snapshot then state.on_snapshot() end
+				return state.receipt
+			end,
 			invalidate = function() state.receipt = nil; listener(nil) end,
 		}
 		guard = require("modules.keystats.focus_guard").new({

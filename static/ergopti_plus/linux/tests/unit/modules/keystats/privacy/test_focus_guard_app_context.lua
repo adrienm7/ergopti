@@ -56,6 +56,7 @@ local function fixture(body, asynchronous)
 				state.depth = state.depth - 1
 				return result
 			end,
+			snapshot = function() return snapshot() end,
 		}
 		local ports = {
 			watch = watch, detector = require("platform.focus.secure_field_detector"), keystats = logger,

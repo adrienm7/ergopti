@@ -3264,6 +3264,24 @@ The maintainer answered the agent decisions pending on 2026-11-25.
   under each analyser's name; the codegen refuses a single value. A new
   scorer or rerun states both values in `docs/design/analyser-scores.md`.
 
+## A Linux key never waits for the accessibility focus (2026-11-25)
+
+Maintainer decision (Arch, KDE Plasma Wayland field report: Brave and Discord
+answer a fresh AT-SPI query in about 20 ms, and each key waited for one):
+the focus guard's key checks read the last receipt the focus worker already
+sent (`atspi_focus_watch.snapshot()`, kept current by the worker's own focus
+events and heartbeats), never `barrier()`. The password-manager list, the
+private-window filter (checked in RAM against the joined application and
+title) and the password-field latch (a field once seen as a password stays
+closed until the worker reports another field) still apply. The cost
+accepted: a key typed in the instant between an application moving its own
+focus and the worker's event reaching the daemon is judged on the previous
+field. Only the focus refresh and an expansion's output boundary in the field
+mode still wait for a fresh answer. Action: do not put a focus query back on
+the key path; `test_focus_guard_input_latency.lua` refuses one. macOS
+(`km_utils.is_secure_field`, a cached verdict) and Windows (UIA in a worker,
+cached per focus generation) had no per-key wait.
+
 ## One daily log; « Export the logs (zip) » for testers (2026-11-25)
 
 Maintainer decision (QCM, « too many log files; testers must send dozens »):

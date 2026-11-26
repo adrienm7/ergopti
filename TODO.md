@@ -542,6 +542,16 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       `pacman -Q lua51-lgi webkit2gtk-4.1 libayatana-appindicator` must list all three packages. Unproved here: the
       pkexec prompt under KDE's polkit agent, `sg` acquiring the new groups in the same session, and KWin Wayland's
       layout read (a failure shows « Disposition clavier non lue »).
+- [ ] **[FIELD] Linux keys never wait for the accessibility focus (maintainer decision, 2026-11-25).** Arch,
+      KDE Plasma Wayland, Brave and Discord: every key waited the 20 ms barrier (`focus_barrier_timeout_ms`) for a
+      fresh AT-SPI answer, twice per character (`Slow input.char 21.44 ms own`, `input.dispatch` about 21 ms).
+      Decided: a key reads the last receipt the focus worker already sent (`watch.snapshot()`), never a barrier; the
+      password-manager list, the private-window filter and the password-field latch still close it. Proof:
+      `test_focus_guard_input_latency.lua` (no barrier step, no query, with a silent or slow worker; a latched password
+      field stays closed). Left: on the tester's machine, type a paragraph in Brave and in Discord and check the log has
+      no `Slow input.char` or `Slow input.dispatch` line of about 20 ms; then Tab into a password field and check that
+      a hotstring trigger typed there does not expand. macOS and Windows have no such wait (their key paths read a
+      cached field verdict).
 - [ ] **[CODE] Windows and macOS silent-failure findings (audit of 2026-11-25), field checks.** The code is on
       `dev`: the Windows error and diagnostics delivery without WebView2, its 🔴 keyboard core row for a failed
       `ergopti_nav_owner.dll` (`HealthCheck_FormatPlain`, uncalled, was removed), the macOS red Hotstrings dot for a

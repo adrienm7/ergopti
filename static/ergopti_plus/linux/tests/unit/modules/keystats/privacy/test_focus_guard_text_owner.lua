@@ -20,7 +20,7 @@ helpers.describe("ordinary text destination ownership", function()
 			helpers.assert_eq(state.pumps, pumps)
 		end)
 	end)
-	helpers.it("(linux-output-barrier-budget) waits for the native query deadline at an output boundary, not the input budget", function()
+	helpers.it("(linux-output-barrier-budget) waits for the native query deadline at an output boundary, and a key waits for none", function()
 		fixture.with(function(guard, state)
 			local owner = assert(guard.capture_text_owner())
 			state.budgets = {}
@@ -29,7 +29,7 @@ helpers.describe("ordinary text destination ownership", function()
 				"right after an erase the application is still busy with the keys just sent")
 			state.budgets = {}
 			helpers.assert_eq(guard.blocks_text(), false)
-			helpers.assert_eq(state.budgets, { "input" }, "an input callback keeps the short budget a physical key waits on")
+			helpers.assert_eq(state.budgets, {}, "a physical key reads the last receipt and waits on no barrier")
 		end)
 	end)
 	for _, change in ipairs({ "field", "password", "unknown", "epoch", "ABA", "policy", "watch-port" }) do
@@ -61,9 +61,9 @@ helpers.describe("ordinary text destination ownership", function()
 			end)
 		end)
 	end
-	helpers.it("does not capture a replacement owner during the initial barrier", function()
+	helpers.it("does not capture a replacement owner during the initial read", function()
 		fixture.with(function(guard, state)
-			state.on_barrier = function() state.on_barrier = nil; guard.invalidate() end
+			state.on_snapshot = function() state.on_snapshot = nil; guard.invalidate() end
 			helpers.assert_eq(guard.capture_text_owner(), nil)
 		end)
 	end)

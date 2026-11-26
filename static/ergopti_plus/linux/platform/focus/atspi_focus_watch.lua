@@ -148,8 +148,6 @@ function M.new(options)
 	local receipt, last_at, sequence, request = nil, nil, 0, 0
 	local pending, received = "", false
 	local answered_request, answered_at = -1, nil
-	-- When the latest request was sent, so poll() renews one left unanswered.
-	local requested_at = nil
 	-- The kind of the answer to answered_request: "snapshot", "unknown" or
 	-- "absent" (the focused window is on no application of the bus).
 	local answered_kind = nil
@@ -211,7 +209,7 @@ function M.new(options)
 		active, ready, failed = true, false, false
 		operation = nil
 		receipt, last_at, sequence, request, pending, received = nil, nil, 0, 0, "", false
-		answered_request, answered_at, answered_kind, requested_at = -1, nil, nil, nil
+		answered_request, answered_at, answered_kind = -1, nil, nil
 		watcher.started_at = now_ms()
 		local ok, owned = pcall(create_transport)
 		if not ok or type(owned) ~= "table" then fail("transport unavailable"); return false end
@@ -327,25 +325,26 @@ function M.new(options)
 	function watcher.invalidate()
 		publish(nil)
 		if not active or failed or not transport then return false end
-		request, requested_at = request + 1, now_ms()
+		request = request + 1
 		if not transport.request(request) then fail("refresh request refused"); return false end
 		return true
 	end
 
-	--- Obtains a causally fresh resident answer before logical input collection.
+	--- Obtains a causally fresh resident answer, off the key path: a physical
+	--- key reads snapshot() and never waits here (decided 2026-11-25).
 	--- Timeout withholds logical collection and never starts a second process.
-	--- An input callback keeps the short default budget, since a physical key
-	--- waits on it. An output boundary may pass a longer one, up to the lease of
-	--- a receipt: the application is then still busy with the keys just sent to
-	--- it, and a refusal there aborts the whole injection.
-	--- @param budget_ms number|nil Answer deadline; nil for the input budget.
+	--- The focus refresh keeps the short default budget, since it runs on the
+	--- loop that reads the keyboard. An output boundary may pass a longer one,
+	--- up to the lease of a receipt: the application is then still busy with
+	--- the keys just sent to it, and a refusal there aborts the whole injection.
+	--- @param budget_ms number|nil Answer deadline; nil for the short default.
 	--- @return table|nil receipt
 	function watcher.barrier(budget_ms)
 		assert(budget_ms == nil or (type(budget_ms) == "number" and budget_ms > 0
 			and budget_ms % 1 == 0 and budget_ms <= lease_ms), "focus barrier budget refused")
 		watcher.pump()
 		if not ready or failed or not transport then return nil end
-		request, requested_at = request + 1, now_ms()
+		request = request + 1
 		if not transport.request(request) then fail("admission request refused"); return nil end
 		local deadline = now_ms() + (budget_ms or barrier_ms)
 		while true do
@@ -365,31 +364,6 @@ function M.new(options)
 		return nil
 	end
 
-	--- Answers without waiting, for an input callback once the worker let a
-	--- barrier's budget pass: drains what it sent and returns the receipt of a
-	--- fresh answer to the latest request. With none, one request stays
-	--- outstanding, renewed after a lease, so a later key finds its answer.
-	--- @return table|nil receipt The fresh answer's receipt.
-	--- @return boolean answered Whether the latest request has a fresh answer.
-	function watcher.poll()
-		watcher.pump()
-		if not ready or failed or not transport then return nil, false end
-		if answered_request == request then
-			if answered_at ~= nil and now_ms() - answered_at <= lease_ms then return watcher.snapshot(), true end
-		elseif requested_at ~= nil and now_ms() - requested_at <= lease_ms then
-			return nil, false
-		end
-		request, requested_at = request + 1, now_ms()
-		if not transport.request(request) then fail("admission request refused") end
-		return nil, false
-	end
-
-	--- Whether the latest request has a fresh answer, from RAM only.
-	--- @return boolean answered
-	function watcher.answered()
-		return answered_request == request and answered_at ~= nil and now_ms() - answered_at <= lease_ms
-	end
-
 	--- Returns the last live, exact focused-control receipt without native work.
 	--- @return table|nil receipt
 	function watcher.snapshot()
@@ -398,15 +372,18 @@ function M.new(options)
 	end
 
 	--- Says, from RAM only, what authority the watcher holds over the focus.
+	--- Like snapshot(), it is the worker's last answer while its frames stay
+	--- fresh: a focus event makes the worker send a new one, and a key asks
+	--- for none (decided 2026-11-25).
 	--- @return string "field" (a fresh exact receipt), "absent" (the worker's
-	--- fresh answer to the latest request: the focused window is on no
-	--- application of the bus), "unanswered" (no fresh answer to the latest
-	--- request, or an inconclusive one) or "unavailable" (no running worker).
+	--- last answer to the latest request: the focused window is on no
+	--- application of the bus), "unanswered" (no answer to the latest request,
+	--- or an inconclusive one) or "unavailable" (no running worker).
 	function watcher.authority()
 		if not active or failed or not transport or not ready then return "unavailable" end
 		if watcher.snapshot() then return "field" end
-		if answered_request == request and answered_kind == "absent" and answered_at ~= nil
-			and now_ms() - answered_at <= lease_ms then return "absent" end
+		if answered_request == request and answered_kind == "absent" and last_at ~= nil
+			and now_ms() - last_at <= lease_ms then return "absent" end
 		return "unanswered"
 	end
 

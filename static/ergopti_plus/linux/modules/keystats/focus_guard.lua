@@ -27,16 +27,20 @@
 ---    context, the settle delay after navigation and a stopped guard always
 ---    close. Metrics and every other blocks_text() reader stay closed outside
 ---    "field" (decided 2026-11-25, see TODO.md).
+--- 7. A physical key's check never waits for the focus worker: it reads the
+---    last receipt the worker sent. Only a caller passing a budget (an output
+---    boundary) and the off-key refresh wait on a barrier (decided 2026-11-25).
 --- ==============================================================================
 
 local M = {}
 
 -- How long an output boundary of a retained destination waits for the focus
--- worker's fresh answer: the worker's own native query deadline. The input
--- budget (focus_barrier_timeout_ms) holds a physical key; an output boundary
--- holds none, and right after an erase the application is still busy with
--- the Backspaces just sent to it. With the input budget an expansion failed
--- at random there as programmable_publication_stale (real-GTK field test).
+-- worker's fresh answer: the worker's own native query deadline. A physical
+-- key waits for no answer at all; an output boundary holds no key, and right
+-- after an erase the application is still busy with the Backspaces just sent
+-- to it. With the short barrier budget (focus_barrier_timeout_ms) an
+-- expansion failed at random there as programmable_publication_stale
+-- (real-GTK field test).
 local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
 
 -- The closing reasons that are the desktop's, not the field's: with them alone
@@ -118,8 +122,6 @@ function M.new(opts)
 	-- A password field seen and not left for another field: it closes even the
 	-- window mode, whatever later answers fail to say (INVARIANTS 6).
 	local password_latched = false
-	-- Whether the worker left the latest input barrier unanswered (text_admission).
-	local worker_unanswered = false
 	-- Context joins that settled without a context since the last success.
 	local context_failures = 0
 	local state_mode, state_reason = "closed", "starting"
@@ -424,8 +426,9 @@ function M.new(opts)
 		return context_failures > 0 and "context_unavailable" or "context_pending"
 	end
 
-	--- Checks live privacy and retains the exact receipt from its single barrier.
-	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
+	--- Checks live privacy and retains the exact receipt it decided on.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for a physical
+	--- key, which reads the last receipt without waiting.
 	--- @return boolean blocked
 	--- @return table|nil snapshot Fresh resident native receipt.
 	--- @return string reason Why text is admitted or withheld (INVARIANTS 6).
@@ -437,20 +440,16 @@ function M.new(opts)
 		if watch then
 			watch.pump()
 			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true, nil, "settling" end
-			-- No joined field: once the worker let one barrier's budget pass, a
-			-- physical key reads its answers without waiting (KDE Wayland joins
-			-- none, and each press and release used to wait the whole budget).
-			-- Only a fresh answer to the latest request counts, as a barrier's;
-			-- an output boundary's own budget still waits.
-			if budget_ms == nil and contextual and context_pending and worker_unanswered then
-				local answered
-				snapshot, answered = watch.poll()
-				if answered then worker_unanswered = false end
+			-- A physical key never waits for the worker (decided 2026-11-25, see
+			-- TODO.md): it reads the last receipt the worker already sent, which
+			-- its own focus events keep current. A Chromium field answers a fresh
+			-- query in about 20 ms, the whole barrier budget, and each press and
+			-- release paid it (Arch field report). Only an output boundary of a
+			-- retained destination passes a budget and still waits.
+			if budget_ms == nil then
+				snapshot = watch.snapshot()
 			else
 				snapshot = watch.barrier(budget_ms)
-				-- A watch without answer polling (a controlled double) keeps barriers.
-				worker_unanswered = type(watch.poll) == "function" and type(watch.answered) == "function"
-					and not watch.answered()
 			end
 			if snapshot then password_latched = snapshot.role == 40 end
 			if contextual then
@@ -509,7 +508,7 @@ function M.new(opts)
 
 	--- Decides whether ordinary text automation (hotstrings, their erase and
 	--- output) may act on the focused control right now (INVARIANTS 6).
-	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for a physical key's check.
 	--- @return boolean allowed
 	--- @return string mode "field", "window" or "closed".
 	--- @return string reason
@@ -542,7 +541,7 @@ function M.new(opts)
 
 	--- Captures a fresh exact AI text target without launching a native helper.
 	--- A receipt cannot outlive its joined context, generation or detector epoch.
-	--- @param budget_ms number|nil Barrier answer deadline; nil for the input budget.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for a physical key's check.
 	--- @return string|nil identity Exact active non-password bus/object identity.
 	function guard.focused_text_identity(budget_ms)
 		if reading_text_identity or stopped or not contextual or not watch or context_pending or joining_context
@@ -589,13 +588,13 @@ function M.new(opts)
 			local called, allowed = pcall(options.window_policy)
 			return called and allowed == true
 		end
-		-- The input budget, never OUTPUT_BARRIER_MS: the window mode exists
+		-- A key's check, never OUTPUT_BARRIER_MS: the window mode exists
 		-- because the worker gives no field answer, so the long barrier only
 		-- timed out, and an expansion's preflight waits here while the
 		-- hook's forwarded trigger key is still down on the virtual keyboard.
 		-- On KDE Wayland ",e" then autorepeated into ",eeeeeeeeeje" before the
-		-- release reached the desktop (Arch field report, 2026-11-25). Once the
-		-- worker left a barrier unanswered, text_admission polls without waiting.
+		-- release reached the desktop (Arch field report, 2026-11-25). A key's
+		-- check reads the last receipt without waiting.
 		function window_owner.current()
 			if not window_owner.cached() then return false end
 			local allowed, mode = guard.text_automation()
