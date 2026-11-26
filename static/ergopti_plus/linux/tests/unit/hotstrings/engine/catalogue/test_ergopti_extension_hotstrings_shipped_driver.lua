@@ -108,6 +108,8 @@ helpers.describe("Ergopti extension distance reduction", function()
 			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result" }) do
 				helpers.assert_eq(m[flag], row[flag], row.trigger .. "/" .. flag)
 			end
+			helpers.assert_eq(m.is_case_sensitive_strict, row.is_case_sensitive_strict == true,
+				row.trigger .. "/is_case_sensitive_strict")
 		end
 		helpers.assert_eq(exists(Paths.shared("hotstrings/data/catalogue") .. "/distancesreduction.toml"), false)
 		local without = load(false)

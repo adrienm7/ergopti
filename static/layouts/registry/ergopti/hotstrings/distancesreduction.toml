@@ -82,82 +82,82 @@ space_around_symbols ={ fr = "Ajouter un espace avant et après les symboles obt
 # =====================================
 
 [[dead_key_e_circumflex]]
-"ê " = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê'" = { output = "⚠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê," = { output = "➜", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê." = { output = "•", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê/" = { output = "⁄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê0" = { output = "🄋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê1" = { output = "➀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê2" = { output = "➁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê3" = { output = "➂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê4" = { output = "➃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê5" = { output = "➄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê6" = { output = "➅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê7" = { output = "➆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê8" = { output = "➇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê9" = { output = "➈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê:" = { output = "▶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê;" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê^" = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê_" = { output = "\\", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êA" = { output = "Â", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êÀ" = { output = "Æ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êà" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êB" = { output = "Ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êb" = { output = "ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êC" = { output = "Ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êc" = { output = "ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êD" = { output = "☆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êd" = { output = "★", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êÈ" = { output = "Í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êè" = { output = "í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êÉ" = { output = "Œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êé" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êÊ" = { output = "Á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êê" = { output = "á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êF" = { output = "⚑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êf" = { output = "⚐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êG" = { output = "Ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êg" = { output = "ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êH" = { output = "Ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êh" = { output = "ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êI" = { output = "Î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êJ" = { output = "J", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êj" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êK" = { output = "☻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êk" = { output = "☺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êL" = { output = "‡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êl" = { output = "†", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êM" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êm" = { output = "✅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êN" = { output = "Ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ên" = { output = "ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êO" = { output = "Ô", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êo" = { output = "ô", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êP" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êp" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êQ" = { output = "☐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êq" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êR" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êr" = { output = "º", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êS" = { output = "ẞ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ês" = { output = "ß", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êU" = { output = "Û", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êu" = { output = "û", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êV" = { output = "✔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êv" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êW" = { output = "Ù", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êw" = { output = "ù ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êX" = { output = "✖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êx" = { output = "✕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êY" = { output = "Ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êy" = { output = "ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êZ" = { output = "Ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"êz" = { output = "ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"ê¨" = { output = "/", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ê " = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê'" = { output = "⚠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê," = { output = "➜", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê." = { output = "•", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê/" = { output = "⁄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê0" = { output = "🄋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê1" = { output = "➀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê2" = { output = "➁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê3" = { output = "➂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê4" = { output = "➃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê5" = { output = "➄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê6" = { output = "➅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê7" = { output = "➆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê8" = { output = "➇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê9" = { output = "➈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê:" = { output = "▶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê;" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê^" = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê_" = { output = "\\", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êA" = { output = "Â", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êa" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êÀ" = { output = "Æ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êà" = { output = "æ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êB" = { output = "Ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êb" = { output = "ó", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êC" = { output = "Ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êc" = { output = "ç", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êD" = { output = "☆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êd" = { output = "★", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êÈ" = { output = "Í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êè" = { output = "í", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êÉ" = { output = "Œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êé" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êÊ" = { output = "Á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êê" = { output = "á", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êF" = { output = "⚑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êf" = { output = "⚐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êG" = { output = "Ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êg" = { output = "ĝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êH" = { output = "Ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êh" = { output = "ĥ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êI" = { output = "Î", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êi" = { output = "î", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êJ" = { output = "J", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êj" = { output = "j", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êK" = { output = "☻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êk" = { output = "☺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êL" = { output = "‡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êl" = { output = "†", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êM" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êm" = { output = "✅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êN" = { output = "Ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ên" = { output = "ñ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êO" = { output = "Ô", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êo" = { output = "ô", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êP" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êp" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êQ" = { output = "☐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êq" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êR" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êr" = { output = "º", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êS" = { output = "ẞ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ês" = { output = "ß", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êU" = { output = "Û", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êu" = { output = "û", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êV" = { output = "✔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êv" = { output = "✓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êW" = { output = "Ù", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êw" = { output = "ù ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êX" = { output = "✖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êx" = { output = "✕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êY" = { output = "Ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êy" = { output = "ŷ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êZ" = { output = "Ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"êz" = { output = "ẑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"ê¨" = { output = "/", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 
 
 

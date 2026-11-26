@@ -269,6 +269,8 @@ helpers.describe("Ergopti extension distance reduction", function()
 			for _, flag in ipairs({ "output", "is_word", "auto_expand", "is_case_sensitive", "final_result" }) do
 				helpers.assert_eq(found[flag], row[flag], row.trigger .. "/" .. flag)
 			end
+			helpers.assert_eq(found.is_case_sensitive_strict == true, row.is_case_sensitive_strict == true,
+				row.trigger .. "/is_case_sensitive_strict")
 		end
 		helpers.assert_nil(real_io().read_file(static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/distancesreduction.toml"))
 		local user = os.tmpname()
@@ -315,7 +317,9 @@ helpers.describe("Ergopti extension distance reduction", function()
 				helpers.assert_eq(found.auto, row.auto_expand)
 				-- Comma rules keep explicit shifted-symbol variants; ordinary
 				-- case-insensitive rules use the conforming registry entry.
-				local mode = row.is_case_sensitive and "fold"
+				-- A strict row (a dead-key case pair) compares exactly.
+				local mode = row.is_case_sensitive_strict and "exact"
+					or row.is_case_sensitive and "fold"
 					or (row.trigger:find("[,'.]") and "exact" or "conform")
 				helpers.assert_eq(found.match_mode, mode, row.trigger .. " matching mode")
 				helpers.assert_eq(found.final_result, row.final_result)

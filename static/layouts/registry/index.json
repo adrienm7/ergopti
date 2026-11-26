@@ -142,7 +142,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "5d0519eceebdd30562f9e00b5eac9de2ad49603c86ccce38ea0580890ab8ce6b",
+				"sha256": "51ccc661a8faeeca330bdf84b8d74c0fb5e88deee3732aa2887c4bed1f18c6f4",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -153,8 +153,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -254,7 +254,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "7958a9b517467d876b07e3b31d8e969f88ba537304dab07484bc3c1adbd33df5",
+				"sha256": "1832a7093f91a38b65ad5483ac5da68789650c266b95e20c3f44f98c69aa149f",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -265,8 +265,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -366,7 +366,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "fa14a0d9cdb3f53ba4405e79e15b123153360cb997808efff21aa8c94a91bc5d",
+				"sha256": "f450983240e31e29ec5a2c0b49b642742c8d8b60cbf7ec0e25c8794d40b1f91c",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -377,8 +377,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -478,7 +478,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "14c8692d040bb173ac2e688d3e97f5fc22ccb5ae9ce33994cc08835c017ca820",
+				"sha256": "1c85b8eaf1cedbdd0c34428b47bede4d4688f8890b3b3b8ca4253aa466a0ed39",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -489,8 +489,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",

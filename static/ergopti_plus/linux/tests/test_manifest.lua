@@ -702,6 +702,7 @@ return {
 	"tests.unit.hotstrings.engine.magic_key.test_catalogue",
 	"tests.unit.hotstrings.engine.catalogue.test_section_opt_in_defaults",
 	"tests.unit.hotstrings.engine.catalogue.test_rolls_left_arrow",
+	"tests.unit.hotstrings.engine.catalogue.test_circumflex_dead_key_case",
 	"tests.unit.hotstrings.engine.injector.test_output_transaction",
 	"tests.unit.hotstrings.engine.dynamic.test_personal_info_combo_resolver",
 	"tests.unit.hotstrings.engine.dynamic.test_personal_tag_case",

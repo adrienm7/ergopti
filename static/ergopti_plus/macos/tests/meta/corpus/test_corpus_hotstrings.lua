@@ -23,6 +23,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Unicode case folding: string.lower is ASCII-only, so it cannot tell that
+-- "ÉÊ" ends a buffer for the trigger "éê".
+local text_utils = require("core.text.engine.utils_core")
 
 
 
@@ -203,7 +206,7 @@ seq_counter             = 0,
 				if v.is_case_sensitive_strict == true then
 					ends_with = (tail == v.trigger)
 				else
-					ends_with = (tail:lower() == v.trigger:lower())
+					ends_with = (text_utils.trig_fold(tail) == text_utils.trig_fold(v.trigger))
 				end
 				helpers.assert_true(ends_with,
 					"vector '" .. v.id .. "': buffer does not end with trigger")

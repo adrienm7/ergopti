@@ -272,6 +272,14 @@ candidate-refusal/fallback ordering, not just rerun the pure helper vectors.
 Case conformity, case sensitivity, and ending-character behavior are independent
 flags. Preserve them independently through parsing, caching, and dispatch.
 
+`is_case_sensitive` alone registers a literal that still folds case on every
+driver. Two such literals that differ only in case (`"êé"` = `œ`, `"êÉ"` = `Œ`)
+are one rule there: the first written answers both casings. A case pair that
+means two outputs needs `is_case_sensitive_strict = true` on both halves, as
+the Windows dead-key registrar's `C` flag gives it. The Linux test
+`test_circumflex_dead_key_case.lua` refuses any such fold pair in the shipped
+catalogue.
+
 ### project-shifted-comma-case-variants
 
 The uppercase form of comma/apostrophe/period variants uses the configured
