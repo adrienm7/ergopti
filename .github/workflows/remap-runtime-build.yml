@@ -161,6 +161,9 @@ jobs:
           bash tools/build/build_macos_app.sh
           test -d build/macos/ErgoptiPlus.app/Contents/Resources
           test -f build/macos/luasocket-build/lua.tar.gz
+          # The app build now ships its own installed source module; the
+          # packaging stages the validated one there and refuses an existing file.
+          rm build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/adapters/native/installed_physical_source.so
 
       # The runtime is signed with the stable self-signed identity the
       # application uses, so the capture requirement pinned in the manifest

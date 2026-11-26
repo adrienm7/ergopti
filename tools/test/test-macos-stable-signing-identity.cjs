@@ -50,6 +50,12 @@ const NETWORK_RETRY = fs.readFileSync(
 );
 const CREATE = path.join(ROOT, 'tools/build/create_macos_signing_identity.sh');
 const HASH = '0123456789ABCDEF0123456789ABCDEF01234567';
+const INSTALLED_SOURCE_ID = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/core/text/data/identifiers.json'),
+		'utf8'
+	)
+).signing_ids.installed_physical_source;
 const P12_BYTES = Buffer.from('not a real pkcs12, only bytes to round-trip');
 const P12_PASSWORD = 'p12-password-under-test';
 const errors = [];
@@ -102,6 +108,8 @@ function replay(source, options) {
 	const signing = sliceBetween(source, '======= 8/ Codesign + zip', '======= 9/ Entrypoint');
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
 	const relayCompiler = shellFunction(source, 'resolve_relay_go');
+	// The module path codesign_app signs is the build's own section-1 constant.
+	const installedSourceModule = (source.match(/^INSTALLED_SOURCE_MODULE="[^"\n]+"$/m) || [''])[0];
 	// main() admits the developer source switch first; replay the real check.
 	const devSource = [
 		shellFunction(source, 'check_dev_source_configuration'),
@@ -157,6 +165,8 @@ BUNDLE_ID="com.ergoptiplus.app"
 ERGOPTI_APP_BUNDLE="ErgoptiPlus.app"
 ERGOPTI_VERSION=0.0.0-dev ERGOPTI_BUILD=1 ERGOPTI_CHANNEL=main
 HAMMERSPOON_VERSION=1.1.1
+${installedSourceModule}
+ERGOPTI_SIGNING_ID_INSTALLED_PHYSICAL_SOURCE="${INSTALLED_SOURCE_ID}"
 BUILD_DIR="$T/build"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -191,6 +201,11 @@ assemble_app() {
 	: > "$APP_PATH/Contents/Resources/static/ergopti_plus/macos/socket/core.so"
 }
 bash() { :; }
+build_installed_source_module() {
+	local module="$APP_PATH/Contents/Resources/static/ergopti_plus/macos/$INSTALLED_SOURCE_MODULE"
+	mkdir -p "$(dirname "$module")"
+	: > "$module"
+}
 build_icon() { :; }
 generate_info_plist() { mkdir -p "$APP_PATH/Contents"; : > "$APP_PATH/Contents/Info.plist"; }
 plutil() { :; }
@@ -246,6 +261,7 @@ ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 	}
 }
 
+const INSTALLED_SOURCE_SUFFIX = '/adapters/native/installed_physical_source.so';
 const CERT_DR = `designated => identifier "com.ergoptiplus.app" and certificate leaf = H"${HASH.toLowerCase()}"`;
 const ADHOC_DR = 'designated => cdhash H"feedfacefeedfacefeedfacefeedfacefeedface"';
 const B64 = P12_BYTES.toString('base64');
@@ -362,18 +378,30 @@ function checkKeychain(run, label) {
 
 const FULL_ORDER = [
 	'/socket/core.so',
+	INSTALLED_SOURCE_SUFFIX,
 	'/Contents/Frameworks/Hammerspoon.app',
 	'/Contents/Frameworks/Sparkle.framework',
 	'/Contents/MacOS/ErgoptiPlus',
 	'/ErgoptiPlus.app'
 ];
-const HELPER_ORDER = FULL_ORDER.slice(2);
+const HELPER_ORDER = FULL_ORDER.slice(3);
 
 const full = replay(BUILD, { entry: 'main', base64: B64, password: P12_PASSWORD, dr: CERT_DR });
 errors.push(
 	...certificateProblems(full, FULL_ORDER).map((problem) => `certificate build: ${problem}`)
 );
 checkKeychain(full, 'certificate build');
+// The owned runtime's capture module (v1.0.10 shipped without it) carries the
+// fixed identifier the launcher admits; an anonymous signature fails its check.
+const moduleSignature = signatures(full).find((call) =>
+	target(call).endsWith(INSTALLED_SOURCE_SUFFIX)
+);
+check(
+	moduleSignature !== undefined &&
+		moduleSignature[moduleSignature.indexOf('--identifier') + 1] === INSTALLED_SOURCE_ID,
+	`certificate build: the installed source module must be signed as ${INSTALLED_SOURCE_ID}`
+);
+
 const verified = full.calls.filter((call) => call[0] === 'codesign' && call.includes('--verify'));
 check(
 	verified.some(

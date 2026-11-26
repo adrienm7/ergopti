@@ -141,6 +141,10 @@ HAMMERSPOON_CACHE_DIR="$REPO_ROOT/build/cache/hammerspoon"
 APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
 ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
+# The signed Lua module the owned runtime's capture loads from the bundle, below
+# the bundled driver root, at the path adapters/installed_physical_source.lua
+# derives (MODULE_RELATIVE).
+INSTALLED_SOURCE_MODULE="adapters/native/installed_physical_source.so"
 
 # Architectures of the host executable. They must match the universal slices of
 # the embedded Hammerspoon, Sparkle and LuaSocket binaries: a host-only
@@ -618,6 +622,20 @@ assemble_app() {
 
 
 
+# The owned runtime, the default on macOS, starts its capture through the
+# native module above; without it the capture is refused and the tap-holds
+# stay off (v1.0.10 shipped without it, as only the runtime build compiled it).
+# The compile reuses that build's own module roster, against the Lua headers
+# bundle-macos-luasocket.sh verified, so it runs after it; codesign_app signs it.
+build_installed_source_module() {
+	log "Building the installed physical source module"
+	python3 "$REPO_ROOT/tools/build/build_installed_source_module.py" \
+		--repository "$REPO_ROOT" --lua-build "$BUILD_DIR/luasocket-build" \
+		--work "$BUILD_DIR/installed-source-module" \
+		--output "$APP_PATH/Contents/Resources/static/ergopti_plus/macos/$INSTALLED_SOURCE_MODULE" \
+		|| fail "The installed physical source module could not be built."
+}
+
 
 # ===========================================
 # ===========================================
@@ -955,6 +973,12 @@ codesign_app() {
 	local luasocket="$driver_root/socket/core.so"
 	[ -f "$luasocket" ] || fail "Bundled LuaSocket extension missing: $luasocket"
 	sign_code "$luasocket"
+	# The launcher admits this module only under its own fixed identifier and the
+	# app's certificate leaf (OwnedRuntimeInstallOwner.swift); ad hoc it loads but
+	# refuses to start a capture, like every owned runtime part of such a build.
+	local installed_source="$driver_root/$INSTALLED_SOURCE_MODULE"
+	[ -f "$installed_source" ] || fail "Installed physical source module missing: $installed_source"
+	sign_code --identifier "$ERGOPTI_SIGNING_ID_INSTALLED_PHYSICAL_SOURCE" "$installed_source"
 	sign_code --deep "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 
 	codesign_native_runtime
@@ -1032,6 +1056,7 @@ main() {
 	[ -f "$launcher_bin" ] || fail "launcher_bin does not exist: $launcher_bin"
 	assemble_app "$launcher_bin"
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
+	build_installed_source_module
 	build_icon
 	generate_info_plist
 	[ "$ERGOPTI_DEV_SOURCE" != 1 ] || record_dev_source_root
