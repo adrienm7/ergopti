@@ -1031,8 +1031,8 @@ _GestureRestartAbortReservation(Epoch) {
 ; @param &Pid {Integer} Receives the worker's PID; a refused UAC prompt throws.
 GestureRestartRunElevated(ScriptPath, &Pid) {
 	Switches := ""
-	for Switch in ShellRunner_WinPsArgv(["-NoProfile"], "-File")
-		Switches .= Switch . " "
+	for PsSwitch in ShellRunner_WinPsArgv(["-NoProfile"], "-File")
+		Switches .= PsSwitch . " "
 	Run('*RunAs "' . ShellRunner_WinPsPath() . '" ' . Switches . '"' . ScriptPath . '"', , "Hide", &Pid)
 }
 
