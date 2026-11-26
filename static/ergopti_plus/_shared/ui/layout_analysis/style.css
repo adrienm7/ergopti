@@ -146,13 +146,17 @@ body:has(> main.layout-analysis) {
 	outline-offset: 1px;
 }
 
-/* A label read by assistive technology only (the heatmap's metric choice). */
+/* A label read by assistive technology only (the heatmap's metric choice, the
+   filters' legend). No padding: a legend's own 2 px each side made the box
+   4 px wide, 8 px at 200 % text, and no longer the 1 px box the reading gate
+   knows as screen-reader text. */
 .la-sr-only {
 	clip-path: inset(50%);
 	height: 1px;
 	min-block-size: 0;
 	min-inline-size: 0;
 	overflow: hidden;
+	padding: 0;
 	position: absolute;
 	white-space: nowrap;
 	width: 1px;
