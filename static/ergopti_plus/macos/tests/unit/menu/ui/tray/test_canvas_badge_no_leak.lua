@@ -166,6 +166,53 @@ helpers.describe("canvas_badge: prepend_to deletes every canvas it creates", fun
 		end
 	end)
 
+	helpers.it("spans the title column a hinted row really draws (v1.0.10 photo, 2026-11-26)", function()
+		-- The hint of « Suspendre » is drawn after the badge: measured on its plain
+		-- caption, the image was narrower than the title column and the pill sat
+		-- off the middle.
+		local widths = { Suspend = 120, ["Suspend    Opt + Return"] = 230, Layouts = 190 }
+		local canvas, counters = make_canvas_stub()
+		local M = helpers.load_with_stubs("menu.ui.builder.canvas_badge", {
+			canvas = canvas,
+			drawing = { getTextDrawingSize = function(text, attrs)
+				return { w = attrs.font == "Helvetica-Bold" and 60 or widths[text] }
+			end },
+		})
+		local suspend = { title = "Suspend" }
+		local rows = { { title = "Layouts", menu = {} }, suspend }
+		M.prepend_to(rows, {}, function() end, { [suspend] = "Suspend    Opt + Return" })
+		helpers.assert_eq(counters.frame.w, 230, "the image spans the hinted row")
+		local rect = counters.elements[1].frame
+		local columns = M.menu_columns()
+		local menu_w = columns.left + 230 + columns.trailing + columns.submenu_arrow
+		helpers.assert_eq(columns.left + rect.x + rect.w / 2, menu_w / 2, "the pill is centred on the menu")
+	end)
+
+	helpers.it("keeps the right columns' excess to the calibrated few points (v1.0.10 photo, 2026-11-26)", function()
+		-- A 62-point arrow column put the pill 11 points right of the middle once
+		-- the real title column was measured: menu 1205 px, pill 320 px for 74
+		-- points, 47 px right of the middle.
+		local M = helpers.load_with_stubs("menu.ui.builder.canvas_badge", {
+			canvas = make_canvas_stub(), drawing = make_drawing_stub(),
+		})
+		local columns = M.menu_columns()
+		local excess = columns.trailing + columns.submenu_arrow - columns.left
+		helpers.assert_true(excess >= 0 and excess <= 6,
+			"the submenu columns exceed the state column by " .. tostring(excess) .. " points, not a few")
+		local geometry = M.layout(222, true, 58)
+		helpers.assert_eq(geometry.pill_x, (222 + excess - geometry.pill_w) / 2)
+	end)
+
+	helpers.it("centres the caption inside the pill", function()
+		local canvas, counters = make_canvas_stub()
+		local M = helpers.load_with_stubs("menu.ui.builder.canvas_badge", { canvas = canvas, drawing = make_drawing_stub() })
+		M.prepend_to({ { title = "Row", menu = {} } }, {}, function() end)
+		local rect, text = counters.elements[1].frame, counters.elements[2].frame
+		helpers.assert_eq(counters.elements[2].textAlignment, "center")
+		helpers.assert_eq(text.x, rect.x, "the caption box starts with the pill")
+		helpers.assert_eq(text.w, rect.w, "the caption box is the pill's width")
+	end)
+
 	helpers.it("delete_count equals create_count after a single call", function()
 		local canvas_stub, counters = make_canvas_stub()
 

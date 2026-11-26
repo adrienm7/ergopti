@@ -79,4 +79,28 @@ function M.decorate(rows, script_control)
 		function(row, hint) return M.title(row.title, hint, row.disabled == true) end)
 end
 
+--- The titles M.decorate will give the finished root rows, without changing
+--- them: the header pill measures the rows before the hints are drawn (the
+--- root compositions admit string titles only), and a hint row is often the
+--- widest one.
+--- @param rows table The finished root, left unchanged.
+--- @param script_control table|nil The script control owner (ctx.script_control).
+--- @return table titles Row -> its hinted title, for the hinted rows only.
+function M.preview(rows, script_control)
+	local probes, origins = {}, {}
+	for _, row in ipairs(rows) do
+		if type(row) == "table" then
+			probes[#probes + 1] = { title = row.title, disabled = row.disabled }
+			origins[#probes] = row
+		end
+	end
+	M.decorate(probes, script_control)
+	local titles = {}
+	for index, probe in ipairs(probes) do
+		local row = origins[index]
+		if not rawequal(probe.title, row.title) then titles[row] = probe.title end
+	end
+	return titles
+end
+
 return M

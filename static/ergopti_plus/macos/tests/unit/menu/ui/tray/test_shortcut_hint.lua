@@ -34,8 +34,10 @@ end
 --- Builds the real tray root with recorded styled titles.
 --- @param control table The script-control double.
 --- @param paused boolean|nil
+--- @param spy function|nil Receives the badge module the builder holds and
+---   returns the function that restores it.
 --- @return table rows
-local function root(control, paused)
+local function root(control, paused, spy)
 	-- The hint and its adapter read the hs stub of this load, not an earlier one.
 	package.loaded["core.ui.adapters.styled_title"] = nil
 	package.loaded["menu.ui.builder.shortcut_hint"] = nil
@@ -46,8 +48,10 @@ local function root(control, paused)
 	hs.styledtext.new = function(text, attributes)
 		return setmetatable({ spans = { { text = text, attributes = attributes } } }, Styled)
 	end
+	local restore = spy and spy(package.loaded["menu.ui.builder.canvas_badge"]) or nil
 	local ok, rows = pcall(builder.generate, { paused = paused == true, script_control = control }, {},
 		{ reload = function() end, quit = function() end })
+	if restore then restore() end
 	hs.styledtext.new = saved
 	if not ok then error(rows, 0) end
 	return rows
@@ -143,5 +147,49 @@ helpers.describe("macOS tray shortcut hints (script-chord-tray-hint)", function(
 		helpers.assert_true(ok, tostring(title))
 		helpers.assert_eq(title.spans[1].attributes.color.name, "disabledControlTextColor")
 		helpers.assert_eq(title.spans[2].attributes.color.name, "disabledControlTextColor")
+	end)
+
+	-- v1.0.10 field photo of 2026-11-26: the header pill sat right of the menu's
+	-- middle because it measured « Suspendre » before its hint made it the
+	-- widest row (canvas_badge.lua, « Measured As Drawn »).
+	helpers.it("hands the header pill the hinted titles before they are drawn", function()
+		local seen
+		local ok, rows = pcall(root, control(PRESETS), false, function(badge)
+			local prepend = badge.prepend_to
+			badge.prepend_to = function(items, ctx, on_click, drawn_titles)
+				local suspend = row_for(items, "menu.global.suspend")
+				seen = { suspend = suspend, title = suspend and suspend.title,
+					drawn = type(drawn_titles) == "table" and suspend and drawn_titles[suspend] or nil }
+				return prepend(items, ctx, on_click, drawn_titles)
+			end
+			return function() badge.prepend_to = prepend end
+		end)
+		helpers.assert_true(ok, tostring(rows))
+		helpers.assert_true(seen ~= nil and seen.suspend ~= nil, "the badge sees the Suspend row")
+		helpers.assert_eq(seen.title, require("core.i18n.engine.i18n").get("menu.global.suspend"),
+			"the row still holds its plain caption when the badge measures it")
+		helpers.assert_eq(type(seen.drawn), "table", "the badge receives the hinted title")
+		helpers.assert_eq(tostring(seen.drawn), tostring(row_for(rows, "menu.global.suspend").title),
+			"the measured title is the one the menu draws")
+	end)
+
+	helpers.it("previews the hinted titles without changing the rows", function()
+		package.loaded["core.ui.adapters.styled_title"] = nil
+		package.loaded["menu.ui.builder.shortcut_hint"] = nil
+		local Hint = helpers.load_with_stubs("menu.ui.builder.shortcut_hint")
+		local i18n = require("core.i18n.engine.i18n")
+		local saved = hs.styledtext.new
+		hs.styledtext.new = function(text, attributes)
+			return setmetatable({ spans = { { text = text, attributes = attributes } } }, Styled)
+		end
+		local suspend = { title = i18n.get("menu.global.suspend") }
+		local other = { title = "Other" }
+		local ok, titles = pcall(Hint.preview, { suspend, other, { title = "-" } }, control(PRESETS))
+		hs.styledtext.new = saved
+		helpers.assert_true(ok, tostring(titles))
+		helpers.assert_eq(suspend.title, i18n.get("menu.global.suspend"), "the row keeps its caption")
+		helpers.assert_eq(type(titles[suspend]), "table", "the hinted row has its drawn title")
+		helpers.assert_true(tostring(titles[suspend]):find(i18n.get("sg_labels.script_ropt_return"), 1, true) ~= nil)
+		helpers.assert_eq(titles[other], nil, "a row without a hint has no preview")
 	end)
 end)

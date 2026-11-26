@@ -1006,12 +1006,19 @@ function M.generate(ctx, menu_mods, actions)
 	--
 	-- Its native owner captures the badge image after sizing the completed root.
 	-- Canonical completed-row composition then owns badge/boundary/body order.
+	-- The pill measures the rows as drawn: the hints come after the badge (the
+	-- compositions admit string titles only), so it measures their preview.
+	local ok_preview, drawn_titles = pcall(ShortcutHint.preview, rendered, ctx.script_control)
+	if not ok_preview then
+		Logger.error(LOG, string.format("Error previewing the tray shortcut hints: %s.", tostring(drawn_titles)))
+		drawn_titles = nil
+	end
 	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, rendered, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
 			if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
 		end
-	end)
+	end, drawn_titles)
 	if not ok_badge then
 		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
 	end
