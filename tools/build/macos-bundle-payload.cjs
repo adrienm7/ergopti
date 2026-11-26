@@ -29,6 +29,10 @@
  *    an `only` file that is not tracked, an existing destination file, a
  *    tree that stages nothing or an untracked file the payload would ship
  *    stops the build instead of shipping a gap.
+ * 4. Built outputs are checked too: an `external` entry is a file another
+ *    build step writes, so the release archive producer refuses a bundle
+ *    missing one that carries no `condition`. v1.0.10 shipped without the
+ *    owned runtime's capture module and nothing noticed.
  *
  * USAGE:  node tools/build/macos-bundle-payload.cjs stage <repo-root> <static-root>
  *         Copies the payload into <static-root> (Contents/Resources/static).
@@ -49,7 +53,7 @@ const MANIFEST_REL = 'tools/build/macos-bundle-manifest.json';
 // Keys each manifest level may carry; anything else is a typo that would be ignored
 const MANIFEST_KEYS = new Set(['description', 'trees', 'external', 'exclude']);
 const TREE_KEYS = new Set(['source', 'target', 'reason', 'only']);
-const EXTERNAL_KEYS = new Set(['target', 'owner', 'reason']);
+const EXTERNAL_KEYS = new Set(['target', 'owner', 'reason', 'condition']);
 const EXCLUDE_KEYS = new Set(['group', 'reason', 'patterns', 'except']);
 
 // ===========================================
@@ -168,6 +172,12 @@ function parseManifest(text) {
 			if (typeof entry[key] !== 'string' || entry[key] === '') {
 				throw new Error(`${label}.${key} must be a non-empty string`);
 			}
+		}
+		if (
+			entry.condition !== undefined &&
+			(typeof entry.condition !== 'string' || entry.condition === '')
+		) {
+			throw new Error(`${label}.condition must say when the owner leaves the file out`);
 		}
 	});
 	const groups = new Set();
@@ -416,6 +426,38 @@ function stage(root, staticRoot) {
 	return files.length;
 }
 
+/**
+ * Lists the external outputs a built bundle lacks. An entry with a
+ * `condition` is written only on some builds and is never required.
+ * @param {{external: object[]}} manifest Validated manifest.
+ * @param {string} staticRoot Built Contents/Resources/static.
+ * @return {string[]} Missing external targets.
+ */
+function missingExternals(manifest, staticRoot) {
+	return manifest.external
+		.filter((entry) => entry.condition === undefined)
+		.map((entry) => entry.target)
+		.filter((target) => !fs.existsSync(path.join(staticRoot, ...target.split('/'))));
+}
+
+/**
+ * Refuses a built application whose payload lacks a required external output.
+ * @param {string} root Repository root holding the manifest.
+ * @param {string} app Built .app bundle.
+ */
+function requireExternals(root, app) {
+	const missing = missingExternals(
+		loadManifest(root),
+		path.join(app, 'Contents', 'Resources', 'static')
+	);
+	if (missing.length > 0) {
+		throw new Error(
+			`The bundle ${app} lacks build outputs the payload manifest requires:\n` +
+				missing.map((target) => `  ${target}`).join('\n')
+		);
+	}
+}
+
 // ===========================================
 // ===========================================
 // ======= 4/ Command line ===================
@@ -449,5 +491,7 @@ module.exports = {
 	requireTrackedPayload,
 	exclusionFor,
 	resolvePayload,
-	stage
+	stage,
+	missingExternals,
+	requireExternals
 };

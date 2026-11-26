@@ -50,9 +50,15 @@
 			"reason": "The native half of the bundled LuaSocket."
 		},
 		{
+			"target": "ergopti_plus/macos/adapters/native/installed_physical_source.so",
+			"owner": "build_installed_source_module",
+			"reason": "The signed native module the owned runtime's capture loads (adapters/installed_physical_source.lua MODULE_RELATIVE); without it the capture is refused and the tap-holds stay off."
+		},
+		{
 			"target": "ergopti_plus/_shared/ai/data/managed_ollama_release.json",
 			"owner": "tools/build/stage-macos-managed-ollama-inputs.py",
-			"reason": "Generated conditionally from both genuine native producer archives and provenance receipts through the source-qualified catalogue owner; never committed."
+			"reason": "Generated conditionally from both genuine native producer archives and provenance receipts through the source-qualified catalogue owner; never committed.",
+			"condition": "Only when ERGOPTI_MANAGED_OLLAMA_INPUTS names the producer inputs; a local build may omit this optional runtime."
 		}
 	],
 	"exclude": [

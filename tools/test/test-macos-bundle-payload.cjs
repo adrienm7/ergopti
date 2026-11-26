@@ -38,6 +38,11 @@
  * 5. A self-check removes one runtime file per reference kind and injects one
  *    forbidden file per group: the guard must report each, or it could not
  *    fail for the regression it exists to catch.
+ * 6. Every external output without a `condition` must exist in a built
+ *    bundle: the release archive producer refuses one that lacks it. v1.0.10
+ *    shipped without the owned runtime's capture module, which only the
+ *    runtime build compiled, so the guard ties that module's Lua load path to
+ *    the manifest entry and the build step, and replays the v1.0.10 layout.
  * ==============================================================================
  */
 
@@ -1258,6 +1263,135 @@ try {
 	);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// ===========================================
+// ===========================================
+// ======= 7/ Built external outputs =========
+// ===========================================
+// ===========================================
+
+// v1.0.10 booted the owned runtime by default, but its app had no
+// installed_physical_source.so: only the runtime build compiled that module,
+// into a scaffold it never published, so the capture was refused and the
+// tap-holds stayed off. The module is a declared external with a real owner in
+// the build, at the path the Lua adapter loads, and the archive producer
+// refuses a built bundle that lacks it (installed-source-module-2026-11-26).
+const MODULE_LUA = 'static/ergopti_plus/macos/adapters/installed_physical_source.lua';
+const moduleRelative =
+	(fs
+		.readFileSync(path.join(ROOT, MODULE_LUA), 'utf8')
+		.match(/^M\.MODULE_RELATIVE = "([^"\n]+)"$/m) || [])[1] || '';
+check(moduleRelative !== '', `${MODULE_LUA}: MODULE_RELATIVE not found`);
+const STATIC_PREFIX = '/Contents/Resources/static/';
+const moduleExternal = manifest.external.find(
+	(entry) => STATIC_PREFIX + entry.target === moduleRelative
+);
+check(
+	moduleExternal !== undefined && moduleExternal.condition === undefined,
+	`macos-bundle-manifest.json: no unconditional external entry ships ${moduleRelative}, which ${MODULE_LUA} loads`
+);
+// The build names the module below the bundled driver root, where it stages
+// and signs it, so together they must spell the path the adapter loads.
+const DRIVER_PREFIX = `${STATIC_PREFIX}${DRIVER_ROOT}/`;
+const buildModule = (BUILD.match(/^INSTALLED_SOURCE_MODULE="([^"\n]+)"$/m) || [])[1] || '';
+check(
+	DRIVER_PREFIX + buildModule === moduleRelative &&
+		BUILD.includes(
+			'"$APP_PATH/Contents/Resources/static/ergopti_plus/macos/$INSTALLED_SOURCE_MODULE"'
+		) &&
+		BUILD.includes('"$driver_root/$INSTALLED_SOURCE_MODULE"'),
+	`${BUILD_REL}: INSTALLED_SOURCE_MODULE must stage and sign ${moduleRelative}, the path the Lua adapter loads`
+);
+const buildMain = shellFunction(BUILD, 'main');
+const luasocketAt = buildMain.indexOf('tools/build/bundle-macos-luasocket.sh');
+const moduleAt = buildMain.indexOf('\n\tbuild_installed_source_module\n');
+const signAt = buildMain.indexOf('\n\tcodesign_app\n');
+check(
+	luasocketAt >= 0 && moduleAt > luasocketAt && signAt > moduleAt,
+	`${BUILD_REL}: main() must build the installed source module after the LuaSocket headers exist and before codesign_app`
+);
+check(
+	/^\tpython3 "\$REPO_ROOT\/tools\/build\/build_installed_source_module\.py" /m.test(
+		shellFunction(BUILD, 'build_installed_source_module')
+	),
+	`${BUILD_REL}: build_installed_source_module() must compile through build_installed_source_module.py`
+);
+
+// The compile reuses the runtime build's module rows; the Python owner proves
+// it here on every host, since only a Mac can run the compile itself.
+const roster = spawnSync(
+	'python3',
+	['-B', path.join(ROOT, 'tools/build/build_installed_source_module_test.py')],
+	{ encoding: 'utf8' }
+);
+check(
+	roster.status === 0,
+	`tools/build/build_installed_source_module_test.py failed: ${(roster.stderr || String(roster.error)).trim().split('\n').slice(-3).join(' | ')}`
+);
+
+/**
+ * Builds a static root holding the given external targets as empty files.
+ * @param {string} directory Fresh static root.
+ * @param {string[]} targets Static-root-relative targets.
+ */
+function fabricate(directory, targets) {
+	for (const target of targets) {
+		const file = path.join(directory, ...target.split('/'));
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, '');
+	}
+}
+
+const required = manifest.external.filter((entry) => entry.condition === undefined);
+const outputs = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-macos-externals-'));
+try {
+	const complete = path.join(outputs, 'complete');
+	fabricate(
+		complete,
+		required.map((entry) => entry.target)
+	);
+	check(
+		payload.missingExternals(manifest, complete).length === 0,
+		'a bundle with every required external output must pass, conditional ones left out'
+	);
+	// The v1.0.10 layout: every other output present, the capture module absent.
+	const app = path.join(outputs, 'ErgoptiPlus.app');
+	const released = path.join(app, 'Contents', 'Resources', 'static');
+	fabricate(
+		released,
+		required.map((entry) => entry.target).filter((target) => target !== moduleExternal?.target)
+	);
+	check(
+		JSON.stringify(payload.missingExternals(manifest, released)) ===
+			JSON.stringify([moduleExternal?.target]),
+		'the v1.0.10 layout, without the installed source module, must be reported missing exactly it'
+	);
+	// The release producer itself refuses that bundle before any native tool.
+	fs.writeFileSync(
+		path.join(app, 'Contents', 'Info.plist'),
+		'<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict/></plist>\n'
+	);
+	const archives = path.join(outputs, 'archives');
+	fs.mkdirSync(archives);
+	for (const args of [
+		[app, archives],
+		['--ci-receipt', app, archives]
+	]) {
+		const producer = spawnSync(
+			process.execPath,
+			[path.join(ROOT, 'tools/build/macos-release-archives.cjs'), ...args],
+			{ encoding: 'utf8' }
+		);
+		check(
+			producer.status !== 0 &&
+				producer.stderr.includes(moduleExternal?.target ?? '<no module entry>') &&
+				fs.readdirSync(archives).length === 0,
+			`macos-release-archives.cjs ${args[0]}: a bundle without the installed source module must be refused before archiving, got ${producer.status}: ${producer.stderr.trim().split('\n').slice(-3).join(' | ')}`
+		);
+	}
+} finally {
+	fs.rmSync(outputs, { recursive: true, force: true });
 }
 
 if (errors.length > 0) {

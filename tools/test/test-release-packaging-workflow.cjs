@@ -2579,6 +2579,14 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			path.join(app, 'Contents', 'Info.plist'),
 			'<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict/></plist>\n'
 		);
+		// ...and one without a required build output of the payload manifest.
+		const payload = require('../build/macos-bundle-payload.cjs');
+		for (const entry of payload.loadManifest(path.resolve(__dirname, '..', '..')).external) {
+			if (entry.condition !== undefined) continue;
+			const output = path.join(app, 'Contents', 'Resources', 'static', ...entry.target.split('/'));
+			fs.mkdirSync(path.dirname(output), { recursive: true });
+			fs.writeFileSync(output, 'Independent build output.');
+		}
 		for (const binding of bindings)
 			fs.writeFileSync(path.join(input, binding.name), 'Independent input bytes.');
 		function native(primary, refused) {
