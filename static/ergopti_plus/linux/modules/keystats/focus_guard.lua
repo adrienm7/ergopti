@@ -46,9 +46,6 @@ local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "a
 -- a fresh answer within the short barrier budget, so a frozen application is
 -- never written to on a stale receipt.
 local FOCUS_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "focus_barrier_timeout_ms")
--- A physical key reads the worker's last answer while it is this fresh, and
--- asks again past it: a role change on the same control sends no focus event.
-local FOCUS_ANSWER_FRESH_MS = require("core.timing.engine.timings").ms("privacy", "focus_answer_fresh_ms")
 
 -- The closing reasons that are the desktop's, not the field's: with them alone
 -- the window policy may still admit ordinary text automation (INVARIANTS 6).
@@ -454,15 +451,7 @@ function M.new(opts)
 			-- release paid it (Arch field report). Only an output boundary of a
 			-- retained destination passes a budget and still waits.
 			if budget_ms == nil then
-				-- Within a typing burst the last answer stands; the first key after a
-				-- pause asks again, so a field that turned into a password field
-				-- without any focus event is never typed into (secure focus e2e).
-				local age = type(watch.answer_age_ms) == "function" and watch.answer_age_ms() or nil
-				if age ~= nil and age > FOCUS_ANSWER_FRESH_MS then
-					snapshot = watch.barrier(FOCUS_BARRIER_MS)
-				else
-					snapshot = watch.snapshot()
-				end
+				snapshot = watch.snapshot()
 			else
 				snapshot = watch.barrier(budget_ms)
 			end

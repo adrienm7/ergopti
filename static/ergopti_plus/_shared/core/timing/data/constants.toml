@@ -823,12 +823,6 @@ context_retry_ms = 1000
 # callbacks wait no longer than this budget before physical pass-through resumes.
 focus_barrier_timeout_ms = 20
 
-# Linux: how old the worker's last answer to a focus query may be for a physical
-# key to read it without a new query. A role change on the same control (a field
-# turning into a password field) sends no focus event, so the first key after
-# this window asks again; the rest of a typing burst never waits.
-focus_answer_fresh_ms = 250
-
 # Linux: how long the accessibility worker's pump sleeps between two polls of its
 # transport while it waits for the desktop to answer (one libuv tick, so the wait
 # neither spins a core nor adds a visible delay).

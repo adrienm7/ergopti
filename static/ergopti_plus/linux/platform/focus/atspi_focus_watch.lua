@@ -364,13 +364,6 @@ function M.new(options)
 		return nil
 	end
 
-	--- How long ago the worker answered the latest focus query, from RAM only.
-	--- @return number|nil age_ms nil before any answer.
-	function watcher.answer_age_ms()
-		if answered_at == nil then return nil end
-		return now_ms() - answered_at
-	end
-
 	--- Returns the last live, exact focused-control receipt without native work.
 	--- @return table|nil receipt
 	function watcher.snapshot()
