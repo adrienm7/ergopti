@@ -160,7 +160,8 @@ function M.run(options)
 	if options.terminal_logger_throws then env.Logger.error = function() error("controlled terminal logger failure", 0) end end
 	env.tray_menu = { start = function() ui("tray"); return true end,
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
-	env.TapHold = { is_active = function() return true end }
+	-- The start-up line reads the feature switch before the engine state.
+	env.TapHold = { feature_enabled = function() return true end, is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
 	-- The typing path's settings and catalogues are read before the hook starts.
 	env.RepeatKey = { is_enabled = function() record("typing.repeat_key"); return false end }
