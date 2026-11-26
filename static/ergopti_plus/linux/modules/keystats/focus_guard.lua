@@ -42,10 +42,6 @@ local M = {}
 -- expansion failed at random there as programmable_publication_stale
 -- (real-GTK field test).
 local OUTPUT_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
--- An AI text target is an output boundary, never a key: it asks the worker for
--- a fresh answer within the short barrier budget, so a frozen application is
--- never written to on a stale receipt.
-local FOCUS_BARRIER_MS = require("core.timing.engine.timings").ms("privacy", "focus_barrier_timeout_ms")
 
 -- The closing reasons that are the desktop's, not the field's: with them alone
 -- the window policy may still admit ordinary text automation (INVARIANTS 6).
@@ -545,7 +541,7 @@ function M.new(opts)
 
 	--- Captures a fresh exact AI text target without launching a native helper.
 	--- A receipt cannot outlive its joined context, generation or detector epoch.
-	--- @param budget_ms number|nil Barrier answer deadline; nil for the short barrier budget.
+	--- @param budget_ms number|nil Barrier answer deadline; nil for a physical key's check.
 	--- @return string|nil identity Exact active non-password bus/object identity.
 	function guard.focused_text_identity(budget_ms)
 		if reading_text_identity or stopped or not contextual or not watch or context_pending or joining_context
@@ -555,7 +551,7 @@ function M.new(opts)
 		local called, result = pcall(function()
 			if field.generation ~= context_generation or field.epoch == nil
 				or detector.currentEpoch() ~= field.epoch then return nil end
-			local blocked, snapshot = text_admission(budget_ms or FOCUS_BARRIER_MS)
+			local blocked, snapshot = text_admission(budget_ms)
 			if blocked or not snapshot or snapshot.role == 40
 				or snapshot.bus ~= field.bus or snapshot.path ~= field.path or snapshot.role ~= field.role
 				or detector.currentEpoch() ~= field.epoch or joined_field ~= field or joined_context ~= context
