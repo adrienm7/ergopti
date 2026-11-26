@@ -2,7 +2,7 @@
 
 --- Explicit configuration choices for live hardware and service fixtures.
 local M = {}
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local Shell = require("core.process.adapters.shell_runner")
 
 --- Creates the canonical preference folder before its conditional writers run.
@@ -31,8 +31,8 @@ function M.daemon()
 			.. "\n[shortcuts.keyboard]\nmeta_space = \"llm_predict_rewrite\"\n"
 	end
 	assert(Files.write(Paths.config("config.toml"), config), "live configuration must be created")
-	local Hotstrings = require("modules.hotstrings.hotstrings_config")
-	Hotstrings.init(require("modules.hotstrings.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
+	local Hotstrings = require("hotstrings.engine.catalogue.config")
+	Hotstrings.init(require("hotstrings.engine.engine").new(), "tests/e2e/fixtures/daemon_keys.toml")
 	Hotstrings.load_all()
 	assert(Hotstrings.set_all_sections("daemon_keys", true), "the live catalogue must be explicitly selected")
 	assert(Files.write(Paths.config("tap_hold.toml"), require("tests.support.tap_hold_fixture").with_preset()),
@@ -40,7 +40,7 @@ function M.daemon()
 	local preset = require("layouts.engine.layers.editor").read_shipped(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 	assert(Files.write(directory .. "/layers.toml", preset), "the live navigation fixture must explicitly import its preset")
 	if os.getenv("ERGOPTI_LIVE_LLM_PORT") then
-		assert(require("infra.llm_preferences").set_many({
+		assert(require("ai.engine.preferences").set_many({
 			["llm.enabled"] = true, ["llm.models.selected"] = "api", ["llm.profiles.num_predictions"] = 1,
 			["llm.navigation.val_modifiers"] = {},
 		}), "the live API choices must reach canonical preferences")

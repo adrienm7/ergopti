@@ -188,6 +188,14 @@ function M.set_llm_timeout(seconds) Config.set_llm_timeout(seconds) end
 --- @param enabled boolean True to allow color, false to enforce gray.
 function M.set_colorization_enabled(enabled) Config.set_colorization_enabled(enabled) end
 
+--- Shows or hides the category glyph of the hotstring previews.
+--- @param enabled boolean
+function M.set_category_glyphs_enabled(enabled) Config.set_category_glyphs_enabled(enabled) end
+
+--- Lets or stops VoiceOver being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled) Config.set_announcements_enabled(enabled) end
+
 local function hide_surface(expected_session, owns)
 	if not owns() then return false end
 	local llm_hidden
@@ -495,6 +503,13 @@ end
 --- @param key string Context key — "hotstring_star", "hotstring_autocorrect", "hotstring_personal", "ai_loading", "ai_prediction".
 --- @return table|nil The RGBA color table, or nil.
 function M.tint(key) return Config.tint(key) end
+
+--- Returns the category glyph and its i18n name key for a display context, or
+--- nil when the glyph switch is off. Delegates to Config.glyph().
+--- @param key string Context key, as for M.tint().
+--- @return string|nil glyph
+--- @return string|nil name_key
+function M.glyph(key) return Config.glyph(key) end
 
 --- Overrides the default accent color for a given display context.
 --- Pass nil to remove the tint (tooltip renders with standard dark background).

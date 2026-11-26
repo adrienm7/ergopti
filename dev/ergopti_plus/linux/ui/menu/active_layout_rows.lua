@@ -22,7 +22,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local InputSourceSwitch = require("adapters.input_source_switch")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local Shell = require("core.process.adapters.shell_runner")
 local COMMAND = require("settings.engine.keys").COMMAND
 
@@ -86,6 +86,8 @@ function M.rows(ctx)
 		rows[#rows + 1] = {
 			label = choice.label,
 			checked = choice.active == true,
+			-- The desktop has one active source: a choice of one, drawn as a radio.
+			radio = true,
 			disabled = choice.active == true,
 			action = function()
 				Logger.start(LOG, "Switching the keyboard layout to '%s' from the menu…", id)

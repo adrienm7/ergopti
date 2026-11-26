@@ -1,0 +1,1 @@
+import{n as e}from"../chunks/XKyaHtl9.js";import"../chunks/CFanQ2AK.js";import"../chunks/DrgYvoPP.js";import{t}from"../chunks/CMzNJ3LR.js";var n=e({trailingSlash:()=>r}),r=`always`;function i(e){t(e,{from:`/benchmarks`})}export{i as component,n as universal};

@@ -189,6 +189,24 @@ helpers.describe("compositor_focus: source", function()
 		helpers.assert_eq(source.snapshot(), nil, "a cleared focus is unknown, not the last window")
 	end)
 
+	helpers.it("(text-automation-visible) records whether KWin runs the focus script", function()
+		-- Field report, Plasma 6.8 Wayland, 2026-11-25: the worker listened,
+		-- KWin never loaded the script, and nothing said so.
+		local source, process = new_source("kde")
+		helpers.assert_true(source.start())
+		process.say('{"kind":"ready"}\n')
+		helpers.assert_eq(source.script_state(), nil, "unknown until the worker asked KWin")
+		process.say('{"kind":"script","loaded":false,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "not_loaded")
+		helpers.assert_eq(source.status(), "ready", "a script KWin does not run is a fact, not a worker failure")
+		process.say('{"kind":"script","loaded":false,"answered":false}\n')
+		helpers.assert_eq(source.script_state(), "unanswered")
+		process.say('{"kind":"script","loaded":true,"answered":true}\n')
+		helpers.assert_eq(source.script_state(), "loaded")
+		process.say('{"kind":"script","loaded":"yes","answered":true}\n')
+		helpers.assert_eq(source.status(), "failed", "a malformed script record fails closed")
+	end)
+
 	for _, case in ipairs({
 		{ "a report before readiness", FOCUS },
 		{ "a malformed line", '{"kind":"ready"}\nnot json\n' },
@@ -243,9 +261,190 @@ end)
 
 
 
+-- =====================================
+-- =====================================
+-- ======= 3/ GNOME extension state ====
+-- =====================================
+-- =====================================
+
+--- A recording logger, installed for the source the case creates.
+--- @return table logger, function restore
+local function recording_logger()
+	local previous = package.loaded["core.logger.engine.shim"]
+	local logger = helpers.make_logger_stub()
+	logger.lines = {}
+	for _, level in ipairs({ "info", "warn", "error" }) do
+		logger[level] = function(_, template, ...)
+			logger.lines[#logger.lines + 1] = { level = level, text = string.format(template, ...) }
+		end
+	end
+	package.loaded["core.logger.engine.shim"] = logger
+	return logger, function() package.loaded["core.logger.engine.shim"] = previous end
+end
+
+--- The lines of one level that contain a text.
+local function lines_with(logger, level, text)
+	local count = 0
+	for _, line in ipairs(logger.lines) do
+		if line.level == level and line.text:find(text, 1, true) then count = count + 1 end
+	end
+	return count
+end
+
+--- A fake GNOME Shell Extensions interface: GetExtensionInfo answers from a
+--- queue of dictionaries (false: no answer), recording each call.
+--- @param answers table
+--- @return function read_info, table calls
+local function fake_shell(answers)
+	local calls = { count = 0 }
+	return function()
+		calls.count = calls.count + 1
+		local answer = table.remove(answers, 1)
+		if answer == false then return nil end
+		return answer
+	end, calls
+end
+
+helpers.describe("compositor_focus: GNOME extension state (gnome-focus-extension)", function()
+	local Worker = helpers.load_module("platform.focus.compositor_focus_worker")
+
+	helpers.it("(gnome-focus-extension) the worker names each GetExtensionInfo answer", function()
+		for _, case in ipairs({
+			{ {}, "absent", "an empty dictionary: GNOME Shell knows no such extension" },
+			{ { state = 99 }, "absent", "uninstalled" },
+			{ { state = 1 }, "active" },
+			{ { state = 8 }, "active", "enabling" },
+			{ { state = 2 }, "inactive", "disabled" },
+			{ { state = 6 }, "inactive", "initialized, never enabled" },
+			{ { state = 4 }, "out_of_date" },
+			{ { state = 3 }, "error" },
+			{ { state = 42 }, "unknown", "a state this worker does not know is not guessed" },
+			{ nil, "unanswered", "no answer from GNOME Shell" },
+		}) do
+			helpers.assert_eq(Worker.extension_record(case[1], false),
+				{ kind = "extension", state = case[2], silent = false }, case[3] or case[2])
+		end
+		helpers.assert_eq(Worker.extension_record({ state = 1 }, true).silent, true)
+	end)
+
+	helpers.it("(gnome-focus-extension) the worker asks again after the silence bound only when nothing reported", function()
+		local emitted = {}
+		local read, calls = fake_shell({ { state = 1 }, { state = 1 } })
+		local monitor = Worker.new_extension_monitor(read, function(record) emitted[#emitted + 1] = record end)
+		monitor.check(false)
+		helpers.assert_eq(emitted[1], { kind = "extension", state = "active", silent = false })
+		helpers.assert_true(monitor.silence_elapsed(), "active but silent: GNOME Shell is asked again")
+		helpers.assert_eq(emitted[2], { kind = "extension", state = "active", silent = true })
+		helpers.assert_eq(calls.count, 2)
+
+		local quiet = {}
+		local reader, asked = fake_shell({ { state = 1 } })
+		local reporting = Worker.new_extension_monitor(reader, function(record) quiet[#quiet + 1] = record end)
+		reporting.check(false)
+		reporting.admitted()
+		helpers.assert_eq(reporting.silence_elapsed(), false, "a report arrived: nothing to ask")
+		helpers.assert_eq(#quiet, 1)
+		helpers.assert_eq(asked.count, 1)
+	end)
+
+	for _, case in ipairs({
+		{ "absent", {}, "log out and back in after an install" },
+		{ "inactive", { state = 2 }, "gnome-extensions enable focus@ergopti.fr" },
+		{ "out_of_date", { state = 4 }, "update Ergopti+" },
+		{ "error", { state = 3 }, "gnome-extensions info focus@ergopti.fr" },
+	}) do
+		helpers.it("(gnome-focus-extension) an extension " .. case[1] .. " is named at start, once, then recovers", function()
+			local logger, restore = recording_logger()
+			local ok, failure = pcall(function()
+				local source, process = new_source("gnome")
+				source.start()
+				local emitted = {}
+				local monitor = Worker.new_extension_monitor(fake_shell({ case[2], case[2] }), function(record)
+					emitted[#emitted + 1] = record
+				end)
+				process.say('{"kind":"ready"}\n')
+				monitor.check(false)
+				local Json = require("core.text.engine.json")
+				process.say(Json.encode(emitted[1]) .. "\n")
+				helpers.assert_eq(source.extension_problem(), case[1], "named without waiting for the silence bound")
+				helpers.assert_eq(source.status(), "ready", "a missing reporter is a fact, not a worker failure")
+				monitor.silence_elapsed()
+				process.say(Json.encode(emitted[2]) .. "\n")
+				helpers.assert_eq(lines_with(logger, "warn", "(" .. case[1] .. ", state "), 1, "one diagnosis line")
+				helpers.assert_true(lines_with(logger, "warn", case[3]) == 1, "the line says what to do")
+				-- The user fixes it and GNOME Shell reports.
+				process.say(FOCUS)
+				helpers.assert_eq(source.extension_problem(), nil, "a report clears the problem")
+				helpers.assert_eq(lines_with(logger, "info", "reports focus again (after " .. case[1] .. ")"), 1,
+					"the diagnosis is paired")
+				helpers.assert_true(source.snapshot() ~= nil)
+			end)
+			restore()
+			helpers.assert_true(ok, tostring(failure))
+		end)
+	end
+
+	helpers.it("(gnome-focus-extension) an active extension that stays silent is named after the bound", function()
+		local logger, restore = recording_logger()
+		local ok, failure = pcall(function()
+			local source, process = new_source("gnome")
+			source.start()
+			process.say('{"kind":"ready"}\n{"kind":"extension","state":"active","silent":false}\n')
+			helpers.assert_eq(source.extension_problem(), nil, "active: the first report may still come")
+			helpers.assert_eq(lines_with(logger, "warn", "sends no focus report"), 0)
+			process.say('{"kind":"extension","state":"active","silent":true}\n')
+			helpers.assert_eq(source.extension_problem(), "silent")
+			helpers.assert_eq(lines_with(logger, "warn", "log out and back in"), 1)
+			process.say('{"kind":"clear"}\n')
+			helpers.assert_eq(source.extension_problem(), nil, "a clear is a report too")
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(gnome-focus-extension) an unanswered query waits for the bound, and reports win over it", function()
+		local source, process = new_source("gnome")
+		source.start()
+		process.say('{"kind":"ready"}\n{"kind":"extension","state":"unanswered","silent":false}\n')
+		helpers.assert_eq(source.extension_problem(), nil)
+		process.say(FOCUS .. '{"kind":"extension","state":"unanswered","silent":true}\n')
+		helpers.assert_eq(source.extension_problem(), nil, "reports arrived before the bound: nothing to name")
+	end)
+
+	for _, case in ipairs({
+		{ "an extension record off GNOME", "kde", '{"kind":"extension","state":"active","silent":false}\n' },
+		{ "an unknown extension state", "gnome", '{"kind":"extension","state":"broken","silent":false}\n' },
+		{ "an extension record without its silence flag", "gnome", '{"kind":"extension","state":"active"}\n' },
+	}) do
+		helpers.it("(gnome-focus-extension) fails closed on " .. case[1], function()
+			local source, process = new_source(case[2])
+			source.start()
+			process.say('{"kind":"ready"}\n' .. case[3])
+			helpers.assert_eq(source.status(), "failed")
+			helpers.assert_eq(source.extension_problem(), nil)
+		end)
+	end
+
+	helpers.it("(gnome-focus-extension) the GNOME worker command carries the registry's silence bound", function()
+		local Focus = helpers.load_module("platform.focus.compositor_focus")
+		local start, process = fake_process()
+		local source = Focus.new({ family = "gnome", start_process = start })
+		helpers.assert_true(source.start())
+		helpers.assert_true(process.arguments[1]:find("/platform/focus/compositor_focus_worker.lua$") ~= nil)
+		helpers.assert_eq(process.arguments[2], "org.gnome.Shell")
+		local Timings = require("core.timing.engine.timings")
+		helpers.assert_eq(process.arguments[5], tostring(Timings.ms("adapters", "desktop_focus_silence_ms")))
+		source.stop()
+	end)
+end)
+
+
+
+
+
 -- ==================================
 -- ==================================
--- ======= 3/ WindowInfo join =======
+-- ======= 4/ WindowInfo join =======
 -- ==================================
 -- ==================================
 
@@ -302,6 +501,21 @@ helpers.describe("compositor_focus: window_info join", function()
 			helpers.assert_eq(window_info.getFocused().appId, "konsole")
 			helpers.assert_eq(window_info.focused_identity(), "kwin:77:{u-1}")
 			helpers.assert_eq(commands, {})
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(gnome-focus-extension) window_info names GNOME Shell's missing reporter, nil off GNOME", function()
+		local window_info, _, restore = wayland_window_info("ubuntu:GNOME")
+		local start, process = fake_process()
+		local ok, failure = pcall(function()
+			helpers.assert_eq(window_info.compositor_extension_problem(), nil, "no source yet")
+			window_info.start_compositor_focus({ start_process = start, command = function() return "luajit", {}, "/" end })
+			process.say('{"kind":"ready"}\n{"kind":"extension","state":"out_of_date","silent":false}\n')
+			helpers.assert_eq(window_info.compositor_extension_problem(), "out_of_date")
+			process.say(FOCUS)
+			helpers.assert_eq(window_info.compositor_extension_problem(), nil)
 		end)
 		restore()
 		helpers.assert_true(ok, tostring(failure))

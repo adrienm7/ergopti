@@ -45,14 +45,14 @@ local function with_output(body)
 	-- AZERTY: z is KEY_W, x is KEY_X, both on the base level.
 	layout._set_table_for_test({ z = { keycode = KEY_W, level = 1, mods = {} },
 		x = { keycode = KEY_X, level = 1, mods = {} } })
-	helpers.load_module("modules.gestures.combo_emitter")
-	local injector = helpers.load_module("modules.hotstrings.injector")
+	helpers.load_module("gestures.engine.combo_emitter")
+	local injector = helpers.load_module("hotstrings.engine.injector")
 	injector._set_nanosleep_for_test(function() end)
 	local emulation = helpers.load_module("modules.keymap.layout_emulation")
 	local ok, err = pcall(function()
 		assert(injector.open_fast_channel(), "the recorded channel opens")
 		local deps = emulation.production_deps({ injector = injector, is_paused = function() return false end,
-			dispatch_char = function() end, magic_evdev = function() return nil end })
+			dispatch_char = function() end })
 		body(deps, rows, injector)
 	end)
 	injector.close_fast_channel()

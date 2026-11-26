@@ -3,23 +3,20 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Keyboard Layout Submenu
 --- DESCRIPTION:
---- Builds the tray's keyboard layout submenu: the installed layouts with the
---- active one ticked, the custom layouts, the desktop's input sources, the
---- number-row policy and the pause layout rows, with the notices a layout
---- switch shows.
+--- Builds the tray's layouts and emulation submenu: the emulated layout and its
+--- layers and rows, the desktop's input sources with the pause layout rows and
+--- the layout manager, then the number-row policy and the other options that
+--- work on any layout, with the notices a layout switch shows.
 --- ==============================================================================
 
 local M = {}
 
-local NativePresentation = require("infra.native_presentation")
-local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local Logger = require("core.logger.engine.shim")
-local MagicKeySourceRows = require("layouts.engine.layers.magic_key_source")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local show_error = require("ui.menu.menu_dialogs").show_error
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_layouts"
 
@@ -40,7 +37,8 @@ local function _build_layouts(ctx)
 	-- restricts the layout emulation switch to Windows with its reason.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
-	-- The "Manage layouts…" row opens the shared layout manager window.
+	-- « Install or remove layouts… » opens the shared layout manager window.
+	-- Creating a layout is Ergopti Studio's, the tray root's row right above.
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
 	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = function()
@@ -50,57 +48,10 @@ local function _build_layouts(ctx)
 		end
 		return ctx.webview.show(require("settings.engine.keys").COMMAND.LAYOUT_MANAGER)
 	end
-	-- « Create or edit a layout… »: the layout editor's own window, which answers
-	-- its page's ready with the last saved source (ui/layout_manager/bridge.lua).
-	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = function()
-		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-			Logger.error(LOG, "No webview manager in the menu context — the layout editor cannot open.")
-			return false
-		end
-		return require("ui.layout_manager.bridge").open_editor_window(ctx.webview)
-	end
-
 
 	local providers = {
-		-- The custom layout picker: the registry layouts the layout manager
-		-- installed, the one this session activated checked; choosing one makes
-		-- it the first input source of the desktop session.
-		["custom_layouts"] = function()
-			local ok_registry, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
-			if not ok_registry then
-				Logger.error(LOG, "The layout registry client is unavailable: %s.", tostring(LayoutRegistry))
-				return {}
-			end
-			local snapshot = LayoutRegistry.snapshot()
-			local entries = {}
-			for _, entry in pairs(snapshot.installed or {}) do entries[#entries + 1] = entry end
-			table.sort(entries, function(a, b) return tostring(a.name) < tostring(b.name) end)
-			local rows = {}
-			for _, entry in ipairs(entries) do
-				local id = entry.id
-				rows[#rows + 1] = {
-					label   = type(entry.name) == "string" and entry.name or id,
-					checked = snapshot.active == id,
-					action  = function()
-						LayoutRegistry.select(id, function(selected, _, detail)
-							if not selected then
-								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
-							elseif type(ctx.on_menu_changed) == "function" then
-								ctx.on_menu_changed()
-							end
-						end)
-					end,
-				}
-			end
-			if #rows == 0 then
-				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
-				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
-				return type(status) == "table" and status or {}
-			end
-			return rows
-		end,
 		["base_layouts"] = function()
-			local ok_reader, reader = pcall(require, "modules.hotstrings.input_reader")
+			local ok_reader, reader = pcall(require, "hotstrings.engine.input_reader")
 			if not ok_reader or type(reader.get_layouts) ~= "function" then
 				Logger.error(LOG, "The input reader exposes no layout table — no layout can be offered.")
 				return {}
@@ -123,6 +74,7 @@ local function _build_layouts(ctx)
 					-- puts one platform's convention inside a string, and the row was
 					-- not even a check item.
 					checked = current == name,
+					radio   = true,
 					action  = function()
 						if type(on_change) ~= "function" then
 							Logger.error(LOG, "ctx.on_layout_change is absent — '%s' cannot be selected.", chosen)
@@ -146,21 +98,44 @@ local function _build_layouts(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	local EmulationRows = require("layouts.engine.emulation.menu")
+	-- One write for the radio rows and the picker window: stored, then applied live.
+	local function choose_emulation(choice)
+		local committed = require("infra.layout_emulation_preferences").choose(choice)
+		emulation_changed(committed)
+		return committed
+	end
+	-- One read of config.toml per build: the choice rows and the six switch
+	-- rows each read and decoded it, seven times per tray rebuild.
+	local emulation_settings, layout_config = nil, nil
+	local function current_layout_config()
+		layout_config = layout_config or (require("infra.layout_emulation_preferences").snapshot())
+		return layout_config
+	end
+	local function current_emulation_settings()
+		emulation_settings = emulation_settings or require("infra.layout_emulation_preferences").settings(current_layout_config())
+		return emulation_settings
+	end
 	providers["layout_emulation"] = function()
-		local Preferences = require("infra.layout_emulation_preferences")
 		local Registry = require("modules.keymap.layout_registry")
 		return EmulationRows.choice_rows({
 			t = i18n_safe,
-			settings = Preferences.settings(),
+			settings = current_emulation_settings(),
 			status = require("modules.keymap.layout_emulation").status(),
 			snapshot = Registry.snapshot(),
-			choose = function(choice) emulation_changed(Preferences.choose(choice)) end,
+			choose = choose_emulation,
+			-- « Others… »: every layout, searchable, in the shared picker window.
+			open_picker = require("ui.emulation_picker.bridge").open,
+			others_rows = function(open)
+				return ManifestMenu.template_rows("layout_emulation_others_commands",
+					{ [require("settings.engine.keys").COMMAND.LAYOUT_EMULATION_OTHERS] = open }, {}, {})
+			end,
 		})
 	end
 	local function switch_rows(path, label_key)
 		local Preferences = require("infra.layout_emulation_preferences")
 		return EmulationRows.switch_row({
-			t = i18n_safe, label_key = label_key, checked = Preferences.switch(path),
+			t = i18n_safe, label_key = label_key,
+			checked = require("layouts.engine.emulation.settings").switch_value(current_emulation_settings(), path),
 			toggle = function(value) emulation_changed(Preferences.set_switch(path, value)) end,
 		})
 	end
@@ -176,55 +151,6 @@ local function _build_layouts(ctx)
 		local path = "layout.emulate_" .. row
 		render_ctx.feature_rows[path] = function() return switch_rows(path, "menu.layout.emulate_" .. row) end
 	end
-
-	-- The physical magic key: the key typing the magic key, chosen by pressing it
-	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
-	-- are the shared ones macOS draws too.
-	providers[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
-		local Source = ctx.magic_key_source
-		if type(Source) ~= "table" then
-			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
-			return {}
-		end
-		local function notify(key, level)
-			local ok_notifier, Notifier = pcall(require, "platform.focus.application_notifier")
-			if ok_notifier then
-				local body = i18n_safe(key)
-				local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
-				local title = receipt and NativePresentationTitle(receipt) or nil
-				if title == nil then return false end
-				Notifier.send(body, { title = title, level = level })
-			else
-				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
-			end
-		end
-		local function changed()
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end
-		return MagicKeySourceRows.menu_rows(Source.resolver(), {
-			manifest = ManifestMenu,
-			t = i18n_safe,
-			current = Source.get(),
-			key_text = Source.key_text,
-			reason = Source.choice_reason,
-			choose = function(value)
-				local ok, reason = Source.set(value)
-				if not ok then
-					show_error(i18n_safe(reason))
-					return
-				end
-				changed()
-			end,
-			capture = Source.can_capture() and function()
-				local started = Source.capture({
-					on_chosen = changed,
-					on_refused = function(reason) notify(reason, "warning") end,
-				})
-				if started then notify("dialog.magic_key_source.prompt", "info") end
-			end or nil,
-		})
-	end
-
 	-- The scope's restore and clear: the layout rows of config.toml (number-row
 	-- ordering and edges), loaded by the session before they settle.
 	local function apply_layout_scope(mode)
@@ -236,8 +162,7 @@ local function _build_layouts(ctx)
 				Logger.error(LOG, "Keyboard layout scope '%s' was not applied: %s.", mode, tostring(detail))
 				show_error(i18n_safe("layouts.linux_rows_not_applied"))
 			end
-			-- The scope holds the emulation's rows too: it types what was restored.
-			require("modules.keymap.layout_emulation").reload_if_started()
+			-- The participant has already had the emulation type what was restored.
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end)
 		-- The session may answer later: a dispatched request is accepted now and
@@ -255,8 +180,9 @@ local function _build_layouts(ctx)
 	providers["number_row_policy"] = function()
 		local NumberRowLive = require("modules.keymap.number_row_live")
 		local available, reason = NumberRowLive.available()
-		-- An emulation typing the number row applies the ordering itself.
-		local emulating = require("modules.keymap.layout_emulation").status().active == true
+		-- An emulation typing the number row applies the ordering itself; one with
+		-- its base layer or its number row off leaves the row to the system layout.
+		local emulating = require("modules.keymap.layout_emulation").status().number_row == true
 		available = available or emulating
 		local stored = NumberRowLive.stored()
 		-- The choice is stored first; a refusal after that is told, except the two the
@@ -278,6 +204,40 @@ local function _build_layouts(ctx)
 			set_edges = function(value) return NumberRowLive.set("edges", value, applied) end,
 		})
 	end
+	-- « Touches de jeu »: the global choice and the focused application's own,
+	-- greyed with why where this session cannot honour one
+	-- (modules/keymap/game_keys_focus.lua decides the switch on a focus change).
+	providers["layout_game_keys"] = function()
+		local Preferences = require("infra.layout_emulation_preferences")
+		local Focus = require("modules.keymap.game_keys_focus")
+		local GameKeys = require("layouts.engine.emulation.game_keys")
+		local settings = Preferences.game_keys(current_layout_config())
+		local app = Focus.is_initialised() and Focus.current_app() or nil
+		local own, overridden = GameKeys.choice_for(settings, "linux", app)
+		local function changed(committed)
+			if not committed then show_error(i18n_safe("menu.layout.emulation_not_saved")) end
+			-- The focused application takes its new keys at once.
+			if committed and Focus.is_initialised() then Focus.on_focus(Focus.current_app()) end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return EmulationRows.game_keys_rows({
+			t = i18n_safe,
+			settings = settings,
+			app = app,
+			app_choice = overridden and own or nil,
+			route = function(choice, game)
+				if not Focus.is_initialised() then
+					return GameKeys.route("linux", require("modules.keymap.layout_emulation").status().active
+						and GameKeys.MODE_EMULATION or GameKeys.MODE_SYSTEM, choice, {})
+				end
+				local caps, mode = Focus.caps(app, settings)
+				caps.game = game
+				return GameKeys.route("linux", mode, choice, caps)
+			end,
+			choose = function(choice) changed(Preferences.set_game_keys(nil, choice)) end,
+			choose_app = function(choice) changed(Preferences.set_game_keys(app, choice)) end,
+		})
+	end
 	-- Layout on pause / resume: the shared frames macOS draws, listing the
 	-- desktop's own layouts (ui/menu/pause_layout_rows.lua).
 	providers["layout_switching"] = function()
@@ -295,9 +255,14 @@ local function _build_layouts(ctx)
 			switch = ctx.pause_layout,
 		})
 	end
+	-- Install and activate Ergopti, or activate or uninstall it, without the
+	-- layout manager window, whose toolkit a system can lack.
+	providers["layout_user_install"] = function()
+		return require("ui.layout_manager.tray_actions").rows()
+	end
 	-- How far GTK 3 applications compose the installed layouts' sequences.
 	providers["compose_input_method"] = function()
-		return require("ui.menu.compose_input_method_row").rows({ t = i18n_safe })
+		return require("menu.ui.compose_input_method_row").rows({ t = i18n_safe })
 	end
 	-- Input sources: the desktop's layouts, the active one ticked; choosing one
 	-- switches the desktop (ui/menu/active_layout_rows.lua), as macOS does.
@@ -347,10 +312,17 @@ local function _build_layouts(ctx)
 			}, {
 				["accented_letter_off_checked"] = function() return not entry.enabled end,
 			}, { ["accented_letter_choices"] = function() return choices end }) or {}
-			-- The Windows title: « Tous les raccourcis sur la touche É correspondent
-			-- à ceux de » and the current letter (GetMenuTitleByPath).
-			local caption = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper()
-			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters }
+			-- « É → raccourcis de C », not the Windows title « Tous les raccourcis
+			-- sur la touche É correspondent à ceux de C »: KDE Plasma cut that
+			-- sentence before the letter, five rows read alike and a menu
+			-- cannot scroll sideways (Arch field report, 2026-11-25). The whole
+			-- sentence stays the row's tooltip.
+			local key = require("core.text.engine.unicode_case").upper(Accented.LETTERS[id])
+			local caption = i18n_safe("shortcuts.accented_row"):gsub("{([12])}", function(slot)
+				return slot == "1" and key or entry.letter:upper()
+			end)
+			items[#items + 1] = { label = caption, checked = entry.enabled, items = letters,
+				tooltip = i18n_safe("shortcuts." .. id:gsub("_", "")) .. entry.letter:upper() }
 		end
 		return { items = items }
 	end

@@ -113,10 +113,10 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 		local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 		local slots = {
 			"platform.focus.window_manager",
-			"adapters.app_launcher",
+			"apps.adapters.launcher",
 			"core.events.timer_scheduler",
-			"adapters.clipboard",
-			"infra.config_paths",
+			"clipboard.adapters.clipboard",
+			"settings.engine.paths",
 			"core.ui.engine.dialog_util",
 			"modules.shortcuts.actions.apps",
 		}
@@ -130,16 +130,16 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["platform.focus.window_manager"] = {
 				activate = function() return false end,
 			}
-			package.loaded["adapters.app_launcher"] = {
+			package.loaded["apps.adapters.launcher"] = {
 				launch = function() return false end,
 			}
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return true end,
 			}
-			package.loaded["adapters.clipboard"] = {
+			package.loaded["clipboard.adapters.clipboard"] = {
 				get_text = function() return "" end,
 			}
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				get_config_dir = function() return "/tmp/ergopti" end,
 			}
 			package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }

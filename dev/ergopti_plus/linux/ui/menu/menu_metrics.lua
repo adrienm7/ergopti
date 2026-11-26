@@ -13,11 +13,11 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local ParentSource = require("menu.engine.frames.parent_source")
 local TextPrompt = require("core.ui.ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local show_error = require("ui.menu.menu_dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_metrics"
 
@@ -59,9 +59,11 @@ local function _availability_rows(k)
 	local rows = {}
 	local function add(name_key, availability)
 		if type(availability) == "table" and availability.measured == false then
+			-- The reason is the row's tooltip, which the Linux tray draws below the
+			-- row: inline it made rows of 120 columns and more, cut by the panel.
 			rows[#rows + 1] = {
-				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key),
-					i18n_safe(assert(availability.reason, "an unmeasured metric names its reason"))),
+				label = string.format(i18n_safe("menu.metrics.not_measured"), i18n_safe(name_key)),
+				tooltip = i18n_safe(assert(availability.reason, "an unmeasured metric names its reason")),
 				disabled = true,
 			}
 		end
@@ -72,11 +74,11 @@ local function _availability_rows(k)
 	if type(k.tap_click_availability) == "function" then
 		add("menu.metrics.touchpad_taps", k.tap_click_availability())
 	end
-	local ok, SystemMetrics = pcall(require, "modules.keystats.system_metrics")
+	local ok, SystemMetrics = pcall(require, "modules.keystats.system.system_metrics")
 	if ok and type(SystemMetrics.space_change_availability) == "function" then
 		add("menu.metrics.space_changes", SystemMetrics.space_change_availability())
 	end
-	local loaded, TopologyMetrics = pcall(require, "modules.keystats.topology_metrics")
+	local loaded, TopologyMetrics = pcall(require, "modules.keystats.system.topology_metrics")
 	if loaded and type(TopologyMetrics.window_topology_availability) == "function" then
 		add("menu.metrics.window_topology", TopologyMetrics.window_topology_availability())
 	end
@@ -354,7 +356,7 @@ local function _manifest_metrics_rows(ctx, k)
 		-- The applications whose typing is never recorded: the same submenu the
 		-- other two drivers draw, over this driver's own keystats list.
 		["exclude_apps"] = function()
-			local AppRows = require("ui.menu.app_exclusion_rows")
+			local AppRows = require("apps.ui.menu.exclusion_rows")
 			local count = #k.get_disabled_apps()
 			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
 			-- The add-application prompt's caption, not a row label.

@@ -312,6 +312,21 @@ helpers.describe("Changelog one-click release install (macOS)", function()
 		end)
 	end)
 
+	-- UPD-10: a refused code signature (release_stage.sh exit 27) read as an
+	-- integrity check
+	helpers.it("upd-10: names a refused code signature", function()
+		with_changelog(function(changelog, state, post)
+			local deps, events = owners({ stage = { stage = "signature" } })
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			for _, name in ipairs(events) do
+				helpers.assert_true(name:sub(1, 4) ~= "arm:", "nothing installs: " .. name)
+			end
+			local message = last_install_message(state)
+			helpers.assert_true(message:find("install_error_signature", 1, true) ~= nil, message)
+		end)
+	end)
+
 	helpers.it("refuses a tag the fetched list does not hold, without a backup", function()
 		with_changelog(function(changelog, state, post)
 			local deps, events = owners()

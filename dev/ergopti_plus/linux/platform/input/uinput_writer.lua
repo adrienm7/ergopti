@@ -70,9 +70,10 @@ local EV_KEY     = 0x01
 local EV_REL     = 0x02
 local SYN_REPORT = 0x00
 
--- The relative axes the device can send: pointer motion and both wheels, in
--- their classic and high-resolution reports. The keyboard hook forwards a mouse
--- through them while the navigation layer owns its wheel (adapters/keyboard_hook).
+-- The relative axes the pointer device can send: pointer motion and both
+-- wheels, in their classic and high-resolution reports. The keyboard hook
+-- forwards a mouse through them while the navigation layer owns its wheel
+-- (adapters/keyboard_hook); the keyboard device itself has no EV_REL.
 local RELATIVE_AXES = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0b, 0x0c }
 local RELATIVE_AXIS = {}
 for _, axis in ipairs(RELATIVE_AXES) do RELATIVE_AXIS[axis] = true end
@@ -100,6 +101,28 @@ local UI_DEV_DESTROY = 0x5502
 -- cannot emit it — the write succeeds while the application sees nothing.
 local KEY_CODE_MAX = 0x2FF
 
+-- Codes the keyboard device never advertises: the BTN_* blocks (mouse,
+-- joystick, gamepad, digitizer, wheel and the trigger-happy buttons). A
+-- keyboard advertising them, with REL_X/REL_Y beside them, was classified by
+-- udev as a mouse and a joystick too, and KDE Plasma then disabled the
+-- touchpad for as long as the daemon ran (2026-11-25 field report).
+local BUTTON_RANGES = { { 0x100, 0x15f }, { 0x2c0, 0x2ff } }
+-- The buttons the separate pointer device advertises: BTN_0..BTN_9 and the
+-- mouse buttons BTN_LEFT..BTN_TASK, what a mouse the navigation layer holds
+-- reports. A code in BUTTON_RANGES outside these reaches the pointer device,
+-- which drops it, as no desktop reads it from a mouse anyway.
+local POINTER_BUTTON_FIRST, POINTER_BUTTON_LAST = 0x100, 0x117
+
+--- Whether a key code is a button that belongs to the pointer device.
+--- @param code integer evdev key code.
+--- @return boolean
+local function is_button_code(code)
+	for _, range in ipairs(BUTTON_RANGES) do
+		if code >= range[1] and code <= range[2] then return true end
+	end
+	return false
+end
+
 -- File descriptors are non-negative signed native int values.
 local MAX_DESCRIPTOR = 0x7FFFFFFF
 
@@ -115,6 +138,7 @@ local BUS_VIRTUAL   = 0x06
 -- device finder classifies by it, so a second copy here is a silent way for the
 -- three to disagree. See platform/input/device_names.lua for what that costs.
 local DEVICE_NAME   = require("platform.input.device_names").VIRTUAL_KEYBOARD
+local POINTER_NAME  = require("platform.input.device_names").VIRTUAL_POINTER
 local DEVICE_VENDOR = 0x0001
 local DEVICE_PROD   = 0x0001
 local DEVICE_VER    = 0x0001
@@ -199,12 +223,13 @@ end
 --- Layout: struct input_id { u16 bustype, vendor, product, version } then
 --- char name[80] then u32 ff_effects_max — 92 bytes.
 --- @return string A 92-byte struct.
-function M.encode_setup()
-	local name = DEVICE_NAME
+--- @param pointer boolean|nil True for the pointer device's identity.
+function M.encode_setup(pointer)
+	local name = pointer and POINTER_NAME or DEVICE_NAME
 	if #name > 79 then name = name:sub(1, 79) end
 	return pack_uint_le(BUS_VIRTUAL, 2)
 		.. pack_uint_le(DEVICE_VENDOR, 2)
-		.. pack_uint_le(DEVICE_PROD, 2)
+		.. pack_uint_le(pointer and DEVICE_PROD + 1 or DEVICE_PROD, 2)
 		.. pack_uint_le(DEVICE_VER, 2)
 		.. name
 		.. string.rep("\0", 80 - #name)
@@ -242,8 +267,78 @@ local _strict_constructor = false
 local _constructor_ports = nil
 local _legacy_wire = false
 local _legacy_failed = false
+-- The pointer device, created at the first pointer report and destroyed by
+-- release_pointer() or with the keyboard: { fd, write, ioctl, close }.
+local _pointer = nil
 local encode_event = M.encode_event
 local encode_setup = M.encode_setup
+
+--- Creates the pointer device through the given native ports, once.
+--- @param ports table { open, ioctl, write, close } of the keyboard's backend.
+--- @return table|nil pointer The live pointer device, nil when refused.
+local function ensure_pointer(ports)
+	if _pointer ~= nil then return _pointer end
+	local descriptor = ports.open(_uinput_path, OPEN_FLAGS)
+	if descriptor == nil or descriptor == false then
+		pcall(Logger.error, LOG, "The virtual pointer could not be opened on %s.", _uinput_path)
+		return nil
+	end
+	local function admit(request, argument) return ports.ioctl(descriptor, request, argument) == true end
+	local created = admit(UI_SET_EVBIT, EV_KEY)
+	for code = POINTER_BUTTON_FIRST, POINTER_BUTTON_LAST do created = created and admit(UI_SET_KEYBIT, code) end
+	created = created and admit(UI_SET_EVBIT, EV_REL)
+	for _, axis in ipairs(RELATIVE_AXES) do created = created and admit(UI_SET_RELBIT, axis) end
+	created = created and admit(UI_SET_EVBIT, EV_SYN) and admit(UI_DEV_SETUP, encode_setup(true))
+		and admit(UI_DEV_CREATE, 0)
+	if not created then
+		local closed, ack = pcall(ports.close, descriptor)
+		if not closed or ack ~= true then _debt = true end
+		pcall(Logger.error, LOG, "The virtual pointer creation was not acknowledged.")
+		return nil
+	end
+	_pointer = { fd = descriptor, write = ports.write, ioctl = ports.ioctl, close = ports.close }
+	pcall(Logger.success, LOG, "Virtual pointer created on %s.", _uinput_path)
+	return _pointer
+end
+
+--- Destroys the pointer device; a refusal is native debt, never retried.
+--- @return boolean acknowledged True when absent or destroyed and closed.
+local function destroy_pointer()
+	local pointer = _pointer
+	if pointer == nil then return true end
+	_pointer = nil
+	local destroyed, destroy_ack = pcall(pointer.ioctl, pointer.fd, UI_DEV_DESTROY, 0)
+	local closed, close_ack = pcall(pointer.close, pointer.fd)
+	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true
+	if acknowledged then
+		pcall(Logger.success, LOG, "Virtual pointer retired.")
+	else
+		_debt = true
+		pcall(Logger.error, LOG, "Virtual pointer retirement remains unacknowledged.")
+	end
+	return acknowledged
+end
+
+--- Writes one event and its SYN on the device that owns the event: the
+--- pointer device for EV_REL and buttons, the keyboard otherwise.
+--- @param ports table { open, ioctl, write, close } of the keyboard's backend.
+--- @param fd any The keyboard's descriptor.
+--- @return boolean acknowledged
+local function write_routed(ports, fd, event_type, code, value)
+	local write = ports.write
+	if event_type == EV_REL or (event_type == EV_KEY and is_button_code(code)) then
+		local pointer = ensure_pointer(ports)
+		if pointer == nil then return false end
+		fd, write = pointer.fd, pointer.write
+	end
+	if write(fd, encode_event(event_type, code, value)) ~= true then return false end
+	return write(fd, encode_event(EV_SYN, SYN_REPORT, 0)) == true
+end
+
+--- The native ports of a captured output record.
+local function output_ports(output)
+	return { open = rawget(output.backend, "open"), ioctl = output.ioctl, write = output.write, close = output.close }
+end
 
 --- Checks only private observed currency; this is not a kernel state lease.
 --- @param output table Issued private record.
@@ -279,9 +374,7 @@ local function emit_owned(capability, code, value, transaction)
 	_busy = true
 	output.write_epoch = output.write_epoch + 1
 	local called, acknowledged = pcall(function()
-		if output.write(output.fd, encode_event(EV_KEY, code, value)) ~= true then return false end
-		if not output_identity(output) then return false end
-		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		if not write_routed(output_ports(output), output.fd, EV_KEY, code, value) then return false end
 		return output_identity(output)
 	end)
 	if not called or acknowledged ~= true then
@@ -315,9 +408,7 @@ local function emit_relative_owned(capability, axis, value)
 	_busy = true
 	output.write_epoch = output.write_epoch + 1
 	local called, acknowledged = pcall(function()
-		if output.write(output.fd, encode_event(EV_REL, axis, value)) ~= true then return false end
-		if not output_identity(output) then return false end
-		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		if not write_routed(output_ports(output), output.fd, EV_REL, axis, value) then return false end
 		return output_identity(output)
 	end)
 	if not called or acknowledged ~= true then
@@ -340,6 +431,7 @@ local function close_owned(capability, transaction)
 	_busy = true
 	output.close_attempted = true
 	pcall(Logger.start, LOG, "Retiring the exact owned virtual keyboard…")
+	local pointer_retired = destroy_pointer()
 	local destroyed, destroy_ack = pcall(output.ioctl, output.fd, UI_DEV_DESTROY, 0)
 	local closed, close_ack = pcall(output.close, output.fd)
 	local same = output_identity(output)
@@ -347,7 +439,7 @@ local function close_owned(capability, transaction)
 		_fd = nil
 		output.retired = true
 	end
-	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true and same
+	local acknowledged = pointer_retired and destroyed and destroy_ack == true and closed and close_ack == true and same
 	if acknowledged then
 		output.retirement_ack = true
 		_output = nil
@@ -360,8 +452,11 @@ local function close_owned(capability, transaction)
 		-- A failed close may already have recycled its fd. It must never be retried.
 		_debt = true
 	end
-	pcall(acknowledged and Logger.success or Logger.error, LOG,
-		acknowledged and "Owned virtual keyboard retired." or "Native retirement remains unacknowledged; the descriptor will not be retried.")
+	if acknowledged then
+		pcall(Logger.success, LOG, "Owned virtual keyboard retired.")
+	else
+		pcall(Logger.error, LOG, "Native retirement remains unacknowledged; the descriptor will not be retried.")
+	end
 	_busy = false
 	return acknowledged
 end
@@ -387,6 +482,7 @@ function M._reset_backend()
 	if _busy or _debt then return false end
 	if _output ~= nil and not close_owned(_output.capability) then return false end
 	_busy = true
+	if _pointer then pcall(_pointer.close, _pointer.fd); _pointer = nil end
 	if _fd and _backend and _backend.close then pcall(_backend.close, _fd) end
 	_backend = nil
 	_fd = nil
@@ -757,12 +853,9 @@ function M.open()
 		end
 		if not admit(UI_SET_EVBIT, EV_KEY) then return false end
 		for code = 1, KEY_CODE_MAX do
-			if not admit(UI_SET_KEYBIT, code) then return false end
+			if not is_button_code(code) and not admit(UI_SET_KEYBIT, code) then return false end
 		end
-		if not admit(UI_SET_EVBIT, EV_REL) then return false end
-		for _, axis in ipairs(RELATIVE_AXES) do
-			if not admit(UI_SET_RELBIT, axis) then return false end
-		end
+		-- No EV_REL here: pointer reports go to the separate pointer device.
 		if not admit(UI_SET_EVBIT, EV_SYN) then return false end
 		if not admit(UI_DEV_SETUP, encode_setup()) then return false end
 		if not admit(UI_DEV_CREATE, 0) then return false end
@@ -800,10 +893,11 @@ function M.close()
 	_busy = true
 	pcall(Logger.start, LOG, "Destroying the virtual keyboard…")
 	local fd, ports = _fd, _constructor_ports
+	local pointer_retired = destroy_pointer()
 	local destroyed, destroy_ack = pcall(ports.ioctl, fd, UI_DEV_DESTROY, 0)
 	local closed, close_ack = pcall(ports.close, fd)
 	if closed and close_ack == true then _fd = nil end
-	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true
+	local acknowledged = pointer_retired and destroyed and destroy_ack == true and closed and close_ack == true
 	if acknowledged then
 		_strict_constructor = false
 		_legacy_wire = false
@@ -848,8 +942,9 @@ local function legacy_emit(event_type, code, value)
 	if _legacy_failed then return false end
 	_busy, _legacy_wire = true, true
 	local called, acknowledged = pcall(function()
-		return _backend.write(_fd, M.encode_event(event_type, code, value)) == true
-			and _backend.write(_fd, M.encode_event(EV_SYN, SYN_REPORT, 0)) == true
+		local ports = { open = rawget(_backend, "open"), ioctl = rawget(_backend, "ioctl"),
+			write = rawget(_backend, "write"), close = rawget(_backend, "close") }
+		return write_routed(ports, _fd, event_type, code, value)
 	end)
 	if not called or acknowledged ~= true then _legacy_failed = true end
 	_busy = false
@@ -1006,6 +1101,27 @@ end
 --- @return boolean retired
 function M.close_owned(capability)
 	return close_owned(capability)
+end
+
+--- Retires the pointer device while no button it carries is held, so the
+--- desktop stops counting a mouse once the navigation layer gave it back.
+--- @return boolean released True when no pointer device remains.
+function M.release_pointer()
+	if _pointer == nil then return true end
+	if _busy or _transaction ~= nil or _dispatch ~= nil then return false end
+	if _output ~= nil then
+		for code in pairs(_output.down) do if is_button_code(code) then return false end end
+	end
+	_busy = true
+	local released = destroy_pointer()
+	_busy = false
+	return released
+end
+
+--- Whether the pointer device exists (diagnostics and tests).
+--- @return boolean
+function M.has_pointer()
+	return _pointer ~= nil
 end
 
 --- Reports unresolved write/constructor/retirement custody.

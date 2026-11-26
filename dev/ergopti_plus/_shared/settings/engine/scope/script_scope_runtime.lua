@@ -132,7 +132,7 @@ function M.new(options)
 			enum_values = list_copy(entry.enum_values), default = manifest.default_for(path) }
 	end
 	local function context_matches()
-		if not rawequal(package.loaded["infra.manifest_reader"], manifest) then return false end
+		if not rawequal(package.loaded["menu.engine.manifest_reader"], manifest) then return false end
 		if not rawequal(package.loaded["core.fs.adapters.storage"], Storage)
 			or not rawequal(package.loaded["core.fs.adapters.file_system"], options.files) then return false end
 		for _, method in ipairs(file_names) do if options.files[method] ~= file_methods[method] then return false end end

@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
-local ConfigPaths = require("infra.config_paths")
+local Manifest = require("menu.engine.manifest_reader")
+local ConfigPaths = require("settings.engine.paths")
 local ConfigKeys = require("settings.engine.keys")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")

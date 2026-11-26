@@ -42,7 +42,7 @@ local function with_manager(route, body)
 		end
 		write(config_path, text)
 		write(tap_path, '[tap_hold]\nenabled = true\ninherit_defaults = false\n')
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local original = paths.config
 		paths.config = function(name)
 			if name == "config.toml" then return config_path end
@@ -74,7 +74,7 @@ local function with_manager(route, body)
 			s.rows = {}
 			function s.withdraw_binding() write(config_path, text:gsub('"script_reload"', '"none"')) end
 			function s.select(ids)
-				package.loaded["modules.hotstrings.device_finder"].find_devices = function()
+				package.loaded["hotstrings.engine.device_finder"].find_devices = function()
 					local selected = {}; for _, id in ipairs(ids) do selected[#selected + 1] = s.paths[id] end
 					return selected, {}
 				end
@@ -152,12 +152,28 @@ helpers.describe("configured combinations retain their original isolation and bu
 				helpers.assert_eq(s.hook.held_modifiers(), {})
 			end)
 		end)
-		helpers.it("pair-multidevice cannot borrow a foreign " .. route .. " prefix", function()
+		-- KCD-7 (maintainer decision of 2026-11-21): a pair or chord across two
+		-- keyboards runs, as on Windows and macOS; each key keeps its own source.
+		for _, order in ipairs({ { "a", "b" }, { "b", "a" } }) do
+			helpers.it("(kcd-7) pair-multidevice combines a " .. route .. " across two keyboards " .. order[1] .. order[2], function()
+				with_manager(route, function(s)
+					s.edge(order[1], 58, 1, 1000); s.edge(order[2], 15, 1, 1010)
+					s.edge(order[2], 15, 0, 1100); s.edge(order[1], 58, 0, 1110)
+					helpers.assert_eq(s.reloads, 1, "The key held on one keyboard pairs with the key struck on the other")
+					helpers.assert_eq(s.hook.held_modifiers(), {})
+					helpers.assert_eq(count(s, 15, 1), 0, "The second key never reaches the application")
+				end)
+			end)
+		end
+		helpers.it("(kcd-7) pair-multidevice releases a cross-keyboard " .. route .. " first key on its own source", function()
 			with_manager(route, function(s)
 				s.edge("a", 58, 1, 1000); s.edge("b", 15, 1, 1010)
-				s.edge("b", 15, 0, 1100); s.edge("a", 58, 0, 1110)
-				helpers.assert_eq(s.reloads, 0)
+				s.edge("a", 58, 0, 1020); s.edge("b", 15, 0, 1030)
 				helpers.assert_eq(s.hook.held_modifiers(), {})
+				helpers.assert_eq(count(s, 58, 0), count(s, 58, 1), "Every forwarded first-key press is released")
+				helpers.assert_eq(count(s, 15, 0), count(s, 15, 1), "Every forwarded second-key press is released")
+				s.edge("a", 30, 1, 1200); s.edge("a", 30, 0, 1210)
+				helpers.assert_eq(s.chars[#s.chars], "a", "Typing resumes on the keyboard that held the first key")
 			end)
 		end)
 	end

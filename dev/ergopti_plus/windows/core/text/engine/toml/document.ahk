@@ -16,8 +16,9 @@
 global _TOML_DocumentParses := 0
 
 ; Monotonic count of characters the lexer classified one at a time. That is the
-; slow path, so the boot record publishes it per parse and the startup smoke
-; bounds it: a native run that stops matching shows up here, not in a wall clock.
+; slow path, so the boot record publishes it per parse and the lexer test proves
+; it does not grow with the length of a run: a native run that stops matching
+; shows up here, not in a wall clock.
 global _TOML_DocumentSlowSteps := 0
 ; Document parses per caller<parent since the last interval publication. The
 ; boot's ceiling counts parses, and only the owners tell a new boot reader from an
@@ -25,6 +26,17 @@ global _TOML_DocumentSlowSteps := 0
 ; name per caller pair filled it and refused unrelated counters.
 global _TOML_DocumentParseOwners := Map()
 global TOML_DOCUMENT_PARSE_OWNER_LIMIT := 32
+; boot-parse-repeats-2026-11-18: the texts each reader ("document", "flat") parsed
+; since the last interval publication, and the owners that parsed one of them
+; again. A repeat is work the boot already did, whatever the size of the data, so
+; the startup smoke names the owners allowed to repeat instead of capping a count
+; that every new shared setting moved. Both maps keep the owner bound above.
+global _TOML_ParseRepeatSources := Map("document", Map(), "flat", Map())
+global _TOML_ParseRepeatOwners := Map("document", Map(), "flat", Map())
+; The sources TOML_ParseDocumentShared remembers, the oldest dropped first, so
+; the memo never pins every text a session read. One named bound: the memo test
+; reads it instead of a copy.
+global TOML_SHARED_PARSE_ENTRIES := 4
 
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
@@ -198,9 +210,55 @@ _TOML_DocumentMultilineBody(Raw) {
 	return TOML_UnescapeBasicStringContents(Result)
 }
 
+/**
+ * The patterns of text the lexer copies verbatim: a one-line basic string or a
+ * token free of every character the lexer classifies (quotes, comments,
+ * containers, separators), bare keys holding one, and one-line assignments of
+ * such a scalar, of an inline table of such members or of an array of such
+ * scalars, with blanks and tabs between the tokens. Built once.
+ * @returns {Object} List (a whole member list), Member (one member) and Record
+ *   (a whole line, capturing its key and value) patterns.
+ */
+_TOML_DocumentSimpleMemberPatterns() {
+	; Possessive throughout: each class is disjoint from what follows it, so
+	; nothing ever needs to be given back.
+	Basic := '"(?:[^"\\\r\n]++|\\[^\r\n])*+"'
+	Scalar := "(?:" . Basic . "|[A-Za-z0-9_.+-]++)"
+	Member := "[A-Za-z0-9_-]++[ \t]*+=[ \t]*+" . Scalar
+	Members := Member . "(?:[ \t]*+,[ \t]*+" . Member . ")*+"
+	Inline := "\{[ \t]*+(?:" . Members . "[ \t]*+)?\}"
+	Items := "\[[ \t]*+(?:" . Scalar . "(?:[ \t]*+,[ \t]*+" . Scalar . ")*+[ \t]*+)?\]"
+	Key := "(?:" . Basic . "|[A-Za-z0-9_-]++(?:\.[A-Za-z0-9_-]++)*+)"
+	return { List: "^[ \t]*+" . Members . "[ \t]*+\z", Member: Member,
+		Record: "^[ \t]*+(?<key>" . Key . ")[ \t]*+=[ \t]*+(?<value>" . Scalar . "|" . Inline . "|" . Items
+			. ")[ \t\r]*+\z" }
+}
+
 ; Only the semantic inline-table reader uses this canonical strict delegation.
 ; Keep the generic inline-table splitter unchanged for all existing callers.
 _TOML_DocumentSplit(Body, Separator := ",", Strict := true) {
+	; A member list made only of bare keys holding a one-line basic string or a
+	; bare token, the shape of every hotstring entry, is split by native matches
+	; instead of the lexer: in it the lexer copies each member verbatim between
+	; two commas, so the parts are the same. Anything else, an empty or trailing
+	; member included, is left to the lexer and its errors.
+	if Separator == "," {
+		static Patterns := _TOML_DocumentSimpleMemberPatterns()
+		try {
+			Simple := RegExMatch(Body, Patterns.List)
+		} catch {
+			; The engine's match limit on a very long member: the lexer decides.
+			Simple := 0
+		}
+		if Simple {
+			Parts := [], Position := 1
+			while RegExMatch(Body, Patterns.Member, &Member, Position) {
+				Parts.Push(Member[0])
+				Position := Member.Pos + Member.Len
+			}
+			return Parts
+		}
+	}
 	Parts := [], Position := 1
 	while Position <= StrLen(Body) {
 		Token := _TOML_DocumentToken(Body, &Position, Separator, &Separated)
@@ -242,6 +300,13 @@ _TOML_DocumentValue(Raw) {
 		}
 		return Result
 	}
+	; A one-line basic string and a lowercase Boolean, nearly every member of a
+	; hotstring entry, decode here as TOML_CoerceValue decodes them, without the
+	; integer spellings and the scalar checks neither can match.
+	if StrLen(Raw) >= 2 && SubStr(Raw, 1, 1) == Chr(34) && SubStr(Raw, -1) == Chr(34)
+		return TOML_UnescapeBasicStringContents(SubStr(Raw, 2, StrLen(Raw) - 2))
+	if Raw == "true" || Raw == "false"
+		return TOML_Bool(Raw == "true")
 	Spelled := _TOML_DocumentSpelledInteger(Raw)
 	return Spelled != "" ? Spelled : TOML_CoerceValue(Raw, true)
 }
@@ -307,6 +372,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	_TOML_DocumentParses += 1
 	PerfCount("toml.document_parse")
 	_TOML_DocumentParseOwnerCount(Error("", -2).What . "<" . Error("", -3).What)
+	_TOML_ParseRepeatNote("document", Source)
 	PerfCount("toml.document_chars", StrLen(Source))
 	SlowStepsBefore := _TOML_DocumentSlowSteps
 	try return _TOML_ParseDocumentRecords(Source, &Records, &Physical)
@@ -314,6 +380,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 }
 
 _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
+	static Patterns := _TOML_DocumentSimpleMemberPatterns()
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -326,6 +393,25 @@ _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 		if SubStr(Source, Position, 1) == Chr(10) {
 			Position += 1
 			Physical.Push({ Kind: "trivia", Section: NativeSection, Text: Chr(10) })
+			continue
+		}
+		; A one-line assignment of simple tokens, nearly every line of a
+		; configuration or a hotstrings file, is the record the lexer would copy
+		; verbatim up to its line feed; its key and value are read from the match.
+		LineEnd := InStr(Source, Chr(10), true, Position)
+		LineStop := LineEnd ? LineEnd : StrLen(Source) + 1
+		try {
+			Simple := RegExMatch(SubStr(Source, Position, LineStop - Position), Patterns.Record, &Assignment)
+		} catch {
+			; The engine's match limit on a very long line: the lexer decides.
+			Simple := 0
+		}
+		if Simple {
+			Position := LineEnd ? LineEnd + 1 : LineStop
+			RawRecord := SubStr(Source, Start, Position - Start)
+			KeyText := Assignment["key"], Raw := Assignment["value"]
+			_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+				Declared, Dotted, Arrays, Sealed, Records, Physical)
 			continue
 		}
 		Record := _TOML_DocumentToken(Source, &Position, Chr(10))
@@ -370,38 +456,47 @@ _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
 			Physical.Push({ Kind: "opaque", Section: NativeSection, Text: RawRecord })
 			continue
 		}
-		Parts := TOML_ParseKeyPath(KeyText, true)
 		Raw := Trim(SubStr(Record, SplitPosition), " " . Chr(9) . Chr(13) . Chr(10))
-		Node := Current
-		loop Parts.Length - 1 {
-			Key := Parts[A_Index]
-			if !Node.Has(Key)
-				Node[Key] := _TOML_DocumentTable()
-			Child := Node[Key]
-			if !(Child is Map) || Sealed.Has(Child) || Arrays.Has(Child)
-					|| (Declared.Has(Child) && !Dotted.Has(Child))
-				throw ValueError("TOML assignment extends a closed namespace")
-			Declared[Child] := true
-			Dotted[Child] := true
-			Node := Child
-		}
-		Key := Parts[Parts.Length]
-		if Node.Has(Key)
-			throw ValueError("Duplicate TOML semantic assignment")
-		Value := _TOML_DocumentValue(Raw)
-		Node[Key] := Value
-		_TOML_DocumentSealed(Value, Sealed)
-		Path := CurrentPath.Clone()
-		for Part in Parts
-			Path.Push(Part)
-		NativeKey := KeyText
-		if StrLen(NativeKey) >= 2 && SubStr(NativeKey, 1, 1) == Chr(34) && SubStr(NativeKey, -1) == Chr(34)
-			NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
-		Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
-			NativeSection: NativeSection, NativeKey: NativeKey })
-		Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
+		_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+			Declared, Dotted, Arrays, Sealed, Records, Physical)
 	}
 	return Root
+}
+
+; Stores one assignment record in its table, whichever path cut it from the
+; source: its dotted parents, its decoded value and its typed and physical
+; records. Raw is the value text and RawRecord the exact source span.
+_TOML_DocumentAssign(Current, CurrentPath, NativeSection, KeyText, Raw, RawRecord,
+		Declared, Dotted, Arrays, Sealed, Records, Physical) {
+	Parts := TOML_ParseKeyPath(KeyText, true)
+	Node := Current
+	loop Parts.Length - 1 {
+		Key := Parts[A_Index]
+		if !Node.Has(Key)
+			Node[Key] := _TOML_DocumentTable()
+		Child := Node[Key]
+		if !(Child is Map) || Sealed.Has(Child) || Arrays.Has(Child)
+				|| (Declared.Has(Child) && !Dotted.Has(Child))
+			throw ValueError("TOML assignment extends a closed namespace")
+		Declared[Child] := true
+		Dotted[Child] := true
+		Node := Child
+	}
+	Key := Parts[Parts.Length]
+	if Node.Has(Key)
+		throw ValueError("Duplicate TOML semantic assignment")
+	Value := _TOML_DocumentValue(Raw)
+	Node[Key] := Value
+	_TOML_DocumentSealed(Value, Sealed)
+	Path := CurrentPath.Clone()
+	for Part in Parts
+		Path.Push(Part)
+	NativeKey := KeyText
+	if StrLen(NativeKey) >= 2 && SubStr(NativeKey, 1, 1) == Chr(34) && SubStr(NativeKey, -1) == Chr(34)
+		NativeKey := SubStr(NativeKey, 2, StrLen(NativeKey) - 2)
+	Records.Push({ Path: Path, Raw: Raw, Value: Value, Owner: Node, Key: Key,
+		NativeSection: NativeSection, NativeKey: NativeKey })
+	Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
 }
 
 /**
@@ -417,7 +512,6 @@ _TOML_ParseDocumentRecords(Source, &Records, &Physical) {
  */
 TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
 	static Entries := []
-	static MAX_ENTRIES := 4
 	static MAX_SOURCE_CHARS := 262144
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
@@ -432,7 +526,7 @@ TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
 	if StrLen(Source) <= MAX_SOURCE_CHARS {
 		Entries.Push({ Source: Source, Document: Document, Records: Records, Physical: Physical })
-		while Entries.Length > MAX_ENTRIES
+		while Entries.Length > TOML_SHARED_PARSE_ENTRIES
 			Entries.RemoveAt(1)
 	}
 	return Document
@@ -1710,5 +1804,43 @@ TOML_DocumentParseOwnersTake() {
 	global _TOML_DocumentParseOwners
 	Owners := _TOML_DocumentParseOwners
 	_TOML_DocumentParseOwners := Map()
+	return Owners
+}
+
+/**
+ * Notes one parse of Source by a reader. A text this reader already parsed in
+ * the current interval counts the reader's caller as a repeat owner. Called by
+ * the reader function itself, so its caller and parent are frames -3 and -4.
+ * @param {String} Reader - "document" or "flat".
+ * @param {String} Source - The parsed text; an empty one costs nothing and is not kept.
+ */
+_TOML_ParseRepeatNote(Reader, Source) {
+	global _TOML_ParseRepeatSources, _TOML_ParseRepeatOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if Source == ""
+		return
+	Sources := _TOML_ParseRepeatSources[Reader]
+	if !Sources.Has(Source) {
+		if Sources.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+			Sources[Source] := true
+		return
+	}
+	Owners := _TOML_ParseRepeatOwners[Reader]
+	Owner := Error("", -3).What . "<" . Error("", -4).What
+	if Owners.Has(Owner)
+		Owners[Owner] += 1
+	else if Owners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		Owners[Owner] := 1
+}
+
+/**
+ * Returns and clears one reader's repeat owners, and forgets the texts it parsed.
+ * @param {String} Reader - "document" or "flat".
+ * @returns {Map} Owner to repeated parse count.
+ */
+TOML_ParseRepeatOwnersTake(Reader) {
+	global _TOML_ParseRepeatSources, _TOML_ParseRepeatOwners
+	Owners := _TOML_ParseRepeatOwners[Reader]
+	_TOML_ParseRepeatOwners[Reader] := Map()
+	_TOML_ParseRepeatSources[Reader] := Map()
 	return Owners
 }

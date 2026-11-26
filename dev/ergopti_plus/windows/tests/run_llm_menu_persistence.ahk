@@ -16,14 +16,14 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/config_keys.ahk
 #Include ../_generated/app_dirs.ahk
-#Include ../infra/app_folders.ahk
-#Include ../infra/legacy_folder_migration.ahk
-#Include ../_generated/logger_sub_files.ahk
+#Include ../apps/engine/folders.ahk
+#Include ../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../core/logger/engine/logger.ahk
 #Include ../core/crypto/crypto.ahk
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../core/events/timer_scheduler.ahk
 #Include ../core/text/engine/json.ahk
+#Include ../hotstrings/engine/magic_key_rules.ahk
 #Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../core/i18n/engine/i18n.ahk
@@ -31,27 +31,29 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../platform/input/hotkey_registrar.ahk
 #Include ../infra/hotpath_profiler.ahk
 #Include ../core/text/engine/toml/helpers.ahk
+; The scheduler's suspended re-queue reads the shared timing registry.
+#Include ../core/timing/engine/config.ahk
 #Include ../core/text/engine/toml/loader.ahk
 #Include ../core/text/engine/toml/config_loader.ahk
-#Include ../infra/manifest_reader.ahk
+#Include ../menu/engine/manifest_reader.ahk
 #Include ../core/lifecycle/engine/master_gates.ahk
-#Include ../infra/hotstrings/hotstrings_cache.ahk
-#Include ../infra/config_transition.ahk
-#Include ../infra/config_transition_runtime.ahk
-#Include ../infra/config_migrate.ahk
-#Include ../infra/magic_editor.ahk
-#Include ../infra/config_io.ahk
-#Include ../infra/config_scope.ahk
+#Include ../hotstrings/engine/catalogue/cache.ahk
+#Include ../settings/engine/migration/transition.ahk
+#Include ../settings/engine/migration/transition_runtime.ahk
+#Include ../settings/engine/migration/migrate.ahk
+#Include ../infra/star_slot.ahk
+#Include ../settings/engine/io.ahk
+#Include ../settings/engine/scope/scope.ahk
 #Include ../infra/metrics/metrics_filters.ahk
 #Include ../infra/metrics/metrics_shortcuts.ahk
 #Include support/wpm_widget_state_contract.ahk
 #Include support/config_journal_fixtures.ahk
-#Include ../modules/llm/models.ahk
-#Include ../infra/llm_defaults.ahk
+#Include ../ai/engine/settings/models.ahk
+#Include ../ai/engine/defaults.ahk
 #Include ../_generated/llm_profiles_data.ahk
-#Include ../modules/llm/profiles.ahk
-#Include ../modules/llm/option_validation.ahk
-#Include ../modules/llm/prediction_engine.ahk
+#Include ../ai/engine/settings/profiles.ahk
+#Include ../ai/engine/api/option_validation.ahk
+#Include ../ai/engine/prediction/engine.ahk
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
@@ -65,17 +67,18 @@ global _LLM_Menu := Map(
 	"ollama_port", 11435, "inline_autotype", false, "user_profiles", []
 )
 global _LLM_Menu_Loaded := false
-#Include ../ui/menu/menu_llm/menu_api_entries.ahk
-#Include ../ui/menu/menu_llm/transactions.ahk
-#Include ../ui/menu/menu_llm/menu_models.ahk
-#Include ../ui/menu/menu_llm/menu_profiles.ahk
-#Include ../ui/menu/menu_llm/hotkey_identity.ahk
-#Include ../ui/menu/menu_llm/persist.ahk
+#Include ../ai/ui/menu/api_entries.ahk
+#Include ../ai/ui/menu/transactions.ahk
+#Include ../ai/ui/menu/models/models.ahk
+#Include ../ai/ui/menu/profiles.ahk
+#Include ../ai/ui/prompt_editor/init.ahk
+#Include ../ai/ui/menu/hotkey_identity.ahk
+#Include ../ai/ui/menu/persist.ahk
 ; The native AI tray owner catches the real staged-root exception classes.
-#Include ../ui/menu/menu_rebuild.ahk
-#Include ../ui/menu/menu_llm/init.ahk
-#Include unit/modules/llm/menu/test_llm_menu_persistence.ahk
-#Include unit/modules/llm/menu/test_llm_menu_regressions.ahk
+#Include ../menu/ui/builder/rebuild.ahk
+#Include ../ai/ui/menu/init.ahk
+#Include unit/ai/menu/test_persistence.ahk
+#Include unit/ai/menu/test_regressions.ahk
 
 ; Isolated suite should finish in seconds; exit if a stale lock/hang blocks RunTests.
 _LlmPersistWatchdog(*) {
@@ -84,6 +87,7 @@ _LlmPersistWatchdog(*) {
 }
 SetTimer(_LlmPersistWatchdog, -LLM_PERSISTENCE_RUNNER_TIMEOUT_MS)
 
+TimingsLoadShared(_SharedDir)
 LLM_Defaults_Load()
 
 RunTests()

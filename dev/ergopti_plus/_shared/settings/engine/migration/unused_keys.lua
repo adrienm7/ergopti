@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Lists the keys of a driver's config.toml that none of that driver's readers
 --- consumes and, on request, removes them after writing a byte-exact backup
---- next to the file. The Lua counterpart of windows/infra/config_unused_keys.ahk,
+--- next to the file. The Lua counterpart of windows/settings/engine/migration/unused_keys.ahk,
 --- shared by the macOS and Linux drivers.
 ---
 --- FEATURES & RATIONALE:

@@ -383,5 +383,39 @@ function formatDisplayDate(dateStr) {
 	return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
 
+/**
+ * The text alternative of every Chart.js canvas: role img, named by its
+ * figure's heading and its data, so the values a pointer reads in the hover
+ * tooltips reach the keyboard and assistive technology too (WCAG 1.1.1,
+ * 1.4.13). Up to 24 non-zero points per series keep the name readable.
+ */
+const CHART_TEXT_ALTERNATIVE = {
+	id: 'ergoptiTextAlternative',
+	afterUpdate(chart) {
+		const canvas = chart.canvas;
+		const holder = canvas.closest('figure, section');
+		const heading = holder ? holder.querySelector('h3') : null;
+		const labels = chart.data.labels || [];
+		const value = (point) => (point && typeof point === 'object' ? point.y : point);
+		const series = (chart.data.datasets || []).map((dataset) => {
+			const points = (dataset.data || [])
+				.map((point, index) => [labels[index], value(point)])
+				.filter(([, v]) => typeof v === 'number' && v !== 0)
+				.slice(0, 24)
+				.map(
+					([label, v]) =>
+						`${label} ${Number(v.toFixed(1)).toLocaleString(window._i18n_locale || undefined)}`
+				);
+			return `${dataset.label ? dataset.label + ': ' : ''}${points.join(', ')}`;
+		});
+		canvas.setAttribute('role', 'img');
+		canvas.setAttribute(
+			'aria-label',
+			[heading ? heading.textContent.trim() : '', ...series].filter(Boolean).join('. ')
+		);
+	}
+};
+if (typeof Chart !== 'undefined') Chart.register(CHART_TEXT_ALTERNATIVE);
+
 // ===================================
 // ===================================

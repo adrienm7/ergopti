@@ -30,11 +30,11 @@ WORKER = r"""
 local uv = require("luv")
 local root = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_ROOT"))
 local mode = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_MODE"))
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local owned_paths = {}
 for key, value in pairs(Paths) do owned_paths[key] = value end
 owned_paths.home = function() return root end
-package.loaded["infra.config_paths"] = owned_paths
+package.loaded["settings.engine.paths"] = owned_paths
 local Manager = require("modules.updater.manager")
 local original_url = Manager.release_api_url()
 local count = assert(original_url:match("per_page=(%d+)"))

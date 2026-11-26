@@ -42,7 +42,7 @@ class _SpotlightSessionNative {
 
 class _SpotlightSessionTimerNative {
 	static Arm() {
-		SetTimer(_SpotlightTick, 100)
+		SetTimer(_SpotlightTick, TimingsGet("ui", "spotlight_poll_ms"))
 	}
 
 	static Stop() {
@@ -587,4 +587,25 @@ _SpotlightDrawCrossResources(Graphics, Pad, HalfSize, BarWidth, StrokeWidth,
 	PaintFn := _SpotlightPaintCrossBody.Bind(Graphics, Pad, HalfSize, BarWidth,
 		StrokeWidth, FillColor, StrokeColor)
 	_SpotlightPaintRun(PaintFn, Native)
+}
+
+; The overlay is drawn pixels: a screen reader user who pressed the shortcut
+; heard nothing. While one runs, the shown circle's window says « Mouse
+; pointer highlighted » as a polite live region, on a fresh timer turn.
+; @param Receipt {Map} The published session (its first window is the circle).
+; @param ScreenReaderFn {Func|Integer} Replaces A11ySystem_ScreenReaderOn (tests).
+; @param AnnounceFn {Func|Integer} Replaces A11ySystem_Announce (tests).
+; @returns {String} The text handed to the screen reader, "" when none was.
+_SpotlightAnnounce(Receipt, ScreenReaderFn := 0, AnnounceFn := 0) {
+	ReaderOn := IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn()
+	if !ReaderOn
+		return ""
+	Windows := (Receipt is Map) ? Receipt.Get("windows", []) : []
+	if !(Windows is Array) || Windows.Length == 0
+		return ""
+	Hwnd := Windows[1]
+	Text := t("accessibility.spotlight_shown")
+	Announce := IsObject(AnnounceFn) ? AnnounceFn : A11ySystem_Announce
+	SetTimer(() => Announce.Call(Hwnd, Text), -1)
+	return Text
 }

@@ -186,7 +186,7 @@ end
 --- Linux, "stdin" where the id comes from a command.
 --- @param pass_spec string An openssl `-pass` source.
 --- @param program string|nil The openssl to run, already a shell word; "openssl"
----   by default. Linux passes its private runtime's copy (infra/owned_programs.lua).
+---   by default. Linux passes its private runtime's copy (settings/engine/preferences/owned_programs.lua).
 --- @return string|nil command, string|nil reason
 function M.derive_key_command(pass_spec, program)
 	if type(pass_spec) ~= "string" or pass_spec == "" then

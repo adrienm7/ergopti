@@ -188,8 +188,8 @@ local function with_write_receipts(channel, refusal, body)
 	function logger.disable_repeat_collapsing() end
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
-	local previous_paths = package.loaded["infra.config_paths"]
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end,
+	local previous_paths = package.loaded["settings.engine.paths"]
+	package.loaded["settings.engine.paths"] = { get_logs_dir = function() return dir end,
 		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function() return 0 end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
@@ -211,8 +211,10 @@ local function with_write_receipts(channel, refusal, body)
 			end
 			return true
 		end
-		function file.write()
+		file.text = ""
+		function file.write(_, ...)
 			file.writes = file.writes + 1
+			file.text = file.text .. table.concat({ ... })
 			return receipt("write")
 		end
 		function file.flush()
@@ -231,7 +233,7 @@ local function with_write_receipts(channel, refusal, body)
 	Sink.uninstall(logger)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
-	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["settings.engine.paths"] = previous_paths
 	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
@@ -274,6 +276,33 @@ helpers.describe("linux-logger-write-receipts", function()
 			end)
 		end
 	end
+	-- LOG-05: a refused main file stayed retired until midnight, and the file
+	-- never said that lines were missing
+	helpers.it("linux-logger-write-receipts: a refused main channel reopens after the retry interval and counts what it missed", function()
+		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
+			local Monotonic = require("core.logger.engine.monotonic")
+			local interval = require("core.timing.engine.timings").ms("logger", "flush_interval_ms")
+			local real_now, clock = Monotonic.now_ms, 1000
+			Monotonic.now_ms = function() return clock end
+			local ok, err = pcall(function()
+				local failed = state.files.main
+				state.emit("2026-11-20 10:00:00:000 [INFO] [probe] first", "info")
+				state.emit("2026-11-20 10:00:00:100 [INFO] [probe] second", "info")
+				helpers.assert_true(state.files.main == failed, "inside the interval the refused channel stays retired")
+				state.failing = false
+				clock = clock + interval
+				state.emit("2026-11-20 10:00:01:000 [INFO] [probe] third", "info")
+				helpers.assert_true(state.files.main ~= failed, "the next line after the interval reopens the file")
+				helpers.assert_true(Sink.is_file_sink_active())
+				helpers.assert_eq(state.files.main.text,
+					"2026-11-20 10:00:01:000 [WARNING] [logger_sink] 2 lines were not written to the log file while it refused writes.\n"
+					.. "2026-11-20 10:00:01:000 [INFO] [probe] third\n")
+				helpers.assert_eq(#state.diagnostics, 1, "the refusal episode is reported once")
+			end)
+			Monotonic.now_ms = real_now
+			if not ok then error(err, 0) end
+		end)
+	end)
 	helpers.it("linux-logger-write-receipts: closed diagnostic output cannot retain a failed owner", function()
 		with_write_receipts("main", { stage = "flush" }, function(Sink, state)
 			state.diagnostics_unavailable = true
@@ -309,10 +338,10 @@ local function with_repoint_receipts(case, body)
 	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {}, diagnostics = {} }
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
-	local previous_paths = package.loaded["infra.config_paths"]
+	local previous_paths = package.loaded["settings.engine.paths"]
 	local logger = { set_sink = function(callback) state.emit = callback end,
 		enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end,
+	package.loaded["settings.engine.paths"] = { get_logs_dir = function() return state.target end,
 		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function()
 		if state.phase ~= "initial" and case.mode == "mkdir" then return false end
@@ -365,7 +394,7 @@ local function with_repoint_receipts(case, body)
 	Sink.uninstall(logger)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
-	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["settings.engine.paths"] = previous_paths
 	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
@@ -523,19 +552,24 @@ helpers.describe("logger sink — production wiring", function()
 	end)
 
 	helpers.it("the exit paths close every open streak before the last line", function()
-		-- Exit and crash are the last chance to emit a withheld count.
+		-- A boot failure, the clean exit and a crash are each the last chance
+		-- to emit a withheld count.
+		local boot_failed_at = entry:find('"Daemon boot failed before its main loop', 1, true)
 		local exiting_at = entry:find('Logger.info(LOG, "Daemon exiting.")', 1, true)
 		local crash_at = entry:find('pcall(Logger.error, LOG, "Daemon terminated by an unhandled error', 1, true)
+		helpers.assert_not_nil(boot_failed_at, "the boot-failure line was not found")
 		helpers.assert_not_nil(exiting_at, "the clean-exit line was not found")
 		helpers.assert_not_nil(crash_at, "the crash line was not found")
-		-- A direct call, or the guarded pcall form the crash path uses.
+		-- A direct call, or the guarded pcall form the boot guard and the crash path use.
 		local terminal_flush = "()Logger%.flush_repeats[%(,]%s*true%)"
 		local flushes = {}
 		for at in entry:gmatch(terminal_flush) do flushes[#flushes + 1] = at end
-		helpers.assert_eq(#flushes, 2, "the clean exit and the crash path each need one terminal flush")
-		helpers.assert_true(flushes[1] < exiting_at and exiting_at - flushes[1] < 200,
+		helpers.assert_eq(#flushes, 3, "the boot guard, the clean exit and the crash path each need one terminal flush")
+		helpers.assert_true(flushes[1] < boot_failed_at and boot_failed_at - flushes[1] < 200,
+			"the boot guard must flush right before its failure line")
+		helpers.assert_true(flushes[2] < exiting_at and exiting_at - flushes[2] < 200,
 			"the clean exit must flush right before its last line")
-		helpers.assert_true(flushes[2] < crash_at and crash_at - flushes[2] < 400,
+		helpers.assert_true(flushes[3] < crash_at and crash_at - flushes[3] < 400,
 			"the crash path must flush right before its fatal line")
 	end)
 end)
@@ -716,7 +750,7 @@ local function with_private_log_sink(options, body)
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
-	local names = { "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
+	local names = { "core.fs.engine.paths", "settings.engine.paths", "core.timing.engine.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
@@ -724,7 +758,7 @@ local function with_private_log_sink(options, body)
 	local logger = { enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
 	function logger.set_sink(callback) state.emit = callback end
 	local Sink = helpers.load_module("core.logger.engine.sink")
-	local DirectoryResolver = helpers.load_module("infra.config_paths")
+	local DirectoryResolver = helpers.load_module("settings.engine.paths")
 	state.account_home, state.directory_home = DirectoryResolver.account_home, DirectoryResolver.home
 	state.home_resolutions = 0
 	package.loaded["core.fs.engine.paths"] = {
@@ -735,7 +769,7 @@ local function with_private_log_sink(options, body)
 			return "/owned-shared"
 		end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_logs_dir = function() return "/home/PrivateUser/logs" end,
 		get_config_dir = function() return "/home/PrivateUser/.config/ergopti" end,
 		account_home = function()
@@ -971,149 +1005,77 @@ end)
 
 
 
--- =================================================================
--- =================================================================
--- ======= 3/ Topical sub-files, as on the other two drivers =======
--- =================================================================
--- =================================================================
+-- ==================================================================
+-- ==================================================================
+-- ======= 3/ One daily log, the retired sub-files removed ==========
+-- ==================================================================
+-- ==================================================================
 
-helpers.describe("linux-logger-topical-fan-out", function()
+helpers.describe("linux-logger-one-daily-log", function()
 	local IDENTITY = { home = "/home/fixture-user", user = "fixture-user" }
+	local RETIRED = require("core.fs.engine.app_dirs").files.retired_topical_logs
 
-	--- A private directory per case so a topical file left by an earlier case
-	--- cannot make a missing fan-out look like a pass.
-	local function topical_dir(name)
-		local dir = temp_dir() .. "/ergopti-topical-" .. name .. "-" .. tostring(os.time()) .. tostring(math.random(1e6))
+	--- A private directory per case so a file left by an earlier case cannot
+	--- make a missing deletion look like a pass.
+	local function private_dir(name)
+		local dir = temp_dir() .. "/ergopti-daily-" .. name .. "-" .. tostring(os.time()) .. tostring(math.random(1e6))
 		os.execute("mkdir -p '" .. dir .. "'")
 		return dir
 	end
 
-	local function remove_dir(dir)
-		os.execute("rm -rf '" .. dir .. "'")
+	local function write(path, text)
+		local handle = assert(io.open(path, "wb"))
+		handle:write(text)
+		handle:close()
 	end
 
-	local function with_sink(name, body)
+	local function with_sink(dir, body)
 		local Sink   = helpers.load_module("core.logger.engine.sink")
 		local Logger = helpers.load_module("core.logger.engine")
-		local dir    = topical_dir(name)
 		local ok, err = xpcall(function()
 			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
 			body(Sink, Logger, dir)
 		end, debug.traceback)
 		Sink.uninstall(Logger)
-		remove_dir(dir)
+		os.execute("rm -rf '" .. dir .. "'")
 		if not ok then error(err, 0) end
 	end
 
-	helpers.it("linux-logger-topical-fan-out: keystats, llm and hotstrings lines reach their own files", function()
-		with_sink("route", function(_, Logger, dir)
+	helpers.it("linux-logger-one-daily-log: a tagged line reaches the daily log and no topical file", function()
+		with_sink(private_dir("route"), function(_, Logger, dir)
+			Logger.info("hotstrings.engine.injector", "marker-hotstrings")
 			Logger.info("modules.keystats.keystats", "marker-keystats")
-			Logger.info("modules.llm.inference", "marker-llm")
-			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
-			Logger.info("sink_test", "marker-unrouted")
-			-- The keystats file name comes from the routing table, not a spelling here.
-			local keystats_file
-			for _, entry in ipairs(require("_generated.logger_sub_files")) do
-				for _, pattern in ipairs(entry.patterns) do
-					if keystats_file == nil and ("[modules.keystats.keystats]"):find(pattern, 1, true) then
-						keystats_file = entry.name
-					end
-				end
-			end
-			helpers.assert_not_nil(keystats_file, "a sub-file must route the keystats module")
-			local keystats = read_file(dir .. "/" .. keystats_file)
-			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
-			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
-			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
-			helpers.assert_contains(keystats, "marker-keystats")
-			helpers.assert_true(not keystats:find("marker%-llm"), "a topic file holds only its own lines")
-			helpers.assert_contains(llm, "marker-llm")
-			helpers.assert_contains(hotstrings, "marker-hotstrings")
+			Logger.info("ai.engine.local_servers.inference", "marker-llm")
 			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
-			helpers.assert_contains(main, "marker-unrouted", "the main log still receives every line")
-			for _, name in ipairs({ "keystats", "llm", "hotstrings" }) do
-				local topic = read_file(dir .. "/ErgoptiPlus_" .. name .. ".log")
-				helpers.assert_true(not topic:find("marker%-unrouted"), name .. " must not hold an unrouted line")
+			for _, marker in ipairs({ "marker-hotstrings", "marker-keystats", "marker-llm" }) do
+				helpers.assert_contains(main, marker, "the daily log receives every line")
+			end
+			for _, name in ipairs(RETIRED) do
+				helpers.assert_eq(read_file(dir .. "/" .. name), nil, name .. " must not be written any more")
 			end
 		end)
 	end)
 
-	helpers.it("linux-logger-topical-fan-out: macOS-only topics are never created", function()
-		with_sink("platform", function(_, Logger, dir)
-			Logger.info("karabiner", "marker-karabiner")
-			Logger.info("mlx", "marker-mlx")
-			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_karabiner.log"), nil)
-			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_mlx.log"), nil)
-		end)
-	end)
-
-	helpers.it("linux-logger-topical-fan-out: a topic file from an earlier day starts over, today's is appended", function()
-		local Sink   = helpers.load_module("core.logger.engine.sink")
-		local Logger = helpers.load_module("core.logger.engine")
-		local dir    = topical_dir("rotate")
-		local stale  = io.open(dir .. "/ErgoptiPlus_llm.log", "w")
-		stale:write("2000-01-01 10:00:00:000 [INFO] [modules.llm.inference] marker-yesterday\n")
-		stale:close()
-		local ok, err = xpcall(function()
-			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
-			Logger.info("modules.llm.inference", "marker-first-today")
-			Sink.uninstall(Logger)
-			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
-			Logger.info("modules.llm.inference", "marker-second-today")
-			local content = read_file(dir .. "/ErgoptiPlus_llm.log")
-			helpers.assert_true(not content:find("marker%-yesterday"), "an earlier day's lines must be dropped")
-			helpers.assert_contains(content, "marker-first-today")
-			helpers.assert_contains(content, "marker-second-today", "a restart on the same day appends")
-		end, debug.traceback)
-		Sink.uninstall(Logger)
-		remove_dir(dir)
-		if not ok then error(err, 0) end
-	end)
-
-	helpers.it("linux-logger-topical-fan-out: a refused topic handle is retired without silencing the main log", function()
-		with_sink("refuse", function(_, Logger, dir)
-			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_menu.log'")
-			Logger.info("ui.menu.builder", "marker-menu-refused")
-			Logger.info("modules.llm.inference", "marker-llm-after")
-			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
-			helpers.assert_contains(main, "marker-menu-refused")
-			helpers.assert_contains(read_file(dir .. "/ErgoptiPlus_llm.log"), "marker-llm-after")
-		end)
-	end)
-
-	helpers.it("linux-logger-topical-fan-out: closed stderr cannot block later topics", function()
-		with_sink("closed-stderr", function(_, Logger, dir)
-			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_gestures.log'")
-			local stderr = io.stderr
-			io.stderr = { write = function() error("attempt to use a closed file") end }
-			local ok, err = pcall(function()
-				Logger.info("modules.llm.inference", "gesture marker-both-topics")
-			end)
-			io.stderr = stderr
-			if not ok then error(err) end
-			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
-			helpers.assert_not_nil(llm, "a refused earlier topic must not starve the next")
-			helpers.assert_contains(llm, "marker-both-topics")
-		end)
-	end)
-
-	helpers.it("linux-logger-topical-fan-out: the generated table is exactly sub_files.toml's linux entries", function()
-		local raw = read_file(DRIVER_ROOT .. "/../_shared/core/logger/data/sub_files.toml")
-		helpers.assert_not_nil(raw, "the canonical routing file must be readable")
-		local expected = {}
-		local current
-		for line in raw:gmatch("[^\r\n]+") do
-			local name = line:match('^name%s*=%s*"([^"]*)"')
-			if name then current = name end
-			local platforms = line:match("^platforms%s*=%s*(%b[])")
-			if platforms and current and platforms:find('"linux"', 1, true) then
-				expected["ErgoptiPlus_" .. current .. ".log"] = true
+	helpers.it("linux-logger-one-daily-log: install deletes exactly the retired regular files", function()
+		local dir = private_dir("cleanup")
+		helpers.assert_true(#RETIRED == 13, "the thirteen retired topical names are declared")
+		for _, name in ipairs(RETIRED) do write(dir .. "/" .. name, "2000-01-01 10:00:00:000 [INFO] [x] old\n") end
+		local today = "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+		write(dir .. "/" .. today, "2000-01-01 10:00:00:000 [INFO] [x] kept\n")
+		write(dir .. "/ErgoptiPlus_notes.txt", "user notes\n")
+		-- A link named like a retired file is not a file the sweep owns.
+		os.remove(dir .. "/" .. RETIRED[1])
+		write(dir .. "/link-target.txt", "linked\n")
+		os.execute("ln -s '" .. dir .. "/link-target.txt' '" .. dir .. "/" .. RETIRED[1] .. "'")
+		with_sink(dir, function()
+			for index, name in ipairs(RETIRED) do
+				if index > 1 then helpers.assert_eq(read_file(dir .. "/" .. name), nil, name .. " must be deleted") end
 			end
-		end
-		local generated = {}
-		for _, sub in ipairs(require("_generated.logger_sub_files")) do generated[sub.name] = true end
-		helpers.assert_true(next(expected) ~= nil, "the canonical file must declare Linux topics")
-		helpers.assert_eq(generated, expected)
+			helpers.assert_eq(read_file(dir .. "/" .. RETIRED[1]), "linked\n", "a symlink is never followed nor removed")
+			helpers.assert_eq(read_file(dir .. "/link-target.txt"), "linked\n")
+			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_notes.txt"), "user notes\n", "a user file is kept")
+			helpers.assert_contains(read_file(dir .. "/" .. today), "kept", "today's daily log is kept")
+		end)
 	end)
 end)
 
@@ -1138,7 +1100,11 @@ helpers.describe("linux-bootstrap-log", function()
 			local content = read_file(dir .. "/" .. require("core.fs.engine.app_dirs").files.bootstrap_log)
 			helpers.assert_not_nil(content, "the pre-configuration log must exist")
 			helpers.assert_contains(content, "[ERROR] [bootstrap] Privacy initialization refused; daemon not started.")
-			helpers.assert_contains(content, "this start yielded")
+			-- A second start yielding to the live daemon is the single-owner rule
+			-- working, a WARNING as on Windows: the field log read it as a failure.
+			helpers.assert_contains(content, "[WARNING] [bootstrap] Another daemon owns the session lock; this start yielded.")
+			helpers.assert_eq(content:find("[ERROR] [bootstrap] Another daemon", 1, true), nil,
+				"a yielding second start is not an ERROR (linux-bootstrap-yield-severity)")
 			local lines = 0
 			for _ in content:gmatch("[^\n]+") do lines = lines + 1 end
 			helpers.assert_eq(lines, 2)
@@ -1155,7 +1121,7 @@ helpers.describe("linux-bootstrap-log", function()
 
 	helpers.it("linux-bootstrap-log: the entry point records each fatal that precedes the sink", function()
 		local entry = strip_comment_lines(read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua"))
-		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded" }) do
+		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded", "boot_failed" }) do
 			helpers.assert_contains(entry, '"' .. code .. '"', "the entry point must append " .. code)
 			helpers.assert_not_nil(Bootstrap.CODES[code], code .. " must be a declared code")
 		end

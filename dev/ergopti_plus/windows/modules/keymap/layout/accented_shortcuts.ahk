@@ -6,7 +6,8 @@
 ; Lets Ctrl/Alt/Win (+ Shift) on a key that types an accented letter directly
 ; act as the same chord on a configured Latin letter: Ctrl+é → Ctrl+C on an
 ; AZERTY, BÉPO or OS-installed Ergopti layout, whose accented keys would
-; otherwise send shortcuts no application binds.
+; otherwise send shortcuts no application binds. The key that types ★ directly
+; joins them (maintainer's decision of 2026-11-21): with « s », Ctrl+★ saves.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Layout-driven, not position-driven: the Ergopti emulation remaps fixed
@@ -25,12 +26,14 @@
 
 #Requires AutoHotkey v2.0
 
-; Feature id → accented letter. The feature ids are Features["shortcuts"][Id].
+; Feature id → the letter its key types directly. The feature ids are
+; Features["shortcuts"][Id]; "star" is the real ★, never the configured magic key.
 global ACCENTED_SHORTCUT_LETTERS := Map(
 	"e_grave", "è",
 	"e_circ", "ê",
 	"e_acute", "é",
-	"a_grave", "à"
+	"a_grave", "à",
+	"star", "★"
 )
 
 ; Every modifier chord remapped, AltGr (^!) deliberately excluded. The left-side
@@ -156,7 +159,19 @@ AccentedShortcutResolve(HotkeyName, Keys) {
 	Sc := Integer("0x" . Match[1])
 	if !Keys.Has(Sc)
 		return ""
+	if _AccentedShortcutYieldsToStarSlot(HotkeyName, Keys[Sc])
+		return ""
 	return AccentedShortcutTargetLetter(Keys[Sc])
+}
+
+; Win+★ belongs to the ★ key's slot (infra/star_slot.ahk) while it holds an
+; action: an assigned shortcut keeps its chord, as for every other key.
+_AccentedShortcutYieldsToStarSlot(HotkeyName, Id) {
+	global KeyboardShortcutAssignments
+	if Id != "star" || !InStr(SubStr(HotkeyName, 1, StrLen(HotkeyName) - 5), "#")
+		return false
+	return IsSet(KeyboardShortcutAssignments) && (KeyboardShortcutAssignments is Map)
+		&& KeyboardShortcutAssignments.Get(StarSlot()["id"], "none") != "none"
 }
 
 _AccentedShortcutIsActive(HotkeyName) {

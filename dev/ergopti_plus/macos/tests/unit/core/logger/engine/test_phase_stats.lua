@@ -20,7 +20,7 @@ package.loaded["core.logger.engine.logger"] = {
 	volume_interval = function() return { info = 3, dropped = 7 } end,
 	volume_text = function(counters) return "info=" .. counters.info .. " dropped=" .. counters.dropped end,
 	LEVELS = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
-	error = function() end, start = function() end, done = function() end,
+	error = function() end, start = function() end, success = function() end,
 }
 package.loaded["infra.phase_stats"] = nil
 local Stats = require("infra.phase_stats")

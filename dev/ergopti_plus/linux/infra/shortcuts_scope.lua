@@ -3,7 +3,7 @@
 --- Publishes one shortcut scope through existing preference and dispatch owners.
 local M = {}
 local PhysicalAvailability = require("shortcuts.engine.physical_availability")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
@@ -13,8 +13,8 @@ local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_busy = nil, nil, false
-require("infra.scope_registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
-require("infra.scope_registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
+require("settings.engine.scope.registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
 
 --- The script chords' rows of the Shortcuts scope: their section and the
 --- parameters of the bindings they dispatch under. Their submenu's restore and
@@ -83,11 +83,11 @@ function M.new(options)
 		"unknown shortcut scope narrowing")
 	local taps = options.taps or require("modules.shortcuts.tap_keys")
 	local chords = options.chords or require("modules.shortcuts.script_chords")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local url = options.url or require("modules.shortcuts.chatgpt")
 	local files = options.files or require("core.fs.adapters.file_system")
 	local manifest = options.manifest or Manifest
-	local pair_feature = manifest.find_entry_by_path("category_enabled.key_combinations")
+	local pair_feature = manifest.find_entry_by_path(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	local admitted_pairs = options.combinations ~= nil or (type(pair_feature) == "table"
 		and pair_feature.type == "boolean" and pair_feature.default == true)
 	local combinations = admitted_pairs and (options.combinations or require("modules.shortcuts.key_combinations")) or nil
@@ -215,7 +215,7 @@ function M.new(options)
 		return nil
 	end
 	local editor_inventory = require("shortcuts.engine.physical_editor_inventory").new({
-		path = options.path, current_path = options.current_path or function() return require("infra.config_paths").config("config.toml") end,
+		path = options.path, current_path = options.current_path or function() return require("settings.engine.paths").config("config.toml") end,
 		read = function(path) return Writer.read_classified(path, files) end,
 		keyboard = keyboard, parameters = parameters, recognizes = domain,
 	})
@@ -553,7 +553,7 @@ function M.apply(mode, only)
 	if mode ~= "clear" and mode ~= "recommended" then return false end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path, backup_path = path .. ".shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		only = only })
 	Logger.start(LOG, "Shortcut preference scope %s started.", mode)
@@ -570,10 +570,10 @@ function M.editor_owner()
 	_editor_busy = true
 	local called, result = pcall(function()
 		-- A pause does not keep the editor closed (EDD-1, 2026-11-12).
-		local path = require("infra.config_paths").config("config.toml")
+		local path = require("settings.engine.paths").config("config.toml")
 		if type(path) ~= "string" or path == "" then return nil end
 		if _editor_owner and _editor_owner.pending() and _editor_owner.retry_restore() ~= true then return nil end
-		if require("infra.config_paths").config("config.toml") ~= path then return nil end
+		if require("settings.engine.paths").config("config.toml") ~= path then return nil end
 		if _editor_owner and _editor_path ~= path then
 			_editor_owner.release()
 			_editor_owner, _editor_path = nil, nil
@@ -582,7 +582,7 @@ function M.editor_owner()
 			_sequence = _sequence + 1
 			local owner = M.new({ path = path,
 				backup_path = path .. ".physical-shortcuts-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
-			if require("infra.config_paths").config("config.toml") ~= path then
+			if require("settings.engine.paths").config("config.toml") ~= path then
 				owner.release()
 				return nil
 			end

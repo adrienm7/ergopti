@@ -11,7 +11,10 @@
 --- runs once per install: resetting at every reload erased the entry the user
 --- had just added (field report 2026-11-05). When another copy signed
 --- differently is registered, its switch can be the one the user turned on:
---- the entry is then left alone and a dialog names those copies.
+--- the entry is then left alone and the steps name those copies. The steps
+--- that add and turn on the app are shown in every case: macOS's prompt
+--- alone left a first-time user turning on the wrong entry, and reloading a
+--- runtime they did not know about (field report 2026-11-23).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -51,9 +54,9 @@ local function harness(overrides)
 			h.reopen = on_reopen
 			return function() event("unwatch") end
 		end,
-		name_other_copies = function(paths)
-			event("name:" .. table.concat(paths, ","))
-			return function() event("close_copies") end
+		show_guide = function(copies)
+			event("guide:" .. table.concat(copies, ","))
+			return function() event("close_guide") end
 		end,
 		on_trusted = function() event("trusted") end,
 		on_timeout = function(elapsed) event("timeout:" .. tostring(elapsed)) end,
@@ -74,7 +77,43 @@ local function harness(overrides)
 	return h
 end
 
+--- Counts the events that start with a prefix.
+--- @param h table Harness.
+--- @param prefix string Event prefix.
+--- @return integer count
+local function count_prefix(h, prefix)
+	local count = 0
+	for _, e in ipairs(h.events) do if e:sub(1, #prefix) == prefix then count = count + 1 end end
+	return count
+end
+
 helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
+	helpers.it("shows the steps for a lone copy after the prompt, and closes them on the grant", function()
+		local h = harness()
+		h.wait.start(h.opts)
+		helpers.assert_nil(h.index("guide:"), "no steps while the stale entry is still being reset")
+		h.reset_done(true)
+		helpers.assert_true(h.index("guide:") ~= nil and h.index("settings") < h.index("guide:"),
+			"a first-time user needs the steps, not only macOS's prompt: " .. table.concat(h.events, ","))
+		h.reopen()
+		helpers.assert_eq(count_prefix(h, "guide:"), 2, "reopening ErgoptiPlus shows the steps again")
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("close_guide") ~= nil and h.index("close_guide") < h.index("trusted"),
+			"the steps close before the boot resumes")
+	end)
+
+	helpers.it("a reopen before the copy probe answers leaves the steps to its answer", function()
+		local h = harness()
+		h.copies_pending = true
+		h.wait.start(h.opts)
+		h.reopen()
+		helpers.assert_eq(count_prefix(h, "guide:"), 0, "the steps wait for the copies they may name")
+		h.copies_done({})
+		h.reset_done(true)
+		helpers.assert_eq(count_prefix(h, "guide:"), 1)
+	end)
+
 	helpers.it("resets the stale entry before prompting and opening the pane", function()
 		local h = harness()
 		helpers.assert_eq(h.wait.start(h.opts), true)
@@ -92,6 +131,21 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_eq(h.wait.start(h.opts), true)
 		helpers.assert_eq(h.reset_done, nil, "the entry the user just added must not be reset again")
 		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil, table.concat(h.events, ","))
+	end)
+
+	-- Every boot after an install's first left the reset pending forever, so the
+	-- grant was ignored until the deadline and the user had to reload again
+	-- (field report 2026-11-23, accessibility-wait-resumes-after-reload).
+	helpers.it("a reload of the same install resumes the boot as soon as trust arrives", function()
+		local h = harness()
+		h.remembered = "0.0.0-dev.162:16777230:4242"
+		helpers.assert_eq(h.wait.start(h.opts), true)
+		h.ticks()
+		helpers.assert_nil(h.index("trusted"), "no resume while untrusted")
+		h.trusted = true
+		h.ticks()
+		helpers.assert_true(h.index("trusted") ~= nil, "the grant must resume the boot without another reload")
+		helpers.assert_nil(h.index("timeout:3"), table.concat(h.events, ","))
 	end)
 
 	helpers.it("a new install resets once more", function()
@@ -220,15 +274,13 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_eq(h.reset_done, nil, "resetting erased the switch the other copy holds, at every reload")
 		helpers.assert_eq(h.remembered, nil)
 		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil, table.concat(h.events, ","))
-		helpers.assert_true(h.index("name:/Applications/ErgoptiPlus.app,/Users/me/build/macos/ErgoptiPlus.app") ~= nil,
+		helpers.assert_true(h.index("guide:/Applications/ErgoptiPlus.app,/Users/me/build/macos/ErgoptiPlus.app") ~= nil,
 			table.concat(h.events, ","))
 		h.reopen()
-		local named = 0
-		for _, e in ipairs(h.events) do if e:sub(1, 5) == "name:" then named = named + 1 end end
-		helpers.assert_eq(named, 2, "reopening ErgoptiPlus shows the copies again")
+		helpers.assert_eq(count_prefix(h, "guide:/"), 2, "reopening ErgoptiPlus shows the copies again")
 		h.trusted = true
 		h.ticks()
-		helpers.assert_true(h.index("close_copies") ~= nil and h.index("close_copies") < h.index("trusted"),
+		helpers.assert_true(h.index("close_guide") ~= nil and h.index("close_guide") < h.index("trusted"),
 			"the dialog closes before the boot resumes")
 	end)
 
@@ -245,14 +297,14 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 			helpers.assert_true(h.reset_done ~= nil, refusal .. ": a lone copy still needs its stale entry cleared")
 			h.reset_done(true)
 			helpers.assert_true(h.index("prompt") ~= nil)
-			helpers.assert_nil(h.index("name:"), "nothing to name")
+			helpers.assert_true(h.index("guide:") ~= nil, refusal .. ": the steps name no copy")
 		end
 	end)
 
 	helpers.it("a dialog that raises costs only the paths", function()
 		local h = harness()
 		h.copies_pending = true
-		h.opts.name_other_copies = function() error("WebKit unavailable") end
+		h.opts.show_guide = function() error("WebKit unavailable") end
 		h.wait.start(h.opts)
 		h.copies_done({ "/Applications/ErgoptiPlus.app" })
 		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil)

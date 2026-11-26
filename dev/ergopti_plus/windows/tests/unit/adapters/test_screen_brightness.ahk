@@ -81,12 +81,13 @@ _SBT_Owned(Action, Body, Configure := 0, ExpectedStart := true) {
 }
 
 _SBT_Terminal(Fake, Observed, Notices) {
-	AssertEqual("powershell.exe", Fake.executable)
+	AssertEqual(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe", Fake.executable,
+		"the worker starts by its absolute path (system-program-absolute-path)")
 	AssertEqual("brightness_up", Fake.args[Fake.args.Length])
-	AssertEqual("-ExecutionPolicy", Fake.args[5])
-	AssertEqual("Bypass", Fake.args[6], "only the owned process receives the native worker policy")
-	AssertEqual("-File", Fake.args[7])
-	AssertTrue(InStr(Fake.args[8], "\ergopti_brightness_worker.ps1") > 0,
+	; No hidden window style: the tree-owned spawn has no console window at all.
+	for Index, Expected in ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-File"]
+		AssertEqual(Expected, Fake.args[Index], "worker argument " . Index)
+	AssertTrue(InStr(Fake.args[6], "\ergopti_brightness_worker.ps1") > 0,
 		"the real worker, rather than an unsupported Send key, owns the effect")
 	AssertEqual(8192, Fake.max_output, "native output is bounded")
 	AssertEqual(0, Observed.Length, "acquisition is not target acknowledgement")
@@ -407,7 +408,7 @@ Test("screen brightness: closed diagnostic refuses malformed private observation
 
 _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 		ExpectedStage := "readback", ExpectedPolicyType := "object") {
-	global _DriverDir, _SharedDir, _VendorDir
+	global _DriverDir, _SharedDir, _VendorDir, TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Observed := [], Control := Map(), Polls := 0
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-File", _DriverDir . "\tests\fixtures\screen_brightness_provider.ps1",
@@ -428,7 +429,7 @@ _SBT_NativeProvider(Mode, ExpectedStatus, ExpectedExit, ExpectedCalls := 1,
 	try {
 		AssertTrue(Handle.start(), "the native owned child must really start")
 		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired(Started, 5000) {
+		while Observed.Length == 0 && !TickExpired(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS) {
 			Polls++
 			_SR_TreePoll()
 			Sleep(10)

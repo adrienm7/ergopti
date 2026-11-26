@@ -3,7 +3,7 @@
 --- Real writer, preference checkpoint and global writer fence for picker fixtures.
 local helpers = require("tests.helpers")
 local Writer = require("core.text.engine.toml_codec.writer")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Assignment = require("shortcuts.engine.assignment")
 
 return function(gestures, state, kind, read_action, save_attempt, controls)
@@ -52,15 +52,15 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		return files_port.write_if_unchanged(path, value, { status = status, content = content })
 	end
 	package.loaded["core.fs.adapters.file_system"] = files_port
-	package.loaded["infra.preferences"] = nil
-	local preferences = require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	local preferences = require("settings.engine.preferences.preferences")
 	preferences.load("config")
 	local previous_get_actions = gestures.get_all_actions
 	gestures.get_all_actions = function()
 		if kind == "gesture" then return { tap_3 = read_action() } end
 		return previous_get_actions and previous_get_actions() or {}
 	end
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = { gestures = gestures },
 		initial_state = state, initial_preferences = preferences.snapshot(state, {}, { gestures = gestures }),
 		restore_runtime = noop,
@@ -71,7 +71,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		end,
 		snapshot_view = controls.snapshot_view,
 	})
-	local global = require("ui.menu.global_actions_transaction").create({
+	local global = require("menu.ui.transactions.global_actions_transaction").create({
 		state = state, capture_preferences = function() return {} end, sync_runtime = noop,
 		restore_state = noop,
 		settings = { get = function() end, set = noop, get_keys = function() return {} end },
@@ -84,13 +84,13 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		request_reload = noop, terminal_pending = function() return false end,
 	})
 	assert(global, "real global writer fixture unavailable")
-	package.loaded["ui.menu.program_parameter_transaction"] = nil
-	local owner = require("ui.menu.program_parameter_transaction").new({
+	package.loaded["menu.ui.transactions.program_parameter_transaction"] = nil
+	local owner = require("menu.ui.transactions.program_parameter_transaction").new({
 		path = "config", files = files_port, gestures = gestures, preferences = preferences, checkpoint = checkpoint,
 		paused = function() return false end, admission = global.run_exclusive,
 		current_path = function() return controls.current_path or "config" end,
 		capture_checkpoint_candidate = function()
-			return { state = require("ui.menu.preferences_transaction").clone(state),
+			return { state = require("settings.ui.menu.preferences_transaction").clone(state),
 				preferences = preferences.snapshot(state, {}, { gestures = gestures }) }
 		end,
 		save_prefs = function(on_error)

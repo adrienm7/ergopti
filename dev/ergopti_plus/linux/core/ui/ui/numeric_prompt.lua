@@ -21,9 +21,12 @@
 --- 2. One request at a time, and opening a second replaces the first. Two
 ---    prompts sharing one bridge would deliver the second answer to the first
 ---    caller, which is worse than refusing to open.
---- 3. The bounds are checked HERE as well as in the page. The page is the
----    convenience; this is the guarantee, because a bridge is reachable by
----    anything that can post to it.
+--- 3. The typed text is read HERE, by the shared value check (parse_entry), with
+---    the declaration of the setting the caller names: the grammar, the range,
+---    the whole-number rule and the refusal text are the ones macOS and Windows
+---    apply, replayed from value_check_vectors.json by the three suites. The page
+---    only sends what was typed, so a bridge reachable by anything that can post
+---    to it cannot hand the setter a value its declaration forbids.
 --- ==============================================================================
 
 local M = {}
@@ -31,7 +34,8 @@ M.bridge_name = "numeric_prompt_bridge"
 
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
-local NumberPolicy = require("core.text.engine.number_policy")
+local ValueCheck = require("settings.engine.value_check")
+local I18n = require("core.i18n.engine.i18n")
 local LOG = "bridge.numeric_prompt"
 local APP_NAME = "numeric_prompt"
 
@@ -44,8 +48,7 @@ local function public_request(pending)
 		title = pending.title,
 		hint = pending.hint,
 		value = pending.value,
-		min = pending.min,
-		max = pending.max,
+		range = pending.range,
 		request_epoch = pending.request_epoch,
 	}
 end
@@ -83,6 +86,19 @@ local function push_request(pending)
 	return ok_push and pushed == true and current(pending)
 end
 
+--- Shows why the typed text was refused, under the field of the same page.
+--- @param pending table Exact request.
+--- @param message string Localized refusal.
+--- @return boolean shown
+local function show_refusal(pending, message)
+	if not current(pending) then return false end
+	local ok_json, encoded = pcall(Json.encode, message)
+	if not ok_json or type(encoded) ~= "string" then return false end
+	local ok_push, pushed = pcall(pending.webview.eval_js, APP_NAME,
+		"if(window.show_refusal) window.show_refusal(" .. encoded .. ")")
+	return ok_push and pushed == true and current(pending)
+end
+
 local function hide_prompt(pending)
 	if not retained(pending) then return false end
 	local manager = pending.webview
@@ -104,7 +120,8 @@ end
 
 --- Opens the window for one value.
 ---
---- @param request table { title, hint?, value, min, max, on_save = function(number) }
+--- @param request table { title, hint?, key, value, on_save = function(number, page_current) }:
+---   key names the setting's value schema declaration, value is the one in force.
 --- @param webview table The webview manager, so this module opens nothing itself.
 --- @return boolean Whether the window was opened.
 function M.ask(request, webview)
@@ -112,11 +129,15 @@ function M.ask(request, webview)
 		Logger.error(LOG, "ask(): a request with an on_save callback is required.")
 		return false
 	end
-	if not NumberPolicy.is_finite(request.value) or not NumberPolicy.is_finite(request.min)
-		or not NumberPolicy.is_finite(request.max) or request.min > request.max
-		or request.value < request.min or request.value > request.max then
-		Logger.error(LOG, "ask(): a range is required — an unbounded numeric field "
-			.. "accepts anything and the caller then has to reject it after the fact.")
+	local known, entry = pcall(ValueCheck.declaration, request.key)
+	if not known or (entry.type ~= "integer" and entry.type ~= "decimal") or entry.entry_scale ~= nil then
+		Logger.error(LOG, "ask(): '%s' is not a declared number typed in its stored unit — "
+			.. "an undeclared field accepts anything and the caller then has to reject it after the fact.",
+			tostring(request.key))
+		return false
+	end
+	if not ValueCheck.check_value(entry, request.value).ok then
+		Logger.error(LOG, "ask(): the value in force for '%s' is outside its declaration.", request.key)
 		return false
 	end
 	if not webview or type(webview.show) ~= "function" or type(webview.eval_js) ~= "function"
@@ -134,8 +155,14 @@ function M.ask(request, webview)
 		title = request.title or "",
 		hint = request.hint or "",
 		value = request.value,
-		min = request.min,
-		max = request.max,
+		key = request.key,
+		entry = entry,
+		-- A blank answer saves the setting's default when the caller names one
+		-- (maintainer decision PCK-13, 2026-11-21, as on Windows and macOS).
+		default = request.default,
+		-- What the setting accepts, in the words of a refusal
+		range = ValueCheck.render_message(ValueCheck.message_parts(entry, ValueCheck.parse_entry(entry, "")),
+			I18n.get),
 		on_save = request.on_save,
 		webview = webview,
 		request_epoch = _next_request_epoch,
@@ -235,16 +262,16 @@ function M.on_message(payload, _state)
 			return { saved = true, closed = closed }
 		end
 		if not current(request) then return { saved = false, stale = true } end
-		local value = payload.value
-		-- Checked here as well as in the page. The page is the convenience; this
-		-- is the guarantee, because a bridge is reachable by anything that can
-		-- post to it and the caller's setter should never see a value its own
-		-- range forbids.
-		if not NumberPolicy.is_finite(value) or value < request.min or value > request.max then
-			Logger.error(LOG, "Prompt returned %s, outside %s..%s — refused.",
-				tostring(payload.value), tostring(request.min), tostring(request.max))
-			return { saved = false }
+		-- The page sends what was typed; the shared check reads it, so the
+		-- caller's setter never sees a value its declaration forbids.
+		local parsed = ValueCheck.parse_entry(request.entry, payload.text, request.default)
+		if not parsed.ok then
+			Logger.warn(LOG, "Prompt entry for %s refused (%s).", request.key, parsed.reason)
+			local shown = show_refusal(request, ValueCheck.render_message(
+				ValueCheck.message_parts(request.entry, parsed), I18n.get))
+			return { saved = false, refused = parsed.reason, shown = shown }
 		end
+		local value = parsed.value
 
 		request.saving = true
 		local ok, accepted = pcall(request.on_save, value, function() return current(request) end)

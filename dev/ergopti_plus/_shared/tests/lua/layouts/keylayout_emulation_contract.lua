@@ -67,7 +67,6 @@ function M.register(helpers, shared)
 		Emulation.configure(live, {
 			base = pick(overrides.base, true), alt_gr = pick(overrides.alt_gr, true), layout = layout,
 			number_row = overrides.number_row or "native", edges = overrides.edges == true,
-			magic_code = overrides.magic_key and by_scan[overrides.magic_key] or nil,
 		})
 		return live
 	end
@@ -182,14 +181,14 @@ function M.register(helpers, shared)
 
 		helpers.it("reads the [layout] settings the way Windows selects the layout", function()
 			local Settings = require("layouts.engine.emulation.settings")
-			local default_for = require("infra.manifest_reader").default_for
+			local default_for = require("menu.engine.manifest_reader").default_for
 			local reported = {}
 			local function report(segments) reported[#reported + 1] = table.concat(segments, ".") end
 			local empty = Settings.resolve({}, default_for, report)
 			helpers.assert_true(not Settings.active(empty), "an empty configuration emulates nothing")
-			local builtin = Settings.resolve({ layout = { ergopti_base = true } }, default_for, report)
-			helpers.assert_eq(builtin.id, "ergopti", "the built-in variant none types Ergopti")
-			local plus = Settings.resolve({ layout = { ergopti_base = true, ergopti_variant = "ergopti_plus" } },
+			local builtin = Settings.resolve({ layout = { ergopti_variant = "ergopti" } }, default_for, report)
+			helpers.assert_eq(builtin.id, "ergopti", "the ergopti variant types Ergopti")
+			local plus = Settings.resolve({ layout = { ergopti_variant = "ergopti_plus" } },
 				default_for, report)
 			helpers.assert_eq(plus.id, "ergopti_plus", "the plus variant")
 			local registry = Settings.resolve({ layout = { emulated_layout = "bepo", ergopti_variant = "ergopti_plus",
@@ -205,20 +204,53 @@ function M.register(helpers, shared)
 			helpers.assert_eq(Settings.choice_values("ergopti_plus")["layout.ergopti_variant"], "ergopti_plus",
 				"a built-in choice writes the variant")
 			helpers.assert_eq(Settings.choice_values("bepo")["layout.emulated_layout"], "bepo", "a registry choice")
-			helpers.assert_eq(Settings.choice_values("none")["layout.ergopti_base"], false, "none clears the base layer")
 			helpers.assert_nil(Settings.choice_values("Not An Id"), "an invalid choice")
+		end)
+
+		-- The four layers (base and Shift, AltGr and Shift+AltGr) are on by
+		-- default and the selection is their one gate (maintainer decision of
+		-- 2026-11-23): AltGr was off by default, so choosing a layout emulated its
+		-- base and Shift layers only (layout-selection-is-the-gate).
+		helpers.it("gates the four on-by-default layers on the layout selection alone (layout-selection-is-the-gate)", function()
+			local Settings = require("layouts.engine.emulation.settings")
+			local default_for = require("menu.engine.manifest_reader").default_for
+			local fresh = Settings.resolve({}, default_for)
+			helpers.assert_eq({ fresh.base, fresh.alt_gr }, { true, true }, "the four layers are on by default")
+			helpers.assert_nil(fresh.id, "« None » is the default selection")
+			helpers.assert_true(not Settings.active(fresh), "a fresh configuration emulates nothing")
+			local none = Settings.resolve({ layout = { ergopti_base = true, ergopti_alt_gr = true,
+				ergopti_variant = "none" } }, default_for)
+			helpers.assert_true(not Settings.active(none), "under « None » the layer switches do nothing")
+			for _, choice in ipairs({ "ergopti", "ergopti_plus", "bepo" }) do
+				local values = Settings.choice_values(choice)
+				helpers.assert_nil(values["layout.ergopti_base"], choice .. " writes no base switch")
+				helpers.assert_nil(values["layout.ergopti_alt_gr"], choice .. " writes no AltGr switch")
+				local layout = {}
+				for path, value in pairs(values) do layout[path:match("^layout%.(.+)$")] = value end
+				local chosen = Settings.resolve({ layout = layout }, default_for)
+				helpers.assert_true(Settings.active(chosen), choice .. " is emulated")
+				helpers.assert_eq({ chosen.base, chosen.alt_gr }, { true, true }, choice .. " emulates its four layers")
+			end
+			local none_values = Settings.choice_values("none")
+			helpers.assert_nil(none_values["layout.ergopti_base"], "none writes no layer switch")
+			helpers.assert_eq(none_values["layout.ergopti_variant"], "none", "none is the selection alone")
+			local no_alt_gr = Settings.resolve({ layout = { ergopti_variant = "ergopti", ergopti_alt_gr = false } },
+				default_for)
+			helpers.assert_eq({ no_alt_gr.base, no_alt_gr.alt_gr }, { true, false }, "an unticked layer alone is off")
+			helpers.assert_true(Settings.active(no_alt_gr), "the other layers stay emulated")
 		end)
 
 		helpers.it("lists the emulation choices with the current one ticked", function()
 			local Settings = require("layouts.engine.emulation.settings")
 			local Menu = require("layouts.engine.emulation.menu")
-			local default_for = require("infra.manifest_reader").default_for
+			local default_for = require("menu.engine.manifest_reader").default_for
 			local chosen
 			local function rows_for(layout, status)
 				return Menu.choice_rows({ t = function(key) return key end,
 					settings = Settings.resolve({ layout = layout }, default_for),
 					status = status or { active = true }, snapshot = index_snapshot(),
-					choose = function(choice) chosen = choice end })
+					choose = function(choice) chosen = choice end, open_picker = function() chosen = "others" end,
+					others_rows = function(open) return require("menu.engine.manifest_menu").template_rows("layout_emulation_others_commands", { layout_emulation_others = open }, {}, {}) end })
 			end
 			local rows = rows_for({ emulated_layout = "bepo", ergopti_base = true })
 			helpers.assert_eq(#rows, 1, "one submenu")
@@ -231,8 +263,21 @@ function M.register(helpers, shared)
 			helpers.assert_eq(labels[1], "onboarding.layout.emulated_none", "none comes first")
 			rows[1].items[1].action()
 			helpers.assert_eq(chosen, "none", "a row chooses its value")
+			-- The quick choices end on « Others… », the picker of every layout
+			-- (maintainer decision of 2026-11-25).
+			local items = rows[1].items
+			helpers.assert_true(items[#items - 1].separator == true, "a separator closes the group")
+			helpers.assert_eq(items[#items].label, require("core.i18n.engine.i18n").get("menu.layout.emulation_others"))
+			items[#items].action()
+			helpers.assert_eq(chosen, "others", "« Others… » opens the picker")
+			local recents = Settings.choice_values("ergol", { "bepo", "ergol" })["layout.emulated_layout_recents"]
+			helpers.assert_eq(recents, { "ergol", "bepo" }, "a choice leads the recent layouts")
+			helpers.assert_nil(Settings.choice_values("none", { "bepo" })["layout.emulated_layout_recents"],
+				"None is never recorded")
 			local off = rows_for({})
 			helpers.assert_true(off[1].items[1].checked, "nothing emulated ticks none")
+			local layers_on = rows_for({ ergopti_base = true, ergopti_alt_gr = true, ergopti_variant = "none" })
+			helpers.assert_true(layers_on[1].items[1].checked, "the selection alone ticks none, whatever the layers")
 			local failed = rows_for({ emulated_layout = "missing", ergopti_base = true }, { error = "unreadable" })
 			helpers.assert_true(failed[1].label:find("menu.layout.emulation_failed", 1, true) ~= nil,
 				"a layout that cannot be emulated says so")

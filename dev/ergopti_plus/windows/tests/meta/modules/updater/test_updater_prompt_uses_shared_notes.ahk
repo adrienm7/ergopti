@@ -34,8 +34,13 @@ _UPSN_PromptLoadsTheSharedPage() {
 		"the prompt, its notes navigator and the page URL helper must exist")
 	Assert(InStr(Prompt, "_Updater_NavigateReleaseNotes(WVC, Release)") > 0,
 		"the WebView2 notes pane must load the shared release-notes page")
-	Assert(InStr(Prompt, "_Updater_ReleaseNotesToPlain(Release.Body)") > 0,
-		"the native notes fallback must show the plain-text changelog section")
+	; No plain-text notes pane stands in for the page any more (2026-11-21).
+	Assert(InStr(Prompt, 'WebView_RequireAvailable("update prompt")') > 0,
+		"the prompt must ask the shared admission before building its window")
+	Assert(InStr(Prompt, 'WebView_RefuseUnavailable("update prompt", Err.Message)') > 0,
+		"a failed notes pane must refuse with the shared message")
+	AssertEqual(0, InStr(Prompt, '"Edit"'), "the prompt must not build a native notes Edit")
+	AssertEqual("", _DriverFuncBodyOrEmpty("_Updater_ReleaseNotesToPlain"), "the plain-text notes converter must not come back")
 	Assert(InStr(Navigate, "SetVirtualHostNameToFolderMapping(") > 0
 		&& InStr(Navigate, "_Updater_ReleaseNotesSeed(") > 0
 		&& InStr(Navigate, "WebMessageReceived(") > 0,

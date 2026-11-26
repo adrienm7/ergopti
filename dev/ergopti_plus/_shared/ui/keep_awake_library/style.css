@@ -1,0 +1,232 @@
+/* _shared/ui/keep_awake_library/style.css */
+
+/* =========================================================================== */
+/* Anti-Sleep Library Window Styles.                                           */
+/*                                                                             */
+/* The preset list beside the preset editor, theme tokens only so the light   */
+/* and dark palettes of theme.css apply, and every control at least 44 px     */
+/* tall (WCAG 2.5.5).                                                          */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: var(--theme-bg);
+	color: var(--theme-text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+	margin: 0;
+}
+
+main {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 16px 20px 14px;
+}
+
+h1 {
+	color: var(--theme-text);
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 2px;
+}
+
+h2 {
+	color: var(--theme-text);
+	font-size: 14px;
+	margin: 8px 0;
+}
+
+h3 {
+	color: var(--theme-text);
+	font-size: 13px;
+	margin: 12px 0 4px;
+}
+
+.subtitle,
+.hint {
+	color: var(--theme-sub);
+	font-size: 12px;
+	margin: 0 0 8px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 2/ Layout ============== */
+/* ================================ */
+/* ================================ */
+
+.layout {
+	display: flex;
+	flex: 1;
+	gap: 16px;
+	min-height: 0;
+}
+
+.list-pane {
+	flex: 0 0 240px;
+	overflow-y: auto;
+}
+
+.editor-pane {
+	flex: 1;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+.toolbar,
+.row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 4px 0 8px;
+}
+
+.preset-list,
+.targets {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.preset {
+	margin: 0 0 4px;
+	text-align: start;
+	width: 100%;
+}
+
+.preset[aria-pressed='true'] {
+	background: var(--theme-accent-soft);
+	border-color: var(--theme-accent);
+	font-weight: 600;
+}
+
+.field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+	margin: 4px 0;
+}
+
+.group {
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	margin: 8px 0;
+	padding: 6px 10px 8px;
+}
+
+.check,
+.number {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+	margin-inline-end: 12px;
+	min-height: 44px;
+}
+
+.target {
+	align-items: center;
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 4px 0;
+	padding: 4px 8px;
+}
+
+.target img {
+	border: 1px solid var(--theme-separator);
+	max-height: 44px;
+	max-width: 120px;
+}
+
+.variants {
+	flex: 1;
+	min-width: 160px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Controls ============ */
+/* ================================ */
+/* ================================ */
+
+button,
+input,
+textarea {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	color: var(--theme-text);
+	font: inherit;
+	min-height: 44px;
+	padding: 6px 12px;
+}
+
+input[type='checkbox'] {
+	height: 22px;
+	min-height: 22px;
+	width: 22px;
+}
+
+input[type='text'] {
+	flex: 1;
+	min-width: 180px;
+}
+
+textarea {
+	width: 100%;
+}
+
+input[type='number'] {
+	width: 110px;
+}
+
+button {
+	cursor: pointer;
+	min-width: 44px;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+
+:focus-visible {
+	outline: 3px solid var(--theme-accent);
+	outline-offset: 2px;
+}
+
+.status {
+	margin: 8px 0 0;
+	min-height: 20px;
+}
+
+.status.error {
+	color: var(--theme-bad-text);
+}
+
+.btns {
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 8px;
+}

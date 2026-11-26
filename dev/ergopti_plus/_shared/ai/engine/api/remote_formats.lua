@@ -37,11 +37,13 @@
 ---    may carry a null `error` beside a good answer, so the generic error rule
 ---    does not apply to it, and a tool's item may stand before the message.
 ---
---- The AutoHotkey port is windows/modules/llm/remote_formats.ahk. Both are
+--- The AutoHotkey port is windows/ai/engine/api/remote_formats.ahk. Both are
 --- pinned by _shared/tests/corpus/llm/remote_formats_vectors.json.
 --- ==============================================================================
 
 local M = {}
+
+local Identifiers = require("core.text.engine.identifiers")
 
 
 
@@ -56,8 +58,8 @@ local M = {}
 -- Header carrying a Backboard key
 M.BACKBOARD_KEY_HEADER = "X-API-Key"
 
--- Name of the one assistant the driver creates per key
-M.BACKBOARD_ASSISTANT_NAME = "Ergopti+"
+-- Name of the one assistant the driver creates per key: the product name
+M.BACKBOARD_ASSISTANT_NAME = Identifiers.app.display_name
 
 --- Splits a Backboard model id into the provider and the model it names.
 --- @param model string "<llm_provider>/<model_name>".

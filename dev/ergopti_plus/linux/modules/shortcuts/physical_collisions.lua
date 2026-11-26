@@ -1,6 +1,6 @@
 --- modules/shortcuts/physical_collisions.lua
 
---- Joins four captured Linux claim families and configured Magic Key/wrap-symbol/prediction consumers to the original physical-chord source.
+--- Joins four captured Linux claim families and configured wrap-symbol/prediction consumers to the original physical-chord source.
 --- This preflight is partial; it never publishes all-owner or output readiness.
 local Policy = require("shortcuts.engine.physical_conflicts")
 local ConfigKeys = require("settings.engine.keys")
@@ -9,19 +9,18 @@ local conflicts = Policy.conflicts
 
 --- Binds original owner ports; validation acquires no input/output or file lease.
 function M.new(keyboard, taps, combinations, manager, capture)
-	local magic = require("modules.hotstrings.magic_key_source")
 	local wrapping = require("modules.shortcuts.manager")
-	local prediction = require("modules.llm.prediction_engine")
-	local owners = { [1] = keyboard, [2] = taps, [3] = combinations, [4] = manager, [5] = magic, [6] = wrapping, [7] = prediction }
+	local prediction = require("ai.engine.prediction.engine")
+	local owners = { [1] = keyboard, [2] = taps, [3] = combinations, [4] = manager, [5] = wrapping, [6] = prediction }
 	local methods = {}
-	for index = 1, 7 do
+	for index = 1, 6 do
 		local owner = owners[index]
 		methods[index] = type(owner) == "table" and rawget(owner, "capture_collision_inventory") or nil
 	end
 	local descriptor, native_code, identity = keyboard.physical_slot_descriptor, keyboard.physical_native_code, keyboard.collision_identity
 	local source, view, sealed = capture.chord_sources, capture.chord_source_view, capture.chord_source_current
 	local function ports_current()
-		for index = 1, 7 do
+		for index = 1, 6 do
 			local owner = owners[index]
 			if type(methods[index]) ~= "function" or getmetatable(owner) ~= nil
 				or rawget(owner, "capture_collision_inventory") ~= methods[index] then return false end
@@ -36,9 +35,8 @@ function M.new(keyboard, taps, combinations, manager, capture)
 			and rawequal(package.loaded["modules.shortcuts.key_combinations"], combinations)
 			and rawequal(package.loaded["platform.remap.tap_hold_manager"], manager)
 			and rawequal(package.loaded["adapters.xkb_capture"], capture)
-			and rawequal(package.loaded["modules.hotstrings.magic_key_source"], magic)
 			and rawequal(package.loaded["modules.shortcuts.manager"], wrapping)
-			and rawequal(package.loaded["modules.llm.prediction_engine"], prediction)
+			and rawequal(package.loaded["ai.engine.prediction.engine"], prediction)
 	end
 	local owner = {}
 	function owner.validate(updates)
@@ -46,14 +44,14 @@ function M.new(keyboard, taps, combinations, manager, capture)
 		local frames, claims, prediction_unknown = {}, {}, false
 		for index, method in ipairs(methods) do
 			local frame = method()
-			if index == 7 and frame == nil then
+			if index == 6 and frame == nil then
 				-- Unknown prediction scope cannot erase a separately proved collision.
 				prediction_unknown = true
 			else
 				if type(frame) ~= "table" or getmetatable(frame) ~= nil or type(frame.current) ~= "function"
 					or type(frame.sealed) ~= "function" or frame.current() ~= true or type(frame.claims) ~= "table" then return false, "source_changed" end
 				frames[index] = frame
-				if (index == 2 or index == 3 or index == 5 or index == 6 or index == 7) and (frame.path ~= frames[1].path or frame.content ~= frames[1].content
+				if (index == 2 or index == 3 or index == 5 or index == 6) and (frame.path ~= frames[1].path or frame.content ~= frames[1].content
 					or frame.status ~= frames[1].status) then return false, "source_changed" end
 				if index ~= 3 then for _, claim in ipairs(frame.claims) do claims[#claims + 1] = claim end end
 			end

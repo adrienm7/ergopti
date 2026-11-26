@@ -212,12 +212,12 @@ local function load_active_remap(options)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- unless the test hands a folder of its own.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "tests/unit/platform/remap/active-regeneration.toml" end,
 		get_config_dir = function() return options.config_dir or "tests/unit/platform/remap/no-layers-toml" end,
 	}
@@ -287,7 +287,7 @@ end
 --- The deployment port records its input; it does not acknowledge native reload.
 --- @param run function Receives remap, protocol observations and a menu pick function.
 local function with_live_picker(run)
-	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils", "ui.action_picker" }, function()
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "menu.ui.builder.utils", "ui.action_picker" }, function()
 		local remap, calls = load_active_remap({ actions = {
 			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
 			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },

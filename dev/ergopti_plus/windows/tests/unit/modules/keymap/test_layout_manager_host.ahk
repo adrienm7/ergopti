@@ -73,6 +73,8 @@ _LMH_Deps(Dir, Log) {
 		"select", (Id) => Log.Push(Map("call", "select " . Id)),
 		"open_url", (Url) => (Log.Push(Map("call", "open " . Url)), true),
 		"close", () => Log.Push(Map("call", "close")),
+		; No keyboard layout DLL is registered: the page state never reads the machine.
+		"registry", Map("reg_read", (*) => "", "reg_subkeys", (*) => []),
 		"pending", Pending
 	)
 }
@@ -196,66 +198,17 @@ Test("layout manager host: the active layout follows the emulation settings (lay
 	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
 		Map("emulated_layout", "", "ergopti_base", true, "ergopti_variant", "ergopti")))),
 	AssertEqual("", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "", "ergopti_base", false))),
-		"without the Ergopti emulation Windows types its own layout")
+		"without the Ergopti emulation Windows types its own layout"),
+	; The selection is the one gate (maintainer decision of 2026-11-23): a layer
+	; switch selects no layout, and unticking one keeps the layout selected
+	; (layout-selection-is-the-gate).
+	AssertEqual("", LayoutManager_ActiveId(Map("layout",
+		Map("emulated_layout", "", "ergopti_base", true, "ergopti_alt_gr", true, "ergopti_variant", "none"))),
+		"« None » selects nothing whatever the layer switches say"),
+	AssertEqual(ERGOPTI_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
+		Map("emulated_layout", "", "ergopti_base", false, "ergopti_variant", "ergopti"))),
+		"a selected layout stays selected with its base layer unticked")
 ))
-
-; The status displays the selected emulation only while its category is on;
-; its row never acts as a second, ambiguous layout-selection command.
-_LMH_EmulationStatusCase(Layout, Enabled, Name) {
-	Index := LayoutCatalogue_BundledIndex()
-	Assert(Index is Map, "the actual shipped registry must load")
-	Rows := _LAY_CustomLayoutRows(Map("layout", Layout), Enabled, Index)
-	AssertEqual(1, Rows.Length)
-	Expected := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
-	AssertEqual(Expected, Rows[1]["label"])
-	AssertTrue(Rows[1].Get("disabled", false), "the status must be visibly disabled")
-	AssertFalse(Rows[1].Has("action"), "the status must not select or reload anything")
-	AssertFalse(Rows[1].Has("checked"), "a disabled status is not an emulation switch")
-}
-
-Test("layout menu: no base emulation explicitly reports none (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", false), true, ""))
-Test("layout menu: the built-in Ergopti emulation is named (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_variant", "ergopti"), true, "Ergopti"))
-Test("layout menu: the built-in Ergopti+ variant is distinguished (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", true, "ergopti_variant", "ergopti_plus"), true, "Ergopti+"))
-Test("layout menu: a selected registry layout takes precedence (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("emulated_layout", "ergol", "ergopti_base", true), true, "Ergo-L"))
-Test("layout menu: a disabled category does not claim its saved emulation is active (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("emulated_layout", "ergol", "ergopti_base", true), false, ""))
-Test("layout menu: AltGr-only adjustments do not claim base-layout emulation (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("ergopti_base", false, "ergopti_alt_gr", true), true, ""))
-Test("layout menu: a selection absent from the catalogue stays identified (layout-menu-emulation-status)",
-	() => _LMH_EmulationStatusCase(Map("emulated_layout", "custom-installed-layout"), true, "custom-installed-layout"))
-
-_LMH_NativeEmulationStatus() {
-	static PROBE_KEY := "_test_layout_emulation_status"
-	Root := _MR_GetManifestRoot()
-	Assert(Root is Map, "the actual menu manifest must load")
-	Fragment := []
-	for Item in Root["layout_menu"] {
-		if _MR_Get(Item, "id") == "custom_layouts" || _MR_Get(Item, "id") == "layout_manager"
-			Fragment.Push(Item)
-	}
-	AssertEqual(2, Fragment.Length, "the actual declaration must contain status and management")
-	Root[PROBE_KEY] := Fragment
-	try {
-		Providers := Map("custom_layouts", () => _LAY_CustomLayoutRows(Map("layout", Map("ergopti_base", false)), true))
-		Rendered := MenuRenderer_Build(PROBE_KEY, "Layout", "", "", Providers,
-			Map("layout_manager", (*) => 0))
-		AssertEqual(2, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"))
-		AssertEqual(t("menu.layout.emulated_none"), _SRR_LabelAt(Rendered, 0))
-		AssertEqual(t("menu.layout.manage"), _SRR_LabelAt(Rendered, 1))
-		State := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 0, "uint", 0x400, "uint")
-		Assert(State != 0xFFFFFFFF && (State & 3) != 0, "the real Win32 status item must be disabled")
-		Manager := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", 1, "uint", 0x400, "uint")
-		Assert(Manager != 0xFFFFFFFF && (Manager & 3) == 0, "layout management must remain usable")
-	} finally {
-		Root.Delete(PROBE_KEY)
-	}
-}
-Test("layout menu: the native status is grayed and management remains usable (layout-menu-emulation-status)",
-	_LMH_NativeEmulationStatus)
 
 ; Keep the emulated layout (decided on 2026-11-12, as macOS and Linux): the menu
 ; choice installs a layout that is not installed before selecting it, the boot
@@ -284,7 +237,8 @@ _LMH_EmulationChoiceInstallsFirst() {
 	AssertEqual("install ergol; install ergol", _LMH_JoinLog(Log),
 		"choosing it again installs it and reloads the emulation, never a second selection")
 	Log := []
-	Other := Map("layout", Map("emulated_layout", "", "ergopti_base", false))
+	; Chosen before, Ergo-L is a quick choice of the menu (emulation-quick-picker).
+	Other := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "emulated_layout_recents", ["ergol"]))
 	Rows := _LAY_EmulationChoiceRows(Other, Select, Index, Map(), Refuse, Install, "", After)
 	AssertFalse(InStr(Rows[1]["label"], t("menu.layout.emulation_failed")) > 0, "nothing failed, nothing named")
 	Item(Rows, "Ergo-L")["action"].Call()
@@ -381,7 +335,7 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		AssertEqual(Expected, Parsed["layout"].Get("emulated_layout", ""))
 		AssertEqual(Base, Parsed["layout"].Get("ergopti_base", false))
 		AssertEqual(Plus, (Parsed["layout"].Get("ergopti_variant", "ergopti") == "ergopti_plus"))
-		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"], "selection does not claim an independent AltGr layer")
+		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"], "a selection writes no layer switch")
 		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])
 		AssertEqual("retain", Parsed["layout"]["future_owner"])
 		AssertEqual(false, Parsed["category_enabled"]["layout"], "picker selection cannot grant a closed category")
@@ -413,10 +367,12 @@ _LMH_SelectionPendingCase(Id, Expected, Base, Plus) {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
+; A selection writes no layer switch: the fixture's unticked base layer stays
+; as the user left it (layout-selection-is-the-gate).
 Test("layout selection: built-in Ergopti+ owns empty emulation until late refusal (todo96-picker-handoff)",
-	_LMH_SelectionPendingCase.Bind("ergopti_plus", "", true, true))
+	_LMH_SelectionPendingCase.Bind("ergopti_plus", "", false, true))
 Test("layout selection: built-in Ergopti restores its exact source on refusal (todo96-picker-handoff)",
-	_LMH_SelectionPendingCase.Bind("ergopti", "", true, false))
+	_LMH_SelectionPendingCase.Bind("ergopti", "", false, false))
 Test("layout selection: a registry source preserves built-in gates on refusal (todo96-picker-handoff)",
 	_LMH_SelectionPendingCase.Bind("ergol", "ergol", false, true))
 
@@ -565,7 +521,7 @@ _LMH_SelectionCommittedCase() {
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		AssertFalse(Parsed["layout"].Has("emulated_layout"), "the neutral empty source is omitted by the real sparse writer")
 		AssertEqual("", Parsed["layout"].Get("emulated_layout", ""))
-		AssertEqual(true, Parsed["layout"]["ergopti_base"])
+		AssertEqual(false, Parsed["layout"]["ergopti_base"], "a selection writes no layer switch")
 		AssertEqual("ergopti_plus", Parsed["layout"]["ergopti_variant"])
 		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"])
 		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])

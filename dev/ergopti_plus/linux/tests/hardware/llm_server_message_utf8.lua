@@ -10,7 +10,7 @@
 
 local uv = require("luv")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
-local Remote = require("modules.llm.api_remote")
+local Remote = require("ai.engine.api.api_remote")
 local Http = require("core.network.adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))
 local root = assert(os.getenv("LLM_RESPONSE_ROOT"))

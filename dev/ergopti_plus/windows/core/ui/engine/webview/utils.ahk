@@ -4,6 +4,7 @@
 
 #Include script.ahk
 #Include ../../adapters/webview_profiles.ahk
+#Include reading_preferences.ahk
 
 ; ==============================================================================
 ; MODULE: WebView Utils
@@ -30,7 +31,7 @@ global _WebView_SharedEnvRetired := false
 
 ; A lost or wedged WebView2 COM completion must not freeze AHK's only
 ; interpreter indefinitely. The host catches the propagated TimeoutError and
-; opens its native fallback, leaving the rest of the driver responsive.
+; refuses with the shared WebView2 message, leaving the driver responsive.
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
 
@@ -86,6 +87,30 @@ WebView_FitToWindow(Controller) {
 	Controller.Fill()
 }
 
+; COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC: the host, not Tab, moves the focus.
+global WEBVIEW_MOVE_FOCUS_PROGRAMMATIC := 0
+
+/**
+ * Hands the keyboard to the page of a window that has just opened.
+ *
+ * Showing the host window focuses the host, not the browser: the page's own
+ * focus() then lands in a document that holds no keyboard focus, so the first
+ * keystrokes and Escape reach the host window until the user clicks
+ * (PCK-16). macOS and Linux focus their web views on open.
+ * A window shown without activation never calls this.
+ * @param Controller {WebView2.Controller} The controller of the opened window.
+ * @returns {Boolean} Whether the controller took the focus; a refusal is logged.
+ */
+WebView_TakeFocus(Controller) {
+	global WEBVIEW_MOVE_FOCUS_PROGRAMMATIC
+	try Controller.MoveFocus(WEBVIEW_MOVE_FOCUS_PROGRAMMATIC)
+	catch as Err {
+		LoggerError("WebView", "The page could not take the keyboard focus: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
 ; exactly one and it is reused forever), so it is leak-free by construction.
@@ -109,8 +134,8 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	; `await()` pumps the message queue. A re-entrant second caller therefore
 	; cannot wait here: its Sleep loop runs on AHK's only interpreter and prevents
 	; the first await from receiving the completion that would clear this flag.
-	; Fail this second open immediately so its normal native/unavailable fallback
-	; runs; the first owner publishes the shared environment when it completes.
+	; Fail this second open immediately so its normal refusal runs; the first
+	; owner publishes the shared environment when it completes.
 	if _WebView_SharedEnvCreating {
 		if _WebView_SharedEnvBackground && !_WebView_SharedEnvBackgroundAwaiting
 				&& IsObject(_WebView_SharedEnvBootPromise) {
@@ -133,7 +158,7 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	try LoggerTrace("WebView", "Booting the shared WebView2 environment…")
 	try {
 		; The finite await pumps messages until the environment is ready, then
-		; throws to the caller's native fallback if WebView2 never completes.
+		; throws to the caller's refusal if WebView2 never completes.
 		if HasMethod(CreateEnvironmentFn, "Call")
 			BootPromise := CreateEnvironmentFn.Call(0, WEBVIEW_SHARED_UDIR, "", loader)
 		else
@@ -174,7 +199,8 @@ _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 	global _WebView_SharedEnvBootPromise, _WebView_SharedEnvBackground, _WebView_SharedEnvRetired
 	if (_WebView_SharedEnvBootPromise !== BootPromise)
 		return
-	if Succeeded && !_WebView_SharedEnvRetired
+	; A retired ownership never takes a late environment.
+	if (!_WebView_SharedEnvRetired && Succeeded)
 		_WebView_SharedEnv := Value
 	_WebView_SharedEnvBootPromise := 0
 	_WebView_SharedEnvCreating := false
@@ -183,97 +209,7 @@ _WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
 
 #Include browser_warmup.ahk
 
-
-; Below this much free physical RAM (MiB), a WebView window that has a native
-; equivalent skips the Edge/Chromium cold start and uses that native view
-; instead. Chromium needs real headroom to boot; on a thrashing machine the cold
-; start costs many seconds, so a plain native view beats a styled WebView that
-; takes a minute to appear. Tunable -- raise it to prefer native more often,
-; lower it to prefer the richer WebView.
-global WEBVIEW_MIN_AVAIL_RAM_MB := 1536
-
-; Returns available physical RAM in MiB, or -1 when the OS query fails.
-WebView_AvailRamMb() {
-	MemStatus := Buffer(64, 0)
-	NumPut("UInt", 64, MemStatus, 0)   ; dwLength -- required before the call
-	if !DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus)
-		return -1
-	return NumGet(MemStatus, 16, "UInt64") / 1048576   ; ullAvailPhys
-}
-
-; The oldest Evergreen runtime the pages run on: the first with
-; SetVirtualHostNameToFolderMapping (ICoreWebView2_3), which every page needs.
-global WEBVIEW_MIN_RUNTIME_VERSION := "87.0.664.8"
-; The runtime's EdgeUpdate client, where Microsoft documents its version.
-global WEBVIEW_RUNTIME_CLIENT := "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-global _WebView_RuntimeRefusalShown := false
-
-; The installed Evergreen runtime's version, per machine then per user.
-; @returns {String} "" when none is installed.
-WebView_RuntimeVersion() {
-	global WEBVIEW_RUNTIME_CLIENT
-	for Root in ["HKLM\SOFTWARE\WOW6432Node\", "HKLM\SOFTWARE\", "HKCU\Software\"] {
-		Version := RegRead(Root . WEBVIEW_RUNTIME_CLIENT, "pv", "")
-		if (Version != "" && Version != "0.0.0.0")
-			return Version
-	}
-	return ""
-}
-
-; Refuses a runtime below the minimum, saying so once per run: the pages would
-; break on a missing interface. No runtime at all is not a refusal: creating the
-; web view fails as before and each window falls back on its own.
-; @param VersionFn {Func} Test seam, WebView_RuntimeVersion by default.
-; @param NoticeFn {Func} Test seam taking the text, a tooltip by default.
-; @returns {Boolean} True when the runtime is too old.
-WebView_RuntimeIsRefused(VersionFn := 0, NoticeFn := 0) {
-	global WEBVIEW_MIN_RUNTIME_VERSION, _WebView_RuntimeRefusalShown
-	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
-	if (Version == "" || VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) >= 0)
-		return false
-	if !_WebView_RuntimeRefusalShown {
-		_WebView_RuntimeRefusalShown := true
-		LoggerError("WebView", "The WebView2 Runtime {1} is below the minimum {2}: native windows only.",
-			Version, WEBVIEW_MIN_RUNTIME_VERSION)
-		Text := StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
-		if HasMethod(NoticeFn, "Call")
-			NoticeFn.Call(Text)
-		else
-			TooltipShow({ Text: Text, DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
-	}
-	return true
-}
-
-; True when a WebView window should use its native fallback: the runtime is too
-; old, or free RAM is too low to comfortably boot Chromium. An unknown reading
-; never gates (returns false), leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
-	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
-	; A warm environment already owns the browser process; this open needs only
-	; a controller, so the cold-start RAM heuristic must not suppress it.
-	if _WebView_SharedEnv
-		return false
-	if (HasMethod(RefusedFn, "Call") ? RefusedFn.Call() : WebView_RuntimeIsRefused())
-		return true
-	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
-	if Avail < 0
-		return false
-	return Avail < WEBVIEW_MIN_AVAIL_RAM_MB
-}
-
-/**
- * Refuses a WebView-only window that could not open: logs the reason at ERROR
- * and tells the user, once per refused request, that WebView2 is required.
- * The personal editors have no native form (maintainer decision 2026-11-11).
- * @param {String} Surface English name of the window, for the log.
- * @param {String} Reason What failed, for the log.
- * @returns {Boolean} Always false: nothing opened.
- */
-WebView_RefuseUnavailable(Surface, Reason) {
-	try LoggerError("WebView", "The {1} cannot open: WebView2 is required ({2}).", Surface, Reason)
-	Ui_MsgBox(t("webview.required"), t("common.error_title"), "Iconx")
-	return false
-}
+#Include availability.ahk
 
 
 
@@ -282,7 +218,7 @@ WebView_RefuseUnavailable(Surface, Reason) {
 ; WebViewHost — factory class that consolidates the WebView2 lifecycle shared by
 ; every short-lived UI window. Each module that used to reimplement ~200 lines of
 ; identical boilerplate (Gui creation, show-before-create, WebView2.create +
-; fallback, settings hardening, subscriptions, vhost mapping, i18n seed,
+; refusal, settings hardening, subscriptions, vhost mapping, i18n seed,
 ; navigation, queue-based eval, resize → Fill, safe teardown) now calls
 ; WebViewHost.TryOpen(AppId, Opts) and keeps only its business logic.
 ;
@@ -323,8 +259,9 @@ class WebViewHost {
 
 		; --------------------------------------------------------------------------
 		; Factory: opens (or reuses) a WebView2 window for AppId.
-		; Returns a host for an opened or user-cancelled request, or "" on fallback.
-		; The caller checks the return value: if falsy, build the native fallback.
+		; Returns a host for an opened or user-cancelled request, or "" after the
+		; shared refusal (WebView2 missing, too old or failed). There is no native
+		; window to build instead (maintainer decision 2026-11-21).
 		;
 		; Opts keys (all optional unless noted):
 		;   Title                — brandless contextual caption label; default is the
@@ -341,8 +278,18 @@ class WebViewHost {
 		;   SkipI18nSeed         — default false; when true the I18nSeed script is
 		;                          NOT injected via AddScriptToExecuteOnDocumentCreated
 		;   CustomHtmlPath       — override the convention "ui/<AppId>/index.html"
+		;   LosslessJson         — default false; true decodes the page's messages
+		;                          with JsonParseLossless (true and false stay
+		;                          JSON_TRUE and JSON_FALSE, never 1 and 0)
+		;   RunsWhilePaused      — default false; true for a configuration window
+		;                          (EDD-1: a pause stops typing, not configuration),
+		;                          whose messages, ready and scripts the pause does
+		;                          not fence (_PauseFenced)
 		; --------------------------------------------------------------------------
 		static TryOpen(AppId, Opts) {
+				; Admission first: no window may appear before WebView2 is known usable.
+				if !WebView_RequireAvailable(AppId)
+						return ""
 				; ── Load manifest if not cached ──────────────────────────────────────
 				; The cache holds "" until loaded, then a Map. AHK v2 ``IsSet`` accepts
 				; only a plain variable (never a property expression), so the not-loaded
@@ -374,12 +321,15 @@ class WebViewHost {
 						}
 				} finally Critical(PreviousCritical)
 				if Reused {
-						if Existing.Gui != 0 && !Existing.CloseRequested
+						if Existing.Gui != 0 && !Existing.CloseRequested {
 								WMPresentWindow(Existing.Gui)
+								if Existing.HasOwnProp("Controller") && !Existing.Opts.Get("NoActivate", false)
+										WebView_TakeFocus(Existing.Controller)
+						}
 						return Existing
 				}
 
-				; _Build retires this exact reservation on fallback, cancellation or
+				; _Build retires this exact reservation on refusal, cancellation or
 				; failure. A late return cannot overwrite a replacement's ownership.
 				if !Host._Build()
 						return Host.CloseRequested ? Host : ""
@@ -452,7 +402,11 @@ class WebViewHost {
 		}
 
 		; --------------------------------------------------------------------------
-		; Reads geometry from the manifest. Returns {w, h, min_w, min_h}.
+		; Reads geometry from the manifest. Returns {w, h, min_w, min_h, maximized}.
+		; The size is in DPI-scaled units (the Gui scales it), so a manifest size
+		; larger than the work area at 150 % or 200 % would push the centred
+		; window's title bar off the screen: it is clamped to the primary work area
+		; less the frame and caption.
 		; --------------------------------------------------------------------------
 		_Geometry() {
 				Entry := this._ManifestEntry()
@@ -460,7 +414,12 @@ class WebViewHost {
 				H := Entry.Has("height")    && IsNumber(Entry["height"])    ? Entry["height"]    : 400
 				MW := Entry.Has("min_width") && IsNumber(Entry["min_width"]) ? Entry["min_width"] : W
 				MH := Entry.Has("min_height") && IsNumber(Entry["min_height"]) ? Entry["min_height"] : H
-				return {w: W, h: H, min_w: MW, min_h: MH}
+				Maximized := Entry.Has("maximized") && Entry["maximized"] == true
+				MonitorGetWorkArea(MonitorGetPrimary(), &Left, &Top, &Right, &Bottom)
+				Scale := A_ScreenDPI / 96
+				W := Min(W, Floor((Right - Left - 2 * SysGet(32)) / Scale))
+				H := Min(H, Floor((Bottom - Top - SysGet(4) - 2 * SysGet(33)) / Scale))
+				return {w: W, h: H, min_w: Min(MW, W), min_h: Min(MH, H), maximized: Maximized}
 		}
 
 		/**
@@ -490,7 +449,7 @@ class WebViewHost {
 		; --------------------------------------------------------------------------
 		; Internal: builds Gui, creates WebView2 controller, hardens settings,
 		; sets up the bridge, maps vhost, seeds i18n, navigates, and fills.
-		; Returns true on success, false on fallback.
+		; Returns true on success, false after a refusal or a cancellation.
 		; --------------------------------------------------------------------------
 		_Build() {
 				if this.BuildActive || this.ResetDone
@@ -515,6 +474,15 @@ class WebViewHost {
 		}
 
 		/**
+		 * Whether WebView2 can open a page: the shared admission, a test seam here.
+		 * @param {string} Loader - Absolute path to WebView2Loader.dll.
+		 * @returns {boolean}
+		 */
+		_RuntimeAvailable(Loader) {
+				return WebView_UnavailableReason() == ""
+		}
+
+		/**
 		 * Acquires a controller while the native parent remains owned by the build.
 		 */
 		_CreateController(PlaceholderHwnd, Loader) {
@@ -524,6 +492,13 @@ class WebViewHost {
 		_BuildOwned() {
 				global _VendorDir, _SharedDir, _I18nLocale
 				this.Epoch += 1
+
+				; No window before WebView2 is known usable: an unusable runtime would
+				; otherwise flash an empty host on the desktop, as it did in the suite.
+				if !this._RuntimeAvailable(_VendorDir . "\64bit\WebView2Loader.dll") {
+						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
+						return false
+				}
 
 				Opts  := this.Opts
 				Geo   := this._Geometry()
@@ -542,23 +517,20 @@ class WebViewHost {
 				g.OnEvent("Size",  this._OnResize.Bind(this))
 
 				; Show BEFORE creating the control — a hidden Gui has a zero client rect
-				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
+				; A maximized app (manifest "maximized") restores to its clamped size.
+				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center"
+						. (Geo.maximized ? " Maximize" : ""))
 				if this.CloseRequested
 						return false
 
 				; ── WebView2 create ──────────────────────────────────────────────────
 				loader := _VendorDir . "\64bit\WebView2Loader.dll"
-				if !IsSet(WebView2) || !FileExist(loader) {
-						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
-						return false
-				}
 				try {
 						this.Controller := this._CreateController(Placeholder.Hwnd, loader)
 				} catch as Err {
 						if this.CloseRequested
 								return false
-						try LoggerError("WebViewHost", "WebView2 create failed for '{1}': {2} — falling back.", this.AppId, Err.Message)
-						return false
+						return WebView_RefuseUnavailable(this.AppId, Err.Message)
 				}
 
 				if this.CloseRequested
@@ -610,6 +582,8 @@ class WebViewHost {
 						Loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
 						Seed := "window.__i18n_base='https://" . Vhost . "/core/i18n/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
+								. ReadingPrefs_SeedScript()
+						ReadingPrefs_Track(this.WebView)
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
 						if this.CloseRequested
 								return false
@@ -620,7 +594,13 @@ class WebViewHost {
 				try this.WebView.Navigate("https://" . Vhost . HtmlPath . "?cb=" . A_TickCount)
 				if this.CloseRequested
 						return false
-				try this.Controller.Fill()
+				; The window may already be larger than the placeholder (a maximized app).
+				try WebView_FitToWindow(this.Controller)
+				if this.CloseRequested
+						return false
+				; An activated window hands its keyboard to the page (PCK-16).
+				if !Opts.Get("NoActivate", false)
+						WebView_TakeFocus(this.Controller)
 				if this.CloseRequested
 						return false
 
@@ -638,7 +618,7 @@ class WebViewHost {
 
 		; ── WebMessageReceived callback (COM) ────────────────────────────────────
 		_OnWebMessage(Handler, Args) {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				try Msg := Args.TryGetWebMessageAsString()
 				if !IsSet(Msg)
@@ -652,8 +632,10 @@ class WebViewHost {
 						return
 				}
 
-				; Parse JSON and dispatch to the module's OnMessage callback
-				try Payload := JsonParse(Msg)
+				; Parse JSON and dispatch to the module's OnMessage callback; a page
+				; whose closed schema refuses a boolean where a number is due reads
+				; its messages lossless (JsonParseLossless).
+				try Payload := this.Opts.Get("LosslessJson", false) ? JsonParseLossless(Msg) : JsonParse(Msg)
 				if (!IsSet(Payload) || !(Payload is Map))
 						return
 				if this.Opts.Has("OnMessage") {
@@ -663,7 +645,7 @@ class WebViewHost {
 		}
 
 		_DispatchMessage(CallbackEpoch, Payload) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
 						return
 				; Timer callbacks report failures through the global error owner.
 				this.Opts["OnMessage"](this, Payload)
@@ -675,7 +657,7 @@ class WebViewHost {
 						return
 				; Navigation authorizes init even while paused. User scripts stay
 				; queued; only the admitted ready callback can resume later.
-				if !A_IsSuspended
+				if !this._PauseFenced()
 						this._FlushQueue()
 				this._FireOnReady()
 		}
@@ -701,7 +683,7 @@ class WebViewHost {
 		_ArmReady(Pending) {
 				PreviousCritical := Critical("On")
 				try {
-						if A_IsSuspended || this.ResetDone || this.CloseRequested
+						if this._PauseFenced() || this.ResetDone || this.CloseRequested
 								|| Pending.Epoch != this.Epoch || Pending.Scheduled
 								|| WebViewHost._PendingReady.Get(this, 0) != Pending
 								return false
@@ -721,7 +703,7 @@ class WebViewHost {
 						if this.ResetDone || this.CloseRequested || CallbackEpoch != this.Epoch
 								return
 						Pending := WebViewHost._PendingReady.Get(this, 0)
-						if A_IsSuspended {
+						if this._PauseFenced() {
 								; Only a previously admitted ready event can retain init;
 								; neither a safety flush nor a user command creates one.
 								if !this.ReadyFired || !this.Opts.Has("OnReady")
@@ -760,10 +742,23 @@ class WebViewHost {
 						Item.Host._ArmReady(Item.Receipt)
 		}
 
+		; ── Pause fence ──────────────────────────────────────────────────────────
+		; Whether the pause fences this window: a window that only shows or acts
+		; on typing waits for the resume, a configuration window (RunsWhilePaused,
+		; the Studio) keeps its messages, ready and scripts, as on macOS and Linux
+		; (EDD-1, LTP-03). A host built without options is fenced.
+		_PauseFenced() {
+				if !A_IsSuspended
+						return false
+				if !this.HasOwnProp("Opts") || !(this.Opts is Map)
+						return true
+				return this.Opts.Get("RunsWhilePaused", false) != true
+		}
+
 		; ── Queue-based eval ─────────────────────────────────────────────────────
 		; Evaluates JS in the page, queuing until the page signals ready.
 		Eval(Js) {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				if (this.Ready && this.HasOwnProp("WebView")) {
 						SetTimer(this._RunScript.Bind(this, Js), -1)
@@ -777,7 +772,7 @@ class WebViewHost {
 		_RunScript(Js) {
 				; Suspend leaves native timers armed, including scripts admitted before
 				; the pause. Refuse at delivery as well as at queue admission.
-				if A_IsSuspended || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
 						return
 				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
@@ -794,7 +789,7 @@ class WebViewHost {
 		}
 
 		_SafetyFlush() {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || this.CloseRequested
 						return
 				if (!this.Ready) {
 						try LoggerWarn("WebViewHost", "{1}: page did not signal ready within timeout — flushing.", this.AppId)
@@ -804,7 +799,7 @@ class WebViewHost {
 
 		; ── Window events ────────────────────────────────────────────────────────
 		_OnResize(GuiObj, MinMax, Width, Height) {
-				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
+				if this._PauseFenced() || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
 						try WebView_FitToWindow(this.Controller)

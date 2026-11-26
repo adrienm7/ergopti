@@ -14,12 +14,29 @@ local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.start_at_login"
 
+--- The helper's environment for an AppImage: the .AppImage file its entry
+--- starts and the AppDir it was mounted at, as the updater's installation
+--- resolution names them. Every other origin passes nothing.
+--- @return string prefix Shell assignments ending in a space, or "".
+local function appimage_environment()
+	local context = require("modules.updater.installer").resolve(
+		Paths.driver_root() .. "/modules/updater/manager.lua")
+	if type(context) ~= "table" or context.kind ~= "appimage" then return "" end
+	if type(context.appimage) ~= "string" then
+		Logger.warn(LOG, "This AppImage names no file a login entry could start: %s.",
+			tostring(context.launcher_refusal))
+		return ""
+	end
+	return "ERGOPTI_APPIMAGE_FILE=" .. ShellRunner.quote(context.appimage)
+		.. " ERGOPTI_APPIMAGE_DIR=" .. ShellRunner.quote(context.appdir) .. " "
+end
+
 --- Calls the installed startup helper, retaining external failure as a failure.
 --- @param action string
 --- @param run function|nil
 --- @return boolean, string
 local function invoke(action, run)
-	return (run or ShellRunner.exec_checked)("/bin/bash "
+	return (run or ShellRunner.exec_checked)(appimage_environment() .. "/bin/bash "
 		.. ShellRunner.quote(Paths.driver_root() .. "/install/start_at_login.sh") .. " " .. action)
 end
 
@@ -55,14 +72,29 @@ local function read_state(run)
 	return nil
 end
 
+--- The effective startup state of one helper answer.
+--- @param state string|nil
+--- @return boolean|nil
+local function enabled_of(state)
+	if state == "enabled" then return true end
+	if state == "disabled" or state == "stale" then return false end
+	return nil
+end
+
+--- Whether one helper answer proves this installation's startup command.
+--- @param state string|nil
+--- @return boolean|nil
+local function command_available_of(state)
+	if state == "other" then return false end
+	if state == "enabled" or state == "disabled" or state == "stale" then return true end
+	return nil
+end
+
 --- Returns the effective startup state, or nil if the query failed.
 --- @param run function|nil
 --- @return boolean|nil
 function M.enabled(run)
-	local state = read_state(run)
-	if state == "enabled" then return true end
-	if state == "disabled" or state == "stale" then return false end
-	return nil
+	return enabled_of(read_state(run))
 end
 
 --- Returns false only when the native entry proves a different startup command.
@@ -70,10 +102,17 @@ end
 --- @param run function|nil
 --- @return boolean|nil
 function M.command_available(run)
+	return command_available_of(read_state(run))
+end
+
+--- Both answers from ONE helper run. A tray build asks both, and each read
+--- starts bash and systemctl: two per build were a large part of a field
+--- menu.rebuild over its budget on every boot.
+--- @param run function|nil
+--- @return table { enabled = boolean|nil, command_available = boolean|nil }
+function M.snapshot(run)
 	local state = read_state(run)
-	if state == "other" then return false end
-	if state == "enabled" or state == "disabled" or state == "stale" then return true end
-	return nil
+	return { enabled = enabled_of(state), command_available = command_available_of(state) }
 end
 
 --- Toggles startup only after a successful query and confirms the final state.

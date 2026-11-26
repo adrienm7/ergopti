@@ -26,9 +26,15 @@
 ---    their own switch, the four row switches (layout_rows_policy), the
 ---    number-row ordering and its edge keys (number_row_policy), a pending dead
 ---    key completed by a key the emulation leaves to the OS, the dead-key reset
----    keys and the physical magic key, which keeps its unshifted press.
+---    keys.
 --- 4. Fail fast: an unknown convention, a key code the layout's sets cannot
 ---    reach or an undefined action raise at compile time, never on a key.
+--- 5. The accented-letter shortcuts of Ergopti's own layouts: a chord on the key
+---    that types è, ê, é or à sends the letter chosen for it ([shortcuts]), or
+---    the accented letter itself when that shortcut is off, as the Windows
+---    built-in Ergopti base does (ErgoptiBaseMapping); the driver passes the
+---    choices only for a layout of the Ergopti family, whose Command level holds
+---    their default letters. Any other layout keeps its own Command level.
 --- ==============================================================================
 
 local RowsPolicy = require("layouts.engine.layout.rows_policy")
@@ -437,12 +443,33 @@ function M.new_session(model, rows)
 	return { model = model, rows = rows, state = M.NEUTRAL, config = nil }
 end
 
+--- The chord character of each accented letter from the resolved [shortcuts]
+--- choices: the chosen letter, or false while that shortcut is off.
+--- @param choices table id -> { enabled = boolean, letter = string }.
+--- @param letters table id -> the accented letter (è, ê, é, à).
+--- @return table accented letter -> chosen letter or false.
+function M.accented_choices(choices, letters)
+	if type(choices) ~= "table" or type(letters) ~= "table" then
+		error("The accented shortcuts need the choices and their letters.")
+	end
+	local accented = {}
+	for id, letter in pairs(letters) do
+		local choice = choices[id]
+		if type(choice) ~= "table" or type(choice.enabled) ~= "boolean" or type(choice.letter) ~= "string" then
+			error("The accented shortcut " .. tostring(id) .. " has no resolved choice.")
+		end
+		accented[letter] = choice.enabled and choice.letter or false
+	end
+	return accented
+end
+
 --- Applies the [layout] settings the session decides with. Called off the key
 --- path, at start and on every change of these settings.
 --- @param session table
 --- @param settings table { base, alt_gr, layout = the [layout] table holding the
 ---   emulate_<row> switches, number_row = direct_access_digits,
----   edges = number_row_reorder_edges, magic_code = KeyboardEvent.code|nil }
+---   edges = number_row_reorder_edges,
+---   accented = M.accented_choices for a layout of the Ergopti family, else nil }
 --- @return table effective { [false] = {mode, reason}, [true] = {mode, reason} }
 function M.configure(session, settings)
 	if type(settings) ~= "table" or type(settings.base) ~= "boolean" or type(settings.alt_gr) ~= "boolean" then
@@ -458,10 +485,23 @@ function M.configure(session, settings)
 		end
 		swaps[caps], effective[caps] = found, applied
 	end
+	if settings.accented ~= nil and type(settings.accented) ~= "table" then
+		error("The accented shortcut choices are a table of letters.")
+	end
 	session.config = { base = settings.base, alt_gr = settings.alt_gr, row_on = row_on,
-		swaps = swaps, magic_code = settings.magic_code }
+		swaps = swaps, accented = settings.accented }
 	session.state = M.NEUTRAL
 	return effective
+end
+
+--- Whether the configured session types the number row itself, so its ordering
+--- (number_row_policy) applies through the emulation: the base layer and the
+--- number-row switch must both be on, the rule M.configure orders the row with.
+--- @param session table|nil
+--- @return boolean
+function M.orders_number_row(session)
+	local config = type(session) == "table" and session.config or nil
+	return type(config) == "table" and config.base == true and config.row_on.number_row == true
 end
 
 --- Drops a pending dead key.
@@ -512,6 +552,15 @@ function M.chord_char(session, code, ctrl, alt, win)
 	if config == nil then error("The emulation session is not configured.") end
 	if not (ctrl or alt or win) or session.model.mac_codes[code] == nil then return nil, false end
 	if M.NATIVE_CHORD_KEYS[code] or not config.base or not row_emulated(session, code) then return nil, false end
+	if config.accented ~= nil then
+		-- The key that types the accented letter unshifted carries its shortcut.
+		local model = session.model
+		local base = M.resolve(model, model.levels[combo_key(false, false, false)], model.mac_codes[code])
+		-- Not `and ... or nil`: a shortcut switched off is false and must survive.
+		if base.kind == "text" and config.accented[base.text] ~= nil then
+			return config.accented[base.text] or base.text, true
+		end
+	end
 	local char = M.shortcut_char(session.model, code, ctrl and "ctrl" or (alt and "alt" or "win"))
 	if char == "" then return nil, true end
 	return char, true
@@ -594,7 +643,6 @@ function M.decide(session, code, shift, caps, option, ctrl, alt, win, native)
 		return M.PASS, nil
 	end
 	local pending = session.state ~= M.NEUTRAL
-	if not pending and not shift and config.magic_code == code then return M.PASS, nil end
 	if config.base and emulated then
 		if config.swaps[caps == true][code] then shift = not shift end
 		return step_level(session, mac, shift, caps, false)

@@ -18,6 +18,8 @@
 ---    dialog may run, so the report goes through the timer scheduler.
 --- 4. A Cancelled Prompt Is Not An Error: closing the administrator prompt
 ---    changes nothing and shows nothing.
+--- 5. A Refusal Says Its Cause: each stable reason has a localized message that
+---    says what to do; the reason itself stays in the log.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +31,26 @@ local LOG = "virtual_hid_update"
 
 -- The reasons of platform/remap/runtime_vhid_update.lua this module acts on.
 local REASON = require("platform.remap.runtime_vhid_update").REASON
+
+-- What the user reads for each refusal: the cause in their language and what
+-- to do. The stable reason itself goes to the log only.
+local FAILURE_MESSAGE = {
+	[REASON.STORE] = "karabiner.vhid_update.failed_download",
+	[REASON.DOWNLOAD] = "karabiner.vhid_update.failed_download",
+	[REASON.SIZE] = "karabiner.vhid_update.failed_download",
+	[REASON.DIGEST] = "karabiner.vhid_update.failed_download",
+	[REASON.SIGNATURE] = "karabiner.vhid_update.failed_signature",
+	[REASON.INSTALL] = "karabiner.vhid_update.failed_install",
+	[REASON.ACTIVATE] = "karabiner.vhid_update.failed_install",
+	[REASON.UNPINNED] = "karabiner.vhid_update.failed_unavailable",
+	[REASON.NOT_OFFERED] = "karabiner.vhid_update.failed_unavailable",
+}
+for name, reason in pairs(REASON) do
+	if reason ~= REASON.CANCELLED and not FAILURE_MESSAGE[reason] then
+		error("virtual_hid_update: the refusal " .. name .. " has no message for the user")
+	end
+end
+M.FAILURE_MESSAGE = FAILURE_MESSAGE
 
 
 
@@ -53,8 +75,12 @@ end
 --- @return boolean scheduled
 local function report(ok, reason, reload)
 	if not ok and reason == REASON.CANCELLED then return false end
-	local message = ok and i18n.get("karabiner.vhid_update.done")
-		or i18n.format("karabiner.vhid_update.failed", tostring(reason))
+	local failure_key = not ok and FAILURE_MESSAGE[reason] or nil
+	if not ok and not failure_key then
+		Logger.error(LOG, "The driver update settled with an unknown refusal: %s.", tostring(reason))
+		failure_key = "karabiner.vhid_update.failed_install"
+	end
+	local message = ok and i18n.get("karabiner.vhid_update.done") or i18n.get(failure_key)
 	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		local shown, err = pcall(function()
 			require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"), message,

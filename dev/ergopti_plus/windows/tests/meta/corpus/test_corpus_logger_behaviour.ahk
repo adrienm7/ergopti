@@ -195,8 +195,8 @@ _LogCorpus_ParseLine(Line) {
 ; every later test of the suite.
 _LogCorpus_ReplayRepeat(Section, Vector) {
 	global LOGGER_MIN_LEVEL, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_SUB_PATHS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 
 	Base := RegExReplace(Vector.Has("base_time") ? Vector["base_time"] : Section["base_time"], "[^0-9]")
@@ -207,11 +207,9 @@ _LogCorpus_ReplayRepeat(Section, Vector) {
 	SavedLog := LOGGER_LOG_PATH
 	SavedErrors := LOGGER_ERRORS_LOG_PATH
 	SavedDate := _LOGGER_PATH_DATE
-	SavedSubPaths := _LOGGER_SUB_PATHS
 	LOGGER_LOG_PATH := ""
 	LOGGER_ERRORS_LOG_PATH := ""
 	_LOGGER_PATH_DATE := ""
-	_LOGGER_SUB_PATHS := Map()
 	_LogCorpus_SetLevel("DEBUG")
 	_LogCorpus_ResetDedup()
 	LOGGER_RING_BUFFER := []
@@ -250,11 +248,9 @@ _LogCorpus_ReplayRepeat(Section, Vector) {
 		LOGGER_RING_CURSOR := 0
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		LOGGER_LOG_PATH := SavedLog
 		LOGGER_ERRORS_LOG_PATH := SavedErrors
 		_LOGGER_PATH_DATE := SavedDate
-		_LOGGER_SUB_PATHS := SavedSubPaths
 		LOGGER_MIN_LEVEL := SavedLevel
 		_LoggerRefreshFastFlags()
 	}

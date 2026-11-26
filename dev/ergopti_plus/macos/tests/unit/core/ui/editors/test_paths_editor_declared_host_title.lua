@@ -17,8 +17,8 @@ local function with_fixture(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "ui.menu.menu_paths", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.deferred_work",
+			"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "settings.ui.menu.paths", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+			"core.logger.engine.logger", "core.fs.engine.paths", "settings.engine.paths", "core.timing.engine.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "hs", "tests.stubs.hs",
 		}, function()
@@ -270,7 +270,7 @@ helpers.describe("paths editor declared host title receiving", function()
 			-- Preserve the single modeled hs cohort captured by the actual factory,
 			-- translator and adapters. These established resolver/bridge fixture
 			-- ports expose only read-only directory data; no configuration is written.
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				is_initialized = function() return true end,
 				get = function(key) return "/tmp/ergopti/" .. tostring(key) end,
 				get_config_dir = function() return "/tmp/ergopti/" end,
@@ -281,7 +281,7 @@ helpers.describe("paths editor declared host title receiving", function()
 			hs.webview.usercontent = { new = function()
 				return { setCallback = function() return true end }
 			end }
-			local editor = require("ui.menu.menu_paths")
+			local editor = require("settings.ui.menu.paths")
 			local receive, received = builder.show_webview, nil
 			builder.show_webview = function(opts)
 				received = opts

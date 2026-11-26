@@ -7,6 +7,11 @@
 
 [_meta]
 color = "#e53935"
+# The symbol a preview row shows beside its trigger label, so a reader who
+# cannot tell the tints apart still tells the categories apart; the key names it
+# for a screen reader (_shared/hotstrings/engine/category_glyph.lua).
+glyph = "✦"
+glyph_name_key = "hs_config.cat_magickey"
 delay = 2.0
 show_tooltip = true
 description = { fr = "Touche ★ et expansion de texte", en = "★ key and text expansion", de = "★-Taste und Texterweiterung", es = "Tecla ★ y expansión de texto", zh = "★ 键与文本扩展", ar = "مفتاح ★ وتوسيع النص", cs = "Klávesa ★ a rozšíření textu", da = "★-tast og tekstudvidelse", he = "מקש ★ והרחבת טקסט", hi = "★ कुंजी और टेक्स्ट विस्तार", it = "Tasto ★ e espansione testo", ja = "★キーとテキスト展開", ko = "★ 키와 텍스트 확장", nl = "★-toets en tekstuitbreiding", no = "★-tast og tekstutvidelse", pl = "Klawisz ★ i rozszerzenie tekstu", pt = "Tecla ★ e expansão de texto", ru = "Клавиша ★ и расширение текста", sv = "★-tangent och textutvidgning", tr = "★ tuşu ve metin genişletme", uk = "Клавіша ★ та розширення тексту" }

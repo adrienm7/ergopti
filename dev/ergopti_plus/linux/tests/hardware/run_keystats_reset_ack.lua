@@ -33,7 +33,7 @@ for _, successor in ipairs({ false, true }) do
 			Fixture.with(function(k)
 				k.init({ sqlite_path = path })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				local system = require("modules.keystats.system_metrics")
+				local system = require("modules.keystats.system.system_metrics")
 				assert(system.sample())
 				local writer = require("modules.keystats.sqlite_writer")
 				local start, operations, released = writer.start_flush, {}, false

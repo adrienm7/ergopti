@@ -18,6 +18,7 @@ class Identifiers {
 		static AHK := "ErgoptiPlus.ahk"
 		static EXE := "ErgoptiPlus.exe"
 		static BUNDLE := "ErgoptiPlus.app"
+		static DISPLAY_NAME := "Ergopti+"
 	}
 	class BundleIds {
 		static LAUNCHER := "com.ergoptiplus.app"
@@ -54,5 +55,9 @@ class Identifiers {
 	}
 	class Locales {
 		static SYSTEM_FALLBACK := "en"
+	}
+	class WindowsVendor {
+		static LUA_EXPORT_EXE := "ergopti_lua_export.exe"
+		static LUA_EXPORT_IDENTITY := "ergopti_lua_export.json"
 	}
 }

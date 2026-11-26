@@ -165,5 +165,5 @@ button.primary {
 /* Close stands alone on the left; reporting, the action the page asks for,
    is the last button on the right, where the eye ends. */
 #btn-close {
-	margin-right: auto;
+	margin-inline-end: auto;
 }

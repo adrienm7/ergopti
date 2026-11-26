@@ -4,7 +4,7 @@
 ; MODULE: Parser SplitBlocks Cap Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "llm-split-batch-no-cap" audit finding in
-; modules/llm/parser.ahk.
+; ai/engine/api/parser.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; _LLM_Engine_SplitBatchBlocks(raw, max_count) was written and tested in

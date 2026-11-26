@@ -223,7 +223,7 @@ end)
 scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 	local shell = require("core.process.adapters.shell_runner")
 	local original_line, original_has = shell.exec_line, shell.has_command
-	local system = require("modules.keystats.system_metrics")
+	local system = require("modules.keystats.system.system_metrics")
 	local network = "network-one"
 	shell.has_command = function(name) return name == "nmcli" or name == "loginctl" or name == "pactl" end
 	shell.exec_line = function(command)

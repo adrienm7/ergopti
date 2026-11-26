@@ -27,6 +27,17 @@
 ---    first install refuses an existing runtime by design. It installs no
 ---    driver package and requests no activation: it restarts the services of
 ---    the installed copy, and the next owner names any approval still due.
+--- 8. A Stale Runtime Is Retired: the install is offered only when an
+---    installed file is missing or unreadable, so its administrator shell
+---    first stops the Core job and removes what an earlier install left at the
+---    Runtime path; otherwise the helper refused every retry
+---    (`refused-destination`, field report 2026-11-23).
+--- 9. Interrupted Installs Are Retired Too: that shell also removes the
+---    install journal and copy stages an earlier helper left, which the next
+---    helper otherwise refused forever (`refused-cleanupPending`, field report
+---    2026-11-24). A journal a live helper still holds stops it at the
+---    `install_busy` step, reported under the reason of the same name, so the
+---    user is told another install is running.
 --- ==============================================================================
 
 local M = {}
@@ -82,8 +93,14 @@ M.REASON = {
 	NOT_OFFERED = "install_not_offered",
 	-- The repair restarted part of the services and left the rest for a retry.
 	REPAIR_PENDING = "repair_pending",
+	-- A live helper still holds the journal of another install, so nothing was stopped or removed.
+	BUSY = "install_busy",
 }
 local REASON = M.REASON
+
+--- The administrator shell's step that finds another install's journal still
+--- held (OwnedRuntimeUninstall.busyStep, UninstallWorker.swift).
+M.BUSY_STEP = REASON.BUSY
 
 -- The administrator shell's exit statuses the helper uses (InstallerMain.swift).
 local HELPER_REFUSED = 77
@@ -123,11 +140,34 @@ local KINDS = {
 	},
 }
 
+--- The longest cause: the field check reports it as one step value.
+M.CAUSE_MAX_LENGTH = require("diagnostics.engine.field_check.report").MAX_VALUE_LENGTH
+
+--- The helper trail's first refusal, or else its last note, as one closed
+--- token: `refused-source-root-dup-errno-24:OwnedRuntimeInstallWorker.swift:239`
+--- reads `source-root-dup-errno-24`. The full trail stays in the detail. The
+--- helper of the pinned 16.3.0-ergopti.6 artifact still puts an `@` before the
+--- file, which the diagnostics redaction reads as an e-mail address; later
+--- helpers write `:` (OwnedRuntimeInstallTrail.refusal).
+--- @param trail string|nil Comma-joined notes the launcher relayed.
+--- @return string|nil cause Letters, digits and `_.:+-` only, at most CAUSE_MAX_LENGTH long.
+function M.trail_cause(trail)
+	if type(trail) ~= "string" or trail == "" then return nil end
+	local first_refusal, last
+	for note in trail:gmatch("[^,]+") do
+		if not first_refusal and note:sub(1, 8) == "refused-" then first_refusal = note:sub(9) end
+		last = note
+	end
+	local cause = ((first_refusal or last or ""):gsub("[@:][^@:,]+:%d+$", ""):gsub("[^%w_%.:%+%-]", ""))
+	if cause == "" then return nil end
+	return cause:sub(1, M.CAUSE_MAX_LENGTH)
+end
+
 --- Reads one role's answer line.
 --- @param role table KINDS entry.
 --- @param code any Exit status.
 --- @param stdout any Standard output.
---- @return boolean done, string|nil reason, string|nil detail
+--- @return boolean done, string|nil reason, string|nil detail, string|nil cause
 local function parse_role(role, code, stdout)
 	local line = type(stdout) == "string" and stdout:match("^([^\n]*)\n?$") or nil
 	if line == nil then return false, REASON.UNANSWERED, "no answer line" end
@@ -142,20 +182,32 @@ local function parse_role(role, code, stdout)
 	if line == request .. "cancelled" then return false, REASON.CANCELLED, nil end
 	local refused = line:match("^" .. request .. "refused|([%w_%-]+)$")
 	if refused then return false, REASON.REFUSED, refused end
-	local status, step = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)$")
+	local status, step, trail = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)|([%w%._@:%+,%-]+)$")
+	if not status then status, step = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)$") end
 	if not status then status = line:match("^" .. request .. "failed|(%-?[%w]+)$") end
 	if status then
 		local number = math.tointeger(tonumber(status))
-		if number == HELPER_REFUSED then
-			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "")
+		local cause = M.trail_cause(trail)
+		-- Field report 2026-11-15: the driver log and the field check said only « cleanup pending »; the helper's
+		-- trail named the descriptor exhaustion that left it.
+		local traced = trail and (", trail " .. trail) or ""
+		if number == HELPER_REFUSED and step == M.BUSY_STEP then
+			return false, REASON.BUSY, "another install's helper still holds its journal, so nothing was stopped or removed"
 		end
-		if number == HELPER_CLEANUP then return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" end
+		if number == HELPER_REFUSED then
+			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "") .. traced, cause
+		end
+		if number == HELPER_CLEANUP then
+			return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" .. (step and (" at step " .. step) or "")
+				.. traced, cause
+		end
 		if number == Update.EXIT_DIGEST or number == Update.EXIT_SIGNATURE then
 			return false, REASON.DRIVER, "the kept VirtualHIDDevice package failed its "
 				.. (number == Update.EXIT_DIGEST and "digest" or "signature") .. " check as root"
 		end
 		-- The staged program names the step that failed (field reports 2026-11-05 and 2026-11-06 had only "1").
 		return false, REASON.FAILED, "administrator shell status " .. status .. (step and (" at step " .. step) or "")
+			.. traced, cause
 	end
 	return false, REASON.UNANSWERED, "unexpected answer: " .. line
 end
@@ -166,6 +218,7 @@ end
 --- @return boolean installed True only for the helper's full success.
 --- @return string|nil reason Stable reason when not installed.
 --- @return string|nil detail The refusal or status the line names.
+--- @return string|nil cause The helper trail's closed cause (trail_cause), when the launcher relayed one.
 function M.parse(code, stdout)
 	return parse_role(KINDS.install, code, stdout)
 end
@@ -176,6 +229,7 @@ end
 --- @return boolean repaired True only when the helper observed every service.
 --- @return string|nil reason Stable reason when not repaired.
 --- @return string|nil detail The refusal or status the line names.
+--- @return string|nil cause The helper trail's closed cause (trail_cause), when the launcher relayed one.
 function M.parse_repair(code, stdout)
 	return parse_role(KINDS.repair, code, stdout)
 end
@@ -209,7 +263,7 @@ function M.new(ports)
 	local repair_waiters
 
 	--- Settles every waiter of the running install once.
-	local function settle(ok, reason, detail)
+	local function settle(ok, reason, detail, cause)
 		local pending = waiters
 		waiters = nil
 		if ok then
@@ -220,7 +274,7 @@ function M.new(ports)
 			Logger.error(LOG, "Owned runtime install refused (%s): %s", tostring(reason), tostring(detail))
 		end
 		for _, waiter in ipairs(pending or {}) do
-			local called, failure = pcall(waiter, ok, reason, detail)
+			local called, failure = pcall(waiter, ok, reason, detail, cause)
 			if not called then Logger.error(LOG, "Owned runtime install callback failed: %s.", tostring(failure)) end
 		end
 	end
@@ -240,7 +294,7 @@ function M.new(ports)
 	end
 
 	--- Installs the owned runtime, then requests the driver's activation.
-	--- @param callback function fn(ok, reason|nil, detail|nil) called once.
+	--- @param callback function fn(ok, reason|nil, detail|nil, cause|nil) called once.
 	function installer.install(callback)
 		assert(type(callback) == "function", "Missing owned runtime install callback")
 		if waiters then
@@ -259,8 +313,8 @@ function M.new(ports)
 		Logger.start(LOG, "Installing Ergopti's own Karabiner runtime on the user's request…")
 		local function run_role()
 			ports.exec(executable, { M.FLAG }, M.INSTALL_TIMEOUT_SEC, function(code, stdout)
-				local installed, reason, why = M.parse(code, stdout)
-				if not installed then return settle(false, reason, why) end
+				local installed, reason, why, cause = M.parse(code, stdout)
+				if not installed then return settle(false, reason, why, cause) end
 				activate()
 			end, environment)
 		end

@@ -507,6 +507,27 @@ function M.start_compositor_focus(options)
 	return _compositor_focus.start()
 end
 
+--- The state of the focus source start_compositor_focus() started, for the
+--- field run's setup check.
+--- @return string|nil nil when this session has none (X11, another desktop).
+function M.compositor_focus_status()
+	return _compositor_focus and _compositor_focus.status() or nil
+end
+
+--- Whether KWin runs the Ergopti focus script, nil off KDE or before the
+--- worker says (compositor_focus source.script_state).
+--- @return string|nil "loaded", "not_loaded" or "unanswered"
+function M.compositor_script_state()
+	return _compositor_focus and _compositor_focus.script_state() or nil
+end
+
+--- Why GNOME Shell sends no focus report, nil off GNOME, while reports may
+--- still come or once they do (compositor_focus source.extension_problem).
+--- @return string|nil "absent", "inactive", "out_of_date", "error" or "silent"
+function M.compositor_extension_problem()
+	return _compositor_focus and _compositor_focus.extension_problem() or nil
+end
+
 --- Stops the focus source started by start_compositor_focus().
 --- @return boolean settled
 function M.stop_compositor_focus()
@@ -612,7 +633,7 @@ end
 --- @return string|nil Unique native accessibility bus/object identity.
 function M.focused_text_identity()
 	local captured, destination = pcall(function()
-		return require("adapters.user_hotstring_destination").capture_current()
+		return require("hotstrings.adapters.user_hotstring_destination").capture_current()
 	end)
 	if not captured or not destination then return nil end
 	return "atspi:" .. destination.bus .. ":" .. destination.path
@@ -633,7 +654,7 @@ function M.focused_identity()
 		-- Ergopti integration reports). The accessible control
 		-- still has an exact native destination; labels never substitute for it.
 		local captured, destination = pcall(function()
-			return require("adapters.user_hotstring_destination").capture_current()
+			return require("hotstrings.adapters.user_hotstring_destination").capture_current()
 		end)
 		if captured and destination then identity = "atspi:" .. destination.bus .. ":" .. destination.path end
 	end

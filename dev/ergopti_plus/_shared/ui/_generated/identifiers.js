@@ -9,7 +9,8 @@ const ERGOPTI_IDENTIFIERS = Object.freeze({
 		name: 'ErgoptiPlus',
 		ahk: 'ErgoptiPlus.ahk',
 		exe: 'ErgoptiPlus.exe',
-		bundle: 'ErgoptiPlus.app'
+		bundle: 'ErgoptiPlus.app',
+		display_name: 'Ergopti+'
 	}),
 	bundle_ids: Object.freeze({
 		launcher: 'com.ergoptiplus.app',

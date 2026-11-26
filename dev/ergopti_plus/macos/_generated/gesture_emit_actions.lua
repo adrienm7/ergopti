@@ -6,7 +6,7 @@
 --- MODULE: Gesture Emit Actions (macOS)
 --- DESCRIPTION:
 --- Every action macOS performs as a plain keystroke, as { key, mods } for
---- hs.eventtap.keyStroke. modules/gestures/actions.lua registers these instead
+--- hs.eventtap.keyStroke. gestures/engine/actions.lua registers these instead
 --- of spelling each one out as its own closure.
 ---
 --- These are macOS values, NOT shared ones. Of the 24 actions both drivers

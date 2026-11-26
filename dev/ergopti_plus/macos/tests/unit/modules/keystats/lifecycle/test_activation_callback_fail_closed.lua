@@ -58,8 +58,8 @@ local function load_keystats(options)
 
 	package.loaded["modules.keystats.init"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["modules.keymap"] = {}
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	package.loaded["hotstrings.engine.expander"] = {}
 
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_module, fmt, ...)
@@ -67,10 +67,10 @@ local function load_keystats(options)
 		ctx.errors[#ctx.errors + 1] = ok and rendered or tostring(fmt)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return true end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti-test" end,
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,

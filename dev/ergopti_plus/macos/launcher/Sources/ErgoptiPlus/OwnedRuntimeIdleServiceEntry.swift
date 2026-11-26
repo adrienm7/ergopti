@@ -9,6 +9,16 @@ enum OwnedRuntimeIdleServiceEntry {
 		case filesPublishedServiceCleanupPending = "files-published-service-cleanup-pending"
 		case refused, cleanupPending = "cleanup-pending"
 	}
+	/// The answer of a publication that failed before its files were published. A refusal before the journal
+	/// wrote nothing, so there is nothing to roll back: it is a refusal (exit 77), not cleanup pending, which
+	/// field report 2026-11-23 read for a plain `refused-destination`.
+	/// - Parameters:
+	///   - state: The publication's state after the failure.
+	///   - rollback: Retires the unpublished files the journal recorded; true when it did.
+	/// - Returns: `.refused` when nothing is left behind, `.cleanupPending` otherwise.
+	static func unpublishedResult(_ state: OwnedRuntimeFirstInstallOwner.State, rollback: () -> Bool) -> Result {
+		state == .refused || rollback() ? .refused : .cleanupPending
+	}
 	static func runFirstInstallation() -> Result {
 		guard let publication = OwnedRuntimeFirstInstallOwner.acquire() else { return .refused }
 		let done = DispatchSemaphore(value: 0)
@@ -38,7 +48,7 @@ enum OwnedRuntimeIdleServiceEntry {
 			} catch {
 				OwnedRuntimeInstallTrail.note(step + "-failed-" + String(describing: error))
 				if publication.snapshot() == .filesPublished { result = .filesPublishedServiceCleanupPending }
-				else { result = publication.rollbackUnpublishedFiles() ? .refused : .cleanupPending }
+				else { result = unpublishedResult(publication.snapshot(), rollback: publication.rollbackUnpublishedFiles) }
 			}
 		}
 		done.wait(); return result

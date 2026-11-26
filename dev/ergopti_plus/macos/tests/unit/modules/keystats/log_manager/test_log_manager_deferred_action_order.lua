@@ -14,13 +14,13 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 --- Establishes an actual absent source before asking the cipher to admit plaintext.
 local function plaintext_cipher()
-	package.loaded["infra.preferences"] = nil
+	package.loaded["settings.engine.preferences.preferences"] = nil
 	local path = os.tmpname()
 	assert(os.remove(path))
 	local logger = require("core.logger.engine.logger")
 	local previous, errors = logger.error, {}
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-	local _, status = helpers.load_with_stubs("infra.preferences").load(path)
+	local _, status = helpers.load_with_stubs("settings.engine.preferences.preferences").load(path)
 	logger.error = previous
 	helpers.assert_eq(status, "absent", table.concat(errors, "; "))
 	return require("modules.keystats.text_cipher")
@@ -81,6 +81,10 @@ local function load_fixture(options)
 	}
 
 	local wpm_calls = 0
+	-- A fresh cache retires Ergopti Studio's saved read at init. Its real owner
+	-- would load the file-system adapter under this fixture's hs.fs and keep
+	-- that stub for the plaintext cipher's real config read below.
+	package.loaded["modules.keystats.studio_snapshot"] = { retire = function() return true end }
 	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function()
 			wpm_calls = wpm_calls + 1
@@ -399,7 +403,7 @@ for _, name in ipairs({
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
 	"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
-	"core.events.timer_scheduler",
+	"core.events.timer_scheduler", "modules.keystats.studio_snapshot",
 }) do
 	package.loaded[name] = nil
 end

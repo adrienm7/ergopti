@@ -71,15 +71,11 @@ class _PRRP_Controller {
 	Close() {
 		this.Closed += 1
 	}
+	MoveFocus(Reason) {
+	}
 	Fill() {
 		this.Fills += 1
 	}
-}
-
-_PRRP_Input(*) {
-	global _PRRP
-	_PRRP.FallbackInputs += 1
-	throw Error("Business oracle: a consumed prompt opening reached native fallback input.")
 }
 
 _PRRP_Log(Line) {
@@ -91,7 +87,9 @@ _PRRP_Log(Line) {
 _PRRP_Open(Profile) {
 	global _PRRP
 	_PRRP.PublicCalls += 1
-	LLM_Menu_PromptEditProfile(Profile, Map("input", _PRRP_Input))
+	; A refused opening returns false; none of these admitted openings may.
+	if !LLM_Menu_PromptEditProfile(Profile)
+		_PRRP.Refusals += 1
 }
 
 _PRRP_Create(Hwnd) {
@@ -171,7 +169,7 @@ _PRRP_Observe() {
 	global _PRRP, _PromptEdWeb_ContextEpoch
 	FileAppend("RECEIPT prompt-repoint windows=" . _PRRP.Windows.Length . " controllers=" . _PRRP.Controllers.Length
 		. " public_calls=" . _PRRP.PublicCalls . " timer_calls=" . _PRRP.TimerCalls
-		. " boundary_failure=" . IsObject(_PRRP.Failure) . " fallback_inputs=" . _PRRP.FallbackInputs
+		. " boundary_failure=" . IsObject(_PRRP.Failure) . " refusals=" . _PRRP.Refusals
 		. " environments=" . _PRRP.Environments . " current_epoch=" . _PromptEdWeb_ContextEpoch
 		. " init_scripts=" . _PRRP.InitScripts.Length . "`n", "*", "UTF-8")
 }
@@ -190,8 +188,8 @@ _PRRP_Check() {
 	if IsObject(_PRRP.Failure)
 		throw _PRRP.Failure
 	_PRRP_Require(_PRRP.TimerCalls == 1 && _PRRP.PublicCalls == 2 && _PRRP.Errors.Length == 0
-		&& _PRRP.FallbackInputs == 0 && _PRRP.Environments == 1,
-		"The actual native timer and both real public openings must complete without a boundary or fallback refusal.")
+		&& _PRRP.Refusals == 0 && _PRRP.Environments == 1,
+		"The actual native timer and both real public openings must complete without a boundary or WebView refusal.")
 	_PRRP_Require(_PRRP.Windows.Length == 1 && _PRRP.Controllers.Length == 1
 		&& _PromptEdWeb_Gui == _PRRP.InitialWindow && _PromptEdWeb_EditId == "user_private_b"
 		&& _PromptEdWeb_ContextEpoch == _PRRP.SuccessorEpoch && !_PromptEdWeb_ResetDone,
@@ -231,7 +229,7 @@ _PRRP_Main() {
 	Persistent(true)
 	_PRRP := { Mode: A_Args[1], Windows: [], Hwnds: [], Controllers: [], Profiles: [], Source: "",
 		Pending: 0, Boundary: 0, Failure: 0, Errors: [], PublicCalls: 0, CloseSent: 0,
-		OldEpoch: 0, SuccessorEpoch: 0, FallbackInputs: 0, Environments: 0, TimerCalls: 0,
+		OldEpoch: 0, SuccessorEpoch: 0, Refusals: 0, Environments: 0, TimerCalls: 0,
 		InitialWindow: 0, InitialEpoch: 0, SourceA: 0, SourceB: 0, InitScripts: [] }
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_PRRP_OnError)

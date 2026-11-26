@@ -9,9 +9,8 @@ if !(A_Args[5] == "plain" || A_Args[5] == "held" || A_Args[5] == "released") || 
 global _SharedDir := A_Args[3]
 global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", false,
-	"emulate_home_row", true, "emulate_bottom_row", true),
-	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC030")
+	"emulate_home_row", true, "emulate_bottom_row", true))
+global ScriptInformation := Map()
 global _LRNF := {Mode: A_Args[5], Window: 0, Edit: 0, Received: [], Callbacks: [],
 	ShiftReleased: false, ShiftOwned: false, Failure: 0, Vk: 0, Observer: 0, ObservedKeys: 0, ObservedText: "", ExpectedHost: "", OriginalMarker: 0x4C524E46}
 

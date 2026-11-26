@@ -26,7 +26,8 @@ _I18nTestReset() {
 	global _I18nCacheEn, _I18nCacheEnLoaded
 	global _I18nCacheFr, _I18nCacheFrLoaded
 	global _I18nFallbacksWarmed
-	global _I18nActiveCacheIdentity
+	global _I18nActiveCacheIdentity, _I18nConfiguredLocale
+	_I18nConfiguredLocale := ""
 	_I18nCache        := Map()
 	_I18nCacheLoaded  := false
 	_I18nCacheEn      := Map()
@@ -248,6 +249,32 @@ _I18nLazyCacheRoundTripsEscapes() {
 }
 Test("i18n cache: backslash + newline round-trip through the .tsv", _I18nLazyCacheRoundTripsEscapes)
 
+; perf-i18n-tsv-keys-2026-11-17: every key of the boot's 4,830-key locale went
+; through the per-character unescape, most of the 360 ms i18n stage. A key is
+; unescaped only when it holds a backslash, as a value already was, and an
+; escaped key still decodes exactly.
+_I18nTsvUnescapesOnlyEscapedKeys() {
+	BS := Chr(0x5C)
+	M := _I18nParseTSV("plain.key`tValue`n"
+		. "tab" . BS . "tkey" . BS . BS . "x`tv" . BS . "nw`n"
+		. _I18N_TSV_SENTINEL . "2`n", Chr(0x2605), Status := { Complete: false })
+	AssertTrue(Status.Complete, "both records count toward the sentinel")
+	AssertEqual("Value", M["plain.key"])
+	AssertTrue(M.Has("tab`tkey" . BS . "x"), "an escaped key must still decode exactly")
+	AssertEqual("v`nw", M["tab`tkey" . BS . "x"])
+	Body := _StripFullLineComments(_DriverFuncBody("_I18nParseTSV"))
+	Calls := StrSplit(Body, "_I18nUnescapeTSV(").Length - 1
+	Guarded := 0, Pos := 1
+	while (Pos := RegExMatch(Body, 'if InStr\((\w+), "\\"\)\s+\1 := _I18nUnescapeTSV\(\1\)', &Match, Pos)) {
+		Guarded += 1
+		Pos += Match.Len
+	}
+	AssertEqual(2, Calls, "the TSV parse unescapes its key and its value")
+	AssertEqual(Calls, Guarded,
+		"every field unescape of the TSV parse must sit behind its backslash check")
+}
+Test("i18n cache: the .tsv parse unescapes only the fields that hold a backslash", _I18nTsvUnescapesOnlyEscapedKeys)
+
 _I18nLazyCacheStoresRawStar() {
 	_I18nTestReset()
 	global _I18nCache, ScriptInformation
@@ -255,15 +282,20 @@ _I18nLazyCacheStoresRawStar() {
 	ScriptInformation["MagicKey"] := "@@"   ; distinct key so we can tell them apart
 	TsvPath := A_Temp . "\i18n_test_locale.tsv"
 	Path := _I18nTmpJson('{"hint": "Press ' . Chr(0x2605) . ' now"}')
-	_I18nLoadFile(Path)
-	AssertEqual("Press @@ now", _I18nCache["hint"], "in-memory cache must carry the substituted MagicKey")
-	Raw := FileRead(TsvPath, "UTF-8")
-	AssertTrue(InStr(Raw, Chr(0x2605)) > 0, "the .tsv must store the RAW ★ placeholder")
-	AssertFalse(InStr(Raw, "@@") > 0, "the .tsv must NOT bake in the MagicKey (stays cache-independent)")
-	FileDelete(Path)
-	FileDelete(TsvPath)
-	ScriptInformation["MagicKey"] := Saved
-	_I18nTestReset()
+	try {
+		_I18nLoadFile(Path)
+		; The magic key shows as « ★ (@@) » (2026-11-21), never the configured key alone.
+		AssertEqual("Press " . Chr(0x2605) . " (@@) now", _I18nCache["hint"],
+			"in-memory cache must carry the magic key's display")
+		Raw := FileRead(TsvPath, "UTF-8")
+		AssertTrue(InStr(Raw, Chr(0x2605)) > 0, "the .tsv must store the RAW ★ placeholder")
+		AssertFalse(InStr(Raw, "@@") > 0, "the .tsv must NOT bake in the MagicKey (stays cache-independent)")
+	} finally {
+		try FileDelete(Path)
+		try FileDelete(TsvPath)
+		ScriptInformation["MagicKey"] := Saved
+		_I18nTestReset()
+	}
 }
 Test("i18n cache: .tsv stores the raw ★ placeholder, not the MagicKey", _I18nLazyCacheStoresRawStar)
 
@@ -546,6 +578,9 @@ _I18nInitRetainsVerifiedCache() {
 	SavedShared := _SharedDir
 	SavedLocale := _I18nLocale
 	SavedMagic := ScriptInformation.Get("MagicKey", "★")
+	; The shared display rule is read from the real shared root before the
+	; fixture points _SharedDir at its own locale folder.
+	MagicKeyRulesShared()
 	Directory := A_Temp . "\ergopti-locale-reuse-" . A_ScriptHwnd . "-" . A_TickCount
 	DirCreate(Directory . "\core\i18n\data\locales")
 	Path := Directory . "\core\i18n\data\locales\fr.json"
@@ -561,7 +596,7 @@ _I18nInitRetainsVerifiedCache() {
 		I18nInit(Map("script", Map("locale", "fr")))
 		AssertTrue(_I18nCacheLoaded)
 		AssertTrue(_I18nCache == Cache, "unchanged source keeps the verified locale map")
-		AssertEqual("Press new", t("hint"), "raw templates update only the configured glyph")
+		AssertEqual("Press ★ (new)", t("hint"), "raw templates update only the configured glyph's display")
 		AssertEqual("old stays literal", t("other"), "literal text never undergoes old-token replacement")
 		Timestamp := FileGetTime(Path, "M")
 		FileDelete(Path)
@@ -569,7 +604,7 @@ _I18nInitRetainsVerifiedCache() {
 		FileSetTime(Timestamp, Path, "M")
 		I18nInit(Map("script", Map("locale", "fr")))
 		AssertFalse(_I18nCacheLoaded, "same timestamp and size cannot conceal changed source bytes")
-		AssertEqual("Other new", t("hint"), "a detected source edit must also bypass a stale timestamp-valid TSV")
+		AssertEqual("Other ★ (new)", t("hint"), "a detected source edit must also bypass a stale timestamp-valid TSV")
 	} finally {
 		_SharedDir := SavedShared
 		_I18nLocale := SavedLocale
@@ -861,7 +896,7 @@ _IDN_InitFromRegion(Region, UiRegion := "", UseNative := false) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _LOGGER_VOLUME
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
 	PreviousCritical := Critical("On")
 	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
@@ -876,7 +911,6 @@ _IDN_InitFromRegion(Region, UiRegion := "", UseNative := false) {
 	try {
 		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
 		_ResetLogger()
-		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
 		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""

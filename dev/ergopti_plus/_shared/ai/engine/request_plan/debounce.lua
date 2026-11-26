@@ -24,7 +24,7 @@
 ---    llm.trigger.min_request_interval_ms) and never reads the configuration
 ---    itself, so an invalid value fails where the setting lives.
 ---
---- The AutoHotkey twin (windows/modules/llm/prediction_keystats.ahk and
+--- The AutoHotkey twin (windows/ai/engine/prediction/keystats.ahk and
 --- prediction_exec.ahk) replays the same vectors when its side is ported.
 --- ==============================================================================
 

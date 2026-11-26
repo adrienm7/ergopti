@@ -31,7 +31,7 @@ local M = {}
 
 local hs            = hs
 local notifications = require("core.ui.engine.notifications")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings       = require("core.timing.engine.timings")
@@ -39,8 +39,8 @@ local Logger        = require("core.logger.engine.logger")
 local Keycodes      = require("platform.input.keycodes")
 local i18n          = require("core.i18n.engine.i18n")
 
-local Engine    = require("modules.gestures.engine")
-local GestActions = require("modules.gestures.actions")
+local Engine    = require("gestures.engine.engine")
+local GestActions = require("gestures.engine.actions")
 local KeyState  = require("platform.input.key_state")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
 local ScriptChords = require("keyboard.engine.layers.script_chords")
@@ -559,6 +559,19 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
+	-- The navigation layer's wheel is no shortcut: pause_bindings() leaves it
+	-- bound, as the Shortcuts switch does, so the pause holds it back here.
+	if _shortcuts and type(_shortcuts.pause_layer_wheel) == "function" then
+		ok_step, step_reason = add_required_step(
+			"shortcuts.pause_layer_wheel",
+			_shortcuts.pause_layer_wheel,
+			_shortcuts.resume_layer_wheel,
+			nil,
+			"shortcuts.resume_layer_wheel"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
 	-- suspend() preserves CoreState.enabled while gating every gesture. The
 	-- fallback is only reversible when gestures were enabled before pause.
 	if _gestures and type(_gestures.suspend) == "function" then
@@ -581,7 +594,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local api, api_reason = require_pause_module("modules.llm.api_mlx")
+	local api, api_reason = require_pause_module("ai.engine.api.mlx")
 	if api_reason then return false, api_reason end
 	if api then
 		local pause_mlx = type(api.pause_warmup) == "function"
@@ -597,7 +610,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local wc, wc_reason = require_pause_module("modules.llm.warmup_controller")
+	local wc, wc_reason = require_pause_module("ai.engine.local_servers.warmup_controller")
 	if wc_reason then return false, wc_reason end
 	if wc then
 		local warmup_rollback = nil
@@ -621,7 +634,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local oll, oll_reason = require_pause_module("modules.llm.api_ollama")
+	local oll, oll_reason = require_pause_module("ai.engine.api.ollama")
 	if oll_reason then return false, oll_reason end
 	if oll then
 		local pause_ollama = type(oll.pause_warmup) == "function"
@@ -640,7 +653,7 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
-	local remote, remote_reason = require_pause_module("modules.llm.api_remote")
+	local remote, remote_reason = require_pause_module("ai.engine.api.remote")
 	if remote_reason then return false, remote_reason end
 	if remote then
 		local pause_remote = type(remote.pause_warmup) == "function"
@@ -657,6 +670,18 @@ local function pause_all()
 			"api_remote.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
+		-- The local server discovery talks to the servers: a pause holds it and
+		-- keeps its verdicts, so the AI menu still configures them (EDD-1).
+		if type(remote.pause_local_discovery) == "function" then
+			ok_step, step_reason = add_required_step(
+				"api_remote.pause_local_discovery",
+				remote.pause_local_discovery,
+				remote.resume_local_discovery,
+				nil,
+				"api_remote.resume_local_discovery"
+			)
+			if not ok_step then return false, step_reason end
+		end
 	end
 
 	for _, owner in ipairs({
@@ -1687,6 +1712,7 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	ConfigKeys.COMMAND.WPM_MENUBAR,
 	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",
@@ -2091,6 +2117,15 @@ end
 --- @return boolean
 function M.slot_runs(slot_id, paused)
 	return slot_runs(slot_id, paused)
+end
+
+--- The slot whose chord the tray shows beside an action's row: the first slot
+--- whose live chord runs it (the shared rule, ScriptChords.hint_slot).
+--- @param action string The tray row's action id.
+--- @return string|nil slot_id Nil when no chord runs it.
+function M.hint_slot(action)
+	local actions, chords_on = chord_state()
+	return ScriptChords.hint_slot(ChordCatalogue.get(), actions, chords_on, action)
 end
 
 --- The chord slots in menu order, as catalogue rows (id, hs, karabiner...).

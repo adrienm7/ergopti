@@ -235,9 +235,9 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 				["-"] = { keycode = 12, level = 1, mods = {} }, [" "] = { keycode = 57, level = 1, mods = {} },
 				[":"] = { keycode = 39, level = 2, mods = { "shift" } },
 			})
-			local saved = package.loaded["modules.hotstrings.injector"]
+			local saved = package.loaded["hotstrings.engine.injector"]
 			local injected = {}
-			package.loaded["modules.hotstrings.injector"] = {
+			package.loaded["hotstrings.engine.injector"] = {
 				inject = function(erase, text) injected[#injected + 1] = erase .. ":" .. text; return { ok = true } end,
 			}
 			local ok, err = pcall(function()
@@ -252,7 +252,7 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 					"then = types nothing on the keyboard")
 				helpers.assert_eq(injected, { "0:º" }, "the injector types º, which the layout has no key for")
 			end)
-			package.loaded["modules.hotstrings.injector"] = saved
+			package.loaded["hotstrings.engine.injector"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)

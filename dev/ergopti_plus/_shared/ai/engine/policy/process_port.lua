@@ -89,6 +89,16 @@ function M.new(Worker, NativeProcess, native, retry_ms)
 			return observed and latest == true and not settled and not cancelled
 				and owners[owner] == operation and facade.native_operation == capability
 		end
+		--- The pid of the running physical child, nil unless it is held running.
+		--- @return number|nil pid
+		function operation:pid()
+			if not operation:is_running() then return nil end
+			local capability = facade.native_operation
+			if type(capability.pid) ~= "function" then return nil end
+			local ok, pid = pcall(capability.pid, capability)
+			if not ok or type(pid) ~= "number" or pid < 1 or pid % 1 ~= 0 then return nil end
+			return pid
+		end
 		function operation:on_settled(listener)
 			if type(listener) ~= "function" then return false end
 			if settled then notify(listener) else listeners[#listeners + 1] = listener end

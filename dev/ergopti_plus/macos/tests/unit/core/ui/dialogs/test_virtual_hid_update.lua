@@ -110,8 +110,41 @@ helpers.describe("VirtualHIDDevice driver update offer", function()
 		local Refused, refused_world = load("karabiner.vhid_update.confirm")
 		Refused.open(remap(false, "vhid_update_signature_refused"),
 			function() refused_world.reloads = refused_world.reloads + 1 end)
-		helpers.assert_eq(refused_world.alerts[2].body, "karabiner.vhid_update.failed|vhid_update_signature_refused")
+		helpers.assert_eq(refused_world.alerts[2].body, "karabiner.vhid_update.failed_signature")
 		helpers.assert_eq(refused_world.reloads, 0)
 		restore()
+	end)
+
+	-- SNU-05: the refusal reached the user as « could not be updated
+	-- (vhid_update_digest_mismatch) », a code in no language that says nothing
+	-- of what to do.
+	helpers.it("names each refusal's cause in the user's language, never its code (snu-05)", function()
+		local REASON = require("platform.remap.runtime_vhid_update").REASON
+		local expected = {
+			[REASON.STORE] = "failed_download", [REASON.DOWNLOAD] = "failed_download",
+			[REASON.SIZE] = "failed_download", [REASON.DIGEST] = "failed_download",
+			[REASON.SIGNATURE] = "failed_signature", [REASON.INSTALL] = "failed_install",
+			[REASON.ACTIVATE] = "failed_install", [REASON.UNPINNED] = "failed_unavailable",
+			[REASON.NOT_OFFERED] = "failed_unavailable",
+		}
+		local checked = 0
+		for _, reason in pairs(REASON) do
+			if reason ~= REASON.CANCELLED then
+				local Offer, world = load("karabiner.vhid_update.confirm")
+				Offer.open(remap(false, reason), function() world.reloads = world.reloads + 1 end)
+				helpers.assert_eq(world.alerts[2].body, "karabiner.vhid_update." .. expected[reason], reason)
+				helpers.assert_true(world.alerts[2].body:find(reason, 1, true) == nil, "no raw reason: " .. reason)
+				checked = checked + 1
+				restore()
+			end
+		end
+		helpers.assert_eq(checked, 9, "every refusal reason is covered")
+		local locales = helpers.driver_root() .. "../_shared/core/i18n/data/locales/"
+		local en = hs.json.decode(require("tests.support.source_file").read(locales .. "en.json"))
+		for _, name in ipairs({ "failed_download", "failed_signature", "failed_install", "failed_unavailable" }) do
+			local text = en["karabiner.vhid_update." .. name]
+			helpers.assert_true(type(text) == "string" and text:find("menu", 1, true) ~= nil,
+				name .. " says where to try again")
+		end
 	end)
 end)

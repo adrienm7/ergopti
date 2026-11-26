@@ -11,8 +11,8 @@ local helpers = require("tests.helpers")
 local Document = require("tests.support.document_fixture")
 
 local function with_browser(body)
-	local previous = package.loaded["ui.model_browser.bridge"]
-	local bridge = helpers.load_module("ui.model_browser.bridge")
+	local previous = package.loaded["ai.ui.model_browser.bridge"]
+	local bridge = helpers.load_module("ai.ui.model_browser.bridge")
 	local seen = { refreshes = 0, cache = { "qwen3.5:0.8b" }, identity = {}, selected = {}, downloads = {} }
 	local llm = {
 		get_models = function() error("page reprojection cannot call an acquiring getter") end,
@@ -38,7 +38,7 @@ local function with_browser(body)
 	local fixture = Document.new("model_browser", bridge, { llm = llm })
 	local ok, failure = xpcall(function() body(fixture, bridge, seen) end, debug.traceback)
 	local closed, acknowledgement = pcall(fixture.close)
-	package.loaded["ui.model_browser.bridge"] = previous
+	package.loaded["ai.ui.model_browser.bridge"] = previous
 	assert(ok, failure)
 	assert(closed and acknowledgement, "actual Manager fixture must retire its owned document")
 end
@@ -105,8 +105,8 @@ helpers.describe("model browser inventory document", function()
 	end)
 	for _, action in ipairs({ "select_model", "delete_model" }) do
 		helpers.it("(inventory-review) refuses " .. action .. " after a same-model source successor", function()
-			local previous = package.loaded["ui.menu.llm_backend_rows"]
-			package.loaded["ui.menu.llm_backend_rows"] = { api_page = function() return { rows = {}, providers = {}, tools = {} } end }
+			local previous = package.loaded["ai.ui.menu.backend_rows"]
+			package.loaded["ai.ui.menu.backend_rows"] = { api_page = function() return { rows = {}, providers = {}, tools = {} } end }
 			local ok, failure = pcall(with_browser, function(f, bridge, seen)
 				local deletes = 0
 				bridge.bind({ dialogs = {}, delete_model = function() deletes = deletes + 1; return true end,
@@ -123,7 +123,7 @@ helpers.describe("model browser inventory document", function()
 				else helpers.assert_eq(result.selected, false) end
 				helpers.assert_eq(deletes, 0); helpers.assert_eq(seen.selected, {})
 			end)
-			package.loaded["ui.menu.llm_backend_rows"] = previous
+			package.loaded["ai.ui.menu.backend_rows"] = previous
 			assert(ok, failure)
 		end)
 	end
@@ -308,8 +308,8 @@ helpers.describe("model browser inventory document", function()
 	end)
 
 	helpers.it("(linux-model-inventory-owner) refuses deletion of an obsolete installed row", function()
-		local previous = package.loaded["ui.menu.llm_backend_rows"]
-		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+		local previous = package.loaded["ai.ui.menu.backend_rows"]
+		package.loaded["ai.ui.menu.backend_rows"] = { api_page = function()
 			return { rows = {}, providers = {}, tools = {} }
 		end }
 		local ok, failure = pcall(with_browser, function(f, bridge, seen)
@@ -328,7 +328,7 @@ helpers.describe("model browser inventory document", function()
 			helpers.assert_eq(result.deleted, false)
 			helpers.assert_eq(deletions, 0)
 		end)
-		package.loaded["ui.menu.llm_backend_rows"] = previous
+		package.loaded["ai.ui.menu.backend_rows"] = previous
 		assert(ok, failure)
 	end)
 
@@ -350,8 +350,8 @@ helpers.describe("model browser inventory document", function()
 
 	for _, mode in ipairs({ "throw", "refuse", "inline" }) do
 		helpers.it("(model-selector-listing-refusal) reports " .. mode .. " without leaking an exception", function()
-			local previous, states = package.loaded["ui.menu.llm_backend_rows"], {}
-			package.loaded["ui.menu.llm_backend_rows"] = { api_page = function(_, _, _, _, listings)
+			local previous, states = package.loaded["ai.ui.menu.backend_rows"], {}
+			package.loaded["ai.ui.menu.backend_rows"] = { api_page = function(_, _, _, _, listings)
 				if listings and listings.e1 then states[#states + 1] = listings.e1.state end
 				return { rows = {}, providers = {}, tools = {} }
 			end }
@@ -377,14 +377,14 @@ helpers.describe("model browser inventory document", function()
 				end
 				helpers.assert_eq(states[#states], mode == "inline" and "listed" or "failed")
 			end)
-			package.loaded["ui.menu.llm_backend_rows"] = previous
+			package.loaded["ai.ui.menu.backend_rows"] = previous
 			assert(ok, failure)
 		end)
 	end
 
 	helpers.it("(model-selector-private-error) keeps action exceptions out of the log", function()
-		local previous = package.loaded["ui.menu.llm_backend_rows"]
-		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+		local previous = package.loaded["ai.ui.menu.backend_rows"]
+		package.loaded["ai.ui.menu.backend_rows"] = { api_page = function()
 			return { rows = {}, tools = {}, providers = { { id = "test", label = "Test",
 				run = function() error("synthetic-private-token") end } } }
 		end }
@@ -405,7 +405,7 @@ helpers.describe("model browser inventory document", function()
 				helpers.assert_true(not message:find("synthetic-private-token", 1, true))
 			end
 		end)
-		package.loaded["ui.menu.llm_backend_rows"] = previous
+		package.loaded["ai.ui.menu.backend_rows"] = previous
 		assert(ok, failure)
 	end)
 
@@ -425,8 +425,8 @@ helpers.describe("model browser inventory document", function()
 	end)
 
 	helpers.it("(linux-model-delete-owner) passes the page owner to the model deletion", function()
-		local previous = package.loaded["ui.menu.llm_backend_rows"]
-		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+		local previous = package.loaded["ai.ui.menu.backend_rows"]
+		package.loaded["ai.ui.menu.backend_rows"] = { api_page = function()
 			return { rows = {}, providers = {}, tools = {} }
 		end }
 		local ok, failure = pcall(with_browser, function(f, bridge)
@@ -449,7 +449,7 @@ helpers.describe("model browser inventory document", function()
 			f.send({ action = "delete_model", backend = "ollama", name = installed.name })
 			helpers.assert_eq(checked, true)
 		end)
-		package.loaded["ui.menu.llm_backend_rows"] = previous
+		package.loaded["ai.ui.menu.backend_rows"] = previous
 		assert(ok, failure)
 	end)
 
@@ -478,8 +478,8 @@ helpers.describe("model browser inventory document", function()
 	end
 
 	helpers.it("(model-selector-api-owner) passes the actual page lifetime to API callbacks", function()
-		local previous, current = package.loaded["ui.menu.llm_backend_rows"], nil
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		local previous, current = package.loaded["ai.ui.menu.backend_rows"], nil
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			api_page = function(_, _, _, _, _, owner)
 				current = owner
 				return { rows = {}, providers = {}, tools = {} }
@@ -496,7 +496,7 @@ helpers.describe("model browser inventory document", function()
 			bridge.on_window_acquiring(9999)
 			helpers.assert_eq(current(), false)
 		end)
-		package.loaded["ui.menu.llm_backend_rows"] = previous
+		package.loaded["ai.ui.menu.backend_rows"] = previous
 		assert(ok, failure)
 	end)
 
@@ -554,7 +554,7 @@ helpers.describe("model browser inventory document", function()
 			local factory = assert(compile("return function(rebuild_tray_menu, require) return " .. callback .. " end"))()
 			local rebuilt, before = 0, #f.effects
 			local notify = factory(function() rebuilt = rebuilt + 1 end, function(name)
-				helpers.assert_eq(name, "ui.model_browser.bridge")
+				helpers.assert_eq(name, "ai.ui.model_browser.bridge")
 				return bridge
 			end)
 			notify()
@@ -594,8 +594,8 @@ helpers.describe("model browser inventory document", function()
 	helpers.it("(model-selector-install-button) Install Ollama follows the runtime and runs the AI enable", function()
 		-- The API rows are another owner's (test_model_selector_api_listing);
 		-- the real one would load the HTTP stack this fixture does not provide.
-		local saved_rows = package.loaded["ui.menu.llm_backend_rows"]
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		local saved_rows = package.loaded["ai.ui.menu.backend_rows"]
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			api_page = function() return { rows = {}, providers = {}, tools = {} } end,
 		}
 		local ok, failure = pcall(with_browser, function(f, bridge)
@@ -658,7 +658,7 @@ helpers.describe("model browser inventory document", function()
 			helpers.assert_eq(#f.effects, painted + 1, "and the page learns where the install stands")
 			bridge._reset()
 		end)
-		package.loaded["ui.menu.llm_backend_rows"] = saved_rows
+		package.loaded["ai.ui.menu.backend_rows"] = saved_rows
 		assert(ok, failure)
 	end)
 

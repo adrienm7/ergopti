@@ -123,9 +123,9 @@ helpers.describe("configured Linux ordered pair ownership", function()
 		local _,action,_,frame = process(state,15,0,100); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
 	end)
 	helpers.it("leaves a tap-only AI pair to the keys while the AI is off and takes it once on (ai-off-pair)", function()
-		local previous = package.loaded["modules.llm.prediction_engine"]
+		local previous = package.loaded["ai.engine.prediction.engine"]
 		local switch = { enabled = false }
-		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return switch.enabled end }
+		package.loaded["ai.engine.prediction.engine"] = { is_enabled = function() return switch.enabled end }
 		local ok, err = pcall(function()
 			local text = base_text:gsub('caps_lock_then_tab = "shift"', 'caps_lock_then_tab = "none"')
 				:gsub('caps_lock_then_tab = "run_program"', 'caps_lock_then_tab = "llm_generate_prediction"')
@@ -143,12 +143,20 @@ helpers.describe("configured Linux ordered pair ownership", function()
 			helpers.assert_eq(slot, binding)
 			helpers.assert_true(frame.ack(true))
 		end)
-		package.loaded["modules.llm.prediction_engine"] = previous
+		package.loaded["ai.engine.prediction.engine"] = previous
 		if not ok then error(err, 0) end
 	end)
-	helpers.it("refuses a cross-keyboard pair and a duplicate-code source collision", function()
+	-- KCD-7 (maintainer decision of 2026-11-21): a pair across two keyboards
+	-- runs, as on Windows and macOS.
+	helpers.it("(kcd-7) admits a pair whose second key comes from another keyboard", function()
 		local state = make(); process(state,58,1,0)
-		local _,action,_,frame = process(state,15,1,10,origin(7,"other-keyboard")); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
+		local _,action,_,frame = process(state,15,1,10,origin(7,"other-keyboard"))
+		helpers.assert_true(frame ~= nil, "the key struck on the other keyboard is taken by the pair")
+		helpers.assert_eq(action,nil,"the pair has a hold: it decides at release, as on one keyboard")
+		helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("refuses a duplicate-code source collision", function()
+		local state = make(); process(state,58,1,0)
 		helpers.assert_eq(rows(process(state,58,1,20,origin(7,"other-keyboard"))),"")
 		helpers.assert_eq(rows(process(state,58,0,30,origin(7,"other-keyboard"))),"")
 		helpers.assert_true(state.base.held[58] ~= nil)
@@ -205,7 +213,7 @@ end
 helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("dispatches the action between acknowledged lift and restore in the actual hook", function()
 		local state = make(); local emitted, observed = {}, false
-		protected_modules({ ["platform.input.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"] = false, ["hotstrings.engine.device_finder"] = { physical_sources = function(devices)
 			local out = {}; for _, device in ipairs(devices) do out[#out + 1] = { path=device,sysfs="/controlled/physical",name="controlled",physical=true } end; return out
 		end } }, function()
 			local hook = helpers.load_module("platform.input.keyboard_hook")
@@ -229,7 +237,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["platform.remap.nav_layer"]={load=function() return {} end},
 			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
-			["infra.config_paths"]={config=function() return path end} },function()
+			["settings.engine.paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
 			-- requires it; previous cache identity is restored by the outer guard.
 			local manager = require("platform.remap.tap_hold_manager")
@@ -255,16 +263,16 @@ helpers.describe("combination binding canonical program dispatch",function()
 		end
 		publish()
 		local ok,err = pcall(function()
-			protected_modules({ ["modules.gestures.manager"]=false,
+			protected_modules({ ["gestures.engine.manager"]=false,
 				["core.fs.adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
 				["modules.shortcuts.key_combinations"]={ get_action=state.owner.get_action,capture_action=state.owner.capture_action },
-				["modules.gestures.program_owner"]={new=function(capture) return {
+				["gestures.engine.program_owner"]={new=function(capture) return {
 					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
 				} end},
 				["adapters.window_switch"]={new=function() return {stop=function() return true end} end},
-				["ui.gesture_conflicts"]={notify_boot=function() end},
+				["gestures.ui.conflicts"]={notify_boot=function() end},
 			},function()
-				local manager = require("modules.gestures.manager")
+				local manager = require("gestures.engine.manager")
 				manager.init({persist=true,enabled=false,config_path=config_path,is_paused=function() return state.paused end})
 				helpers.assert_eq(manager.get_action_parameter(binding,"run_program"),scalar)
 				helpers.assert_true(manager.run_program(binding)); helpers.assert_eq(captured,scalar)
@@ -277,10 +285,50 @@ helpers.describe("combination binding canonical program dispatch",function()
 		if not ok then error(err,0) end
 	end)
 end)
+-- KCD-2 (maintainer decision of 2026-11-22): a pair's chord runs a program
+-- under the binding of the pair that owns it, its table [mod_combos.config.<pair>].
+helpers.describe("(kcd-2-chord-runs) combination chord program dispatch",function()
+	helpers.it("(kcd-2-chord-runs) runs a chord's program and blocks a source change",function()
+		local scalar = '{"version":1,"executable":"/controlled/program","arguments":[]}'
+		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab="copy"\n[mod_combos.config.caps_lock_then_tab]\ncombo="run_program"\n[gesture_parameters]\n' .. binding .. '__run_program=\'' .. scalar .. '\'\n'
+		local bytes, captured, admission, chord_current = text, nil, nil, true
+		local config_path = os.tmpname()
+		local file = assert(io.open(config_path, "wb")); assert(file:write(bytes)); assert(file:close())
+		local ok,err = pcall(function()
+			protected_modules({ ["gestures.engine.manager"]=false,
+				["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+				["modules.shortcuts.key_combinations"]={ get_action=function() return "copy" end,
+					get_chord=function(pair) return pair=="caps_lock_then_tab" and "run_program" or "none" end,
+					capture_action=function() return nil end,
+					capture_chord=function(slot,action)
+						if slot~=binding or action~="run_program" then return nil end
+						return function() return chord_current end
+					end },
+				["gestures.engine.program_owner"]={new=function(capture) return {
+					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
+				} end},
+				["adapters.window_switch"]={new=function() return {stop=function() return true end} end},
+				["gestures.ui.conflicts"]={notify_boot=function() end},
+			},function()
+				local manager = require("gestures.engine.manager")
+				manager.init({persist=true,enabled=false,config_path=config_path,is_paused=function() return false end})
+				helpers.assert_true(manager.run_program(binding),"the chord's program starts")
+				helpers.assert_eq(captured,scalar)
+				chord_current = false
+				assert_false(admission(),"a chord the owner no longer runs cannot keep its launch")
+				chord_current = true
+				bytes = bytes .. "\n# edited after capture\n"
+				assert_false(admission(),"a changed source cannot keep the launch")
+			end)
+		end)
+		os.remove(config_path)
+		if not ok then error(err,0) end
+	end)
+end)
 helpers.describe("pair native receipt refusal boundaries",function()
 	helpers.it("never invokes action or modal after a refused real hook output port",function()
 		local state = make(); local actions, modal = 0,0
-		protected_modules({ ["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _, device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end} },function()
 			local hook = require("platform.input.keyboard_hook")
@@ -325,7 +373,7 @@ helpers.describe("configured pair publication lifecycle",function()
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
-			["infra.config_paths"]={config=function() return path end}},function()
+			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
@@ -352,7 +400,7 @@ end)
 helpers.describe("pair source and restoration refusals",function()
 	helpers.it("refuses malformed source after installation and forwards unrelated grabbed input",function()
 		local state=make();state.bytes='[shortcuts.key_combination_taps\n'
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");local emitted,actions={},0
@@ -406,7 +454,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
-			["infra.config_paths"]={config=function() return path end}},function()
+			["settings.engine.paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
 				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
@@ -445,7 +493,7 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("resumes baseline letters after exact source-revocation retirement through the actual hook",function()
 		local state=make();local emitted,actions={},0
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
@@ -458,7 +506,7 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("keeps baseline output acquisition owned during reentrant native retirement",function()
 		local state=make();local accepted,entered
-		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["hotstrings.engine.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
 			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
@@ -726,7 +774,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 				elseif replacement == "issuer" then require("platform.remap.key_combination_engine").input_owner_current = function() return true end
 				elseif replacement == "lease" then setmetatable(s.lease, {})
 				elseif replacement == "configuration" then s.paused = true
-				elseif replacement == "classification" then require("modules.hotstrings.device_finder").physical_sources = function() return {} end
+				elseif replacement == "classification" then require("hotstrings.engine.device_finder").physical_sources = function() return {} end
 				elseif replacement == "hook" then s.hook.arm_one_shot = function() return true end
 				else helpers.assert_true(s.engine:set_tap_holds_enabled(false)); helpers.assert_true(s.engine:set_tap_holds_enabled(true)) end
 				assert_false(s.hook.input_owner_current(s.lease))
@@ -1474,12 +1522,14 @@ helpers.describe("same-device third slot through original production consumers (
 			helpers.assert_eq(native_rows(s),"29:1 29:0 28:1 28:0")
 		end)
 	end)
-	helpers.it("does not steal a matching second from a different original device",function()
+	-- KCD-7 (maintainer decision of 2026-11-21): a chord across two keyboards
+	-- runs, as on Windows and macOS.
+	helpers.it("(kcd-7) a chord takes its second key from a different original device",function()
 		with_chord({},function(s)
 			s.edge("a",58,1,1000);s.edge("b",15,1,1010)
-			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 15:1")
+			helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+			helpers.assert_true(not native_rows(s):find("15:1",1,true),"the second key never reaches the application")
 			s.edge("b",15,0,1011);s.edge("a",58,0,1200)
-			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
 		end)
 	end)
 	for _,field in ipairs({"symmetric", "simultaneous_threshold_ms"}) do
@@ -1607,7 +1657,7 @@ helpers.describe("acknowledged buffered Reader cohort replacement (controlled tr
 		end},function(s)
 			s.edge("a",58,1,1000);s.edge("a",15,1,1010)
 			s.edge("a",58,0,1020);s.edge("a",15,0,1021)
-			local finder=require("modules.hotstrings.device_finder")
+			local finder=require("hotstrings.engine.device_finder")
 			local slot="keyboard:"..s.paths.a
 			local first=assert(s.reader.capture_source_owner(slot))
 			local function reconcile()
@@ -1686,7 +1736,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  for _,field in ipairs({"default_for","find_entry_by_path"}) do
   helpers.it("retires pending input after replaced declared getter "..field,function()
    with_public({},function(s)
-    local features=require("infra.manifest_reader");local original=features[field]
+    local features=require("menu.engine.manifest_reader");local original=features[field]
     s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
     features[field]=function(...) return original(...) end
     local called,detail=pcall(function()
@@ -1701,7 +1751,7 @@ helpers.describe("generated Linux defaults received by original native combinati
  end
  helpers.it("retires pending input after mutation of the original declared default map",function()
   with_public({},function(s)
-   local features=require("infra.manifest_reader")
+   local features=require("menu.engine.manifest_reader")
    local entry=features.find_entry_by_path("mod_combos.simultaneous_threshold_ms");local previous=entry.default
    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
    entry.default=101
@@ -1714,16 +1764,22 @@ helpers.describe("generated Linux defaults received by original native combinati
    if not called then error(detail,0) end
   end)
  end)
+ -- KCD-3 (maintainer decision of 2026-11-21): a refused delay or a switch that
+ -- is not a boolean is reported and the declared value applies, as on Windows
+ -- and macOS; the chords never all turn off for it.
  for _,stored in ipairs({'0','3.5','1001','"100"'}) do
-  helpers.it("reports a refused stored chord delay "..stored.." and keeps the chords off (value-validation)",function()
+  helpers.it("(kcd-3) reports a refused stored chord delay "..stored.." and applies the declared delay",function()
    local Outdated=require("settings.engine.migration.outdated")
    local original,reported=Outdated.report,{}
    Outdated.report=function(path,detail,...) reported[#reported+1]={path,detail};return original(path,detail,...) end
    local ok,err=pcall(with_public,{before_manager=function(s)
      s.bytes='[mod_combos]\nsimultaneous_threshold_ms='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
     end},function(s)
-    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1},"a refused delay never delays the original hold")
-    s.edge("a",58,0,1100)
+    helpers.assert_eq(s.owner.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    s.edge("a",58,1,1100)
+    helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}},"the declared delay runs the chord")
+    s.edge("a",15,0,1101);s.edge("a",58,0,1102)
    end)
    Outdated.report=original
    if not ok then error(err,0) end
@@ -1734,8 +1790,28 @@ helpers.describe("generated Linux defaults received by original native combinati
    helpers.assert_true(found,"the refused delay is reported, never dropped silently")
   end)
  end
+ for _,stored in ipairs({'"false"','0','1'}) do
+  helpers.it("(kcd-3) warns on a non-boolean chord switch "..stored.." and keeps the chords on",function()
+   local Logger=require("core.logger.engine.shim")
+   local original,warned=Logger.warn,{}
+   Logger.warn=function(scope,message,...) warned[#warned+1]=string.format(message,...);return original(scope,message,...) end
+   local ok,err=pcall(with_public,{before_manager=function(s)
+     s.bytes='[mod_combos]\nenabled='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+    end},function(s)
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    s.edge("a",58,1,1050)
+    helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}},"the chords stay on")
+    s.edge("a",15,0,1101);s.edge("a",58,0,1102)
+   end)
+   Logger.warn=original
+   if not ok then error(err,0) end
+   local found=false
+   for _,line in ipairs(warned) do if line:find("not a boolean",1,true) then found=true end end
+   helpers.assert_true(found,"the non-boolean switch is reported, never dropped silently")
+  end)
+ end
  for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
-  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
+  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n'}) do
   helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
    with_public({before_manager=function(s) s.bytes=text end},function(s)
     s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1})
@@ -2213,10 +2289,10 @@ end)
 -- One chord action this driver lacks (another OS's, written by a shared
 -- configuration) used to drop every chord without a word (TCL-003).
 helpers.describe("chord slots read from config.toml", function()
-	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+	local function chord_snapshot(chords, assignable)
 		local text = base_text .. '[mod_combos]\nenabled = true\n'
-			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
-			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
+			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "' .. chords[1] .. '"\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. chords[2] .. '"\n'
 		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
 			files = { read_with_status = function(file)
 				if file == path then return text, "ok" end
@@ -2225,13 +2301,75 @@ helpers.describe("chord slots read from config.toml", function()
 			route = function() return path end,
 			is_paused = function() return false end,
 			changed = function() return true end,
-			actions = { is_assignable = function(action) return action == "run_program" end } })
+			actions = { is_assignable = function(action) return assignable[action] == true end } })
 		local token = {}
 		helpers.assert_true(owner.acquire_configuration(token))
 		local snapshot = owner.configuration_snapshot(token)
-		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
-		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "run_program")
-		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
 		helpers.assert_true(owner.release_configuration(token))
+		return snapshot
+	end
+	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+		local snapshot = chord_snapshot({ "copy", "mission_control" }, { copy = true })
+		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
+		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy")
+		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
+	end)
+	-- Linux turned an unavailable tap or hold, and a pair on a key this keyboard
+	-- lacks, into nothing without a word; Windows warns for each.
+	helpers.it("(kcl-invalid-pair-slot-logged) an unread pair slot is logged", function()
+		local Logger = require("core.logger.engine.shim")
+		local warn, warned = Logger.warn, {}
+		Logger.warn = function(module, message, ...) warned[#warned + 1] = string.format(message, ...); return warn(module, message, ...) end
+		local text = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "foreign_action"\nfuture_then_tab = "copy"\n'
+			.. '[shortcuts.key_combination_holds]\ntab_then_caps_lock = "foreign_hold"\n'
+		local ok, err = pcall(function()
+			local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+				files = { read_with_status = function(file)
+					if file == path then return text, "ok" end
+					return nil, "absent"
+				end },
+				route = function() return path end,
+				is_paused = function() return false end,
+				changed = function() return true end,
+				actions = { is_assignable = function(action) return action == "copy" end } })
+			helpers.assert_eq(owner.get_action("caps_lock_then_tab"), "none")
+			helpers.assert_eq(owner.get_hold("tab_then_caps_lock"), "none")
+		end)
+		Logger.warn = warn
+		helpers.assert_true(ok, tostring(err))
+		local function said(...)
+			for _, line in ipairs(warned) do
+				local all = true
+				for _, part in ipairs({ ... }) do all = all and line:find(part, 1, true) ~= nil end
+				if all then return true end
+			end
+			return false
+		end
+		helpers.assert_true(said("caps_lock_then_tab", "foreign_action"), "the unavailable tap is logged")
+		helpers.assert_true(said("tab_then_caps_lock", "foreign_hold"), "the unavailable hold is logged")
+		helpers.assert_true(said("future_then_tab"), "the pair on a missing key is logged")
+	end)
+	-- The read refuses and logs what no chord runs, as Windows does at its read.
+	helpers.it("(kcl-chord-read-refuses-chordless-action) the read refuses what the chord picker refuses", function()
+		for _, action in ipairs({ "one_shot_shift" }) do
+			local Logger = require("core.logger.engine.shim")
+			local warn, warned = Logger.warn, nil
+			Logger.warn = function(module, message, ...) warned = string.format(message, ...); return warn(module, message, ...) end
+			local ok, snapshot = pcall(chord_snapshot, { "copy", action }, { copy = true, [action] = true })
+			Logger.warn = warn
+			helpers.assert_true(ok, tostring(snapshot))
+			helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy", "the other chord survives")
+			helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", action .. " runs in no chord")
+			helpers.assert_true(type(warned) == "string" and warned:find(action, 1, true) ~= nil, action .. " is logged")
+		end
+	end)
+	-- KCD-2 (maintainer decision of 2026-11-22): a chord runs a program launch
+	-- and the monitor Alt-Tab, as on Windows and macOS.
+	helpers.it("(kcd-2-chord-runs) the read keeps a chord's program launch and monitor Alt-Tab", function()
+		for _, action in ipairs({ "run_program", "alt_tab_monitor" }) do
+			local snapshot = chord_snapshot({ "copy", action }, { copy = true, [action] = true })
+			helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "copy")
+			helpers.assert_eq(snapshot.chords.tab_then_caps_lock, action, action .. " runs in a chord")
+		end
 	end)
 end)

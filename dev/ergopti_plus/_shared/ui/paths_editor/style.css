@@ -47,8 +47,10 @@ h1 {
 	margin: 0 0 2px;
 }
 
+/* Every small text keeps 7:1 on its background (WCAG 1.4.6): a dark grey
+   for the notes, the deep blue and brown for the tags and the save button. */
 .subtitle {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-48484c);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 12px;
@@ -84,8 +86,11 @@ h1 {
 	margin-bottom: 5px;
 }
 
-.row-icon {
+/* The row's icon is drawn, not read: its label names the row. */
+.row-header::before {
 	color: var(--theme-blue);
+	content: attr(data-icon);
+	content: attr(data-icon) / '';
 	flex-shrink: 0;
 	font-size: 13px;
 	line-height: 1;
@@ -102,6 +107,7 @@ label {
 	align-items: center;
 	display: flex;
 	gap: 5px;
+	margin: 0;
 }
 
 input[type='text'] {
@@ -112,6 +118,10 @@ input[type='text'] {
 	flex-grow: 1;
 	font-family: 'SF Mono', 'Monaco', monospace;
 	font-size: 10.5px;
+	/* With its label above, the field is a 44 px target (WCAG 2.5.5) whatever
+	   the fonts: drawn from its text alone, the pair met 44 px here and fell
+	   short on the CI runner's fonts. */
+	min-height: 32px;
 	outline: none;
 	padding: 5px 8px;
 	transition:
@@ -126,15 +136,22 @@ input[type='text']:focus {
 }
 
 input[type='text'].is-default {
-	color: var(--theme-grey-999);
+	color: var(--theme-hue-48484c);
 }
 
 /* The default folder shown under each field, and the logs field's note. */
 .row-default,
 .row-hint {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-48484c);
 	font-size: 10.5px;
 	margin: 5px 0 0;
+}
+
+/* « Default: <folder> » reads as one line. */
+.row-default dt,
+.row-default dd {
+	display: inline;
+	margin: 0;
 }
 
 .row-default code {
@@ -169,10 +186,10 @@ input[type='text'].is-default {
 .tag-default {
 	background: var(--theme-hue-e8f4ff);
 	border-radius: 4px;
-	color: var(--theme-blue);
+	color: var(--theme-hue-004a99);
 	font-size: 10px;
 	font-weight: 500;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 2px 6px;
 	white-space: nowrap;
 }
@@ -180,10 +197,10 @@ input[type='text'].is-default {
 .tag-modified {
 	background: var(--theme-hue-fff3e0);
 	border-radius: 4px;
-	color: var(--theme-hue-e65100);
+	color: var(--theme-hue-5c3800);
 	font-size: 10px;
 	font-weight: 500;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 2px 6px;
 	white-space: nowrap;
 }
@@ -204,7 +221,7 @@ input[type='text'].is-default {
 }
 
 .btns .reset {
-	margin-right: auto;
+	margin-inline-end: auto;
 }
 
 button {
@@ -227,14 +244,14 @@ button:hover {
 }
 
 .save {
-	background: var(--theme-blue);
+	background: var(--theme-hue-004a99);
 	color: var(--theme-white);
 }
 
 .reset {
 	background: transparent;
 	border: 1px solid var(--theme-grey-ccc);
-	color: var(--theme-grey-666);
+	color: var(--theme-hue-48484c);
 	font-size: 11.5px;
 	padding: 6px 12px;
 }
@@ -242,4 +259,12 @@ button:hover {
 .reset:hover {
 	background: var(--theme-grey-f0f0f0);
 	filter: none;
+}
+
+/* The main landmark holds the page and keeps the body's column layout. */
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
 }

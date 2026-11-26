@@ -76,7 +76,7 @@ _BPS_StampsAreReplayed() {
 	Replay := _DriverFuncBody("_BootProfileReplayStamps")
 	Assert(Replay != "", "_BootProfileReplayStamps() must exist in the driver source")
 	Assert(InStr(Replay, "drain") > 0,
-		"the replay must DRAIN the buffer, so a second BootProfile_Begin (the driver reloads itself on layout change) cannot re-emit the previous run's stamps as if they were this one's")
+		"the replay must DRAIN the buffer, so a reloaded driver process cannot re-emit the previous run's stamps as if they were this one's")
 	Assert(InStr(Replay, "_BOOT_PROFILE_START") == 0 and InStr(Replay, "_BOOT_PROFILE_LAST") == 0,
 		"the replay must not move the mark origin. Every existing phase line measures from BootProfile_Begin, and re-anchoring them on process creation would silently shift every number in the log, making new boots incomparable with the ones already collected")
 }

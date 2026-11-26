@@ -63,13 +63,19 @@ M.sections = {
 
 M.features = {
 	{
-		path = "script.locale", id = "locale", section = "script", default = "fr", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs", "linux" }, recommended = "fr", family = "setting",
+		path = "script.locale", id = "locale", section = "script", default = "", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "setting",
 	},
 	{
 		path = "script.log_level", id = "log_level", section = "script", default = "INFO", type = "enum", description_key = "menu.script.log_level", platforms = { "ahk", "hs", "linux" }, recommended = "INFO", family = "setting", enum_values = { "DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR" },
 	},
 	{
 		path = "script.show_error_dialog", id = "show_error_dialog", section = "script", default = true, type = "boolean", description_key = "menu.debug.show_error_dialog", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
+	},
+	{
+		path = "script.reading_font", id = "reading_font", section = "script", default = "default", type = "enum", description_key = "menu.configuration.reading_font", platforms = { "ahk", "hs", "linux" }, recommended = "default", family = "setting", enum_values = { "default", "hyperlegible", "dyslexic" },
+	},
+	{
+		path = "script.reading_spacing", id = "reading_spacing", section = "script", default = "default", type = "enum", description_key = "menu.configuration.reading_spacing", platforms = { "ahk", "hs", "linux" }, recommended = "default", family = "setting", enum_values = { "default", "wide" },
 	},
 	{
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
@@ -84,13 +90,13 @@ M.features = {
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" }, recommended = "★", family = "setting",
 	},
 	{
-		path = "hotstrings.magic_key_source", id = "magic_key_source", section = "hotstrings", default = "auto", type = "enum", description_key = "menu.hotstrings.magic_key_source", platforms = { "ahk", "hs", "linux" }, recommended = "auto", family = "setting", enum_values = { "auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash" },
-	},
-	{
-		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_detection_is_windows", platforms = { "ahk" },
-	},
-	{
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
+	},
+	{
+		path = "hotstrings.backspace_restore_enabled", id = "backspace_restore_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.backspace_restore_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
+	},
+	{
+		path = "hotstrings.backspace_restore_window_ms", id = "backspace_restore_window_ms", section = "hotstrings", default = 500, type = "number", description_key = "menu.hotstrings.backspace_restore_window", platforms = { "ahk", "hs", "linux" }, recommended = 500, family = "setting", preset_values = { 250, 500, 1000, 2000 },
 	},
 	{
 		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, family = "setting", preset_values = { 0, 1, 2, 3, 5, 10 },
@@ -121,6 +127,12 @@ M.features = {
 	},
 	{
 		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
+	},
+	{
+		path = "hotstrings.preview_category_glyphs", id = "preview_category_glyphs", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_category_glyphs", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
+	},
+	{
+		path = "hotstrings.preview_announcements", id = "preview_announcements", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_announcements", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
 	},
 	{
 		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting", cleared = false,
@@ -204,12 +216,6 @@ M.features = {
 		path = "hotstrings.rolls.chevron_equal", id = "chevron_equal", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_equal", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
 	},
 	{
-		path = "hotstrings.rolls.chevron_greater", id = "chevron_greater", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_greater", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
-		path = "hotstrings.rolls.chevron_less", id = "chevron_less", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.chevron_less", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
 		path = "hotstrings.rolls.close_chevron_tag", id = "close_chevron_tag", section = "hotstrings.rolls", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.rolls.close_chevron_tag", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 0.5 }, family = "feature",
 	},
 	{
@@ -244,9 +250,6 @@ M.features = {
 	},
 	{
 		path = "hotstrings.rolls.paren_quote", id = "paren_quote", section = "hotstrings.rolls", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.rolls.paren_quote", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
-	},
-	{
-		path = "hotstrings.magic_key.replace", id = "replace", section = "hotstrings.magic_key", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.magic_key.replace", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true }, family = "feature",
 	},
 	{
 		path = "hotstrings.magic_key.repeat_corrections", id = "repeat_corrections", section = "hotstrings.magic_key", default = { enabled = false, time_activation_seconds = 2 }, type = "feature", description_key = "menu.hotstrings.magic_key.repeat_corrections", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 2 }, family = "feature",
@@ -318,7 +321,7 @@ M.features = {
 		path = "hotstrings.dynamic.user_code", id = "user_code", section = "hotstrings.dynamic", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.user_code.title", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, family = "feature",
 	},
 	{
-		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false, pattern_max_length = 1 }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, pattern_max_length = 1 }, family = "feature",
+		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false }, family = "feature",
 	},
 	{
 		path = "hotstrings.personal.autocorrection", id = "autocorrection", section = "hotstrings.personal", default = { enabled = false, time_activation_seconds = 0.75 }, type = "feature", description_key = "menu.hotstrings.personal.autocorrection", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 0.75 }, family = "feature",
@@ -498,16 +501,22 @@ M.features = {
 		path = "shortcuts.search.search_engine_url_query", section = "shortcuts.search", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.take_note.dated_notes", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.dated_notes", section = "shortcuts.take_note", reason_key = "platform_reason.take_note_settings_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
+		path = "shortcuts.take_note.destination_folder", section = "shortcuts.take_note", reason_key = "platform_reason.take_note_settings_are_windows", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.a_grave.enabled", id = "enabled", section = "shortcuts.a_grave", default = false, type = "boolean", description_key = "menu.shortcuts.a_grave", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
 		path = "shortcuts.a_grave.letter", id = "letter", section = "shortcuts.a_grave", default = "v", type = "string", description_key = "menu.shortcuts.a_grave.letter", platforms = { "ahk", "linux" }, recommended = "v", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+	},
+	{
+		path = "shortcuts.star.enabled", id = "enabled", section = "shortcuts.star", default = false, type = "boolean", description_key = "menu.shortcuts.star", platforms = { "ahk", "linux" }, recommended = false, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
+	},
+	{
+		path = "shortcuts.star.letter", id = "letter", section = "shortcuts.star", default = "s", type = "string", description_key = "menu.shortcuts.star.letter", platforms = { "ahk", "linux" }, recommended = "s", family = "setting", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
 	},
 	{
 		path = "shortcuts.e_acute.enabled", id = "enabled", section = "shortcuts.e_acute", default = false, type = "boolean", description_key = "menu.shortcuts.e_acute", platforms = { "ahk", "linux" }, recommended = true, family = "feature", reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos",
@@ -543,21 +552,6 @@ M.features = {
 		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "setting",
 	},
 	{
-		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.mouse_drag_window", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.mouse_tab_switching", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.professional_environment", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.personal.programmable_keyboard", section = "shortcuts.personal", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
@@ -573,10 +567,16 @@ M.features = {
 		path = "shortcuts.script_control.script_altgr_escape", id = "script_altgr_escape", section = "shortcuts.script_control", default = "script_quit", type = "action", description_key = "menu.shortcuts.script_control.script_altgr_escape", platforms = { "ahk", "hs", "linux" }, recommended = "script_quit", family = "feature", cleared = "none",
 	},
 	{
-		path = "shortcuts.keyboard.magic_editor", id = "magic_editor", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.magic_editor", platforms = { "ahk", "hs", "linux" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none",
+		path = "shortcuts.keyboard.meta_star", id = "meta_star", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.meta_star", platforms = { "ahk", "linux" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none", reason_key = "platform_reason.star_slot_is_ctrl_on_macos",
 	},
 	{
-		path = "shortcuts.keyboard.primary_b", section = "shortcuts.keyboard", platforms = { "ahk" },
+		path = "shortcuts.keyboard.secondary_star", id = "secondary_star", section = "shortcuts.keyboard", default = "open_hotstrings_editor", type = "action", description_key = "menu.shortcuts.keyboard.secondary_star", platforms = { "hs" }, recommended = "open_hotstrings_editor", family = "feature", cleared = "none", reason_key = "platform_reason.star_slot_is_ctrl_on_macos",
+	},
+	{
+		path = "shortcuts.keyboard.primary_b", id = "primary_b", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_b", platforms = { "ahk", "linux" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.primary_o", id = "primary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "ahk", "linux" }, recommended = "ocr_screenshot", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.meta_a", section = "shortcuts.keyboard", platforms = { "ahk" },
@@ -624,7 +624,7 @@ M.features = {
 		path = "shortcuts.keyboard.meta_quote", section = "shortcuts.keyboard", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "llm_generate_prediction", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_space", id = "secondary_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" }, recommended = "none", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.secondary_a", id = "secondary_a", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_a", platforms = { "hs" }, recommended = "select_line", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
@@ -648,7 +648,10 @@ M.features = {
 		path = "shortcuts.keyboard.secondary_m", id = "secondary_m", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_m", platforms = { "hs" }, recommended = "activity_simulation", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.secondary_o", id = "secondary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.secondary_b", id = "secondary_b", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_b", platforms = { "hs" }, recommended = "surround_parens", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+	},
+	{
+		path = "shortcuts.keyboard.secondary_o", id = "secondary_o", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_o", platforms = { "hs" }, recommended = "ocr_screenshot", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.keyboard.secondary_p", id = "secondary_p", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_p", platforms = { "hs" }, recommended = "display_mirror_toggle", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
@@ -687,7 +690,7 @@ M.features = {
 		path = "shortcuts.keyboard.primary_g", id = "primary_g", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "shortcuts.label_ctrl_g", platforms = { "linux" }, recommended = "open_chatgpt", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
-		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "ahk", "linux" }, recommended = "llm_generate_prediction", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
+		path = "shortcuts.keyboard.meta_space", id = "meta_space", section = "shortcuts.keyboard", default = "none", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "ahk", "linux" }, recommended = "none", family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" }, recommended = "screenshot_fullscreen_save", family = "feature",
@@ -1053,7 +1056,7 @@ M.features = {
 		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs", "linux" }, recommended = 3.5, family = "setting", reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers",
 	},
 	{
-		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
+		path = "layout.ergopti_base", id = "ergopti_base", section = "layout", default = true, type = "boolean", description_key = "menu.layout.ergopti_base", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", family = "feature", enum_values = { "native", "digits", "symbols" },
@@ -1065,7 +1068,7 @@ M.features = {
 		path = "layout.number_row_reorder_edges", id = "number_row_reorder_edges", section = "layout", default = false, type = "boolean", description_key = "menu.layout.number_row_edges", platforms = { "ahk", "hs", "linux" }, recommended = false, family = "feature",
 	},
 	{
-		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = false, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
+		path = "layout.ergopti_alt_gr", id = "ergopti_alt_gr", section = "layout", default = true, type = "boolean", description_key = "menu.layout.ergopti_alt_gr", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "feature",
 	},
 	{
 		path = "layout.ergopti_variant", id = "ergopti_variant", section = "layout", default = "none", type = "enum", description_key = "menu.layout.ergopti_plus", platforms = { "ahk", "hs", "linux" }, recommended = "ergopti_plus", family = "feature", enum_values = { "none", "ergopti", "ergopti_plus" },
@@ -1083,10 +1086,16 @@ M.features = {
 		path = "layout.emulate_bottom_row", id = "emulate_bottom_row", section = "layout", default = true, type = "boolean", description_key = "menu.layout.emulate_bottom_row", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
-		path = "layout.ctrl_magic_save", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
+		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
 	},
 	{
-		path = "layout.emulated_layout", id = "emulated_layout", section = "layout", default = "", type = "string", description_key = "menu.layout.emulated_layout", platforms = { "ahk", "hs", "linux" }, recommended = "", family = "feature",
+		path = "layout.emulated_layout_recents", id = "emulated_layout_recents", section = "layout", default = {  }, type = "array", description_key = "menu.layout.emulation_recents", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
+	},
+	{
+		path = "layout.game_keys", id = "game_keys", section = "layout", default = "physical", type = "enum", description_key = "menu.layout.game_keys", platforms = { "ahk", "hs", "linux" }, recommended = "physical", family = "setting", enum_values = { "physical", "letters" },
+	},
+	{
+		path = "layout.game_keys_apps", id = "game_keys_apps", section = "layout", default = {  }, type = "map", description_key = "menu.layout.game_keys_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, family = "setting",
 	},
 	{
 		path = "category_enabled.hotstrings", section = "category_enabled", platforms = { "ahk" },
@@ -1101,7 +1110,7 @@ M.features = {
 		path = "category_enabled.tap_holds", section = "category_enabled", platforms = { "ahk" },
 	},
 	{
-		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = true, family = "setting", reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos",
+		path = "category_enabled.key_combinations", id = "key_combinations", section = "category_enabled", default = true, type = "boolean", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "hs", "linux" }, recommended = true, family = "setting",
 	},
 	{
 		path = "network.proxy_override", section = "network", platforms = { "ahk" },
@@ -1120,9 +1129,6 @@ M.features = {
 	},
 	{
 		path = "shortcuts.keys.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
-	},
-	{
-		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, family = "feature", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver",
 	},
 	{
 		path = "category_enabled.autocorrection", section = "category_enabled", platforms = { "ahk" },

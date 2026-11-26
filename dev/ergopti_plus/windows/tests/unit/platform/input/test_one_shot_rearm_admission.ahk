@@ -32,12 +32,12 @@ _OSRA_ChildSource() {
 	}
 	for Name in ["OneShotShift", "OneShotShiftFix", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys",
 		"TapHoldNewOwner", "TapHoldOwnerCurrent", "TapHoldDispatchTap", "HotstringEndCharOfTap", "TapHoldTapInDispatch", "TapHoldShouldCancelTap", "_TH_TakePressTakenByCombination",
-		"TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList",
+		"TapHoldReleaseSyntheticKeys", "_TH_KeysIncludeAltGr", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList",
 		"_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending",
 		"_TH_RetrySyntheticKeyRelease", "_TH_SyntheticKeyLabel",
 		"TapHoldForgetTrackedKey", "TapHoldTapIsCommand", "_TapHoldTapEndsCapsWord", "TapHoldDuration",
 		"_TapHoldDurationValid", "TapHoldGlobalDuration",
-		"TapHoldIsEnabled", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldConfiguredTapAction",
+		"TapHoldIsEnabled", "_TapHoldGameSkips", "TapHoldEntryHasKnownAction", "TapHoldTapAction", "TapHoldConfiguredTapAction",
 		"AiActionBlocked", "AiActionIsAi", "TapHoldHoldModifier", "TapHoldHoldLayer"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine route dependency must exist: " . Name)

@@ -9,7 +9,7 @@
 --- 1. _shared/tests/corpus/healthcheck/errors_tail_vectors.json through
 ---    healthcheck.snapshot.parse_errors_tail (the window's recent issues).
 --- 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
----    diagnostics.issue_link (the prefilled GitHub issue URL).
+---    diagnostics.issue_link (the prefilled GitHub issue URL and the pasted report).
 --- 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ---    diagnostics.redact with the rules of
 ---    _shared/diagnostics/data/redaction.json (what leaves the machine).
@@ -90,12 +90,31 @@ helpers.describe("diagnostics corpus: GitHub issue link (issue-link-corpus)", fu
 			local templates = {}
 			for key, value in pairs(corpus.templates) do templates[key] = value end
 			templates.max_url_bytes = vector.max_url_bytes
+			templates.max_redirect_bytes = vector.max_redirect_bytes
 			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values, vector.notes)
 			if vector.expect_error then
 				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))
 			else
 				helpers.assert_true(ok, vector.id .. ": " .. tostring(url))
 				helpers.assert_eq(url, vector.expected, vector.id)
+			end
+		end)
+	end
+
+	helpers.it("has fit vectors (issue-link-corpus)", function()
+		helpers.assert_true(type(corpus.fit_vectors) == "table" and #corpus.fit_vectors >= 5,
+			"the issue-link corpus must hold its pasted-report vectors")
+	end)
+
+	for _, vector in ipairs(corpus.fit_vectors or {}) do
+		helpers.it("fit_lines: " .. vector.id .. " (issue-link-corpus)", function()
+			local ok, text = pcall(IssueLink.fit_lines, vector.text, vector.max_bytes, vector.marker, vector.note)
+			if vector.expect_error then
+				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(text))
+			else
+				helpers.assert_true(ok, vector.id .. ": " .. tostring(text))
+				helpers.assert_eq(text, vector.expected, vector.id)
+				helpers.assert_true(#text <= vector.max_bytes, vector.id .. ": over its budget")
 			end
 		end)
 	end
@@ -201,6 +220,7 @@ helpers.describe("diagnostics corpus: issue form identity (form-identity-corpus)
 			local document = Share.document(snapshot, config.schema, "")
 			helpers.assert_eq(document.fields.version, vector.version, vector.id .. ": version")
 			helpers.assert_eq(document.fields.os, vector.os, vector.id .. ": os")
+			helpers.assert_eq(document.fields.driver, corpus.driver_options[vector.snapshot.driver], vector.id .. ": driver option")
 			helpers.assert_true(not document.fields.diagnostics:find("```json", 1, true),
 				vector.id .. ": the form report has no JSON block")
 		end)

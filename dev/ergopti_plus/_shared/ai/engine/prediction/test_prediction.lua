@@ -6,7 +6,7 @@
 --- The AI menu's « Test a prediction » on macOS and Linux: one prediction on a
 --- translated sample context with the active backend, showing the answer or why
 --- it could not run. Windows has the same behaviour in
---- ui/menu/menu_llm/menu_settings.ahk (LLM_Menu_TestPrediction).
+--- ai/ui/menu/settings.ahk (LLM_Menu_TestPrediction).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Straight to the Backend: an engine answer is a tooltip the user could accept

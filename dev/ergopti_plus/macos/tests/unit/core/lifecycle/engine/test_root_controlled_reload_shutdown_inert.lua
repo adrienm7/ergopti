@@ -14,7 +14,11 @@
 local helpers = require("tests.helpers")
 -- The declared base expansion delay, read through the real reader before the
 -- fixture replaces it.
-local EXPANSION_DELAY = require("infra.manifest_reader").default_for("hotstrings.expansion_delay")
+local EXPANSION_DELAY = require("menu.engine.manifest_reader").default_for("hotstrings.expansion_delay")
+-- The declared log level the root chunk restores at boot (init.lua), read the
+-- same way.
+local LOG_LEVEL_PATH = require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL
+local LOG_LEVEL_ENTRY = require("menu.engine.manifest_reader").find_entry_by_path(LOG_LEVEL_PATH)
 
 local MODULE_NAMES = {
 	"hs",
@@ -29,22 +33,22 @@ local MODULE_NAMES = {
 	"core.logger.adapters.boot_journal",
 	"core.i18n.engine.i18n",
 	"core.i18n.engine.locale",
-	"modules.diagnostics.crash_reporter",
+	"diagnostics.engine.reports.crash_reporter",
 	"core.lifecycle.engine.reload.guard",
 	"core.lifecycle.engine.shutdown.emergency_exit",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"core.lifecycle.engine.startup_transaction",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.fs.engine.paths",
-	"modules.hotstrings.hotstrings_config",
-	"infra.factory_reset_journal",
-	"modules.gestures",
-	"modules.keymap",
-	"infra.manifest_reader",
+	"hotstrings.engine.catalogue.config",
+	"settings.engine.factory_reset_journal",
+	"gestures.engine",
+	"hotstrings.engine.expander",
+	"menu.engine.manifest_reader",
 	"core.text.engine.toml_codec.writer",
 	"modules.shortcuts",
-	"modules.dynamic_hotstrings",
+	"hotstrings.engine.dynamic",
 	"core.fs.adapters.toml_cache",
 	"core.text.engine.toml.reader",
 	"core.timing.engine.timings",
@@ -52,16 +56,34 @@ local MODULE_NAMES = {
 	"core.fs.adapters.file_system",
 	"platform.remap",
 	"platform.remap.tap_hold_file",
-	"ui.menu",
-	"ui.menu.menu_llm",
-	"modules.llm.mlx_deps_checker",
-	"modules.llm.ollama_deps_checker",
-	"modules.llm.backend_detector",
+	-- Initialized once per boot: a real reload starts a fresh Lua state.
+	"settings.engine.registry_cache",
+	"menu.ui",
+	"ai.ui.menu",
+	"ai.engine.local_servers.mlx_deps_checker",
+	"ai.engine.ollama.deps_checker",
+	"ai.engine.api.backend_detector",
 	"core.ui.engine.notifications",
-	"ui.error_dialog",
-	"infra.ui_restore",
+	"diagnostics.ui.error_dialog",
+	"menu.engine.ui_restore",
 	"ui.onboarding",
 }
+
+-- The stubbed hs module has no source file; every other name is a real module
+-- whose per-boot state the fixture resets.
+local VIRTUAL_MODULE_NAMES = { hs = true }
+
+--- Raises when a reset name no longer resolves: a moved module leaves a stale
+--- name here, its state then survives into the next boot of the same Lua state
+--- and a once-per-boot initializer refuses the second boot.
+local function assert_reset_names_resolve()
+	for _, name in ipairs(MODULE_NAMES) do
+		if not VIRTUAL_MODULE_NAMES[name] then
+			local path, missing = package.searchpath(name, package.path)
+			helpers.assert_not_nil(path, "stale per-boot module name " .. name .. ": " .. tostring(missing))
+		end
+	end
+end
 
 local function run_isolated(options, assertions)
 	if type(options) == "function" then
@@ -69,6 +91,7 @@ local function run_isolated(options, assertions)
 		options = {}
 	end
 	options = options or {}
+	assert_reset_names_resolve()
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
 	local saved_globals = {
@@ -130,6 +153,10 @@ local function run_isolated(options, assertions)
 			state.privacy_initializations = (state.privacy_initializations or 0) + 1
 		end
 		function Logger.set_level() return true end
+		function Logger.apply_level_setting(_, entry)
+			helpers.assert_true(entry == LOG_LEVEL_ENTRY, "The root restores the level through its manifest declaration")
+			return { level = entry.default }
+		end
 		function Logger.init_log_path() return true end
 		function Logger.logs_dir() return "/virtual/logs/" end
 		function Logger.classify_async_sink_boot_environment() return "managed" end
@@ -292,9 +319,9 @@ local function run_isolated(options, assertions)
 			},
 			["core.i18n.engine.locale"] = {
 				set_locale = function() end,
-				set_trigger_provider = function() end,
+				set_display_provider = function() end,
 			},
-			["modules.diagnostics.crash_reporter"] = {
+			["diagnostics.engine.reports.crash_reporter"] = {
 				report = function() return {} end,
 				prompt_user = function() end,
 			},
@@ -302,14 +329,14 @@ local function run_isolated(options, assertions)
 			["core.lifecycle.engine.shutdown.emergency_exit"] = { request = function() return true end },
 			["core.lifecycle.engine.startup_transaction"] = {},
 			-- The boot lets config.toml's [script] rows win once the path resolves.
-			["infra.script_scope"] = { adopt_configured = function() return {} end },
-			["infra.config_paths"] = {
+			["settings.engine.scope.script_scope"] = { adopt_configured = function() return {} end },
+			["settings.engine.paths"] = {
 				init = function() return true end,
 				get_config_dir = function() return "/virtual/config" end,
 				get_logs_dir = function() return "/virtual/logs/" end,
 				get = function(name) return "/virtual/" .. tostring(name) end,
 			},
-			["infra.factory_reset_journal"] = {
+			["settings.engine.factory_reset_journal"] = {
 				path_for = function(config_path)
 					if type(config_path) ~= "string" or config_path == "" then return nil end
 					return config_path .. ".ergopti-reset-journal-v1.json"
@@ -327,15 +354,15 @@ local function run_isolated(options, assertions)
 					}
 				end,
 			},
-			["modules.gestures"] = {
+			["gestures.engine"] = {
 				stop = function() return true end,
 				restore_all_overrides = function() return true end,
 			},
-			["modules.keymap"] = {
+			["hotstrings.engine.expander"] = {
 				get_trigger_char = function() return "★" end,
 				stop = function() return true end,
 			},
-			["infra.manifest_reader"] = {
+			["menu.engine.manifest_reader"] = {
 				-- The real cold hotstring controller reads the base expansion
 				-- delay from the manifest (31372616); every other read is the
 				-- trigger character the boot asks for.
@@ -346,10 +373,14 @@ local function run_isolated(options, assertions)
 					return "★"
 				end,
 				has_default = function() return false end,
+				find_entry_by_path = function(path)
+					if path ~= LOG_LEVEL_PATH then error("no other manifest entry in shutdown fixture: " .. tostring(path)) end
+					return LOG_LEVEL_ENTRY
+				end,
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
 			["modules.shortcuts"] = { stop = function() return true end },
-			["modules.dynamic_hotstrings"] = {},
+			["hotstrings.engine.dynamic"] = {},
 			["core.fs.adapters.toml_cache"] = { init = function() return true end },
 			["core.text.engine.toml.reader"] = {
 				set_cache_provider = function() end,
@@ -379,13 +410,13 @@ local function run_isolated(options, assertions)
 				config_toml_path_for = function() return "/virtual/ConfigTomlPath" end,
 				import_legacy = function() return true, "none" end,
 			},
-			["ui.menu"] = { stop_watchers = function() return true end },
-			["ui.menu.menu_llm"] = MenuLLM,
-			["modules.llm.mlx_deps_checker"] = {},
-			["modules.llm.ollama_deps_checker"] = {},
-			["modules.llm.backend_detector"] = {},
+			["menu.ui"] = { stop_watchers = function() return true end },
+			["ai.ui.menu"] = MenuLLM,
+			["ai.engine.local_servers.mlx_deps_checker"] = {},
+			["ai.engine.ollama.deps_checker"] = {},
+			["ai.engine.api.backend_detector"] = {},
 			["core.ui.engine.notifications"] = { notify = function() return true end },
-			["ui.error_dialog"] = {
+			["diagnostics.ui.error_dialog"] = {
 				init = function()
 					state.error_dialog_inits = state.error_dialog_inits + 1
 					return true
@@ -395,7 +426,7 @@ local function run_isolated(options, assertions)
 					return true
 				end,
 			},
-			["infra.ui_restore"] = {},
+			["menu.engine.ui_restore"] = {},
 			["ui.onboarding"] = {
 				should_run = function() return true end,
 				run = function()
@@ -440,7 +471,17 @@ local function run_isolated(options, assertions)
 			_G
 		)
 		helpers.assert_not_nil(chunk, tostring(load_err))
-		chunk()
+		-- init.lua re-runs itself under the boot guard and returns at once when it
+		-- is not the guarded run, so the fixture boots it the way the guard does:
+		-- the real guard, with only the file load replaced by the truncated chunk.
+		-- A failure is re-raised with its stack instead of reaching the reporter.
+		package.loaded["core.lifecycle.engine.boot_guard"] = nil
+		local BootGuard = require("core.lifecycle.engine.boot_guard")
+		local booted = BootGuard.run(helpers.driver_root() .. "root_boot_chunk", {
+			loadfile = function() return chunk end,
+			report = function() return false end,
+		})
+		helpers.assert_true(booted, "the guarded root boot chunk must return normally")
 		helpers.assert_eq(state.privacy_policy_reads, 1)
 		helpers.assert_eq(state.privacy_initializations, 1)
 		helpers.assert_eq(state.fatal_exit_calls, 0, "The fixture must not accidentally take the privacy-abort route")
@@ -481,7 +522,7 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			local accepted = hs_stub.reload("mlx-callback-pending")
 			helpers.assert_eq(accepted, true)
-			local Hotstrings = require("modules.hotstrings.hotstrings_config")
+			local Hotstrings = require("hotstrings.engine.catalogue.config")
 			helpers.assert_nil(Hotstrings.get_override_path(), "the real first-run controller is still uninitialized")
 			helpers.assert_nil(Hotstrings.capture_terminal_admission(), "root holds the exact cold admission during MLX cleanup")
 			helpers.assert_eq(Hotstrings.init({ override_path = "/virtual/hotstrings_config.toml",

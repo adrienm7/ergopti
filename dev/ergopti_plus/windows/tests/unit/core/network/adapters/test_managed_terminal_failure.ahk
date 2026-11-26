@@ -1,6 +1,6 @@
 ﻿; tests/unit/core/network/adapters/test_managed_terminal_failure.ahk
 ; Independent controls drive actual terminal sessions and production owner fences.
-; Native GUI construction and networking remain separately UNRUN.
+; Networking remains UNRUN. Without WebView2 there is no native failure window.
 _MTF_Scope(Body) {
 	Owners := ManagedNetworkTerminalFailure.Owners
 	Intents := ManagedNetworkTerminalFailure.Intents
@@ -15,7 +15,7 @@ _MTF_Scope(Body) {
 _MTF_Report() {
 	return ManagedNetworkFailureWindows_Classify(_MNW_ProxyReceipt(), () => true)
 }
-_MTF_Present(State, Report, Owner, CurrentFn, RetryFn, ClosedFn, FallbackFn) {
+_MTF_Present(State, Report, Owner, CurrentFn, RetryFn, ClosedFn) {
 	Session := ManagedDownloadFailureSession()
 	State["terminal_session"] := Session
 	State["terminal_closed"] := ClosedFn
@@ -68,25 +68,34 @@ _MTF_RetrySuccessor(State, Present) {
 	return ManagedNetworkTerminalFailure.Publish("control", _MTF_Report(), () => true, "download_window.window_title", 0, Present)
 }
 Test("managed terminal failures: actual retry consumes once and retains a reentrant successor", (*) => _MTF_Scope(_MTF_Retry))
-_MTF_NativeSender(State) {
-	AssertTrue(ManagedNetworkTerminalFailure.Publish("control", _MTF_Report(), () => true, "download_window.window_title", 0, _MTF_Present.Bind(State)))
-	Host := ManagedNativeFailureWindow()
-	Host.AppId := "download_window", Host.Epoch := 7, Host.Gui := Map(), Host.ResetDone := false
-	Host.Failure := State["terminal_session"]
-	Button := Map(), Other := Map(), Payload := _MTF_Payload(Host.Failure, "proxy_settings")
-	ManagedDownloadFailureWindow.Current := Host
-	WebViewHost._Instances[Host.AppId] := Host
-	try {
-		AssertFalse(Host.NativeAction(7, Host.Gui, Button, Payload, Other), "a foreign control sender cannot execute")
-		AssertFalse(Host.NativeAction(6, Host.Gui, Button, Payload, Button), "a queued old native GUI generation cannot execute")
-		AssertTrue(Host.NativeAction(7, Host.Gui, Button, Payload, Button), "the actual captured native control executes through shared dispatch")
-		AssertEqual(1, State["opens"].Length)
-	} finally {
-		ManagedDownloadFailureWindow.Current := 0
-		WebViewHost._Instances.Delete(Host.AppId)
-	}
+; Every top-level window this process owns, hidden ones included.
+_MTF_OwnWindows() {
+	PreviousDetect := DetectHiddenWindows(true)
+	try return WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . ProcessExist())
+	finally DetectHiddenWindows(PreviousDetect)
 }
-Test("managed terminal failures: actual native callback binds control and GUI generation", (*) => _MTF_Scope(_MTF_NativeSender))
+
+; The native failure window that stood in for the page is gone (maintainer
+; decision 2026-11-21): the suite never loads WebView2, so the real presenter
+; builds nothing and the failure stays visible as one notice.
+_MTF_NoNativeWindow(State) {
+	Before := Map()
+	for Hwnd in _MTF_OwnWindows()
+		Before[Hwnd] := true
+	Report := _MTF_Report()
+	AssertFalse(ManagedNetworkTerminalFailure.Publish("control", Report, () => true,
+		"download_window.window_title", 0), "no window presents the failure without WebView2")
+	Created := 0
+	for Hwnd in _MTF_OwnWindows()
+		if !Before.Has(Hwnd)
+			Created += 1
+	AssertEqual(0, Created, "no native failure window may be built")
+	AssertEqual(0, ManagedDownloadFailureWindow.Current, "no presenter remains published")
+	AssertEqual(1, State["notices"].Length, "the failure is told once as a notice")
+	AssertEqual(Report["message_key"], State["notices"][1], "the notice names the canonical cause")
+}
+Test("managed terminal failures: an absent WebView2 builds no native window and leaves one notice (download-failure-webview-only)",
+	(*) => _MTF_Scope(_MTF_NoNativeWindow))
 _MTF_ApiOwner(State) {
 	global _LLM_Menu, _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
 	Saved := _LLM_Menu, SavedEpoch := _LLM_Menu_ApiFailureEpoch

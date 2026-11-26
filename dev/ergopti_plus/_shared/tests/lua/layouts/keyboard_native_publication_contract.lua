@@ -28,8 +28,10 @@ function M.register(helpers, driver)
 	local Publication = require("settings.engine.publication.keyboard_publication")
 	local native = "modules.shortcuts.keyboard_shortcuts"
 	local prefix = driver == "macos" and "secondary_" or "primary_"
-	-- macOS accepts two slot-only keys (Caps Lock, apostrophe) beyond the 40 shared ones.
-	local slots_per_group = driver == "macos" and 42 or 40
+	-- macOS accepts two slot-only keys (Caps Lock, apostrophe) beyond the 40 shared
+	-- ones, and lists its ★ key slot (secondary_star) in this Ctrl group.
+	local slots_per_group = driver == "macos" and 43 or 40
+	local star_slot = require("shortcuts.engine.star_slot_core").slot(driver).id
 	local function fresh()
 		package.loaded[native] = nil
 		return require(native)
@@ -55,11 +57,13 @@ function M.register(helpers, driver)
 					else count = count + 1 end
 				end
 				helpers.assert_eq(count, driver == "macos" and 211 or 241)
-				helpers.assert_eq(physical_count, 1536, "96 registry key positions times all 16 exact modifier subsets")
+				-- The slot space is the registry's, whatever a driver can read: the
+				-- six JIS and ABNT keys count on macOS too, where three have no keycode.
+				helpers.assert_eq(physical_count, 1632, "102 registry key positions times all 16 exact modifier subsets")
 				helpers.assert_eq(published.slots.physical_none_KeyJ, true)
 				helpers.assert_eq(published.slots.physical_ctrl_alt_shift_super_KeyJ, true)
 				helpers.assert_nil(published.slots.physical_none_KeyFuture)
-				helpers.assert_eq(published.slots.magic_editor, true)
+				helpers.assert_eq(published.slots[star_slot], true)
 				helpers.assert_eq(published.slots[prefix .. "enter"], true)
 				if driver == "linux" then
 					helpers.assert_eq(published.slots.alt_shift_enter, true)
@@ -206,39 +210,39 @@ function M.register(helpers, driver)
 			local keys = { { id = "a" }, { id = "enter", chord_key = "return" } }
 			local modifiers = { "ctrl" }
 			local groups = { { "ctrl_", modifiers } }
-			local receipt = Publication.publish(keys, groups, "magic_editor")
-			helpers.assert_eq(receipt(keys, groups, "magic_editor"), {
-				prefix = "keyboard__", slots = { ctrl_a = true, ctrl_enter = true, magic_editor = true },
+			local receipt = Publication.publish(keys, groups, "meta_star")
+			helpers.assert_eq(receipt(keys, groups, "meta_star"), {
+				prefix = "keyboard__", slots = { ctrl_a = true, ctrl_enter = true, meta_star = true },
 			})
-			keys[1].id = "b"; helpers.assert_nil(receipt(keys, groups, "magic_editor")); keys[1].id = "a"
-			keys[2].chord_key = "space"; helpers.assert_nil(receipt(keys, groups, "magic_editor")); keys[2].chord_key = "return"
-			modifiers[1] = "alt"; helpers.assert_nil(receipt(keys, groups, "magic_editor")); modifiers[1] = "ctrl"
-			groups[1][1] = "alt_"; helpers.assert_nil(receipt(keys, groups, "magic_editor")); groups[1][1] = "ctrl_"
-			local original = keys[1]; keys[1] = { id = "a" }; helpers.assert_nil(receipt(keys, groups, "magic_editor")); keys[1] = original
+			keys[1].id = "b"; helpers.assert_nil(receipt(keys, groups, "meta_star")); keys[1].id = "a"
+			keys[2].chord_key = "space"; helpers.assert_nil(receipt(keys, groups, "meta_star")); keys[2].chord_key = "return"
+			modifiers[1] = "alt"; helpers.assert_nil(receipt(keys, groups, "meta_star")); modifiers[1] = "ctrl"
+			groups[1][1] = "alt_"; helpers.assert_nil(receipt(keys, groups, "meta_star")); groups[1][1] = "ctrl_"
+			local original = keys[1]; keys[1] = { id = "a" }; helpers.assert_nil(receipt(keys, groups, "meta_star")); keys[1] = original
 			helpers.assert_nil(receipt(keys, groups, "another_contextual_owner"))
-			helpers.assert_nil(receipt({ keys[1], keys[2] }, groups, "magic_editor"))
-			helpers.assert_eq(receipt(keys, groups, "magic_editor").slots.ctrl_enter, true)
+			helpers.assert_nil(receipt({ keys[1], keys[2] }, groups, "meta_star"))
+			helpers.assert_eq(receipt(keys, groups, "meta_star").slots.ctrl_enter, true)
 		end)
 		helpers.it("preserves simultaneous case-distinct native identities without an equality fallback", function()
 			local keys = { { id = "a" }, { id = "A" } }
 			local groups = { { "ctrl_", { "ctrl" } } }
-			local receipt = Publication.publish(keys, groups, "magic_editor")
-			helpers.assert_eq(receipt(keys, groups, "magic_editor"), {
-				prefix = "keyboard__", slots = { ctrl_a = true, ctrl_A = true, magic_editor = true },
+			local receipt = Publication.publish(keys, groups, "meta_star")
+			helpers.assert_eq(receipt(keys, groups, "meta_star"), {
+				prefix = "keyboard__", slots = { ctrl_a = true, ctrl_A = true, meta_star = true },
 			})
 			local replacement = setmetatable({ keys[1], keys[2] }, { __eq = function() return true end })
-			helpers.assert_nil(receipt(replacement, groups, "magic_editor"))
+			helpers.assert_nil(receipt(replacement, groups, "meta_star"))
 			keys[2].id = "a"
-			helpers.assert_nil(receipt(keys, groups, "magic_editor"))
+			helpers.assert_nil(receipt(keys, groups, "meta_star"))
 			keys[2].id = "A"
-			helpers.assert_eq(receipt(keys, groups, "magic_editor").slots.ctrl_A, true)
+			helpers.assert_eq(receipt(keys, groups, "meta_star").slots.ctrl_A, true)
 		end)
 		helpers.it("refuses malformed inventories rather than publishing a manufactured empty set", function()
 			for _, keys in ipairs({ {}, { [2] = { id = "a" } }, { { id = "a" }, { id = "a" } },
 				{ setmetatable({}, { __index = { id = "a" } }) },
 				setmetatable({ { id = "a" } }, { __pairs = function() error("metamethod must not run") end }),
 			}) do
-				local okay, detail = pcall(Publication.publish, keys, { { "ctrl_", { "ctrl" } } }, "magic_editor")
+				local okay, detail = pcall(Publication.publish, keys, { { "ctrl_", { "ctrl" } } }, "meta_star")
 				helpers.assert_eq(okay, false)
 				helpers.assert_contains(tostring(detail), "config_keyboard_publication: invalid")
 			end
@@ -246,7 +250,7 @@ function M.register(helpers, driver)
 				{ { "ctrl_", {} } }, { { "ctrl_", { "ctrl", "ctrl" } } },
 				{ { "ctrl_", { "ctrl" } }, { "ctrl_", { "ctrl" } } },
 			}) do
-				local okay, detail = pcall(Publication.publish, { { id = "a" } }, groups, "magic_editor")
+				local okay, detail = pcall(Publication.publish, { { id = "a" } }, groups, "meta_star")
 				helpers.assert_eq(okay, false)
 				helpers.assert_contains(tostring(detail), "config_keyboard_publication: invalid")
 			end

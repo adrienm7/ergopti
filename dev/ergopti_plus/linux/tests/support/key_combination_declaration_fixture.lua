@@ -5,7 +5,7 @@
 --- the new public cohorts use that owner unchanged instead.
 local M = {}
 function M.install_unavailable()
-	local original=require("infra.manifest_reader")
+	local original=require("menu.engine.manifest_reader")
 	local unavailable={}
 	local function absent(path)
 		return path=="mod_combos.simultaneous_threshold_ms" or path=="mod_combos.symmetric"
@@ -19,7 +19,7 @@ function M.install_unavailable()
 		assert(not absent(path),"Linux chord declaration unavailable in this predecessor fixture")
 		return original.default_for(path)
 	end
-	package.loaded["infra.manifest_reader"]=unavailable
+	package.loaded["menu.engine.manifest_reader"]=unavailable
 	return original
 end
 return M

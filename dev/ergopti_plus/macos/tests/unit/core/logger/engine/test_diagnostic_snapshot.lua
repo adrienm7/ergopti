@@ -81,7 +81,7 @@ local FAKE_SYSTEM = {
 
 helpers.describe("Diagnostic snapshot: macOS collector", function()
 	local contract = read_contract()
-	local Collector = require("infra.diagnostic_snapshot")
+	local Collector = require("diagnostics.engine.reports.snapshot")
 
 	helpers.it("the shared vectors render byte for byte on the macOS path", function()
 		helpers.assert_true(#contract.vectors >= 3, "the vectors must load")

@@ -133,9 +133,9 @@ _LPS_ResolvedKeyIsSilentOnBothPaths() {
 _LPS_ResolverUsesTheSilentAccessor() {
 	Body := _DriverFuncBody("TryMenuLabelFromDescriptionKey")
 	Assert(Body != "", "TryMenuLabelFromDescriptionKey() must exist in the driver source")
-	Assert(InStr(Body, "I18nLookup(") > 0,
-		"the candidate-probe loop must resolve through I18nLookup — it walks up to nine keys expecting all but one "
-		. "to miss (i18n-probe-warns-about-itself)")
+	Assert(InStr(Body, "I18nProbe(") > 0,
+		"the candidate-probe loop must resolve through I18nProbe — it walks up to nine keys expecting all but one "
+		. "to miss (i18n-probe-warns-about-itself), and I18nLookup's first miss loads a fallback catalogue")
 	Assert(RegExMatch(Body, "[^A-Za-z0-9_]t\(") == 0,
 		"the candidate-probe loop must not call t() at all: t() reports a miss as a user-visible defect, and this "
 		. "loop's misses are its normal control flow")
@@ -150,3 +150,44 @@ Test("locale: a key that resolves is silent through both accessors (i18n-probe-w
 	_LPS_ResolvedKeyIsSilentOnBothPaths)
 Test("locale: the menu-label resolver probes through the silent accessor (i18n-probe-warns-about-itself)",
 	_LPS_ResolverUsesTheSilentAccessor)
+
+
+
+
+; =================================================================
+; =================================================================
+; ======= 2/ A candidate miss loads no fallback catalogue =========
+; =================================================================
+; =================================================================
+
+; The Layout submenu's first open on CI (run 44983580030) loaded the whole
+; French fallback catalogue, 150 million cycles and 2000 page faults, because
+; the resolver's first candidate menu.layout.ergopti_base is in no catalogue and
+; its I18nLookup miss loaded the fallbacks before layout.ergoptibase resolved.
+_LPS_CandidateMissLoadsNoFallback() {
+	global _I18nLocale, _I18nFallbacksWarmed
+	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	Saved := [_I18nFallbacksWarmed, _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded]
+	_I18nEnsureActiveLoaded()
+	_I18nFallbacksWarmed := false
+	if _I18nLocale != "en"
+		_I18nCacheEn := Map(), _I18nCacheEnLoaded := false
+	if _I18nLocale != "fr"
+		_I18nCacheFr := Map(), _I18nCacheFrLoaded := false
+	try {
+		Assert(I18nProbe("menu.layout.ergopti_base") == "",
+			"prerequisite: the canonical key must be in no catalogue, or the resolver never misses first")
+		Label := TryMenuLabelFromDescriptionKey("menu.layout.ergopti_base", "layout.ergopti_base")
+		Assert(Label != "" && Label == I18nProbe("layout.ergoptibase"),
+			"the folded legacy key must still resolve from the active catalogue")
+		Assert((_I18nLocale == "en" || !_I18nCacheEnLoaded) && (_I18nLocale == "fr" || !_I18nCacheFrLoaded),
+			"a candidate the active catalogue lacks must not load a fallback catalogue: every catalogue carries "
+			. "the same keys, and that load billed a whole catalogue to the first menu that missed")
+	} finally {
+		_I18nFallbacksWarmed := Saved[1], _I18nCacheEn := Saved[2], _I18nCacheEnLoaded := Saved[3]
+		_I18nCacheFr := Saved[4], _I18nCacheFrLoaded := Saved[5]
+	}
+}
+
+Test("locale: a menu-label candidate miss loads no fallback catalogue (startup-fallback-first-miss)",
+	_LPS_CandidateMissLoadsNoFallback)

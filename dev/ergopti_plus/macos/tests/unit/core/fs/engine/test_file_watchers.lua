@@ -30,7 +30,7 @@ end
 
 -- ui_restore is UI glue not meant to load headless; mock it so the test isolates
 -- file_watchers' own logic. notifications/i18n load fine under the stub harness.
-package.loaded["infra.ui_restore"] = {
+package.loaded["menu.engine.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,

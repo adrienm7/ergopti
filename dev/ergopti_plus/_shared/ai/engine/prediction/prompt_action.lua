@@ -16,7 +16,7 @@
 ---    ("user_…", "custom_…"): letters, digits, "_" and "-" only, so "|" can
 ---    never be part of an id.
 ---
---- The AutoHotkey port is windows/modules/llm/prompt_action.ahk; the action
+--- The AutoHotkey port is windows/ai/engine/prediction/prompt_action.ahk; the action
 --- picker page parses the same syntax. All are pinned by
 --- _shared/tests/corpus/action_parameters/llm_prompt_vectors.json.
 --- ==============================================================================

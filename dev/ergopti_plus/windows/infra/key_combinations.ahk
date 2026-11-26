@@ -34,7 +34,7 @@
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\core\lifecycle\engine\value_check.ahk
-#Include %A_LineFile%\..\ai_action_gate.ahk
+#Include %A_LineFile%\..\..\ai\engine\action_gate.ahk
 #Include %A_LineFile%\..\..\core\text\engine\number.ahk
 
 
@@ -466,7 +466,7 @@ _KeyCombinationPorts() {
 		"own_modifier", (Second, ModKey, Seconds) => TapHoldOwnImmediateModifier(
 			Second, _KeyCombinationScanNames[Second], ModKey, Seconds),
 		"own_layer", (Second, Seconds) => TapHoldOwnImmediateLayer(
-			Second, _KeyCombinationScanNames[Second], Seconds),
+			Second, _KeyCombinationScanNames[Second], Seconds, 0, 0, 0, 0, 0, 0, 0, TapHoldShouldCancelTap),
 		"run_tap", _KeyCombinationRunTap,
 		"take_first", _KeyCombinationTakeFirstKey)
 	return Ports
@@ -531,7 +531,11 @@ KeyCombinationFire(Second, Ports := 0) {
 	}
 	; The hold is taken at key-down, as every tap-hold of this driver takes
 	; it; a release inside the second key's threshold makes the press a tap.
-	if (Result["tap"] && Tap != KEY_COMBINATION_NONE) {
+	; The pair's own tap takes the strict threshold, never the lone tap window
+	; the modifier owner grants a key pressed alone: the shared policy macOS
+	; and Linux follow (maintainer decision THD-2, 2026-11-21).
+	PairTap := Result["tap"] && Result["elapsed_ms"] <= Seconds * 1000
+	if (PairTap && Tap != KEY_COMBINATION_NONE) {
 		; The original owner has already retired; deny only a newly emitted tap.
 		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"
@@ -555,23 +559,53 @@ _KeyCombinationTakeFirstKey(First, Second) {
 
 ; Runs a pair's action as the key combination alone: without the modifier the
 ; first key holds synthetically, which AutoHotkey keeps down around a Send, and
-; out of the navigation layer that key may hold. A one-shot Shift the first or
-; the second key armed on its press is dropped: the key was part of a
-; combination, not a Shift for the next character.
+; out of the navigation layer that key may hold. The layer is lifted for the
+; action only and comes back afterwards while its owner still holds it, as the
+; Linux engine's combination_lift / combination_restore do (maintainer decision
+; THD-1 of 2026-11-21). A one-shot Shift the first or the second key armed on
+; its press is dropped: the key was part of a combination, not a Shift for the
+; next character.
 ; @param First {String} Tap-hold key id of the key held first.
 ; @param Second {String} Tap-hold key id of the key struck under it.
 ; @param ActionId {String} A catalogue action id.
 _KeyCombinationRunTap(First, Second, ActionId) {
-	global TapHold, LayerEnabled, _TH_OwnedModifiers
+	global TapHold, _TH_OwnedModifiers
 	if (ActionId != "one_shot_shift"
 			&& (TapHoldTapAction(TapHold, First) == "one_shot_shift"
 				|| TapHoldTapAction(TapHold, Second) == "one_shot_shift"))
 		OneShotShiftFix()
-	if (IsSet(LayerEnabled) && LayerEnabled)
-		DisableLayer()
 	RunAction := GestureInvokeAction.Bind(ActionId, KeyCombinationBindingId(KeyCombinationPairId(First, Second)))
 	Held := _TH_OwnedModifiers.Has(First) ? _TH_SyntheticKeyList(_TH_OwnedModifiers[First]) : []
-	return _KeyCombinationRunWithKeysUp(Held, 1, RunAction)
+	return _KeyCombinationRunOutOfLayer(_KeyCombinationRunWithKeysUp.Bind(Held, 1, RunAction))
+}
+
+; Runs RunFn with the navigation layer lifted, then gives the layer back to
+; the owner that held it, unless that owner released it meanwhile (its
+; DisableLayer(Owner) closed it) or the driver was suspended. The owner stays
+; recorded while lifted, so a release during the action still proves itself.
+; @param RunFn {Func} The action.
+; @returns {Any} What RunFn returns.
+_KeyCombinationRunOutOfLayer(RunFn) {
+	global LayerEnabled, _TH_LayerOwner
+	if !(IsSet(LayerEnabled) && LayerEnabled)
+		return RunFn.Call()
+	Owner := _TH_LayerOwner
+	LayerEnabled := false
+	UpdateCapsLockLED()
+	try return RunFn.Call()
+	finally _KeyCombinationRestoreLayer(Owner)
+}
+
+; Gives the lifted layer back to Owner when Owner still holds it.
+; @param Owner {Object|Integer} The layer owner recorded at the lift, 0 for none.
+_KeyCombinationRestoreLayer(Owner) {
+	global LayerEnabled, _TH_LayerOwner
+	if A_IsSuspended || LayerEnabled || _TH_LayerOwner != Owner
+		return
+	if IsObject(Owner) && (!TapHoldOwnerCurrent(Owner) || Owner.Closed)
+		return
+	LayerEnabled := true
+	UpdateCapsLockLED()
 }
 
 ; Runs RunFn with every key of Names lifted, each given back afterwards to
@@ -798,12 +832,28 @@ _KeyCombinationPairRow(First, Second) {
 	IsAssigned := KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
 		|| KeyCombinationChordOf(PairId) != KEY_COMBINATION_NONE
-	ActionLabel := _KeyCombinationTapLabel(PairId)
-	if KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE
-		ActionLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE
-			? _KeyCombinationHoldLabel(PairId) : ActionLabel . " / " . _KeyCombinationHoldLabel(PairId)
-	Label := LabelValue(PairLabel, ActionLabel)
+	TapLabel := KeyCombinationTapOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationTapLabel(PairId)
+	HoldLabel := KeyCombinationHoldOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationHoldLabel(PairId)
+	ChordLabel := KeyCombinationChordOf(PairId) == KEY_COMBINATION_NONE ? "" : _KeyCombinationChordLabel(PairId)
+	Label := LabelValue(PairLabel, KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel))
 	return Map("label", Label, "checked", IsAssigned, "action", _KeyCombinationPairMenuOpener(PairId, PairLabel))
+}
+
+; A pair's summary: the label of each assigned slot in the order tap, hold,
+; chord, joined by " / ", or the picker's « disabled » when none is set.
+; Linux and macOS draw the same (_shared/tap_hold/engine/combination_labels.lua
+; summary); all replay _shared/tests/corpus/tap_hold/key_combination_pair_rows.json.
+; @param TapLabel {String} The tap's label, "" when empty.
+; @param HoldLabel {String} The hold's label, "" when empty.
+; @param ChordLabel {String} The chord's label, "" when empty.
+; @returns {String}
+KeyCombinationPairSummary(TapLabel, HoldLabel, ChordLabel) {
+	Summary := ""
+	for _, Label in [TapLabel, HoldLabel, ChordLabel] {
+		if (Label != "")
+			Summary .= (Summary == "" ? "" : " / ") . Label
+	}
+	return Summary == "" ? t("dialog.action_picker.disabled") : Summary
 }
 
 _KeyCombinationPairMenuOpener(PairId, PairLabel) {
@@ -848,9 +898,26 @@ KeyCombinationSlotRows(PairId, PairLabel) {
 			"disabled", true, "disabled_reason_key", "menu.shortcuts.key_combinations_chord_no_altgr")]
 	ChordRow := Map("action", (*) => ShowActionPicker(t("menu.shortcuts.key_combinations_chord_title_prefix") . PairLabel,
 		KeyCombinationChordOf(PairId), (ActionName) => SetKeyCombinationChord(PairId, ActionName),
-		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId))))
+		false, KeyCombinationBindingId(KeyCombinationChordOwnerPair(PairId)), 0, KeyCombinationChordPickerItems()))
 	ChordRow["label"] := StrReplace(t("menu.shortcuts.key_combinations_chord"), "%s", _KeyCombinationChordLabel(PairId))
 	return [TapRow, HoldRow, ChordRow]
+}
+
+; The chord picker's items: the catalogue's, without the actions no chord runs
+; on any OS (KEY_COMBINATION_CHORD_REFUSED_ACTIONS, the one-shot Shift). A
+; program launch and the monitor Alt-Tab run in a chord on the three OS
+; (maintainer decision KCD-2 of 2026-11-22).
+; @param Items {Array} Replaces GestureActionPickerItems() in tests.
+; @returns {Array} Picker items.
+KeyCombinationChordPickerItems(Items := 0) {
+	global KEY_COMBINATION_CHORD_REFUSED_ACTIONS
+	Source := (Items is Array) ? Items : GestureActionPickerItems()
+	Kept := []
+	for _, Item in Source {
+		if (Item.Type != "action") || !KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Item.Id)
+			Kept.Push(Item)
+	}
+	return Kept
 }
 
 ; Opens the shared action picker on a pair's hold slot: the shared hold
@@ -1077,8 +1144,10 @@ class KeyCombinationChordPolicy {
 ; How often the wait looks at its key, and the level the keys are sent again at.
 global KEY_COMBINATION_CHORD_POLL_MS := 5
 global KEY_COMBINATION_CHORD_REPLAY_LEVEL := 1
-; Actions a chord cannot hold: they need the key's own press or release. As Linux.
-global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true, "run_program", true, "alt_tab_monitor", true)
+; Actions a chord cannot hold: they need the key's own press or release. The
+; shared list (CHORD_REFUSED_EVERYWHERE); a program launch and the monitor
+; Alt-Tab run in a chord (maintainer decision KCD-2 of 2026-11-22).
+global KEY_COMBINATION_CHORD_REFUSED_ACTIONS := Map("one_shot_shift", true)
 
 ; Pair id -> action, the delay and symmetry in force, and the switch of the chords.
 global KeyCombinationChords := Map()
@@ -1699,10 +1768,13 @@ KeyCombinationChordToggleSymmetric(Path := "", ReloadFn := 0) {
 
 ; The rows that copy every pair's tap slot into its chord slot, planned from one
 ; decoded configuration as macOS and Linux plan their bulk copy: the chord takes
-; the tap's action and an empty tap empties the chord. Under symmetry a chord
-; slot belongs to the earlier order of its pair, so only that order's tap is
-; copied. A pair that cannot hold a chord on the layout in force is skipped, and
-; so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
+; the tap's action and an empty tap empties the chord. Each order writes its own
+; chord, symmetry or not, as the shared plan_chord_copy does: only the earlier
+; order's chord runs under symmetry, and the later one's shows again once
+; symmetry is turned off (decision KCD-1 of 2026-11-21). The shared vectors of
+; _shared/tests/corpus/tap_hold/key_combination_chord_copy.json pin both
+; planners. A pair that cannot hold a chord on the layout in force is skipped,
+; and so is a tap action no chord can run (KEY_COMBINATION_CHORD_REFUSED_ACTIONS),
 ; which is logged with its pair.
 ; @param Snapshot {Object} A ConfigTomlDecodeSnapshot result.
 ; @param AllowedFn {Func} Replaces KeyCombinationChordPairIsAllowed in tests.
@@ -1711,7 +1783,6 @@ KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
 	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_NONE, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
 	Cache := Snapshot.Cache
 	Taps := _KeyCombinationReadSlots(Cache, KEY_COMBINATION_TAP_SECTION, false)
-	ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
 	Allowed := HasMethod(AllowedFn, "Call") ? AllowedFn : KeyCombinationChordPairIsAllowed
 	Rows := []
 	Ids := KeyCombinationKeyIds()
@@ -1720,7 +1791,7 @@ KeyCombinationChordCopyRows(Snapshot, AllowedFn := 0) {
 			if (First == Second)
 				continue
 			PairId := KeyCombinationPairId(First, Second)
-			if (_KeyCombinationChordOwnerPairFor(PairId, Symmetric) != PairId) || !Allowed.Call(PairId)
+			if !Allowed.Call(PairId)
 				continue
 			Tap := Taps.Get(PairId, KEY_COMBINATION_NONE)
 			if KEY_COMBINATION_CHORD_REFUSED_ACTIONS.Has(Tap) {
@@ -1802,7 +1873,9 @@ KeyCombinationChordPromptDelay() {
 KeyCombinationChordCommitDelay(Text, Path := "", ReloadFn := 0) {
 	global ConfigurationFile
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS), Text,
+		ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 	if !Typed["ok"] {
 		ValueCheckShowRefusal(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, Typed, Text)
 		return false

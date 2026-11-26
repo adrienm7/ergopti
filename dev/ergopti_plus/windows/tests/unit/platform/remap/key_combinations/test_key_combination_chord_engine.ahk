@@ -142,19 +142,17 @@ _KCCE_ChordCopyPlansFromTheTaps() {
 Test("key combination chords: the bulk copy plans each chord from its pair's tap (copy-tap-to-combo)",
 	_KCCE_ChordCopyPlansFromTheTaps)
 
-; Under symmetry both orders share the earlier order's chord slot: only that
-; order's tap is copied, and the later order gets no slot of its own.
+; Under symmetry each order still writes its own chord, as macOS and Linux do
+; (decision KCD-1 of 2026-11-21): only the earlier order's chord runs, and the
+; later one's shows again once symmetry is turned off.
 _KCCE_ChordCopyFollowsSymmetry() {
-	Owner := _KeyCombinationChordOwnerPairFor("caps_lock_then_tab", true)
-	AssertTrue(Owner == "caps_lock_then_tab" || Owner == "tab_then_caps_lock", "the owner is one of the two orders")
-	Other := Owner == "caps_lock_then_tab" ? "tab_then_caps_lock" : "caps_lock_then_tab"
 	Rows := _KCCE_CopyRows(_KCCE_ChordCopySource(true))
-	Row := Rows.Get("mod_combos.config." . Owner, 0)
-	AssertTrue(IsObject(Row) && Row.Value == (Owner == "caps_lock_then_tab" ? "copy" : "paste"),
-		"the shared slot takes its owner order's tap")
-	AssertFalse(Rows.Has("mod_combos.config." . Other), "the other order gets no slot of its own")
+	for PairId, Tap in Map("caps_lock_then_tab", "copy", "tab_then_caps_lock", "paste") {
+		Row := Rows.Get("mod_combos.config." . PairId, 0)
+		AssertTrue(IsObject(Row) && Row.Value == Tap, PairId . " takes its own tap under symmetry")
+	}
 }
-Test("key combination chords: the bulk copy follows the chord symmetry (copy-tap-to-combo)",
+Test("key combination chords: the bulk copy writes each order's own chord under symmetry (kcd-1-copy-each-order)",
 	_KCCE_ChordCopyFollowsSymmetry)
 
 ; The command commits like every chord writer: a held lease reports false with no
@@ -667,7 +665,7 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
  try {
   Before := FSReadUtf8Exact(Path)
   ; Whole milliseconds from 1 to 1000 (the shared value schema); 3.5 is refused.
-  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon", "3.5", "1001"] {
+  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "soon", "3.5", "1001"] {
    AssertFalse(KeyCombinationChordCommitDelay(Raw, Path, Reload), "The complete user magnitude must be refused before any config write")
    AssertEqual(Before, FSReadUtf8Exact(Path), "A rejected delay cannot change even private source bytes")
    AssertEqual(0, Reloads, "A rejected delay cannot reload")
@@ -677,6 +675,58 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
   AssertTrue(KeyCombinationChordCommitDelay(" 1000 ", Path, Reload), "the declared maximum is accepted")
   AssertEqual(2, Reloads)
   AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 1000")
+  ; A blank answer resets the delay to its default (PCK-13, 2026-11-21): the
+  ; sparse writer turns the default into the absent row.
+  AssertTrue(KeyCombinationChordCommitDelay("  ", Path, Reload), "a blank delay is accepted")
+  AssertEqual(3, Reloads)
+  AssertFalse(InStr(FSReadUtf8Exact(Path), "simultaneous_threshold_ms"), "and resets it to its default")
  } finally FileDelete(Path)
 }
 Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)
+
+; Decision KCD-2 of 2026-11-22: a program launch and the monitor Alt-Tab run
+; in a chord, as on macOS and Linux; only the one-shot Shift stays out.
+_KCCE_ChordPickerOffersProgramAndMonitorSwitch() {
+	Items := Map()
+	for _, Item in KeyCombinationChordPickerItems()
+		if (Item.Type == "action")
+			Items[Item.Id] := Item
+	for _, Id in ["run_program", "alt_tab_monitor"] {
+		AssertTrue(Items.Has(Id), Id . " stays listed")
+		AssertFalse(Items[Id].HasOwnProp("Disabled") && Items[Id].Disabled, Id . " is pickable")
+	}
+	AssertFalse(Items.Has("one_shot_shift"), "the one-shot Shift is left out")
+	AssertTrue(Items.Has("copy") && !Items["copy"].HasOwnProp("Disabled"), "a chord action stays pickable")
+}
+Test("key combination chords: the chord picker offers a program launch and the monitor Alt-Tab (kcd-2-chord-runs)",
+	_KCCE_ChordPickerOffersProgramAndMonitorSwitch)
+
+_KCCE_ChordRunsProgramAndMonitorSwitch() {
+	for _, Action in ["run_program", "alt_tab_monitor"]
+		_KCCE_With(Map("caps_lock_then_tab", Action), false, _KCCE_ChordRunsBody.Bind(Action))
+}
+_KCCE_ChordRunsBody(Action, World, Ports) {
+	AssertEqual(Action, KeyCombinationChordOf("caps_lock_then_tab"), "the read keeps the chord")
+	AssertEqual("wait", _KCCE_Press(World, Ports, "caps_lock"), "the first key waits")
+	World.Now += 50
+	AssertEqual("chord", _KCCE_Press(World, Ports, "tab"), "the second key fires the chord")
+	AssertEqual("caps_lock+tab=" . Action, World.Actions[1], "the chord runs the action once")
+	World.Held.Delete("tab"), World.Held.Delete("caps_lock")
+	KeyCombinationChordTick(Ports)
+}
+Test("key combination chords: a chord runs a program launch and the monitor Alt-Tab (kcd-2-chord-runs)",
+	_KCCE_ChordRunsProgramAndMonitorSwitch)
+
+; The program owner admits a pair's binding and reads a chord's program from
+; its [mod_combos.config.<pair>] table, so the chord's launch is not refused.
+_KCCE_ProgramOwnerAdmitsAChord() {
+	AssertTrue(ProgramActions_BindingSupported(KeyCombinationBindingId("caps_lock_then_tab")),
+		"a key combination's binding may run a program")
+	Document := TOML_ParseDocument('[mod_combos.config.caps_lock_then_tab]`ncombo = "run_program"`n'
+		. '[shortcuts.key_combination_taps]`ntab_then_caps_lock = "run_program"`n')
+	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "chord", "caps_lock_then_tab"))
+	AssertEqual("run_program", _ProgramActions_StoredAction(Document, "key_combination_taps", "tab_then_caps_lock"))
+	AssertEqual("", _ProgramActions_StoredAction(Document, "chord", "tab_then_caps_lock"))
+}
+Test("key combination chords: the program owner admits a chord's launch (kcd-2-chord-runs)",
+	_KCCE_ProgramOwnerAdmitsAChord)

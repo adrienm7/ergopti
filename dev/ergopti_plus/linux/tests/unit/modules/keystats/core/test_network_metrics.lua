@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local it = helpers.it
 
-local Network = require("modules.keystats.network_metrics")
+local Network = require("modules.keystats.system.network_metrics")
 
 require("tests.lua.core.network_transitions_contract").register(helpers)
 

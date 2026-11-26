@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "core.ui.engine.dialog_util", "core.logger.engine.logger",
 	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.focus.running_application",
 	"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
-	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
+	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "gestures.engine.action_confirm",
 	"adapters.mouse_control", "platform.focus.window_info", "platform.focus.window_manager", "core.i18n.engine.i18n" }
 
 
@@ -257,8 +257,8 @@ helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fas
 			}
 			package.loaded["platform.focus.window_info"] = { frontmost_application = function() return nil end }
 			package.loaded["platform.focus.window_manager"] = { activate = function() return true end }
-			package.loaded["modules.gestures.action_confirm"] = nil
-			local Confirm = require("modules.gestures.action_confirm")
+			package.loaded["gestures.engine.action_confirm"] = nil
+			local Confirm = require("gestures.engine.action_confirm")
 			local ran = 0
 			helpers.assert_eq(Confirm.ask("x", function() ran = ran + 1 end), true)
 			helpers.assert_eq(#fixture.alerts, 1, "the confirmation is shown")

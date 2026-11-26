@@ -39,8 +39,8 @@ local function with_owner(body, managed, public_chords)
 		if public_chords~=true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 		package.loaded["modules.shortcuts.key_combinations"] = nil
 		local PairOwner = require("modules.shortcuts.key_combinations")
-		package.loaded["modules.gestures.manager"] = nil
-		local gestures = require("modules.gestures.manager")
+		package.loaded["gestures.engine.manager"] = nil
+		local gestures = require("gestures.engine.manager")
 		local state = { bytes = { [path] = source }, paused = false, publications = 0, changes = 0 }
 		local files = {
 			read_with_status = function(target)
@@ -66,7 +66,7 @@ local function with_owner(body, managed, public_chords)
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
 			package.loaded["core.fs.adapters.file_system"]=files
-			package.loaded["infra.config_paths"]={config=function() return path end}
+			package.loaded["settings.engine.paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.native then
 					state.retired=state.native:release_all()
@@ -103,7 +103,7 @@ local function with_owner(body, managed, public_chords)
 		helpers.assert_true(gestures.release_parameter_configuration(initial))
 		state.gestures, state.files = gestures, files
 		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
-			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
+			manifest=public_chords==true and require("menu.engine.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
 			end}})
 		body(state)
@@ -118,16 +118,16 @@ local function failed(value) helpers.assert_eq(value,false) end
 local function next_scope(s,expected,manifest,tag)
 	return Scope.new({path=path,backup_path=backup..(tag or ".next"),
 		files=s.files,combinations=s.pairs,parameters=s.gestures,
-		manifest=manifest or require("infra.manifest_reader"),expected_source=expected})
+		manifest=manifest or require("menu.engine.manifest_reader"),expected_source=expected})
 end
 
 local function with_menu(body, public_chords)
 	with_owner(function(s)
 		package.loaded["core.fs.adapters.file_system"]=s.files
-		package.loaded["infra.config_paths"]={config=function() return path end}
+		package.loaded["settings.engine.paths"]={config=function() return path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
-		local renderer=require("infra.manifest_menu")
+		local renderer=require("menu.engine.manifest_menu")
 		local i18n=require("core.i18n.engine.i18n")
 		local Holds=require("tap_hold.engine.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}

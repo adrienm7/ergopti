@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_windows(options, callback)
 	helpers.with_stub_scope({
 		"platform.focus.window_manager", "adapters.mouse_control",
-		"modules.gestures.app_switch", "core.logger.engine.logger",
+		"gestures.engine.app_switch", "core.logger.engine.logger",
 	}, function()
 		local focused = {}
 		local function window(id, pid, behavior)
@@ -61,7 +61,7 @@ local function with_windows(options, callback)
 			record = { window = candidate, id = 22, pid = 202, minimized = false },
 			focused = focused,
 			switch = function(least_recent)
-				local switch = require("modules.gestures.app_switch")
+				local switch = require("gestures.engine.app_switch")
 				if least_recent then return switch.least_recent_app() end
 				return switch.previous_app(switch.SCOPE_ALL_SCREENS)
 			end,

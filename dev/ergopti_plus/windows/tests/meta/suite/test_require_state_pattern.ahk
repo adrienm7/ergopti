@@ -48,11 +48,11 @@
 ; keystroke, was among the files flagged.
 ;
 ; So this stays a ratchet, and the value is drift: a NEW module that introduces
-; injected state without a guard raises the count and fails here, at which point
-; a human decides whether it is a real violation or another cache. Do not
-; "fix" the existing entries by bolting guards onto them.
+; injected state without a guard is not in the named drift ledger and fails
+; here, at which point a human decides whether it is a real violation or another
+; cache. Do not "fix" the existing entries by bolting guards onto them.
 ;
-; NEVER raise the baseline to make a change pass.
+; NEVER add a drift entry to make a change pass.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -61,17 +61,17 @@
 ; file that does not exist suppresses nothing and merely hides that its
 ; successor was never triaged. Every path below was confirmed to exist.
 _REQUIRE_STATE_ALLOWLIST := Map(
-	"modules/llm/api_common.ahk", true,
-	"modules/llm/api_ollama/init.ahk", true,
-	"modules/llm/api_remote.ahk", true,
-	"modules/llm/models.ahk", true,
-	"modules/llm/profiles.ahk", true,
+	"ai/engine/api/common.ahk", true,
+	"ai/engine/api_ollama/init.ahk", true,
+	"ai/engine/api/remote.ahk", true,
+	"ai/engine/settings/models.ahk", true,
+	"ai/engine/settings/profiles.ahk", true,
 	"modules/keystats/keystats_hook.ahk", true,
 	"platform/remap/tap_hold_loader.ahk", true,
-	"modules/keymap/llm_bridge.ahk", true,
-	"ui/tray_menu.ahk", true,
-	"modules/gestures/actions.ahk", true,
-	"modules/llm/ollama_deps_checker.ahk", true,
+	"ai/engine/bridge.ahk", true,
+	"menu/ui/tray_menu.ahk", true,
+	"gestures/engine/actions.ahk", true,
+	"ai/engine/ollama/deps_checker.ahk", true,
 	"modules/keymap/layout.ahk", true,
 	; _HardwareCapsLockOn — a self-initialising flag, not injected state. It is
 	; seeded from the real toggle at its declaration and thereafter written only
@@ -99,8 +99,32 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
 ; predicate. See the module header: this is a drift baseline, not a defect count.
 ; Lowered to 25 on 2026-11-12 once a duplicate-start rejection counted as a
-; guard (infra/field_run.ahk already rejected one).
-_REQUIRE_STATE_BASELINE := 25
+; guard (diagnostics/engine/field_run/field_run.ahk already rejected one).
+; Named on 2026-11-22: the drift is the list in require_state_drift.txt beside
+; this file, which only shrinks. A new unguarded file fails, and so does a line
+; that is guarded, allowlisted or gone, where the count let one pay for the
+; other. The paths live in a data file so this source does not pin them.
+
+/**
+ * Reads the admitted drift from require_state_drift.txt beside this file: one
+ * driver path per line, "#" lines are comments.
+ * @returns {Map} Path to true.
+ */
+_MetaRequireStateDrift() {
+	SplitPath(A_LineFile, , &OwnDir)
+	Drift := Map()
+	for Line in StrSplit(FileRead(OwnDir . "\require_state_drift.txt", "UTF-8"), "`n", "`r") {
+		Line := Trim(Line)
+		if Line == "" || SubStr(Line, 1, 1) == "#"
+			continue
+		if Drift.Has(Line)
+			throw Error("require_state_drift.txt lists " . Line . " twice")
+		Drift[Line] := true
+	}
+	if !Drift.Count
+		throw Error("require_state_drift.txt admits nothing; delete the file and its reader instead")
+	return Drift
+}
 
 _MetaListAhkFilesGuardV2(Dir) {
 	Files := []
@@ -131,16 +155,21 @@ _MetaListAhkFilesGuardV2(Dir) {
 ; Runs inside its test: scanning the tree at registration taxed every runner boot.
 ; Whether a stateful file guards its state: a lazy check on a private global
 ; (if !_X), or an owner start that rejects a duplicate initialization
-; (if IsObject(_X) followed by a throw), as AGENTS.md asks of a stateful module.
+; (if IsObject(_X), or if IsSet(_X) && IsObject(_X) for an owner whose stop can
+; run before its top-level assignment, followed by a throw), or a use before
+; initialization that fails fast on the state's type (if !(_X is Map), followed
+; by a throw), as AGENTS.md asks of a stateful module.
 ; @param Body {String} The file's source.
 ; @returns {Boolean}
 _MetaRequireStateHasGuard(Body) {
 	return (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
-		or (Body ~= "im)^\s*if\s*\(?\s*IsObject\(_\w+\)\s*\)?[ \t]*\r?\n\s*throw\b")
+		or (Body ~= "im)^\s*if\s*\(?\s*(?:IsSet\((_\w+)\)\s*&&\s*IsObject\(\1\)|IsObject\(_\w+\))\s*\)?[ \t]*\r?\n\s*throw\b")
+		or (Body ~= "im)^\s*if\s+!\(\s*_\w+\s+is\s+\w+\s*\)[ \t]*\r?\n\s*throw\b")
 }
 
 _MetaGuardRatchet() {
-	global _REQUIRE_STATE_ALLOWLIST, _REQUIRE_STATE_BASELINE
+	global _REQUIRE_STATE_ALLOWLIST
+	Drift := _MetaRequireStateDrift()
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Violations := []
@@ -148,7 +177,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core", "settings", "menu", "tray", "ai", "apps", "clipboard", "diagnostics", "gestures", "hotstrings"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -178,18 +207,21 @@ _MetaGuardRatchet() {
 		}
 	}
 
-	Offenders := ""
-	for Rel in Violations
-		Offenders .= (Offenders == "" ? "" : ", ") . Rel
-
 	; Non-vacuity floor. The original scan saw THREE files and could not
 	; fail; anything in this range proves it is still reaching the whole
 	; driver. Set below the current 59 so excluding a few more constants
 	; from the predicate does not trip it.
 	Assert(ScannedCount >= 50,
 		"the guard scan must reach the whole driver (only " . ScannedCount . " files with module-level state seen) — it previously scanned 3 and was therefore incapable of failing")
-	Assert(Violations.Length <= _REQUIRE_STATE_BASELINE,
-		"files with unguarded module-level state rose to " . Violations.Length . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
+	Unguarded := Map()
+	for Rel in Violations {
+		Unguarded[Rel] := true
+		Assert(Drift.Has(Rel),
+			Rel . " holds unguarded module-level state and is not in require_state_drift.txt. This is a DRIFT signal, not a proven defect: check whether it holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not add it to the drift ledger.")
+	}
+	for Rel in Drift
+		Assert(Unguarded.Has(Rel),
+			Rel . " no longer holds unguarded module-level state (guarded, allowlisted, moved or gone); remove it from require_state_drift.txt.")
 }
 Test("meta require_state: module-level state without an init guard does not increase", _MetaGuardRatchet)
 
@@ -197,7 +229,15 @@ Test("meta require_state: module-level state without an init guard does not incr
 _MetaRequireStateGuardShapes() {
 	AssertTrue(_MetaRequireStateHasGuard('Start() {`n`tif IsObject(_Owner)`n`t`tthrow Error("started")`n}'))
 	AssertTrue(_MetaRequireStateHasGuard("Get() {`n`tif (!_Cache)`n`t`t_Cache := Map()`n}"))
+	AssertTrue(_MetaRequireStateHasGuard('Start() {`n`tif IsSet(_Owner) && IsObject(_Owner)`n`t`tthrow Error("started")`n}'),
+		"an unset-tolerant duplicate-start rejection is the same guard")
+	AssertFalse(_MetaRequireStateHasGuard('Start() {`n`tif IsSet(_Other) && IsObject(_Owner)`n`t`tthrow Error("started")`n}'),
+		"the IsSet half must test the owner itself")
 	AssertFalse(_MetaRequireStateHasGuard('Stop() {`n`tif IsObject(_Owner)`n`t`t_Owner := ""`n}'))
+	AssertTrue(_MetaRequireStateHasGuard('Apply() {`n`tif !(_Base is Map)`n`t`tthrow Error("load first")`n}'),
+		"a use before initialization that fails fast on the state's type is a guard")
+	AssertFalse(_MetaRequireStateHasGuard('Apply() {`n`tif !(_Base is Map)`n`t`t_Base := Map()`n}'),
+		"a type check that only branches is not")
 	AssertFalse(_MetaRequireStateHasGuard("Read() {`n`treturn _Owner`n}"))
 }
 Test("meta require_state: a duplicate-start rejection counts as an init guard", _MetaRequireStateGuardShapes)

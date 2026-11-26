@@ -40,7 +40,7 @@ local function run_fixture(body, source)
 		files[path] = value; controls.writes = controls.writes + 1; return true
 	end
 	package.loaded["core.fs.adapters.file_system"] = file_port
-	package.loaded["infra.config_paths"] = { get = function() return "config" end }
+	package.loaded["settings.engine.paths"] = { get = function() return "config" end }
 	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
@@ -122,7 +122,7 @@ local function run_fixture(body, source)
 	facades.system.has_screenshot_pause_claim = function(parent) return claims[parent] == true end
 	facades.system.has_pending_screenshot_action = function() return false end
 	for _, edge in ipairs({ "pause", "stop", "resume" }) do facades.system[edge .. "_awake"] = function() return true end end
-	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_cmd_star", "bind_tap_keys" }) do
+	for _, name in ipairs({ "bind_instant_screenshot", "bind_layer_wheel", "bind_wrap_text_if_selected", "bind_tap_keys" }) do
 		facades.system[name] = function() return handle("binding") end
 	end
 	for name, facade in pairs(facades) do
@@ -144,18 +144,18 @@ local function run_fixture(body, source)
 		end
 		return tap
 	end
-	local gestures = require("modules.gestures")
+	local gestures = require("gestures.engine")
 	local bindings = require("modules.shortcuts.bindings")
 	local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 	local taps = require("modules.shortcuts.tap_keys")
 	local script = require("modules.shortcuts.script_control")
 	local shortcuts = require("modules.shortcuts")
-	local prefs = require("infra.preferences")
+	local prefs = require("settings.engine.preferences.preferences")
 	local saved = prefs.load("config")
 	local state = { shortcuts = true, script_control_enabled = true,
 		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
 			script_altgr_delete = "open_personal_shortcuts", script_altgr_escape = "none" },
-		shortcut_keys = { cmd_star = true }, chatgpt_url = "https://example.test" }
+		shortcut_keys = { wrap_text_if_selected = true }, chatgpt_url = "https://example.test" }
 	for key, value in pairs(saved.gesture_action_parameters or {}) do
 		local binding, action = gestures.split_action_parameter_key(key)
 		if binding and action and type(value) == "string" then
@@ -163,7 +163,7 @@ local function run_fixture(body, source)
 		end
 	end
 	taps.load(gestures.is_assignable)
-	bindings.pause_hotkeys_only(); bindings.enable("cmd_star")
+	bindings.pause_hotkeys_only(); bindings.enable("wrap_text_if_selected")
 	bindings.set_chatgpt_url(state.chatgpt_url)
 	helpers.assert_eq(shortcuts.start(), true)
 	helpers.assert_eq(bindings.is_started(), true, "fixture static registry started")
@@ -172,8 +172,8 @@ local function run_fixture(body, source)
 	local function start_script() return script.start({}, shortcuts, gestures) end
 	helpers.assert_eq(start_script(), true)
 	local modules = { gestures = gestures, shortcuts_mod = shortcuts }
-	local demotions = require("ui.menu.session_demotions").new()
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(prefs, {
+	local demotions = require("menu.ui.transactions.session_demotions").new()
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(prefs, {
 		path = "config", state = state, hotfiles = {}, core_modules = modules,
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
 		snapshot_view = demotions.persisted_view,

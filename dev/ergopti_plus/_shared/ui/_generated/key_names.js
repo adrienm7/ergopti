@@ -42,6 +42,10 @@ const KEY_NAMES_DATA = Object.freeze({
 		arrow_right: Object.freeze({ windows: "key_name.arrow_right", macos: "key_name.arrow_right", linux: "key_name.arrow_right" }),
 		context_menu: Object.freeze({ windows: "key_name.context_menu", macos: "key_name.context_menu", linux: "key_name.context_menu" }),
 		num_lock: Object.freeze({ windows: "key_name.num_lock", macos: "key_name.num_lock", linux: "key_name.num_lock" }),
+		muhenkan: Object.freeze({ windows: "key_name.muhenkan", macos: "key_name.muhenkan", linux: "key_name.muhenkan" }),
+		henkan: Object.freeze({ windows: "key_name.henkan", macos: "key_name.henkan", linux: "key_name.henkan" }),
+		kana_mode: Object.freeze({ windows: "key_name.kana_mode", macos: "key_name.kana_mode", linux: "key_name.kana_mode" }),
+		ro: Object.freeze({ windows: "key_name.ro", macos: "key_name.ro", linux: "key_name.ro" }),
 		volume_mute: Object.freeze({ windows: "key_name.volume_mute", macos: "key_name.volume_mute", linux: "key_name.volume_mute" }),
 		volume_down: Object.freeze({ windows: "key_name.volume_down", macos: "key_name.volume_down", linux: "key_name.volume_down" }),
 		volume_up: Object.freeze({ windows: "key_name.volume_up", macos: "key_name.volume_up", linux: "key_name.volume_up" })
@@ -78,6 +82,10 @@ const KEY_NAMES_DATA = Object.freeze({
 		"arrowright": "arrow_right",
 		"contextmenu": "context_menu",
 		"numlock": "num_lock",
+		"nonconvert": "muhenkan",
+		"convert": "henkan",
+		"kanamode": "kana_mode",
+		"intlro": "ro",
 		"audiovolumemute": "volume_mute",
 		"audiovolumedown": "volume_down",
 		"audiovolumeup": "volume_up"

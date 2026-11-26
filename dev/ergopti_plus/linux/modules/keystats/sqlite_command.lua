@@ -133,8 +133,8 @@ function M.build(db_path, sql, opts)
 	-- A failed statement must stop before a later line can COMMIT. The CLI's
 	-- default differs from native sqlite3_exec: it resumes at the next line,
 	-- persisting partial migration batches despite a refused terminal receipt.
-	-- The private runtime's sqlite3 (infra/owned_programs.lua), never a host copy.
-	local program = require("infra.owned_programs").path("sqlite3")
+	-- The private runtime's sqlite3 (settings/engine/preferences/owned_programs.lua), never a host copy.
+	local program = require("settings.engine.preferences.owned_programs").path("sqlite3")
 	local words = { Shell.quote(program), Shell.quote("-init"), Shell.quote("/dev/null"), Shell.quote("-bail") }
 	-- Flags are literals chosen inside this repository, never caller data, but
 	-- they go through the same quoter so no call site can smuggle one in later.

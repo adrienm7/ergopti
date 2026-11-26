@@ -10,7 +10,7 @@
 
 local M = {}
 local Shared = require("apps.engine.program_providers")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Paths = require("core.fs.engine.paths")
 local FsDir = require("core.fs.engine.dir")
 local hs = hs

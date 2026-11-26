@@ -282,7 +282,7 @@ helpers.describe("conditional publication retained admission", function()
 					mod_combos_config = {}, tap_hold_timeout_ms = 200, sticky_timeout_ms = 1000,
 					simultaneous_threshold_ms = 50, combo_symmetric = false }
 			end
-			package.loaded["infra.config_paths"].get = function() return path end
+			package.loaded["settings.engine.paths"].get = function() return path end
 			local captured_files = require("core.fs.adapters.file_system")
 			for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 				captured_files[method] = fs[method]
@@ -548,7 +548,7 @@ helpers.describe("conditional publication retained admission", function()
 					simultaneous_threshold_ms = 50, combo_symmetric = false }
 			end
 			package.loaded["platform.remap.defaults"].tap_hold = { left_shift = { "escape", "none" } }
-			package.loaded["infra.config_paths"].get = function() return path end
+			package.loaded["settings.engine.paths"].get = function() return path end
 			local captured_files = require("core.fs.adapters.file_system")
 			for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 				captured_files[method] = fs[method]

@@ -25,7 +25,14 @@
 ---    every module the entry file requires at load ran before the boot clock,
 ---    so begin() reads the process's age from /proc (its start time against
 ---    the system uptime, both in clock ticks of 10 ms) and reports it as the
----    "load" phase; a spawn-to-ready time is then the sum of the two.
+---    "load" phase.
+--- 5. The boot total is spawn to ready: the load phase plus the stages, as the
+---    Windows total counts from the process creation and `[budgets]
+---    boot_total_ms` defines it. complete() logs, judges and returns that sum,
+---    and its CPU is the process's own since its start. It used to start at
+---    begin(), so a slow module load was never judged nor reported as boot
+---    (boot profiler parity BPF-01). A load /proc does not tell is said once at
+---    begin() and again at complete(), whose total then starts at begin().
 --- ==============================================================================
 
 local M = {}
@@ -47,6 +54,10 @@ end
 
 -- Replaceable in tests, which cannot make a process burn a known amount of CPU.
 local _cpu_ms = process_cpu_ms
+
+-- Reads the process age at begin(); replaceable in tests, whose own process
+-- age is the test runner's.
+local _process_age_ms = function() return M.process_age_ms() end
 
 -- Monotonic milliseconds at begin(); nil until the profiler is started.
 local _origin_ms = nil
@@ -117,7 +128,7 @@ function M.begin()
 	end
 	_origin_ms = Monotonic.now_ms()
 	_cpu_origin_ms = _cpu_ms()
-	_load_ms = M.process_age_ms()
+	_load_ms = _process_age_ms()
 	-- The marker line the field log analyser and macOS share, left as it is.
 	Logger.info(LOG, "Boot timing started.")
 	if _load_ms then
@@ -139,6 +150,14 @@ end
 function M.elapsed_ms()
 	if _origin_ms == nil then return 0 end
 	return Monotonic.now_ms() - _origin_ms
+end
+
+--- How long the daemon has run: the monotonic time since begin() plus the
+--- process age measured then. Nil before begin(), never a guessed zero.
+--- @return number|nil
+function M.uptime_ms()
+	if _origin_ms == nil then return nil end
+	return Monotonic.now_ms() - _origin_ms + (_load_ms or 0)
 end
 
 --- Opens a named boot stage.
@@ -177,13 +196,21 @@ function M.complete()
 	if _boot_ms ~= nil then
 		error("boot_profiler.complete() called twice — boot completes once.")
 	end
-	_boot_ms = M.elapsed_ms()
 	local still_open = TableUtil.sorted_keys(_open)
 	if #still_open > 0 then
 		Logger.warn(LOG, "Boot completed with unclosed stage(s): %s.", table.concat(still_open, ", "))
 	end
-	local boot_cpu_ms = M.cpu_ms()
-	Logger.info(LOG, "Boot complete in %.0f ms (cpu %.0f ms).", _boot_ms, boot_cpu_ms)
+	local boot_cpu_ms
+	if _load_ms then
+		_boot_ms = _load_ms + M.elapsed_ms()
+		boot_cpu_ms = _cpu_ms()
+		Logger.info(LOG, "Boot complete in %.0f ms (cpu %.0f ms) since the process started.", _boot_ms, boot_cpu_ms)
+	else
+		_boot_ms = M.elapsed_ms()
+		boot_cpu_ms = M.cpu_ms()
+		Logger.info(LOG, "Boot complete in %.0f ms (cpu %.0f ms) since boot timing; the load phase is not measured.",
+			_boot_ms, boot_cpu_ms)
+	end
 	require("core.logger.engine.perf_budget").judge(Logger, LOG, "boot", _boot_ms,
 		function() return require("core.timing.engine.timings").ms("budgets", "boot_total_ms") end)
 	-- One never-collapsed summary: every stage's milliseconds and the heap, so
@@ -198,7 +225,7 @@ function M.complete()
 	return _boot_ms
 end
 
---- Total boot milliseconds, or nil before complete().
+--- Total boot milliseconds, spawn to ready (see complete()), or nil before it.
 --- @return number|nil
 function M.boot_ms()
 	return _boot_ms
@@ -210,11 +237,18 @@ function M._use_cpu_clock(fn)
 	_cpu_ms = fn or process_cpu_ms
 end
 
+--- Replaces the process age read at begin() (tests only). Pass nil to restore /proc.
+--- @param fn function|nil Zero-argument function returning milliseconds or nil.
+function M._use_process_age(fn)
+	_process_age_ms = fn or function() return M.process_age_ms() end
+end
+
 --- Resets every piece of state. Tests only.
 function M._reset_for_test()
 	_origin_ms, _cpu_origin_ms, _open, _open_cpu, _boot_ms, _done_stages = nil, nil, {}, {}, nil, {}
 	_load_ms = nil
 	_cpu_ms = process_cpu_ms
+	_process_age_ms = function() return M.process_age_ms() end
 end
 
 return M

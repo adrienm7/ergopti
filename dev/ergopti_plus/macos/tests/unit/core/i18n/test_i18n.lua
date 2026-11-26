@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- Stub menu.labels before anything requires it — decorate_section is a pure wrapper.
 -- This module-scope stub is cleared at the end of the file (see the teardown block)
 -- so it does not leak into later test files that require the REAL menu.labels
--- (test_log_level_emojis.lua and ui/menu/builder.lua both call log_level_emoji).
+-- (test_log_level_emojis.lua and menu/ui/builder/builder.lua both call log_level_emoji).
 local _labels_called = {}
 package.loaded["menu.engine.labels"] = {
 	decorate_section = function(text)
@@ -454,13 +454,27 @@ end)
 
 
 helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", function()
-	helpers.before_each(reset_state)
+	-- A locale choice writes its config.toml row (locale-neutral-2026-11-21),
+	-- and an owned rewrite of an absent file is refused, so every case starts
+	-- from an existing config.toml without a locale row. A case that needs
+	-- other bytes points ConfigTomlPath at its own file.
+	local config_path = os.tmpname()
+	local Paths = require("settings.engine.paths")
+	local prior_paths_get = Paths.get
+	Paths.get = function(key)
+		if key == "ConfigTomlPath" then return config_path end
+		return prior_paths_get(key)
+	end
+	helpers.before_each(function()
+		reset_state()
+		local file = assert(io.open(config_path, "wb")); assert(file:write("")); assert(file:close())
+	end)
 
 	helpers.it("restores configured locale bytes when native persistence refuses", function()
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr" # preserve comment\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local prior = Paths.get
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
@@ -478,7 +492,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr" # existing\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local prior, prior_scheduler = Paths.get, package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
 		local ok, err = xpcall(function()
@@ -499,7 +513,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		local published
@@ -526,7 +540,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -552,7 +566,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -576,7 +590,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -643,7 +657,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	helpers.it("holds the real storage cohort and removes its exact backup after commit", function()
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		local directory, base = path:match("^(.*)/([^/]+)$")
 		local function backups()
@@ -704,7 +718,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Storage = require("infra.config_paths"), require("core.fs.adapters.storage")
+		local Paths, Storage = require("settings.engine.paths"), require("core.fs.adapters.storage")
 		local prior_get, prior_scheduler = Paths.get, package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		local foreign = {}
@@ -937,7 +951,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.it("(locale-superseded-reload) a " .. refusal .. " refusal hands the accepted reload back", function()
 			local path = os.tmpname()
 			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
-			local Paths = require("infra.config_paths")
+			local Paths = require("settings.engine.paths")
 			local prior_get, prior_reload = Paths.get, hs.reload
 			local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 			local reloads = {}
@@ -974,7 +988,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
+		local Paths, Writer = require("settings.engine.paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_publish = Paths.get, Writer.publish_if_unchanged
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
@@ -997,7 +1011,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
+		local Paths, Writer = require("settings.engine.paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_batch = Paths.get, Writer.batch_write
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
@@ -1115,14 +1129,57 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 			"unknown locale must not be persisted")
 	end)
 
-	helpers.it("set_locale() is a no-op when the same locale is already active", function()
+	helpers.it("set_locale() is a no-op when the active locale is the saved one", function()
+		hs.settings.set("ergopti.i18n_locale", "fr")
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
-		i18n.set_locale("fr")  -- already the default
+		local timers = #hs.timer.__timers
+		helpers.assert_true(i18n.set_locale("fr"))
 
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
-			"same locale must not re-persist")
+		helpers.assert_eq(#hs.timer.__timers, timers, "the saved locale schedules no reload")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_eq(actual, "", "the saved locale is not rewritten")
+	end)
+
+	-- The maintainer's decision of 2026-11-21: the language shown while nothing
+	-- is saved is the neutral value, so choosing it is an explicit choice that
+	-- is saved and written, French included.
+	helpers.it("set_locale() writes the shown locale while nothing is saved (locale-neutral-2026-11-21)", function()
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		helpers.assert_true(i18n.set_locale("fr"))
+
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "fr", "the choice is saved")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_contains(actual, 'locale = "fr"')
+	end)
+
+	-- Maintainer decision of 2026-11-22: a locale chosen while config.toml
+	-- does not exist creates the file with the locale row.
+	helpers.it("creates config.toml for a locale choice while it is absent (locale-creates-config-2026-11-22)", function()
+		os.remove(config_path)
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		helpers.assert_true(i18n.set_locale("de"))
+
+		helpers.assert_eq(i18n.get_locale(), "de")
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de", "the choice is saved")
+		local read = assert(io.open(config_path, "rb")); local actual = read:read("*a"); read:close()
+		helpers.assert_contains(actual, 'locale = "de"')
+	end)
+
+	helpers.it("removes the config.toml it created when the saved choice is refused (locale-creates-config-2026-11-22)", function()
+		os.remove(config_path)
+		local i18n = load_i18n()
+		i18n.set_locale_injector(function(_) end)
+		with_settings_refusal("false", function()
+			helpers.assert_eq(i18n.set_locale("de"), false)
+		end)
+
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(io.open(config_path, "rb"), "the created file is removed with the refused choice")
 	end)
 
 	helpers.it("persist_locale() writes to settings without changing in-memory locale", function()
@@ -1180,6 +1237,9 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.assert_eq(i18n.get_locale(), "fr",
 			"unknown code must not change locale")
 	end)
+
+	Paths.get = prior_paths_get
+	os.remove(config_path)
 end)
 
 
@@ -1259,7 +1319,7 @@ end)
 -- Teardown — the runner requires each test file once, in sequence, running its
 -- cases inline (helpers.describe/it execute immediately). Clearing the stubs this
 -- file installed forces the NEXT file to load the genuine modules: menu.labels
--- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
+-- (needed real by test_log_level_emojis.lua and menu/ui/builder/builder.lua) and the
 -- stub-wired lib.i18n / lib.locale pair must not leak either.
 package.loaded["menu.engine.labels"] = nil
 package.loaded["core.i18n.engine.locale"]  = nil

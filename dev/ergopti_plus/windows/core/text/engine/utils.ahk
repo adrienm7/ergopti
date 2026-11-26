@@ -158,6 +158,52 @@ _TextCodepointLength(Text) {
 	return Count
 }
 
+/**
+ * Counts user-perceived characters, the unit one Backspace or Left arrow crosses
+ * in a text field: an accent typed as a combining mark, an emoji with a skin
+ * tone, a ZWJ sequence or a flag is one character of several code points. The
+ * rules are those of the shared corpus
+ * (_shared/tests/corpus/hotstrings/caret_steps_vectors.json), which the Linux
+ * injector and the macOS composed-text walk replay too; "\r\n" is one step.
+ * @param {String} Text The text.
+ * @returns {Integer} The number of characters.
+ */
+_TextCaretSteps(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCaretSteps expects a string, got " . Type(Text) . ".")
+	Steps := 0
+	Previous := -1
+	RegionalOpen := false
+	AfterJoiner := false
+	Units := StrLen(Text)
+	Position := 1
+	while (Position <= Units) {
+		Width := _TextCodepointWidth(Text, Position, Units)
+		Code := Ord(SubStr(Text, Position, Width))
+		Position += Width
+		Regional := Code >= 0x1F1E6 && Code <= 0x1F1FF
+		Joins := Previous >= 0 && (_TextExtendsCluster(Code) || AfterJoiner
+			|| (Previous == 0x0D && Code == 0x0A) || (Regional && RegionalOpen))
+		if !Joins
+			Steps += 1
+		; A flag is a PAIR of regional indicators: the third starts a new flag.
+		RegionalOpen := Regional && !(Joins && RegionalOpen)
+		AfterJoiner := Code == 0x200D
+		Previous := Code
+	}
+	return Steps
+}
+
+; Combining marks, variation selectors, skin tones, tag characters and the
+; joiner extend the character before them instead of starting a new one.
+_TextExtendsCluster(Code) {
+	return Code == 0x200D || (Code >= 0x0300 && Code <= 0x036F) || (Code >= 0x1AB0 && Code <= 0x1AFF)
+		|| (Code >= 0x1DC0 && Code <= 0x1DFF) || (Code >= 0x20D0 && Code <= 0x20FF)
+		|| (Code >= 0xFE00 && Code <= 0xFE0F) || (Code >= 0xFE20 && Code <= 0xFE2F)
+		|| (Code >= 0x1F3FB && Code <= 0x1F3FF) || (Code >= 0xE0020 && Code <= 0xE007F)
+		|| (Code >= 0xE0100 && Code <= 0xE01EF)
+}
+
 /** Returns the UTF-16 span erased by up to Count native Backspace events. */
 _TextTailCodeUnits(Text, Count) {
 	if !(Text is String) || !(Count is Integer) || Count < 0

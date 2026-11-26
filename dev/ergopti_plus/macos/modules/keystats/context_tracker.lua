@@ -914,6 +914,14 @@ end
 -- =============================================
 -- =============================================
 
+--- Tells whether keystats has started this tracker. A reader that runs while
+--- metrics are off, such as the apps dashboard, asks first: there is then no
+--- open interval to add, and calling a state accessor would log an ERROR.
+--- @return boolean initialized True once M.init() accepted its dependencies.
+function M.is_initialized()
+	return _state ~= nil
+end
+
 --- Returns the unpersisted foreground duration for the active application.
 --- App-time events are normally committed only on a focus transition. The
 --- dashboard also needs the open interval so a long uninterrupted work block
@@ -1184,6 +1192,10 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	if _state.active_app_name ~= app_name or not app_object then
 		discard_roi_word()
 		_state.roi_window_id = nil
+		-- A focus change ends the typing burst: the speed widget hides (TWD-2).
+		if type(_state.wpm_activity) == "table" then
+			require("metrics.engine.wpm.activity").record_break(_state.wpm_activity, hs.timer.absoluteTime() / 1000000)
+		end
 	end
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). ProcessLifecycle.onAppActivate keeps

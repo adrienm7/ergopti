@@ -14,15 +14,15 @@
 _LoggerErrorsSharingDenial(DenyMain := false) {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING, _LOGGER_TEST_SINK
+	global _LOGGER_TEST_SINK
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 	global _LOGGER_ERROR_ENABLED, _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
 	global _LOGGER_DROPPED_LINES, _HealthCheckLastError, _HealthCheckErrCount
 	Saved := {
 		Ring: [LOGGER_RING_BUFFER, LOGGER_RING_CURSOR],
-		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING],
+		Queues: [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS],
 		Paths: [LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE],
-		Fanout: [LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_TEST_SINK],
+		Fanout: [_LOGGER_TEST_SINK],
 		Dedup: [_LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime],
 		Flags: [_LOGGER_ERROR_ENABLED, _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES],
 		Health: [_HealthCheckLastError, _HealthCheckErrCount]
@@ -50,13 +50,10 @@ _LoggerErrorsSharingDenial(DenyMain := false) {
 		LOGGER_RING_CURSOR := 0
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		LOGGER_LOG_PATH := DenyMain ? MainPath : ""
 		LOGGER_ERRORS_LOG_PATH := Path
 		; The supported empty date disables rollover and preserves the exact fixture path.
 		_LOGGER_PATH_DATE := ""
-		LOGGER_SUB_FILES := []
-		_LOGGER_SUB_PATHS := Map()
 		_LOGGER_TEST_SINK := 0
 		_LOGGER_DEDUP_KEY := ""
 		_LOGGER_DEDUP_LEVEL := ""
@@ -120,13 +117,10 @@ _LoggerErrorsSharingDenial(DenyMain := false) {
 			LOGGER_RING_CURSOR := Saved.Ring[2]
 			_LOGGER_PENDING := Saved.Queues[1]
 			_LOGGER_PENDING_ERRORS := Saved.Queues[2]
-			_LOGGER_SUB_PENDING := Saved.Queues[3]
 			LOGGER_LOG_PATH := Saved.Paths[1]
 			LOGGER_ERRORS_LOG_PATH := Saved.Paths[2]
 			_LOGGER_PATH_DATE := Saved.Paths[3]
-			LOGGER_SUB_FILES := Saved.Fanout[1]
-			_LOGGER_SUB_PATHS := Saved.Fanout[2]
-			_LOGGER_TEST_SINK := Saved.Fanout[3]
+			_LOGGER_TEST_SINK := Saved.Fanout[1]
 			_LOGGER_DEDUP_KEY := Saved.Dedup[1]
 			_LOGGER_DEDUP_LEVEL := Saved.Dedup[2]
 			_LOGGER_DEDUP_COUNT := Saved.Dedup[3]

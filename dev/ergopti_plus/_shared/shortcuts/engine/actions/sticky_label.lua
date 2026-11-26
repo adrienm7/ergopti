@@ -8,7 +8,7 @@
 --- named from the shared key name table on the platform that shows them
 --- (« 📌 Cmd + Maj rémanents » on macOS, « 📌 Win + Maj rémanents » on
 --- Windows). The labels used to spell macOS's English names in every locale.
---- Port: windows/modules/gestures/actions.ahk _GestureActionLabel.
+--- Port: windows/gestures/engine/actions.ahk _GestureActionLabel.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The id spells the modifiers, as the catalogue does on every driver:

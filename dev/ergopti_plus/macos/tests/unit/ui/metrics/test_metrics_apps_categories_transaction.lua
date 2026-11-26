@@ -21,7 +21,7 @@ local CATEGORY_OWNERS = {
 	"core.logger.engine.logger",
 	"core.ui.engine.dialog_util",
 	"core.fs.adapters.file_system",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"core.ui.adapters.webview_result",
@@ -126,10 +126,10 @@ local function with_category_store_owned(spec, callback)
 	state.warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 	local previous_modules = {}
 	for _, name in ipairs({ "hs.fs", "core.events.timer_scheduler", "modules.keystats.log_manager",
-			"infra.config_paths" }) do
+			"settings.engine.paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return state.config_dir end }
+	package.loaded["settings.engine.paths"] = { get_config_dir = function() return state.config_dir end }
 	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
 	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { timer = {} }, true end,
@@ -415,9 +415,9 @@ end)
 helpers.describe("metrics warning native signature", function()
 	helpers.it("presents an invalid score warning without saving the category", function()
 		-- The shared value check's refusal names the declared range (value-validation):
-		-- a word, past the maximum, a fraction past it written with a comma, a
-		-- hexadecimal string and an empty answer.
-		for _, input in ipairs({ "abc", "3", "2,5", "0x1", "" }) do
+		-- a word, past the maximum, a fraction past it written with a comma and a
+		-- hexadecimal string. A blank answer returns to the unedited score (PCK-13).
+		for _, input in ipairs({ "abc", "3", "2,5", "0x1" }) do
 			with_category_store({ score_input = input }, function(metrics, state, callbacks)
 				local before = state.target
 				attempt_edit(metrics, callbacks)

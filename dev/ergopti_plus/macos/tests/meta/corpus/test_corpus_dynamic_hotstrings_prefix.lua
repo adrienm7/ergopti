@@ -94,4 +94,20 @@ helpers.describe("dynamic hotstrings prefix corpus (macOS): shared reference mat
 			helpers.assert_eq(result, v.expected, "[" .. v.id .. "] spaced_prefix")
 		end
 	end)
+
+
+
+
+	-- ==================================================
+	-- ======= 5/ international_prefix parity ===========
+	-- ==================================================
+
+	helpers.it("international_prefix matches every international_prefix_vector", function()
+		helpers.assert_true(type(corpus) == "table" and type(corpus.international_prefix_vectors) == "table"
+			and #corpus.international_prefix_vectors > 0, "corpus must contain international_prefix_vectors")
+		for _, v in ipairs(corpus.international_prefix_vectors) do
+			helpers.assert_eq(DynamicHotstrings.international_prefix(v.phone, v.plain_count), v.expected,
+				"[" .. v.id .. "] international_prefix")
+		end
+	end)
 end)

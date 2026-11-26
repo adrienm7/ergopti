@@ -98,6 +98,7 @@ local file_system
 require("tests.support.file_system_transaction_fixture").with_fixture(function(native)
 	file_system = native.make_adapter(nil, nil, nil, require("lfs").link)
 end)
+local scheduled = {}
 local complete_batch_offset
 local function ports()
 	_G.hs = { fs = fs, timer = timer, json = json,
@@ -112,12 +113,26 @@ local function ports()
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
-	package.loaded["core.events.timer_scheduler"] = { after = function()
-		return { committed = true, timer = {} }, true
+	package.loaded["core.events.timer_scheduler"] = { after = function(_, callback)
+		local handle = { committed = true, timer = {} }
+		scheduled[#scheduled + 1] = { handle = handle, callback = callback }
+		return handle, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"] = { cleanup = function() return true end,  _last_complete_batch_offset = complete_batch_offset, init = function() end,
 		sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return "other" end }
+end
+--- Runs the recovery's scheduled slices until it ends: a rebuild publishes one
+--- day per transaction and pauses between days once its slice budget is spent.
+--- @param manager table The loaded log manager.
+local function finish_recovery(manager)
+	while manager.is_recovering() do
+		local due = scheduled; scheduled = {}
+		assert(#due > 0, "a running recovery scheduled no next slice")
+		for _, entry in ipairs(due) do
+			if entry.handle.timer ~= nil then entry.callback() end
+		end
+	end
 end
 local metrics = temporary .. "/metrics"
 local identity = "physical-release-device"
@@ -169,22 +184,22 @@ shell.run(function(capture, observed, native)
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["core.logger.engine.logger"]=log
-	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
+	package.loaded["settings.engine.paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
-	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
+	package.loaded["menu.engine.manifest_reader"]={default_for=function() return true end}
 	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
-	package.loaded["modules.keymap"]={is_running=function() return false end}
-	package.loaded["modules.gestures.engine"]={}
-	package.loaded["modules.gestures.actions"]={}
+	package.loaded["hotstrings.engine.expander"]={is_running=function() return false end}
+	package.loaded["gestures.engine.engine"]={}
+	package.loaded["gestures.engine.actions"]={}
 	leaf.caffeinate={watcher={systemDidWake=1,screensDidWake=2,screensDidUnlock=3,systemWillSleep=4,screensDidSleep=5,screensDidLock=6,new=function(fn)
 		observations.caffeinate=fn; local w={}; function w:start() return self end; function w:stop() return self end; return w end}}
 	local app_name, title, secure="Original","Ordinary",false
@@ -344,6 +359,7 @@ shell.run(function(capture, observed, native)
 		assert(manager.stop({process_exit=true}))
 		for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
+		finish_recovery(manager)
 		receipt[phase]=snapshot()
 		helpers.assert_eq(receipt[phase],receipt.live,"Real raw rebuild must recover independent totals")
 	end
@@ -522,22 +538,22 @@ shell.run(function(capture, observed, native)
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["core.logger.engine.logger"]=log
-	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
+	package.loaded["settings.engine.paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
-	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
+	package.loaded["menu.engine.manifest_reader"]={default_for=function() return true end}
 	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
-	package.loaded["modules.keymap"]={is_running=function() return false end}
-	package.loaded["modules.gestures.engine"]={}
-	package.loaded["modules.gestures.actions"]={}
+	package.loaded["hotstrings.engine.expander"]={is_running=function() return false end}
+	package.loaded["gestures.engine.engine"]={}
+	package.loaded["gestures.engine.actions"]={}
 	leaf.caffeinate={watcher={systemDidWake=1,screensDidWake=2,screensDidUnlock=3,systemWillSleep=4,screensDidSleep=5,screensDidLock=6,new=function(fn)
 		observations.caffeinate=fn; local w={}; function w:start() return self end; function w:stop() return self end; return w end}}
 	local app_name, title, secure="Original","Ordinary",false

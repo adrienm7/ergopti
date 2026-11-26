@@ -3,7 +3,7 @@
 --- Shared behavior proves both hosts keep backups, consent and rollback debt.
 return function(helpers)
 	local Codec = require("core.text.engine.toml_codec")
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 
 	local function fixture()
 		local original = '[gestures]\nenabled = true\nswipe_3_down = "copy"\nfuture = 42\n[gestures.expert]\nvalue = "preserve"\n[llm]\nenabled = true\n'

@@ -157,6 +157,10 @@ local _ring      = {}   -- Array of log lines (strings)
 local _ring_head = 0    -- Points to the slot to write NEXT (0-indexed)
 local _ring_size = 0    -- Number of entries currently stored
 
+--- Lines a raising sink lost since the last line it accepted, the last error it
+--- raised, and whether the report of those lines is being delivered right now.
+local _sink_refusal = { count = 0, last = nil, reporting = false }
+
 
 
 
@@ -208,15 +212,23 @@ M.clock_fn = M.default_clock
 -- =============================================
 -- =============================================
 
---- Sets the minimum severity level. Lines below this level are silently dropped.
---- @param level number|string  Numeric (10/20/30/40) or string alias
----   ("debug"|"info"|"warning"|"error").
+--- Sets the minimum severity level. Lines below this level are dropped and
+--- counted (see M.volume). An unknown alias or a value that is no number raises:
+--- it used to become DEBUG without a word, so a typo in a level name silently
+--- turned the most verbose logging on (logger parity audit LOG-01).
+--- @param level number|string  Numeric (10/20/30/40), a string alias
+---   ("debug"|"info"|"warning"|"error") or a variant name ("trace", "start"…),
+---   any case.
 function M.set_level(level)
+	local threshold = level
 	if type(level) == "string" then
-		local aliases = { debug = 10, info = 20, warning = 30, error = 40 }
-		level = aliases[level:lower()] or 10
+		local name = level:lower()
+		threshold = (name == "warning") and LEVELS.warn or LEVELS[name]
 	end
-	_min_level = tonumber(level) or 10
+	if type(threshold) ~= "number" then
+		error(string.format("logger: unknown log level %q", tostring(level)), 2)
+	end
+	_min_level = threshold
 end
 
 --- Returns the current minimum severity level.
@@ -258,6 +270,16 @@ end
 --- @param fn function|nil  function(line: string, variant: string) → void
 function M.set_sink(fn)
 	_sink = (type(fn) == "function") and fn or nil
+	-- Refusals belong to the sink that raised them; a new sink starts clean.
+	_sink_refusal.count, _sink_refusal.last, _sink_refusal.reporting = 0, nil, false
+end
+
+--- Reports the lines the current sink refused (raised on) and that no accepted
+--- line has reported yet, with the last error it raised.
+--- @return number count
+--- @return string|nil last
+function M.sink_refusals()
+	return _sink_refusal.count, _sink_refusal.last
 end
 
 --- Installs the ERROR observer. Call with nil to remove it (tests).
@@ -289,11 +311,32 @@ local function deliver(line, variant)
 	_ring_head  = _ring_head + 1
 	if _ring_size < RING_CAPACITY then _ring_size = _ring_size + 1 end
 
-	if _sink then
-		local ok = pcall(_sink, line, variant)
-		-- Sink errors are deliberately swallowed — a broken sink must never
-		-- prevent the calling code from completing its own work
-		if not ok then end
+	if not _sink then return end
+	-- A raising sink must never break the caller's own work, so the error stays
+	-- here; but the line it lost is counted and reported by the next line the
+	-- sink accepts, as the Windows logger reports the lines its queue cap dropped.
+	-- Swallowing it without a trace let a sink fault erase lines silently
+	-- (logger parity audit LOG-05).
+	local ok, err = pcall(_sink, line, variant)
+	if not ok then
+		_sink_refusal.count = _sink_refusal.count + 1
+		_sink_refusal.last = tostring(err)
+		return
+	end
+	if _sink_refusal.count == 0 or _sink_refusal.reporting then return end
+	local count = _sink_refusal.count
+	local stamp = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d) ") or M.timestamp_fn()
+	local report = string.format("%s [%s] [logger] %d %s refused by the log sink before this one (last refusal: %s).",
+		stamp, LABELS.warn, count, count == 1 and "line was" or "lines were", _sink_refusal.last)
+	-- The report takes the path of any line (ring, volume, sink). A refused
+	-- report keeps the count for the next accepted line; it is not itself a lost line.
+	_sink_refusal.reporting = true
+	deliver(report, "warn")
+	_sink_refusal.reporting = false
+	if _sink_refusal.count == count then
+		_sink_refusal.count, _sink_refusal.last = 0, nil
+	else
+		_sink_refusal.count = count
 	end
 end
 
@@ -467,11 +510,20 @@ local function emit_record(exempt, variant, module_name, msg, ...)
 		return nil
 	end
 
-	-- Build message body, guarding against format errors
+	-- Build the body. A format error must not cost the line, nor pass for a
+	-- normal one: the template alone keeps its placeholders and loses every
+	-- value, so the failure rides on the line itself, worded as the Windows
+	-- logger words it (logger parity audit LOG-02)
 	local body
-	if select("#", ...) > 0 then
+	local count = select("#", ...)
+	if count > 0 then
 		local ok, result = pcall(string.format, msg, ...)
-		body = ok and result or tostring(msg)
+		if ok then
+			body = result
+		else
+			body = string.format("%s  [!! log format failed: %s \u{2014} %d arg(s) not substituted]",
+				tostring(msg), tostring(result), count)
+		end
 	else
 		body = tostring(msg)
 	end

@@ -14,9 +14,9 @@ local Logger = require("core.logger.engine.shim")
 local i18n = require("core.i18n.engine.i18n")
 local LOG = "modules.keep_awake"
 local READY = "ERGOPTI_INHIBITED\n"
-local POLL_SECONDS = 1
-local STARTUP_SECONDS = 5
 local _owner
+-- Whether the auto-clicker ran when the driver paused; the resume restarts it.
+local _auto_click_paused = false
 
 --- Holds an unwritten pipe until cancellation. OwnedProcess owns its closure.
 --- @return table source
@@ -41,10 +41,16 @@ local function hold_pipe()
 end
 
 --- Constructs one explicitly owned inhibitor; dependencies are native by default.
---- @param ports table|nil Native process, scheduler and pipe ports for tests.
+--- @param ports table|nil Native process, scheduler, pipe and timings ports for tests.
 --- @return table owner
 function M.new(ports)
 	ports = ports or {}
+	-- The poll and the ready bound are the shared registry's [keep_awake].
+	local timings = ports.timings or require("core.timing.engine.timings")
+	-- The wait is counted in whole milliseconds: summed seconds drift.
+	local poll_ms = timings.ms("keep_awake", "inhibitor_poll_ms")
+	local poll_seconds = timings.sec("keep_awake", "inhibitor_poll_ms")
+	local ready_timeout_ms = timings.ms("keep_awake", "inhibitor_ready_timeout_ms")
 	local start = ports.start or require("core.process.adapters.owned_process").start
 	local scheduler = ports.scheduler or require("core.events.timer_scheduler")
 	local pipe = ports.pipe or hold_pipe
@@ -55,7 +61,7 @@ function M.new(ports)
 	local now_ms = ports.now_ms or require("core.logger.engine.monotonic").now_ms
 	-- A finished session is the day's awake_ms, as on Windows and macOS (KMD-3).
 	local record_session = ports.record_session or function(duration_ms)
-		return require("modules.keystats.system_metrics").record_awake_session(duration_ms)
+		return require("modules.keystats.system.system_metrics").record_awake_session(duration_ms)
 	end
 	local current
 	local owner = {}
@@ -66,7 +72,9 @@ function M.new(ports)
 		current = nil
 		Logger.info(LOG, "Session idle inhibitor released.")
 		if session.active then
-			notify("shortcuts.keep_awake_off")
+			-- One short notice for every end but the daemon's own exit, the same
+			-- key on the three OS (maintainer decision SNU-12, 2026-11-21).
+			if not session.quiet then notify("shortcuts.keep_awake_ended") end
 			local recorded, credited = pcall(record_session, math.max(0, now_ms() - session.active_since_ms))
 			if not recorded or credited ~= true then
 				Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(credited))
@@ -79,11 +87,13 @@ function M.new(ports)
 	end
 
 	--- Cancels the current inhibitor and retains every unsettled native owner.
+	--- @param options table|nil `quiet = true` ends it without the end notice.
 	--- @return boolean settled
-	function owner.stop()
+	function owner.stop(options)
 		local session = current
 		if not session then return true end
 		session.stopping = true
+		if options and options.quiet then session.quiet = true end
 		if session.timer and scheduler.cancel(session.timer) == true then session.timer = nil end
 		session.input:cancel()
 		session.operation:cancel()
@@ -115,7 +125,7 @@ function M.new(ports)
 			notify("notify.keep_awake_failed")
 			return false
 		end
-		local session = { input = pipe(), output = "", waited = 0 }
+		local session = { input = pipe(), output = "", waited_ms = 0 }
 		current = session
 		local operation = start("systemd-inhibit", {
 			"--what=idle", "--mode=block", "--who=Ergopti", "--why=" .. i18n.get("sg_actions.activity_simulation"),
@@ -148,11 +158,11 @@ function M.new(ports)
 			if current then owner.stop() end
 			return false
 		end
-		session.timer = scheduler.every(POLL_SECONDS, function()
+		session.timer = scheduler.every(poll_seconds, function()
 			if current ~= session then return end
 			if session.stopping then owner.stop(); return end
-			session.waited = session.waited + POLL_SECONDS
-			if not operation:is_running() or (not session.active and session.waited >= STARTUP_SECONDS) then
+			session.waited_ms = session.waited_ms + poll_ms
+			if not operation:is_running() or (not session.active and session.waited_ms >= ready_timeout_ms) then
 				Logger.error(LOG, "Keep-awake lost or refused: the session idle inhibitor is unavailable.")
 				notify("notify.keep_awake_failed")
 				owner.stop()
@@ -199,16 +209,44 @@ function M.new(ports)
 	return owner
 end
 
---- Toggles the daemon's only inhibitor.
+--- Toggles the anti-sleep mode with the active preset: its keep-awake part
+--- holds the daemon's only inhibitor, its auto-click part runs the
+--- auto-clicker (modules/auto_click.lua). A second Ctrl+M stops both.
 --- @return boolean admitted
 function M.toggle()
 	if not _owner then _owner = M.new() end
-	return _owner.toggle()
+	local AutoClick = require("modules.auto_click")
+	if AutoClick.running() then
+		AutoClick.stop()
+		return _owner.stop()
+	end
+	if _owner.is_active() then return _owner.toggle() end
+	local plan = AutoClick.active_plan()
+	if not plan.keep_awake and not plan.auto_click then
+		Logger.warn(LOG, "The active anti-sleep preset keeps nothing awake and clicks nothing.")
+		require("platform.focus.application_notifier").send(i18n.get("keepawake.preset_empty"))
+		return false
+	end
+	local admitted = true
+	if plan.keep_awake then admitted = _owner.toggle() end
+	if plan.auto_click then
+		local started, reason = AutoClick.start(plan)
+		if not started then
+			require("platform.focus.application_notifier").send(i18n.get("keepawake.auto_click_refused"))
+			Logger.warn(LOG, "Auto-click did not start with the mode: reason=%s.", tostring(reason))
+		end
+		admitted = admitted and started
+	end
+	return admitted
 end
 
---- Releases the daemon's inhibitor before its event loop stops.
+--- Releases the daemon's inhibitor before its event loop stops, silently:
+--- the driver is leaving, as on macOS. The auto-clicker stops with it.
 --- @return boolean settled
-function M.stop() return not _owner or _owner.stop() end
+function M.stop()
+	require("modules.auto_click").stop()
+	return not _owner or _owner.stop({ quiet = true })
+end
 
 --- Follows the driver's pause: the daemon's inhibitor stops with it and comes
 --- back on resume when it ran at the pause.
@@ -216,6 +254,14 @@ function M.stop() return not _owner or _owner.stop() end
 --- @return boolean settled
 function M.set_paused(paused)
 	if type(paused) ~= "boolean" then error("keep_awake.set_paused() needs a boolean pause state", 2) end
+	local AutoClick = require("modules.auto_click")
+	if paused and AutoClick.running() then
+		_auto_click_paused = true
+		AutoClick.stop()
+	elseif not paused and _auto_click_paused then
+		_auto_click_paused = false
+		AutoClick.start(AutoClick.active_plan())
+	end
 	if not _owner then return true end
 	return _owner.set_paused(paused)
 end

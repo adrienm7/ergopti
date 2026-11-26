@@ -1,5 +1,5 @@
 ﻿; _generated/touchpad_registry.ahk
-; AUTO-GENERATED from windows/modules/gestures/precision_touchpad_registry.toml.
+; AUTO-GENERATED from windows/gestures/adapters/precision_touchpad_registry.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:touchpad-registry` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -9,13 +9,13 @@
 ; Every registry value Ergopti writes so each gesture slot sends its
 ; Ctrl + Win + Shift + Fn shortcut, in write order. The tray action and the
 ; first-run wizard both write it in process, through
-; modules/gestures/touchpad_registry.ahk, which backs it up and restores it, or
+; gestures/adapters/touchpad_registry.ahk, which backs it up and restores it, or
 ; writes factory_defaults back (and deletes every other name) when no
 ; backup exists.
 ; ==============================================================================
 
 ; A function rather than a global initialiser so include ORDER cannot matter:
-; the first-run wizard reads it before modules/gestures/init.ahk runs. Each
+; the first-run wizard reads it before gestures/engine/init.ahk runs. Each
 ; call returns fresh maps, so no caller can alter what another one reads.
 TouchpadRegistryData() {
 	return Map(

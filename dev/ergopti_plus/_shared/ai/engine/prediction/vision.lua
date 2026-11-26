@@ -20,7 +20,7 @@
 --- 3. Prompts, tags, token budgets and defaults live in vision.json, read by
 ---    every driver.
 ---
---- The AutoHotkey port is windows/modules/llm/vision.ahk. Both are pinned by
+--- The AutoHotkey port is windows/ai/engine/prediction/vision.ahk. Both are pinned by
 --- _shared/tests/corpus/llm/vision_vectors.json.
 --- ==============================================================================
 

@@ -594,7 +594,7 @@ _NECP_Exports() {
 
 _NECP_WaitFile(State, Path, Boundary) {
 	Started := A_TickCount
-	while !FileExist(Path) && State.Calls == 0 && TickElapsed(Started) < 5000 {
+	while !FileExist(Path) && State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		_SR_TreePoll()
 		Sleep(10)
 	}
@@ -752,7 +752,7 @@ _NECP_Run(Delayed) {
 				if Events.Length >= 3
 					AssertTrue(DllCall("Kernel32\SetEvent", "Ptr", Events[3], "Int"), "RETIREMENT: request owned receiver stop")
 				Started := A_TickCount
-				while State.Calls == 0 && TickElapsed(Started) < 5000 {
+				while State.Calls == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 					_SR_TreePoll()
 					Sleep(10)
 				}

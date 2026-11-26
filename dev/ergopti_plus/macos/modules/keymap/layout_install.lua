@@ -629,6 +629,9 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 		return install_fn(bundles_dir, bundle_name)
 	end, debug.traceback)
 	_install_in_flight = false
+	-- Whatever the outcome, the scope folders may have changed: the menu's
+	-- cached view of them is read again at its next rebuild.
+	require("modules.keymap.layout_sources_cache").invalidate(scope_label .. " install")
 	if not call_ok then
 		Logger.error(LOG, "%s keyboard-layout install raised: %s.",
 			scope_label, tostring(committed_or_err))
@@ -640,6 +643,91 @@ end
 local function install_user(bundles_dir, bundle_name)
 	return run_exclusive_install(
 		"User", install_user_unlocked, bundles_dir, bundle_name)
+end
+
+--- Builds the removal of one installed Ergopti bundle: the exact bundle is moved
+--- into a private folder of the same directory, so macOS stops listing it at
+--- once, then that folder is deleted. A name that is no Ergopti bundle, or a
+--- bundle without its Info.plist, is refused before anything moves.
+--- @param target_dir string Keyboard Layouts directory holding the bundle.
+--- @param bundle_name string Basename of the installed bundle.
+--- @return string|nil command POSIX shell command, or nil on invalid input.
+--- @return string|nil detail Validation failure detail.
+local function build_remove_transaction(target_dir, bundle_name)
+	if type(target_dir) ~= "string" or target_dir == "" then
+		return nil, "target directory is missing"
+	end
+	if type(bundle_name) ~= "string" or not bundle_name:match("^Ergopti_v[%d%.]+%.bundle$") then
+		return nil, "bundle name is invalid"
+	end
+	local sq = text_utils.shell_quote
+	return table.concat({
+		"target=" .. sq(target_dir:gsub("/+$", "")) .. ";",
+		"name=" .. sq(bundle_name) .. ";",
+		'[ -f "$target/$name/Contents/Info.plist" ] || { echo "The keyboard layout bundle is not installed."; exit 1; };',
+		'work="$(mktemp -d "$target/.ergopti-remove.XXXXXX")" || exit 1;',
+		'mv "$target/$name" "$work/$name" || { rmdir "$work"; exit 1; };',
+		'if ! rm -rf "$work"; then',
+			'echo "Keyboard layout removal cleanup failed; retained at $work.";',
+		'fi;',
+		'exit 0;',
+	}, " ")
+end
+
+--- Removes one Ergopti bundle from the user's Keyboard Layouts folder. The
+--- system folder needs administrator rights, which this driver cannot bind to
+--- its launcher yet (install_system_unlocked), so its copy is never removed here.
+--- @param bundle_name string Basename of the installed user bundle.
+--- @return boolean removed Whether the bundle left the user folder.
+--- @return string|nil reason Closed failure reason for the menu.
+local function remove_user_unlocked(bundle_name)
+	local present = false
+	for _, entry in ipairs(find_installed_bundles(USER_LAYOUTS_DIR)) do
+		if entry.name == bundle_name then present = true end
+	end
+	if not present then
+		Logger.warn(LOG, "User bundle removal refused: %s is not in %s.", tostring(bundle_name), USER_LAYOUTS_DIR)
+		return false, "not_installed"
+	end
+	local command, detail = build_remove_transaction(USER_LAYOUTS_DIR, bundle_name)
+	if not command then
+		Logger.error(LOG, "User bundle removal refused: %s.", tostring(detail))
+		return false, "invalid_bundle"
+	end
+	Logger.start(LOG, "Removing %s from the user Keyboard Layouts folder…", bundle_name)
+	local call_ok, output, native_ok = pcall(hs.execute, command)
+	if not call_ok or native_ok ~= true then
+		Logger.error(LOG, "User bundle removal failed: %s.", tostring(output))
+		return false, "remove_failed"
+	end
+	if type(output) == "string" and output:find("Keyboard layout removal cleanup failed; retained at ", 1, true) then
+		Logger.warn(LOG, "%s", (output:gsub("%s+$", "")))
+	end
+	Logger.success(LOG, "User bundle removal done — %s.", bundle_name)
+	return true
+end
+
+--- Removes the user copy of an Ergopti bundle under the install owner, so a
+--- removal never interleaves with an install of either scope.
+--- @param bundle_name string Basename of the installed user bundle.
+--- @return boolean removed
+--- @return string|nil reason
+local function remove_user(bundle_name)
+	if _install_in_flight then
+		Logger.warn(LOG, "User keyboard-layout removal refused — an install is still in progress.")
+		return false, "busy"
+	end
+	_install_in_flight = true
+	local call_ok, removed_or_err, reason = xpcall(function()
+		return remove_user_unlocked(bundle_name)
+	end, debug.traceback)
+	_install_in_flight = false
+	require("modules.keymap.layout_sources_cache").invalidate("User removal")
+	if not call_ok then
+		Logger.error(LOG, "User keyboard-layout removal raised: %s.", tostring(removed_or_err))
+		return false, "remove_failed"
+	end
+	return removed_or_err == true, reason
 end
 
 local function install_system(bundles_dir, bundle_name)
@@ -663,6 +751,8 @@ return {
 	bundle_variants        = bundle_variants,
 	bundle_keylayout_names = bundle_keylayout_names,
 	install_user          = install_user,
+	remove_user           = remove_user,
+	build_remove_transaction = build_remove_transaction,
 	duplicate_bundles     = duplicate_bundles,
 	report_duplicate_bundles = report_duplicate_bundles,
 	install_system         = install_system,

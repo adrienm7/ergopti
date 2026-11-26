@@ -5,17 +5,17 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local function with_fixture(source, body)
-	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.preferences",
-		"infra.config_paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "platform.input.keyboard_geometry" }
+	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "settings.engine.preferences.preferences",
+		"settings.engine.paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "platform.input.keyboard_geometry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0 }
 	local ok, err = pcall(function()
-		helpers.load_with_stubs("infra.preferences")
+		helpers.load_with_stubs("settings.engine.preferences.preferences")
 		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical assignments must not consult legacy storage") end
 		end })
-		package.loaded["infra.config_paths"] = { get = function(name)
+		package.loaded["settings.engine.paths"] = { get = function(name)
 			assert(name == "ConfigTomlPath"); return "config"
 		end }
 		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
@@ -32,8 +32,8 @@ local function with_fixture(source, body)
 				control.content, control.writes = candidate, control.writes + 1; return true
 			end,
 		}
-		package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
-		local preferences = require("infra.preferences")
+		package.loaded["settings.engine.preferences.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
+		local preferences = require("settings.engine.preferences.preferences")
 		preferences.load("config")
 		package.loaded["platform.input.keyboard_geometry"] = nil
 		require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
@@ -55,7 +55,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			helpers.assert_eq(marks["shortcuts.tap_keys.number_row_left"], true)
 			helpers.assert_nil(marks["shortcuts.tap_keys.foreign"])
 			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
-				require("ui.menu.unused_keys_cleanup").collect)
+				require("settings.ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(scan.status, "ok")
 			helpers.assert_eq(#scan.keys, 1)
 			helpers.assert_eq(scan.keys[1].key, "foreign")

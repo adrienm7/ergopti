@@ -289,7 +289,7 @@ function M.register_pure(helpers)
 end
 
 local function with_native(helpers, content, body)
-	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
+	helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
@@ -297,7 +297,7 @@ local function with_native(helpers, content, body)
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["core.fs.adapters.file_system"] = nil
 		require("settings.engine.migration.outdated").reset_for_tests()
-		local preferences = helpers.load_with_stubs("infra.preferences")
+		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local path = os.tmpname()
 		local backups = {}
 		local function write(bytes)

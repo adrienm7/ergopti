@@ -137,6 +137,15 @@ test("native running proof requires source truth and suppresses source exception
 	mode = "throw"; assert(not op:is_running() and not op:is_settled())
 	op:cancel(); state.absent = true; state.finish(0); state.acknowledge()
 end)
+-- OLL-13: the managed Ollama's readiness is admitted only from a socket its own
+-- process group holds; the detached child leads that group under its pid.
+test("(oll-13) a running child names its pid, which leads its detached group", function(owner, _, state)
+	local op = owner.start("fixture", {}, { owner = "running-pid" }, function() end)
+	assert(op:pid() == 8001 and state.options.detached == true, "the spawned pid of a detached child")
+	state.absent = true; state.finish(0)
+	assert(op:pid() == nil, "an exited child names no pid")
+	state.acknowledge()
+end)
 test("missing native dispatch cannot manufacture a running process", function(owner, _, state)
 	state.spawn_mode = "refused"
 	local op = owner.start("fixture", {}, { owner = "running-missing" }, function() end)

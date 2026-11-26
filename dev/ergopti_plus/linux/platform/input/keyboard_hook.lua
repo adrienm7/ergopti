@@ -111,6 +111,14 @@ local _context  = { appId = "", windowTitle = "" }
 -- Running flag — set after the device is successfully opened.
 local _running  = false
 
+-- Why the last capture session ended, nil while one runs: { deliberate, reason,
+-- detail }, reason a closed log id (owner_stop, capture_retired, emergency_stop)
+-- and detail the sentence that names the cause.
+-- The daemon's hook supervisor reads it to tell a quit from a failure and to
+-- name the cause; a retirement that said nothing left the daemon exiting with
+-- « keyboard hook stopped » and no reason anywhere in the log.
+local _last_stop = nil
+
 -- One captured publisher and one in-flight source transaction belong to a start.
 local _capture_session, _capture_options, _capture_republisher = nil, nil, nil
 local _source_reconciliation = nil
@@ -127,9 +135,10 @@ local _device = nil
 -- or button (LayerPointer.sync).
 -- slots maps each taken reader slot to its path; buttons holds the forwarded
 -- buttons still down: the grab ends after them. emit_relative writes one
--- relative report on the virtual device (onEmitRelative). One table: the
+-- relative report on the virtual pointer (onEmitRelative); release_output
+-- retires that pointer once every mouse is given back (onReleasePointer). One table: the
 -- module's main chunk is at LuaJIT's 200-local ceiling.
-local LayerPointer = { slots = {}, buttons = {}, emit_relative = nil }
+local LayerPointer = { slots = {}, buttons = {}, emit_relative = nil, release_output = nil }
 
 -- One unread event per source for the timestamp merge. Heads survive a bounded
 -- pump so an older backlog entry can never be overtaken on the next iteration.
@@ -162,6 +171,11 @@ local _consumed_down = {}
 -- The release owner a consumer named for its consumed press (a held key of the
 -- layout source emulation), called once on that press's key-up.
 local _consumed_release = {}
+-- The key a consumer holds on the wire in a consumed press's place (the layout
+-- emulation's held key, « Touches de jeu »): { key, code, entry }, entry being
+-- the exact forwarded-down record its down created. Its repeats and its up
+-- follow the physical key's; a reset that already released it leaves no up.
+local _consumed_hold = {}
 local _sync_dropped = {}
 local _forwarded_down = {}
 local _physical_down = {}
@@ -207,11 +221,11 @@ local _remap_source_of = {}
 -- The last key or pointer event's time on the clock the events carry, and the
 -- daemon's monotonic time when it was read: the pump tells the engine what
 -- time it is on the events' clock from these, with nothing to read in between.
-local _clock_event_ms = nil
-local _clock_read_ms = nil
--- Test seam: the time the engine reads while _test_drive replays a stream
--- whose events carry `at_ms` and no kernel timestamp. nil in production.
-local _test_clock_ms = nil
+-- `test_ms` is a test seam: the time the engine reads while _test_drive
+-- replays a stream whose events carry `at_ms` and no kernel timestamp, nil in
+-- production. One table, not three locals: this chunk is at Lua 5.4's budget
+-- of 200 active locals, which a module-level for loop also draws on.
+local _clock = { event_ms = nil, read_ms = nil, test_ms = nil }
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
@@ -231,17 +245,19 @@ for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
 -- _locks, not a local of its own: this chunk is near LuaJIT's local budget.
 _locks.word = nil
 _locks.describe_failure = require("diagnostics.engine.reports.error_description").describe
+-- Caps Lock and AltGr presses the layout emulation holds a custom modifier on
+-- (start({ onHeldModifierKey })): the callback, and source key -> the press's
+-- receipt callbacks. In _locks for the same local budget.
+_locks.held_modifier_callback = nil
+_locks.held_modifier_keys = {}
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
 -- therefore produce characters; ctrl, alt and meta start a shortcut and
 -- therefore produce none. Treating AltGr as Alt is how a French keyboard loses
 -- é, € and « — or how Alt+Tab ends up in the typing buffer.
-local _shift_held = false
-local _ctrl_held  = false
-local _alt_held   = false
-local _altgr_held = false
-local _meta_held  = false
+-- One table for the five roles, for the same local budget as _clock.
+local _held = { shift = false, ctrl = false, alt = false, altgr = false, meta = false }
 
 -- Physical modifier keys currently down, keyed by evdev code, and a count per
 -- role. A single boolean cannot represent Left+Right Shift: releasing either
@@ -249,6 +265,13 @@ local _meta_held  = false
 local _modifier_down = {}
 local _modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
 local _modifier_order = {}
+
+-- The modifier role of the latest key press ("altgr", "shift"... or false for
+-- a key that is no modifier) and of the press before it, the one a consumer
+-- reads: a script chord is AltGr pressed, then its key, with no other key
+-- between (the maintainer, 2026-11-17). nil before any press.
+local _last_down_role = nil
+local _prior_down_role = nil
 
 -- When each key went down, by evdev code. Cleared on release, so a key still
 -- held when a flush lands is simply not reported until it comes up.
@@ -298,7 +321,7 @@ local _on_click = nil
 -- of a touch, and with ("frame", code, value, slot, timestamp_us) per SYN_REPORT.
 local _on_pointer_event = nil
 -- Previous coordinates of the absolute pointers, per reader slot.
-local _absolute_motion = require("infra.absolute_motion").new()
+local _absolute_motion = require("gestures.engine.absolute_motion").new()
 
 -- Set while XKB cannot tell the keys' roles or capture them, so that is
 -- logged once and not at every key event; the next press XKB answers in full
@@ -342,7 +365,7 @@ local _test_capture_event = nil
 
 local function _get_input_reader()
 	if _input_reader then return _input_reader end
-	local ok, mod = pcall(require, "modules.hotstrings.input_reader")
+	local ok, mod = pcall(require, "hotstrings.engine.input_reader")
 	if ok then
 		_input_reader = mod
 	else
@@ -360,7 +383,7 @@ local function _legacy_capture_for_test(code, value)
 	end
 	local ir = _get_input_reader()
 	if not ir or not ir.resolve_char then return nil, nil, "test input_reader unavailable" end
-	local char = ir.resolve_char(code, _layout, _shift_held)
+	local char = ir.resolve_char(code, _layout, _held.shift)
 	return char, char, nil
 end
 
@@ -586,11 +609,11 @@ local function _track_modifier(source, code, value, role)
 	else
 		return held_role ~= nil
 	end
-	_shift_held = _modifier_count.shift > 0
-	_ctrl_held  = _modifier_count.ctrl > 0
-	_alt_held   = _modifier_count.alt > 0
-	_altgr_held = _modifier_count.altgr > 0
-	_meta_held  = _modifier_count.meta > 0
+	_held.shift = _modifier_count.shift > 0
+	_held.ctrl  = _modifier_count.ctrl > 0
+	_held.alt   = _modifier_count.alt > 0
+	_held.altgr = _modifier_count.altgr > 0
+	_held.meta  = _modifier_count.meta > 0
 	return true
 end
 
@@ -598,10 +621,13 @@ local function _reset_modifier_state()
 	_modifier_down = {}
 	_modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
 	_modifier_order = {}
-	_shift_held, _ctrl_held, _alt_held = false, false, false
-	_altgr_held, _meta_held = false, false
+	_last_down_role, _prior_down_role = nil, nil
+	_held.shift, _held.ctrl, _held.alt = false, false, false
+	_held.altgr, _held.meta = false, false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
+	_locks.held_modifier_keys = {}
 	_pressed_at = {}
 	_hold_owners = {}
 end
@@ -611,7 +637,7 @@ end
 --- produce text.
 --- @return boolean
 local function _shortcut_modifier_held()
-	return _ctrl_held or _alt_held or _meta_held
+	return _held.ctrl or _held.alt or _held.meta
 end
 
 local _owned_row_receipt = nil
@@ -705,7 +731,7 @@ local function _input_runtime_current(ctx, active)
 			or rawget(M, name) ~= port then return false end
 	end
 	if type(ctx.finder) ~= "table" or type(ctx.classify_source) ~= "function"
-		or package.loaded["modules.hotstrings.device_finder"] ~= ctx.finder
+		or package.loaded["hotstrings.engine.device_finder"] ~= ctx.finder
 		or rawget(ctx.finder, "physical_sources") ~= ctx.classify_source then return false end
 	local output = ctx.output_issuer
 	if not output or output ~= _input_output_owner or output.broker ~= ctx.broker
@@ -766,7 +792,7 @@ do
 		if not view or view.origin ~= "native-evdev" or view.source ~= source or view.code ~= code or view.value ~= 1
 			or not down or down.origin ~= origin or not _remapper_input_owner then return nil end
 		local hook_ports = {}; for _,name in ipairs(INPUT_HOOK_PORT_NAMES) do hook_ports[name] = rawget(M,name) end
-		local finder = package.loaded["modules.hotstrings.device_finder"]
+		local finder = package.loaded["hotstrings.engine.device_finder"]
 		local record = {engine=engine,generation=_remapper_generation,issuer=_remapper_input_owner,origin=origin,
 			engine_release_all=rawget(engine,"release_all"),engine_ack_retirement=rawget(engine,"ack_retirement"),
 			view=view,source=source,stamp=stamp,down=down,at_ms=at_ms,hook_ports=hook_ports,
@@ -1233,9 +1259,9 @@ local function _event_time_ms(ev)
 	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then
 		at_ms = ev.timestamp_us / 1000
 	else
-		at_ms = _test_clock_ms or Monotonic.now_ms()
+		at_ms = _clock.test_ms or Monotonic.now_ms()
 	end
-	_clock_event_ms, _clock_read_ms = at_ms, Monotonic.now_ms()
+	_clock.event_ms, _clock.read_ms = at_ms, Monotonic.now_ms()
 	return at_ms
 end
 
@@ -1251,9 +1277,9 @@ end
 --- back would press every later hold at once.
 --- @return number|nil nil before any event.
 local function _event_clock_now_ms()
-	if not _clock_event_ms then return nil end
-	local since_read = Monotonic.now_ms() - _clock_read_ms - Monotonic.resolution_ms()
-	return _clock_event_ms + math.max(0, since_read)
+	if not _clock.event_ms then return nil end
+	local since_read = Monotonic.now_ms() - _clock.read_ms - Monotonic.resolution_ms()
+	return _clock.event_ms + math.max(0, since_read)
 end
 
 --- Arms the installed engine's one-shot Shift for an origin that owns no key
@@ -1315,20 +1341,49 @@ function M.arm_action_sticky(codes)
 	return true
 end
 
+-- The fields a consumption receipt may carry.
+local RECEIPT_FIELDS = { consume = true, repeat_callback = true, release_callback = true,
+	hold_code = true, after_hold = true }
+
 --- Accepts only the explicit native repeat receipt; boolean consumers stay once-only.
---- A receipt may also name the owner of the press's release.
+--- A receipt may also name the owner of the press's release, and a key to hold
+--- on the wire in the press's place (hold_code, an evdev code) with the
+--- callback to run once that down is written (after_hold): the press then
+--- behaves like a pass-through of that key, its repeats and its up following.
 --- @param receipt any Consumer result.
 --- @return function|nil callback Exact callback owned by this physical press.
 --- @return function|nil release_callback Called once on the press's key-up.
+--- @return table|nil hold { code, after } The key held in the press's place.
 local function consumed_repeat_callback(receipt)
 	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or receipt.consume ~= true
 		or type(receipt.repeat_callback) ~= "function" then return nil end
 	for key in pairs(receipt) do
-		if key ~= "consume" and key ~= "repeat_callback" and key ~= "release_callback" then return nil end
+		if not RECEIPT_FIELDS[key] then return nil end
 	end
 	local release = receipt.release_callback
 	if release ~= nil and type(release) ~= "function" then return nil end
-	return receipt.repeat_callback, release
+	local hold = nil
+	if receipt.hold_code ~= nil then
+		local code = receipt.hold_code
+		if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > 0x2ff
+			or (receipt.after_hold ~= nil and type(receipt.after_hold) ~= "function") then return nil end
+		hold = { code = code, after = receipt.after_hold }
+	elseif receipt.after_hold ~= nil then
+		return nil
+	end
+	return receipt.repeat_callback, release, hold
+end
+
+--- Writes one edge of a consumed press's held key, only while the down it wrote
+--- is still the wire's: a reset or a stop that released it owes no other edge.
+--- @param held table The _consumed_hold record.
+--- @param value integer InputEvent value.
+--- @param source string Owned device path.
+--- @return boolean delivered
+--- @return table|nil receipt The broker's receipt.
+local function _forward_hold_edge(held, value, source)
+	if _forwarded_down[held.key] ~= held.entry then return false end
+	return _forward_raw({ type = EVDEV_TYPE_KEY, code = held.code, value = value }, source)
 end
 
 --- Detaches the native event identity and its already-published origin epoch.
@@ -1342,6 +1397,7 @@ local function consumption_detail(ev, source, identity, char)
 		physical = ev.remapped ~= true and _physical_sources[source] == true,
 		origin_generation = _origin_ready and _origin_generation or nil,
 		value = ev.value, mods = M.held_modifiers(), shift_side = M.held_shift_side(),
+		prior_role = _prior_down_role,
 	}
 end
 
@@ -1565,7 +1621,7 @@ function _number_row.binding(record)
 	return output.writer.capture_kernel_source == record.kernel_capture
 		and output.writer.kernel_source_ports == record.kernel_ports
 		and XkbCapture.capture_receiving_rows == record.capture_rows and XkbCapture.receiving_row_ports == record.row_ports
-		and package.loaded["modules.hotstrings.device_finder"] == record.finder
+		and package.loaded["hotstrings.engine.device_finder"] == record.finder
 		and rawget(record.finder, "physical_sources") == record.source_inventory
 end
 function _number_row.input_allowed(record, source)
@@ -1653,7 +1709,7 @@ function _number_row.construct()
 		or not _input_exports_current() or _source_reconciliation then return false end
 	local output, options = _input_output_owner, _capture_options
 	local writer = output.writer
-	local finder = require("modules.hotstrings.device_finder")
+	local finder = require("hotstrings.engine.device_finder")
 	local source_inventory = rawget(finder, "physical_sources")
 	if type(source_inventory) ~= "function" then return false end
 	local writer_name = require("platform.input.device_names").VIRTUAL_KEYBOARD
@@ -1715,8 +1771,8 @@ function _number_row.preview(ev, source)
 	if record.owners.has(key) and ev.value == InputEvent.VALUE_UP then return { record = record, key = key, release = true } end
 	if ev.code < 2 or ev.code > 11 or ev.value == InputEvent.VALUE_UP
 		or (ev.value == InputEvent.VALUE_REPEAT and not record.owners.has(key)) or _consumed_down[key]
-		or _shortcut_modifier_held() or _altgr_held or not _number_row.event_current(record, ev, source) then return nil end
-	local plan = record.rows.prepare({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, record.mode, ev.code - 1, _shift_held)
+		or _shortcut_modifier_held() or _held.altgr or not _number_row.event_current(record, ev, source) then return nil end
+	local plan = record.rows.prepare({ 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, record.mode, ev.code - 1, _held.shift)
 	if not plan then return nil end
 	local preview = record.rows.preview(plan)
 	if not preview or not _number_row.event_current(record, ev, source) then record.rows.retire(plan); return nil end
@@ -1732,7 +1788,7 @@ function _number_row.deliver(plan, ev, source)
 	if plan.suppressed then return true, nil, nil end
 	local record = plan.record
 	record.event, record.source = ev, source
-	local called, accepted, outcome = pcall(record.owners.event, plan.key, ev, record.mode, ev.code - 1, _shift_held, plan.plan)
+	local called, accepted, outcome = pcall(record.owners.event, plan.key, ev, record.mode, ev.code - 1, _held.shift, plan.plan)
 	record.event, record.source = nil, nil
 	if not called or accepted ~= true then
 		_number_row.abandon(plan, ev, false)
@@ -1763,6 +1819,46 @@ end
 
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
+--- Takes a Caps Lock or AltGr press as a plain key when the layout emulation
+--- holds a custom modifier on it (Neo's Mod3 and Mod4): neither XKB, the
+--- modifier tracking, the lock nor the application sees the key, so Caps Lock
+--- never toggles and AltGr selects no XKB level. Its repeats and its release
+--- go to the press's owner; a layout holding nothing there keeps both roles.
+--- @param ev table Decoded evdev event.
+--- @param source string Source identity.
+--- @return boolean handled True when the event is the held modifier's.
+function _locks.take_held_modifier_key(ev, source)
+	if ev.code ~= EvdevCodes.KEY_CAPSLOCK and ev.code ~= EvdevCodes.KEY_RIGHTALT then return false end
+	local key = source_key(source, ev.code)
+	local held = _locks.held_modifier_keys[key]
+	if held ~= nil then
+		if ev.value == InputEvent.VALUE_UP then
+			_locks.held_modifier_keys[key] = nil
+			if held.release then
+				_call_callback("held-modifier-key release callback", held.release,
+					consumption_detail(ev, source, nil, nil))
+			end
+		elseif ev.value == InputEvent.VALUE_REPEAT then
+			_call_callback("held-modifier-key repeat callback", held.repeat_callback,
+				consumption_detail(ev, source, nil, nil))
+		end
+		return true
+	end
+	if ev.value ~= InputEvent.VALUE_DOWN or not _intercept or not _locks.held_modifier_callback
+		or (ev.remapped and not ev.original_owner) then return false end
+	local called, receipt = _call_callback("held-modifier-key callback", _locks.held_modifier_callback,
+		consumption_detail(ev, source, nil, nil))
+	-- A failed decision is no claim: the key keeps its own role.
+	if not called or receipt == nil then return false end
+	local repeat_callback, release_callback = consumed_repeat_callback(receipt)
+	if repeat_callback == nil then
+		M.emergency_stop("held-modifier-key callback returned no receipt")
+		return true
+	end
+	_locks.held_modifier_keys[key] = { repeat_callback = repeat_callback, release = release_callback }
+	return true
+end
+
 local function _dispatch_post_remap(ev, source)
 	local session = _capture_session
 	local original_source = source
@@ -1776,6 +1872,7 @@ local function _dispatch_post_remap(ev, source)
 		if ev.value == InputEvent.VALUE_UP then _synthetic_source_of[holder_key] = nil end
 	end
 	_wire_source_of[ev] = original_source
+	if not ev.handoff and _locks.take_held_modifier_key(ev, source) then return end
 	-- Observe the role before every XKB transition, including custody handoffs.
 	local pressed = ev.value ~= InputEvent.VALUE_UP
 	local role, role_failed = nil, false
@@ -1785,6 +1882,11 @@ local function _dispatch_post_remap(ev, source)
 		if capture_err then M.emergency_stop("XKB handoff capture refused: " .. tostring(capture_err)); return end
 		_forward_raw(ev, source)
 		return
+	end
+	-- Every press, a modifier's included, moves the key history one step; a
+	-- repeat or a release does not, as in AutoHotkey's A_PriorKey.
+	if ev.value == InputEvent.VALUE_DOWN then
+		_prior_down_role, _last_down_role = _last_down_role, role or false
 	end
 	local modifier_key = source_key(source, ev.code)
 	local held_role = _modifier_down[modifier_key]
@@ -1889,10 +1991,17 @@ local function _dispatch_post_remap(ev, source)
 
 	local consumed_key = source_key(source, ev.code)
 	if _consumed_down[consumed_key] then
+		local held = _consumed_hold[consumed_key]
 		if ev.value == InputEvent.VALUE_UP then
 			_consumed_down[consumed_key] = nil
 			local release_callback = _consumed_release[consumed_key]
 			_consumed_release[consumed_key] = nil
+			-- The held key's up first: the wire never keeps a key the hand released.
+			if held ~= nil then
+				_consumed_hold[consumed_key] = nil
+				_forward_hold_edge(held, InputEvent.VALUE_UP, source)
+				if not _running or _capture_session ~= session then return end
+			end
 			if release_callback ~= nil then
 				_call_callback("consumed-key release callback", release_callback,
 					consumption_detail(ev, source, identity, char))
@@ -1902,6 +2011,13 @@ local function _dispatch_post_remap(ev, source)
 			-- included, and the application saw none of them.
 			local compose_cancelled = _withdraw_capture_compose(compose_mark)
 			local repeat_callback = _consumed_down[consumed_key]
+			-- A held key repeats on the wire as a pass-through key does; its
+			-- consumer hears of a repeat the wire took, never of a spent one.
+			if held ~= nil and ev.value == InputEvent.VALUE_REPEAT then
+				local delivered, receipt = _forward_hold_edge(held, InputEvent.VALUE_REPEAT, source)
+				if not _running or _capture_session ~= session then return end
+				if not delivered or (receipt and receipt.native_writes == 0) then repeat_callback = nil end
+			end
 			if ev.value == InputEvent.VALUE_REPEAT and type(repeat_callback) == "function" then
 				local called, acknowledged = false, false
 				if compose_cancelled then
@@ -1924,7 +2040,7 @@ local function _dispatch_post_remap(ev, source)
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
 		local ok_consume, consume, retired = _call_callback("key-consumption callback", _on_consume,
 			consumption_detail(ev, source, identity, char))
-		local repeat_callback, release_callback = consumed_repeat_callback(consume)
+		local repeat_callback, release_callback, hold = consumed_repeat_callback(consume)
 		if not ok_consume then
 			if not retired then return end
 			_number_row.abandon(row_plan, ev, false)
@@ -1946,6 +2062,17 @@ local function _dispatch_post_remap(ev, source)
 				-- Its first output is already consumed; a refused retirement
 				-- cannot leave optional repeats alive for this held press.
 				_consumed_down[consumed_key] = true
+			end
+			if hold ~= nil then
+				-- The held key goes down on the wire now and stays down until this
+				-- physical key's up (« Touches de jeu »): no tap, no wait between.
+				local held_key = source_key(source, hold.code)
+				if not _forward_raw({ type = EVDEV_TYPE_KEY, code = hold.code, value = InputEvent.VALUE_DOWN }, source) then
+					return
+				end
+				if not _running or _capture_session ~= session then return end
+				_consumed_hold[consumed_key] = { key = held_key, code = hold.code, entry = _forwarded_down[held_key] }
+				if hold.after ~= nil then _call_callback("held-key callback", hold.after) end
 			end
 			return
 		end
@@ -2039,7 +2166,7 @@ local function _run_owned_tap_frame(frame, tap, binding, exact, original_generat
 				"begin_delivery", "end_delivery", "release_all", "ack_retirement", "take_custody", "output_holder" }) do
 				engine_ports[name] = rawget(exact, name)
 			end
-			local finder = package.loaded["modules.hotstrings.device_finder"]
+			local finder = package.loaded["hotstrings.engine.device_finder"]
 			_live_input_context = { engine = exact, generation = original_generation,
 				hook_ports = hook_ports, engine_ports = engine_ports, finder = finder, classify_source = type(finder) == "table" and rawget(finder, "physical_sources") or nil,
 				issuer = _remapper_input_owner, origin = origin, source = source,
@@ -2179,7 +2306,7 @@ local function position_runtime(record)
 		or not _input_exports_current()
 		or not rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
 		or rawget(XkbCapture, "source_generation") ~= position_capture.source
-		or not rawequal(package.loaded["modules.hotstrings.device_finder"], record.finder)
+		or not rawequal(package.loaded["hotstrings.engine.device_finder"], record.finder)
 		or type(record.finder) ~= "table" or type(record.classify) ~= "function"
 		or rawget(record.finder, "physical_sources") ~= record.classify then return false end
 	for name, port in pairs(position_capture.exports) do
@@ -2211,7 +2338,7 @@ function M.position_capture_available()
 	if position_capture.busy or position_capture.pending or type(position_capture.source) ~= "function" then return false end
 	local info = debug.getinfo(position_capture.source, "S")
 	if not info or not HookModuleSource.same(info.source, position_capture.source_file, hook_directory) then return false end
-	local finder = package.loaded["modules.hotstrings.device_finder"]
+	local finder = package.loaded["hotstrings.engine.device_finder"]
 	if type(finder) ~= "table" then return false end
 	return position_runtime({ session = _capture_session, options = _capture_options,
 		sources = _input_source_owners, observers = _input_source_observers, origin = _origin_generation,
@@ -2227,7 +2354,7 @@ function M.capture_position(current, receive)
 		or type(receive) ~= "function" or position_capture.exports.position_capture_available() ~= true then return nil end
 	local info = debug.getinfo(position_capture.source, "S")
 	if not info or not HookModuleSource.same(info.source, position_capture.source_file, hook_directory) then return nil end
-	local finder = package.loaded["modules.hotstrings.device_finder"]
+	local finder = package.loaded["hotstrings.engine.device_finder"]
 	if type(finder) ~= "table" or type(rawget(finder, "physical_sources")) ~= "function" then return nil end
 	local token = {}
 	local record = { current = current, receive = receive, token = token, session = _capture_session,
@@ -2774,6 +2901,12 @@ function LayerPointer.sync()
 		end
 		LayerPointer.slots = {}
 		Logger.debug(LOG, "The navigation layer gave the mouse back.")
+		-- The pointer device lives only while a mouse is held: while it exists
+		-- desktops count a mouse as connected and may disable the touchpad.
+		if LayerPointer.release_output then
+			local called, released = pcall(LayerPointer.release_output)
+			if not called or released ~= true then Logger.warn(LOG, "The virtual pointer was not retired; it stays until the daemon stops.") end
+		end
 	end
 end
 
@@ -2844,6 +2977,7 @@ local function _dispatch_pointer(ev, slot)
 	end
 	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
 		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
+	local press_reported, contact_reported = false, false
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
 		-- A mouse may also expose keyboard/media keys on the same node. Those
 		-- keys reach the desktop and count as activity for a held tap-hold.
@@ -2864,6 +2998,23 @@ local function _dispatch_pointer(ev, slot)
 		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
 		-- caret all the same, so the password-field verdict and the typing
 		-- buffer must be dropped as on a click.
+		-- A button's press is reported first: the click happened in the field
+		-- the click callback is about to withdraw, and the metrics count it
+		-- there, as macOS counts a click in the context it lands in. Reported
+		-- after, every click met a field already unknown and went uncounted.
+		if ev.value == InputEvent.VALUE_DOWN and _on_pointer_event and InputEvent.is_pointer_button(ev.code) then
+			if not _running or _capture_session ~= session then return end
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
+			press_reported = true
+		end
+		-- So is a finger's landing: the tap it may become is counted in the
+		-- field its touch began in (tap-click-touch-context), the field the
+		-- click callback is about to withdraw.
+		if ev.value == InputEvent.VALUE_DOWN and _on_pointer_event and not InputEvent.is_pointer_button(ev.code) then
+			if not _running or _capture_session ~= session then return end
+			_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
+			contact_reported = true
+		end
 		if ev.value == InputEvent.VALUE_DOWN and _on_click then
 			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer callback", _on_click, ev.code)
@@ -2899,12 +3050,12 @@ local function _dispatch_pointer(ev, slot)
 				_call_callback("pointer event callback", _on_pointer_event, "absolute_motion", ev.code, ev.value, slot)
 			end
 		elseif pointer_key then
-			if not InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+			if not InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT and not contact_reported then
 				-- A finger landing or lifting (BTN_TOUCH, BTN_TOOL_*), both edges.
 				_call_callback("pointer event callback", _on_pointer_event, "contact", ev.code, ev.value, slot)
 				if not _running or _capture_session ~= session then return end
 			end
-			if ev.value == InputEvent.VALUE_DOWN then
+			if ev.value == InputEvent.VALUE_DOWN and not press_reported then
 				_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)
 			end
 		elseif ev.type == InputEvent.EV_SYN then
@@ -3140,15 +3291,17 @@ end
 --- it arrives. An event already read and not yet dispatched (a drain that hit
 --- its bound) must not sleep behind the wait, so it answers at once.
 --- @param timeout_ms integer Longest wait.
---- @param companion table|nil The tray's GLib half of the wait
----   (tray_menu.wait_companion), polled with the input sources.
+--- @param companions table|nil The other halves of the wait, polled with the
+---   input sources: the event loop's libuv descriptor
+---   (event_loop.wait_companion) and the tray's GLib main context
+---   (tray_menu.wait_companion), an array of { begin, finish }.
 --- @return boolean|nil ready True when a source can be read now, false after a
 ---   quiet wait, nil when no wait is possible (hook stopped or reacquiring,
 ---   no open source): the loop then yields a fixed millisecond.
-function M.idle_wait(timeout_ms, companion)
+function M.idle_wait(timeout_ms, companions)
 	if not _running or _reacquiring or _source_reconciliation then return nil end
 	if next(_pending_events) ~= nil then return true end
-	return EvdevReader.wait_any_readable(timeout_ms, companion)
+	return EvdevReader.wait_any_readable(timeout_ms, companions)
 end
 
 --- The text a key would type now, in the live layout and with the modifiers
@@ -3188,9 +3341,21 @@ end
 --- @return table Array of "shift" / "altgr", in press order.
 function M.held_text_modifiers()
 	local held = {}
-	if _shift_held then held[#held + 1] = "shift" end
-	if _altgr_held then held[#held + 1] = "altgr" end
+	if _held.shift then held[#held + 1] = "shift" end
+	if _held.altgr then held[#held + 1] = "altgr" end
 	return held
+end
+
+--- The modifier role the live keymap gave a held key at its press: XKB options
+--- and layouts move roles between keys (a Ctrl key can carry ISO_Level5_Shift,
+--- Right Alt is Alt_R on a US layout), so the physical code alone cannot tell.
+--- Valid from the key's own physical-key callback until its release.
+--- @param source string Source identity the physical callback received.
+--- @param code integer evdev keycode.
+--- @return string|false "shift", "altgr", "ctrl", "alt" or "meta"; false when
+---   the key is not held as a modifier.
+function M.held_modifier_role(source, code)
+	return _modifier_down[source_key(source, code)] or false
 end
 
 --- Exact physical keycodes of held text-level modifiers, in press order.
@@ -3288,11 +3453,11 @@ end
 --- @return table { shift?, ctrl?, alt?, altgr?, meta? } — true when held.
 function M.held_modifiers()
 	return {
-		shift = _shift_held or nil,
-		ctrl  = _ctrl_held or nil,
-		alt   = _alt_held or nil,
-		altgr = _altgr_held or nil,
-		meta  = _meta_held or nil,
+		shift = _held.shift or nil,
+		ctrl  = _held.ctrl or nil,
+		alt   = _held.alt or nil,
+		altgr = _held.altgr or nil,
+		meta  = _held.meta or nil,
 	}
 end
 
@@ -3371,7 +3536,7 @@ end
 --- Rechecks the existing capture owner's kernel origin without a new watcher.
 --- @return table receipt Physical-source generation and admission.
 function M.physical_source_receipt()
-	local ok, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local ok, Finder = pcall(require, "hotstrings.engine.device_finder")
 	local sources = ok and type(Finder.physical_sources) == "function" and Finder.physical_sources(_devices) or {}
 	local ready = _running and _intercept and #_devices > 0 and #sources == #_devices
 	local signature, physical = { tostring(ready) }, {}
@@ -3392,7 +3557,7 @@ end
 --- Resolves every device the daemon should be reading right now.
 --- @return table keyboards, table pointers
 local function _best_devices()
-	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	local ok_df, df = pcall(require, "hotstrings.engine.device_finder")
 	if not ok_df then return {}, {} end
 	if type(df.find_devices) == "function" then
 		local ok_find, keyboards, pointers = pcall(df.find_devices)
@@ -3406,7 +3571,7 @@ local function _best_devices()
 end
 
 local function _best_pointers()
-	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	local ok_df, df = pcall(require, "hotstrings.engine.device_finder")
 	if not ok_df then return {} end
 	if type(df.find_pointers) == "function" then
 		local ok_find, pointers = pcall(df.find_pointers)
@@ -3738,6 +3903,12 @@ local function _retire_source_transaction(tx, reason)
 			end
 		end
 		if _capture_session == tx.session then
+			if _running or _reacquiring then
+				_last_stop = { deliberate = false, reason = "capture_retired",
+					detail = tostring(reason or "source transaction retired") }
+				pcall(Logger.error, LOG, "Keyboard capture retired — %s; the keyboard is back with the desktop.",
+					_last_stop.detail)
+			end
 			_running, _reacquiring, _capture_session = false, false, nil
 			_devices, _pointer_devices, _device = {}, {}, nil
 			_absolute_motion.reset()
@@ -3814,7 +3985,7 @@ local function _acquire(paths, force_path, tx)
 				-- Discovery is a pathname snapshot. Only the opened fd identifies
 				-- the complete stream this grab would take from the desktop.
 				local query = _input_reader_ports.event_capabilities
-				local finder = package.loaded["modules.hotstrings.device_finder"]
+				local finder = package.loaded["hotstrings.engine.device_finder"]
 				local policy = type(finder) == "table" and rawget(finder, "is_interceptable_event_mask")
 				local called, mask = false, nil
 				if type(query) == "function" and rawget(EvdevReader, "event_capabilities") == query then
@@ -3823,7 +3994,7 @@ local function _acquire(paths, force_path, tx)
 				local checked, allowed = false, false
 				if called and mask ~= nil and type(policy) == "function" then checked, allowed = pcall(policy, mask) end
 				if not checked or allowed ~= true or rawget(EvdevReader, "event_capabilities") ~= query
-					or package.loaded["modules.hotstrings.device_finder"] ~= finder
+					or package.loaded["hotstrings.engine.device_finder"] ~= finder
 					or rawget(finder, "is_interceptable_event_mask") ~= policy
 					or tx and not _source_transaction_current(tx) then
 					_close_paths(opened, keyboard_slot, tx)
@@ -4103,7 +4274,7 @@ function M.check_device()
 			-- reuses eventN numbers across hotplug: the exact path may now name a
 			-- mouse or another non-keyboard node. start() refuses those, so the
 			-- watchdog must not adopt one behind its back and grab it as a keyboard.
-			local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+			local ok_finder, Finder = pcall(require, "hotstrings.engine.device_finder")
 			local validate = ok_finder and Finder.is_key_device
 			if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
 			if type(validate) ~= "function" then
@@ -4300,7 +4471,8 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onHold?, onHoldAdmission?, onConsume?,
+---   onHeldModifierKey?, onDesync?, onEmitRaw?, device?, pinned? }
 ---              onHold function     Receives an admitted physical scancode, held milliseconds
 ---                                  and the source path.
 ---              onHoldAdmission function Returns the current opaque plain-table policy token or nil.
@@ -4314,8 +4486,15 @@ end
 ---                                  and with ("shortcut", { key, mods }) for a chord.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
 ---                                  evdev_value, source_path) for every physical down/up transition.
----              onConsume function Called before pass-through with a key detail;
+---              onConsume function Called before pass-through with a key detail
+---                                  (prior_role: the modifier role of the key pressed
+---                                  just before, false for no modifier, nil for none);
 ---                                  true suppresses its down/repeat/up in intercept mode.
+---              onHeldModifierKey function Called in intercept mode with the detail of a
+---                                  Caps Lock or AltGr press before either gets its own
+---                                  role; a { consume, repeat_callback, release_callback }
+---                                  receipt makes the key a plain held key (no lock, no
+---                                  XKB level), nil leaves it its role.
 ---              onDesync function Called synchronously when evdev reports queue loss.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
@@ -4370,12 +4549,14 @@ function M.start(opts)
 	_on_click = type(options.onClick) == "function" and options.onClick or nil
 	_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
+	_locks.held_modifier_callback = type(options.onHeldModifierKey) == "function" and options.onHeldModifierKey or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	_intercept = options.intercept == true
 	-- An emitter left over from an earlier session would satisfy the guard below
 	-- while pointing at a channel this session never asked for.
 	_emit_raw  = type(options.onEmitRaw) == "function" and options.onEmitRaw or nil
 	LayerPointer.emit_relative = type(options.onEmitRelative) == "function" and options.onEmitRelative or nil
+	LayerPointer.release_output = type(options.onReleasePointer) == "function" and options.onReleasePointer or nil
 
 	local ok_capture, refusal = M.can_capture(_intercept, _emit_raw)
 	if not ok_capture then
@@ -4453,7 +4634,7 @@ function M.start(opts)
 	-- Required through pcall like the other two uses in this file: the finder reads
 	-- /proc, and a runtime without it must fail HERE with a reason rather than at
 	-- the first keystroke that never comes.
-	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+	local ok_finder, Finder = pcall(require, "hotstrings.engine.device_finder")
 	local validate = ok_finder and Finder.is_key_device
 	if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
 	if type(validate) ~= "function" then
@@ -4495,10 +4676,11 @@ function M.start(opts)
 		_ticks_since_check = 0
 		_reported_missing = false
 		_running = true
+		_last_stop = nil
 		-- Acquisition proved the device before it was running. Publish admission
 		-- at the completed lifecycle boundary so the first press can own repeats.
 		M.physical_source_receipt()
-		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
+		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d input_family=%s intercept=%s).",
 			#_devices, #_pointer_devices, type(options.layout) == "string" and options.layout or _layout, tostring(_intercept))
 		return _publish_source_transaction(tx)
 	end)
@@ -4537,7 +4719,7 @@ function M.valid_layout(layout)
 		Logger.error(LOG, "set_layout(): a layout name is required — layout unchanged.")
 		return false
 	end
-	local reader = require("modules.hotstrings.input_reader")
+	local reader = require("hotstrings.engine.input_reader")
 	local known = type(reader.get_layouts) == "function" and reader.get_layouts() or nil
 	if known and not known[layout] then
 		-- Named but unknown is worse than refused: `LAYOUTS[layout] or
@@ -4568,6 +4750,7 @@ function M.stop()
 	_locks.end_word(true, "keyboard hook stopped")
 	if _capture_session ~= session then return false end
 	_capture_session = nil
+	_last_stop = { deliberate = true, reason = "owner_stop", detail = "stopped by its owner" }
 	if not _running and not _reacquiring then return end
 	local remaps_released = _release_remapped()
 	if _capture_session ~= nil then return false end
@@ -4598,11 +4781,12 @@ function M.stop()
 	_running = false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -4622,6 +4806,7 @@ function M.emergency_stop(reason)
 	if _capture_session ~= session then return false end
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
+	_last_stop = { deliberate = false, reason = "emergency_stop", detail = message }
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
 	if _capture_session ~= nil then return false end
 	-- Best effort as below: a CapsLock left locked types every later letter in
@@ -4666,11 +4851,12 @@ function M.emergency_stop(reason)
 	_running = false
 	_consumed_down = {}
 	_consumed_release = {}
+	_consumed_hold = {}
 	_remap_owned = {}
 	_remap_orphans = {}
 	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -4851,6 +5037,13 @@ function M.isRunning()
 	return _running
 end
 
+--- Why the last capture session ended, nil while one runs or before any start.
+--- @return table|nil stop { deliberate = boolean, reason = string, detail = string } (a copy).
+function M.last_stop()
+	if not _last_stop then return nil end
+	return { deliberate = _last_stop.deliberate == true, reason = _last_stop.reason, detail = _last_stop.detail }
+end
+
 --- Returns true while a previously live source set is waiting to be acquired
 --- again. This is distinct from startup failure: the daemon keeps its periodic
 --- watchdog alive only for a capture session that proved it was operational.
@@ -4943,9 +5136,11 @@ function M._test_drive(events, callbacks, intercept)
 	_on_hold_admission = cb.onHoldAdmission
 	_hold_admission_session = _capture_session
 	_on_consume  = cb.onConsume
+	_locks.held_modifier_callback = cb.onHeldModifierKey
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	LayerPointer.emit_relative = cb.onEmitRelative
+	LayerPointer.release_output = cb.onReleasePointer
 	_intercept   = intercept and true or false
 	-- liveXkb drives the production path through adapters/xkb_capture, whose
 	-- backend and keymap the test has installed; otherwise a capture double.
@@ -4973,13 +5168,13 @@ function M._test_drive(events, callbacks, intercept)
 	while status == "bounded" do
 		local count
 		count, status = EvdevReader.drain(function(ev)
-			_test_clock_ms = times[at]
+			_clock.test_ms = times[at]
 			_dispatch_event(ev, test_path)
 		end, slot)
 		drained = drained + count
 	end
-	_test_clock_ms = nil
-	_clock_event_ms, _clock_read_ms = nil, nil
+	_clock.test_ms = nil
+	_clock.event_ms, _clock.read_ms = nil, nil
 	_remap_source_of = {}
 	_running = false
 	_devices = {}

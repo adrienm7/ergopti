@@ -80,13 +80,11 @@ _KSNR_FamiliesAndKeysMatch() {
 	Corpus := _KSNR_Corpus()
 	_KSNR_AssertList(Corpus["families"]["windows"], SlotRoleFamilyPrefixes(), "families")
 	_KSNR_AssertList(Corpus["families"]["windows"], KeyboardSlotDeclaration()["groups"], "the declared groups")
-	; The menu lists its groups in the role table's order, the magic row first.
+	; The menu lists its groups in the role table's order, the ★ slot among Win's.
 	Listed := []
 	global KEYBOARD_SLOT_GROUPS
-	for Group in KEYBOARD_SLOT_GROUPS {
-		if Group["prefix"] != "magic_"
-			Listed.Push(Group["prefix"])
-	}
+	for Group in KEYBOARD_SLOT_GROUPS
+		Listed.Push(Group["prefix"])
 	_KSNR_AssertList(Corpus["families"]["windows"], Listed, "the menu groups")
 	Keys := KeyboardSlotDeclaration()["keys"]
 	for Extra in Corpus["extra_keys"]["windows"] {
@@ -139,8 +137,13 @@ _KSNR_ChordsHoldOnBothAltGrFamilies() {
 		Saved := _TestSetAltGrFamily(Family == "kana", Family == "standard")
 		try {
 			Seen := 0
+			Pending := Map()
+			for Key in _KSNR_Corpus()["pending_keys"]
+				Pending[Key] := true
 			for Row in _KSNR_Corpus()["crosswalk"] {
-				if Row["driver"] != "windows"
+				; A pending key (★) is no catalogue key: the ★ slot owner binds it on
+				; the scan code the layout types it with (infra/star_slot.ahk).
+				if Row["driver"] != "windows" || Pending.Has(Row["key"])
 					continue
 				Seen += 1
 				Context := Row["slot"] . " on the " . Family . " AltGr"
@@ -179,7 +182,7 @@ _KSNR_EmulatedLetterKeepsItsKey() {
 		AssertEqual("SC030", KeyboardSlotLayoutScan("primary_b"), "whatever the scan's spelling")
 		AssertEqual("", KeyboardSlotLayoutScan("meta_c"), "the host layout answers a letter the emulation leaves")
 		AssertEqual("", KeyboardSlotLayoutScan("meta_space"), "a named key is no letter")
-		AssertEqual("", KeyboardSlotLayoutScan("magic_editor"), "the contextual slot names no chord")
+		AssertEqual("", KeyboardSlotLayoutScan("meta_star"), "the ★ slot's key is the broker's, not a role key")
 		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_b", "SC030"))
 		AssertEqual("^SC030", HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"]), "the Ctrl slot binds that key")
 		Parsed := ChordParse(_KeyboardSlotBoundChord("primary_c", ""))
@@ -206,7 +209,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 	HadAssignments := IsSet(KeyboardShortcutAssignments)
 	if HadAssignments
 		SavedAssignments := KeyboardShortcutAssignments
-	State := MagicEditorState()
+	State := StarSlotState()
 	SavedPhysical := State["ordinary_physical"], SavedInitialized := State["initialized"]
 	Expected := Format("SC{:03X}", GetKeySC("s"))
 	RemappedList := Map()
@@ -216,7 +219,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 		AssertEqual(Expected, KeyboardSlotWinScan("meta_s"), "a letter the emulation leaves still binds its key")
 		AssertEqual("", KeyboardSlotWinScan("meta_sc029"), "a key spelled by its scan keeps that spelling")
 		AssertEqual("", KeyboardSlotWinScan("meta_capslock"), "so does Caps Lock")
-		AssertEqual("", KeyboardSlotWinScan("magic_editor"), "the contextual slot names no chord")
+		AssertEqual("", KeyboardSlotWinScan("meta_star"), "the ★ slot's key is the broker's, not a role key")
 		KeyboardShortcutsBindAll()
 		AssertTrue(State["ordinary_physical"].Has(Expected), "the Win slot joins the physical broker on its key")
 		AssertEqual("meta_s", State["ordinary_physical"][Expected]["slot"], "the broker runs that slot")
@@ -230,7 +233,7 @@ _KSNR_WinSlotBindsItsPhysicalKey() {
 Test("neutral slots: a Win slot binds its physical key, not a textual chord (win-s-open-target)", _KSNR_WinSlotBindsItsPhysicalKey)
 
 ; RemapKey registers Ctrl and Alt of every key it remaps, so a slot on that chord was
-; refused as another producer's on each boot: Ctrl+B never ran microsoft_bold.
+; refused as another producer's on each boot: a Ctrl+B slot never ran its action.
 _KSNR_CtrlSlotSharesTheLayoutChord() {
 	global RemappedList, KeyboardShortcutAssignments
 	SavedList := RemappedList
@@ -281,7 +284,7 @@ _KSNR_SlotsBindBetweenLayoutAndBroker() {
 	Src := _DriverSourceNoComments()
 	Layout := RegExMatch(Src, "m)^#Include\s.*\blayout\.ahk$")
 	Bind := InStr(Src, "KeyboardShortcutsBindAll()" . "`n")
-	Broker := InStr(Src, "MagicEditorStart()" . "`n")
+	Broker := InStr(Src, "StarSlotStart()" . "`n")
 	AssertTrue(Layout > 0 && Bind > Layout, "the slots bind once the layout tables exist")
 	AssertTrue(Broker > Bind, "the slots join the broker before it acquires its keys")
 }
@@ -290,7 +293,7 @@ Test("neutral slots: the slots bind after the layout and before the Win broker",
 ; The switches owned these until v19: an action must work with no switch at all.
 _KSNR_ActionsNeedNoSwitch() {
 	Win := _DriverDirConcat("modules/shortcuts")
-	AssertTrue(RegExMatch(Win, "m)^global AWAKE_TICK_MIN_MS") > 0, "keep-awake's constants exist whatever is bound")
+	AssertTrue(RegExMatch(Win, "m)^global AwakeStartedTick") > 0, "keep-awake's constants exist whatever is bound")
 	AssertFalse(RegExMatch(Win, 'if Features\["shortcuts"\]\["(move|search|open_downloads|get_hex_value|screen)"\]'),
 		"no retired switch gates an action's owner")
 	Body := _DriverFuncBody("GestureTakeNote")

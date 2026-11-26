@@ -1,0 +1,17 @@
+{
+	"description": "The face of each reading font the tray menus draw with (script.reading_font, Configuration > Accessibility). Native menu text cannot load WOFF2: the macOS launcher registers these files for the login session (CTFontManagerRegisterFontsForURL) and the Windows tray loads them privately (AddFontResourceEx). Each file is the lossless sfnt decode of its source, written by tools/build/import-menu-fonts.py, never edited by hand. Keys are the feature's values; family is the name GDI selects, postscript the name AppKit selects, both read back from the file's name table by tools/test/test-menu-font-faces.cjs.",
+	"faces": {
+		"hyperlegible": {
+			"source": "atkinson-hyperlegible/atkinson-hyperlegible-latin-400-normal.woff2",
+			"file": "atkinson-hyperlegible/atkinson-hyperlegible-latin-400-normal.ttf",
+			"family": "Atkinson Hyperlegible",
+			"postscript": "AtkinsonHyperlegible-Regular"
+		},
+		"dyslexic": {
+			"source": "opendyslexic/opendyslexic-latin-400-normal.woff2",
+			"file": "opendyslexic/opendyslexic-latin-400-normal.otf",
+			"family": "OpenDyslexic",
+			"postscript": "OpenDyslexic-Regular"
+		}
+	}
+}

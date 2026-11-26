@@ -32,8 +32,8 @@ local M = {}
 function M.with_sentinel(callback)
 	local names = {
 		"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n",
-		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-		"adapters.event_provenance", "platform.input.synthetic_input",
+		"gestures.engine.engine", "gestures.engine.actions", "modules.keystats",
+		"diagnostics.adapters.event_provenance", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "platform.input.key_state",
 		"modules.shortcuts.script_control",
 	}
@@ -55,14 +55,14 @@ function M.with_sentinel(callback)
 			ESCAPE = 0x35,
 			FORWARD_DELETE = 0x75,
 		}
-		package.loaded["modules.gestures.engine"] = {init = function() end}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.engine"] = {init = function() end}
+		package.loaded["gestures.engine.actions"] = {
 			SG_NAMES = {"none", "open_config"},
 			get_label = function(name) return name end,
 			execute_single = function() return false end,
 		}
 		package.loaded["modules.keystats"] = {log_shortcut = function() end}
-		package.loaded["adapters.event_provenance"] = {
+		package.loaded["diagnostics.adapters.event_provenance"] = {
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function() return nil, "hardware", nil end,
 		}
@@ -123,8 +123,8 @@ end
 function M.with_configurable(callback)
 	local names = {
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
-		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
-		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
+		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "gestures.engine.actions",
+		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "settings.engine.paths", "settings.engine.preferences.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
@@ -148,15 +148,15 @@ function M.with_configurable(callback)
 			end,
 			unbind = function() return true end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			-- The stored action must be one the catalogue offers, or the loader
 			-- leaves the slot unbound and no callback exists to throw.
 			is_assignable = function(action_id) return action_id == "throwing_action" end,
 			execute_single = function() error("gesture exploded") end,
 		}
 		package.loaded["core.fs.adapters.storage"] = nil
-		package.loaded["infra.config_paths"] = { get = function() return "callback-fixture-config" end }
-		package.loaded["infra.preferences"] = nil
+		package.loaded["settings.engine.paths"] = { get = function() return "callback-fixture-config" end }
+		package.loaded["settings.engine.preferences.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts")

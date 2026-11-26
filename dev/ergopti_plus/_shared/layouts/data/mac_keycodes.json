@@ -1,5 +1,5 @@
 {
-	"_comment": "Physical keys a registry layout (.keylayout) defines, with the macOS virtual key code the .keylayout uses and the XKB key name and AutoHotkey scan code the same physical key has on Linux and Windows. The single table every consumer converts a .keylayout with: the Linux XKB converter (static/ergopti/linux/xkb_generation) and the Windows emulation. Two keys are numbered differently by Apple ISO and ANSI keyboards, so their macOS code depends on the layout's keycode_convention (meta.toml): iso = code 10 is the key left of 1 and code 50 the ISO key left of Z; ansi = the reverse. Keys are listed by row, from the space bar to the bottom row.",
+	"_comment": "Physical keys a registry layout (.keylayout) defines, with the macOS virtual key code the .keylayout uses and the XKB key name and AutoHotkey scan code the same physical key has on Linux and Windows. The single table every consumer converts a .keylayout with: the Linux XKB converter (static/ergopti/linux/xkb_generation) and the Windows emulation. Two keys are numbered differently by Apple ISO and ANSI keyboards, so their macOS code depends on the layout's keycode_convention (meta.toml): iso = code 10 is the key left of 1 and code 50 the ISO key left of Z; ansi = the reverse. Keys are listed by row, from the space bar to the bottom row. extra_keys are the character keys only JIS and ABNT keyboards have (Yen, Ro or ABNT C1, the keypad comma or ABNT C2), with Apple's kVK_JIS_* codes and the XKB names of xkeyboard-config's keycodes/evdev (AE13, AB11, and KPPT, its alias of the keypad comma for the Brazilian keypad point): the converters that read them write such a key only when a layout types on it, so a layout without them keeps its bytes.",
 	"conventions": ["iso", "ansi"],
 	"keys": [
 		{ "code": "Space", "xkb": "SPCE", "ahk": "SC039", "mac": 49 },
@@ -51,5 +51,10 @@
 		{ "code": "Comma", "xkb": "AB08", "ahk": "SC033", "mac": 43 },
 		{ "code": "Period", "xkb": "AB09", "ahk": "SC034", "mac": 47 },
 		{ "code": "Slash", "xkb": "AB10", "ahk": "SC035", "mac": 44 }
+	],
+	"extra_keys": [
+		{ "code": "IntlYen", "xkb": "AE13", "ahk": "SC07D", "mac": 93 },
+		{ "code": "IntlRo", "xkb": "AB11", "ahk": "SC073", "mac": 94 },
+		{ "code": "NumpadComma", "xkb": "KPPT", "ahk": "SC07E", "mac": 95 }
 	]
 }

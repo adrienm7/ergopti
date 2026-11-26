@@ -5,7 +5,7 @@
 local uv = require("luv")
 local root = assert(os.getenv("UPDATER_FLAG_ROOT"))
 local origin = assert(os.getenv("UPDATER_FLAG_ORIGIN"))
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 Paths.home = function() return root end
 local M = require("modules.updater.manager")
 -- A checkout's "local" version deliberately skips canonical asset admission.

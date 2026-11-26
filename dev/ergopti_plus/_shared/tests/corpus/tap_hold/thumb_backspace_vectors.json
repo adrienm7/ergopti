@@ -1,0 +1,55 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/tap_hold_thumb_backspace.v1.json",
+	"description": "Cross-driver corpus for what the thumb key tapping Backspace deletes under the keys held when it is tapped: Windows' BackSpaceLogic (lalt.ahk 4.10) is the reference, the Linux engine's lalt_backspace_chords follows it, and the macOS Karabiner generator gives left Command's Backspace tap the same variants (maintainer decision THD-4 of 2026-11-21). `held` names the keys physically down before the tap: left_ctrl, shift and right_ctrl, the key Windows and Linux call right_ctrl and macOS right_option. `right_ctrl_tap` is that key's tap: one_shot_shift (macOS sticky_shift, holding Shift) makes it a Shift to this logic, none a Ctrl (macOS: it holds Ctrl). `expected` is what the tap deletes: char_back (Backspace), char_forward (Delete; Windows and Linux type Right then Backspace under the one-shot so LAlt cannot make Ctrl+Alt+Delete), word_back (Ctrl+Backspace; macOS Option+Backspace, its word deletion) or word_forward (Ctrl+Delete, or Ctrl+Right then Ctrl+Backspace; macOS Option+Forward Delete).",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "nothing_held_deletes_back",
+			"held": [],
+			"right_ctrl_tap": "none",
+			"expected": "char_back"
+		},
+		{
+			"id": "shift_deletes_forward",
+			"held": ["shift"],
+			"right_ctrl_tap": "none",
+			"expected": "char_forward"
+		},
+		{
+			"id": "left_ctrl_deletes_a_word_back",
+			"held": ["left_ctrl"],
+			"right_ctrl_tap": "none",
+			"expected": "word_back"
+		},
+		{
+			"id": "left_ctrl_and_shift_delete_a_word_forward",
+			"held": ["left_ctrl", "shift"],
+			"right_ctrl_tap": "none",
+			"expected": "word_forward"
+		},
+		{
+			"id": "one_shot_right_ctrl_deletes_forward",
+			"held": ["right_ctrl"],
+			"right_ctrl_tap": "one_shot_shift",
+			"expected": "char_forward"
+		},
+		{
+			"id": "left_ctrl_and_one_shot_right_ctrl_delete_a_word_forward",
+			"held": ["left_ctrl", "right_ctrl"],
+			"right_ctrl_tap": "one_shot_shift",
+			"expected": "word_forward"
+		},
+		{
+			"id": "plain_right_ctrl_deletes_a_word_back",
+			"held": ["right_ctrl"],
+			"right_ctrl_tap": "none",
+			"expected": "word_back"
+		},
+		{
+			"id": "plain_right_ctrl_and_shift_delete_a_word_forward",
+			"held": ["right_ctrl", "shift"],
+			"right_ctrl_tap": "none",
+			"expected": "word_forward"
+		}
+	]
+}

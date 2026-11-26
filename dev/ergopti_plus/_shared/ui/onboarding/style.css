@@ -24,6 +24,15 @@ body {
 	margin: 0;
 }
 
+:root {
+	/* The wizard has one appearance, light, whatever the system's: its surfaces
+	   are palette whites. The semantic accent turns to the dark appearance's
+	   blue under a dark system and fell to 3.4:1 on them (WCAG 1.4.3), so the
+	   page keeps the light accent, 5.6:1 or more on them. */
+	--onboarding-accent: var(--theme-hue-004a99);
+	color-scheme: light;
+}
+
 body {
 	background: var(--theme-page-background);
 	color: var(--theme-grey-333);
@@ -40,7 +49,8 @@ body {
 /* ====================================== */
 /* ====================================== */
 
-#wizard {
+/* The wizard is the page: the step bar, the step and the buttons. */
+body {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -52,10 +62,10 @@ body {
    scrollbar next to the window edge while the padding keeps text clear of it. */
 .step-scroll {
 	flex: 1 1 auto;
-	margin-right: -14px;
+	margin-inline-end: -14px;
 	min-height: 0;
 	overflow-y: auto;
-	padding-right: 12px;
+	padding-inline-end: 12px;
 }
 
 .step {
@@ -80,26 +90,35 @@ body {
 	flex-shrink: 0;
 	gap: 6px;
 	justify-content: center;
-	margin-bottom: 18px;
+	list-style: none;
+	margin: 0 0 18px;
+	padding: 0;
 }
 
+/* The three states differ by shape, not only by hue (WCAG 1.4.1): a step to
+   come is a ring, a done one a filled dot, the current one a wider bar. Each
+   edge holds 3:1 on the page (WCAG 1.4.11); the pale grey dot and the green
+   one were 1.4:1 and 2.0:1. */
 .step-dot {
-	background: var(--theme-hue-d0d0d5);
-	border-radius: 50%;
-	height: 7px;
+	background: transparent;
+	border: 1.5px solid var(--theme-hue-48484c);
+	border-radius: 4px;
+	height: 8px;
 	transition:
 		background 0.2s,
-		transform 0.2s;
-	width: 7px;
+		width 0.2s;
+	width: 8px;
 }
 
 .step-dot.active {
-	background: var(--theme-blue);
-	transform: scale(1.25);
+	background: var(--onboarding-accent);
+	border-color: var(--onboarding-accent);
+	width: 20px;
 }
 
 .step-dot.done {
-	background: var(--theme-green);
+	background: var(--onboarding-accent);
+	border-color: var(--onboarding-accent);
 }
 
 /* =============================== */
@@ -116,7 +135,7 @@ h1 {
 }
 
 .desc {
-	color: var(--theme-grey-555);
+	color: var(--theme-hue-48484c);
 	font-size: 12.5px;
 	line-height: 1.55;
 	margin: 0 0 14px;
@@ -124,7 +143,8 @@ h1 {
 }
 
 .hint {
-	color: var(--theme-grey-888);
+	/* #888 was 3.3:1 on the page. */
+	color: var(--theme-hue-48484c);
 	font-size: 11px;
 	font-style: italic;
 	line-height: 1.5;
@@ -135,7 +155,7 @@ h1 {
 	background: var(--theme-hue-fff8e1);
 	border: 1px solid var(--theme-hue-f0c040);
 	border-radius: 6px;
-	color: var(--theme-hue-7a5500);
+	color: var(--theme-hue-5c3800);
 	font-size: 11px;
 	line-height: 1.5;
 	margin: 0 0 12px;
@@ -169,13 +189,19 @@ h1 {
 .lang-item {
 	align-items: center;
 	background: var(--theme-white);
+	border: none;
 	border-bottom: 1px solid var(--theme-grey-f0f0f0);
+	border-radius: 0;
+	color: inherit;
 	cursor: pointer;
 	display: flex;
+	font: inherit;
 	gap: 10px;
 	padding: 9px 12px;
+	text-align: start;
 	transition: background 0.1s;
 	user-select: none;
+	width: 100%;
 }
 
 .lang-item:first-child {
@@ -196,7 +222,7 @@ h1 {
 }
 
 .lang-item.selected .lang-name {
-	color: var(--theme-blue);
+	color: var(--onboarding-accent);
 	font-weight: 600;
 }
 
@@ -208,6 +234,36 @@ h1 {
 	justify-content: center;
 	line-height: 1;
 	width: 24px;
+}
+
+/* The reading choices above the languages: each label beside its list, both
+   pairs on one row, wrapped when the window is narrow. */
+.reading-prefs {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 12px;
+}
+
+.reading-choice {
+	color: var(--theme-label);
+	font-size: 13px;
+}
+
+.reading-prefs select {
+	background: var(--theme-white);
+	border: 1.5px solid var(--theme-grey-d0d0d0);
+	border-radius: 7px;
+	color: var(--theme-label);
+	font: inherit;
+	padding: 5px 8px;
+}
+
+.reading-prefs select:focus-visible {
+	border-color: var(--theme-blue);
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	outline: 2px solid var(--theme-blue);
 }
 
 /* PNG flag (Windows path) sized to sit on the emoji baseline. */
@@ -231,15 +287,15 @@ h1 {
 
 .field-group {
 	display: flex;
-	margin-bottom: 4px;
+	margin: 0 0 4px;
 	width: 100%;
 }
 
 #config-input {
 	background: var(--theme-white);
 	border: 1.5px solid var(--theme-grey-d0d0d0);
+	border-inline-end: none;
 	border-radius: 7px 0 0 7px;
-	border-right: none;
 	color: var(--theme-label);
 	flex: 1;
 	font-family: inherit;
@@ -270,6 +326,18 @@ h1 {
 /* ======= 7/ Question & Radio Cards ==== */
 /* ====================================== */
 /* ====================================== */
+
+/* Every group of choices is a fieldset named by its legend, drawn bare. */
+fieldset {
+	border: 0;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+legend {
+	padding: 0;
+}
 
 .question {
 	margin: 0 0 12px;
@@ -325,7 +393,7 @@ h1 {
 }
 
 .radio-card input[type='radio']:checked + .radio-label {
-	color: var(--theme-blue);
+	color: var(--onboarding-accent);
 	font-weight: 500;
 }
 
@@ -372,6 +440,14 @@ h1 {
 	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
 }
 
+/* The refused trigger is said in words, not only by the red edge. */
+.field-error {
+	color: var(--theme-bad-text);
+	font-size: 12px;
+	font-weight: 600;
+	margin: 6px 0 0;
+}
+
 /* ====================================== */
 /* ====================================== */
 /* ======= 8/ Checklist ================= */
@@ -401,25 +477,30 @@ h1 {
 
 .checklist-group.depth-1,
 .checklist-group.depth-2 {
-	margin-left: 18px;
+	margin-inline-start: 18px;
 }
 
 .checklist-group-header .check-label {
 	font-weight: 600;
 }
 
+/* Each box is 16 px and the rows 26 px apart at least: the boxes were 13 px,
+   23.5 px apart, under the 24 px a pointer target needs (WCAG 2.5.8). */
+/* The row is its checkbox's 44 px target (theme.css), the box centred in it. */
 .check-row {
-	align-items: flex-start;
+	align-items: center;
 	cursor: pointer;
 	display: flex;
 	gap: 8px;
-	padding: 3px 0;
+	padding: 4px 0;
 }
 
 .check-row input[type='checkbox'] {
 	accent-color: var(--theme-blue);
 	flex-shrink: 0;
-	margin: 2px 0 0;
+	height: 16px;
+	margin: 1px 0 0;
+	width: 16px;
 }
 
 .check-row input[type='checkbox']:disabled + .check-label {
@@ -435,8 +516,14 @@ h1 {
 /* The separator between a trigger and its action: the arrows inside gesture
    and action labels must never read as it. */
 .value-separator {
-	color: var(--theme-blue);
+	color: var(--onboarding-accent);
 	font-weight: 700;
+}
+
+/* A trigger (kbd) and its action (samp) read in the label's own font. */
+.item-trigger,
+.item-action {
+	font: inherit;
 }
 
 .check-row input[type='checkbox']:disabled + .check-label .value-separator {
@@ -473,7 +560,8 @@ button:hover {
 }
 
 .primary {
-	background: var(--theme-blue);
+	/* White on the system blue was 4.0:1. */
+	background: var(--theme-accent-fill);
 	color: var(--theme-white);
 }
 
@@ -484,7 +572,7 @@ button:hover {
 
 /* The Back button sits on the left, Next / Finish on the right. */
 #btn-back {
-	margin-right: auto;
+	margin-inline-end: auto;
 }
 
 /* ============================================== */
@@ -523,9 +611,9 @@ button:hover {
 }
 
 .register-status.register-ok {
-	color: var(--theme-hue-1a8c3a);
+	color: var(--theme-good-text);
 }
 
 .register-status.register-err {
-	color: var(--theme-hue-dd1111);
+	color: var(--theme-bad-text);
 }

@@ -234,3 +234,24 @@ _DequeueContract_RegisterAll() {
 }
 
 _DequeueContract_RegisterAll()
+
+; TWD-1, decided by the maintainer on 2026-11-16: a preview shown with no delay
+; hides after the shared [timing] safety_timeout_sec on the three OS. Windows
+; typed 3.0 here instead of reading the shared value (twd1-zero-delay-safety).
+_DequeueContract_SafetyFromSharedTiming() {
+	global _SharedDir, UI_TOOLTIP_SAFETY_SEC, _TOOLTIP_SAFETY_SEC
+	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
+	Shared := Float(IniCacheGet(Constants, "timing", "safety_timeout_sec"))
+	Assert(Shared > 0, "constants.toml declares [timing].safety_timeout_sec")
+	Saved := [UI_TOOLTIP_SAFETY_SEC, _TOOLTIP_SAFETY_SEC]
+	try {
+		UI_TOOLTIP_SAFETY_SEC := Shared
+		Tooltip_UpdateStyles()
+		AssertEqual(Shared, _TOOLTIP_SAFETY_SEC, "the no-delay deadline is the shared value")
+	} finally {
+		UI_TOOLTIP_SAFETY_SEC := Saved[1]
+		_TOOLTIP_SAFETY_SEC := Saved[2]
+	}
+}
+Test("tooltip: a no-delay preview's deadline is the shared safety_timeout_sec (twd1-zero-delay-safety)",
+	_DequeueContract_SafetyFromSharedTiming)

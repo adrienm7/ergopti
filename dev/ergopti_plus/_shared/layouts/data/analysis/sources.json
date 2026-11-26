@@ -8,6 +8,20 @@
 			"path": "docs/design/layout-analysis.md",
 			"anchor": "metrics"
 		},
+		"engine_doc_bonuses": {
+			"title": "Ergopti — layout analysis engine: coverage and simplicity bonuses",
+			"path": "docs/design/layout-analysis.md",
+			"anchor": "coverage-and-simplicity-bonuses"
+		},
+		"engine_doc_ways": {
+			"title": "Ergopti — layout analysis engine: ways of typing",
+			"path": "docs/design/layout-analysis.md",
+			"anchor": "ways-of-typing"
+		},
+		"engine_doc_context": {
+			"title": "Ergopti — magic and repeat keys in the layout model",
+			"path": "docs/design/magic-and-repeat-keys.md"
+		},
 		"study": {
 			"title": "Ergopti — study of the layout analysers",
 			"path": "docs/audits/layout-analysers/report.md"
@@ -56,6 +70,11 @@
 			"title": "Oxeylyzer",
 			"url": "https://github.com/O-X-E-Y/oxeylyzer",
 			"checked": "2026-11-14"
+		},
+		"keycraft": {
+			"title": "keycraft (Barend Scholtus)",
+			"url": "https://github.com/rbscholtus/keycraft",
+			"checked": "2026-11-25"
 		},
 		"cmini": {
 			"title": "cmini",
@@ -157,6 +176,11 @@
 			"path": "docs/design/analyser-scores.md",
 			"anchor": "oxeylyzer"
 		},
+		"analyser_doc_keycraft": {
+			"title": "Ergopti — how the keycraft score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "keycraft"
+		},
 		"analyser_doc_dariogoetz": {
 			"title": "Ergopti — how the Keyboard Layout Optimizer (dariogoetz) score is reproduced",
 			"path": "docs/design/analyser-scores.md",
@@ -171,6 +195,11 @@
 			"title": "Ergopti — how the Ergo-L analyser and Kalamine statistics score is reproduced",
 			"path": "docs/design/analyser-scores.md",
 			"anchor": "ergo-l-analyser-and-kalamine-statistics"
+		},
+		"analyser_doc_cyanophage": {
+			"title": "Ergopti — how the Cyanophage optimiser score is reproduced",
+			"path": "docs/design/analyser-scores.md",
+			"anchor": "cyanophage-optimiser"
 		},
 		"kla_stevep": {
 			"title": "Keyboard Layout Analyzer, SteveP's fork",
@@ -196,15 +225,24 @@
 			"title": "carpalx (Martin Krzywinski), GitHub mirror",
 			"url": "https://github.com/narze/carpalx",
 			"checked": "2026-11-14"
+		},
+		"cyanophage": {
+			"title": "Cyanophage optimiser (cyanophage.github.io)",
+			"url": "https://github.com/cyanophage/cyanophage.github.io",
+			"checked": "2026-11-19"
 		}
 	},
 	"items": {
 		"sfb": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "genkey"],
 		"repeat": ["engine_doc", "ergol_stats"],
 		"sfs": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "trialyzer"],
+		"sfb_distance": ["engine_doc", "genkey", "oxeylyzer", "dariogoetz", "cyanophage"],
 		"lsb": ["engine_doc", "kld", "ergol_stats", "genkey", "km_metrics"],
 		"scissors": ["engine_doc", "kld", "ergol_stats", "oxeylyzer", "keygen"],
 		"half_scissors": ["engine_doc", "kld"],
+		"pinky_ring": ["engine_doc", "oxeylyzer", "cyanophage", "keygen"],
+		"row_jump": ["engine_doc", "carpalx", "cyanophage"],
+		"hand_run": ["engine_doc", "dariogoetz", "carpalx", "oxeylyzer"],
 		"roll_in": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
 		"roll_out": ["engine_doc", "kld", "oxeylyzer", "dariogoetz"],
 		"hand_change": ["engine_doc", "ergol_stats"],
@@ -221,14 +259,19 @@
 		"finger_imbalance": ["engine_doc", "study_finger_load", "dariogoetz", "genkey"],
 		"hand_imbalance": ["engine_doc", "dariogoetz"],
 		"pinky_load": ["engine_doc", "ergol_stats", "genkey", "oxeylyzer"],
-		"modifier_usage": ["engine_doc", "dariogoetz", "kla"],
-		"dead_key_usage": ["engine_doc", "ergol_stats", "kalamine"],
+		"modifier_usage": ["engine_doc", "engine_doc_ways", "dariogoetz", "kla"],
+		"altgr_usage": ["engine_doc", "engine_doc_ways", "dariogoetz"],
+		"dead_key_usage": ["engine_doc", "engine_doc_ways", "ergol_stats", "kalamine"],
+		"context_key_usage": ["engine_doc_context", "engine_doc_ways"],
 		"outer_column": ["engine_doc", "study"],
 		"unsupported": ["engine_doc", "ergol_stats"],
 		"compact_fit": ["engine_doc", "study"],
 		"char_coverage": ["engine_doc", "study"],
 		"direct_digits": ["engine_doc", "study"],
 		"shortcut_left": ["engine_doc", "study_shortcuts"],
+		"distinct_chars": ["engine_doc_bonuses"],
+		"coverage_bonus": ["engine_doc_bonuses"],
+		"simplicity": ["engine_doc_bonuses"],
 		"ideal_finger_load": ["study_finger_load", "dariogoetz", "genkey", "oxeylyzer", "ergol_stats"],
 		"shortcut_letters": [
 			"study_shortcuts",
@@ -251,6 +294,8 @@
 		"analyser.oxeylyzer": ["analyser_doc_oxeylyzer", "oxeylyzer"],
 		"analyser.dariogoetz": ["analyser_doc_dariogoetz", "dariogoetz"],
 		"analyser.cmini": ["analyser_doc_cmini", "cmini"],
-		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"]
+		"analyser.ergol": ["analyser_doc_ergol", "ergol_stats", "kalamine"],
+		"analyser.cyanophage": ["analyser_doc_cyanophage", "cyanophage"],
+		"analyser.keycraft": ["analyser_doc_keycraft", "keycraft"]
 	}
 }

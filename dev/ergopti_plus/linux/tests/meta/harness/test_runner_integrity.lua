@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Contract = require("tests.runner_contract")
-local CONTINUATION_MODULE = "tests.unit.infra.scope.test_global_shortcuts_pair_scope"
+local CONTINUATION_MODULE = "tests.unit.settings.scope.test_global_shortcuts_pair_scope"
 
 --- Keeps the continuation actor's deliberate failure and headers out of the real tally.
 --- @param body function Owned private actor, given its retained transcript.
@@ -186,7 +186,7 @@ helpers.describe("linux test runner: UTF-8 timing frames", function()
 					if row.kind == "case" then
 						case_count = case_count + 1
 						helpers.assert_eq(row.module, "tests.unit.core.ui.editors.test_bridge_handlers_onboarding")
-						if row.name:find("refuses unsafe answer", 1, true) then
+						if row.name:find("refuses malformed answer", 1, true) then
 							unsafe_names[row.name] = (unsafe_names[row.name] or 0) + 1
 						end
 					else
@@ -195,20 +195,16 @@ helpers.describe("linux test runner: UTF-8 timing frames", function()
 					end
 				end
 			end
-			helpers.assert_eq(case_count, 20, "all actual onboarding subject assertions must run")
+			helpers.assert_eq(case_count, 17, "all actual onboarding subject assertions must run")
 			helpers.assert_true(module_count > 0, "the canonical module loader must also emit timings")
 			local expected = {}
 			for _, case in ipairs({
-				{ "dialog.magic_key.error_common", "semicolon" },
-				{ "dialog.magic_key.error_common", "accented letter" },
-				{ "dialog.magic_key.error_common", "ASCII letter" },
-				{ "dialog.magic_key.error_common", "Hebrew letter" },
 				{ "dialog.magic_key.error_length", "multiple characters" },
 				{ "dialog.magic_key.error_length", "invalid leading byte" },
 				{ "dialog.magic_key.error_length", "overlong sequence" },
 				{ "dialog.magic_key.error_empty", "empty input" },
 			}) do
-				expected["(onboarding-linux-trigger) refuses unsafe answer " .. case[1] .. " " .. case[2]] = 1
+				expected["(onboarding-linux-trigger) refuses malformed answer " .. case[1] .. " " .. case[2]] = 1
 			end
 			helpers.assert_eq(unsafe_names, expected, "every malformed-input vector retains its distinct authored label")
 		end

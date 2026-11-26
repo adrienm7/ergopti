@@ -3,32 +3,18 @@
 --- ==============================================================================
 --- MODULE: Native Logger File Admission
 --- DESCRIPTION:
---- Actual special endpoints must never block startup, topical fan-out, sink
---- repointing or the final pre-sink fatal record. Regular files retain append
---- and daily topical rotation semantics through the same native owners.
+--- Actual special endpoints must never block startup, the retention sweep,
+--- sink repointing or the final pre-sink fatal record. Regular files retain
+--- append semantics through the same native owners, and a retired topical
+--- sub-file is deleted only when it is a regular file.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local native = require("luv")
 local Shell = require("core.process.adapters.shell_runner")
 local AppDirs = require("core.fs.engine.app_dirs")
-local SubFiles = require("_generated.logger_sub_files")
-
--- The marker line the child logs; its topical file comes from the routing
--- table (the sink's substring rule), so a renamed file needs no edit here.
-local MARKER_TAG = "[keystats]"
-
---- The sub-file a line is routed to, by the sink's own rule.
---- @param line string Complete log line.
---- @return string name
-local function routed_file(line)
-	for _, entry in ipairs(SubFiles) do
-		for _, pattern in ipairs(entry.patterns) do
-			if line:find(pattern, 1, true) then return entry.name end
-		end
-	end
-	error("no sub-file routes " .. line)
-end
+-- A retired topical name the sweep deletes when it is a regular file.
+local RETIRED_NAME = AppDirs.files.retired_topical_logs[1]
 
 --- Runs an isolated real logger operation under a native process deadline.
 --- @param endpoint string Endpoint to replace with a FIFO, or "regular".
@@ -40,19 +26,19 @@ local function run_endpoint(endpoint)
 	local date = os.date("%Y-%m-%d")
 	local main = root .. "/logs/" .. AppDirs.files.unified_prefix .. date .. AppDirs.files.extension
 	local errors = root .. "/logs/" .. AppDirs.files.errors_prefix .. date .. AppDirs.files.extension
-	local topical = root .. "/logs/" .. routed_file(MARKER_TAG .. " native-special-file-marker")
+	local retired = root .. "/logs/" .. RETIRED_NAME
 	local targets = {
 		bootstrap = root .. "/logs/" .. AppDirs.files.bootstrap_log,
 		main = main,
 		errors = errors,
-		topical = topical,
+		retired = retired,
 		repoint = root .. "/candidate/" .. AppDirs.files.unified_prefix .. date .. AppDirs.files.extension,
 		privacy = root .. "/shared/diagnostics/data/redaction.json",
 	}
 	if endpoint ~= "regular" and endpoint ~= "close" then
 		assert(Shell.run("mkfifo -- " .. Shell.quote(assert(targets[endpoint]))))
 	else
-		for _, path in ipairs({ main, errors, topical }) do
+		for _, path in ipairs({ main, errors, retired }) do
 			local file = assert(io.open(path, "w"))
 			assert(file:write("2001-01-01 [INFO] [old] retained-before-append\n"))
 			assert(file:close())
@@ -100,7 +86,7 @@ local active = Sink.install(logger, { log_dir = root .. "/logs", redaction_conte
 assert(active == (endpoint ~= "main" and endpoint ~= "close"), "main refusal must degrade without blocking other channels")
 if endpoint == "close" then assert(close_refusals == 1, "the actual admission descriptor close must be observed") end
 if endpoint == "repoint" then
- require("infra.config_paths").get_logs_dir = function() return root .. "/candidate" end
+ require("settings.engine.paths").get_logs_dir = function() return root .. "/candidate" end
  assert(Sink.repoint() == false, "refused candidate must retain the original sink")
 end
 assert(type(emit) == "function")
@@ -123,7 +109,8 @@ Sink.uninstall(logger)
 	while not exited do native.run("once") end
 	native.run("nowait")
 	local observed = {}
-	for key, path in pairs({ main = main, errors = errors, topical = topical }) do
+	local retired_kind = (native.fs_lstat(retired) or {}).type
+	for key, path in pairs({ main = main, errors = errors }) do
 		local attrs = native.fs_lstat(path)
 		if attrs and attrs.type == "file" then
 			local file = assert(io.open(path, "r"))
@@ -135,7 +122,7 @@ Sink.uninstall(logger)
 	helpers.assert_eq(expired, false, endpoint .. " must not wait for a FIFO peer")
 	helpers.assert_eq(exit_code, 0, endpoint .. " must preserve the logger's refusal and publication contract")
 	helpers.assert_eq(exit_signal, 0, "a killed or crashed logger never counts as safe degradation")
-	if endpoint == "errors" or endpoint == "topical" or endpoint == "repoint" or endpoint == "regular" then
+	if endpoint == "errors" or endpoint == "retired" or endpoint == "repoint" or endpoint == "regular" then
 		helpers.assert_contains(observed.main or "", "native-special-file-marker", "healthy main output must survive another channel's refusal")
 	end
 	if endpoint == "close" then
@@ -146,14 +133,15 @@ Sink.uninstall(logger)
 		helpers.assert_contains(observed.main or "", "retained-before-append", "main logs append existing data")
 		helpers.assert_contains(observed.errors or "", "retained-before-append", "error logs append existing data")
 		helpers.assert_contains(observed.errors or "", "native-special-file-marker")
-		helpers.assert_contains(observed.topical or "", "native-special-file-marker")
-		helpers.assert_eq((observed.topical or ""):find("retained-before-append", 1, true), nil,
-			"a topical file from an earlier day is replaced only after regular-file admission")
+		helpers.assert_eq(retired_kind, nil, "a retired topical regular file is deleted at install")
+	end
+	if endpoint == "retired" then
+		helpers.assert_eq(retired_kind, "fifo", "a special file named like a retired topical file is kept")
 	end
 end
 
 helpers.describe("logger-native-file-admission", function()
-	for _, endpoint in ipairs({ "bootstrap", "main", "errors", "topical", "repoint", "privacy", "close", "regular" }) do
+	for _, endpoint in ipairs({ "bootstrap", "main", "errors", "retired", "repoint", "privacy", "close", "regular" }) do
 		helpers.it("(logger-native-file-admission) handles " .. endpoint .. " without blocking or losing healthy output", function()
 			run_endpoint(endpoint)
 		end)

@@ -1,0 +1,10 @@
+# _shared/tests/corpus/config_migrations/shipped_microsoft_bold_bindings_dropped/input.toml
+
+[_meta]
+schema_version = 23
+
+[shortcuts.keyboard]
+primary_b = "microsoft_bold"
+meta_b = "lock_screen"
+meta_o = "microsoft_bold"
+meta_s = "surround_parens"

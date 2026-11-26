@@ -21,12 +21,12 @@ global _DriverBootPhase := "starting"
 ; included here and the handler calls it under try.
 global _DriverStartupSmokeDir := ""
 
-#Include ../../infra/error_net.ahk
+#Include ../../diagnostics/engine/reports/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)
 OnExit(_PathsEarlyObserveExit)
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../_generated/app_dirs.ahk
-#Include ../../infra/app_folders.ahk
+#Include ../../apps/engine/folders.ahk
 #Include ../../core/text/engine/toml/helpers.ahk
 
 if IsSet(Features) || IsSet(_SharedDir) || IsSet(_ConfigDir) || IsSet(ConfigurationFile)

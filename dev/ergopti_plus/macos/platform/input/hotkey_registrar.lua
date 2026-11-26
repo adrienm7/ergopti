@@ -594,4 +594,18 @@ function M.live_count()
 	return TableUtil.count(_bindings)
 end
 
+--- Reports whether an enabled binding answers one physical chord.
+--- The modifiers + magic key save leaves such a chord to its shortcut.
+--- @param mods table Canonical modifier array.
+--- @param key number Virtual keycode.
+--- @return boolean
+function M.has_live_binding(mods, key)
+	local identity = M.physical_identity(mods, key)
+	if identity == nil then return false end
+	for _, entry in pairs(_bindings) do
+		if entry.enabled == true and entry.identity == identity then return true end
+	end
+	return false
+end
+
 return M

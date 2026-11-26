@@ -288,13 +288,13 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
 	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (core/lifecycle/engine/lifecycle.ahk).
-	Src := _DriverDirsConcat("infra", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "hotstrings/engine", "diagnostics/engine/reports", "diagnostics/engine/field_run", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
 	Assert(Body != "", "ToggleSuspend must exist in core/lifecycle/engine/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
-	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,
+	Assert(ClearPos > 0 and InStr(Body, 'SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))') > ClearPos,
 		"ToggleSuspend must defer Suspend until the physical AltGr/Kana prefix has released")
 }
 Test("Shortcuts/AltGr: ToggleSuspend drains the AltGr prefix latch before toggling Suspend (historical AltGr latch gotcha)",
@@ -305,7 +305,7 @@ TestShortcuts_MenuItemsUseRegisterMenuItem() {
 	; the menu_dispatcher WM_COMMAND retry path and silently drops ~1 click in 3
 	; under AHK 2.0. All actionable shortcut menu items must go through
 	; RegisterMenuItem instead.
-	Src := _DriverDirConcat("ui/menu")
+	Src := _DriverDirsConcat("ui/menu", "hotstrings/ui/menu", "gestures/ui/menu", "apps/ui/menu", "ai/ui/menu", "menu/ui/builder")
 	Assert(Src != "", "ui/menu must be readable")
 	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
 	; TWO ways to be on the retry path, and the file must be on one of them. It
@@ -520,7 +520,7 @@ _SRCT_RecordLaunch(State, Target) {
 	State["events"].Push("run")
 	State["launches"] += 1
 	State["suspended_at_launch"] := A_IsSuspended
-	AssertEqual("Regedit.exe", Target)
+	AssertEqual('"' . A_WinDir . '\regedit.exe"', Target, "the Registry Editor starts by its absolute path")
 	if State["throw_launch"]
 		throw Error("owned launch failure")
 	return true
@@ -649,7 +649,7 @@ Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
 TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
 	Targets := []
 	AssertTrue(_OpenDownloadsWith(() => "Z:\Company\Alice Downloads", (Command) => Targets.Push(Command)))
-	AssertEqual('explorer.exe "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
+	AssertEqual('"' . A_WinDir . '\explorer.exe" "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
 	FailedResolve() {
 		throw Error("Downloads lookup denied")
 	}

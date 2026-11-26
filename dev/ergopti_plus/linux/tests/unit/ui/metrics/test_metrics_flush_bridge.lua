@@ -20,16 +20,23 @@ local function fixture(app)
 		subscribers[#subscribers + 1] = callback
 		return true
 	end
-	K.get_dashboard_payload = function()
+	K.get_dashboard_payload = function(options)
 		counts.reads = counts.reads + 1
 		if pending then return nil, "SQLite flush pending" end
+		local prefetch = nil
+		if not options or options.include_prefetch ~= false then prefetch = { historical = {}, today = {} } end
 		return { metrics_manifest = { day = { app = { chars = 17 } } }, app_icons = {},
-			_prefetch_data = { historical = {}, today = {} }, driver_meta = { os = "linux" } }
+			_prefetch_data = prefetch, driver_meta = { os = "linux" } }
 	end
 	K.get_range_payload = function()
 		counts.reads = counts.reads + 1
 		if pending then return nil, "SQLite flush pending" end
 		return { historical = { witness = 9 }, today = {} }
+	end
+	K.get_today_payload = function()
+		counts.reads = counts.reads + 1
+		if pending then return nil, "SQLite flush pending" end
+		return { today = { app = { witness = 5 } }, today_date = "2026-11-21" }
 	end
 	K.capture_app_category_edit = function() return {} end
 	K.set_app_category = function()
@@ -119,7 +126,8 @@ H.describe("metrics flush bridge", function()
 	end)
 	-- The shared value schema's declaration (value-validation): a refused typed
 	-- score is notified with the localized text naming the range, nothing is written.
-	for _, typed in ipairs({ "3", "2,5", "abc", "0x1", "", "-2.01" }) do
+	-- A blank answer is no refusal: it returns to the unedited score (PCK-13).
+	for _, typed in ipairs({ "3", "2,5", "abc", "0x1", "-2.01" }) do
 		H.it("category edit refuses the typed score " .. typed .. " with the value check's text (value-validation)", function()
 			local F = fixture("metrics_apps")
 			F.read_safe()
@@ -248,7 +256,7 @@ H.describe("metrics flush bridge", function()
 		end)
 		H.it(app .. " coalesces polls without cancelling the user's mutation", function()
 			local F = fixture(app)
-			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context)
+			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", reset_id = 5, app = "a", cat = "Work", score = 0 }, F.state, F.context)
 			for _ = 1, 20 do F.B.on_message("refresh", F.state, F.context) end
 			H.assert_eq(F.c.writes, 0)
 			H.assert_eq(F.c.subscriptions, 1)
@@ -258,7 +266,7 @@ H.describe("metrics flush bridge", function()
 		end)
 		H.it(app .. " refuses an action after close and replacement", function()
 			local F = fixture(app)
-			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context)
+			F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", reset_id = 5, app = "a", cat = "Work", score = 0 }, F.state, F.context)
 			F.B.on_window_closed(1)
 			F.epoch(2)
 			F.settle()
@@ -307,7 +315,7 @@ H.describe("metrics flush bridge", function()
 		end)
 	end
 	for _, mode in ipairs({ "immediate", "deferred" }) do
-		H.it("(range-projection-unavailable) " .. mode .. " nil projection cannot publish or poison the next read", function()
+		H.it("(range-projection-unavailable, met-05) " .. mode .. " nil projection fails the request, publishes nothing", function()
 			local F = fixture("metrics_typing")
 			if mode == "immediate" then F.read_safe() end
 			local available = F.K.get_range_payload
@@ -321,7 +329,11 @@ H.describe("metrics flush bridge", function()
 				F.settle()
 			end
 			H.assert_eq(F.c.reads, 1, "A nil range must stop before reading/caching another dashboard payload")
-			H.assert_eq(#F.pushed, 0, "No incomplete range may be published")
+			-- met-05: no data is published, but the waiting page is told its
+			-- request failed rather than left on its loader for the watchdog.
+			H.assert_eq(#F.pushed, 1, "One terminal, and no incomplete range, reaches the page (met-05)")
+			H.assert_contains(F.pushed[1], "window.complete_range_request.apply(null,[80,\"failed\"])")
+			H.assert_nil(F.pushed[1]:find("__hostBridgeResponse", 1, true), "the terminal carries no data")
 			F.K.get_range_payload = available
 			local reply = F.B.on_message({ action = "range", request_id = 81 }, F.state, F.context)
 			H.assert_eq(reply.range_request_id, 81)
@@ -329,6 +341,53 @@ H.describe("metrics flush bridge", function()
 			H.assert_eq(F.c.reads, 3, "Recovery must read a fresh range and dashboard exactly once")
 		end)
 	end
+
+	H.it("(heatmap-active-layout, met-09) every typing answer names the keys by the active layout", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		-- An AZERTY keymap with a dead circumflex: what each key types now
+		local azerty = { [16] = "a", [17] = "z", [30] = "q", [26] = "^" }
+		local ok, err = pcall(function()
+			F.B._legend = function(code) return azerty[code] end
+			local expected = { ["16"] = "a", ["17"] = "z", ["26"] = "^", ["30"] = "q" }
+			H.assert_eq(F.B.on_message({ action = "ready" }, F.state, F.context).keycode_layout, expected)
+			H.assert_eq(F.B.on_message({ action = "refresh" }, F.state, F.context).keycode_layout, expected)
+			local range = F.B.on_message({ action = "range", request_id = 90 }, F.state, F.context)
+			H.assert_eq(range.keycode_layout, expected, "a range reply keeps the legends (the page rebuilds them per answer)")
+			azerty[16] = "b"
+			H.assert_eq(F.B.on_message({ action = "refresh" }, F.state, F.context).keycode_layout["16"], "b",
+				"a layout switch reaches the next answer")
+		end)
+		F.B._reset()
+		if not ok then error(err, 0) end
+	end)
+	H.it("(heatmap-active-layout, met-09) the default legend reads the emulation, then the XKB keymap", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		local layout = F.B.on_message({ action = "ready" }, F.state, F.context).keycode_layout
+		H.assert_eq(type(layout), "table", "an answer always carries the map, empty with no keymap loaded")
+		for code, legend in pairs(layout) do
+			H.assert_true(tonumber(code) ~= nil and type(legend) == "string" and legend ~= "")
+		end
+	end)
+	H.it("(live-ngrams-refresh, met-10) the poll refresh carries today's n-grams, not the history", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		local reply = F.B.on_message({ action = "refresh" }, F.state, F.context)
+		H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+		H.assert_eq(reply._prefetch_data.today.app.witness, 5, "today's tables follow the typing")
+		H.assert_eq(reply._prefetch_data.today_date, "2026-11-21")
+		H.assert_nil(reply._prefetch_data.historical, "an omitted history keeps the one the page holds")
+		H.assert_eq(F.c.reads, 2, "one manifest read and one today read")
+	end)
+	H.it("(live-ngrams-refresh, met-10) a refused today read keeps the manifest refresh", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		F.K.get_today_payload = function() return nil, "SQLite projection unavailable" end
+		local reply = F.B.on_message({ action = "refresh" }, F.state, F.context)
+		H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+		H.assert_nil(reply._prefetch_data, "the tables keep their last counts")
+	end)
 
 	H.it("typing range preserves request identity after deferred settlement", function()
 		local F = fixture("metrics_typing")
@@ -342,9 +401,33 @@ H.describe("metrics flush bridge", function()
 	H.it("typing cache refusal returns full data and false outcome", function()
 		local F = fixture("metrics_typing")
 		F.read_safe(true)
-		local reply = F.B.on_message({ action = "clear_cache" }, F.state, F.context)
+		local reply = F.B.on_message({ action = "clear_cache", reset_id = 9 }, F.state, F.context)
 		H.assert_eq(reply.cleared, false)
+		H.assert_eq(reply.reset_id, 9, "the page settles its own Reset with this outcome (met-19)")
 		H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+	end)
+	for _, invalid in ipairs({ 0, -1, 1.5, "7", false }) do
+		H.it("(met-19) a reset with the id " .. tostring(invalid) .. " is refused before clearing", function()
+			local F = fixture("metrics_typing")
+			F.read_safe()
+			H.assert_nil(F.B.on_message({ action = "clear_cache", reset_id = invalid }, F.state, F.context))
+			H.assert_eq(F.c.writes, 0, "an unanswerable Reset clears nothing")
+		end)
+	end
+	H.it("(met-19) a reset with no id is refused before clearing", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		H.assert_nil(F.B.on_message({ action = "clear_cache" }, F.state, F.context))
+		H.assert_eq(F.c.writes, 0)
+	end)
+	H.it("(met-19) a reset whose rebuild fails still tells the page its outcome", function()
+		local F = fixture("metrics_typing")
+		F.read_safe()
+		F.K.get_dashboard_payload = function() return nil, "SQLite projection unavailable" end
+		H.assert_nil(F.B.on_message({ action = "clear_cache", reset_id = 12 }, F.state, F.context))
+		H.assert_eq(F.c.writes, 1)
+		H.assert_eq(#F.pushed, 1, "the page hears its Reset instead of waiting for its watchdog")
+		H.assert_contains(F.pushed[1], "window.complete_cache_reset.apply(null,[12,true])")
 	end)
 	H.it("apps reset waits then accepts only its acknowledged generation increment", function()
 		local F = fixture("metrics_apps")
@@ -396,7 +479,7 @@ H.describe("metrics flush bridge", function()
 		H.assert_true(type(F.B.on_message("ready", {}).metrics_manifest) == "table")
 		H.assert_eq(F.B.on_message({ action = "edit" }, {}).saved, false)
 		local T = fixture("metrics_typing")
-		H.assert_eq(T.B.on_message({ action = "clear_cache" }, {}).cleared, false)
+		H.assert_eq(T.B.on_message({ action = "clear_cache", reset_id = 4 }, {}).cleared, false)
 	end)
 	H.it("subscription throw after inline notification cannot execute a mutation", function()
 		local F = fixture("metrics_apps")
@@ -517,7 +600,7 @@ H.describe("metrics flush bridge", function()
 				return false
 			end
 			F.K.set_app_category, F.K.clear_cache = revoke, revoke
-			H.assert_nil(F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", app = "a", cat = "Work", score = 0 }, F.state, F.context))
+			H.assert_nil(F.B.on_message({ action = app == "metrics_apps" and "edit" or "clear_cache", reset_id = 5, app = "a", cat = "Work", score = 0 }, F.state, F.context))
 			H.assert_eq(F.c.reads, 0)
 			H.assert_eq(#F.pushed, 0)
 		end)

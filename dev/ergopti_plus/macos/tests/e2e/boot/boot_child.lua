@@ -162,7 +162,7 @@ elseif ACTION == "select_layout_natively" then
 elseif ACTION == "open_windows" then
 	-- Every window and file the menu, a gesture or a shortcut can open through
 	-- the action catalogue: each must find its data outside the bundle.
-	local Actions = require("modules.gestures.actions")
+	local Actions = require("gestures.engine.actions")
 	for _, name in ipairs({
 		"open_metrics_typing", "open_metrics_apps", "open_hotstrings_editor", "open_paths_editor",
 		"open_config", "open_personal_info", "open_personal_hotstrings", "open_personal_shortcuts",
@@ -179,7 +179,7 @@ elseif ACTION == "open_windows" then
 	end
 elseif ACTION == "python_helper" then
 	-- As a keyboard shortcut slot runs it; its Python answers "single_screen".
-	local Actions = require("modules.gestures.actions")
+	local Actions = require("gestures.engine.actions")
 	local ran, result = xpcall(function() return Actions.execute_single("display_mirror_toggle", "keyboard__e2e") end,
 		debug.traceback)
 	if not ran or result ~= true then
@@ -187,7 +187,7 @@ elseif ACTION == "python_helper" then
 	end
 	idle(5)
 elseif ACTION == "gesture_conflict" then
-	local gestures = require("modules.gestures")
+	local gestures = require("gestures.engine")
 	World.record("FACT", "system_tap_3_state=" .. tostring(gestures.system_slot_state("tap_3")))
 elseif ACTION == "type_for_wpm" then
 	-- A user types after the configured application's real menu started Metrics

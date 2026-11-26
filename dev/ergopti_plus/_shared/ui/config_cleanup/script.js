@@ -38,11 +38,11 @@
 		el('keys').textContent = '';
 		state.keys.forEach(function (entry) {
 			var row = document.createElement('li');
-			var key = document.createElement('span');
+			var key = document.createElement('code');
 			key.className = 'setting-key';
 			// A bare root key has no section to name.
 			key.textContent = (entry.section === '' ? '' : '[' + entry.section + '] ') + entry.key;
-			var value = document.createElement('span');
+			var value = document.createElement('code');
 			value.className = 'setting-value';
 			value.textContent = entry.value;
 			row.appendChild(key);
@@ -80,6 +80,14 @@
 			}
 			post({ action: action, session: state ? state.session : '' });
 		});
+	});
+	// Escape closes, as the Close button does: the page holds the keyboard, so
+	// no host window sees the key. An IME composition keeps its own Escape.
+	document.addEventListener('keydown', function (event) {
+		if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+		if (event.defaultPrevented) return;
+		event.preventDefault();
+		post({ action: 'close', session: state ? state.session : '' });
 	});
 	var apply = window.i18n_apply;
 	window.i18n_apply = function (strings) {

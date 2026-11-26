@@ -44,7 +44,7 @@ local Keycodes   = require("platform.input.keycodes")
 local FileSystem = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
-local MetadataCommandStats = require("adapters.metadata_command_stats")
+local MetadataCommandStats = require("diagnostics.adapters.metadata_command_stats")
 local JsonCodec  = require("core.fs.adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
@@ -103,6 +103,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 	tap_hold_config           = { "tap_holds.enabled", "hotstrings.tap_hold_resets_word" }, -- config-key-literal-ok: a manifest feature selector
 	tap_hold_timeout_ms       = { "tap_holds.enabled" }, -- config-key-literal-ok: a manifest feature selector
 	lone_modifier_tap_max_ms  = { "tap_holds.lone_modifier_tap_max_ms" }, -- config-key-literal-ok: a manifest feature selector
+	key_combinations_enabled  = { "category_enabled.key_combinations" }, -- config-key-literal-ok: a manifest feature selector
 	mod_combos_enabled        = { "mod_combos.*" },
 	mod_combos_config         = { "mod_combos.*" },
 	simultaneous_threshold_ms = { "mod_combos.simultaneous_threshold_ms" }, -- config-key-literal-ok: a manifest feature selector
@@ -119,7 +120,7 @@ M.REQUIREMENT_STATE_FEATURES = {
 -- generated rules append to. requirements.toml holds the signature that finds
 -- them; every caller is listed here with its features or its reason.
 M.REQUIREMENT_FACADE_FEATURES = {
-	["modules/gestures/actions.lua"]        = { "gestures.*" },
+	["gestures/engine/actions.lua"]        = { "gestures.*" },
 	["modules/shortcuts/script_control.lua"] = { "shortcuts.script_control.*" },
 	["platform/remap/watchers.lua"]         = { "shortcuts.caps_word.**" },
 	["modules/keystats/kc_bridge.lua"]      = { "metrics.**" },
@@ -221,10 +222,10 @@ local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 -- pointing ConfigDirPath elsewhere; bridge reader resolves the same path.
 local KE_PHYSICAL_KC_LOG
 do
-	local mp = require("infra.config_paths")
+	local mp = require("settings.engine.paths")
 	KE_PHYSICAL_KC_LOG = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
-	-- Parent dir created lazily by deploy_json_file() or when keystats starts;
-	-- no mkdir here to avoid creating metrics/ when the feature is off
+	-- The KC bridge (modules/keystats/kc_bridge.lua), which drains this log from
+	-- keystats load, creates its folder; Karabiner's echo cannot.
 end
 
 
@@ -827,6 +828,11 @@ local function physical_kc_ledger_event(key_code, release)
 	}
 end
 
+-- The manipulators whose own mandatory flags are their whole condition (the
+-- thumb Backspace variants): their exact-modifier split keeps those flags in
+-- its last variant, which would otherwise match with none of them held.
+local KEEPS_OWN_FLAGS = setmetatable({}, { __mode = "k" })
+
 --- Reports whether any given action is told apart from another only by its
 --- modifiers (actions.json `exact_modifiers`): Hammerspoon binds its trigger
 --- as an exact-match hotkey, so one added modifier runs another action.
@@ -882,8 +888,10 @@ end
 --- a flag two held keys both press (CapsLock and Fn both holding Cmd) stays
 --- down once: no rule can remove it.
 --- @param manipulator table Manipulator; never mutated.
+--- @param keep_own boolean|nil Whether the last variant keeps the rule's own
+---   mandatory flags (KEEPS_OWN_FLAGS).
 --- @return table manipulators Replacement list, in match order.
-local function exact_modifier_manipulators(manipulator)
+local function exact_modifier_manipulators(manipulator, keep_own)
 	local from = manipulator.from
 	if not accepts_any_held_modifier(from.modifiers) then return { manipulator } end
 	local own = type(from.modifiers.mandatory) == "table" and from.modifiers.mandatory or {}
@@ -927,7 +935,12 @@ local function exact_modifier_manipulators(manipulator)
 			variants[#variants + 1] = variant({ mandatory = mandatory, optional = { CAPS_LOCK_MODIFIER } })
 		end
 	end
-	variants[#variants + 1] = variant({ mandatory = { ANY_MODIFIER } })
+	-- Two flags or more besides the rule's own: a mandatory "any" claims them
+	-- all. It no longer requires the rule's own flags, which a pair's holder
+	-- keeps down anyway; a rule whose own flags are its whole condition (the
+	-- thumb Backspace variants) keeps them mandatory and lets the others through.
+	variants[#variants + 1] = variant(keep_own and #own > 0
+		and { mandatory = deep_copy(own), optional = { ANY_MODIFIER } } or { mandatory = { ANY_MODIFIER } })
 	return variants
 end
 
@@ -992,7 +1005,8 @@ local function rewrite_control_output(rules)
 		local manipulators = {}
 		for _, manipulator in ipairs(rule.manipulators or {}) do
 			local prepared = deep_copy(manipulator)
-			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared) or { manipulator }
+			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared, KEEPS_OWN_FLAGS[manipulator])
+				or { manipulator }
 			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
 		end
 		rule.manipulators = manipulators
@@ -1298,6 +1312,43 @@ local function apply_pair_press_order(rules, pair_rules)
 	end
 end
 
+-- The thumb key whose Backspace tap deletes what Windows' BackSpaceLogic
+-- (lalt.ahk 4.10) and the Linux engine's lalt_backspace_chords delete under
+-- the keys held: left Command, the twin of their LAlt (maintainer decision
+-- THD-4 of 2026-11-21, _shared/tests/corpus/tap_hold/thumb_backspace_vectors.json).
+local THUMB_BACKSPACE_KEY = { id = "left_command", tap = "backspace" }
+
+-- The right-hand key that is their RCtrl, and the tap that makes it the
+-- one-shot Shift, a Shift to that logic (its plain Ctrl is the control flag).
+local THUMB_BACKSPACE_ONE_SHOT_KEY = { key_code = "right_option", tap = "sticky_shift" }
+
+-- macOS deletes a word with Option, as Windows does with Ctrl.
+local WORD_FORWARD = { { key_code = "delete_forward", modifiers = { "option" } } }
+local CHAR_FORWARD = { { key_code = "delete_forward" } }
+local WORD_BACK    = { { key_code = "delete_or_backspace", modifiers = { "option" } } }
+
+--- The variants of the thumb Backspace tap, in match order: each claims the
+--- modifier flags it reads (Karabiner lifts them around the tap, as Windows'
+--- TextPressKey lifts the held modifiers) and may also require the one-shot
+--- key held. Control and Shift give Option+Forward Delete; Control under the
+--- one-shot key the same; the one-shot key, or Shift, Forward Delete; Control
+--- Option+Backspace. Nothing held keeps the plain Backspace.
+--- @param one_shot boolean Whether the right_option key taps the one-shot Shift.
+--- @return table variants { mandatory = flags, one_shot = boolean, to = events }
+local function thumb_backspace_variants(one_shot)
+	local variants = { { mandatory = { "control", "shift" }, to = WORD_FORWARD } }
+	if one_shot then
+		-- The one-shot key holds Shift, claimed with it; without its hold
+		-- (Shift only past its threshold) it still deletes forward.
+		variants[#variants + 1] = { mandatory = { "control" }, one_shot = true, to = WORD_FORWARD }
+		variants[#variants + 1] = { mandatory = { "shift" }, one_shot = true, to = CHAR_FORWARD }
+		variants[#variants + 1] = { one_shot = true, to = CHAR_FORWARD }
+	end
+	variants[#variants + 1] = { mandatory = { "shift" }, to = CHAR_FORWARD }
+	variants[#variants + 1] = { mandatory = { "control" }, to = WORD_BACK }
+	return variants
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -1315,8 +1366,11 @@ end
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @param typing_priority boolean|nil False only when reconstructing historical rules.
+--- @param one_shot_key_taps_shift boolean|nil Whether right_option taps the one-shot
+---   Shift, which the thumb Backspace variants read (thumb_backspace_variants).
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority,
+	one_shot_key_taps_shift)
 	hold_action = native_tap_only_hold(key_def.from.key_code, tap_action, hold_action)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
@@ -1369,6 +1423,8 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local key_down_action = hold_action
 	local rollover_hold_var
 	local held_shift_one_shot = false
+	-- Where a tap typed at key_down sits in `to`, for the thumb Backspace variants.
+	local tap_in_to_from, tap_in_to_until
 	if #hold_to == 0 and typing_priority ~= false and HOLD_PAST_THRESHOLD_TAPS[key_def.id] == tap_action.id then
 		-- rctrl.ahk 7.3: the one-shot waits for a quick release, and a long press
 		-- holds Shift from the threshold on (apply_managed_timing_parameters
@@ -1377,7 +1433,9 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		manipulator.to_if_held_down = { { key_code = "left_shift" } }
 	elseif #hold_to == 0 then
 		key_down_action = tap_action
+		tap_in_to_from = #to_events + 1
 		for _, ev in ipairs(marked_tap(tap_to, marked)) do to_events[#to_events + 1] = ev end
+		tap_in_to_until = #to_events
 		if typing_priority ~= false and HELD_SHIFT_ONE_SHOT_TAPS[key_def.id] == tap_action.id then
 			-- lalt.ahk 4.1: the one-shot also holds LShift until the key comes
 			-- up, so a key struck under it is shifted at once. The last entry
@@ -1466,6 +1524,36 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	if has_exact_modifier_action(tap_action, hold_action) then
 		manipulators = exact_modifier_manipulators(manipulator)
 	end
+	if typing_priority ~= false and key_def.id == THUMB_BACKSPACE_KEY.id and tap_action.id == THUMB_BACKSPACE_KEY.tap
+		and (manipulator.to_if_alone or tap_in_to_from) then
+		-- The same press, hold and release, each variant typing its own
+		-- deletion in the tap's place; the plain Backspace stays last.
+		local variants = {}
+		for _, variant in ipairs(thumb_backspace_variants(one_shot_key_taps_shift == true)) do
+			local copy = deep_copy(manipulator)
+			copy.from.modifiers = { mandatory = variant.mandatory, optional = { ANY_MODIFIER } }
+			if variant.one_shot then
+				copy.conditions = copy.conditions or {}
+				copy.conditions[#copy.conditions + 1] = {
+					type = "variable_if", name = held_var_name(THUMB_BACKSPACE_ONE_SHOT_KEY.key_code), value = 1,
+				}
+			end
+			local tap = marked_tap(variant.to, marked)
+			if copy.to_if_alone then
+				copy.to_if_alone = deep_copy(tap)
+			else
+				local to = {}
+				for index = 1, tap_in_to_from - 1 do to[#to + 1] = copy.to[index] end
+				for _, ev in ipairs(tap) do to[#to + 1] = deep_copy(ev) end
+				for index = tap_in_to_until + 1, #copy.to do to[#to + 1] = copy.to[index] end
+				copy.to = to
+			end
+			KEEPS_OWN_FLAGS[copy] = true
+			variants[#variants + 1] = copy
+		end
+		for _, variant in ipairs(manipulators) do variants[#variants + 1] = variant end
+		manipulators = variants
+	end
 	-- Fn is the Windows left-Control position (Paste); the macOS Control
 	-- key has its own Cut action and must not inherit these thumb blockers.
 	if key_code == "fn" and manipulator.to_if_alone then
@@ -1543,6 +1631,89 @@ local function held_key_events(key_code, tap_action, hold_action)
 	return {}
 end
 
+--- Copies an event, gated on a condition of its own (Karabiner v16 filters a
+--- to list on each entry's conditions before posting any of it, so every gate
+--- of one list reads the variables as they were before that list).
+--- @param event table To-event.
+--- @param name string Variable name.
+--- @param value number Value the variable must have.
+--- @return table gated
+local function gated_event(event, name, value)
+	local gated = deep_copy(event)
+	gated.conditions = gated.conditions or {}
+	gated.conditions[#gated.conditions + 1] = { type = "variable_if", name = name, value = value }
+	return gated
+end
+
+--- The events that lift the navigation layer, gated on the layer being on.
+--- @return table events The F19 exit sentinel, then layer_active off.
+local function layer_lift_events()
+	return {
+		gated_event({ key_code = LAYER_EXIT_SENTINEL_NAME }, LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE),
+		gated_event(set_var_event(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_OFF_VALUE),
+			LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE),
+	}
+end
+
+--- The events that give the navigation layer back, each gated on name=value.
+--- The repeat count is kept, as Windows and Linux keep it.
+--- @param name string Variable name of the gate.
+--- @param value number Value of the gate.
+--- @return table events The F20 sentinel, then layer_active on.
+local function layer_restore_events(name, value)
+	return {
+		gated_event({ key_code = LAYER_NAV_SENTINEL_NAME }, name, value),
+		gated_event(set_var_event(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE), name, value),
+	}
+end
+
+--- A pair's tap run out of the navigation layer its first key holds: the layer
+--- is lifted for the action and given back after it, in one to list, as the
+--- Linux engine's combination_lift / combination_restore and Windows'
+--- _KeyCombinationRunOutOfLayer do (maintainer decision THD-1 of 2026-11-21).
+--- Every gate reads layer_active before the list, so a layer already off (the
+--- first key released before a release-judged tap) is neither lifted nor
+--- turned back on.
+--- @param tap_to table The tap's events.
+--- @return table events
+local function tap_out_of_layer(tap_to)
+	local events = layer_lift_events()
+	for _, ev in ipairs(tap_to) do events[#events + 1] = ev end
+	for _, ev in ipairs(layer_restore_events(LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE)) do
+		events[#events + 1] = ev
+	end
+	return events
+end
+
+--- The variable a tap-only pair raises while it holds the layer lifted.
+--- @param k2 string The pair's second key.
+--- @return string name Runtime logical name, generation-scoped at deploy.
+local function pair_layer_lifted_var_name(k2)
+	return held_var_name(k2) .. "_pair_layer_lifted"
+end
+
+--- A tap-only pair whose last key stays down to repeat, run out of the layer:
+--- appending the restore would make that key a tap, so the layer stays lifted
+--- while the second key is held and comes back at its release, only when the
+--- pair lifted it and the first key still holds it (Linux restores only for the
+--- same held first key).
+--- @param tap_to table The tap's events.
+--- @param k1 string The pair's first key.
+--- @param k2 string The pair's second key.
+--- @return table to, table to_after_key_up
+local function tap_out_of_layer_while_held(tap_to, k1, k2)
+	local lifted = pair_layer_lifted_var_name(k2)
+	local to = { gated_event(set_var_event(lifted, 1), LAYER_ACTIVE_VAR_NAME, LAYER_ACTIVE_ON_VALUE) }
+	for _, ev in ipairs(layer_lift_events()) do to[#to + 1] = ev end
+	for _, ev in ipairs(tap_to) do to[#to + 1] = ev end
+	local after = {}
+	for _, ev in ipairs(layer_restore_events(lifted, 1)) do
+		after[#after + 1] = gated_event(ev, held_var_name(k1), 1)
+	end
+	after[#after + 1] = set_var_event(lifted, 0)
+	return to, after
+end
+
 --- Builds the variable-based rule for the tap / hold slots of a combo.
 --- Matches k2 physically while k1 is held (via ke_held_k1=1) and splits
 --- output by press duration (to_if_alone for tap, to for hold).
@@ -1565,8 +1736,11 @@ end
 --- @param k1 string First key (holder).
 --- @param k2 string Second key (trigger).
 --- @param k1_mandatory table|nil Modifier key_codes held by k1's hold action.
+--- @param k1_holds_layer boolean Whether k1's own rule holds the navigation
+---   layer, which the tap then runs out of (tap_out_of_layer).
 --- @return table|nil Karabiner rule object, or nil when both slots are empty.
-local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory)
+local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory,
+	k1_holds_layer)
 	if #tap_to == 0 and #hold_to == 0 then return nil end
 
 	-- When k1's hold action holds a modifier (e.g. right_command → right_option),
@@ -1599,7 +1773,7 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 	if #hold_to > 0 and #tap_to > 0 and not same_output(tap_to, hold_to) then
 		-- Both distinct: split by press duration via tap_hold timeout
 		manip.to          = hold_to
-		manip.to_if_alone = tap_to
+		manip.to_if_alone = k1_holds_layer and tap_out_of_layer(tap_to) or tap_to
 		if hold_action.karabiner_to_after_key_up then
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
@@ -1609,9 +1783,13 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 		if hold_action.karabiner_to_after_key_up then
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
+	elseif k1_holds_layer and type(tap_to[#tap_to]) == "table" and tap_to[#tap_to].key_code ~= nil then
+		-- Tap only, its last key kept down to repeat: the layer stays lifted
+		-- while k2 is held and comes back at its release, if k1 still holds it.
+		manip.to, manip.to_after_key_up = tap_out_of_layer_while_held(tap_to, k1, k2)
 	else
 		-- Tap only: nothing to wait for, so it fires at key_down and repeats
-		manip.to = tap_to
+		manip.to = k1_holds_layer and tap_out_of_layer(tap_to) or tap_to
 	end
 
 	-- A chord whose action keeps a key down leaves k1 held without its held
@@ -1872,7 +2050,9 @@ local function build_combo_rules(combo_def, tap_action, hold_action, combo_actio
 		combo_def, tap_action, combo_action, combo_symmetric, k1, k2, held_of)
 	if chord_rule then rules[#rules + 1] = chord_rule end
 
-	local th_rule = build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory)
+	local k1_holds_layer = activates_nav_layer((held_of[k1] or NOTHING_HELD).to)
+	local th_rule = build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory,
+		k1_holds_layer)
 	if th_rule then rules[#rules + 1] = th_rule end
 
 	return rules
@@ -2071,19 +2251,39 @@ end
 
 --- Whether the key-combination rules are generated for a state.
 ---
---- The one place that rule lives: `mod_combos_enabled` is the persisted
---- [mod_combos] enabled flag, the only switch the combinations follow, as on
---- Windows (decision of 2026-09-29). Absent, it is on: a file that never set it
---- keeps the combinations it generated with the Tap-Holds on.
---- @param state table Remap state (mod_combos_enabled).
+--- Reads one optional Boolean switch of a remap state; absent is on. Each
+--- caller reads its field by name, so the requirement gate sees the read.
+--- @param value any The state field's value.
+--- @param field string The state field, named by the error.
+--- @return boolean
+local function state_switch(value, field)
+	if type(value) == "boolean" then return value end
+	if value ~= nil then error(field .. " must be a boolean or absent, got " .. type(value), 3) end
+	return true
+end
+
+--- Whether the key-combination rules are generated for a state.
+---
+--- The one place that rule lives: `key_combinations_enabled` is the persisted
+--- `[category_enabled] key_combinations`, the master switch of every pair's
+--- tap, hold and chord, as on Windows and Linux (maintainer decision KCD-6 of
+--- 2026-11-21). Absent, it is on: a file that never set it keeps the
+--- combinations it generated with the Tap-Holds on.
+--- @param state table Remap state (key_combinations_enabled).
 --- @return boolean
 function M.key_combinations_enabled(state)
 	if type(state) ~= "table" then error("key_combinations_enabled needs a remap state", 2) end
-	if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
-	if state.mod_combos_enabled ~= nil then
-		error("mod_combos_enabled must be a boolean or absent, got " .. type(state.mod_combos_enabled), 2)
-	end
-	return true
+	return state_switch(state.key_combinations_enabled, "key_combinations_enabled")
+end
+
+--- Whether the chord slots are generated for a state: [mod_combos] enabled
+--- covers only the chords, as on Windows and Linux; the pairs' tap and hold
+--- follow the master alone. Absent, it is on.
+--- @param state table Remap state (mod_combos_enabled).
+--- @return boolean
+function M.chords_enabled(state)
+	if type(state) ~= "table" then error("chords_enabled needs a remap state", 2) end
+	return state_switch(state.mod_combos_enabled, "mod_combos_enabled")
 end
 
 -- The CapsWord exits [shortcuts.caps_word] now decides: the word delimiters a
@@ -2264,6 +2464,7 @@ function M.build_karabiner_json(
 	-- Dynamic modifier combo manipulators (after CapsWord, before the navigation
 	-- layer so a user-defined combo involving a layer-remapped key matches the
 	-- combo first).
+	local chords_on = M.chords_enabled(state)
 	for _, combo_def in ipairs(mod_combos) do
 		-- Skip combos handled outside KE (menu_hidden = handled by Hammerspoon directly)
 		if combo_def.menu_hidden then goto continue end
@@ -2277,6 +2478,15 @@ function M.build_karabiner_json(
 		-- emit their own per-direction tap/hold rules (legitimate asymmetry).
 		local is_non_canonical = non_canonical[combo_def.id] == true
 		if state.combo_symmetric and is_non_canonical then
+			combo_id = "none"
+		end
+		-- [mod_combos] enabled off: the pairs keep their tap and hold, no chord.
+		if not chords_on then combo_id = "none" end
+		-- A configuration written by hand or by an older build can still name an
+		-- action no chord runs (the one-shot Shift): that chord does nothing, said once.
+		if require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[combo_id] then
+			Logger.warn(LOG, "Combo '%s': the action '%s' cannot run as a chord; that chord does nothing.",
+				combo_def.id, combo_id)
 			combo_id = "none"
 		end
 
@@ -2415,7 +2625,9 @@ function M.build_karabiner_json(
 			if deployed_ms == (per_key_ms or state.tap_hold_timeout_ms) then deployed_ms = per_key_ms end
 		end
 		deployed_tap_timeouts[key_def.id] = deployed_ms or state.tap_hold_timeout_ms
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, deployed_ms)
+		local one_shot_cfg = state.tap_hold_config[THUMB_BACKSPACE_ONE_SHOT_KEY.key_code]
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, deployed_ms, nil,
+			type(one_shot_cfg) == "table" and one_shot_cfg.tap == THUMB_BACKSPACE_ONE_SHOT_KEY.tap)
 		if rule then
 			apply_tap_minimum(rule, Defaults.tap_min_duration_ms)
 			all_rules[#all_rules + 1] = rule
@@ -2468,6 +2680,7 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
+	local running_chords = #chord_rules > 0
 	local with_chords = {}
 	for _, rule in ipairs(all_rules) do
 		if not historical_script_rules[rule] then
@@ -2515,6 +2728,11 @@ function M.build_karabiner_json(
 			tap_holds_on and "on" or "off", combinations_on and "on" or "off", #all_rules - #kept)
 		all_rules = kept
 	end
+
+	-- A running chord is right Option pressed, then its key, with no key
+	-- between (the maintainer, 2026-11-17): every final key-down rule takes
+	-- part, so the sequence is applied to the rules as deployed.
+	if running_chords then ScriptChordRules.apply_sequence(all_rules, held_var_name(SCRIPT_CONTROL_HOLDER_KEY)) end
 
 	-- Native control expansion detaches manipulators, so reject aliased source
 	-- graphs first instead of accidentally hiding the decoder's identity error.

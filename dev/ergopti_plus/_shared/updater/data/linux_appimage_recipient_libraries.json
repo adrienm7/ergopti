@@ -52,5 +52,25 @@
 				"libatk-1.0.so.0"
 			]
 		}
-	]
+	],
+	"never_bundled": {
+		"reason": "Libraries and data that load into, or must match, the recipient's GLib and GTK inside the daemon. GIO_MODULE_DIR pointed the recipient's GLib at the bundled modules, and on Arch (GLib 2.86) the Ubuntu 22.04 libdconfsettings.so crashed luajit (SEGV_MAPERR) before any window opened. The image uses the recipient's GIO modules (glib-networking, dconf, libproxy) and schemas (gsettings-desktop-schemas) instead. tools/build/check-elf-needed-closure.cjs and stage-linux-network-runtime.py refuse a tree that carries one, and any library of a group above.",
+		"directories": ["lib/gio", "share/glib-2.0"],
+		"file_patterns": [
+			"^giomodule\\.cache$",
+			"^gschemas\\.compiled$",
+			"^libgio[A-Za-z0-9_-]*\\.so$",
+			"^libdconf[A-Za-z0-9_-]*\\.so(\\.[0-9]+)*$",
+			"^libproxy\\.so(\\.[0-9]+)*$"
+		]
+	},
+	"host_requirements": {
+		"reason": "What the image deliberately takes from the recipient beyond the shared libraries above: the network features need a GIO proxy resolver and its schema, and the tray prefers the recipient's libayatana (the image's copy in usr/lib/tray is only a fallback for a recipient without one).",
+		"components": [
+			"glib-networking (GIO proxy resolver module)",
+			"gsettings-desktop-schemas (org.gnome.system.proxy)",
+			"dconf GSettings backend",
+			"libayatana-appindicator3 (preferred over the bundled fallback)"
+		]
+	}
 }

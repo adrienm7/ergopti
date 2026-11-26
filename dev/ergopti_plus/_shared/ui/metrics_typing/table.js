@@ -50,9 +50,16 @@
 function switch_tab(tab_name) {
 	app_state.current_tab = tab_name;
 
-	document.querySelectorAll('.tabs .tab-btn').forEach((btn) => btn.classList.remove('active'));
-	const active_btn = document.querySelector(`.tab-btn[data-tab="${tab_name}"]`);
-	if (active_btn) active_btn.classList.add('active');
+	// The shown table's tab reads as selected, not by its colour alone (WCAG
+	// 1.4.1, 4.1.2), and is the one stop of the tab list (roving tabindex).
+	document.querySelectorAll('.tabs .tab-btn').forEach((btn) => {
+		const shown = btn.getAttribute('data-tab') === tab_name;
+		btn.classList.toggle('active', shown);
+		btn.setAttribute('aria-selected', shown ? 'true' : 'false');
+		btn.tabIndex = shown ? 0 : -1;
+		if (shown)
+			document.getElementById('metrics_table_panel')?.setAttribute('aria-labelledby', btn.id);
+	});
 
 	// Reset table state to "most frequent first" when switching sections
 	app_state.sort_col = 'count';
@@ -64,6 +71,32 @@ function switch_tab(tab_name) {
 
 	render_current_tab();
 }
+
+/**
+ * Moves between the table tabs with the arrow keys, Home and End, as the tab
+ * pattern does (WCAG 2.1.1): the tab reached is shown at once.
+ * @param {KeyboardEvent} event - A keydown inside the tab list.
+ */
+function handle_tab_keydown(event) {
+	const tabs = Array.from(document.querySelectorAll('.tabs .tab-btn'));
+	const from = tabs.indexOf(event.target);
+	if (from === -1) return;
+	const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+	let to;
+	if (Object.hasOwn(steps, event.key)) to = (from + steps[event.key] + tabs.length) % tabs.length;
+	else if (event.key === 'Home') to = 0;
+	else if (event.key === 'End') to = tabs.length - 1;
+	else return;
+	event.preventDefault();
+	switch_tab(tabs[to].getAttribute('data-tab'));
+	tabs[to].focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+	document
+		.querySelector('.tabs-group[role="tablist"]')
+		?.addEventListener('keydown', handle_tab_keydown);
+});
 
 /**
  * Updates the search query from the table header input and re-renders.
@@ -310,6 +343,17 @@ function gradient_color(value, stops) {
 	}
 	const last = stops[stops.length - 1];
 	return `rgb(${last[1]},${last[2]},${last[3]})`;
+}
+
+/**
+ * The gradient colour as table text: mixed with --hue-ink-base by
+ * --hue-ink-shade (style.css), black on the light appearance and white on
+ * the dark one, so every stop holds 7:1 on the table (WCAG 1.4.6).
+ * @param {string} color - A CSS colour from gradient_color.
+ * @returns {string} A CSS colour.
+ */
+function gradient_ink(color) {
+	return `color-mix(in srgb, ${color}, var(--hue-ink-base) var(--hue-ink-shade))`;
 }
 
 // ===================================
@@ -751,7 +795,7 @@ function render_current_tab() {
 					: show_hs || show_llm
 						? _t('ui_typing.table_mode_mixed')
 						: _t('ui_typing.table_mode_raw');
-			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
+			mode_badge = ` <small style="font-size:0.8em;opacity:0.7;">(${mode_label})</small>`;
 		}
 		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
 	}
@@ -850,7 +894,10 @@ function render_kc_heatmap(kc_data_arr) {
 	const GAP = 4;
 	const R = 5;
 	const KW = U - GAP;
-	const KH = Math.round(U * 0.88 - GAP);
+	// A key is 44 px tall, a pointer target of WCAG 2.5.5, and the rows stand
+	// 48 px apart (ROWS_PX over the Y span), GAP px between them.
+	const KH = Math.round(U * 0.96 - GAP);
+	const ROWS_PX = 6 * U;
 	const PAD = 8; // padding around the full keyboard in px
 
 	// Key y-coordinates span Y_BOT (thumb row) to Y_TOP (fn row)
@@ -953,7 +1000,7 @@ function render_kc_heatmap(kc_data_arr) {
 	key_entries.forEach(([kc_str, pos]) => {
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos);
-		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2);
+		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2);
 		const top_ext = kc_str === '36' ? ROW_PX : 0; // Return: wing extends one row up
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
@@ -1053,6 +1100,8 @@ function render_kc_heatmap(kc_data_arr) {
 
 	let rects = '';
 	let labels = '';
+	// The keys take the focus in turn (hm_key_navigation): only the first one is a Tab stop.
+	let key_index = 0;
 	let tooltips = ''; // foreignObject-based tooltip divs (CSS-positioned via JS)
 
 	// Generate a unique id prefix for tooltip elements
@@ -1063,7 +1112,7 @@ function render_kc_heatmap(kc_data_arr) {
 		const fill = heat_color(count);
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos) + off_x;
-		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 
 		// Half-height keys: up and down arrows share the same grid cell, stacked vertically
 		const half_slot = HALF_HEIGHT_KEYS[kc_str];
@@ -1228,7 +1277,7 @@ function render_kc_heatmap(kc_data_arr) {
 			const rx_ret = stem_lx + stem_w;
 
 			const sy_qwerty =
-				Math.round(((Y_TOP - 0.84) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+				Math.round(((Y_TOP - 0.84) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 			const sy_home = sy; // Return pos.y = 0 (home row), so sy is already the home-row sy
 			const top_y = sy_qwerty; // top of wing (QWERTY row)
 			const wing_bot = sy_qwerty + KH; // bottom of wing rect
@@ -1253,8 +1302,7 @@ function render_kc_heatmap(kc_data_arr) {
 				'Z'
 			].join(' ');
 			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 			// Label centred in the wing portion (wider area, more legible than the narrow stem)
 			const ret_font = 15;
 			const ret_cx = (wing_lx + rx_ret) / 2;
@@ -1267,8 +1315,7 @@ function render_kc_heatmap(kc_data_arr) {
 			// Standard or half-height rounded rect
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
 				fill="${fill}" stroke="${ThemeTokens.color('hue-0d0d1a')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 		}
 
 		// ISO Return renders its own label (centred in the wing); skip the generic one
@@ -1281,25 +1328,25 @@ function render_kc_heatmap(kc_data_arr) {
 
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" role="tooltip" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a1a2e')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:220px;white-space:nowrap;text-align:start;">` +
 			tip_html +
 			`</div>`;
 	});
 
 	container.innerHTML =
-		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-1e96ff')};margin-bottom:6px;text-align:left;">` +
-		`Heatmap de l'utilisation physique des touches</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`<figure style="display:inline-block;position:relative;margin:0;">` +
+		`<figcaption id="kc_heatmap_caption" style="font-size:17px;font-weight:bold;color:var(--heatmap-keys-caption);margin-bottom:6px;text-align:start;">` +
+		`${_t('ui_typing.heatmap_keys_title')}</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="group" aria-labelledby="kc_heatmap_caption" xmlns="http://www.w3.org/2000/svg" onkeydown="hm_key_navigation(event)" ` +
 		`style="background:${ThemeTokens.color('hue-12121e')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
 		`</svg>` +
 		tooltips +
-		`</div>`;
+		`</figure>`;
 }
 
 /**
@@ -1318,6 +1365,74 @@ function hm_show_tip(tip_id) {
 function hm_hide_tip(tip_id) {
 	const el = document.getElementById(tip_id);
 	if (el) el.style.display = 'none';
+}
+
+/**
+ * The attributes of one heatmap key: its popup opens on hover and on keyboard
+ * focus (WCAG 2.1.1, 1.4.13), the key is named for a screen reader and
+ * described by its popup, and only the first key of a drawing is a Tab stop:
+ * the arrow keys move between the others (hm_key_navigation).
+ * @param {string} tip_id - The DOM id of the key's tooltip element.
+ * @param {string} name - What the key types, read as its name.
+ * @param {boolean} first - Whether the key is the drawing's Tab stop.
+ * @returns {string} The attributes, ready for the key's SVG markup.
+ */
+function hm_key_attributes(tip_id, name, first) {
+	return (
+		`data-tip="${tip_id}" class="hm-key" role="img" aria-label="${escape_html(name)}" ` +
+		`aria-describedby="${tip_id}" tabindex="${first ? 0 : -1}" ` +
+		`onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')" ` +
+		`onfocus="hm_focus_tip(this, '${tip_id}')" onblur="hm_hide_tip('${tip_id}')"`
+	);
+}
+
+/**
+ * Shows a key's tooltip beside the focused key, as the pointer shows it
+ * beside the cursor.
+ * @param {Element} key - The focused key shape.
+ * @param {string} tip_id - The DOM id of its tooltip element.
+ */
+function hm_focus_tip(key, tip_id) {
+	const el = document.getElementById(tip_id);
+	if (!el) return;
+	el.style.display = 'block';
+	const box = key.getBoundingClientRect();
+	const tw = el.offsetWidth;
+	const th = el.offsetHeight;
+	let lft = box.right + 8;
+	let top = box.bottom + 8;
+	if (lft + tw > window.innerWidth - 8) lft = Math.max(8, box.left - tw - 8);
+	if (top + th > window.innerHeight - 8) top = Math.max(8, box.top - th - 8);
+	el.style.left = lft + 'px';
+	el.style.top = top + 'px';
+}
+
+/**
+ * Moves the focus between the keys of a heatmap with the arrow keys, Home and
+ * End (one Tab stop per drawing, the roving key keeps it), and closes the
+ * open popup with Escape without moving the focus (WCAG 1.4.13).
+ * @param {KeyboardEvent} evt - The keydown event on the drawing.
+ */
+function hm_key_navigation(evt) {
+	const keys = [...evt.currentTarget.querySelectorAll('.hm-key')];
+	const at = keys.indexOf(document.activeElement);
+	if (at < 0) return;
+	if (evt.key === 'Escape') {
+		hm_hide_tip(keys[at].getAttribute('data-tip'));
+		evt.preventDefault();
+		return;
+	}
+	const STEPS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+	let next;
+	if (evt.key === 'Home') next = 0;
+	else if (evt.key === 'End') next = keys.length - 1;
+	else if (STEPS[evt.key] !== undefined)
+		next = Math.min(keys.length - 1, Math.max(0, at + STEPS[evt.key]));
+	else return;
+	evt.preventDefault();
+	keys[at].setAttribute('tabindex', '-1');
+	keys[next].setAttribute('tabindex', '0');
+	keys[next].focus();
 }
 
 /** Tracks mouse position and repositions any visible heatmap tooltip near the cursor. */
@@ -1370,7 +1485,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	const GAP = 4;
 	const R = 5;
 	const KW = U - GAP;
-	const KH = Math.round(U * 0.88 - GAP);
+	// A key is 44 px tall, a pointer target of WCAG 2.5.5, and the rows stand
+	// 48 px apart (ROWS_PX over the Y span), GAP px between them.
+	const KH = Math.round(U * 0.96 - GAP);
+	const ROWS_PX = 6 * U;
 	const PAD = 8;
 
 	const Y_TOP = 2.7;
@@ -1444,7 +1562,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	key_entries.forEach(([kc_str, pos]) => {
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos);
-		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2);
+		const sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2);
 		const top_ext = kc_str === '36' ? ROW_PX : 0;
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
@@ -1536,6 +1654,8 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 
 	let rects = '';
 	let labels = '';
+	// The keys take the focus in turn (hm_key_navigation): only the first one is a Tab stop.
+	let key_index = 0;
 	let tooltips = '';
 
 	key_entries.forEach(([kc_str, pos]) => {
@@ -1543,7 +1663,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		const fill = heat_color(count);
 		const key_w = compute_kw(kc_str, pos);
 		const sx = compute_sx(kc_str, pos) + off_x;
-		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const base_sy = Math.round(((Y_TOP - pos.y) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 		const half_slot = HALF_HEIGHT_KEYS[kc_str];
 		const key_h = half_slot ? Math.round(KH / 2) - Math.round(GAP / 2) : KH;
 		const sy =
@@ -1574,7 +1694,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			key_occurrences > 0 ? ((sfb_key_count / key_occurrences) * 100).toFixed(1) : '0.0';
 
 		const tip_lines = [
-			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</span><br>`,
+			`<b>${escape_html(label_raw || kc_str)}</b> <small style="color:${ThemeTokens.color('grey-888')};font-size:10px;">(kc ${kc_str})</small><br>`,
 			`Occurrences : <b>${format_number(key_occurrences)}</b>`
 		];
 
@@ -1620,11 +1740,11 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			tip_lines.push(
 				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
 					`<tr style="color:${ThemeTokens.color('grey-888')};">` +
-					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
-					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">% /SFBs touche</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">% SFBs tot.</td>` +
+					`<td style="padding:1px 6px 1px 0;">${escapeHtml(_t('ui_typing.sfb_pairs_col_pair'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;">${escapeHtml(_t('ui_typing.sfb_pairs_col_count'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_key'))}</td>` +
+					`<td style="padding:1px 4px;text-align:end;" title="${_t('ui_typing.tooltip_sfb_rate')}">${escapeHtml(_t('ui_typing.sfb_pairs_col_rate'))}</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:end;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">${escapeHtml(_t('ui_typing.sfb_pairs_col_share_total'))}</td>` +
 					`</tr>`
 			);
 
@@ -1652,10 +1772,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				tip_lines.push(
 					`<tr>` +
 						`<td style="padding:1px 6px 1px 0;${row_color}">${pair_str}</td>` +
-						`<td style="padding:1px 4px;text-align:right;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
-						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
-						`<td style="padding:1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
-						`<td style="padding:1px 0 1px 4px;text-align:right;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:end;${val_color}"><b>${p_count > 0 ? format_number(p_count) : '—'}</b></td>` +
+						`<td style="padding:1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_of_key_sfb + '%' : '—'}</td>` +
+						`<td style="padding:1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_key_use + '%' : '—'}</td>` +
+						`<td style="padding:1px 0 1px 4px;text-align:end;color:${ThemeTokens.color('grey-aaa')};">${p_count > 0 ? pct_sfb_total + '%' : '—'}</td>` +
 						`</tr>`
 				);
 			});
@@ -1676,7 +1796,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 			const stem_w = 34; // ≈ 0.76u — Apple ISO Return stem is narrower than 1u
 			const rx_ret = stem_lx + stem_w;
 			const sy_qwerty =
-				Math.round(((Y_TOP - 0.84) / Y_SPAN) * (5.5 * U)) - Math.round(KH / 2) + off_y;
+				Math.round(((Y_TOP - 0.84) / Y_SPAN) * ROWS_PX) - Math.round(KH / 2) + off_y;
 			const sy_home = sy;
 			const top_y = sy_qwerty;
 			const wing_bot = sy_qwerty + KH;
@@ -1698,8 +1818,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 				'Z'
 			].join(' ');
 			rects += `<path d="${d}" fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 			const ret_font = 15;
 			const ret_cx = (wing_lx + rx_ret) / 2;
 			const ret_cy = sy_qwerty + KH / 2;
@@ -1710,8 +1829,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		} else {
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
 				fill="${fill}" stroke="${ThemeTokens.color('hue-0d1a0d')}" stroke-width="1.5" paint-order="stroke fill"
-				data-tip="${tip_id}" class="hm-key"
-				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+				${hm_key_attributes(tip_id, label_raw || label_disp || kc_str, key_index++ === 0)}/>`;
 		}
 
 		if (kc_str !== '36') {
@@ -1722,26 +1840,26 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		}
 
 		tooltips +=
-			`<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`<div id="${tip_id}" class="hm-tooltip" role="tooltip" style="display:none;position:fixed;z-index:9999;` +
 			`background:${ThemeTokens.color('hue-1a2e1a')};border:1px solid ${ThemeTokens.color('grey-444')};border-radius:6px;padding:7px 10px;` +
-			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
+			`font-size:12px;line-height:1.5;color:${ThemeTokens.color('grey-ddd')};pointer-events:none;max-width:280px;white-space:nowrap;text-align:start;">` +
 			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:${ThemeTokens.color('grey-555')};}</style>` +
 			tip_html +
 			`</div>`;
 	});
 
 	container.innerHTML =
-		`<div style="display:inline-block;position:relative;">` +
-		`<div style="font-size:17px;font-weight:bold;color:${ThemeTokens.color('hue-22c55e')};margin-bottom:6px;text-align:left;">` +
-		`Heatmap des SFBs par touche</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`<figure style="display:inline-block;position:relative;margin:0;">` +
+		`<figcaption id="sfb_heatmap_caption" style="font-size:17px;font-weight:bold;color:var(--heatmap-sfb-caption);margin-bottom:6px;text-align:start;">` +
+		`${_t('ui_typing.heatmap_sfb_title')}</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="group" aria-labelledby="sfb_heatmap_caption" xmlns="http://www.w3.org/2000/svg" onkeydown="hm_key_navigation(event)" ` +
 		`style="background:${ThemeTokens.color('hue-1e1608')};border-radius:10px;display:block;"` +
 		`onmousemove="hm_track_mouse(event)">` +
 		rects +
 		labels +
 		`</svg>` +
 		tooltips +
-		`</div>`;
+		`</figure>`;
 }
 
 // ===================================
@@ -1914,12 +2032,12 @@ function render_table() {
 					const kc_label = kc_name
 						? `kc ${item.key}&nbsp;<span class="kc-name">(${escape_html(kc_name)})</span>`
 						: `kc ${item.key}`;
-					key_html = `<span class="mono-space kc-chip">${kc_label}</span>`;
+					key_html = `<kbd class="mono-space kc-chip">${kc_label}</kbd>`;
 				} else if (['sc_bg', 'sc_tg', 'sc_qg', 'sc_pg'].includes(app_state.current_tab)) {
 					// Keys are shortcut sequences joined by →; split and render each part
 					const sc_parts = item.key.split('→');
 					key_html =
-						`<span class="shortcut-seq">` +
+						`<kbd class="shortcut-seq">` +
 						sc_parts
 							.map(
 								(p, i) =>
@@ -1927,22 +2045,22 @@ function render_table() {
 									format_shortcut_key(p)
 							)
 							.join('') +
-						`</span>`;
+						`</kbd>`;
 				} else if (['w_bg', 'w_tg', 'w_qg', 'w_pg'].includes(app_state.current_tab)) {
 					// Keys are words joined by space; render as plain-text chips with arrows
 					const w_parts = item.key.split(' ');
 					key_html =
-						`<span class="seq-chips">` +
+						`<kbd class="seq-chips">` +
 						w_parts
 							.map(
 								(p, i) =>
 									(i > 0 ? ` <span style="color:var(--text-muted);">→</span> ` : '') +
-									`<span class="mono-space">${escape_html(p)}</span>`
+									`<kbd class="mono-space">${escape_html(p)}</kbd>`
 							)
 							.join('') +
-						`</span>`;
+						`</kbd>`;
 				} else if (is_shortcut_tab) {
-					key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
+					key_html = `<kbd class="shortcut-seq">${format_shortcut_key(item.key)}</kbd>`;
 				} else if (is_ctrl_display) {
 					// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
 					const label =
@@ -1952,16 +2070,16 @@ function render_table() {
 								`\\x${single_code.toString(16).toUpperCase().padStart(2, '0')}`)
 							: null) ??
 						item.key.toUpperCase();
-					key_html = `<span class="shortcut-chip shortcut-key-control">${escape_html(label)}</span>`;
+					key_html = `<kbd class="shortcut-chip shortcut-key-control">${escape_html(label)}</kbd>`;
 				} else {
 					// N-gram tabs always render one chip per token for visual consistency.
 					// Characters/words/shortcuts stay as a single chip when there are no
 					// special markers, which avoids needless per-grapheme splitting for prose.
 					const is_ngram_tab = ['bg', 'tg', 'qg', 'pg', 'hx', 'hp'].includes(app_state.current_tab);
 					if (is_ngram_tab || /\[|\u00A0|\u202F/.test(item.key)) {
-						key_html = `<span class="seq-chips">${format_seq_chips(item.key)}</span>`;
+						key_html = `<kbd class="seq-chips">${format_seq_chips(item.key)}</kbd>`;
 					} else {
-						key_html = `<span class="mono-space">${format_display_key(item.key)}</span>`;
+						key_html = `<kbd class="mono-space">${format_display_key(item.key)}</kbd>`;
 					}
 				}
 
@@ -1969,16 +2087,17 @@ function render_table() {
 				if (item.synth_hs > 0) synth_parts.push(`${format_number(item.synth_hs)} HS`);
 				if (item.synth_llm > 0) synth_parts.push(`${format_number(item.synth_llm)} IA`);
 				const synth_str = synth_parts.length
-					? `<br><span style="font-size:10px;color:var(--text-muted);">(dont ${synth_parts.join(', ')})</span>`
+					? `<br><small style="font-size:10px;color:var(--text-muted);">(dont ${synth_parts.join(', ')})</small>`
 					: '';
 
 				const avg_str = item.avg > 0 ? `${format_number(item.avg.toFixed(1))} ms` : '-';
 
-				const wpm_color = item.wpm > 0 ? gradient_color(item.wpm, WPM_GRADIENT) : 'inherit';
+				const wpm_color =
+					item.wpm > 0 ? gradient_ink(gradient_color(item.wpm, WPM_GRADIENT)) : 'inherit';
 				const wpm_str =
 					item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} ${_t('ui_typing.unit_mpm')}` : '-';
 
-				const acc_color = gradient_color(item.acc, PRECISION_GRADIENT);
+				const acc_color = gradient_ink(gradient_color(item.acc, PRECISION_GRADIENT));
 
 				// Repetition cell: show count · rate% on one line, breakdown below when ★ involved.
 				// null = tab type doesn't support rep (no next-level data); show "—".
@@ -1992,9 +2111,9 @@ function render_table() {
 				} else {
 					const rep_color =
 						item.rep_rate >= 20
-							? ThemeTokens.color('red')
+							? gradient_ink(ThemeTokens.color('red'))
 							: item.rep_rate >= 10
-								? ThemeTokens.color('yellow')
+								? gradient_ink(ThemeTokens.color('yellow'))
 								: 'inherit';
 					const rate_str = format_number(item.rep_rate.toFixed(1)) + ' %';
 					rep_html = `<span style="color:${rep_color}">${format_number(item.rep)} (${rate_str})</span>`;

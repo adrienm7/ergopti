@@ -134,7 +134,9 @@ LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 	if SHIFTED_LETTERS.Has(SC) {
 		_AtCrit := Critical("On")   ; Serialize the letter emit like _RemapEmit
         try {
-		    SendNewResult(SHIFTED_LETTERS[SC])
+		    ; Held like the base layer's letters (Shift+WASD in a game), else typed.
+		    if !GameKeys_TryHold(SC, SHIFTED_LETTERS[SC])
+		        SendNewResult(SHIFTED_LETTERS[SC])
         } finally {
             Critical(_AtCrit)
         }
@@ -230,7 +232,7 @@ RegisterBuiltinNumberRow() {
 ; number-row binding would otherwise outrank the global magic fallback.
 _BuiltinNumberRowCriterion(Sc, *) {
 	return BuiltinNumberRowIsActive() && !GetCapsLockCondition()
-		&& LayoutRowIsEmulated(Sc) && !_KLE_MagicKeyOwnsKey(Sc)
+		&& LayoutRowIsEmulated(Sc)
 }
 
 /**
@@ -300,15 +302,7 @@ RegisterLayoutRowPassthrough(HotkeyFn := Hotkey, HotIfFn := HotIf) {
 
 ; Holds while the built-in emulation would type a key whose row is off.
 _LayoutRowPassthroughCriterion(Sc, HotkeyName := "", *) {
-	global Features, ScriptInformation
-	if !BuiltinNumberRowIsActive() || LayoutRowIsEmulated(Sc)
-		return false
-	if !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
-		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
-		return true
-	; A chosen source owns only its plain press. Its wildcard and modifier
-	; variants follow the effective row; a layout's own source keeps every level.
-	return ScriptInformation["MagicKeySourceChosen"] && StrCompare(StrReplace(HotkeyName, "~"), Sc, true) != 0
+	return BuiltinNumberRowIsActive() && !LayoutRowIsEmulated(Sc)
 }
 
 ; The tilde variant admits the original host event with its original modifier
@@ -381,9 +375,6 @@ RegisterCapsLockLayer() {
 	; happened to be active. RegisterShiftLayer already guards this way; this
 	; sibling did not.
 	try {
-		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
-		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
-
 		; --- Letters and symbols (registered last, highest precedence) ---
 		HotIf((*) => GetCapsLockCondition() and Features["layout"][ConfigLeaf.ERGOPTI_BASE])
 		for SC in SHIFTED_LETTERS {

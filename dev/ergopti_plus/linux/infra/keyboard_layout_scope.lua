@@ -25,13 +25,14 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local Logger = require("core.logger.engine.shim")
+local EmulationReload = require("settings.engine.scope.layout_emulation_reload")
 local LOG = "infra.keyboard_layout_scope"
 local SCOPE = "keyboard_layout"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction over config.toml's layout rows.
 --- @param options table path, backup_path and an optional files port.
@@ -67,7 +68,7 @@ function M.apply(mode)
 		return false, "keyboard layout rollback is pending"
 	end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path,
 		backup_path = path .. ".layout-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
 	Logger.start(LOG, "Keyboard layout scope '%s' started.", mode)
@@ -104,8 +105,10 @@ end
 
 --- The layout participant of a composed scope, bound to the retained owner. It
 --- settles each request only once the session holds the layout the stored rows
---- describe.
---- @param ports table|nil { live } The number-row live owner (tests replace it).
+--- describe, and has the layout emulation reload whatever the scope committed or
+--- reverted: a global restore or clear used to leave it typing its old session.
+--- @param ports table|nil { live, emulation } The number-row live owner and the
+---   layout emulation owner (tests replace them).
 --- @return table participant See config_scope_composition.
 function M.participant(ports)
 	ports = ports or {}
@@ -131,6 +134,7 @@ function M.participant(ports)
 			applying = false
 			return done(false, called and detail or tostring(committed))
 		end
+		EmulationReload.reload(ports.emulation, Logger, LOG)
 		changed = not same_rows(before, live.stored())
 		if not changed then
 			applying = false
@@ -144,6 +148,7 @@ function M.participant(ports)
 			-- The session kept its layout: the file must not claim the new rows.
 			local reverted, revert_detail = cohort.revert()
 			applying = false
+			if reverted == true then EmulationReload.reload(ports.emulation, Logger, LOG) end
 			Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
 				tostring(reverted == true or revert_detail))
 			return done(false, "the session did not load the layout: " .. tostring(code))
@@ -154,6 +159,7 @@ function M.participant(ports)
 		if applying then return done(false, "the layout scope request is still settling") end
 		if cohort == nil then return done(false, "no committed scope to revert") end
 		local reverted, detail = cohort.revert()
+		if reverted == true then EmulationReload.reload(ports.emulation, Logger, LOG) end
 		if reverted ~= true then
 			-- The session reload follows the rows once their rollback settles.
 			owed, changed = changed, false

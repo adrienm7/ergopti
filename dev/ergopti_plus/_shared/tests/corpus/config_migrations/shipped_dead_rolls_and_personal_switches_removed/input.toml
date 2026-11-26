@@ -1,0 +1,25 @@
+# _shared/tests/corpus/config_migrations/shipped_dead_rolls_and_personal_switches_removed/input.toml
+
+[_meta]
+schema_version = 22
+
+[hotstrings.rolls.chevron_equal]
+enabled = true
+
+[hotstrings.rolls.chevron_greater]
+enabled = true
+
+[hotstrings.rolls.chevron_less]
+enabled = false
+
+[hotstrings.rolls.close_chevron_tag]
+enabled = true
+time_activation_seconds = 0.5
+
+[shortcuts.personal]
+laptop_broken_key = true
+mouse_drag_window = true
+mouse_tab_switching = false
+professional_environment = false
+programmable_keyboard = true
+lock_screen = true

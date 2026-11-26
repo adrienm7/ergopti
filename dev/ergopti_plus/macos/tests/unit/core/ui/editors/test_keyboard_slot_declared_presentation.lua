@@ -18,11 +18,11 @@ local function fixture(callback, cleanup_failures)
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
 			"core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.ui.ui.webview_controller_pool", "ui.action_picker", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.deferred_work",
+			"core.logger.engine.logger", "core.fs.engine.paths", "settings.engine.paths", "core.timing.engine.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
 			"core.process.adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
-			"_generated.locale_table", "_generated.logger_sub_files", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
+			"_generated.locale_table", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
 			"diagnostics.engine.reports.redact", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders", "core.logger.engine", "menu.engine.labels",
 		}, function()
 			local state = { creates = 0, bridges = 0, views = {}, contents = {}, payloads = {}, confirmations = 0 }
@@ -334,7 +334,7 @@ end)
 
 helpers.describe("keyboard slot presentation saved-locale initialization", function()
 	helpers.it("keeps genuine factory owners through persisted locale initialization and receives the original captions", function()
-		local retained_state
+		local retained_state, config_path
 		local cleanup_failures = {}
 		fixture(function(state, builder, _, locale, _, open, ready, core, i18n)
 			retained_state = state
@@ -351,6 +351,10 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			helpers.assert_eq(state.creates, 0)
 
 			-- Seed the real saved setting, then use root boot's backend wiring and initializer.
+			-- A locale choice writes its config.toml row, which needs the file
+			-- (locale-neutral-2026-11-21).
+			config_path = require("settings.engine.paths").get("ConfigTomlPath")
+			local config = assert(io.open(config_path, "wb")); assert(config:write("")); assert(config:close())
 			helpers.assert_eq(i18n.persist_locale("de"), true)
 			helpers.assert_eq(Storage.get("i18n_locale"), "de")
 			helpers.assert_eq(i18n.get_locale(), "fr", "persistence alone must not change the active locale")
@@ -389,6 +393,7 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			state.views[1].on_navigation("didFinishNavigation", state.views[1])
 			helpers.assert_true(state.scheduler.activeCount() > 0)
 		end, cleanup_failures)
+		if config_path then os.remove(config_path) end
 		helpers.assert_eq(#cleanup_failures, 0)
 		helpers.assert_eq(retained_state.views[1].deletes, 1)
 		helpers.assert_eq(retained_state.scheduler.activeCount(), 0)

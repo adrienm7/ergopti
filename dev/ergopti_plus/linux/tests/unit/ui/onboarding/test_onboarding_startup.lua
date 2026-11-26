@@ -120,7 +120,7 @@ helpers.describe("first-use startup", function()
 		local call = code:find('require("ui.onboarding.startup").run({', 1, true)
 		helpers.assert_true(call ~= nil, "the daemon starts the first-use check")
 		local block = code:sub(call, code:find("})", call, true))
-		helpers.assert_true(block:find('config_paths").config("config.toml")', 1, true) ~= nil,
+		helpers.assert_true(block:find('require("settings.engine.paths").config("config.toml")', 1, true) ~= nil,
 			"the check reads the config.toml every reader uses")
 		helpers.assert_true(block:find("graphical = opts.tray == true and not opts.dry_run", 1, true) ~= nil,
 			"only a graphical daemon opens a window")

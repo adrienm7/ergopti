@@ -10,8 +10,8 @@
 ;    raw bytes with the production tail decoder so a read cut inside a UTF-8
 ;    sequence is replayed as the file reader sees it.
 ; 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
-;    IssueLink_PercentEncode and IssueLink_BuildUrl (the prefilled GitHub issue
-;    URL).
+;    IssueLink_PercentEncode, IssueLink_BuildUrl and IssueLink_FitLines (the
+;    prefilled GitHub issue URL and the pasted report).
 ; 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ;    Redact_Apply with the rules of _shared/diagnostics/data/redaction.json
 ;    (what leaves the machine).
@@ -118,12 +118,25 @@ _TCD_IssueLink() {
 	for Vector in Data["url_vectors"] {
 		Templates := Data["templates"].Clone()
 		Templates["max_url_bytes"] := Vector["max_url_bytes"]
+		if Vector.Has("max_redirect_bytes")
+			Templates["max_redirect_bytes"] := Vector["max_redirect_bytes"]
 		Build := IssueLink_BuildUrl.Bind(Templates, Data["repository"], Vector["template"], Vector["values"], Vector.Get("notes", 0))
 		if Vector.Has("expect_error") {
 			AssertThrows(Build, Vector["id"] . ": an error was expected")
 			continue
 		}
 		AssertEqual(Vector["expected"], Build.Call(), Vector["id"])
+	}
+	Assert(Data["fit_vectors"].Length >= 5, "the issue-link corpus must hold its pasted-report vectors")
+	for Vector in Data["fit_vectors"] {
+		Fit := IssueLink_FitLines.Bind(Vector["text"], Vector["max_bytes"], Vector["marker"], Vector["note"])
+		if Vector.Has("expect_error") {
+			AssertThrows(Fit, Vector["id"] . ": an error was expected")
+			continue
+		}
+		Got := Fit.Call()
+		AssertEqual(Vector["expected"], Got, Vector["id"])
+		Assert(StrPut(Got, "UTF-8") - 1 <= Vector["max_bytes"], Vector["id"] . ": over its budget")
 	}
 }
 
@@ -226,6 +239,7 @@ _TCD_FormIdentity() {
 		Document := HealthCheck_ShareDocument(Snapshot, Schema)
 		AssertEqual(Vector["version"], Document["fields"]["version"], Vector["id"] . ": version")
 		AssertEqual(Vector["os"], Document["fields"]["os"], Vector["id"] . ": os")
+		AssertEqual(Data["driver_options"][Vector["snapshot"]["driver"]], Document["fields"]["driver"], Vector["id"] . ": driver option")
 		AssertTrue(InStr(Document["fields"]["diagnostics"], Chr(96) . Chr(96) . Chr(96) . "json") = 0,
 			Vector["id"] . ": the form report has no JSON block")
 	}

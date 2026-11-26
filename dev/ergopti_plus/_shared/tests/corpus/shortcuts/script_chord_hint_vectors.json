@@ -1,0 +1,108 @@
+{
+	"description": "Golden vectors for the shortcut the tray shows beside « Suspendre », « Recharger » and « Quitter »: the first script-chord slot, in the order of _shared/shortcuts/data/actions/script_chords.json (the Shortcuts submenu's order), that holds the row's action while its chord runs. An unlisted slot holds \"none\". expected is the slot id, \"\" for no hint. Replayed by the macOS and Linux suites through _shared/keyboard/engine/layers/script_chords.lua (hint_slot) and by the Windows suite through _shared/keyboard/engine/layers/script_chord_hint.ahk.",
+	"vectors": [
+		{
+			"id": "preset_pause",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "script_pause_toggle",
+				"script_altgr_backspace": "script_reload",
+				"script_altgr_delete": "open_personal_shortcuts",
+				"script_altgr_escape": "script_quit"
+			},
+			"action": "script_pause_toggle",
+			"expected": "script_altgr_enter"
+		},
+		{
+			"id": "preset_reload",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "script_pause_toggle",
+				"script_altgr_backspace": "script_reload",
+				"script_altgr_delete": "open_personal_shortcuts",
+				"script_altgr_escape": "script_quit"
+			},
+			"action": "script_reload",
+			"expected": "script_altgr_backspace"
+		},
+		{
+			"id": "preset_quit",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "script_pause_toggle",
+				"script_altgr_backspace": "script_reload",
+				"script_altgr_delete": "open_personal_shortcuts",
+				"script_altgr_escape": "script_quit"
+			},
+			"action": "script_quit",
+			"expected": "script_altgr_escape"
+		},
+		{
+			"id": "switch_off_shows_nothing",
+			"chords_on": false,
+			"assignments": {
+				"script_altgr_enter": "script_pause_toggle",
+				"script_altgr_backspace": "script_reload",
+				"script_altgr_delete": "open_personal_shortcuts",
+				"script_altgr_escape": "script_quit"
+			},
+			"action": "script_reload",
+			"expected": ""
+		},
+		{
+			"id": "unbound_action_shows_nothing",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "none",
+				"script_altgr_backspace": "copy",
+				"script_altgr_delete": "open_personal_shortcuts",
+				"script_altgr_escape": "none"
+			},
+			"action": "script_quit",
+			"expected": ""
+		},
+		{
+			"id": "two_slots_show_the_first_in_catalogue_order",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "none",
+				"script_altgr_backspace": "none",
+				"script_altgr_delete": "script_quit",
+				"script_altgr_escape": "script_quit"
+			},
+			"action": "script_quit",
+			"expected": "script_altgr_delete"
+		},
+		{
+			"id": "catalogue_order_not_alphabetical",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "script_reload",
+				"script_altgr_backspace": "script_reload",
+				"script_altgr_delete": "none",
+				"script_altgr_escape": "none"
+			},
+			"action": "script_reload",
+			"expected": "script_altgr_enter"
+		},
+		{
+			"id": "moved_action_follows_its_slot",
+			"chords_on": true,
+			"assignments": {
+				"script_altgr_enter": "script_quit",
+				"script_altgr_backspace": "none",
+				"script_altgr_delete": "none",
+				"script_altgr_escape": "script_pause_toggle"
+			},
+			"action": "script_pause_toggle",
+			"expected": "script_altgr_escape"
+		},
+		{
+			"id": "missing_slot_is_none",
+			"chords_on": true,
+			"assignments": { "script_altgr_escape": "script_reload" },
+			"action": "script_reload",
+			"expected": "script_altgr_escape"
+		}
+	]
+}

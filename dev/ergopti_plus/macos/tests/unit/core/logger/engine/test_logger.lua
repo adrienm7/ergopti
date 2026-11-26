@@ -64,9 +64,20 @@ helpers.describe("Logger: levels", function()
 		helpers.assert_eq(Logger.current_level, 20)
 	end)
 
-	helpers.it("set_level falls back to WARNING on unknown name", function()
-		Logger.set_level("BOGUS")
-		helpers.assert_eq(Logger.current_level, Logger.LEVELS.WARNING)
+	-- LOG-01: an unknown name used to select WARNING silently, hiding every INFO line
+	helpers.it("set_level refuses an unknown name and keeps the level", function()
+		Logger.set_level("INFO")
+		local ok, err = pcall(Logger.set_level, "BOGUS")
+		helpers.assert_true(not ok, "an unknown level name must raise")
+		helpers.assert_true(tostring(err):find("unknown log level", 1, true) ~= nil, tostring(err))
+		helpers.assert_eq(Logger.current_level, Logger.LEVELS.INFO)
+	end)
+
+	helpers.it("set_level accepts every declared variant name", function()
+		Logger.set_level("SUCCESS")
+		helpers.assert_eq(Logger.current_level, Logger.LEVELS.INFO)
+		Logger.set_level("trace")
+		helpers.assert_eq(Logger.current_level, Logger.LEVELS.DEBUG)
 	end)
 
 	helpers.it("is_enabled reflects current level", function()

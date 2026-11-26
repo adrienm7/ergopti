@@ -80,7 +80,10 @@ check("native nested JSON text keeps escaped NUL and UTF-8 identities", function
 	assert(Writer.exec_sql("UPDATE agg_app_day_burst SET length_buckets_json='" .. Command.escape_literal(buckets) .. "';"))
 	local entry = assert(Reader.read_manifest(database, date, date, { app })[date][app])
 	assert(entry.burst_length_buckets["nul\0é"] == 2)
-	assert(type(Json.decode('{"legacy":null}').legacy) == "table", "legacy decoder semantics changed")
+	-- The default decode drops a null member (77c360e7c3, json_null_contract.lua);
+	-- only the lossless decode keeps its null token.
+	local default = Json.decode('{"absent":null}')
+	assert(type(default) == "table" and default.absent == nil, "default decode kept a null member")
 	assert(Json.is_null(Json.decode_lossless('{"tagged":null}').tagged))
 end)
 

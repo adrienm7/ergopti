@@ -77,6 +77,13 @@ local GIT_REBASE_PROBES = {
 	"rebase-apply/head-name",
 }
 
+-- A Git hold this long (seconds) is reported once as a possible stale lock. The
+-- hold itself never expires: reloading through a live marker loads a half-updated
+-- tree, and a long rebase keeps its markers for minutes. Pinned to the registry's
+-- [ui] dev_source_git_hold_report_ms, the Windows copy, by
+-- tools/test/test-reload-gate-single-source.cjs.
+M.GIT_HOLD_REPORT_SEC = 60
+
 -- Upper bound on the number of parent directories walked while locating the repo
 -- root; guarantees termination on an unexpected path (e.g. a symlink cycle).
 local MAX_WALK_DEPTH = 40
@@ -185,6 +192,65 @@ function M.git_operation_in_progress(fs, start_dir)
 		if fs.exists(git_dir .. "/" .. probe) then return true end
 	end
 	return false
+end
+
+--- Advances a driver's Git hold record by one settled poll. The record is owned
+--- by the caller (`{ since = nil, reported = false }`) so each watcher keeps its
+--- own episode, while every driver shares the transitions:
+--- * "start"  — a marker appeared; the reload is held.
+--- * "report" — the hold reached GIT_HOLD_REPORT_SEC; warn once, keep holding.
+--- * "held"   — still held.
+--- * "end"    — the marker went away; the caller restarts its quiet window,
+---              since Git may have written the last files just before it.
+--- * "clear"  — no hold; the reload may proceed.
+--- @param hold table Caller-owned record { since = number|nil, reported = boolean }.
+--- @param busy boolean Whether a Git operation marker is present now.
+--- @param now_sec number Monotonic time in seconds.
+--- @return string event One of the five transitions above.
+--- @return number held_sec Seconds since the hold began (0 for "clear").
+function M.step_git_hold(hold, busy, now_sec)
+	assert(type(hold) == "table", "step_git_hold needs the caller's hold record")
+	assert(type(now_sec) == "number", "step_git_hold needs a numeric clock")
+	if busy then
+		if hold.since == nil then
+			hold.since, hold.reported = now_sec, false
+			return "start", 0
+		end
+		local held = now_sec - hold.since
+		if not hold.reported and held >= M.GIT_HOLD_REPORT_SEC then
+			hold.reported = true
+			return "report", held
+		end
+		return "held", held
+	end
+	if hold.since == nil then return "clear", 0 end
+	local held = now_sec - hold.since
+	hold.since, hold.reported = nil, false
+	return "end", held
+end
+
+--- Logs one Git hold transition with the driver's logger, so every watcher
+--- reports a hold the same way: the hold is a paired start / success, the stale
+--- lock a single warning, and a continued hold a debug line.
+--- @param logger table Driver logger exposing start, success, warn and debug.
+--- @param tag string Logger tag of the calling watcher.
+--- @param event string A step_git_hold event other than "clear".
+--- @param held_sec number Seconds the hold has lasted.
+--- @param where string The watched tree, named in the log.
+function M.log_git_hold(logger, tag, event, held_sec, where)
+	if event == "start" then
+		logger.start(tag, "Holding the reload while a Git operation rewrites '%s'…", where)
+	elseif event == "report" then
+		logger.warn(tag, "A Git operation has held the reload for %.0f s in '%s'; a stale lock blocks it until removed.",
+			held_sec, where)
+	elseif event == "held" then
+		logger.debug(tag, "Reload held (Git operation in progress for %.0f s) on '%s'.", held_sec, where)
+	elseif event == "end" then
+		logger.success(tag, "The Git operation ended after %.0f s in '%s'; the reload waits for the tree to settle.",
+			held_sec, where)
+	else
+		error("log_git_hold: unexpected Git hold event " .. tostring(event))
+	end
 end
 
 --- Exposes the git-directory resolution to the diagnostic snapshot, which reads

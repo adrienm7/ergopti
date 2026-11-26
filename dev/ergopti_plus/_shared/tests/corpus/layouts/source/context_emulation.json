@@ -1,0 +1,203 @@
+{
+	"macos": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "context_keys",
+		"platform": "macos",
+		"modifiers": [],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 1
+					},
+					"Quote": {
+						"magic": "sfb"
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 2
+					}
+				}
+			}
+		],
+		"shortcuts": [],
+		"tap_holds": [],
+		"remaps": [],
+		"not_emulated": [],
+		"magic": {
+			"sfb": {
+				"rules": [
+					{
+						"after": "e",
+						"types": "d"
+					},
+					{
+						"after": "d",
+						"types": "e"
+					},
+					{
+						"after": "ce",
+						"types": "s"
+					}
+				],
+				"fallback": ""
+			}
+		}
+	},
+	"linux": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "context_keys",
+		"platform": "linux",
+		"modifiers": [],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 1
+					},
+					"Quote": {
+						"magic": "sfb"
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 2
+					}
+				}
+			}
+		],
+		"shortcuts": [],
+		"tap_holds": [],
+		"remaps": [],
+		"not_emulated": [],
+		"magic": {
+			"sfb": {
+				"rules": [
+					{
+						"after": "e",
+						"types": "d"
+					},
+					{
+						"after": "d",
+						"types": "e"
+					},
+					{
+						"after": "ce",
+						"types": "s"
+					}
+				],
+				"fallback": ""
+			}
+		}
+	},
+	"windows": {
+		"format": "ergopti-layout-emulation",
+		"version": 1,
+		"layout": "context_keys",
+		"platform": "windows",
+		"modifiers": [],
+		"layers": [
+			{
+				"id": "base",
+				"selectors": [
+					{
+						"required": [],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 1
+					},
+					"Quote": {
+						"magic": "sfb"
+					}
+				}
+			},
+			{
+				"id": "shift",
+				"selectors": [
+					{
+						"required": [
+							"shift"
+						],
+						"optional": []
+					}
+				],
+				"native": true,
+				"keys": {
+					"IntlBackslash": {
+						"repeat": 2
+					}
+				}
+			}
+		],
+		"shortcuts": [],
+		"tap_holds": [],
+		"remaps": [],
+		"not_emulated": [],
+		"magic": {
+			"sfb": {
+				"rules": [
+					{
+						"after": "e",
+						"types": "d"
+					},
+					{
+						"after": "d",
+						"types": "e"
+					},
+					{
+						"after": "ce",
+						"types": "s"
+					}
+				],
+				"fallback": ""
+			}
+		}
+	}
+}

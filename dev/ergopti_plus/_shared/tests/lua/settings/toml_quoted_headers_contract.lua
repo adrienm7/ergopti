@@ -43,7 +43,7 @@ return function(helpers)
 		end)
 		helpers.it("preserves sparse defaults under equivalent quoted owner paths", function()
 			local path = "/controlled/quoted-sparse-defaults.toml"
-			Writer.set_sparse_defaults(path, require("infra.manifest_reader"))
+			Writer.set_sparse_defaults(path, require("menu.engine.manifest_reader"))
 			local source = '[hotstrings.modules."ext:ergopti:rolls"]\ncustom = true\n'
 			local ok, detail, content = Writer.prepare_batch(path, {
 				{ section = 'hotstrings.modules."ext:ergopti:rolls"', key = "custom", value = false },

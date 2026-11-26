@@ -7,7 +7,7 @@
 ; collection for WM_INPUT (RegisterRawInputDevices), the raw HID reports of one
 ; WM_INPUT, a device's preparsed descriptor, its value capabilities, and a
 ; report reader backed by HidP_GetUsageValue / HidP_GetUsages that
-; modules/gestures/touchpad_hid.ahk parses through.
+; gestures/adapters/touchpad_hid.ahk parses through.
 ;
 ; FEATURES & RATIONALE:
 ; 1. RIDEV_INPUTSINK: the script's hidden window receives the touchpad while

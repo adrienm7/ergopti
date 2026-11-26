@@ -18,7 +18,7 @@ local helpers, build_mock_state = Fixture.helpers, Fixture.build_mock_state
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("paths_editor_bridge", function()
-    local handler = helpers.load_module("ui.paths_editor.bridge")
+    local handler = helpers.load_module("settings.ui.paths_editor.bridge")
 
 		local function paths_state()
 			local values = { config_dir = "/tmp/ergopti-current", logs_dir = "/tmp/ergopti-logs" }
@@ -97,7 +97,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local epoch = 1
 			state.webview_manager.current_epoch = function() return epoch end
 			state.webview_manager.page_current = function(_, value) return epoch == value end
-			local picker = require("ui.config_dir_picker")
+			local picker = require("settings.ui.dir_picker")
 			local original = picker.pick
 			picker.pick = function() epoch = 2; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
@@ -112,7 +112,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local ready = true
 			state.webview_manager.current_epoch = function() return 1 end
 			state.webview_manager.page_current = function() return ready end
-			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			local picker, original = require("settings.ui.dir_picker"), require("settings.ui.dir_picker").pick
 			picker.pick = function() ready = false; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
 				{ app_name = "paths_editor", epoch = 1 })
@@ -267,7 +267,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("personal_info_editor_bridge", function()
-    local handler = helpers.load_module("ui.personal_info_editor.bridge")
+    local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 
 		helpers.it("(personal-save-private-error) never logs a persistence exception containing a field", function()
 			local logger, lines = require("core.logger.engine.shim"), {}
@@ -367,7 +367,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("model_browser_bridge", function()
-    local handler = helpers.load_module("ui.model_browser.bridge")
+    local handler = helpers.load_module("ai.ui.model_browser.bridge")
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")
@@ -414,45 +414,16 @@ helpers.describe("ui.bridge_handlers", function()
         fixture.send({ action = "download_model", backend = "ollama", name = available.name })
         helpers.assert_eq(download.runtime_name, available.runtime_name)
         helpers.assert_eq(download.label, available.name)
+        -- pck-19: the page's Escape posts close, and the window closes.
+        fixture.send({ action = "close" })
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false,
+          "pck-19: the model browser closes on the page's close")
+        helpers.assert_true(fixture.manager.show("model_browser"))
+        fixture.handshake()
       end, debug.traceback)
       local closed = fixture.close()
       assert(ok, failure)
       helpers.assert_true(closed)
-    end)
-  end)
-
-  -- ==========================================================================
-  -- 14. token_bridge
-  -- ==========================================================================
-end)
-
-
-
-
-helpers.describe("ui.bridge_handlers", function()
-  helpers.describe("token_bridge", function()
-    local handler = helpers.load_module("core.ui.ui.token_prompt")
-    local state = build_mock_state()
-
-    helpers.it("has correct bridge_name", function()
-      helpers.assert_eq(handler.bridge_name, "token_bridge")
-    end)
-    helpers.it("'ready' returns token settings", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.max_tokens) == "number")
-      helpers.assert_true(type(result.triggers) == "table")
-      helpers.assert_true(result.auto_inject ~= nil)
-    end)
-    helpers.it("handles 'save_settings' action", function()
-      local result = handler.on_message({ action = "save_settings", settings = { max_tokens = 512, temperature = 0.5 } }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
-    end)
-    helpers.it("handles 'test_prompt' action", function()
-      local result = handler.on_message({ action = "test_prompt", prompt = "Hello world" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.requested)
     end)
   end)
 
@@ -475,7 +446,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	for _, count in ipairs({ 0, 7 }) do
 		helpers.it("admits a canonical successful reload count " .. count, function()
 			local state, context, seen = state_for(function() return count, true end)
-			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+			local result = helpers.load_module("hotstrings.ui.personal_info_editor.bridge").on_message(
 				{ action = "save", values = { first_name = "independent" } }, state, context)
 			helpers.assert_eq(result, { saved = true, reloaded = true, closed = true })
 			helpers.assert_eq(seen, { saves = 1, closes = 1, refreshes = 1 })
@@ -492,7 +463,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 			end
 			if outcome == "missing" then reload = nil end
 			local state, context, seen = state_for(reload)
-			local result = helpers.load_module("ui.personal_info_editor.bridge").on_message(
+			local result = helpers.load_module("hotstrings.ui.personal_info_editor.bridge").on_message(
 				{ action = "save", values = { first_name = "independent" } }, state, context)
 			helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
 			helpers.assert_eq(seen, { saves = 1, closes = 0, refreshes = 0 })
@@ -514,13 +485,13 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		write(path, original);write(choices, '[future]\nlabel = "unchanged"\n');write(empty, '# deliberately empty valid hotstring catalogue\n[raw]\n')
 		local prior = {};for name, value in pairs(package.loaded) do prior[name] = value end
 		local called, failure = pcall(function()
-			for _, name in ipairs({ "modules.dynamic_hotstrings.manager", "hotstrings.engine.dynamic.core", "infra.hotstring_preferences",
-				"modules.hotstrings.hotstrings_config" }) do package.loaded[name] = nil end
-			local preferences = require("infra.hotstring_preferences")
+			for _, name in ipairs({ "hotstrings.engine.dynamic.manager", "hotstrings.engine.dynamic.core", "hotstrings.engine.matcher.preferences",
+				"hotstrings.engine.catalogue.config" }) do package.loaded[name] = nil end
+			local preferences = require("hotstrings.engine.matcher.preferences")
 			assert(preferences._set_file_for_test(choices))
-			local dynamic = require("modules.dynamic_hotstrings.manager")
+			local dynamic = require("hotstrings.engine.dynamic.manager")
 			assert(dynamic.init({ personal_info_path = path, trigger_char = "★" }))
-			local config = require("modules.hotstrings.hotstrings_config")
+			local config = require("hotstrings.engine.catalogue.config")
 			assert(config._set_config_file_for_test(choices))
 			assert(config._set_override_config_dir_for_test(directory))
 			body({ dynamic = dynamic, config = config, path = path, choices = choices, empty = empty,
@@ -535,7 +506,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	end
 	helpers.it("(personal-save-owner) refuses cancellation during a real save", function()
 		with_native_owners(function(c)
-			local handler = helpers.load_module("ui.personal_info_editor.bridge")
+			local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 			local epoch, closes, cancelled, duplicate = 41, 0, nil, nil
 			local document = {}
 			local host = { current_epoch = function() return epoch end,
@@ -567,7 +538,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 	for _, scenario in ipairs({ "positive", "external", "recovery", "root", "page", "publication", "generation", "ready-refused", "retained", "retained-foreign", "forged", "push-reentry", "final-page", "postwrite-external", "state-refresh" }) do
 		helpers.it("personal-source-receipt: preserves the displayed file through " .. scenario, function()
 			with_native_owners(function(c)
-				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 				local epoch, closes, notices = 41, 0, 0
 				local document = {}
 				local host = {
@@ -705,7 +676,7 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 					receipt = { count = count, committed = committed }
 					return count, committed, reason
 				end
-				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local handler = helpers.load_module("hotstrings.ui.personal_info_editor.bridge")
 				local called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" } },
 					{ dyn_hotstrings = c.dynamic, config = c.config,
 						on_config_changed = function() refreshes = refreshes + 1 end },
@@ -761,8 +732,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 	end
 
 	local function with_real_locale(options)
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.config_paths", "core.fs.adapters.storage",
-			"infra.script_scope", "infra.scope_registry" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "settings.engine.paths", "core.fs.adapters.storage",
+			"settings.engine.scope.script_scope", "settings.engine.scope.registry" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -781,13 +752,16 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		local ok, err = xpcall(function()
 			-- config() is where the locale owner rewrites a held [script] locale.
 			-- default_config_dir() is where the storage adapter keeps storage.json.
-			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+			package.loaded["settings.engine.paths"] = { config_home = function() return root end,
 				default_config_dir = function() return root .. "/" .. FOLDER end,
-				config = function(name) return root .. "/config/" .. name end }
+				config = function(name) return root .. "/config/" .. name end,
+				-- The fixture's configuration folder exists: a chosen locale has
+				-- no default folder to create (paths.prepare_default_config_dir).
+				prepare_default_config_dir = function() return true end }
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
-			package.loaded["infra.script_scope"] = nil
-			package.loaded["infra.scope_registry"] = nil
+			package.loaded["settings.engine.scope.script_scope"] = nil
+			package.loaded["settings.engine.scope.registry"] = nil
 			package.loaded["core.i18n.engine.i18n"] = nil
 			local i18n = require("core.i18n.engine.i18n")
 			i18n.init()
@@ -812,7 +786,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			local Writer = require("core.text.engine.toml_codec.writer")
 			local state = {
 				i18n = i18n,
-				manifest = require("infra.manifest_reader"),
+				manifest = require("menu.engine.manifest_reader"),
 				config_paths = {
 					default_config_dir = function() return root .. "/config" end,
 					get_config_dir = function() return root .. "/config" end,
@@ -911,7 +885,10 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 			helpers.assert_eq(observed.captured.hidden, 0)
 			helpers.assert_eq(observed.captured.restarts, 0)
 			helpers.assert_eq(observed.captured.errors, { "onboarding.error.write_failed" })
-			helpers.assert_true(observed.config_original)
+			-- The rollback re-chooses the runtime locale, and a chosen locale is
+			-- always written (locale-neutral-2026-11-21): the wizard's own rows
+			-- stay unwritten and only the snapshot's locale row is added.
+			helpers.assert_eq(observed.config_raw, '[gestures]\nenabled = false\n[future]\nvalue = "retained"\n\n[script]\nlocale = "fr"\n')
 			helpers.assert_eq(require("core.text.engine.json").decode(observed.storage_raw),
 				{ locale = "fr", future = { retained = true } },
 				"the existing runtime rollback persists its runtime snapshot, not an invented raw-source transaction")

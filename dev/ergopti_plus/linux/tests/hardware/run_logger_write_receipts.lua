@@ -83,7 +83,7 @@ local function configured_directory(name)
 	directory(name .. "/" .. FOLDER)
 	local dir = directory(name .. "/" .. FOLDER .. "/logs")
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
-	assert(require("infra.config_paths").get_logs_dir() == dir)
+	assert(require("settings.engine.paths").get_logs_dir() == dir)
 	return dir
 end
 
@@ -191,7 +191,7 @@ check("repoint repairs a retired main channel in the same directory", function()
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
 	directory("repaired/" .. FOLDER)
 	local dir = directory("repaired/" .. FOLDER .. "/logs")
-	assert(require("infra.config_paths").get_logs_dir() == dir, "repair must use the actual configured target")
+	assert(require("settings.engine.paths").get_logs_dir() == dir, "repair must use the actual configured target")
 	local main = paths(dir)
 	local message = "Force a buffered native EFBIG before repair."
 	local limit = message_limit(#message)

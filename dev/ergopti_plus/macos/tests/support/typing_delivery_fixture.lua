@@ -9,6 +9,7 @@
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 return function(callback)
 	return Scope.run(function()
@@ -41,8 +42,17 @@ return function(callback)
 				end
 			end
 		end
-		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
-		package.loaded["modules.keystats.sqlite_reader"] = {}
+		-- A present, empty store: a missing one publishes an incomplete history
+		EmptyStore.install()
+		-- The dashboard reset also retires Ergopti Studio's saved « My typing »
+		-- read of the same store; record each retirement instead of touching disk.
+		context.studio_retired, context.studio_retire_result = {}, true
+		package.loaded["modules.keystats.studio_snapshot"] = {
+			retire = function(store_path)
+				context.studio_retired[#context.studio_retired + 1] = store_path or false
+				return context.studio_retire_result
+			end,
+		}
 		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
 		local logger = package.loaded["core.logger.engine.logger"]
@@ -55,7 +65,10 @@ return function(callback)
 			return self
 		end
 		local original_open, original_rename = io.open, os.rename
-		io.open = function()
+		-- Only writes stay off the disk: the Studio retirement a reset makes reads
+		-- the shared n-gram contract through io.open.
+		io.open = function(path, mode)
+			if mode == nil or mode:sub(1, 1) == "r" then return original_open(path, mode) end
 			local file = {}
 			file.write = function() return file end
 			file.close = function() return true end

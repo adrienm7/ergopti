@@ -232,13 +232,13 @@ _WebView_BrowserWarmOwner() {
 	return Owner
 }
 
-/** Starts browser work asynchronously when the existing RAM policy permits it. */
+/** Starts browser work asynchronously when WebView2 can open a page at all. */
 WebView_BeginBrowserWarmup() {
-	global _VendorDir
-	if !IsSet(WebView2) || !FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-		return false
-	if WebView_ShouldUseNativeFallback() {
-		LoggerInfo("WebView", "Shared browser warmup skipped by the RAM admission policy.")
+	; No warmup is a user action: an unavailable runtime is told by the first
+	; window that refuses, never at boot.
+	Reason := WebView_UnavailableReason()
+	if (Reason != "") {
+		LoggerInfo("WebView", "Shared browser warmup skipped: {1}.", Reason)
 		return false
 	}
 	try return _WebView_BrowserWarmOwner().Begin()

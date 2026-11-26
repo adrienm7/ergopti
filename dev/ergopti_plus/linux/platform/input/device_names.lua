@@ -19,6 +19,9 @@
 
 local M = {}
 
+-- The device names are declared once (identifiers.json linux_input).
+local Input = require("core.text.engine.identifiers").linux_input
+
 
 
 
@@ -30,7 +33,13 @@ local M = {}
 
 --- The uinput device this driver creates to re-emit and inject keystrokes.
 --- Stamped into struct uinput_setup by platform/input/uinput_writer.lua.
-M.VIRTUAL_KEYBOARD = "Ergopti Virtual Keyboard"
+M.VIRTUAL_KEYBOARD = Input.virtual_keyboard
+
+--- The separate uinput device that carries mouse motion, wheel and buttons
+--- while the navigation layer holds a mouse. Kept apart from the keyboard so
+--- udev never classifies the keyboard as a mouse, which made desktops disable
+--- the touchpad for as long as the daemon ran ("mouse connected").
+M.VIRTUAL_POINTER = Input.virtual_pointer
 
 
 

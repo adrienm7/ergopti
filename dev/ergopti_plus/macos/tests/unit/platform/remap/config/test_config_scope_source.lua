@@ -116,7 +116,7 @@ end)
 helpers.describe("remap save of config.toml rows and the preferences source", function()
 	--- Runs body with a fake preferences owner that loaded `loaded` for path.
 	local function with_preferences(loaded, body)
-		local previous = package.loaded["infra.preferences"]
+		local previous = package.loaded["settings.engine.preferences.preferences"]
 		local owner = { exchanges = 0, snapshots = {} }
 		function owner.source_snapshot(path) return owner.snapshots[path] end
 		function owner.replace_source(path, expected, replacement)
@@ -127,9 +127,9 @@ helpers.describe("remap save of config.toml rows and the preferences source", fu
 			owner.exchanges, owner.snapshots[path] = owner.exchanges + 1, replacement
 			return true
 		end
-		package.loaded["infra.preferences"] = owner
+		package.loaded["settings.engine.preferences.preferences"] = owner
 		local ok, err = pcall(body, owner, loaded)
-		package.loaded["infra.preferences"] = previous
+		package.loaded["settings.engine.preferences.preferences"] = previous
 		if not ok then error(err, 0) end
 	end
 

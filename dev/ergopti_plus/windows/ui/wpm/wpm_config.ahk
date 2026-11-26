@@ -44,6 +44,128 @@ _WPMWidget_NeedTiming(Section, Key, Missing) {
 		}
 }
 
+; Builds scan code name → burst role from the canon's [typing_burst] and the
+; physical-key registry, the index macOS and Linux build in
+; _shared/metrics/engine/wpm/typing_keys.lua. A key absent from it is text.
+; @param Canon {Map} The parsed wpm_widget constants.
+; @param SharedRoot {String} The _shared folder (a test seam).
+; @returns {Map}
+WPMWidget_TypingBurstIndex(Canon, SharedRoot := unset) {
+		global _SharedDir
+		if !Canon.Has("typing_burst") || !(Canon["typing_burst"] is Map)
+				throw ValueError("[typing_burst] is missing")
+		Burst := Canon["typing_burst"]
+		for _, Key in ["ending_groups", "modifier_codes", "neutral_codes", "level_codes"]
+				if !Burst.Has(Key) || !(Burst[Key] is Array) || !Burst[Key].Length
+						throw ValueError("[typing_burst]." . Key . " must be a non-empty list")
+		Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
+		RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
+		Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
+		Ending := Map()
+		for _, Group in Burst["ending_groups"]
+				Ending[Group] := true
+		Index := Map()
+		for Code, Record in Registry["keys"]
+				if Record is Map && Record.Has("ahk") && Record["ahk"] is String && Record.Has("group") && Ending.Has(Record["group"])
+						Index[StrUpper(Record["ahk"])] := "ends"
+		for _, Pair in [["modifier_codes", "modifier"], ["neutral_codes", "neutral"], ["level_codes", "level"]]
+				for _, Code in Burst[Pair[1]] {
+						if !Registry["keys"].Has(Code)
+								throw ValueError("[typing_burst]." . Pair[1] . " names an unknown key " . Code)
+						Index[StrUpper(Registry["keys"][Code]["ahk"])] := Pair[2]
+				}
+		return Index
+}
+
+; The role of a scan code in a burst: "ends", "modifier", "neutral", "level" or "" (text).
+; @param Index {Map|Integer} From WPMWidget_TypingBurstIndex, 0 before the canon loads.
+; @param Sc {Integer}
+; @returns {String}
+WPMWidget_BurstRole(Index, Sc) {
+		if !(Index is Map)
+				return ""
+		Name := Format("SC{:03X}", Sc)
+		return Index.Has(Name) ? Index[Name] : ""
+}
+
+; One key press that is not text by itself, the rule of activity.observe_key
+; on macOS and Linux: a modifier waits for its release, any other key cancels
+; that wait, and a shortcut or an ending key ends the burst.
+; @param State {Object} Holds _lone_modifier, _last_break_ms and _last_input_ms (WPMWidget).
+; @param Role {String} From WPMWidget_BurstRole.
+; @param Sc {Integer}
+; @param IsShortcut {Boolean}
+; @param Now {Integer}
+WPMWidget_BurstObserveKey(State, Role, Sc, IsShortcut, Now) {
+		if Role == "modifier" {
+				State._lone_modifier := Sc
+				return
+		}
+		; Shift and AltGr type text: they never end a burst, and one pressed after a
+		; Ctrl (the LCtrl Windows sends with AltGr) means that Ctrl was no lone tap.
+		State._lone_modifier := 0
+		if Role == "level"
+				return
+		; A correction, a new line or a Tab keeps a live burst going, never starts one.
+		if IsShortcut || Role == "ends"
+				State._last_break_ms := Now
+		else if Role == "neutral" && State._last_input_ms != 0 && State._last_break_ms < State._last_input_ms
+				State._last_input_ms := Max(State._last_input_ms, Now)
+}
+
+; A modifier released with no other key since its press ends the burst.
+; @param State {Object}
+; @param Sc {Integer}
+; @param Now {Integer}
+WPMWidget_BurstObserveKeyUp(State, Sc, Now) {
+		if State._lone_modifier != 0 && State._lone_modifier == Sc {
+				State._lone_modifier := 0
+				State._last_break_ms := Now
+		}
+}
+
+; Any physical pointer input newer than the last physical key — a single pixel
+; of movement, a click, a wheel or touchpad scroll — ends the burst (TWD-2,
+; decided by the maintainer on 2026-11-16). Both clocks count physical input
+; only, so the driver's own cursor moves never hide the widget.
+; @param MouseIdleMs {Integer} A_TimeIdleMouse.
+; @param KeyboardIdleMs {Integer} A_TimeIdleKeyboard.
+; @returns {Boolean}
+WPMWidget_PointerEndsBurst(MouseIdleMs, KeyboardIdleMs) {
+		return MouseIdleMs < KeyboardIdleMs
+}
+
+; Whether the burst ended after the last text: the widget then hides.
+; @param LastInput {Integer} Tick of the last text, 0 when none.
+; @param LastBreak {Integer} Tick of the last burst end, 0 when none.
+; @returns {Boolean}
+WPMWidget_BurstEnded(LastInput, LastBreak) {
+		if !(LastBreak is Integer) || LastBreak == 0
+				return false
+		return !(LastInput is Integer) || LastBreak >= LastInput
+}
+
+; Whether the floating widget shows, the rule of the shared
+; Model.widget_visible (TWD-2): during a typing burst only, so the last text
+; is newer than the last burst end and the last pointer use and within the
+; idle delay; a preview is the only exception. The speed is not read: the
+; first text key shows « 0 » as on macOS and Linux, where the pill waited for
+; a second key while the speed needs two (MET-18).
+; @param TooltipUp {Boolean} A hotstring preview is shown.
+; @param Now {Integer} A_TickCount.
+; @param LastInput {Integer} Tick of the last text, 0 when none.
+; @param LastBreak {Integer} Tick of the last burst end, 0 when none.
+; @param PointerEnds {Boolean} From WPMWidget_PointerEndsBurst.
+; @returns {Boolean}
+WPMWidget_ShouldShow(TooltipUp, Now, LastInput, LastBreak, PointerEnds) {
+		if TooltipUp
+				return true
+		if !(LastInput is Integer) || LastInput <= 0 || LastInput > Now
+				return false
+		return TickElapsed64(LastInput, Now) <= WPMWidgetConst.IDLE_HIDE_MS
+				&& !PointerEnds && !WPMWidget_BurstEnded(LastInput, LastBreak)
+}
+
 ; Reads _shared/metrics/data/wpm_widget/constants.toml — the canon macOS and Linux
 ; draw from too — and the timings registry into WPMWidgetConst. No key carries
 ; a copied default: one missing key keeps the widget off and names itself.
@@ -119,6 +241,11 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.MENUBAR_TEXT       := _hex(_WPMWidget_Need(wpm_c, "menubar", "text_color", Missing))
 		WPMWidgetConst.MENUBAR_NEUTRAL_BG := _hex(_WPMWidget_Need(wpm_c, "menubar", "neutral_background", Missing))
 
+		; [typing_burst] — the keys that end, keep or never start a burst (TWD-2).
+		try WPMWidgetConst.BURST := WPMWidget_TypingBurstIndex(wpm_c)
+		catch as BurstErr
+				Missing.Push("[typing_burst] (" . BurstErr.Message . ")")
+
 		; Timings, from the registry every driver reads.
 		WPMWidgetConst.IDLE_HIDE_MS        := _WPMWidget_NeedTiming("ui", "wpm_widget_idle_hide_ms", Missing)
 		WPMWidgetConst.COLOR_HOLD_MS       := _WPMWidget_NeedTiming("ui", "wpm_color_hold_ms", Missing)
@@ -126,6 +253,7 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.MENUBAR_TICK_MS     := _WPMWidget_NeedTiming("ui", "wpm_menubar_update_ms", Missing)
 		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keystats", "wpm_window_ms", Missing)
 		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keystats", "wpm_min_duration_ms", Missing)
+		WPMWidgetConst.IDLE_RESET_MS       := _WPMWidget_NeedTiming("keystats", "wpm_idle_reset_ms", Missing)
 
 		if Missing.Length {
 				Names := ""

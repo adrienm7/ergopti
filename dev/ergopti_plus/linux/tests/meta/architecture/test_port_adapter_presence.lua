@@ -29,8 +29,7 @@
 
 local helpers = require("tests.helpers")
 
-local DRIVER_ROOT   = helpers.driver_root()
-local ADAPTERS_DIR  = DRIVER_ROOT .. "/adapters"
+local DRIVER_ROOT   = (helpers.driver_root():gsub("[/\\]$", ""))
 
 
 
@@ -41,42 +40,36 @@ local ADAPTERS_DIR  = DRIVER_ROOT .. "/adapters"
 -- ===================================================
 -- ===================================================
 
---- Lists the adapter module names present on disk.
+--- Lists the adapter module names present on disk: every Lua file directly
+--- inside a folder named adapters/, wherever the feature tree puts it
+--- (adapters/, clipboard/adapters/, core/fs/adapters/ …), tests excluded.
 --- Derived from the filesystem, never from a hardcoded list: the list is what
 --- went stale last time — it named nine adapters while the driver had far more,
---- so a new adapter joined without anything noticing.
+--- so a new adapter joined without anything noticing. Scanning only the
+--- driver's top adapters/ folder went stale the same way once the structure
+--- plan moved adapters into their features' folders. A file there that is
+--- run as a script (its last statement is not `return <module>`, such as the
+--- network probes the daemon starts with arguments) is not a module and is
+--- left to its own runtime tests.
 --- @return table Array of module names, e.g. "core.fs.adapters.file_system".
 local function adapter_modules()
-	local names, seen = {}, {}
-
-	--- Reads one listing command and folds its .lua entries in.
-	--- @param cmd string Shell command whose stdout is one filename per line.
-	local function absorb(cmd)
-		local pipe = io.popen(cmd)
-		if not pipe then return end
-		for line in pipe:lines() do
-			-- Both listings can emit a full path; take the basename either way.
-			-- Two separate classes rather than one holding both separators: the
-			-- backslash needs escaping inside a Lua pattern, and an escape that a
-			-- rewriting tool does not preserve byte for byte yields a pattern that
-			-- still compiles and matches the wrong thing.
-			local base = line:match("([^/]+)$") or line
-			base = base:match("([^\\]+)$") or base
-			local stem = base:match("^([%w_]+)%.lua%s*$")
-			if stem and not seen[stem] then
-				seen[stem] = true
-				names[#names + 1] = "adapters." .. stem
+	local paths, detail = require("tests.lua.core.runner_discovery").files(DRIVER_ROOT, function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
+	local names = {}
+	for _, path in ipairs(paths) do
+		local relative = path:sub(#DRIVER_ROOT + 2):gsub("\\", "/")
+		local folder, stem = relative:match("^(.-)/?([%w_]+)%.lua$")
+		if folder == "adapters" or (folder and folder:match("/adapters$")) then
+			local last = nil
+			for line in io.lines(path) do
+				if line:match("%S") and not line:match("^%s*%-%-") then last = line end
+			end
+			if last and last:match("^return%s+[%w_]+%s*$") then
+				names[#names + 1] = (folder .. "/" .. stem):gsub("/", ".")
 			end
 		end
-		pipe:close()
-	end
-
-	-- POSIX first; the suite also runs on a Windows dev box, where `ls` is absent
-	-- or cannot read the drive-letter path. Trying both beats making the test
-	-- Linux-only, which would mean it never runs where it is written.
-	absorb(string.format("ls -1 %q 2>/dev/null", ADAPTERS_DIR))
-	if #names == 0 then
-		absorb(string.format('dir /b "%s" 2>nul', (ADAPTERS_DIR:gsub("/", "\\"))))
 	end
 	table.sort(names)
 	return names
@@ -98,8 +91,8 @@ helpers.describe("port adapters: every shipped adapter is real", function()
 	helpers.it("the enumeration found adapters at all", function()
 		-- A scan that finds nothing passes every assertion below for free.
 		helpers.assert_true(#MODULES >= 10, string.format(
-			"found only %d adapter(s) under %s — the scan is broken, and a check over an "
-				.. "empty set is not a check", #MODULES, ADAPTERS_DIR))
+			"found only %d adapter(s) in the adapters/ folders under %s — the scan is broken, "
+				.. "and a check over an empty set is not a check", #MODULES, DRIVER_ROOT))
 	end)
 
 	for _, mod in ipairs(MODULES) do

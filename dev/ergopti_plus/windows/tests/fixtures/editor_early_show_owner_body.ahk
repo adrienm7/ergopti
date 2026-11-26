@@ -13,7 +13,7 @@
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []
@@ -205,6 +205,8 @@ _ESOW_Confirm(*) {
 	_ESOW.Confirmations += 1
 }
 
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) {
 	global _ESOW
 	_ESOW.Environments += 1
@@ -254,6 +256,8 @@ class _ESOW_Controller {
 	}
 	Close() {
 		this.Closed += 1
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1

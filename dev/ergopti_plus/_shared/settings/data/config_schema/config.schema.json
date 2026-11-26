@@ -96,8 +96,8 @@
 			"properties": {
 				"locale": {
 					"type": "string",
-					"pattern": "^[a-z]{2}$",
-					"description": "ISO 639-1 two-letter language code."
+					"pattern": "^([a-z]{2})?$",
+					"description": "ISO 639-1 two-letter language code; empty (the neutral value) means the system language, else English."
 				},
 				"log_level": {
 					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
@@ -105,6 +105,14 @@
 				"show_error_dialog": {
 					"type": "boolean",
 					"description": "Whether a logged error may open the error window (Debug menu)."
+				},
+				"reading_font": {
+					"enum": ["default", "hyperlegible", "dyslexic"],
+					"description": "The font of the app's windows (Configuration menu)."
+				},
+				"reading_spacing": {
+					"enum": ["default", "wide"],
+					"description": "The text spacing of the app's windows (Configuration menu)."
 				},
 				"alt_gr_is_kana_remap": {
 					"oneOf": [{ "type": "boolean" }, { "const": "auto" }]
@@ -124,13 +132,9 @@
 			"properties": {
 				"enabled": { "type": "boolean" },
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
-				"magic_key_source": {
-					"_comment": "The physical magic key: \"auto\" or a KeyboardEvent.code. The accepted codes are the feature manifest's enum_values for hotstrings.magic_key_source, not restated here.",
-					"type": "string",
-					"pattern": "^(auto|[A-Z][A-Za-z0-9]+)$"
-				},
-				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
+				"backspace_restore_enabled": { "type": "boolean" },
+				"backspace_restore_window_ms": { "type": "integer", "minimum": 50, "maximum": 10000 },
 				"idle_reset_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"cascade_max_arrows": { "type": "integer", "minimum": 1, "maximum": 10 },
 				"click_resets_word": { "type": "boolean" },
@@ -139,7 +143,9 @@
 				"tap_hold_resets_word": { "type": "boolean" },
 				"expansion_delay": { "type": "number", "minimum": 0, "maximum": 3600 },
 				"preview_ai_enabled": { "type": "boolean" },
+				"preview_announcements": { "type": "boolean" },
 				"preview_autocorrect_enabled": { "type": "boolean" },
+				"preview_category_glyphs": { "type": "boolean" },
 				"preview_colored_tooltips": { "type": "boolean" },
 				"preview_star_enabled": { "type": "boolean" },
 				"order_overrides": {
@@ -170,17 +176,7 @@
 						"phone_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"ssn_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"user_code": { "$ref": "#/$defs/feature_toggle" },
-						"text_expansion_personal_information": {
-							"description": "feature_toggle plus an optional pattern_max_length. Spelled out (not allOf with feature_toggle) because that strict toggle sets additionalProperties:false, which would otherwise reject pattern_max_length.",
-							"type": "object",
-							"additionalProperties": false,
-							"required": ["enabled"],
-							"properties": {
-								"enabled": { "type": "boolean" },
-								"time_activation_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
-								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
-							}
-						}
+						"text_expansion_personal_information": { "$ref": "#/$defs/feature_toggle" }
 					}
 				}
 			}
@@ -389,8 +385,16 @@
 				"emulate_bottom_row": { "type": "boolean" },
 				"ergopti_alt_gr": { "type": "boolean" },
 				"ergopti_variant": { "type": "string", "enum": ["none", "ergopti", "ergopti_plus"] },
-				"ctrl_magic_save": { "type": "boolean" },
-				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
+				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" },
+				"emulated_layout_recents": {
+					"type": "array",
+					"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+				},
+				"game_keys": { "type": "string", "enum": ["physical", "letters"] },
+				"game_keys_apps": {
+					"type": "object",
+					"additionalProperties": { "type": "string", "enum": ["physical", "letters"] }
+				}
 			}
 		},
 

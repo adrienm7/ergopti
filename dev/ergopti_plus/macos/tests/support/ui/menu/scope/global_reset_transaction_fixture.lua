@@ -12,53 +12,53 @@ local helpers = require("tests.helpers")
 
 local MODULE_KEYS = {
 	"ui.menu.metrics_scope",
-	"ui.menu.hotstrings_scope",
-	"modules.hotstrings.hotstrings_config",
-	"ui.menu.global_scope",
-	"ui.menu.scoped_preferences",
-	"ui.menu.gesture_scope",
+	"hotstrings.ui.menu.scope",
+	"hotstrings.engine.catalogue.config",
+	"menu.ui.transactions.global_scope",
+	"settings.ui.menu.scoped_preferences",
+	"gestures.ui.menu.scope",
 	"core.ui.engine.dialog_util",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
-	"ui.hotstring_editor",
+	"hotstrings.ui.hotstring_editor",
 	"core.text.engine.utils",
 	"core.i18n.engine.i18n",
-	"infra.ui_restore",
-	"infra.preferences",
-	"ui.menu.builder",
-	"ui.menu.hotstring_counter",
-	"ui.menu.menu_paths",
-	"ui.menu.menu_state",
-	"ui.menu.keymap_lifecycle",
-	"ui.menu.menu_watchers",
+	"menu.engine.ui_restore",
+	"settings.engine.preferences.preferences",
+	"menu.ui.builder.builder",
+	"hotstrings.ui.menu.counter",
+	"settings.ui.menu.paths",
+	"menu.ui.builder.state",
+	"menu.ui.keyboard.keymap_lifecycle",
+	"menu.ui.builder.watchers",
 	"modules.updater",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.storage",
-	"adapters.tray_menu",
+	"tray.adapters.menu",
 	"keyboard.engine.chord",
 	"platform.input.hotkey_registrar",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
-	"infra.factory_reset_journal",
-	"ui.menu.recoverable_file_moves",
-	"ui.menu.global_actions_transaction",
-	"ui.menu.menu_gestures",
+	"settings.engine.factory_reset_journal",
+	"menu.ui.transactions.recoverable_file_moves",
+	"menu.ui.transactions.global_actions_transaction",
+	"gestures.ui.menu.gestures",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_keyboard_layout",
-	"ui.menu.menu_hotstrings",
+	"hotstrings.ui.menu.hotstrings",
 	"ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds",
-	"ui.menu.menu_apps",
+	"apps.ui.menu.apps",
 	"ui.menu.menu_about",
-	"ui.menu.menu_llm",
-	"modules.llm",
+	"ai.ui.menu",
+	"ai.engine",
 	"modules.keystats",
 	"modules.shortcuts",
-	"modules.dynamic_hotstrings",
-	"modules.gestures",
+	"hotstrings.engine.dynamic",
+	"gestures.engine",
 	"infra.personal_shortcuts",
-	"ui.menu.preferences_transaction",
-	"ui.menu.program_parameter_transaction",
-	"ui.menu.init",
+	"settings.ui.menu.preferences_transaction",
+	"menu.ui.transactions.program_parameter_transaction",
+	"menu.ui.init",
 }
 
 local SCRIPT_SLOTS = { "script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape" }
@@ -307,14 +307,14 @@ local function with_menu_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
+	package.loaded["hotstrings.ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.preferences"] = {
+	package.loaded["menu.engine.ui_restore"] = {}
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function() return {}, "ok" end,
 		merge_saved_data = noop,
@@ -342,15 +342,15 @@ local function with_menu_fixture(options, callback)
 			return true, snapshot, runtime
 		end,
 	}
-	package.loaded["ui.menu.builder"] = {
+	package.loaded["menu.ui.builder.builder"] = {
 		generate = function(ctx)
 			observations.builder_ctx = ctx
 			return {}
 		end,
 		invalidate_cache = noop,
 	}
-	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["hotstrings.ui.menu.counter"] = { invalidate_cache = noop }
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function(key)
 			if key == "ConfigTomlPath" then return "/virtual/config.toml" end
@@ -360,7 +360,7 @@ local function with_menu_fixture(options, callback)
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["ui.menu.menu_state"] = {
+	package.loaded["menu.ui.builder.state"] = {
 		metrics_start_pending = function() return false end,
 		-- Same order as menu_state: the Shortcuts switch opens or closes the
 		-- admission fence first, then every saved key is replayed behind it.
@@ -375,7 +375,7 @@ local function with_menu_fixture(options, callback)
 			end)
 		end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function(_, callback)
 			observations.config_watcher_callback = callback
 			return { stop = noop }
@@ -386,7 +386,7 @@ local function with_menu_fixture(options, callback)
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = noop,
 		setMenu = function(items)
 			if type(items) == "function" then observations.dynamic_menu_callback = items end
@@ -492,7 +492,7 @@ local function with_menu_fixture(options, callback)
 			end
 		end)
 	end
-	package.loaded["ui.menu.recoverable_file_moves"] = {
+	package.loaded["menu.ui.transactions.recoverable_file_moves"] = {
 		create = function() return file_mover end,
 	}
 	local reset_journal = {
@@ -518,24 +518,24 @@ local function with_menu_fixture(options, callback)
 			end)
 		end,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(path) return path .. ".ergopti-reset-journal-v1.json" end,
 		create = function() return reset_journal end,
 	}
 
 	for _, module_name in ipairs({
-		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
-		"ui.menu.menu_hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
-		"ui.menu.menu_apps", "ui.menu.menu_about",
+		"gestures.ui.menu.gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
+		"hotstrings.ui.menu.hotstrings", "ui.menu.menu_metrics", "ui.menu.menu_tap_holds",
+		"apps.ui.menu.apps", "ui.menu.menu_about",
 	}) do
 		package.loaded[module_name] = {}
 	end
-	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
-	package.loaded["modules.llm"] = { set_backend = noop }
+	package.loaded["ai.ui.menu"] = { create = function() return {} end }
+	package.loaded["ai.engine"] = { set_backend = noop }
 	package.loaded["modules.keystats"] = {}
-	package.loaded["modules.dynamic_hotstrings"] = {}
+	package.loaded["hotstrings.engine.dynamic"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
-	package.loaded["modules.gestures"] = {
+	package.loaded["gestures.engine"] = {
 		SINGLE_SLOTS = { "swipe_left", "swipe_right" },
 		DEFAULT_GESTURES = { swipe_left = "desktop_left", swipe_right = "desktop_right" },
 	}
@@ -697,7 +697,7 @@ local function with_menu_fixture(options, callback)
 	end
 
 	local setup_ok, setup_result = xpcall(function()
-		local Menu = require("ui.menu.init")
+		local Menu = require("menu.ui.init")
 		local menu = Menu.start("/virtual/", {}, gestures, keymap, {}, {}, karabiner, {})
 		helpers.assert_not_nil(menu)
 		helpers.assert_type(observations.dynamic_menu_callback, "function")

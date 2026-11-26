@@ -614,9 +614,7 @@
 					}
 					if (item.state === 'missing' && permissions[item.id] && permissions[item.id].fix) {
 						cell +=
-							'<div class="fix">' +
-							escapeHtml(t('healthcheck.permission_fix.' + item.id)) +
-							'</div>';
+							'<p class="fix">' + escapeHtml(t('healthcheck.permission_fix.' + item.id)) + '</p>';
 					}
 				}
 				html += '<td>' + cell + '</td>';
@@ -647,10 +645,18 @@
 				blocks += '<h3>' + escapeHtml(label) + '</h3><pre>' + escapeHtml(shown.text) + '</pre>';
 				return;
 			}
-			var cell = '<span class="' + shown.state + '">' + escapeHtml(shown.text) + '</span>';
+			// The cell carries the value's state, which its text also says.
+			var cell = escapeHtml(shown.text);
 			if (field.type === 'path' && shown.state === 'value')
 				cell += ' ' + actionButton('open_path', field.id, t('healthcheck.action.open'));
-			rows += '<tr><th scope="row">' + escapeHtml(label) + '</th><td>' + cell + '</td></tr>';
+			rows +=
+				'<tr><th scope="row">' +
+				escapeHtml(label) +
+				'</th><td class="' +
+				shown.state +
+				'">' +
+				cell +
+				'</td></tr>';
 		});
 		return (rows ? '<table class="fields">' + rows + '</table>' : '') + blocks;
 	}
@@ -679,7 +685,7 @@
 			);
 		var html = '<ul class="problems">';
 		list.forEach(function (problem) {
-			html += '<li><span class="fail">' + escapeHtml(problemText(problem, t)) + '</span>';
+			html += '<li class="fail">' + escapeHtml(problemText(problem, t));
 			if (problem.action && problem.action.name === 'open_settings') {
 				html +=
 					' ' +
@@ -1127,7 +1133,14 @@
 						candidate = numberAt < 0 ? '' : candidate.slice(numberAt);
 					}
 				}
-				if (rule.literal && candidate === rule.literal)
+				if (rule.codes) {
+					// A stable diagnosis code (linux core/ui/engine/component_status):
+					// only a code of the closed list is shared, never the sentence after it.
+					var token = candidate
+						? (candidate.slice(rule.message_prefix.length).match(/^[a-z0-9_]+/) || [''])[0]
+						: '';
+					if (rule.codes.indexOf(token) >= 0) event = { entry_index: index + 1, code: token };
+				} else if (rule.literal && candidate === rule.literal)
 					event = { entry_index: index + 1, code: rule.code };
 				else if (rule.prefix && candidate.startsWith(rule.prefix)) {
 					var value = candidate.slice(rule.prefix.length);
@@ -1238,75 +1251,247 @@
 		return { source: 'installed_page_reported', qualification: 'unqualified', results: accepted };
 	}
 
-	/** Renders only detached, policy-approved leaves; local free text never enters these rows. */
-	function shareRows(value, rule, prefix, rows) {
-		if (rule.kind === 'object') {
-			Object.keys(value)
-				.sort()
-				.forEach(function (key) {
-					shareRows(value[key], rule.fields[key], prefix ? prefix + '.' + key : key, rows);
-				});
-		} else if (rule.kind === 'array') {
-			value.forEach(function (item, index) {
-				shareRows(item, rule.item, prefix + '.' + (index + 1), rows);
-			});
-		} else if (rule.kind === 'setting_row')
-			rows.push('| ' + cell(value.setting) + ' | ' + cell(value.type + ': ' + value.value) + ' |');
-		else
-			rows.push(
-				'| ' + cell(prefix) + ' | ' + cell(rule.kind === 'boolean' ? !!value : value) + ' |'
-			);
+	// The operating-system name each driver is shown as in the report's Driver line
+	var SHARE_OS_NAMES = { macos: 'macOS', windows: 'Windows', linux: 'Linux' };
+	// The probe facts the compact report shows after the state; the hashes and
+	// deep-test provenance stay in the JSON block of the complete report
+	var SHARE_PROBE_FACTS = ['detail', 'cleanup', 'native_status', 'ms'];
+	var SHARE_PAGE_CHECK_FACTS = ['reason', 'ms'];
+	var SHARE_FENCE = '```';
+
+	/**
+	 * A number as the three ports print it: an integer bare, else at most two
+	 * decimals.
+	 * @param {number} value
+	 * @returns {string}
+	 */
+	function shareNumber(value) {
+		if (value === Math.floor(value)) return String(value);
+		return value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 	}
 
-	/** Schema sections supply labels; the sharing policy remains the sole data authority. */
-	function shareReadable(safe, schema, t) {
-		var lines = [],
-			policy = schema.share_policy.projection.fields;
-		var rows = [];
-		Object.keys(safe)
-			.sort()
-			.forEach(function (key) {
-				if (key !== 'sections' && key !== 'probes' && key !== 'retired_probes')
-					shareRows(safe[key], policy[key], key, rows);
-			});
-		lines.push('| | |', '| --- | --- |', ...rows, '');
-		schema.sections.forEach(function (section) {
-			var data = safe.sections && safe.sections[section.id];
-			if (!data) return;
-			rows = [];
-			Object.keys(data)
-				.sort()
-				.forEach(function (key) {
-					var label = (section.fields || []).some(function (field) {
-						return field.id === key;
-					})
-						? t('healthcheck.field.' + key)
-						: key;
-					shareRows(data[key], policy.sections.fields[section.id].fields[key], label, rows);
-				});
-			if (rows.length)
-				lines.push(
-					'## ' + t('healthcheck.section.' + section.id),
-					'',
-					'| | |',
-					'| --- | --- |',
-					...rows,
-					''
-				);
+	/**
+	 * A section field's scalar by its schema type: units for sizes and
+	 * durations, yes or no for a boolean.
+	 * @param {*} value
+	 * @param {string|undefined} kind
+	 * @param {function(string): string} label
+	 * @returns {string}
+	 */
+	function shareFieldText(value, kind, label) {
+		if (typeof value === 'boolean' || kind === 'bool')
+			return label(value ? 'healthcheck.value.yes' : 'healthcheck.value.no');
+		if (typeof value !== 'number') return String(value);
+		if (kind === 'bytes') return Math.floor(value / 1048576 + 0.5) + ' MB';
+		if (kind === 'percent') return shareNumber(value) + ' %';
+		if (kind === 'seconds') return shareNumber(value) + ' s';
+		if (kind === 'ms') return shareNumber(value) + ' ms';
+		return shareNumber(value);
+	}
+
+	/**
+	 * The `key=value` facts of a record in the given key order.
+	 * @param {object} record
+	 * @param {string[]} keys
+	 * @returns {string} '' or ' (k=v, k=v)'.
+	 */
+	function shareFacts(record, keys) {
+		var parts = [];
+		keys.forEach(function (key) {
+			var value = record[key];
+			if (value === undefined || value === null) return;
+			parts.push(key + '=' + (typeof value === 'number' ? shareNumber(value) : String(value)));
 		});
-		rows = [];
-		for (var key of ['probes', 'retired_probes'])
-			if (safe[key]) shareRows(safe[key], policy[key], key, rows);
-		if (rows.length)
-			lines.push(
-				'## ' + t('healthcheck.deep_tests.probe_inventory'),
-				'',
-				'| | |',
-				'| --- | --- |',
-				...rows,
-				''
-			);
-		return lines.join('\n');
+		return parts.length ? ' (' + parts.join(', ') + ')' : '';
+	}
+
+	/**
+	 * Formats only detached approved leaves as readable English lines, grouped
+	 * in the order of share_policy.report_order, most useful first: when the
+	 * issue link cuts the report, the least useful part goes. Port of
+	 * share.lua's readable(); all three replay report_vectors.json byte for byte.
+	 * @param {object} safe The projected snapshot.
+	 * @param {object} schema
+	 * @param {function(string): string} label English label lookup.
+	 * @returns {string}
+	 */
+	function shareReadable(safe, schema, label) {
+		var sections = safe.sections || {};
+		var specs = {};
+		schema.sections.forEach(function (section) {
+			specs[section.id] = section;
+		});
+		var out = [];
+		function group(title, lines, fenced) {
+			if (!lines.length) return;
+			out.push('## ' + title);
+			if (fenced) out.push(SHARE_FENCE);
+			out.push.apply(out, lines);
+			if (fenced) out.push(SHARE_FENCE);
+			out.push('');
+		}
+		function fieldLines(id) {
+			var lines = [];
+			var data = sections[id];
+			if (!data || typeof data !== 'object') return lines;
+			(specs[id].fields || []).forEach(function (field) {
+				var value = data[field.id];
+				if (value === undefined || value === null || typeof value === 'object') return;
+				lines.push(
+					label('healthcheck.field.' + field.id) + ': ' + shareFieldText(value, field.type, label)
+				);
+			});
+			return lines;
+		}
+		var render = {
+			issues: function () {
+				var lines = fieldLines('issues');
+				var recent = sections.issues && sections.issues.recent_error_facts;
+				if (recent && recent.examined_entries !== undefined) {
+					// An unread source is no count: "0" would say the log held no error
+					lines.push(
+						label('healthcheck.export.recent_errors_read') +
+							': ' +
+							(recent.observed
+								? shareNumber(recent.examined_entries) +
+									' (' +
+									label('healthcheck.recent_source.' + recent.source) +
+									')'
+								: label('healthcheck.value.unknown'))
+					);
+					(recent.events || []).forEach(function (event) {
+						var keys = Object.keys(event)
+							.sort()
+							.filter(function (key) {
+								return key !== 'code' && key !== 'entry_index';
+							});
+						lines.push(
+							label('healthcheck.export.recognised_error') +
+								': ' +
+								event.code +
+								shareFacts(event, keys)
+						);
+					});
+					// Why the other lines say nothing: no rule names their code, so
+					// their text, which may be private, stays on this computer
+					if (recent.observed && recent.excluded_entries > 0)
+						lines.push(
+							label('healthcheck.export.recent_errors_unrecognised') +
+								': ' +
+								shareNumber(recent.excluded_entries)
+						);
+				}
+				// The maintainer's ask of 2026-11-24: a report without DEBUG lines says how to get them
+				if (sections.developer && sections.developer.detailed_log === false)
+					lines.push(label('healthcheck.export.detailed_log_off'));
+				group(label('healthcheck.section.issues'), lines);
+			},
+			checks: function () {
+				var lines = [];
+				var probes = safe.probes || {};
+				Object.keys(probes)
+					.sort()
+					.forEach(function (id) {
+						var probe = probes[id];
+						var shown = SHARE_PROBE_FACTS.filter(function (key) {
+							return !(key === 'cleanup' && probe.cleanup === 'settled');
+						});
+						lines.push(id + ': ' + String(probe.state) + shareFacts(probe, shown));
+					});
+				var pages = (safe.page_check_observations && safe.page_check_observations.results) || {};
+				Object.keys(pages)
+					.sort()
+					.forEach(function (id) {
+						lines.push(
+							'page.' +
+								id +
+								': ' +
+								String(pages[id].state) +
+								shareFacts(pages[id], SHARE_PAGE_CHECK_FACTS)
+						);
+					});
+				if (Array.isArray(safe.retired_probes) && safe.retired_probes.length)
+					lines.push('retired_runs: ' + safe.retired_probes.length);
+				group(label('healthcheck.export.checks'), lines, true);
+			},
+			permissions: function () {
+				var items = (sections.permissions && sections.permissions.items) || [];
+				group(
+					label('healthcheck.section.permissions'),
+					items.map(function (item) {
+						return label('healthcheck.permission.' + item.id) + ': ' + String(item.state);
+					})
+				);
+			},
+			configuration_files: function () {
+				var items = (sections.configuration_files && sections.configuration_files.items) || [];
+				group(
+					label('healthcheck.section.configuration_files'),
+					items.map(function (item) {
+						return (
+							label('healthcheck.config_file.' + item.id) +
+							': ' +
+							label('healthcheck.config_state.' + item.state)
+						);
+					})
+				);
+			},
+			report: function () {
+				var lines = [
+					label('healthcheck.export.driver') + ': ' + (SHARE_OS_NAMES[safe.driver] || safe.driver)
+				];
+				if (safe.generated_at !== undefined)
+					lines.push(label('healthcheck.export.generated') + ': ' + safe.generated_at);
+				if (safe.schema_version !== undefined)
+					lines.push(label('healthcheck.export.schema') + ': ' + shareNumber(safe.schema_version));
+				if (safe.detailed !== undefined)
+					lines.push(
+						label('healthcheck.export.details') +
+							': ' +
+							shareFieldText(safe.detailed, 'bool', label)
+					);
+				if (safe.extensive !== undefined)
+					lines.push(
+						label('healthcheck.export.extensive') +
+							': ' +
+							shareFieldText(safe.extensive, 'bool', label)
+					);
+				var log = safe.day_log_attachment;
+				if (log && log.included !== undefined)
+					lines.push(
+						label('healthcheck.export.day_log') +
+							': ' +
+							shareFieldText(log.included, 'bool', label) +
+							shareFacts(log, ['bytes', 'lines'])
+					);
+				group(label('healthcheck.export.report'), lines);
+			},
+			configuration: function () {
+				var title = label('healthcheck.export.changed_settings');
+				// Until the configuration probe answers, an empty list would claim
+				// no setting was changed
+				var probe = safe.probes && safe.probes.configuration;
+				if (probe && probe.state !== 'ok') {
+					group(title, [label('healthcheck.value.unknown')]);
+					return;
+				}
+				var items = (sections.configuration && sections.configuration.items) || [];
+				var lines = items.map(function (item) {
+					var value = item.value;
+					if (item.type === 'text') value += ' ' + label('healthcheck.export.characters');
+					else if (item.type === 'list') value += ' ' + label('healthcheck.export.items');
+					return item.setting + ' = ' + value;
+				});
+				if (!lines.length) group(title, [label('healthcheck.value.none')]);
+				else group(title, lines, true);
+			}
+		};
+		schema.share_policy.report_order.forEach(function (id) {
+			if (render[id]) return render[id]();
+			if (!specs[id]) throw new Error('report_order names an unknown section: ' + id);
+			group(label('healthcheck.section.' + id), fieldLines(id));
+		});
+		return out.join('\n');
 	}
 
 	/** The local preview uses the same closed projection as the host's output. */
@@ -1322,8 +1507,6 @@
 		return (
 			'# ErgoptiPlus diagnostics\n\n' +
 			t(schema.share_policy.notice_key) +
-			'\n\ndriver-suites: not_run\npage-model-checks: ' +
-			(safe.page_check_observations ? 'installed_page_reported (unqualified)' : 'not_collected') +
 			'\n\n' +
 			shareReadable(safe, schema, t) +
 			'\n```json\n' +

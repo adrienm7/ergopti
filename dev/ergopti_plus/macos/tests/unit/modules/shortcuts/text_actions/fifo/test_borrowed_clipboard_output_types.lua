@@ -4,10 +4,10 @@
 local helpers = require("tests.helpers")
 
 local STUBS = {
-	"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
-	"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
+	"platform.input.text_sender", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
+	"core.events.timer_scheduler", "diagnostics.adapters.event_provenance", "core.fs.adapters.storage",
 	"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
-	"infra.clipboard_borrowers", "modules.keymap.utils",
+	"clipboard.borrowers", "hotstrings.engine.expander.utils",
 }
 
 local LONG_TEXT = string.rep("borrowed clipboard output ", 12)
@@ -50,7 +50,7 @@ end
 
 --- Registers another family that holds a borrowed clipboard.
 local function borrow_elsewhere()
-	require("infra.clipboard_borrowers").register("other_family", function() return true end)
+	require("clipboard.borrowers").register("other_family", function() return true end)
 end
 
 helpers.describe("Borrowed clipboard output is typed (clipboard-borrowed-output-types)", function()
@@ -79,7 +79,7 @@ helpers.describe("Borrowed clipboard output is typed (clipboard-borrowed-output-
 	helpers.it("(clipboard-borrowed-output-types) keymap output types instead of snapshotting a borrow", function()
 		with_board(function(board)
 			borrow_elsewhere()
-			local utils = require("modules.keymap.utils")
+			local utils = require("hotstrings.engine.expander.utils")
 			helpers.assert_true(utils.should_paste(LONG_TEXT), "this output would normally be pasted")
 			local count, echo, logical = utils.emit_text(LONG_TEXT)
 			helpers.assert_true(count > 0, "the output is still delivered")

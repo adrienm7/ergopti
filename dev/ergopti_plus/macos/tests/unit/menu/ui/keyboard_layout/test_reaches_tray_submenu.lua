@@ -1,0 +1,440 @@
+--- tests/unit/menu/ui/keyboard_layout/test_reaches_tray_submenu.lua
+
+--- ==============================================================================
+--- MODULE: Regression — the Keyboard layout submenu reaches the tray populated
+--- DESCRIPTION:
+--- The tray root is rendered as provider DATA: a component row hands over
+--- `items` (rows to materialise) or `submenu` (a tree already materialised).
+--- menu_keyboard_layout returned the rows ManifestMenu.build had ALREADY turned
+--- into `title`/`fn` rows under `items`, so the tray renderer dropped every one
+--- of them and the submenu opened empty on the real menu bar.
+---
+--- The same builder also asked the renderer for the pause/resume pickers before
+--- it had collected them, so `layout_switching` always rendered nothing.
+---
+--- Both cases go through the exact render call Builder.generate makes.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+package.loaded["tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture"] = nil
+local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture")
+local make_ctx = Fixture.make_ctx
+local switch_row = Fixture.switch_row
+local titles = Fixture.titles
+local tray_row = Fixture.tray_row
+local with_switch_frame = Fixture.with_switch_frame
+
+
+
+
+
+helpers.describe("Keyboard layout submenu reaches the tray populated", function()
+	helpers.it("the rendered tray row carries a non-empty submenu", function()
+		local row = tray_row(make_ctx())
+		helpers.assert_true(type(row) == "table", "the layout row must survive the tray render")
+		helpers.assert_true(type(row.menu) == "table" and #row.menu > 0,
+			"the Keyboard layout submenu reached the tray empty — materialised rows handed over as `items` "
+			.. "are dropped by the tray renderer; they must be handed over as `submenu`")
+		local seen = titles(row.menu)
+		helpers.assert_true(seen["— menu.layout.header_emulation —"] or seen["menu.layout.header_emulation"],
+			"the manifest's emulation header must be in the rendered submenu")
+		helpers.assert_true(seen["menu.layout.manage"], "the layout manager row must be in the rendered submenu")
+		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
+	end)
+
+	-- « Create or edit a layout… » opened Ergopti Studio, which the tray root's
+	-- row right above this menu opens too; it left on 2026-11-19 (no-duplicate-studio).
+	helpers.it("the submenu holds no Ergopti Studio row (no-duplicate-studio)", function()
+		local row = tray_row(make_ctx())
+		local seen = titles(row and row.menu)
+		helpers.assert_nil(seen["menu.layout.edit"], "creating a layout is Ergopti Studio's, not this menu's")
+		helpers.assert_nil(seen["menu.studio.title"], "Ergopti Studio is a row of the tray root only")
+	end)
+
+	-- The emulated rows group handed its finished rows back as `items` too, so
+	-- « Rangées émulées » opened onto nothing.
+	helpers.it("the emulated rows submenu carries its four switches", function()
+		local row = tray_row(make_ctx())
+		local emulated
+		for _, child in ipairs(row and row.menu or {}) do
+			if child.title == "menu.layout.emulated_rows" then emulated = child.menu end
+		end
+		helpers.assert_true(type(emulated) == "table", "the emulated rows group must be in the rendered submenu")
+		local rows = { "number_row", "top_row", "home_row", "bottom_row" }
+		helpers.assert_eq(#emulated, #rows, "one switch per emulated row")
+		for index, name in ipairs(rows) do
+			helpers.assert_eq(emulated[index].title, "menu.layout.emulate_" .. name)
+			helpers.assert_eq(type(emulated[index].fn), "function", name .. " can be switched")
+		end
+	end)
+
+	helpers.it("the pause/resume pickers are collected before the manifest renders them", function()
+		local row = tray_row(make_ctx())
+		local seen = titles(row and row.menu)
+		helpers.assert_true(seen["menu.layout.pause_layout_enabled"],
+			"`layout_switching` rendered nothing — the provider was read before its rows were collected")
+	end)
+
+	-- The magic key is a configured character since 2026-11-21: the Layout menu
+	-- no longer picks a physical key for it.
+	helpers.it("places replacement in the extension and offers no physical magic-key picker", function()
+		local ctx = make_ctx()
+		local row = tray_row(ctx)
+		local seen = titles(row and row.menu)
+		helpers.assert_nil(seen["Replace J with the magic key"],
+			"the relocated replacement control must have no second Layout owner")
+		for title in pairs(seen) do
+			helpers.assert_true(title:find("magic_key_source", 1, true) == nil,
+				"the Layout renderer must expose no physical-key selection: " .. title)
+		end
+		local Hotstrings = helpers.load_with_stubs("hotstrings.ui.menu.hotstrings")
+		local ManifestMenu = require("menu.engine.manifest_menu")
+		local rows = Hotstrings.build_bound_section_rows(ctx, { { group = "magickey", section = "replace" } })
+		local rendered = ManifestMenu.render_rows(rows, "extension_hotstrings")
+		helpers.assert_true(titles(rendered)["Replace J with the magic key"],
+			"the actual extension provider's replacement row must reach the native renderer")
+	end)
+end)
+
+--- Uses the actual empty-source list, canonical binding and native row renderer.
+--- Native effect ports are controlled and expose their launch receipt.
+local function with_empty_source_preferences(callback, labels)
+	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
+		"modules.keymap.input_sources", "modules.keymap.layout_install", "core.process.adapters.shell_runner"}, function()
+		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
+		local installer = require("modules.keymap.layout_install")
+		local state = {records = {}, commands = {}, result = true, effects = 0}
+		sources.list_active_keyboard_layouts = function() return state.records end
+		sources.build_kl_name_to_tis_id = function() return {} end
+		sources.resolve_installed_ergopti_version = function() return nil end
+		installer.pick_latest_bundle = function() return nil end
+		installer.highest_installed = function() return nil end
+		installer.bundle_variants = function() return {} end
+		local function forbid_effect() state.effects = state.effects + 1; error("Opening preferences must not mutate layouts") end
+		installer.install_user = forbid_effect
+		installer.install_system = forbid_effect
+		sources.set_input_source_async = forbid_effect
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(url)
+			state.commands[#state.commands + 1] = url
+			if state.result == "throw" then error("Native launch refused") end
+			return state.result
+		end }
+		local translator = require("core.i18n.engine.i18n")
+		if labels then translator.get = function(key) return labels[key] or key end end
+		package.loaded["menu.engine.manifest_menu"] = nil
+		local binding = require("menu.engine.manifest_menu")
+		package.loaded["ui.menu.menu_keyboard_layout"] = nil
+		local module = require("ui.menu.menu_keyboard_layout")
+		callback(function() return module.build(make_ctx()).submenu end, state, binding)
+		helpers.assert_eq(state.effects, 0, "the preferences command never mutates native layout state")
+	end)
+end
+
+local function empty_preferences_row(rows, title)
+	for _, row in ipairs(rows) do if row.title == title then return row end end
+end
+
+helpers.describe("empty native Input Sources consumes the canonical preferences command", function()
+	helpers.it("retains its independently declared caption and exact native launch command", function()
+		with_empty_source_preferences(function(build, state, binding)
+			-- Every driver offers the system keyboard settings for an empty list (8eaa013c).
+			helpers.assert_eq(binding.get_root().layout_active_source_empty_commands, {{type = "command",
+				id = "layout_open_preferences", i18n = "menu.layout.open_prefs"}})
+			local row = empty_preferences_row(build(), "menu.layout.open_prefs")
+			helpers.assert_not_nil(row)
+			helpers.assert_eq(type(row.fn), "function")
+			helpers.assert_true(row.disabled ~= true)
+			helpers.assert_nil(row.checked)
+			helpers.assert_eq(#state.commands, 0, "building the actual provider never launches preferences")
+			helpers.assert_eq(row.fn(), true, "the asynchronous launcher acknowledged the request")
+			helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
+		end)
+	end)
+	for _, result in ipairs({false, "throw"}) do
+		helpers.it("reports asynchronous launch refusal " .. tostring(result), function()
+			with_empty_source_preferences(function(build, state)
+				state.result = result
+				local row = empty_preferences_row(build(), "menu.layout.open_prefs")
+				helpers.assert_not_nil(row)
+				helpers.assert_eq(row.fn(), false, "a refused native launch must not report success")
+				helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
+			end)
+		end)
+	end
+	helpers.it("materializes an independent caption mutation through the real provider", function()
+		with_empty_source_preferences(function(build, state, binding)
+			local item = binding.get_root().layout_active_source_empty_commands[1]
+			local old = item.i18n
+			item.i18n = "menu.about.check_for_updates"
+			local ok, detail = xpcall(function()
+				local rows = build()
+				helpers.assert_nil(empty_preferences_row(rows, "menu.layout.open_prefs"))
+				local row = empty_preferences_row(rows, "menu.about.check_for_updates")
+				helpers.assert_not_nil(row)
+				helpers.assert_true(row.fn())
+				helpers.assert_eq(#state.commands, 1)
+			end, debug.traceback)
+			item.i18n = old
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	for _, mutation in ipairs({"missing", "wrong_id", "wrong_type", "empty_caption", "invalid_caption", "hidden_platform"}) do
+		helpers.it("refuses the actual " .. mutation .. " declaration without inventing a native fallback", function()
+			with_empty_source_preferences(function(build, state, binding)
+				local root = binding.get_root()
+				local old = root.layout_active_source_empty_commands
+				local candidate = {{type = "command", id = "layout_open_preferences", i18n = "menu.layout.open_prefs",
+					platforms = {"hs"}, unavailable = "hide"}}
+				if mutation == "missing" then candidate = nil
+				elseif mutation == "wrong_id" then candidate[1].id = "removed_layout_open_preferences"
+				elseif mutation == "wrong_type" then candidate[1].type = "list"
+				elseif mutation == "empty_caption" then candidate[1].i18n = ""
+				elseif mutation == "invalid_caption" then candidate[1].i18n = {}
+				else candidate[1].platforms = {"linux"} end
+				root.layout_active_source_empty_commands = candidate
+				local ok, detail = xpcall(function()
+					local rows = build()
+					helpers.assert_nil(empty_preferences_row(rows, "menu.layout.open_prefs"))
+					helpers.assert_not_nil(empty_preferences_row(rows, "menu.layout.manage"))
+					helpers.assert_eq(#state.commands, 0)
+				end, debug.traceback)
+				root.layout_active_source_empty_commands = old
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("withdraws a retained callback before any native preferences effect", function()
+		with_empty_source_preferences(function(build, state, binding)
+			local row = empty_preferences_row(build(), "menu.layout.open_prefs")
+			helpers.assert_not_nil(row)
+			local root = binding.get_root()
+			local old = root.layout_active_source_empty_commands
+			root.layout_active_source_empty_commands = nil
+			local ok, detail = xpcall(function()
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(#state.commands, 0)
+			end, debug.traceback)
+			root.layout_active_source_empty_commands = old
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	helpers.it("does not introduce preferences into nonempty native input-source data", function()
+		with_empty_source_preferences(function(build, state, binding)
+			state.records = {{id = "French", name = "French", selected = false}}
+			binding.get_root().layout_active_source_empty_commands = nil
+			local rows = build()
+			helpers.assert_nil(empty_preferences_row(rows, "menu.layout.open_prefs"))
+			local native = empty_preferences_row(rows, "French")
+			helpers.assert_not_nil(native)
+			helpers.assert_eq(type(native.fn), "function")
+			helpers.assert_eq(#state.commands, 0)
+		end)
+	end)
+	helpers.it("consumes every existing real locale caption without a native literal", function()
+		local codec = require("core.fs.adapters.json_codec")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
+		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
+		helpers.assert_eq(#locales, 21)
+		for _, locale in ipairs(locales) do
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
+			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
+			helpers.assert_true(type(labels["menu.layout.open_prefs"]) == "string" and labels["menu.layout.open_prefs"] ~= "")
+			with_empty_source_preferences(function(build, state)
+				local row = empty_preferences_row(build(), labels["menu.layout.open_prefs"])
+				helpers.assert_not_nil(row, "actual native preferences caption: " .. locale)
+				helpers.assert_eq(type(row.fn), "function")
+				helpers.assert_true(row.fn())
+				helpers.assert_eq(state.commands, {"x-apple.systempreferences:com.apple.preference.keyboard?InputSources"})
+			end, labels)
+		end
+	end)
+end)
+
+--- Controls native discovery while exercising the genuine layout renderer.
+--- All pre-existing registered subjects above remain unchanged.
+
+
+helpers.describe("layout switching consumes its complete shared presentation frame", function()
+	helpers.it("owns the check and both actual native-choice parents in declared order", function()
+		with_switch_frame(function(build, _, _, ctx)
+			local rows = build()
+			local index
+			for i, row in ipairs(rows) do if row.title == "menu.layout.pause_layout_enabled" then index = i end end
+			helpers.assert_not_nil(index)
+			helpers.assert_eq(rows[index].checked, true)
+			helpers.assert_eq(rows[index + 1].title, "  ↳ menu.layout.layout_on_pause : menu.layout.layout_auto")
+			helpers.assert_eq(rows[index + 2].title, "  ↳ menu.layout.layout_on_resume : menu.layout.layout_auto")
+			helpers.assert_eq(#rows[index + 1].menu, 3)
+			helpers.assert_eq(rows[index + 1].menu[1].title, "menu.layout.layout_auto")
+			helpers.assert_eq(rows[index + 1].menu[1].checked, true)
+			helpers.assert_eq(rows[index + 1].menu[2].title, "-")
+			helpers.assert_eq(rows[index + 1].menu[3].title, "French")
+			rows[index + 1].menu[3].fn()
+			helpers.assert_eq(ctx.state.layout_on_pause, "French")
+		end)
+	end)
+	for _, shape in ipairs({"off", "paused", "ready"}) do
+		helpers.it("retains exact disabled state for " .. shape, function()
+			with_switch_frame(function(build, _, _, ctx)
+				ctx.state.layout_pause_switch_enabled = shape ~= "off"
+				ctx.paused = shape == "paused"
+				local rows = build()
+				local parent = switch_row(rows, "  ↳ menu.layout.layout_on_pause : ")
+				helpers.assert_not_nil(parent)
+				-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+				helpers.assert_eq(parent.disabled == true, shape == "off")
+			end)
+		end)
+	end
+	for _, owner in ipairs({"layout_switching_frame", "layout_switch_picker_frame", "layout_switch_picker_choices_frame"}) do
+		helpers.it("refuses the actual family when its " .. owner .. " declaration is withdrawn", function()
+			with_switch_frame(function(build, fixture, binding)
+				local root, old = binding.get_root(), binding.get_root()[owner]
+				root[owner] = nil
+				local ok, detail = xpcall(function()
+					helpers.assert_nil(build(), "Withdrawn presentation must not silently publish native copies")
+					helpers.assert_eq(fixture.saves, 0)
+				end, debug.traceback)
+				root[owner] = old
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	for _, owner in ipairs({"layout_switching_frame", "layout_switch_picker_frame"}) do
+		helpers.it("refuses a retained native choice after " .. owner .. " withdrawal", function()
+			with_switch_frame(function(build, fixture, binding, ctx)
+				local parent = switch_row(build(), "  ↳ menu.layout.layout_on_pause : ")
+				local choose = parent.menu[3].fn
+				local root, old = binding.get_root(), binding.get_root()[owner]
+				root[owner] = nil
+				local ok, detail = xpcall(function()
+					helpers.assert_eq(choose(), false)
+					helpers.assert_nil(ctx.state.layout_on_pause)
+					helpers.assert_eq(fixture.saves, 0)
+					helpers.assert_eq(fixture.updates, 0)
+				end, debug.traceback)
+				root[owner] = old
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("retains nil automatic choice, one save and one update, with no native switch", function()
+		with_switch_frame(function(build, fixture, _, ctx)
+			ctx.state.layout_on_resume = "French"
+			local parent = switch_row(build(), "  ↳ menu.layout.layout_on_resume : ")
+			helpers.assert_eq(parent.menu[1].checked, false)
+			parent.menu[1].fn()
+			helpers.assert_nil(ctx.state.layout_on_resume)
+			helpers.assert_eq(fixture.saves, 1)
+			helpers.assert_eq(fixture.updates, 1)
+		end)
+	end)
+	helpers.it("retains failed save refusal before redraw", function()
+		with_switch_frame(function(build, fixture, _, ctx)
+			fixture.save_result = false
+			local parent = switch_row(build(), "  ↳ menu.layout.layout_on_pause : ")
+			helpers.assert_eq(parent.menu[3].fn(), false)
+			helpers.assert_eq(ctx.state.layout_on_pause, "French")
+			helpers.assert_eq(fixture.saves, 1)
+			helpers.assert_eq(fixture.updates, 0)
+		end)
+	end)
+	helpers.it("the empty native list shows only automatic choice without a dangling boundary", function()
+		with_switch_frame(function(build, fixture)
+			fixture.records = {}
+			local parent = switch_row(build(), "  ↳ menu.layout.layout_on_pause : ")
+			helpers.assert_eq(#parent.menu, 1)
+			helpers.assert_eq(parent.menu[1].title, "menu.layout.layout_auto")
+		end)
+	end)
+	helpers.it("preserves all 21 independently frozen old captions through actual renderer", function()
+		local codec = require("core.fs.adapters.json_codec")
+		local file = assert(io.open(helpers.shared("tests/corpus/menus/layout_switching_captions.json"), "rb"))
+		local vectors = assert(codec.decode(file:read("*a"))); assert(file:close())
+		local count = 0
+		for lang, vector in pairs(vectors) do
+			count = count + 1
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. lang .. ".json"), "rb"))
+			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
+			with_switch_frame(function(build)
+				local rows = build()
+				helpers.assert_not_nil(switch_row(rows, vector.pause), lang .. " pause caption")
+				helpers.assert_not_nil(switch_row(rows, vector.resume), lang .. " resume caption")
+				helpers.assert_not_nil(switch_row(rows, vector.switch), lang .. " check caption")
+			end, labels)
+		end
+		helpers.assert_eq(count, 21)
+	end)
+end)
+
+helpers.describe("the complete Layout family retains genuine native record and outer parent authority", function()
+	for _, owner in ipairs({"layout_native_record_choice", "layout_bundle_install_first", "layout_bundle_frame", "layout_native_parent"}) do
+		helpers.it("refuses to publish after " .. owner .. " withdrawal", function()
+			with_switch_frame(function(build, fixture, binding)
+				local root, old = binding.get_root(), binding.get_root()[owner]
+				root[owner] = nil
+				local ok, detail = xpcall(function()
+					helpers.assert_nil(build(), "Missing complete Layout declaration cannot manufacture a native row")
+					helpers.assert_eq(fixture.saves, 0)
+					helpers.assert_eq(fixture.updates, 0)
+				end, debug.traceback)
+				root[owner] = old
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end
+	helpers.it("retains selected active-source check and disabled state without invoking TIS", function()
+		with_switch_frame(function(build, fixture)
+			fixture.records = {{id = "French", name = "Native 100%s && 🦀", selected = true}}
+			local row = switch_row(build(), "Native 100%s && 🦀")
+			helpers.assert_not_nil(row)
+			helpers.assert_eq(row.title, "Native 100%s && 🦀")
+			helpers.assert_eq(row.checked, true)
+			helpers.assert_eq(row.disabled, true)
+		end)
+	end)
+	helpers.it("a retained policy choice refuses a withdrawn genuine record declaration", function()
+		with_switch_frame(function(build, fixture, binding, ctx)
+			local parent = switch_row(build(), "  ↳ menu.layout.layout_on_pause : ")
+			local choose = parent.menu[3].fn
+			local root, old = binding.get_root(), binding.get_root().layout_native_record_choice
+			root.layout_native_record_choice = nil
+			local ok, detail = xpcall(function()
+				helpers.assert_eq(choose(), false)
+				helpers.assert_nil(ctx.state.layout_on_pause)
+				helpers.assert_eq(fixture.saves, 0)
+			end, debug.traceback)
+			root.layout_native_record_choice = old
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	helpers.it("native record captions remain actual data when a translated layout caption changes", function()
+		with_switch_frame(function(build, fixture, binding)
+			fixture.records = {{id = "French", name = "Actual Record", selected = false}}
+			local root, old = binding.get_root(), binding.get_root().layout_native_record_choice[1].caption_source
+			root.layout_native_record_choice[1].caption_source = "translated"
+			local ok, detail = xpcall(function()
+				helpers.assert_nil(build())
+			end, debug.traceback)
+			root.layout_native_record_choice[1].caption_source = old
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	helpers.it("actual materialized outer parent consumes the declared translated caption", function()
+		with_switch_frame(function(_, fixture, binding, ctx)
+			local module = require("ui.menu.menu_keyboard_layout")
+			local root = binding.get_root()
+			local old = root.layout_native_parent[1].i18n
+			root.layout_native_parent[1].i18n = "menu.layout.manage"
+			local ok, detail = xpcall(function()
+				local built = module.build(ctx)
+				helpers.assert_eq(built.label, "menu.layout.manage")
+				helpers.assert_nil(built.items, "materialized title/fn rows must never be raw provider DATA")
+				helpers.assert_true(type(built.submenu) == "table" and #built.submenu > 0)
+				helpers.assert_eq(fixture.effects, 0)
+			end, debug.traceback)
+			root.layout_native_parent[1].i18n = old
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)

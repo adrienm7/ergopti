@@ -111,7 +111,7 @@ _SWNPK_ToggleDrainsBeforeSuspend() {
 	SuspendPos := InStr(Seg, "Suspend(1)")
 	Assert(ClearPos > 0 and SuspendPos > ClearPos,
 		"ToggleSuspend must verify physical prefixes before the immediate Suspend(1) path")
-	Assert(InStr(Seg, "SetTimer(_SuspendPendingPoll, 25)") > 0,
+	Assert(InStr(Seg, 'SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))') > 0,
 		"A held prefix must schedule the non-blocking pending-suspend poll instead of waiting on the tray thread")
 }
 Test("ErgoptiPlus: ToggleSuspend drains prefix before Suspend (suspend-watchdog-no-prefix-keywait)", _SWNPK_ToggleDrainsBeforeSuspend)

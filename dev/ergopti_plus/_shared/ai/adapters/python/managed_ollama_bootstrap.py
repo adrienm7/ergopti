@@ -217,5 +217,53 @@ class NetworkSnapshot:
             "proxy_url": "",
         }
 
+    def environment(self):
+        """The captured name and value pairs, in capture order (a private copy)."""
+        return [list(pair) for pair in metadata(self._payload)["environment"]]
+
+    def with_environment(self, changes):
+        """A snapshot whose captured variables are replaced or removed.
+
+        The macOS sign-in relay replaces the proxy the daemon selects with its
+        loopback route, or removes every proxy after a refused sign-in
+        (docs/design/proxy-auth-relay.md, "macOS managed daemon").
+
+        Args:
+            changes: Captured variable name (one the policy captures) to its new
+                value, or None to remove it. A name the capture lacks is added
+                when its value is a string.
+
+        Returns:
+            A new NetworkSnapshot; this one is unchanged.
+        """
+        if type(changes) is not dict or any(
+            name not in self.policy.names
+            or (value is not None and (type(value) is not str or "\x00" in value))
+            for name, value in changes.items()
+        ):
+            raise BootstrapRefusal("policy")
+        payload = metadata(self._payload)
+        environment = []
+        for name, value in payload["environment"]:
+            if name not in changes:
+                environment.append([name, value])
+            elif changes[name] is not None:
+                environment.append([name, changes[name]])
+        present = {name for name, _ in payload["environment"]}
+        environment.extend(
+            [name, value]
+            for name, value in changes.items()
+            if name not in present and value is not None
+        )
+        if any(
+            len(value.encode("utf-8")) > self.policy.maximum_value_bytes for _, value in environment
+        ):
+            raise BootstrapRefusal("policy")
+        payload["environment"] = environment
+        wire = encode(payload)
+        if not 0 < len(wire) <= self.policy.maximum_bytes:
+            raise BootstrapRefusal("policy")
+        return NetworkSnapshot(self.policy, wire, self._store)
+
     def authenticated_bytes(self, session_bytes, token):
         return self.policy.seal(self._payload, session_bytes, token)

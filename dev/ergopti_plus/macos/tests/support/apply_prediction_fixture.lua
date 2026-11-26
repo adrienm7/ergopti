@@ -170,8 +170,8 @@ function M.run(options)
 		has_pending_work    = function() return false end,
 		navigate = noop,
 	}
-	package.loaded["modules.llm.prediction_engine"] = engine
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine.prediction.engine"] = engine
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = {
 			llm_after_hotstring = false,
 			llm_reset_on_nav = false,
@@ -186,6 +186,7 @@ function M.run(options)
 		set_timeout = noop,
 		is_visible = function() return false end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 		set_colorization_enabled = noop,
 		set_accent_color = noop,
 		set_accept_callback = function(callback) tooltip_accept_callback = callback end,
@@ -194,17 +195,17 @@ function M.run(options)
 		set_runtime_guard = noop,
 	}
 	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["hotstrings.engine.expander.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {}
-	package.loaded["modules.keymap.terminator_replay"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {}
+	package.loaded["hotstrings.engine.expander.terminator_replay"] = {
 		init = function() return true end,
 		flush_now = noop,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.trigger_char" then return "\u{2605}" end
 			return false
@@ -218,7 +219,7 @@ function M.run(options)
 	}
 
 	local synthetic = require("platform.input.synthetic_input")
-	local km_utils = require("modules.keymap.utils")
+	local km_utils = require("hotstrings.engine.expander.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
 		local text_sender = require("platform.input.text_sender")
@@ -236,18 +237,18 @@ function M.run(options)
 	local expander
 	if options.expander then
 		expander = options.expander
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	elseif options.expander_failure then
 		expander = {
 			init = function() return true end,
 			perform_text_replacement = function() return false end,
 		}
-		package.loaded["modules.keymap.expander"] = expander
+		package.loaded["hotstrings.engine.expander.expander"] = expander
 	else
-		expander = require("modules.keymap.expander")
+		expander = require("hotstrings.engine.expander.expander")
 	end
 
-	local bridge = require("modules.keymap.llm_bridge")
+	local bridge = require("ai.engine.bridge")
 	local suppress_count = 0
 	local state = {
 		buffer = options.buffer or "prefix ",
@@ -267,13 +268,13 @@ function M.run(options)
 	local context = (options.llm_private_mark or "") .. (options.llm_buffer or options.buffer or "prefix ")
 	-- Malformed hotstring buffers exercise rejection independently of AI state.
 	if not utf8.len(context) then context = "" end
-	require("modules.keymap.llm_context").seed(state, context, options.llm_private_mark or "")
+	require("ai.engine.api.context").seed(state, context, options.llm_private_mark or "")
 	bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,
 	})
 	if not options.expander_failure and not options.expander then
-		expander.init(state, package.loaded["modules.keymap.registry"], bridge)
+		expander.init(state, package.loaded["hotstrings.engine.expander.registry"], bridge)
 	end
 
 	local buffer_before = state.buffer
@@ -308,8 +309,8 @@ function M.run(options)
 		end
 	end
 
-	package.loaded["adapters.event_provenance"] = nil
-	local provenance = require("adapters.event_provenance")
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	local provenance = require("diagnostics.adapters.event_provenance")
 	local function fire_next_timer()
 		local selected = nil
 		for _, timer in ipairs(hs_stub.timer.__timers) do

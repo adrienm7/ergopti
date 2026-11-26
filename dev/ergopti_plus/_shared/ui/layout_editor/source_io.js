@@ -259,10 +259,12 @@ var LayoutSourceIO = (function () {
 	 * runs (`export-xkb`), so the files are byte for byte the tool's.
 	 * @param {object} doc
 	 * @param {{lua: {call: function}, keysyms: object, template: string, types: string}} assets
-	 *   A LayoutLuaRunner and key_sym.json, xkb_symbols.txt, xkb_types.txt.
-	 * @returns {{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}}
+	 *   A Lua runner (LayoutLuaRunner on the site, the app host's lua_export in
+	 *   its windows; its call may answer at once or as a promise) and
+	 *   key_sym.json, xkb_symbols.txt, xkb_types.txt.
+	 * @returns {Promise<{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}>}
 	 */
-	function xkbArchive(doc, assets) {
+	async function xkbArchive(doc, assets) {
 		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'linux'));
 		const request = targetStep(() =>
 			LayoutTargetExport.xkbRequest(doc, target, {
@@ -272,7 +274,7 @@ var LayoutSourceIO = (function () {
 				types: assets.types
 			})
 		);
-		const output = assets.lua.call('xkb', request.input);
+		const output = await assets.lua.call('xkb', request.input);
 		const { report, files } = targetStep(() =>
 			LayoutTargetExport.xkbFiles(target, request, output)
 		);
@@ -293,17 +295,17 @@ var LayoutSourceIO = (function () {
 	 * (`export-klc`), so the bytes are the tool's.
 	 * @param {object} doc
 	 * @param {{lua: {call: function}, generator: object}} assets
-	 *   A LayoutLuaRunner and LayoutKlcGenerator.
-	 * @returns {{filename: string, bytes: Uint8Array, report: object}}
+	 *   A Lua runner (as xkbArchive) and LayoutKlcGenerator.
+	 * @returns {Promise<{filename: string, bytes: Uint8Array, report: object}>}
 	 */
-	function klcFile(doc, assets) {
+	async function klcFile(doc, assets) {
 		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'windows'));
 		const metadata = targetStep(() => LayoutTargetExport.klcMetadata(doc));
 		// A structured source compiles straight to the canonical form; a preserved
 		// import's XML is read by the shared Lua reader.
 		let canonical = target.canonical;
 		if (!canonical) {
-			const read = assets.lua.call('read', { xml: target.text });
+			const read = await assets.lua.call('read', { xml: target.text });
 			if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
 			canonical = read.canonical;
 		}
@@ -366,7 +368,7 @@ var LayoutSourceIO = (function () {
 	 * compiler-free writer (_generated/kbd_dll_writer.js, from tools/lib/kbd-dll),
 	 * with what the Windows tables cannot hold.
 	 * @param {object} doc
-	 * @returns {{dllName: string, dlls: Object<string, Uint8Array>, omitted: {path: string, reason: string}[]}}
+	 * @returns {{dllName: string, model: object, dlls: Object<string, Uint8Array>, omitted: {path: string, reason: string}[]}}
 	 */
 	function windowsDlls(doc) {
 		if (isPreserved(doc)) throw new SourceIOError('source_preserved', 'imported_keylayout');
@@ -381,29 +383,56 @@ var LayoutSourceIO = (function () {
 		}
 		return {
 			dllName: converted.model.dll_name,
+			model: converted.model,
 			dlls: LayoutKbdDll.writeDlls(converted.model),
 			omitted: converted.omitted
 		};
 	}
 
 	/**
-	 * The Windows DLL download: one stored ZIP with <dll>/<arch>/<dll>.dll for the
-	 * four images and <dll>/omitted.json listing what the tables leave out.
+	 * The Windows installable package: one stored ZIP with, in <dll>/, the
+	 * generic installer as <dll>-setup.exe (_generated/kbd_setup_stub.js, built
+	 * by makensis in the repository), the layout.ini it reads, the four DLL
+	 * images as <arch>/<dll>.dll and omitted.json listing what the tables leave
+	 * out. The same on the site and in the app windows: no page runs makensis.
 	 * @param {object} doc
 	 * @returns {{filename: string, bytes: Uint8Array}}
 	 */
-	function windowsDllArchive(doc) {
+	function windowsPackage(doc) {
+		if (typeof LayoutKbdSetupStub === 'undefined')
+			throw new SourceIOError('kbd_setup_stub_missing', '_generated/kbd_setup_stub.js');
 		const built = windowsDlls(doc);
+		const dll = built.dllName;
+		let ini;
+		try {
+			ini = LayoutKbdDll.layoutIni(built.model);
+		} catch (error) {
+			const match = /^(kbd_[a-z_]+): (.*)$/.exec((error && error.message) || '');
+			if (!match) throw error;
+			throw new SourceIOError(match[1], match[2]);
+		}
 		const files = Object.entries(built.dlls).map(([arch, bytes]) => ({
-			path: `${built.dllName}/${arch}/${built.dllName}.dll`,
+			path: `${dll}/${arch}/${dll}.dll`,
 			bytes
 		}));
-		files.push({
-			path: `${built.dllName}/omitted.json`,
-			text: `${JSON.stringify(built.omitted, null, 2)}\n`,
-			encoding: 'utf8'
-		});
-		return { filename: `${built.dllName}-dll.zip`, bytes: LayoutZipWriter.pack(files) };
+		files.push(
+			{ path: `${dll}/${dll}-setup.exe`, bytes: base64Bytes(LayoutKbdSetupStub.base64) },
+			{ path: `${dll}/layout.ini`, bytes: ini },
+			{
+				path: `${dll}/omitted.json`,
+				text: `${JSON.stringify(built.omitted, null, 2)}\n`,
+				encoding: 'utf8'
+			}
+		);
+		return { filename: `${dll}-windows.zip`, bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/** The bytes of a base64 text. */
+	function base64Bytes(text) {
+		const binary = atob(text);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+		return bytes;
 	}
 
 	// The native images a host installs beside the .keylayout, by platform: the
@@ -622,6 +651,20 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
+	 * A new editable source that starts as a layout source document another
+	 * module wrote (the layout library's entries, LAYOUT_FORMATS.toSource).
+	 * @param {object} model - The source document, before TOML encoding.
+	 * @param {string} id - The new layout's identifier.
+	 * @param {string} name - Its displayed name.
+	 * @returns {{doc: object, lost: string[]}} The validated copy (nothing lost).
+	 * @throws {LayoutSource.SourceError} On a document the source model refuses.
+	 */
+	function startFromDocument(model, id, name) {
+		const doc = Object.assign({}, model, { layout: Object.assign({}, model.layout, { id, name }) });
+		return { doc: LayoutSource.validate(doc), lost: [] };
+	}
+
+	/**
 	 * The layouts a layer can be filled from: the built-in references (QWERTY,
 	 * AZERTY) and the registry layouts a host supplies as {id, name, convention, text}.
 	 * @param {object[]} supplied
@@ -774,12 +817,52 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * Writes the source's `nav` layer as the drivers' layers.toml.
+	 * The FNV-1a 32-bit hash of a text's UTF-8 bytes, as 8 hex digits: enough
+	 * to tell a hand-edited layers.toml from the one the Studio compiled, not
+	 * a security check.
+	 * @param {string} text
+	 * @returns {string}
+	 */
+	function fnv1a32(text) {
+		let hash = 0x811c9dc5;
+		for (const byte of new TextEncoder().encode(text)) {
+			hash ^= byte;
+			hash = Math.imul(hash, 0x01000193) >>> 0;
+		}
+		return hash.toString(16).padStart(8, '0');
+	}
+
+	// The comment lines naming the source a compiled layers.toml comes from.
+	const NAV_FILE_SOURCE = '# source: ';
+	const NAV_FILE_HASH = '# body-fnv1a32: ';
+
+	/**
+	 * Writes the source's `nav` layer as the drivers' layers.toml. The layout
+	 * source is the one source of truth and layers.toml its compiled form
+	 * (coordinator, 2026-11-15, to review by the maintainer): the file opens
+	 * with the source's id and the hash of the body below, so a hand edit is
+	 * recognisable. The loaders read it as any layers.toml and do not refuse
+	 * an edited one: files written before this header have none.
 	 * @param {object} doc
 	 * @param {object} data - LAYER_EDITOR_DATA.
 	 * @returns {string}
 	 */
 	function navLayerFile(doc, data) {
+		const body = navLayerBody(doc, data);
+		return (
+			[
+				`# Compiled by Ergopti Studio from the navigation layer of « ${doc.layout.id} ».`,
+				'# Edit that layer in the Studio and apply it again: a change made here is',
+				'# replaced the next time it is applied.',
+				NAV_FILE_SOURCE + doc.layout.id,
+				NAV_FILE_HASH + fnv1a32(body),
+				''
+			].join('\n') + body
+		);
+	}
+
+	/** The layers.toml body of the source's `nav` layer, without the source header. */
+	function navLayerBody(doc, data) {
 		const layer = (doc.layers || []).find((l) => l.id === NAV_LAYER);
 		const sections = {};
 		if (layer) {
@@ -815,8 +898,9 @@ var LayoutSourceIO = (function () {
 		approximateImport,
 		fillSources,
 		startFrom,
+		startFromDocument,
 		windowsDlls,
-		windowsDllArchive,
+		windowsPackage,
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,
@@ -826,6 +910,9 @@ var LayoutSourceIO = (function () {
 		installPayload,
 		emulationTable,
 		withNavLayer,
-		navLayerFile
+		navLayerFile,
+		fnv1a32,
+		NAV_FILE_SOURCE,
+		NAV_FILE_HASH
 	};
 })();

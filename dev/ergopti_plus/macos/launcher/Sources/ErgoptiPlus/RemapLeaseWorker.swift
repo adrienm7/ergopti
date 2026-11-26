@@ -123,6 +123,9 @@ private let kProtocolReadBytes = 4_096
 let kCLIDiagnosticReadBytes = 4_096
 let kMaximumCLIDiagnosticChunksPerDrain = 16
 private let kBoundaryPollMaximumEINTRRetries = 3
+/// Reads allowed to empty a hung-up private socket; one valid closing batch
+/// fits in a single read, so this only bounds a misbehaving peer.
+private let kMaximumTerminalDrainReads = 8
 private let kChildPollMicroseconds = LauncherTimings.leaseChildPoll.microseconds
 private let kProcessTerminationGraceSeconds = LauncherTimings.processTerminationGrace.seconds
 private let kFenceRetryDelays: [useconds_t] = [
@@ -2012,6 +2015,35 @@ final class SpawnedLeaseInner {
 		return readLeaseLines(from: descriptor, decoder: &decoder)
 	}
 
+	/// Reads every line still queued behind a terminal poll result, up to EOF.
+	/// A peer that hung up keeps its last writes buffered: an inner that wrote
+	/// FENCED (or FAILED) and exited between two outer reads must not have that
+	/// line discarded and be mistaken for a crash.
+	/// - Returns: Every remaining line, or nil when the tail is unreadable,
+	///   malformed or longer than one protocol batch.
+	func readRemainingLinesAfterHangup() -> [String]? {
+		var remaining: [String] = []
+		var reads = 0
+		var interruptedRetries = 0
+		while reads < kMaximumTerminalDrainReads {
+			switch readLines() {
+			case .lines(let lines):
+				reads += 1
+				remaining += lines
+			case .eof(let lines):
+				remaining += lines
+				return remaining.count <= kMaximumProtocolLinesPerRead ? remaining : nil
+			case .invalid:
+				return nil
+			case .retry:
+				guard interruptedRetries < kBoundaryPollMaximumEINTRRetries else { return nil }
+				interruptedRetries += 1
+			}
+			if remaining.count > kMaximumProtocolLinesPerRead { return nil }
+		}
+		return nil
+	}
+
 	/// Closes only the private liveness socket, never a process by PID.
 	func closeSocket() {
 		if descriptor >= 0 {
@@ -2612,7 +2644,15 @@ final class KarabinerLeaseOuterRuntime {
 				)
 			}
 			if boundaryResult > 0 && leasePollReportsTerminal(boundary.revents) {
-				return consumeTerminalInnerLines(lines)
+				// The inner may have answered and exited after this read: its
+				// closing FENCED or FAILED is still queued and belongs to the batch.
+				guard let remaining = current.readRemainingLinesAfterHangup() else {
+					return finishAfterRecovery(
+						machine.innerLost(),
+						reason: "the inner's closing private read was unreadable"
+					)
+				}
+				return consumeTerminalInnerLines(lines + remaining)
 			}
 			return consumeInnerLines(lines)
 		case .eof(let lines):
@@ -2636,15 +2676,13 @@ final class KarabinerLeaseOuterRuntime {
 	/// - Parameter current: Exact outer-owned inner child.
 	/// - Returns: Terminal result after normal fence completion or recovery.
 	private func consumeTerminalInnerOutput(_ current: SpawnedLeaseInner) -> Int32? {
-		switch current.readLines() {
-		case .lines(let lines), .eof(let lines):
-			return consumeTerminalInnerLines(lines)
-		case .invalid, .retry:
+		guard let lines = current.readRemainingLinesAfterHangup() else {
 			return finishAfterRecovery(
 				machine.innerLost(),
 				reason: "the inner's closing private read was unreadable"
 			)
 		}
+		return consumeTerminalInnerLines(lines)
 	}
 
 	/// Applies a healthy private acknowledgement batch in order.

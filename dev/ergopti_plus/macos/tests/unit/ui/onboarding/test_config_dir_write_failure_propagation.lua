@@ -26,7 +26,7 @@ local function load_refusing_editor()
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/old/hammerspoon/config.toml" end,
 		get_config_dir = function() return "/old/" end,
@@ -51,7 +51,7 @@ local function load_refusing_editor()
 		force_focus = function() return true end,
 	}
 
-	local MenuPaths = helpers.load_with_stubs("ui.menu.menu_paths", {
+	local MenuPaths = helpers.load_with_stubs("settings.ui.menu.paths", {
 		webview = {
 			usercontent = {
 				new = function()

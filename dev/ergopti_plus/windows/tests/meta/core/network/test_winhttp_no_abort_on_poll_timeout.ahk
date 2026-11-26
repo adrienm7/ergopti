@@ -34,7 +34,7 @@
 
 _WNAPT_RemotePollAbortsOnGiveUp() {
 	; Move-resilient: extract _LLMRemote_PollRequest()'s body by name via the
-	; framework helper instead of a pinned modules/llm/api_remote.ahk read. The
+	; framework helper instead of a pinned ai/engine/api/remote.ahk read. The
 	; helper strips full-line comments, so an assertion can never match a phrase
 	; that only appears in a comment.
 	Body := _DriverFuncBody("_LLMRemote_PollRequest")

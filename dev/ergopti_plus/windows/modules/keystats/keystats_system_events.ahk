@@ -63,6 +63,33 @@ _KL_Watchers_SystemObserve(Action) {
 	}
 }
 
+/**
+ * Records one finished keep-awake session: a passive_period row of kind awake,
+ * the row the rebuild sums into awake_ms (maintainer decision KMD-3, as macOS
+ * and Linux). Metrics that are off credit nothing, by their setting.
+ * @param DurationMs {Integer} The session's length in milliseconds.
+ * @returns {Integer} True once the owner holds no delivery debt for it.
+ */
+KL_RecordAwakeSession(DurationMs) {
+	if !(DurationMs is Integer) || DurationMs < 0
+		throw ValueError("A keep-awake session needs a non-negative integer duration.")
+	if !Keystats.initialized
+		return true
+	if !IsObject(KLWatch.system_events)
+		return _KL_Watchers_SystemResult(false, "owner-uninitialized")
+	try {
+		Owner := KLWatch.system_events
+		Ok := Owner.RecordCompleted(Map("kind", "awake", "duration_ms", DurationMs))
+		; A pause stops keep-awake: the session stays pending for the idle
+		; tick's drain after the resume, which is its delivery, not a failure.
+		if !Ok && Owner.LastFailure == "collection-paused"
+			return true
+		return _KL_Watchers_SystemResult(Ok, Owner.LastFailure)
+	} catch Error {
+		return _KL_Watchers_SystemResult(false, "record-exception")
+	}
+}
+
 _KL_Watchers_SystemDrain(Stopping := false) {
 	if !IsObject(KLWatch.system_events)
 		return true

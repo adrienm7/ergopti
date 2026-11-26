@@ -12,9 +12,21 @@ _TSCSO_ClipboardTransactionOwnsSequence() {
 	Receipt := _DriverFuncBody("CB_WriteTextWithReceipt")
 	Assert(Receipt != "", "the actual receipt owner must be present")
 	BeforePos := InStr(Receipt, "BeforeMutation := CBClipboardOwner.mutation_id")
-	SetterPos := InStr(Receipt, "Published := CB_Write(Text)")
+	SetterPos := InStr(Receipt, "Published := Length ? _CB_WriteTransientText(Text) : CB_Write(Text)")
 	Assert(BeforePos > 0 and SetterPos > BeforePos,
 		"the actual setter must follow the captured mutation origin")
+	; A_Clipboard cannot add formats to its write: the TextSend payload is published
+	; natively and marked transient inside the same lease, before CloseClipboard.
+	Writer := _DriverFuncBody("_CB_WriteTransientText")
+	Assert(Writer != "", "the transient text writer must exist")
+	OpenPos := InStr(Writer, "Opened := CB_OpenClipboardWithin(A_ScriptHwnd)")
+	ReservePos := InStr(Writer, "MutationId := _CB_BeginOwnedMutation()")
+	PublishPos := InStr(Writer, 'DllCall("User32\SetClipboardData", "UInt", 13, "Ptr", Handle, "Ptr")')
+	MarkPos := InStr(Writer, "_CB_MarkTransientPublication()")
+	ClosePos := InStr(Writer, 'DllCall("User32\CloseClipboard", "Int")')
+	Assert(OpenPos > 0 and ReservePos > OpenPos and PublishPos > ReservePos and MarkPos > PublishPos
+		and ClosePos > MarkPos and InStr(Writer, "A_Clipboard") == 0,
+		"the TextSend payload must be reserved, published and marked transient under one native lease")
 	Assert(InStr(Receipt, "CBClipboardOwner.mutation_id == BeforeMutation + 1") > SetterPos
 		and InStr(Receipt, 'DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd') > SetterPos
 		and InStr(Receipt, 'StrGet(Pointer, -Length, "UTF-16") == Text') > SetterPos,

@@ -30,9 +30,9 @@ local NativePath = require("core.fs.engine.native_path")
 local FileSystem = require("core.fs.adapters.file_system")
 local i18n          = require("core.i18n.engine.i18n")
 local notifications = require("core.ui.engine.notifications")
-local ui_restore    = require("infra.ui_restore")
+local ui_restore    = require("menu.engine.ui_restore")
 local fs_dir        = require("core.fs.engine.dir")
-local git_status    = require("infra.git_status")
+local git_status    = require("diagnostics.engine.reports.git_status")
 local reload_gate   = require("core.lifecycle.engine.reload.gate")
 local RuntimeLog    = require("diagnostics.engine.runtime_log")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -51,7 +51,7 @@ local function reload_already_terminating()
 end
 
 -- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
--- Same rationale as infra/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
+-- Same rationale as hotstrings/engine/catalogue/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
 -- tree is a user-writable folder, so a self-referential symlink would make a
 -- naive recursion loop forever and abort boot with a stack overflow (F-LOW-4).
 local SCAN_MAX_DEPTH = 16
@@ -62,17 +62,16 @@ local SCAN_MAX_DEPTH = 16
 -- previous boot would re-fire a reload immediately after the next boot — and,
 -- because the replay recurs every boot, cascade into the keyboard-freezing reload
 -- storm (fe57ce045). Mirrors the menu watcher's identical guard
--- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
+-- (menu/ui/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
 local BOOT_SUPPRESS_SEC = 5
 
--- Consecutive Git-hold re-polls before one visible warning is emitted. A live
--- index.lock remains authoritative regardless of elapsed time: bypassing it can
--- reload a half-checked-out tree. The counter saturates after the warning so a
--- stale lock remains safe without flooding the log.
+-- A live Git marker holds the reload for as long as it exists: bypassing it can
+-- reload a half-checked-out tree. reload_gate.step_git_hold reports a stale lock
+-- once after GIT_HOLD_REPORT_SEC and restarts the quiet window when the marker
+-- goes away, the policy every driver shares.
 -- The poll interval itself stays the bare literal 0.5 in hs.timer.doAfter below —
 -- a cross-driver single-source gate pins it to Linux's _debounce_sec
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
-local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
 --- Whether a changed path is a hotstring source: a TOML category, an index,
 --- or the AutoHotkey path marker.
@@ -83,11 +82,11 @@ local function is_hotstring_source(path)
 		or path:match("%.local_ahk_path$") ~= nil
 end
 
---- Whether a developer field run is running (infra/field_run.lua). Read
+--- Whether a developer field run is running (diagnostics/engine/field_run/field_run.lua). Read
 --- through package.loaded: only a developer app ever loads that module.
 --- @return boolean
 local function field_run_holds_reload()
-	local field_run = package.loaded["infra.field_run"]
+	local field_run = package.loaded["diagnostics.engine.field_run.field_run"]
 	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
 		and field_run.holds_reload() == true
 end
@@ -271,6 +270,9 @@ function M.start(ctx)
 	local suppress_until = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 
 	local reload_timer = nil
+	-- The current Git hold episode (reload_gate.step_git_hold). Declared before the
+	-- owner so its stop() can report a hold it interrupts.
+	local git_hold = { since = nil, reported = false }
 
 	--- Stops one exact native capability without discarding it on uncertainty.
 	--- hs.pathwatcher:stop() is a void API, so non-throw is its exact commitment;
@@ -295,6 +297,10 @@ function M.start(ctx)
 		lifecycle_active = false
 		for _, admission in ipairs(callback_admissions) do admission.active = false end
 		lifecycle_generation = lifecycle_generation + 1
+		if git_hold.since ~= nil then
+			Logger.warn(LOG, "File watchers stopped while a Git operation held their reload.")
+			git_hold.since, git_hold.reported = nil, false
+		end
 		local all_stopped = true
 		if reload_timer then
 			if stop_capability(reload_timer, "File-watcher debounce timer") then
@@ -395,9 +401,6 @@ function M.start(ctx)
 		callback_admissions[#callback_admissions + 1] = admission
 		return true
 	end
-	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
-	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
-	local defer_count = 0
 	-- Distinct source paths changed since the current burst began, and the awake
 	-- time (s) of the last change. Together they drive the adaptive settle: a lone
 	-- edit reloads after EDIT_SETTLE_SEC, but a BULK write — git pull, OneDrive /
@@ -468,9 +471,6 @@ function M.start(ctx)
 		end
 		last_change_sec = now
 		reload_refusal_logged = false
-		-- Genuine activity resets the stuck-state counter, so an ongoing write never
-		-- bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
-		defer_count = 0
 		arm_timer(msg)
 	end
 
@@ -504,18 +504,12 @@ function M.start(ctx)
 		end
 		field_run_hold_logged = false
 		local busy, repo = any_git_operation_in_progress()
-		if busy then
-			if defer_count < GIT_HOLD_WARN_DEFERRALS then
-				defer_count = defer_count + 1
-				if defer_count == GIT_HOLD_WARN_DEFERRALS then
-					Logger.warn(LOG,
-						"Git operation in '%s' still owns the reload fence after %d checks; reload remains pending.",
-						tostring(repo), GIT_HOLD_WARN_DEFERRALS)
-				else
-					Logger.debug(LOG, "Reload held (git operation in progress in %s) on '%s' (%d/%d).",
-						tostring(repo), base_dir, defer_count, GIT_HOLD_WARN_DEFERRALS)
-				end
-			end
+		local now = TimerScheduler.awake_time()
+		local event, held_sec = reload_gate.step_git_hold(git_hold, busy, now)
+		if event ~= "clear" then
+			reload_gate.log_git_hold(Logger, LOG, event, held_sec, tostring(repo or base_dir))
+			-- Git may have written the last files just before it released the lock.
+			if event == "end" then last_change_sec = now end
 			arm_timer(msg)
 			return
 		end
@@ -582,7 +576,7 @@ function M.start(ctx)
 					arm_timer(msg)
 					return false
 				end
-				burst_paths, burst_count, defer_count = {}, 0, 0
+				burst_paths, burst_count = {}, 0
 				reload_refusal_logged = false
 				reload_notice_sent = false
 				return true

@@ -61,8 +61,8 @@ local function make_fixture(options)
 
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["platform.input.synthetic_input"] = synthetic
-	package.loaded["adapters.event_provenance"] = nil
-	fixture.provenance = helpers.load_with_stubs("adapters.event_provenance", {
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
+	fixture.provenance = helpers.load_with_stubs("diagnostics.adapters.event_provenance", {
 		eventtap = {
 			event = {
 				properties = {

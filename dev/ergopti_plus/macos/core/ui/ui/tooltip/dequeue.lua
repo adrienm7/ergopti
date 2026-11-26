@@ -100,7 +100,8 @@ end
 --- Stamps absolute expiry timestamps (seconds since epoch) on row copies.
 --- @param rows table
 --- @param now_sec number
---- @param opts table Field names, plus the timing values effective_duration_sec requires.
+--- @param opts table Field names, plus the timing values effective_duration_sec requires,
+---   and safety_timeout_sec, the lifetime of a row with no delay (none when absent).
 --- @return table stamped_rows, number|nil next_expire_sec
 function M.stamp_expiry_times(rows, now_sec, opts)
 	timing_opts(opts)
@@ -122,6 +123,11 @@ function M.stamp_expiry_times(rows, now_sec, opts)
 			local d = row_duration_sec(row, duration_field)
 			if d > 0 then
 				expire_at = now_sec + M.effective_duration_sec(d, opts)
+			elseif type(opts.safety_timeout_sec) == "number" and opts.safety_timeout_sec > 0 then
+				-- macOS: a no-delay row leaves after the shared safety lifetime
+				-- (TWD-1), like a lone no-delay preview; without the option the
+				-- reference behaviour (no expiry) stands.
+				expire_at = now_sec + opts.safety_timeout_sec
 			else
 				expire_at = nil
 			end

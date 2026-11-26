@@ -74,7 +74,7 @@ end
 
 print("=== 1/ the models Ollama reports ===")
 require("tests.support.live_preferences").ensure_directory()
-local Profiles = require("modules.llm.profiles")
+local Profiles = require("ai.engine.settings.profiles")
 Profiles.init({})
 assert(Profiles.enable() == true, "the live prediction fixture must explicitly grant AI consent")
 -- The inventory is acquired off the event loop: a refresh only reserves the
@@ -107,7 +107,7 @@ package.loaded["ui.download_window.bridge"] = {
 	focus = function() return true end,
 	close = function() return true end,
 }
-local Download = require("modules.llm.model_download")
+local Download = require("ai.engine.local_servers.model_download")
 local pulled = nil
 local started = Download.start(Profiles.get_base_url(), MODEL, MODEL, function(succeeded) pulled = succeeded end)
 check(started == true, "the pull request is dispatched")
@@ -125,7 +125,7 @@ check(pulled == true, "Ollama confirms the model through /api/pull")
 -- ===========================================
 
 print("=== 3/ local model admission before inference ===")
-local Ollama = require("modules.llm.api_ollama")
+local Ollama = require("ai.engine.api.api_ollama")
 local Http = require("core.network.adapters.http_client")
 local native_post = Http.postStream
 local inference_posts = 0
@@ -172,7 +172,7 @@ Http.postStream = native_post
 
 print("=== 4/ predictions from the engine ===")
 local offered, final = {}, nil
-local Engine = require("modules.llm.prediction_engine")
+local Engine = require("ai.engine.prediction.engine")
 Engine.init({ focus_id = function() return "owned-ollama-target" end,
 	overlay = {
 		show = function(candidates, meta)
@@ -203,7 +203,7 @@ end
 -- =========================================
 
 print("=== 5/ the remote-API backend on Ollama's OpenAI endpoint ===")
-local Remote = require("modules.llm.api_remote")
+local Remote = require("ai.engine.api.api_remote")
 local entry = {
 	id = "ollama-openai", provider = "openai_compat", label = "Ollama (OpenAI)",
 	token = "ollama", model = MODEL, base_url = Profiles.get_base_url() .. "/v1",

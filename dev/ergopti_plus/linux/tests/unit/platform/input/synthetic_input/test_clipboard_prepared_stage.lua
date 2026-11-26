@@ -13,7 +13,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 
 local function with_stage(body, options)
 	options = options or {}
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "core.logger.engine.shim",
+	local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "core.logger.engine.shim",
 		"adapters.keyboard_layout" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -62,7 +62,7 @@ local function with_stage(body, options)
 		s.lookups = s.lookups + 1; error("prepared paste must use the captured key")
 	end }
 	local ok, detail = xpcall(function()
-		local clipboard = helpers.load_module("adapters.clipboard")
+		local clipboard = helpers.load_module("clipboard.adapters.clipboard")
 		s.channel = { emit = function(code, value)
 			boundary("emit")
 			s.rows[#s.rows + 1] = { code, value }
@@ -120,10 +120,10 @@ helpers.describe("prepared clipboard exact lifetime", function()
 			helpers.assert_eq(s.stage.prepare(), false)
 			helpers.assert_eq(s.value, "external copy")
 			helpers.assert_eq(#s.writes, 1)
-			helpers.assert_eq(s.stage.close(), false, "ambiguous restoration remains pending")
+			helpers.assert_true(s.stage.close(), "another application's copy settles the restoration")
 			s.value = "replacement"
-			helpers.assert_true(s.stage.close(), "the inverse can settle when our payload is identifiable")
-			helpers.assert_eq(s.value, "original")
+			helpers.assert_true(s.stage.close())
+			helpers.assert_eq(#s.writes, 1, "the settled stage never writes again")
 		end, { external_after_failure = true })
 	end)
 
@@ -131,9 +131,10 @@ helpers.describe("prepared clipboard exact lifetime", function()
 		with_stage(function(s)
 			helpers.assert_true(s.stage.prepare())
 			s.failure = "restore"
-			helpers.assert_eq(s.stage.close(), false)
+			local settled, restored = s.stage.close()
+			helpers.assert_eq({ settled, restored }, { true, false }, "a refused restore is given up, never kept as debt")
 			helpers.assert_eq(s.value, "external copy")
-			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_true(s.stage.close())
 			helpers.assert_eq(s.value, "external copy")
 			helpers.assert_eq(#s.writes, 2)
 		end, { external_after_failure = true })
@@ -145,7 +146,8 @@ helpers.describe("prepared clipboard exact lifetime", function()
 			helpers.assert_true(s.stage.prepare())
 			s.value = "external copy"
 			options.read_refused = true
-			helpers.assert_eq(s.stage.close(), false)
+			local settled, restored = s.stage.close()
+			helpers.assert_eq({ settled, restored }, { true, false }, "an unreadable clipboard is given up once")
 			helpers.assert_eq(s.value, "external copy")
 			helpers.assert_eq(#s.writes, 1)
 			options.read_refused = false
@@ -220,16 +222,17 @@ helpers.describe("prepared clipboard exact lifetime", function()
 				helpers.assert_eq(s.rows, {})
 			end, { throws = throws })
 		end)
-		helpers.it("keeps restore debt after an acknowledgement " .. (throws and "throws" or "refuses"), function()
+		helpers.it("gives up restoration once after an acknowledgement " .. (throws and "throws" or "refuses"), function()
 			with_stage(function(s)
 				helpers.assert_eq(s.stage.prepare(), true)
 				s.failure = "restore"
-				helpers.assert_eq(s.stage.close(), false, "changed native bytes alone are not a successful receipt")
+				local settled, restored = s.stage.close()
+				helpers.assert_eq({ settled, restored }, { true, false }, "a refused receipt is reported, never kept as debt")
 				helpers.assert_eq(s.value, "original")
 				helpers.assert_eq(s.stage.prepare(), false)
 				helpers.assert_eq(s.stage.paste(s.channel), false)
 				helpers.assert_eq(s.stage.close(), true)
-				helpers.assert_eq(s.writes, { "replacement", "original", "original" })
+				helpers.assert_eq(s.writes, { "replacement", "original" }, "one attempt only")
 			end, { throws = throws })
 		end)
 		helpers.it("restores after the settle wait " .. (throws and "throws" or "refuses"), function()

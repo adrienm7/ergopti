@@ -94,8 +94,8 @@ LLM_GetBackendBrands() => Map(
 	"mlx", Map("brand", "MLX", "emoji", "m", "kind", "local"),
 	"api", Map("brand", "API", "emoji", "a", "kind", "remote"))
 
-; Minimal WebView2 stand-in so IsSet(WebView2) resolves and the class reference in
-; the (never-called here) ShowWeb path loads. The tests never create a webview.
+; Minimal WebView2 stand-in so the class reference in the (never-called here)
+; ShowWeb path loads. The tests never create a webview.
 class WebView2 {
 	static create(args*) {
 		return { CoreWebView2: {} }
@@ -103,7 +103,10 @@ class WebView2 {
 }
 
 #Include ../core/network/engine/external_url_policy.ahk
-#Include ../ui/model_browser/init.ahk
+; The page asks the uninstall owner whether the managed runtime is published;
+; the real lookup runs here against the stubbed empty managed root above.
+#Include ../ai/engine/ollama/runtime_uninstall.ahk
+#Include ../ai/ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
 _LlmMbWatchdog(*) {
@@ -111,6 +114,12 @@ _LlmMbWatchdog(*) {
 	ExitApp(2)
 }
 SetTimer(_LlmMbWatchdog, -60000)
+
+; The scheduler's suspended re-queue and the browser's own delays read the real
+; shared timing registry; _SharedDir above is a stub folder for the catalogue.
+#Include ../core/text/engine/toml/helpers.ahk
+#Include ../core/timing/engine/config.ahk
+TimingsLoadShared(A_ScriptDir . "\..\..\_shared")
 
 
 

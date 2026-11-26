@@ -12,14 +12,14 @@ local function with_editor(callback)
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
-			"ui.prompt_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
+			"ai.ui.prompt_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n",
 			"hs", "tests.stubs.hs",
 			"core.timing.engine.deferred_work", "core.ui.engine.dialog_util",
 		}, function()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
 			_G.hs = hs_stub
-			local state = { views = {}, bridges = {}, errors = {}, focuses = 0, deletes = 0 }
+			local state = { views = {}, bridges = {}, errors = {}, warnings = {}, focuses = 0, deletes = 0 }
 			hs_stub.webview.usercontent.new = function()
 				local bridge = {}
 				function bridge:setCallback(fn)
@@ -34,6 +34,9 @@ local function with_editor(callback)
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)
+			end
+			logger.warn = function(_, message, ...)
+				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared/prompt_editor" end }
@@ -72,7 +75,7 @@ local function with_editor(callback)
 					return view
 				end,
 			}
-			callback(require("ui.prompt_editor"), state, hs_stub)
+			callback(require("ai.ui.prompt_editor"), state, hs_stub)
 		end)
 	end, debug.traceback)
 	_G.hs = previous_hs
@@ -185,7 +188,7 @@ helpers.describe("prompt editor native boundaries", function()
 				local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
 				state.bridges[1].callback({ body = {
 					action = "save", edit_id = context.edit_id, epoch = context.epoch,
-					name = "Mine", prompt = "Prompt",
+					name = "Mine", prompt = "Prompt", batch = false,
 				} })
 				helpers.assert_eq(#alerts, 0, "the alert never runs inside the page's callback")
 				for _, callback in ipairs(deferred) do callback() end
@@ -194,6 +197,99 @@ helpers.describe("prompt editor native boundaries", function()
 			end)
 		end)
 	end
+
+	helpers.it("pck-10: refuses the scalar fields Windows and Linux refuse, and saves none of them", function()
+		with_editor(function(editor, state, hs_stub)
+			local saved = {}
+			helpers.assert_true(editor.open({ id = "A" }, function(profile)
+				saved[#saved + 1] = profile
+				return true
+			end))
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
+			local function post(fields)
+				local body = { action = "save", edit_id = context.edit_id, epoch = context.epoch }
+				for key, value in pairs(fields) do body[key] = value end
+				state.bridges[1].callback({ body = body })
+			end
+			post({ name = "  ", prompt = "Prompt", batch = false })
+			post({ prompt = "Prompt", batch = false })
+			post({ name = "Mine", prompt = " \n ", batch = false })
+			post({ name = "Mine", batch = false })
+			post({ name = "Mine", prompt = "Prompt", batch = "yes" })
+			post({ name = "Mine", prompt = "Prompt" })
+			helpers.assert_eq(#saved, 0, "no invalid field reaches the profile writer")
+			helpers.assert_eq(state.deletes, 0, "the editor stays open for a valid save")
+			post({ name = "  Mine  ", prompt = "Prompt\n", batch = true })
+			helpers.assert_eq(#saved, 1)
+			helpers.assert_eq(saved[1].label, "Mine", "the name is trimmed, as on Windows and Linux")
+			helpers.assert_eq(saved[1].raw_prompt, "Prompt\n", "a raw prompt is the verbatim text, as on Linux")
+			helpers.assert_eq(saved[1].batch, true)
+		end)
+	end)
+
+	-- PCK-20: the shared save vectors, as Windows and Linux read them.
+	local function corpus(hs_stub)
+		local fh = assert(io.open(helpers.shared("tests/corpus/llm/prompt_editor_save_vectors.json"), "rb"))
+		local raw = fh:read("*a")
+		fh:close()
+		return hs_stub.json.decode(raw)
+	end
+	local function opened(editor, state, hs_stub, saver)
+		helpers.assert_true(editor.open({ id = "A" }, saver))
+		local view = state.views[#state.views]
+		view.options.on_navigation("didFinishNavigation")
+		local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
+		return function(fields)
+			local body = { edit_id = context.edit_id, epoch = context.epoch }
+			for key, value in pairs(fields) do body[key] = value end
+			state.bridges[#state.bridges].callback({ body = body })
+		end
+	end
+
+	helpers.it("pck-20: replays the shared save vectors", function()
+		local count = 0
+		with_editor(function(_, _, hs_stub) count = #corpus(hs_stub).save end)
+		helpers.assert_true(count >= 10, "the corpus carries its save vectors")
+		for index = 1, count do
+			with_editor(function(editor, state, hs_stub)
+				local vector = corpus(hs_stub).save[index]
+				local saved = {}
+				local post = opened(editor, state, hs_stub, function(profile)
+					saved[#saved + 1] = profile
+					return true
+				end)
+				local fields = { action = "save" }
+				for key, value in pairs(vector.payload) do fields[key] = value end
+				post(fields)
+				helpers.assert_eq(#saved, vector.accepted and 1 or 0, vector.id .. ": admission")
+				if vector.accepted then
+					helpers.assert_eq(saved[1].label, vector.name, vector.id .. ": the name")
+					helpers.assert_eq(saved[1].raw_prompt, vector.prompt, vector.id .. ": the prompt is kept byte for byte")
+					helpers.assert_eq(saved[1].batch, vector.batch, vector.id .. ": batch")
+				end
+			end)
+		end
+	end)
+
+	helpers.it("pck-20: an unknown page action is logged as a warning and saves nothing", function()
+		with_editor(function(editor, state, hs_stub)
+			local saves = 0
+			local post = opened(editor, state, hs_stub, function() saves = saves + 1; return true end)
+			post({ action = "ready" })
+			helpers.assert_eq(#state.warnings, 0, "ready is lifecycle, not a defect")
+			for _, action in ipairs(corpus(hs_stub).unknown_actions.actions) do
+				local before = #state.warnings
+				post({ action = action, name = "A", prompt = "x", batch = false })
+				helpers.assert_eq(#state.warnings, before + 1, "pck-20: one warning for " .. action)
+				helpers.assert_true(state.warnings[#state.warnings]:find("'" .. action .. "'", 1, true) ~= nil,
+					"pck-20: the warning names the action " .. action)
+			end
+			helpers.assert_eq(saves, 0, "an unknown action saves nothing")
+			helpers.assert_eq(state.deletes, 0, "an unknown action closes nothing")
+		end)
+	end)
 
 	helpers.it("(prompt-editor-cleanup-owner) retires bridge and presentation before a failed close", function()
 		with_editor(function(editor, state, hs_stub)
@@ -207,7 +303,7 @@ helpers.describe("prompt editor native boundaries", function()
 			view.options.on_navigation("didFinishNavigation")
 			state.bridges[1].callback({ body = {
 				action = "save", edit_id = context.edit_id, epoch = context.epoch,
-				name = "retired", prompt = "retired",
+				name = "retired", prompt = "retired", batch = false,
 			} })
 			helpers.assert_eq(saves, 0, "an ambiguous native window owns cleanup, never persistence")
 			helpers.assert_eq(#view.scripts, 1, "late navigation must not initialize a retired native window")

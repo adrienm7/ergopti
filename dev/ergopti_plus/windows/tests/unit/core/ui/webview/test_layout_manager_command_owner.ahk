@@ -53,19 +53,61 @@ _LMCT_OverlayTimerOwner(Source) {
 	return Result
 }
 
+; The real boot graph and the save, resume, menu and data-policy owners the
+; layout manager's child runs on; the browser stays passive.
+_LMCT_BaseChildSource() {
+	global _DriverDir, _SharedDir
+	Support := _DriverDir . "\tests\support\feature_state_boot_smoke.ahk"
+	Source := FSReadStrict(Support)
+	Boundary := InStr(Source, "`ntry {`n    if (A_Args.Length", true)
+	AssertTrue(Boundary > 0, "The delivered boot graph must have its actual pre-execution boundary")
+	Prefix := SubStr(Source, 1, Boundary - 1)
+	for Name, Expression in Map("_ConfigDir", 'A_Args[2] . "\config\"',
+		"_DriverDir", _LMCT_Quote(_DriverDir), "_SharedDir", _LMCT_Quote(_SharedDir)) {
+		Prefix := RegExReplace(Prefix, "m)^global " . Name . " :=[^`n]+", "global " . Name . " := " . Expression, &Count)
+		AssertEqual(1, Count, "Only this private declaration may change: " . Name)
+	}
+	SplitPath(Support, , &SupportDir)
+	Code := ""
+	for Line in StrSplit(Prefix, "`n") {
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Include)
+			Line := "#Include " . SupportDir . "\" . Include[1]
+		Code .= Line . "`n"
+	}
+	Seen := Map()
+	for Symbol in ["NavLayerSave_SaveAndApply", "KeymapLayers_LoadContext", "WebView_SharedEnvironment",
+		"Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
+		"Keylayout_Parse", "LayoutRegistry_Keycodes", "StarSlotRecordLayoutFallback",
+		"KeylayoutEmulation_LayerIsActive", "NumberRowEffectiveMode", "GetForegroundKeyboardLayout",
+		"LayoutRowsPolicyEmulates", "MasterGateDesiredTapHold", "TapHoldHoldLayer", "NavLayer_BuildTable", "WMPresentWindow",
+		"TimingsGet", "ReadingPrefs_SeedScript"] {
+		OwnerRoot := (Symbol == "LLM_DisplayIndentValues" || Symbol == "LayoutRowsPolicyEmulates")
+			? _DriverDir . "\..\_shared" : _DriverDir
+		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
+		AssertTrue(Owner != "", "The layout manager child requires its genuine whole owner: " . Symbol)
+		if !Seen.Has(Owner) {
+			Seen[Owner] := true
+			Code .= "#Include " . Owner . "`n"
+		}
+	}
+	; The page seed's owner too (LTP-01).
+	AssertEqual(20, Seen.Count, "The whole save, resume/menu, page seed and real data-policy owners must be nonempty and distinct")
+	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
+	AssertTrue(FileExist(PromiseOwner))
+	return Code . "#Include " . PromiseOwner . "`n"
+}
+
 _LMCT_ChildSource() {
 	global _DriverDir
-	Code := _LRDT_ChildSource()
-	Tail := "#Include " . _DriverDir . "\tests\fixtures\layer_editor_ready_delivery_body.ahk`n"
-	AssertTrue(SubStr(Code, -StrLen(Tail)) == Tail, "The delivered real resume graph must retain its exact fixture boundary")
-	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Tail))
+	Code := _LMCT_BaseChildSource()
 	for Symbol in ["UpdateChannelRegistryData", "UpdateScheduleData"]
 		Code .= "#Include " . _LMCT_GeneratedOwner(Symbol) . "`n"
 	; The updater owner of this graph builds its URLs from the generated hosts.
 	Code .= "#Include " . _DriverDir . "\_generated\identifiers.ahk`n"
 	Seen := Map()
 	for Symbol in ["UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_IsLocalSource",
-		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem"] {
+		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem",
+		"KbdRegister_Installed"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The public catalogue path requires its genuine whole owner: " . Symbol)
 		Source := FSReadStrict(Owner)
@@ -75,7 +117,8 @@ _LMCT_ChildSource() {
 		Seen[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
-	AssertEqual(6, Seen.Count, "The real catalogue, extension validation, built-in data and source-mode refresh owners must all be present")
+	; The page state lists the layout DLLs Studio registered (KbdRegister_Installed).
+	AssertEqual(7, Seen.Count, "The real catalogue, extension validation, built-in data, source-mode refresh and layout DLL owners must all be present")
 	Owner := _DriverProductionFileForSymbol("LayoutManager_Open")
 	Source := FSReadStrict(Owner)
 	for Symbol in ["LayoutManager_Open", "_LayMgrWeb_OnWebMessage", "_LayMgrWeb_SessionCall", "LayoutManager_HandleMessage"]

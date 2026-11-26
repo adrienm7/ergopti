@@ -5,55 +5,27 @@
 ; DESCRIPTION:
 ; Builds the Layout category entries (base layout features and AltGr layer features) straight into the parent menu from the manifest.
 ;
-; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
+; Split out of menu/ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\modules\keymap\keylayout\emulation_recents.ahk
+#Include %A_LineFile%\..\..\emulation_picker\init.ahk
 
 
 
 
 /**
- * Reports the enabled emulation; selection belongs to the shared layout manager.
- * macOS and Linux's same list provider selects native input sources instead.
- * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
- * @param {Integer} Enabled Layout category gate; the live gate when omitted.
- * @param {Map} Index Registry metadata; the current catalogue when omitted.
- * @returns {Array} One disabled status row without a selection callback.
- */
-_LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset) {
-	global Features
-	if !IsSet(FeaturesSource)
-		FeaturesSource := Features
-	if !IsSet(Enabled)
-		Enabled := IsCategoryGated("Layout")
-	Active := Enabled ? LayoutManager_ActiveId(FeaturesSource) : ""
-	Name := ""
-	if Active != "" {
-		if !IsSet(Index) {
-			Index := LayoutCatalogue_Last()["index"]
-			if !(Index is Map)
-				Index := LayoutCatalogue_BundledIndex()
-		}
-		Entry := LayoutCatalogue_Entry(Index, Active)
-		; A previously selected layout absent from the current catalogue remains
-		; identified explicitly; it must never be reported as no emulation.
-		Name := (Entry is Map) ? Entry.Get("name", Active) : Active
-	}
-	Label := Name == "" ? t("menu.layout.emulated_none") : Format(t("menu.layout.emulated_status"), Name)
-	if (Active != "" && KeylayoutEmulation_FailedId() == Active)
-		Label .= " — " . t("menu.layout.emulation_failed")
-	return [Map("label", Label, "disabled", true)]
-}
-
-/**
- * Layout > « Disposition à émuler »: the same choices as macOS and Linux
- * (_shared/layouts/engine/emulation/menu.lua): none, the built-in Ergopti
- * variants, then the registry layouts the app lists or the layout manager
- * installed. A choice goes through the layout manager's acknowledged handoff,
+ * Layout > « Disposition à émuler »: the same rows as macOS and Linux
+ * (_shared/layouts/engine/emulation/menu.lua): one radio group of « None » and
+ * the quick choices (the layout in force and the ones chosen last,
+ * modules/keymap/keylayout/emulation_recents.ahk), then « Others… », which opens
+ * the picker of every layout: the built-in Ergopti variants, then the registry
+ * layouts the app lists or the layout manager installed (maintainer decision of
+ * 2026-11-25). A choice goes through the layout manager's acknowledged handoff,
  * which restarts the driver on the new selection. A registry layout that is not
  * installed is installed first: the boot never installs (decided on 2026-11-12,
  * as macOS and Linux), so an uninstalled layout stays chosen, named « cannot be
@@ -69,10 +41,12 @@ _LAY_CustomLayoutRows(FeaturesSource := unset, Enabled := unset, Index := unset)
  *   KeylayoutEmulation_FailedId() by default.
  * @param {Func} AfterFn Port: AfterFn(Id, Action, OnDone) reloads the emulation
  *   after an install; _LayMgrWeb_After by default.
+ * @param {Func} OthersFn Port: OthersFn(Choices, ChooseFn) opens the picker of
+ *   every choice; EmulationPicker_Open by default.
  * @returns {Array} One submenu row holding the choices.
  */
 _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset, Installed := unset, ErrorFn := 0,
-		InstallFn := 0, FailedId := unset, AfterFn := 0) {
+		InstallFn := 0, FailedId := unset, AfterFn := 0, OthersFn := 0) {
 	global Features, _ConfigDir, ERGOPTI_LAYOUT_ID, ERGOPTI_PLUS_LAYOUT_ID
 	if !IsSet(FeaturesSource)
 		FeaturesSource := Features
@@ -93,6 +67,8 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 		FailedId := KeylayoutEmulation_FailedId()
 	if !HasMethod(AfterFn, "Call")
 		AfterFn := _LayMgrWeb_After
+	if !HasMethod(OthersFn, "Call")
+		OthersFn := EmulationPicker_Open
 	ComposerId := LayoutRegistry_Composer()["id"]
 	Current := LayoutManager_ActiveId(FeaturesSource)
 	Registry := Map()
@@ -128,13 +104,30 @@ _LAY_EmulationChoiceRows(FeaturesSource := unset, SelectFn := 0, Index := unset,
 		return (*) => _LAY_ChooseEmulation(Id, SelectFn, ErrorFn, NeedsInstall ? InstallFn : 0,
 			Id == Current ? AfterFn : 0)
 	}
-	Items := []
+	Labels := Map()
 	for Pair in Choices {
-		Checked := Pair[1] == Current
-		if Checked
+		Labels[Pair[1]] := Pair[2]
+		if Pair[1] == Current
 			Shown := Pair[2]
-		Items.Push(Map("label", Pair[2], "checked", Checked, "action", ChooseAction(Pair[1])))
 	}
+	; The picker lists every choice but « None », the menu's first row.
+	Picked := []
+	for Pair in Choices
+		if Pair[1] != ""
+			Picked.Push(Map("id", Pair[1], "label", Pair[2], "current", Pair[1] == Current))
+	ChooseFn := (Id) => ChooseAction(Id).Call()
+	; One single-choice group: « None » and the quick choices, exactly one ticked
+	; (a Win32 tray draws the tick the Linux tray draws as a radio).
+	Items := [Map("label", Labels[""], "checked", Current == "", "action", ChooseAction(""))]
+	for Id in EmulationRecents_Quick(Current, EmulationRecents_Read(FeaturesSource), (Id) => Labels.Has(Id))
+		Items.Push(Map("label", Labels[Id], "checked", Id == Current, "action", ChooseAction(Id)))
+	; « Others… » and the separator before it are the menu manifest's rows.
+	Others := MenuRenderer_TemplateRows("layout_emulation_others_commands",
+		Map(MenuCommand.LAYOUT_EMULATION_OTHERS, (*) => OthersFn.Call(Picked, ChooseFn)), Map(), Map())
+	if !(Others is Array)
+		throw Error("The menu manifest refused layout_emulation_others_commands.")
+	for Row in Others
+		Items.Push(Row)
 	; A chosen layout the boot could not emulate stays ticked and named, as macOS
 	; and Linux show their emulation status error.
 	if (Current != "" && FailedId == Current)
@@ -257,8 +250,7 @@ _LAY_LayoutFeatureBaseRows() {
 ; List provider: the independent Ergopti AltGr layer (ergopti_alt_gr).
 ; Built-in variant intent belongs to the existing emulation picker; it has no row.
 ; The rows that work on any layout are declared on their own in the manifest's
-; « any layout » section: direct_access_digits, and ctrl_magic_save after the
-; magic-key replace option it depends on.
+; « any layout » section: direct_access_digits.
 ;
 ; Named, never « the section minus a list »: a row added to the section later
 ; fell into that remainder, and the pause switch and its two pickers were drawn
@@ -297,7 +289,7 @@ _LAY_NumberRowRuntime() {
 		return Map("owner", IsSet(Features) ? Features : 0,
 			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? KLE_Model : Hkl,
 			"native_owner", IsSet(_LayoutPollRetry) ? _LayoutPollRetry : 0,
-			"generation", MagicEditorState()["configuration_generation"],
+			"generation", StarSlotState()["configuration_generation"],
 			"lifecycle", IsSet(_TrayRootLifecycleEpoch) ? _TrayRootLifecycleEpoch : -1,
 			"hkl", Hkl, "platform", "ahk", "mode", Mode,
 			"master", IsCategoryGated("Layout") ? true : false,
@@ -321,7 +313,7 @@ _LAY_NumberRowSnapshot() {
 			throw TypeError("Number-row source is not readable.")
 		Snapshot["content"] := Content
 		Snapshot["presence"] := Presence
-		Document := TOML_ParseDocumentShared(Content)
+		Document := ConfigTomlSourceDocument(Content)
 		Desired := MasterGateDesiredFeatures(Features)
 		for Path, Expected in Map(ConfigKey.LAYOUT_DIRECT_ACCESS_DIGITS, Snapshot["mode"],
 			ConfigKey.LAYOUT_EMULATED_LAYOUT, Desired["layout"].Get(ConfigLeaf.EMULATED_LAYOUT, ""),
@@ -497,4 +489,107 @@ _LAY_NumberRowEdgesToggle(Value, RefreshFn, *) {
 /** Binds optional native ports without erasing the selected canonical value. */
 _LAY_NumberRowChoose(Expected, WriterFn, RefreshFn, NotifyFn, Value) {
 	return _LAY_NumberRowCommit(Expected, Value, WriterFn, RefreshFn, NotifyFn)
+}
+
+
+
+
+; ── « Touches de jeu » ─────────────────────────────────────────────────────────
+
+/**
+ * Layout > « Touches de jeu » (maintainer decision of 2026-11-26): the same rows
+ * as macOS and Linux (_shared/layouts/engine/emulation/menu.lua game_keys_rows):
+ * the global choice as one single-choice group, each choice greyed with its
+ * reason where Windows cannot honour it here and the checked choice's limit
+ * beneath, then the application last typed in and its own choice, which makes
+ * it a game.
+ * @param {Map} FeaturesSource Feature preferences; the live map when omitted.
+ * @param {Func} WriteFn Port: WriteFn(Path, Value) persists one leaf, true once written.
+ * @param {String} App The application's executable; the one last typed in when omitted.
+ * @param {String} Mode "emulation", "installed" or "system"; read live when omitted.
+ * @param {String} InstalledKlid The installed Ergopti layout's KLID; read live when omitted.
+ * @returns {Array} One submenu row holding the choices.
+ */
+_LAY_GameKeysRows(FeaturesSource := unset, WriteFn := 0, App := unset, Mode := unset, InstalledKlid := unset) {
+	global Features, _GK_Foreground
+	if !IsSet(FeaturesSource)
+		FeaturesSource := Features
+	if !HasMethod(WriteFn, "Call")
+		WriteFn := _LAY_GameKeysWrite
+	if !IsSet(App)
+		App := _GK_Foreground["app"]
+	if !IsSet(InstalledKlid)
+		InstalledKlid := GameKeys_InstalledKlid()
+	if !IsSet(Mode)
+		Mode := _LAY_GameKeysMode(InstalledKlid)
+	Settings := GameKeys_Resolve(FeaturesSource)
+	Installed := InstalledKlid != "" && GameKeys_EmulatesErgopti()
+	Choose(Path, Value) => (*) => WriteFn.Call(Path, Value)
+	; The choice vocabulary's labels, "" being « like the other applications »:
+	; the rows are this list provider's data, as the emulation choices are.
+	Labels := Map("", t("menu.layout.game_keys_app_default"))
+	for Choice in GameKeys_Choices()
+		Labels[Choice] := t("menu.layout.game_keys." . Choice)
+	ChoiceRow(Choice, Checked, Game, Action) {
+		Route := GameKeys_Route("windows", Mode, Choice, Map("installed_layout", Installed, "game", Game))
+		Row := Map("label", Labels[Choice], "checked", Checked, "action", Action, "route", Route)
+		if !Route["available"]
+			Row["disabled"] := true, Row["disabled_reason_key"] := Route["reason_key"]
+		return Row
+	}
+	Items := []
+	Note := ""
+	for Choice in GameKeys_Choices() {
+		Row := ChoiceRow(Choice, Choice == Settings["choice"], false, Choose(ConfigKey.LAYOUT_GAME_KEYS, Choice))
+		if Row["checked"]
+			Note := Row["route"]["note_key"]
+		Row.Delete("route")
+		Items.Push(Row)
+	}
+	if Note != ""
+		Items.Push(Map("label", t(Note), "disabled", true))
+	if App == "" {
+		NoApp := t("menu.layout.game_keys_no_app")
+		Items.Push(Map("label", NoApp, "disabled", true))
+	} else {
+		Chosen := GameKeys_ChoiceFor(Settings, "windows", App)
+		Own := Chosen["overridden"] ? Chosen["choice"] : ""
+		AppItems := [Map("label", Labels[""], "checked", Own == "",
+			"action", Choose(ConfigKey.LAYOUT_GAME_KEYS_APPS, GameKeys_AppsWith(Settings, "windows", App, "")))]
+		for Choice in GameKeys_Choices() {
+			Row := ChoiceRow(Choice, Choice == Own, true,
+				Choose(ConfigKey.LAYOUT_GAME_KEYS_APPS, GameKeys_AppsWith(Settings, "windows", App, Choice)))
+			Row.Delete("route")
+			AppItems.Push(Row)
+		}
+		Shown := Labels[Own]
+		; The row names the application, not its executable file: « windowsterminal »
+		; reads as a name, « windowsterminal.exe » as a file.
+		AppName := RegExReplace(App, "i)\.exe$")
+		Items.Push(Map("label", LabelValue(Format(t("menu.layout.game_keys_app"), AppName), Shown), "items", AppItems))
+	}
+	return [Map("label", LabelValue(t("menu.layout.game_keys"), Labels[Settings["choice"]]),
+		"items", Items)]
+}
+
+; Which Ergopti types now: the emulation, the installed Ergopti layout in front, or neither.
+_LAY_GameKeysMode(InstalledKlid) {
+	global Features
+	if KeylayoutEmulation_IsActive() || GameKeys_EmulatesErgopti()
+		return "emulation"
+	if InstalledKlid != "" && KLS_ActiveId() == InstalledKlid
+		return "installed"
+	return "system"
+}
+
+; Persists one « Touches de jeu » leaf, then redraws the menu with it.
+_LAY_GameKeysWrite(Path, Value) {
+	global Features
+	Written := WriteFeatureV2(Features, Path, Value)
+	if !(Written is Integer) || Written != true
+		return false
+	GameKeys_Invalidate()
+	try LoggerInfo("Menu", "Game keys updated ({1}).", Path)
+	RebuildTrayMenu()
+	return true
 }

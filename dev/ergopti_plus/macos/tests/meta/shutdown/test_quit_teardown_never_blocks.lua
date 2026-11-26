@@ -35,8 +35,8 @@ local FORBIDDEN = {
 local RECEIVER_MODULES = {
 	LauncherGuard = "core.lifecycle.engine.launcher_guard",
 	karabiner = "platform.remap",
-	keymap = "modules.keymap",
-	gestures = "modules.gestures",
+	keymap = "hotstrings.engine.expander",
+	gestures = "gestures.engine",
 	shortcuts = "modules.shortcuts",
 	Storage = "core.fs.adapters.storage",
 	TerminationCoordinator = "core.lifecycle.engine.shutdown.termination_coordinator",
@@ -49,9 +49,9 @@ local IGNORED_RECEIVERS = { captured = true, Logger = true }
 local TRANSITIVE_BODIES = {
 	{ module = "modules.keystats", header = "local function teardown_runtime(" },
 	{ module = "modules.keystats.log_manager", header = "function M.stop(" },
-	{ module = "ui.menu.menu_llm", header = "local function start_detached_sweep(" },
+	{ module = "ai.ui.menu", header = "local function start_detached_sweep(" },
 	-- The MLX stop runs ahead of the step list, awaiting the exact task callback
-	{ module = "ui.menu.menu_llm", header = "function M.stop_mlx_server(" },
+	{ module = "ai.ui.menu", header = "function M.stop_mlx_server(" },
 }
 
 
@@ -173,7 +173,7 @@ helpers.describe("quit teardown step bodies never block (hs-quit-never-blocks)",
 	end)
 
 	helpers.it("(hs-quit-never-blocks) mutant: the scanner detects each primitive", function()
-		local clean = function_body(read_module("ui.menu.menu_llm"),
+		local clean = function_body(read_module("ai.ui.menu"),
 			"function M.terminate_helper_processes(")
 		helpers.assert_eq(blocking_hits(clean), {})
 		for _, mutation in ipairs({

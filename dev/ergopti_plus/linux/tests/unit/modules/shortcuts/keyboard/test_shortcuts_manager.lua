@@ -268,12 +268,12 @@ helpers.describe("modules.shortcuts.manager", function()
   -- ==========================================================================
 
   helpers.it("menu_builder renders shortcuts section when context present", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
-    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "menu.ui.builder.builder")
+    -- Asserted, not skipped. menu/ui/builder/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.builder must load: " .. tostring(menu_builder))
+      "menu.ui.builder.builder must load: " .. tostring(menu_builder))
 
     M.enable()
     local items = menu_builder.build({
@@ -295,12 +295,12 @@ helpers.describe("modules.shortcuts.manager", function()
   end)
 
   helpers.it("menu_builder handles nil shortcuts gracefully", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
-    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "menu.ui.builder.builder")
+    -- Asserted, not skipped. menu/ui/builder/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.builder must load: " .. tostring(menu_builder))
+      "menu.ui.builder.builder must load: " .. tostring(menu_builder))
 
     local items = menu_builder.build({
       _version  = "3.0.0",
@@ -406,7 +406,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 		for _, outcome in ipairs({ "committed", "false", "nil", "number", "throw" }) do
 			helpers.it("ties the real menu to durable master publication " .. outcome .. " from " .. tostring(initial), function()
 				with_master(initial, function(manager, path, source)
-					local builder = helpers.load_module("ui.menu.builder")
+					local builder = helpers.load_module("menu.ui.builder.builder")
 					local redraws, attempts, notices, releases = 0, 0, {}, 0
 					local tree = builder.build({ shortcuts = manager, _version = "9.9.9",
 						on_menu_changed = function() redraws = redraws + 1 end })

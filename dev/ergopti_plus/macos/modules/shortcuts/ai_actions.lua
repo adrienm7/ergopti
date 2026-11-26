@@ -31,7 +31,7 @@ local LOG = "shortcuts.ai_actions"
 -- Prefix shared by every AI action id in the shared catalogue.
 local AI_ACTION_PREFIX = "llm_"
 
-local ENGINE_MODULE = "modules.llm.prediction_engine"
+local ENGINE_MODULE = "ai.engine.prediction.engine"
 
 -- name -> function(): the layers told when the AI switch is committed.
 local _listeners = {}

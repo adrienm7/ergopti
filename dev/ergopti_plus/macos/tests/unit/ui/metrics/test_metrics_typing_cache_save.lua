@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 local Scope = require("tests.support.metrics_typing_scope")
+local EmptyStore = require("tests.support.ui.metrics.typing.empty_store")
 
 local function with_save(mode, callback)
 	local previous_open, previous_rename, previous_remove = io.open, os.rename, os.remove
@@ -33,7 +34,8 @@ local function with_save(mode, callback)
 				state.codes[#state.codes + 1] = code
 				return self
 			end
-			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
+			-- A present, empty store: a missing one is an incomplete read, never saved
+			EmptyStore.install()
 			package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end

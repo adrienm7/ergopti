@@ -25,6 +25,9 @@
 ;    initialiser sets KLWV.available to false in that case.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
+
 #Requires Autohotkey v2.0+
 #Include keystats_webview_range_script.ahk
 #Include keystats_webview_range_mount.ahk
@@ -116,14 +119,10 @@ KLWV_IsAvailable() {
 		; that happens lazily on first KLWV_Open.
 		if KLWV.HasOwnProp("available") && KLWV.available != ""
 				return KLWV.available
-		KLWV.available := false
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		if !FileExist(loader)
-				return false
-		if !IsSet(WebView2)
-				return false
-		KLWV.available := true
-		return true
+		; Without WebView2 the dashboard opens in Edge's app mode: the same shared
+		; page in a browser, never a native AutoHotkey form.
+		KLWV.available := WebView_UnavailableReason() == ""
+		return KLWV.available
 }
 
 
@@ -232,7 +231,7 @@ KLWV_Open(which, metrics_dir) {
 			}
 
 			KLWV.metrics_dir := metrics_dir
-			ReuseKey := _SharedDir . "`n" . I18nGetLocale() . "`n" . metrics_dir
+			ReuseKey := KLWV_ReuseKey(metrics_dir)
 			Cached := KLWV_TakeWarmHost(which, ReuseKey)
 
 			; Do NOT build here — on a cold DB the full build takes 30-75 s and
@@ -362,9 +361,11 @@ KLWV_Open(which, metrics_dir) {
 			; Inject i18n base URL and locale code before page scripts run so
 			; i18n.js can resolve locale files without relying on currentScript
 			; path heuristics (which are unreliable across WebView2 versions).
+			ReadingPrefs_Track(webview)
 			locales_url := KLWV_LocalesUrl()
 			locale_code := I18nGetLocale()
 			seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
+				. ReadingPrefs_SeedScript()
 			try {
 					if !Cached
 							webview.AddScriptToExecuteOnDocumentCreated(seed_script)
@@ -438,6 +439,18 @@ KLWV_Open(which, metrics_dir) {
 				if KLWV.close_during_open.Has(which)
 						KLWV.close_during_open.Delete(which)
 		}
+}
+
+/**
+ * The configuration a retained host was built with. The boot script that seeds
+ * the locale and the reading font and spacing is added once per host, so each
+ * of them belongs to the key: a reading choice changed since the host was
+ * hidden retires it instead of reopening the old look (MET-03).
+ * @param metrics_dir {String} The metrics store the host reads.
+ * @returns {String}
+ */
+KLWV_ReuseKey(metrics_dir) {
+	return _SharedDir . "`n" . I18nGetLocale() . "`n" . metrics_dir . "`n" . ReadingPrefs_SeedScript()
 }
 
 /** Detach a certified inactive host; configuration changes dispose its old owner. */
@@ -653,8 +666,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		; inert while paused. A range request is the exception only long enough to
 		; capture its request id and queue a canceled terminal for resume; it must
 		; never start the detached projection while suspended.
-		if A_IsSuspended && (action != "range") && (action != "range_consumed")
+		if A_IsSuspended && (action != "range") && (action != "range_consumed") {
+				NotifyPausedRefusal("A metrics page action")
+				; The page holds its range for a Reset until it hears the outcome.
+				if (action == "clear_cache") && RegExMatch(msg, '"reset_id"\s*:\s*(\d{1,15})\b', &paused)
+						KLWV_SendCacheReset(which, Epoch, Integer(paused[1]), false)
 				return
+		}
 		switch action {
 		case "pick", "edit":
 			if which == "apps"
@@ -706,6 +724,12 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 			KLPF_RequestRange(which, entry["metrics_dir"], query, Epoch,
 				KLWV_OnRangeBuildTerminal.Bind(which, Epoch, request_id))
 		case "clear_cache":
+						; The page waits for this Reset's outcome before it asks for a range.
+						if !RegExMatch(msg, '"reset_id"\s*:\s*(\d{1,15})\b', &rid) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: a dashboard reset without a valid reset id was refused.")
+								return
+						}
+						ResetId := Integer(rid[1])
 						; Purge every layer of cache so the next rebuild is a full cold read:
 						; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
 						; - KLPF_LAST_JSON:      in-memory JSON blob for the push path
@@ -723,6 +747,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; successor build, so an explicit reset must retire it too.
 						if !KLR_CacheRetire(entry["metrics_dir"]) {
 								LoggerError("Keystats", "KLWV_OnWebMessage: the reader image could not be retired; caches were not fully purged.")
+								KLWV_SendCacheReset(which, Epoch, ResetId, false)
+								return
+						}
+						; Ergopti Studio's saved « My typing » read is derived from the same image.
+						if !KLR_StudioSnapshotRetire(entry["metrics_dir"]) {
+								LoggerError("Keystats", "KLWV_OnWebMessage: the saved Ergopti Studio read could not be retired; caches were not fully purged.")
+								KLWV_SendCacheReset(which, Epoch, ResetId, false)
 								return
 						}
 						if KLWV_IsCurrent(which, Epoch)
@@ -730,6 +761,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						try LoggerDebug("Keystats", "KLWV_OnWebMessage: dashboard caches purged.")
 						if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
 								return
+						; Before the rebuild: its publication must find the Reset settled.
+						KLWV_SendCacheReset(which, Epoch, ResetId, true)
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
 						KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
@@ -933,6 +966,22 @@ KLWV_RunMaintenance(which, Epoch, Kind, MaintenanceId, MetricsDir) {
 		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
 		catch as err {
 				try LoggerError("Keystats", "KLWV_RunMaintenance: the outcome could not reach '{1}': {2}", which, err.Message)
+				return false
+		}
+		return true
+}
+
+; Tells the page how its Reset ended. It holds its range until then, and a
+; failure returned silently: the page then waited for its watchdog (MET-19).
+KLWV_SendCacheReset(which, Epoch, ResetId, Ok) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		; Built by hand: the page requires a JSON boolean, which AHK has no type for.
+		msg := '{"type":"cache_reset","reset_id":' . ResetId . ',"ok":' . (Ok ? "true" : "false") . '}'
+		try entry["webview"].PostWebMessageAsString(KLWV_PageMessage(entry, msg))
+		catch as err {
+				try LoggerError("Keystats", "KLWV_SendCacheReset: the outcome could not reach '{1}': {2}", which, err.Message)
 				return false
 		}
 		return true
@@ -1215,6 +1264,7 @@ KLWV_OnNavigationCompleted(which, Epoch, *) {
 				if !(Source == NavigationUrl)
 						return false
 				Controller.IsVisible := true
+				WebView_TakeFocus(Controller)
 				try LoggerInfo("Keystats", "Dashboard {1} page ready in {2} ms.",
 						which, Round(BootClockWallMs() - Entry["open_started"], 2))
 		}
@@ -1252,6 +1302,7 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 						return false
 				if Source == NavigationUrl
 						Controller.IsVisible := true
+						WebView_TakeFocus(Controller)
 		}
 		if !_KLWV_OwnsNavigation(which, entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
 				return false

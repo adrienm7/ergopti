@@ -108,13 +108,13 @@ helpers.describe("owned runtime service repair (MRT-004)", function()
 	end)
 
 	helpers.it("the dialog asks first, repairs on confirmation and reports with the repair's texts", function()
-		package.loaded["ui.owned_runtime_install"] = nil
+		package.loaded["ai.ui.owned_runtime_install"] = nil
 		local alerts, scheduled = {}, {}
 		local dialog_util = { block_alert = function(title, body, first)
 			alerts[#alerts + 1] = { title = title, body = body }
 			return first
 		end }
-		local Dialog = helpers.load_with_stubs("ui.owned_runtime_install", {
+		local Dialog = helpers.load_with_stubs("ai.ui.owned_runtime_install", {
 			["core.ui.engine.dialog_util"] = dialog_util,
 			["core.timing.engine.deferred_work"] = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end },
 		})
@@ -136,6 +136,6 @@ helpers.describe("owned runtime service repair (MRT-004)", function()
 		helpers.assert_eq(ok, false, "a facade without the repair is refused before any dialog")
 		package.loaded["core.ui.engine.dialog_util"] = nil
 		package.loaded["core.timing.engine.deferred_work"] = nil
-		package.loaded["ui.owned_runtime_install"] = nil
+		package.loaded["ai.ui.owned_runtime_install"] = nil
 	end)
 end)

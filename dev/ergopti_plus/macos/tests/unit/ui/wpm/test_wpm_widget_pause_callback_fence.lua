@@ -21,16 +21,16 @@ local FIXTURE_MODULES = {
 	"core.fs.engine.paths",
 	"core.fs.adapters.storage",
 	"core.ui.adapters.graphics_renderer",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"platform.input.key_state",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
-	"modules.llm.api_mlx",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
+	"ai.engine.api.mlx",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"platform.remap.onboarding",
 	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
@@ -213,7 +213,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			-- canvas, so its release callback can never settle the module-level lease.
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 
-			package.loaded["adapters.event_provenance"] = {}
+			package.loaded["diagnostics.adapters.event_provenance"] = {}
 			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
@@ -236,26 +236,26 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				end,
 				admission_open = function() return admission_fence == nil end,
 			}
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = {
 				get_label = function(name) return name end,
 				execute_single = function() return true end,
 				SG_NAMES = { "none", "script_pause_toggle" },
 				AX_NAMES = {},
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.warmup_controller"] = {
+			package.loaded["ai.engine.local_servers.warmup_controller"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.api_ollama"] = {
+			package.loaded["ai.engine.api.ollama"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}
-			package.loaded["modules.llm.api_remote"] = {
+			package.loaded["ai.engine.api.remote"] = {
 				pause_warmup = function() return true end,
 				resume_warmup = function() return true end,
 			}

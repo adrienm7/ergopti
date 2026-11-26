@@ -74,6 +74,42 @@ function M.missing_program(getenv)
 	return value
 end
 
+--- The command that sets up keyboard access for this installation.
+---
+--- The AppImage's driver root is its mount point, which vanishes with the
+--- process: the message told the Arch user to run an install.sh that no longer
+--- existed. Relaunching the image runs its launcher, which asks once for the
+--- authorization (install/launch.sh). The AppImage runtime names the image in
+--- APPIMAGE.
+--- A Flatpak's driver root is /app, which exists only inside the sandbox, and
+--- no command run there can add a host group: the host runs the app's own
+--- setup_permissions.sh from the deployment Flatpak names in /.flatpak-info.
+--- @param deps table { script_dir?, getenv?, read_file? }
+--- @return string
+function M.setup_command(deps)
+	local quote = require("core.process.adapters.shell_runner").quote
+	local getenv = deps.getenv or os.getenv
+	local image = getenv("APPIMAGE")
+	if type(image) == "string" and image:sub(1, 1) == "/" then return quote(image) end
+	local flatpak = getenv("FLATPAK_ID")
+	if type(flatpak) == "string" and flatpak ~= "" then
+		local info = (deps.read_file or function(path)
+			local handle = io.open(path, "r")
+			if not handle then return nil end
+			local content = handle:read("*a")
+			handle:close()
+			return content
+		end)("/.flatpak-info")
+		local app_path = type(info) == "string" and info:match("\n%[Instance%]\n[^%[]-\napp%-path=([^\n]+)") or nil
+		assert(type(app_path) == "string" and app_path:sub(1, 1) == "/",
+			"a Flatpak without its host deployment path in /.flatpak-info")
+		local driver = require("core.lifecycle.engine.installation").packaged_root(app_path)
+		return "sudo bash " .. quote(driver .. "/install/setup_permissions.sh") .. ' --user "$(id -u)"'
+	end
+	local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
+	return "bash " .. quote(root .. "/install.sh") .. " --setup-perms"
+end
+
 --- Reports an input-access failure to the user.
 --- @param deps table i18n, notifier, print; optional script_dir for an isolated caller;
 ---   program names the missing program that fills {1} of MISSING_PROGRAM_BODY_KEY.
@@ -97,9 +133,7 @@ function M.report(deps, detail)
 	if deps.program then
 		body = body:gsub("{1}", function() return deps.program end)
 	elseif body:find("{1}", 1, true) then
-		local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
-		local command = "bash " .. require("core.process.adapters.shell_runner").quote(root .. "/install.sh") .. " --setup-perms"
-		body = body:gsub("{1}", function() return command end)
+		body = body:gsub("{1}", function() return M.setup_command(deps) end)
 	end
 
 	local out = deps.print or print
@@ -107,7 +141,7 @@ function M.report(deps, detail)
 	out(body)
 
 	if deps.notifier and type(deps.notifier.send) == "function" then
-		pcall(deps.notifier.send, body, { title = notification_label, level = "error" })
+		pcall(deps.notifier.send, body, { title = notification_label, level = "error", persistent = true })
 	end
 	if deps.tray then M.hold_tray(deps, { label = notification_label, title = title, body = body }) end
 	return M.EXIT_ACCESS
@@ -115,7 +149,7 @@ end
 
 --- The window title of the degraded state: the product name, which is what
 --- the AppImage catalogue and a user's task switcher show.
-M.WINDOW_TITLE = "Ergopti+"
+M.WINDOW_TITLE = require("core.text.engine.identifiers").app.display_name
 
 --- A translated label, or its key when the catalogue cannot supply one.
 --- @param i18n table|nil
@@ -130,7 +164,7 @@ end
 --- Opens a path or URL on the desktop, logging a refusal or a failed launch.
 --- @param target string
 local function open_on_desktop(target)
-	local request, reason = require("adapters.desktop_opener").open(target, function(result)
+	local request, reason = require("apps.adapters.desktop_opener").open(target, function(result)
 		if result.ok ~= true then
 			require("core.logger.engine.shim").error(LOG, "Desktop open of %s failed (%s).",
 				target, tostring(result.error or result.code))
@@ -144,13 +178,13 @@ end
 --- The bug form, prefilled with nothing the daemon would need to collect.
 --- @return string
 local function bug_form_url()
-	local documents = require("ui.healthcheck.bridge").config()
+	local documents = require("diagnostics.ui.healthcheck.bridge").config()
 	return require("diagnostics.engine.reports.issue_link").build_url(documents.templates, documents.repository, "bug", {})
 end
 
 --- Default side effects of the degraded menu; tests replace each one.
 local DEFAULT_ACTIONS = {
-	open_logs = function() open_on_desktop(require("infra.config_paths").get_logs_dir()) end,
+	open_logs = function() open_on_desktop(require("settings.engine.paths").get_logs_dir()) end,
 	report_bug = function() open_on_desktop(bug_form_url()) end,
 	-- The menu's actions start desktop helpers on the libuv loop, which the
 	-- daemon's own loop never runs in this state: drain it beside the tray.
@@ -199,8 +233,7 @@ end
 function M.hold_tray(deps, texts)
 	local Logger = require("core.logger.engine.shim")
 	local tray = deps.tray
-	tray.setIcon({ title = "Ergopti" })
-	if tray.getBackend() == nil then return end
+	if not tray.start() then return end
 	local actions = deps.actions or DEFAULT_ACTIONS
 	local function show_details()
 		if not tray.showStatusWindow(M.WINDOW_TITLE, texts.title .. "\n\n" .. texts.body) then

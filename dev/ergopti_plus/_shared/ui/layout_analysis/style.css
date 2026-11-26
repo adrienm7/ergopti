@@ -33,14 +33,45 @@ body:has(> main.layout-analysis) {
 	--la-sub: var(--theme-sub);
 	--la-accent: var(--theme-accent);
 	--la-accent-soft: var(--theme-accent-soft);
-	--la-good: var(--theme-green);
-	--la-bad: var(--theme-danger);
+	--la-good: var(--theme-good-text);
+	--la-bad: var(--theme-bad-text);
+	/* Chart colours (theme.css « Chart look », validated in light and dark):
+	   points gained blue, points lost orange; the heat scale (blue for the
+	   least to red for the most) for the heat maps and the counts, read
+	   through --la-share by the gradient's own colour at that point. */
+	--la-gain: var(--theme-chart-gain);
+	--la-loss: var(--theme-chart-loss);
+	--la-load: var(--theme-chart-gain);
+	--la-heat-scale: var(--theme-chart-heat-scale);
+	--la-heat-edge: var(--theme-chart-ramp-edge);
+	--la-heat-ink: var(--theme-text);
+	--la-heat-fill-ink: var(--theme-chart-heat-ink);
+	/* The analysers' ranks: one blue hue, the first rank darkest. */
+	--la-rank-low: var(--theme-chart-ramp-low);
+	--la-rank-high: var(--theme-chart-ramp-high);
+	--la-rank-ink-strong: var(--theme-chart-ramp-ink-strong);
+	--la-target: var(--theme-text);
+	/* The stacked figures' parts (and the two hands), categorical slots in
+	   their fixed order: the colour follows the part, never its rank. */
+	--la-cat-1: var(--theme-chart-cat-1);
+	--la-cat-2: var(--theme-chart-cat-2);
+	--la-cat-3: var(--theme-chart-cat-3);
+	--la-cat-4: var(--theme-chart-cat-4);
+	--la-cat-5: var(--theme-chart-cat-5);
+	--la-cat-6: var(--theme-chart-cat-6);
 	font:
 		14px/1.45 system-ui,
 		sans-serif;
 	margin: 0 auto;
-	max-width: 1200px;
-	padding: 16px;
+	/* Wide screens show figures side by side rather than one long column. */
+	max-width: 1680px;
+	padding: 16px 20px 24px;
+}
+
+@media (max-width: 480px) {
+	.layout-analysis {
+		padding: 12px 12px 20px;
+	}
 }
 
 .layout-analysis h1 {
@@ -68,6 +99,20 @@ body:has(> main.layout-analysis) {
 	margin: 4px 0;
 }
 
+/* An analyser's fidelity on the corpus, on its own line under its direction. */
+.la-fidelity {
+	display: block;
+}
+
+/* Running text keeps lines a reader can follow, at most about 70 characters
+   (WCAG 1.4.8 asks for 80): a ch is the width of a digit, wider than the
+   average letter. */
+.layout-analysis p.la-muted {
+	max-width: 60ch;
+	/* A number grouped by no-break spaces must not widen a phone's page. */
+	overflow-wrap: anywhere;
+}
+
 .la-error {
 	color: var(--la-bad);
 }
@@ -92,23 +137,170 @@ body:has(> main.layout-analysis) {
 	background: var(--la-accent-soft);
 }
 
+.layout-analysis a {
+	color: var(--la-accent);
+}
+
+.layout-analysis :focus-visible {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 1px;
+}
+
+/* A label read by assistive technology only (the heatmap's metric choice, the
+   filters' legend). No padding: a legend's own 2 px each side made the box
+   4 px wide, 8 px at 200 % text, and no longer the 1 px box the reading gate
+   knows as screen-reader text. */
+.la-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-heading-wide {
+	align-items: baseline;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	justify-content: space-between;
+}
+
+.la-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 16px;
+	list-style: none;
+	margin: 4px 0 8px;
+	padding: 0;
+}
+
+.la-legend li {
+	align-items: center;
+	color: var(--la-sub);
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-swatch {
+	border-radius: 3px;
+	display: inline-block;
+	height: 10px;
+	width: 14px;
+}
+
+.la-swatch-gain {
+	background: var(--la-gain);
+}
+
+.la-swatch-loss {
+	background: var(--la-loss);
+}
+
+.la-swatch-load {
+	background: var(--la-load);
+}
+
+.la-swatch-ideal {
+	background: var(--la-target);
+	width: 3px;
+}
+
 /* ============================== */
 /* ============================== */
 /* ======= 2/ Controls ========== */
 /* ============================== */
 /* ============================== */
 
-.la-controls {
-	display: grid;
-	gap: 12px;
-	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+/* The page's head: its title and « Copy the link » on one line. */
+.la-top {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	justify-content: space-between;
+	margin-bottom: 12px;
 }
 
+.layout-analysis .la-top h1 {
+	margin: 0;
+}
+
+/* Undo and Redo (edit_history.js), before « Share »; a button with nothing to
+   take back stays focusable (aria-disabled) so its name is still heard. */
+.la-history {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-left: auto;
+}
+
+.la-history-button[aria-disabled='true'] {
+	cursor: default;
+	opacity: 0.55;
+}
+
+/* A card: one group of controls or one figure on the surface colour. */
+.la-card,
+.la-figure {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	min-width: 0;
+	padding: 12px 14px;
+}
+
+.layout-analysis .la-card-title {
+	display: block;
+	font-size: 1.05em;
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+/* The corpus beside the text and keyboard choices; stacked on a phone. */
+.la-setup {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+.la-options {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.la-option-pair {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+}
+
+.la-layouts {
+	margin-top: 16px;
+}
+
+.la-layouts .la-row + .la-row {
+	margin-top: 8px;
+}
+
+/* A field: its label, its control and its note (a p when it holds no note,
+   whose margins it drops). */
 .la-field {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+	margin: 0;
 	min-width: 0;
+}
+
+/* A label and its « i » on one line, above the field's control. */
+.la-heading {
+	margin: 0;
 }
 
 .la-custom {
@@ -120,9 +312,62 @@ body:has(> main.layout-analysis) {
 	width: 100%;
 }
 
-.la-file input {
-	margin-left: 8px;
-	max-width: 100%;
+/* A file picker's label is the button (.la-file, fingering_editor.css, which
+   every page that draws one loads). */
+/* « Load a corpus file » under the corpus picker, whatever corpus is chosen
+   (it was hidden under « Your own text »): a tinted button with an icon and
+   the formats it reads (maintainer, 2026-11-19). */
+.la-corpus-file {
+	align-items: center;
+	border-top: 1px solid var(--la-border);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	margin-top: 14px;
+	padding-top: 14px;
+}
+
+.la-file-button.la-file-primary {
+	align-items: center;
+	background: var(--la-accent-soft);
+	border: 1px solid var(--la-accent);
+	border-radius: 8px;
+	color: var(--theme-text);
+	display: inline-flex;
+	font-weight: 600;
+	gap: 8px;
+	min-height: var(--theme-target-min);
+	padding: 8px 16px;
+}
+
+.la-file-button.la-file-primary:hover {
+	background: var(--la-surface-2);
+}
+
+/* The icon in the accent (3:1 at least); the words in the text colour. */
+.la-file-icon {
+	fill: none;
+	flex: none;
+	height: 18px;
+	stroke: var(--la-accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.8;
+	width: 18px;
+}
+
+.la-corpus-file .la-file-formats,
+.la-corpus-file .la-file-name {
+	margin: 0;
+}
+
+.la-corpus-file .la-file-name:empty,
+.la-corpus-file .la-error {
+	flex-basis: 100%;
+}
+
+.la-corpus-file .la-file-name:empty {
+	display: none;
 }
 
 .la-row {
@@ -130,28 +375,143 @@ body:has(> main.layout-analysis) {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+	margin: 0;
 }
 
 .la-row input[type='search'] {
 	flex: 1 1 200px;
 }
 
-.la-layout-list {
-	border: 1px solid var(--la-border);
-	border-radius: 6px;
-	display: grid;
-	gap: 2px 12px;
-	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-	margin-top: 8px;
-	max-height: 220px;
-	overflow-y: auto;
-	padding: 6px;
+/* The layout list folds under one line naming the compared layouts. */
+/* The summary names a bounded number of layouts (SUMMARY_NAMES): it wraps
+   rather than being cut, so larger text or wider spacing hides none of it
+   (WCAG 1.4.12). */
+.la-layouts-box > summary {
+	cursor: pointer;
+	padding: 4px 0;
 }
 
-.la-layout {
+/* « My typing » chosen: the corpus picker carries the accent. */
+.layout-analysis select.la-corpus-mine {
+	border-color: var(--la-accent);
+	box-shadow: 0 0 0 1px var(--la-accent);
+	font-weight: 600;
+}
+
+/* The layout list: one column, a sticky heading per first letter, the ticked
+   layouts on the accent's soft fill with a bar on their edge (not colour
+   alone: the box is ticked too). */
+.la-layout-list {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 8px;
+	max-height: 420px;
+	overflow-y: auto;
+	padding: 0 8px 8px;
+	scroll-padding-top: 40px;
+}
+
+.la-letter {
+	background: var(--la-surface);
+	border-bottom: 1px solid var(--la-border);
+	color: var(--la-accent);
+	font-size: 1rem;
+	margin: 0;
+	padding: 10px 4px 4px;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.la-letter-items {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+}
+
+.la-layout-item {
+	align-items: center;
+	border-left: 4px solid transparent;
+	border-radius: 6px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 16px;
+	padding: 1px 8px;
+}
+
+/* The muted grey reads at 4.3:1 (light) and 4.4:1 (dark) on the accent tint,
+   under the 4.5:1 small text needs (WCAG 1.4.3): a tinted item, row or card
+   writes its muted text in the text colour. */
+.la-layout-item.la-picked {
+	--la-sub: var(--theme-text);
+	background: var(--la-accent-soft);
+	border-left-color: var(--la-accent);
+}
+
+.la-layout-name {
+	font-weight: 600;
+}
+
+.la-layout-meta {
+	color: var(--la-sub);
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The letter index: one button-like link per heading, wrapping on a phone. */
+.la-letters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 10px;
+}
+
+.la-letter-jump {
+	align-items: center;
+	border: 1px solid var(--la-border);
+	border-radius: 6px;
+	color: inherit;
+	display: inline-flex;
+	font-weight: 600;
+	justify-content: center;
+	min-height: var(--theme-target-min);
+	min-width: var(--theme-target-min);
+	text-decoration: none;
+}
+
+.la-letter-jump:hover,
+.la-letter-jump:focus-visible {
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+}
+
+.la-pick-count {
+	color: var(--la-sub);
+	margin: 6px 0 0;
+}
+
+.la-pick-search {
+	flex: 1 1 240px;
+}
+
+/* In its column label, the search keeps its own height: the row rule's
+   flex-basis would stretch it 200 px tall. */
+.la-row .la-pick-search input {
+	flex: none;
+	width: 100%;
+}
+
+/* The whole row is the checkbox's label, its 44 px target (WCAG 2.5.5,
+   theme.css). A layout's « + » box (text mode « final, except + ») is laid
+   out as a layout. */
+.la-layout,
+.la-plus {
 	align-items: center;
 	display: flex;
 	gap: 6px;
+	min-height: var(--theme-target-min);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -160,6 +520,8 @@ body:has(> main.layout-analysis) {
 .la-status {
 	color: var(--la-sub);
 	margin: 14px 0 0;
+	/* Its counts are grouped by no-break spaces: they wrap on a phone. */
+	overflow-wrap: anywhere;
 }
 
 /* ============================== */
@@ -168,19 +530,94 @@ body:has(> main.layout-analysis) {
 /* ============================== */
 /* ============================== */
 
-.la-chart-row {
-	align-items: center;
-	cursor: pointer;
-	display: grid;
-	gap: 8px;
-	grid-template-columns: minmax(90px, 180px) 1fr 56px;
-	padding: 1px 0;
+/* While a corpus loads, the old results stay but read as stale. */
+.la-busy .la-chart,
+.la-busy .la-table-wrap {
+	opacity: 0.5;
+	transition: opacity 0.2s;
 }
 
+/* A bar figure is a table (comparer_page.js barRow) drawn as one grid per
+   row: the table and its rows lose the table layout, their cells the
+   table cell's padding, weight and centring. */
+.la-bars {
+	display: block;
+}
+
+.la-chart-row > th,
+.la-chart-row > td {
+	padding: 0;
+}
+
+.la-chart-row {
+	align-items: center;
+	border-radius: 4px;
+	display: grid;
+	gap: 8px;
+	grid-template-columns: minmax(72px, 180px) minmax(0, 1fr) minmax(44px, auto);
+	padding: 2px 4px;
+}
+
+.la-chart-row.la-selected {
+	--la-sub: var(--theme-text);
+	background: var(--la-accent-soft);
+}
+
+/* A layout's name wraps in its column rather than being cut: larger text or
+   wider spacing must not hide it (WCAG 1.4.12). */
 .la-chart-label {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	font-weight: inherit;
+	overflow-wrap: anywhere;
+	text-align: start;
+}
+
+/* The name that opens a layout's details: the row's text, a button for the
+   keyboard (the row answers to the pointer too). */
+.layout-analysis .la-chart-name {
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	display: block;
+	overflow-wrap: anywhere;
+	padding: 0;
+	text-align: inherit;
+	width: 100%;
+}
+
+.layout-analysis .la-chart-name:hover {
+	background: none;
+}
+
+/* A table row's layout name, a button for the keyboard drawn as the cell's
+   text (the row answers to the pointer too). Its box is at least 44 px each
+   way (WCAG 2.5.5, theme.css): a one- or two-letter name (« Ø ») was a 15 by 20 px target
+   wedged between the rows above and below it. */
+.layout-analysis .la-row-name {
+	background: none;
+	border: 0;
+	border-radius: 2px;
+	color: inherit;
+	font: inherit;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
+	padding: 0;
+	text-align: inherit;
+}
+
+.layout-analysis .la-row-name:hover {
+	background: none;
+}
+
+/* A layout that cannot type the space or a letter: ranked last, flagged in
+   words (never by colour alone), its bar faded. */
+.la-incomplete-flag {
+	color: var(--la-bad);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+.la-incomplete .la-bar {
+	opacity: 0.45;
 }
 
 .la-chart-track {
@@ -206,22 +643,66 @@ body:has(> main.layout-analysis) {
 	top: 0;
 }
 
-.la-bar-good {
-	background: var(--la-good);
+.la-bar-gain {
+	background: var(--la-gain);
 }
 
-.la-bar-bad {
-	background: var(--la-bad);
+/* The global score: one colour for the library, the accent for the user's own. */
+.la-bar-score {
+	background: var(--la-gain);
+}
+
+.la-bar-mine {
+	background: var(--la-accent);
+	box-shadow: 0 0 0 1px var(--la-heat-ink);
+}
+
+.la-bar-loss {
+	background: var(--la-loss);
+}
+
+.la-bar-load {
+	background: var(--la-load);
+}
+
+/* The zero line of the score chart and the ideal-load mark of a finger. */
+.la-zero,
+.la-target {
+	bottom: -2px;
+	position: absolute;
+	top: -2px;
+	z-index: 1;
+}
+
+.la-zero {
+	border-left: 1px solid var(--la-sub);
+}
+
+.la-target {
+	background: var(--la-target);
+	border-radius: 1px;
+	margin-left: -1px;
+	width: 3px;
 }
 
 .la-chart-value {
 	font-variant-numeric: tabular-nums;
 	text-align: right;
+	white-space: nowrap;
 }
 
+/* Every table scrolls inside its own box, never the page: with hundreds of
+   layouts a sub-tab's tables were tens of thousands of pixels long and the
+   next figure was out of reach (maintainer, 2026-11-23). A short table keeps
+   its own height. The rem ceiling holds where the frame grows with the page
+   (the site's benchmarks, reportHeight): there a vh is the frame's own
+   height, so 70vh alone would grow with the tables it bounds. Positioned, so
+   screen-reader text in a cell stays inside the scrolling box. */
 .la-table-wrap {
 	margin-top: 12px;
-	overflow-x: auto;
+	max-height: clamp(12rem, 70vh, 48rem);
+	overflow: auto;
+	position: relative;
 }
 
 .la-table {
@@ -242,14 +723,97 @@ body:has(> main.layout-analysis) {
 	text-align: left;
 }
 
+/* The header stays in view over the rows, and over a column that stays in
+   view (la-name-col, a heat table's row header) at their crossing. */
 .la-table thead th {
 	background: var(--la-surface);
 	position: sticky;
 	top: 0;
+	vertical-align: bottom;
+	z-index: 2;
+}
+
+/* A wide table's layout name stays in view while its metrics scroll by; its
+   own background hides them, and a hovered or selected row tints it too. It
+   wraps in a bounded column: a long name with its « incomplete » flag once
+   took 840 px on one line, most of the box once pinned. */
+.la-table .la-name-col {
+	background: var(--la-surface);
+	left: 0;
+	/* As wide as a usual name, never more: a table cell's width is a floor. */
+	min-width: min(16em, 40vw);
+	overflow-wrap: anywhere;
+	position: sticky;
+	white-space: normal;
+	width: min(16em, 40vw);
+	z-index: 1;
+}
+
+.la-table thead th.la-name-col,
+.la-heat-table thead th:first-child {
+	left: 0;
+	z-index: 3;
+}
+
+.la-table tbody tr:hover > .la-name-col,
+.la-table tr.la-selected > .la-name-col {
+	background: linear-gradient(var(--la-accent-soft), var(--la-accent-soft)), var(--la-surface);
 }
 
 .la-sortable {
 	cursor: pointer;
+}
+
+/* A metric's header: its acronym (« SFB ») or its name on two lines at most,
+   the bottom of every header on one line; the full name, the definition and
+   the formula are in its « i » popover. */
+.la-table thead th.la-th-metric {
+	hyphens: auto;
+	line-height: 1.25;
+	max-width: 14em;
+	/* The table scrolls sideways rather than squeeze a header past two lines.
+	   The « i » and the cell's padding take their share of the column: at
+	   10em a wide sans-serif (Linux's) put « Roulements vers l’intérieur » and
+	   « Caractères non pris en charge » on three lines, and at 12em once the
+	   « i » took its 44 px target (theme.css). */
+	min-width: 14em;
+	vertical-align: bottom;
+	white-space: normal;
+}
+
+.la-th-head {
+	align-items: flex-end;
+	display: inline-flex;
+	gap: 4px;
+	justify-content: flex-end;
+}
+
+/* A header that wraps must not squeeze its « i » below its size: the target
+   and the space around it stay 24 px wide (WCAG 2.5.8). */
+.la-th-head > .la-info {
+	flex-shrink: 0;
+}
+
+/* The header text is the sort button: plain text that the keyboard reaches. */
+.layout-analysis .la-sort {
+	background: none;
+	border: 0;
+	font-weight: 600;
+	padding: 0;
+	text-align: inherit;
+}
+
+.la-delta {
+	white-space: nowrap;
+}
+
+.la-verdict {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-verdict-mark {
+	font-size: 0.8em;
 }
 
 .la-sortable[aria-sort]::after {
@@ -266,6 +830,7 @@ body:has(> main.layout-analysis) {
 
 .la-table tbody tr:hover,
 .la-selected {
+	--la-sub: var(--theme-text);
 	background: var(--la-accent-soft);
 }
 
@@ -289,29 +854,450 @@ body:has(> main.layout-analysis) {
 	text-align: left;
 }
 
-.la-heatmap {
-	margin: 8px 0;
-	max-width: 100%;
-	position: relative;
+/* The layout's credit, an attribution in the line's own size. */
+.la-details-credit {
+	font-size: inherit;
 }
 
-.la-key {
+.la-versus {
+	margin: 4px 0 8px;
+	max-width: 320px;
+}
+
+.la-detail-grid {
+	display: grid;
+	gap: 0 24px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+}
+
+/* The board scales with the page (positions in %, width from the script);
+   its legends shrink with it through the container query unit. */
+.la-heatmap {
+	container-type: inline-size;
+	margin: 8px 0 4px;
+	position: relative;
+	width: 100%;
+}
+
+.la-heatmap .la-key {
 	align-items: center;
+	/* The scale's colour at --la-share: the gradient drawn 100 times the
+	   cell's width, its point at that share under the cell. */
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
+	border: 2px solid var(--la-surface);
 	border-radius: 6px;
-	color: var(--theme-bg);
+	/* The edge inside the surface gap: a key worth zero, as light as the
+	   surface, still shows its shape (theme.css « Chart look »). */
+	box-shadow: inset 0 0 0 1px var(--la-heat-edge);
+	color: var(--la-heat-fill-ink);
 	cursor: default;
 	display: flex;
+	font-size: clamp(9px, 2.6cqw, 15px);
 	font-weight: 600;
-	height: 40px;
 	justify-content: center;
 	position: absolute;
 }
 
+/* A line of the scale's ends, its drawn ramp between them, and its note. */
+.la-heat-legend {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	font-variant-numeric: tabular-nums;
+	gap: 4px 8px;
+	margin: 0 0 8px;
+}
+
+.la-heat-legend small {
+	font-size: inherit;
+}
+
+/* Against another layout: orange where this one puts more, blue where less,
+   mixed into the neutral surface so the midpoint is grey, never a hue. */
+.la-heatmap .la-key-more {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+	color: var(--la-heat-ink);
+}
+
+.la-heatmap .la-key-less {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+	color: var(--la-heat-ink);
+}
+
+.la-heatmap .la-key-same {
+	background: var(--la-surface-2);
+	color: var(--la-heat-ink);
+}
+
+.la-heat-controls {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+	margin: 0;
+}
+
+.la-check {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-heat-key {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-swatch-more {
+	background: var(--la-loss);
+}
+
+.la-swatch-less {
+	background: var(--la-gain);
+}
+
+/* The details' other figures fold, so the phone page stays short. */
+.la-section {
+	border-top: 1px solid var(--la-border);
+	margin-top: 8px;
+	padding: 4px 0;
+}
+
+.la-section > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 6px 0;
+}
+
+.la-section h4 {
+	font-size: 1em;
+	margin: 10px 0 4px;
+}
+
+.la-keys {
+	font-weight: 600;
+	white-space: pre;
+}
+
+/* The key pair matrix scrolls inside its own box, never the page. */
+.la-matrix-wrap {
+	margin-top: 8px;
+	max-width: 100%;
+	overflow: auto;
+	/* The containing block of the cells' screen-reader text (.la-sr-only is
+	   absolute): without it that text escapes the scrolling box and widens the
+	   page at phone width (WCAG 1.4.10). */
+	position: relative;
+}
+
+.la-matrix-wrap:focus-visible {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 2px;
+}
+
+.la-matrix {
+	border-collapse: separate;
+	border-spacing: 2px;
+	font-size: 12px;
+}
+
+.la-matrix th {
+	font-weight: 600;
+	min-width: 22px;
+	padding: 0 2px;
+	text-align: center;
+}
+
+.la-matrix .la-cell {
+	background: var(--la-surface-2);
+	border-radius: 3px;
+	color: var(--la-heat-ink);
+	height: 22px;
+	min-width: 22px;
+	padding: 0;
+	text-align: center;
+}
+
+.la-matrix .la-cell-count {
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
+	color: var(--la-heat-fill-ink);
+}
+
+/* Points: blue gained, orange lost, mixed into the neutral surface. */
+.la-matrix .la-cell-gain {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+}
+
+.la-matrix .la-cell-loss {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+}
+
+/* The ranking table's column choices and row filters. */
+.la-table-options {
+	margin: 8px 0;
+}
+
+.la-table-options > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 4px 0;
+}
+
+.la-columns {
+	border: 1px solid var(--la-border);
+	border-radius: 6px;
+	margin: 6px 0;
+	padding: 6px 10px;
+}
+
+/* The column choices: a group of boxes named by its summary, unframed. */
+.la-column-list {
+	border: 0;
+	display: grid;
+	gap: 4px 12px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+.la-table-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin: 6px 0;
+}
+
+.la-filter-field {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.la-filter-field input,
+.la-filter-field select {
+	max-width: 100%;
+}
+
+.la-heat-ramp {
+	background: var(--la-heat-scale);
+	border: 1px solid var(--la-border);
+	border-radius: 3px;
+	display: inline-block;
+	height: 10px;
+	width: 120px;
+}
+
+/* The score settings, folded by default: the ranking comes first. */
+.la-settings {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	margin-top: 20px;
+	padding: 4px 12px;
+}
+
+.la-settings > summary {
+	cursor: pointer;
+	font-size: 1.1em;
+	font-weight: 600;
+	padding: 8px 0;
+}
+
+.la-settings > .la-weights > .la-heading h2 {
+	margin-top: 12px;
+}
+
+/* Export, import and reset of every score setting, wrapped on a narrow screen. */
+.la-config-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 0;
+}
+
+/* Each settings section and weight group: a mark (theme.css « Marks », 3:1
+   on the surfaces) on its edge and its icon only, never on text, so the text
+   keeps the page's contrast in both themes; the heading and the icon tell the sections apart
+   without the colour. */
+.la-accent-1 {
+	--la-section-accent: var(--theme-mark-1);
+}
+
+.la-accent-2 {
+	--la-section-accent: var(--theme-mark-2);
+}
+
+.la-accent-3 {
+	--la-section-accent: var(--theme-mark-3);
+}
+
+.la-accent-4 {
+	--la-section-accent: var(--theme-mark-4);
+}
+
+.la-accent-5 {
+	--la-section-accent: var(--theme-mark-5);
+}
+
+.la-accent-6 {
+	--la-section-accent: var(--theme-mark-6);
+}
+
+.la-settings > .la-weights {
+	border-left: 4px solid var(--la-section-accent, var(--la-border));
+	margin: 28px 0;
+	padding-left: 14px;
+}
+
+.la-settings .la-heading h2,
+.la-group-heading {
+	align-items: center;
+	display: flex;
+	gap: 10px;
+}
+
+.la-section-icon {
+	fill: none;
+	flex: none;
+	height: 1.4em;
+	stroke: var(--la-section-accent, currentColor);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 1.4em;
+}
+
+.la-weight-groups {
+	display: grid;
+	gap: 32px;
+	margin-top: 20px;
+}
+
+.la-weight-group {
+	border-left: 3px solid var(--la-section-accent);
+	padding: 2px 0 2px 14px;
+}
+
+.la-group-heading {
+	font-size: 1.05em;
+	margin: 0 0 4px;
+}
+
+/* One weight: its name and « i », the input with what a unit is worth, and
+   the metric's definition under them. */
+.la-weight-card {
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 12px;
+}
+
+.la-weight-top {
+	align-items: center;
+	display: flex;
+	font-weight: 600;
+	gap: 8px;
+	justify-content: space-between;
+	margin: 0;
+}
+
+.la-weight-field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 10px;
+	margin: 0;
+}
+
+.la-weight-field input {
+	width: 6em;
+}
+
+.la-weight-card input[aria-invalid='true'] {
+	border-color: var(--la-bad);
+}
+
+/* The unit beside a weight, a side note in the text's own size. */
+.la-weight-unit {
+	color: var(--la-sub);
+	font-size: inherit;
+}
+
+.la-weight-help {
+	color: var(--la-sub);
+	font-size: 0.9em;
+	margin: 0;
+}
+
+/* The ideal finger load: the hands' picture beside its inputs, above them on
+   a narrow screen. */
+.la-ideal-layout {
+	align-items: center;
+	display: grid;
+	gap: 16px 24px;
+	grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+	margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+	.la-ideal-layout {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.la-ideal-hands {
+	height: auto;
+	max-width: 260px;
+	width: 100%;
+}
+
+.la-ideal-finger {
+	fill: var(--la-section-accent);
+}
+
+.la-ideal-palm {
+	fill: var(--la-border);
+}
+
+.la-ideal-value {
+	fill: currentColor;
+	font-size: 11px;
+	text-anchor: middle;
+}
+
+/* A dead key shows its bare accent with a corner mark, as on the editor's board. */
+.la-heatmap .la-key.key-legend-dead::before {
+	border-color: currentColor currentColor transparent transparent;
+	border-style: solid;
+	border-width: 4px;
+	content: '';
+	position: absolute;
+	right: 3px;
+	top: 3px;
+}
+
+/* A list of weights or values: a grid of fields, unmarked. */
 .la-weight-list {
 	display: grid;
-	gap: 6px 16px;
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-	margin-top: 10px;
+	gap: 12px 16px;
+	/* One column under 240 px: the page reflows at 320 px wide. */
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+	list-style: none;
+	margin: 10px 0 0;
+	padding: 0;
+}
+
+/* A value list's item: its label fills the grid cell, as the cell's row is
+   as tall as its tallest label. */
+.la-weight-item {
+	display: grid;
 }
 
 .la-weight {
@@ -331,53 +1317,1185 @@ body:has(> main.layout-analysis) {
 
 /* ============================== */
 /* ============================== */
-/* ======= 5/ Fingering ========= */
+/* ======= 5/ Sub-tabs & figures  */
 /* ============================== */
 /* ============================== */
 
-.la-fingering-row {
+/* The filters every sub-tab follows, one row above the tabs (wrapped, and
+   folded at first, on a phone); the summary says how many layouts they keep. */
+.la-filters-box {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 12px;
+	padding: 6px 14px;
+}
+
+.la-filters-box > summary {
+	cursor: pointer;
+	padding: 4px 0;
+}
+
+.la-filters-box > summary > .la-table-count {
+	margin-left: 8px;
+	overflow-wrap: anywhere;
+}
+
+/* The filters' group, named by the summary's title, unframed. */
+.la-filters {
+	align-items: flex-end;
+	border: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 4px 0 8px;
+}
+
+.la-filters-title {
+	align-self: center;
+	font-weight: 600;
+	margin-right: 4px;
+}
+
+.la-filter-name input {
+	width: min(100%, 220px);
+}
+
+.la-filter-score input {
+	width: 7em;
+}
+
+/* The values query: wide enough for a few comparisons, its hint, its
+   refusal in words and the names it may use under the filters. */
+.la-filter-query {
+	flex: 1 1 18em;
+}
+
+.la-filter-query input {
+	font-family: ui-monospace, monospace;
+	width: 100%;
+}
+
+.la-query-hint,
+.la-query-status {
+	margin: 0 0 4px;
+	max-width: 66ch;
+}
+
+.la-query-status:empty {
+	display: none;
+}
+
+/* The user metrics' editors: one numbered row each, its fields side by side
+   (wrapped on a phone), unframed like the filters; the query takes the room. */
+.la-user-metrics-list {
+	margin: 8px 0;
+	padding-inline-start: 1.6em;
+}
+
+.la-user-metric {
+	margin-bottom: 8px;
+}
+
+.la-user-metric-fields {
+	align-items: flex-end;
+	border: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+.la-user-metric-fields > .la-filter-field:has(.la-user-metric-query) {
+	flex: 1 1 18em;
+}
+
+.la-user-metric-query {
+	font-family: ui-monospace, monospace;
+	width: 100%;
+}
+
+.la-user-metrics-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+}
+
+.la-query-names > summary {
+	cursor: pointer;
+}
+
+.la-query-names ul {
+	columns: 16em;
+	margin: 4px 0 8px;
+}
+
+/* The tab strip leads the page and wraps instead of scrolling it at phone
+   width, so no tab is ever hidden. Each tab carries its icon in its accent
+   slot; the chosen one stands on the surface with a bar in that colour and
+   heavier text (not colour alone). */
+.la-tabs {
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-radius: 12px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin: 12px 0 16px;
+	padding: 6px;
+}
+
+.layout-analysis .la-tab {
+	align-items: center;
+	background: none;
+	border: 0;
+	border-bottom: 3px solid transparent;
+	border-radius: 8px;
+	color: var(--la-sub);
+	display: inline-flex;
+	font-weight: 600;
+	gap: 8px;
+	/* A name wider than a phone's row wraps instead of widening the page. */
+	hyphens: auto;
+	max-width: 100%;
+	min-height: var(--theme-target-min);
+	min-width: 0;
+	overflow-wrap: anywhere;
+	padding: 6px 12px;
+}
+
+.layout-analysis .la-tab:hover {
+	background: var(--la-accent-soft);
+	color: inherit;
+}
+
+.layout-analysis .la-tab[aria-selected='true'] {
+	background: var(--la-surface);
+	border-bottom-color: var(--la-tab-accent);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+	color: inherit;
+	font-weight: 700;
+}
+
+/* Each tab's mark (theme.css « Marks », 3:1 on the surfaces). */
+.la-tab-accent-1 {
+	--la-tab-accent: var(--theme-mark-1);
+}
+
+.la-tab-accent-2 {
+	--la-tab-accent: var(--theme-mark-2);
+}
+
+.la-tab-accent-3 {
+	--la-tab-accent: var(--theme-mark-3);
+}
+
+.la-tab-accent-4 {
+	--la-tab-accent: var(--theme-mark-4);
+}
+
+.la-tab-accent-5 {
+	--la-tab-accent: var(--theme-mark-5);
+}
+
+.la-tab-accent-6 {
+	--la-tab-accent: var(--theme-mark-6);
+}
+
+.la-tab-icon {
+	fill: none;
+	flex: none;
+	height: 1.3em;
+	stroke: var(--la-tab-accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 1.3em;
+}
+
+.la-tab-panel {
+	min-width: 0;
+}
+
+.layout-analysis .la-tab-intro {
+	margin: 0 0 12px;
+	max-width: 90ch;
+}
+
+/* The figures of a tab, as many columns as the width holds. */
+.la-chart-grid,
+.la-heat-grid {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+}
+
+.la-heat-grid {
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+}
+
+.la-figure-wide {
+	grid-column: 1 / -1;
+}
+
+.la-tab-panel > .la-figure {
+	margin-bottom: 16px;
+}
+
+.layout-analysis .la-figure h3 {
+	margin: 0 0 4px;
+}
+
+.la-direction {
+	font-size: 0.9em;
+}
+
+/* The overview: the score chart beside the ranking when the width holds both. */
+.la-overview {
+	align-items: start;
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+}
+
+/* The tiles fill the column beside the score chart. */
+.layout-analysis .la-leaders-box h3 {
+	margin: 0 0 8px;
+}
+
+/* The best layout by the score and a few metrics, one tile each. */
+.layout-analysis .la-leaders {
+	display: grid;
+	gap: 8px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+	margin: 0;
+}
+
+.la-leader {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 8px;
+	min-width: 0;
+	padding: 8px 10px;
+}
+
+.la-leader-mine {
+	border-color: var(--la-accent);
+}
+
+.la-leader dt {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-leader dd {
+	margin: 0;
+}
+
+.la-leader-value {
+	font-size: 1.25em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	/* « -13,6 points » keeps its unit on a no-break space: at 200 % text in a
+	   phone's tile it breaks rather than scrolling the page (WCAG 1.4.10). */
+	overflow-wrap: anywhere;
+}
+
+.layout-analysis .la-leader-name,
+.layout-analysis .la-link-button {
+	background: none;
+	border: 0;
+	color: var(--la-accent);
+	padding: 0;
+	text-align: left;
+}
+
+.layout-analysis .la-leader-name {
+	max-width: 100%;
+	overflow-wrap: anywhere;
+}
+
+.layout-analysis .la-leader-name:hover,
+.layout-analysis .la-link-button:hover {
+	background: none;
+	text-decoration: underline;
+}
+
+.la-link-button {
+	font-weight: 600;
+}
+
+.la-clickable {
+	cursor: pointer;
+}
+
+.la-clickable:hover {
+	background: var(--la-accent-soft);
+}
+
+/* The user's own layout in a table: an accent edge, its name in bold. */
+.la-table .la-row-mine td:nth-child(2) {
+	box-shadow: inset 3px 0 0 var(--la-accent);
+	font-weight: 600;
+}
+
+/* A heat table: the layout's name in a header column that stays in view. */
+.la-heat-table th[scope='row'] {
+	background: var(--la-surface);
+	left: 0;
+	position: sticky;
+	text-align: left;
+	z-index: 1;
+}
+
+.la-heat-table td:nth-child(2) {
+	text-align: right;
+}
+
+.la-heat-table td.la-cell {
+	color: var(--la-heat-ink);
+	min-width: 3.6em;
+}
+
+.la-heat-table .la-cell-count {
+	background: var(--la-heat-scale) var(--la-share) 0 / 10000% 100% no-repeat;
+	color: var(--la-heat-fill-ink);
+}
+
+.la-heat-table .la-cell-rank {
+	background: color-mix(in oklab, var(--la-rank-high) var(--la-share), var(--la-rank-low));
+}
+
+.la-heat-table .la-cell-strong {
+	color: var(--la-rank-ink-strong);
+}
+
+.la-heat-table .la-cell-over {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+}
+
+.la-heat-table .la-cell-under {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+}
+
+/* Each finger's gap to the ideal, written under its share. */
+.la-gap {
+	display: block;
+	font-size: 0.8em;
+}
+
+.la-heat-table .la-ideal-row th,
+.la-heat-table .la-ideal-row td {
+	color: var(--la-sub);
+	cursor: default;
+	font-style: italic;
+}
+
+/* A stacked bar: its parts side by side, a surface gap between them. */
+.la-stack {
+	height: 14px;
+	overflow: hidden;
+}
+
+.la-seg {
+	border-radius: 0;
+	box-shadow: inset -2px 0 0 var(--la-surface);
+}
+
+.la-seg-1,
+.la-swatch-cat-1 {
+	background: var(--la-cat-1);
+}
+
+.la-seg-2,
+.la-swatch-cat-2 {
+	background: var(--la-cat-2);
+}
+
+.la-seg-3,
+.la-swatch-cat-3 {
+	background: var(--la-cat-3);
+}
+
+.la-seg-4,
+.la-swatch-cat-4 {
+	background: var(--la-cat-4);
+}
+
+.la-seg-5,
+.la-swatch-cat-5 {
+	background: var(--la-cat-5);
+}
+
+.la-seg-6,
+.la-swatch-cat-6 {
+	background: var(--la-cat-6);
+}
+
+/* The side-by-side heat maps: smaller legends, the user's own board edged. */
+.la-heat-card .la-heatmap {
+	margin: 6px auto 4px;
+}
+
+.la-heatmap-small .la-key {
+	border-width: 1px;
+	font-size: clamp(8px, 2.4cqw, 13px);
+}
+
+.la-heat-mine {
+	border-color: var(--la-accent);
+}
+
+.la-details-pick {
+	margin-bottom: 12px;
+	max-width: 360px;
+}
+
+.layout-analysis .la-details {
+	margin-top: 0;
+}
+
+/* The details' heatmap takes a row of its own, two columns where three fit. */
+.la-detail-main {
+	grid-column: 1 / -1;
+}
+
+@media (min-width: 1300px) {
+	.la-detail-main {
+		grid-column: span 2;
+	}
+}
+
+.la-heat-table thead th:first-child {
+	text-align: left;
+}
+
+/* At phone width a bar takes the whole width under its label. */
+@media (max-width: 520px) {
+	.la-chart-row {
+		grid-template-columns: minmax(0, 1fr) auto;
+		row-gap: 2px;
+	}
+
+	.la-chart-row > .la-chart-label {
+		grid-column: 1 / -1;
+	}
+}
+
+/* The other analysers' view choice keeps its own width. */
+.la-analysers .la-filter-field {
+	align-items: flex-start;
+}
+
+/* The finger load and the rows under the details' heatmap, at a readable width. */
+.la-detail-loads {
+	max-width: 720px;
+}
+
+/* « Add a layout »: a framed card with a drop zone, the file button inside
+   it, and the paste field with what it recognised (ux-study items 6 and 15). */
+.la-add {
+	background: var(--la-surface-2);
+	border: 1px solid var(--la-border);
+	border-left: 6px solid var(--la-cat-2);
+	border-radius: 10px;
+	display: grid;
+	gap: 10px;
+	margin: 16px 0;
+	padding: 16px 18px;
+}
+
+.la-add-title {
+	font-size: 1.05rem;
+	margin: 0;
+}
+
+.la-drop {
+	align-items: center;
+	border: 2px dashed var(--la-border);
+	border-radius: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	justify-content: center;
+	margin: 0;
+	padding: 18px 12px;
+	text-align: center;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+}
+
+.la-drop-icon {
+	fill: none;
+	height: 28px;
+	stroke: var(--la-cat-2);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 28px;
+}
+
+.la-drop-active {
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+}
+
+.la-paste-label {
+	font-weight: 600;
+}
+
+.la-paste {
+	box-sizing: border-box;
+	font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+	min-height: 5.5em;
+	resize: vertical;
+	width: 100%;
+}
+
+.la-paste-actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	justify-content: space-between;
+	margin: 0;
+}
+
+.la-detected {
+	margin: 0;
+	min-height: 1.4em;
+}
+
+.la-detected-yes {
+	color: var(--la-good);
+	font-weight: 600;
+}
+
+.la-detected-no {
+	color: var(--la-sub);
+}
+
+.la-import-report {
+	background: var(--la-surface-2);
+	border-radius: 8px;
+	margin: 8px 0;
+	padding: 8px 12px;
+}
+
+.la-import-report.la-ok {
+	border-left: 4px solid var(--la-good);
+}
+
+.la-import-report.la-error {
+	border-left: 4px solid var(--la-bad);
+}
+
+/* The user's own layouts in the list: a « Mine » badge and three actions,
+   each an icon with its word, at a 32px target (ux-study item 5). */
+.la-layout-item.la-own {
+	border-left-color: var(--la-cat-3);
+}
+
+.la-mine-actions,
+.la-rename {
+	align-items: center;
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 2px 0;
+}
+
+.la-mine-badge {
+	border: 2px solid var(--la-cat-3);
+	border-radius: 999px;
+	color: var(--theme-text);
+	font-size: 0.75rem;
+	font-weight: 700;
+	padding: 1px 8px;
+}
+
+.la-mine-button {
+	align-items: center;
+	border-radius: 6px;
+	display: inline-flex;
+	gap: 4px;
+	min-height: var(--theme-target-min);
+	padding: 2px 8px;
+}
+
+.la-mine-icon {
+	fill: none;
+	height: 16px;
+	stroke: currentcolor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 16px;
+}
+
+.la-mine-icon-rename {
+	stroke: var(--la-cat-1);
+}
+
+.la-mine-icon-duplicate {
+	stroke: var(--la-cat-4);
+}
+
+.la-mine-icon-remove {
+	stroke: var(--la-bad);
+}
+
+.la-rename-input {
+	min-height: var(--theme-target-min);
+	min-width: 14em;
+}
+
+.la-mine-status {
+	background: var(--la-surface-2);
+	border-radius: 8px;
+	margin: 8px 0;
+	padding: 8px 12px;
+}
+
+.la-mine-status.la-ok {
+	border-left: 4px solid var(--la-good);
+}
+
+.la-mine-status.la-error {
+	border-left: 4px solid var(--la-bad);
+}
+
+.la-mine-undo {
+	font-weight: 600;
+	margin-left: 8px;
+}
+
+/* A penalty's floor under its weight: a second, quieter field. */
+.la-floor-field {
+	border-top: 1px dashed var(--la-border);
+	margin-top: 6px;
+	padding-top: 6px;
+}
+
+.la-floor-name {
+	color: var(--la-sub);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+/* The floor's help takes its own line under its input. */
+.la-floor-help {
+	flex-basis: 100%;
+}
+
+/* A graded metric's grades under its weight: a group as quiet as the floor,
+   one labelled factor per line. */
+.la-grade-group {
+	border: 0;
+	border-top: 1px dashed var(--la-border);
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 6px 0 0;
+	min-width: 0;
+	padding: 6px 0 0;
+}
+
+.la-grade-group legend {
+	float: left;
+	padding: 0;
+	width: 100%;
+}
+
+.la-grade-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-grade-name {
+	flex: 1 1 8em;
+	font-size: 0.9em;
+}
+
+/* Score presets (ux-study item 13): one coloured card per built-in preset,
+   the one in use marked in words, then the user's own in a list. */
+.la-presets {
+	display: grid;
+	gap: 10px;
+	margin-top: 18px;
+}
+
+.la-presets h3 {
+	font-size: 1rem;
+	margin: 6px 0 0;
+}
+
+.la-preset-list {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-preset-apply {
+	align-content: start;
+	border: 1px solid var(--la-border);
+	border-left: 6px solid var(--la-preset-colour, var(--la-accent));
+	border-radius: 10px;
+	box-sizing: border-box;
+	cursor: pointer;
+	display: grid;
+	gap: 4px;
+	height: 100%;
+	padding: 12px 14px;
+	text-align: left;
+	width: 100%;
+}
+
+.la-preset-apply[aria-pressed='true'] {
+	--la-sub: var(--theme-text);
+	background: var(--la-accent-soft);
+	border-color: var(--la-accent);
+	border-left-color: var(--la-preset-colour, var(--la-accent));
+}
+
+.la-preset-accent-1 {
+	--la-preset-colour: var(--la-cat-1);
+}
+
+.la-preset-accent-2 {
+	--la-preset-colour: var(--la-cat-2);
+}
+
+.la-preset-accent-3 {
+	--la-preset-colour: var(--la-cat-3);
+}
+
+.la-preset-accent-4 {
+	--la-preset-colour: var(--la-cat-4);
+}
+
+.la-preset-accent-5 {
+	--la-preset-colour: var(--la-cat-5);
+}
+
+.la-preset-name {
+	font-weight: 700;
+}
+
+.la-preset-help {
+	color: var(--la-sub);
+	font-size: 0.9em;
+}
+
+.la-preset-active,
+.la-preset-stale {
+	border: 2px solid var(--la-good);
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	justify-self: start;
+	padding: 0 8px;
+}
+
+.la-preset-stale {
+	border-color: var(--la-bad);
+}
+
+.la-preset-mine {
+	display: grid;
+	gap: 6px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.la-preset-own {
+	align-items: center;
+	background: var(--la-surface-2);
+	border-left: 4px solid var(--la-cat-3);
+	border-radius: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	padding: 6px 10px;
+}
+
+.la-preset-save {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
-	margin: 8px 0;
 }
 
-.layout-analysis .la-fingering-key {
-	border: 1px solid var(--la-border);
-	color: var(--theme-text);
-	font-size: 0.75em;
-	height: 36px;
-	padding: 0;
-	width: 36px;
+.la-preset-save input {
+	min-height: var(--theme-target-min);
+	min-width: 14em;
 }
 
-/* One hue per finger, the same on both hands; thumbs neutral. */
-.la-fingering-key[data-finger='lp'],
-.la-fingering-key[data-finger='rp'] {
-	background: color-mix(in srgb, var(--theme-red) 30%, var(--la-surface));
+/* The ranking's views (ux-study item 14): a pin per row, pinned rows on a
+   tint with an accent edge; a folded family's best row with a « +n »
+   button, its members indented when shown. */
+.la-ranking-tools {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 16px;
+	margin: 4px 0 8px;
 }
 
-.la-fingering-key[data-finger='lr'],
-.la-fingering-key[data-finger='rr'] {
-	background: color-mix(in srgb, var(--theme-orange) 30%, var(--la-surface));
+.la-ranking-tools .la-muted {
+	margin: 0;
 }
 
-.la-fingering-key[data-finger='lm'],
-.la-fingering-key[data-finger='rm'] {
-	background: color-mix(in srgb, var(--theme-green) 30%, var(--la-surface));
+/* « Download the table (CSV) » wraps on a phone under a larger text. */
+.layout-analysis .la-ranking-tools > button {
+	max-width: 100%;
+	white-space: normal;
 }
 
-.la-fingering-key[data-finger='li'],
-.la-fingering-key[data-finger='ri'] {
-	background: color-mix(in srgb, var(--theme-blue) 30%, var(--la-surface));
+.la-row-button {
+	align-items: center;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	cursor: pointer;
+	display: inline-flex;
+	gap: 2px;
+	margin-right: 4px;
+	min-height: var(--theme-target-min);
+	min-width: var(--theme-target-min);
+	padding: 0 3px;
+	vertical-align: middle;
 }
 
-.la-fingering-home {
-	box-shadow: inset 0 -4px 0 var(--theme-text);
+.la-row-button:hover,
+.la-row-button:focus-visible {
+	border-color: var(--la-border);
+}
+
+.la-row-icon {
+	fill: none;
+	height: 16px;
+	stroke: var(--la-sub);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2;
+	width: 16px;
+}
+
+.la-pin[aria-pressed='true'] .la-row-icon {
+	fill: var(--la-cat-2);
+	stroke: var(--la-cat-2);
+}
+
+.la-fold::after {
+	color: var(--la-accent);
+	content: attr(data-count);
+	font-size: 0.8em;
 	font-weight: 700;
 }
 
-.layout-analysis .la-fingering-key.la-selected {
-	outline: 2px solid var(--la-accent);
+.la-table tr.la-row-pinned td {
+	background: color-mix(in srgb, var(--la-cat-2) 10%, var(--la-surface));
+}
+
+.la-table tr.la-row-pinned td:first-child {
+	box-shadow: inset 4px 0 0 var(--la-cat-2);
+}
+
+.la-csv-button {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	margin-left: auto;
+	min-height: var(--theme-target-min);
+}
+
+.la-csv-button .la-row-icon {
+	stroke: var(--la-cat-4);
+}
+
+.la-table tr.la-row-member td:nth-child(2) {
+	padding-left: 28px;
+}
+
+/* The Pareto tab (an idea seen in the Layouts Wiki playground): the scatter
+   plot and the spread scale to the page's width; every mark repeats a row of
+   the table under them, which names each layout and value in text. The
+   frontier is the first categorical hue, filled and larger; the others are
+   hollow in the secondary text colour; the detailed layout wears a ring in
+   the text colour (3:1 against the surface, WCAG 1.4.11). */
+.la-pareto-chart {
+	max-width: 900px;
+}
+
+.la-pareto-svg {
+	display: block;
+	height: auto;
+	width: 100%;
+}
+
+.la-pareto-axis {
+	stroke: var(--la-sub);
+	stroke-width: 1;
+}
+
+.la-pareto-axis-title,
+.la-pareto-tick,
+.la-pareto-label {
+	fill: var(--theme-text);
+	font-size: 12px;
+}
+
+.la-pareto-tick {
+	fill: var(--la-sub);
+}
+
+.la-pareto-point {
+	fill: none;
+	stroke: var(--la-sub);
+	stroke-width: 1.5;
+}
+
+.la-pareto-point-front {
+	fill: var(--la-cat-1);
+	stroke: var(--la-cat-1);
+}
+
+.la-pareto-front-line {
+	fill: none;
+	stroke: var(--la-cat-1);
+	stroke-dasharray: 4 3;
+	stroke-width: 1.5;
+}
+
+.la-pareto-ring {
+	fill: none;
+	stroke: var(--theme-text);
+	stroke-width: 2.5;
+}
+
+.la-pareto-spread-tick {
+	stroke: var(--la-sub);
+	stroke-width: 1.5;
+}
+
+/* The smoothed distribution above the spread: a light fill of the frontier's
+   colour with its outline, so it reads in both themes without hiding a tick. */
+.la-pareto-density-fill {
+	fill: color-mix(in srgb, var(--la-cat-1) 22%, transparent);
+}
+
+.la-pareto-density {
+	fill: none;
+	stroke: var(--la-cat-1);
+	stroke-width: 1.5;
+}
+
+/* The spread's inner quantiles (P10 to P90): taller dashed marks in the
+   text colour, each named under the strip and listed in the table below. */
+.la-pareto-quantile {
+	stroke: var(--theme-text);
+	stroke-dasharray: 3 2;
+	stroke-width: 1;
+}
+
+.la-swatch-muted {
+	border: 1.5px solid var(--la-sub);
+}
+
+.la-swatch-ring {
+	border: 2.5px solid var(--theme-text);
+	border-radius: 50%;
+	height: 12px;
+	width: 12px;
+}
+
+/* The Comparison layout: a dashed square, told from the Principal's ring by
+   its shape as well as its line. */
+.la-pareto-versus {
+	fill: none;
+	stroke: var(--theme-text);
+	stroke-dasharray: 3 2;
+	stroke-width: 2;
+}
+
+.la-swatch-versus {
+	border: 2px dashed var(--theme-text);
+	height: 12px;
+	width: 12px;
+}
+
+/* The Principal − Comparison table above a frame tab's figures, framed as
+   the filters are; its summary a 44 px target. */
+.la-frame-diff {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 10px;
+	margin-top: 12px;
+	padding: 6px 14px;
+}
+
+.la-frame-diff > summary {
+	cursor: pointer;
+	font-weight: 600;
+	line-height: 1.4;
+	padding: 11px 0;
+}
+
+.la-table tr.la-pareto-row-front th {
+	box-shadow: inset 4px 0 0 var(--la-cat-1);
+}
+
+/* The trace tab: each character over the keys that type it, each key in its
+   finger's hue (the fingering editor's four slots) with its finger printed
+   under its legend, so the colour is never the only cue; a key of a
+   penalised pair or triple wears a thick border in the loss colour and the
+   list under the strip names each such group in words. */
+.la-trace-field textarea {
+	box-sizing: border-box;
+	font: inherit;
+	max-width: 60em;
+	width: 100%;
+}
+
+.la-trace-strip {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 2px;
+	list-style: none;
+	margin: 8px 0;
+	padding: 0;
+}
+
+.la-trace-cell {
+	align-items: center;
+	display: inline-flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 2em;
+}
+
+.la-trace-char {
+	font-family: ui-monospace, monospace;
+	font-weight: 700;
+}
+
+.la-trace-missing .la-trace-char {
+	color: var(--la-bad);
+	text-decoration: line-through;
+}
+
+.la-trace-key {
+	align-items: center;
+	background: color-mix(in oklab, var(--la-finger, var(--la-surface)) 22%, var(--la-surface));
+	border: 2px solid var(--la-finger, var(--la-border));
+	border-radius: 4px;
+	display: inline-flex;
+	flex-direction: column;
+	font-family: ui-monospace, monospace;
+	line-height: 1.1;
+	min-width: 1.8em;
+	padding: 1px 3px;
+}
+
+.la-trace-key.la-trace-bad {
+	box-shadow: 0 0 0 2px var(--la-loss);
+}
+
+.la-trace-finger {
+	color: var(--theme-text);
+	font-family: system-ui, sans-serif;
+	font-size: 0.7em;
+}
+
+.la-trace-key[data-finger='lp'],
+.la-trace-key[data-finger='rp'] {
+	--la-finger: var(--la-cat-1);
+}
+
+.la-trace-key[data-finger='lr'],
+.la-trace-key[data-finger='rr'] {
+	--la-finger: var(--la-cat-2);
+}
+
+.la-trace-key[data-finger='lm'],
+.la-trace-key[data-finger='rm'] {
+	--la-finger: var(--la-cat-3);
+}
+
+.la-trace-key[data-finger='li'],
+.la-trace-key[data-finger='ri'] {
+	--la-finger: var(--la-cat-4);
+}
+
+.la-trace-groups {
+	columns: 18em;
+	margin: 4px 0 8px;
+}
+
+/* The numbers of the Pareto and trace tables line up on their right. */
+.la-table td.la-num {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
+/* Corpus blends (an idea seen in the Layouts Wiki playground): each part a
+   corpus picker and its weight on one wrapping line. A fieldset's default
+   min-inline-size is min-content, so without the zero it would grow to its
+   longest corpus name and widen a phone's page (WCAG 1.4.10). */
+.la-blend-parts {
+	border: 0;
+	margin: 8px 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+
+.la-blend-part {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	margin: 0 0 8px;
+}
+
+.la-blend-part select {
+	max-width: 100%;
+}
+
+.la-blend-part input {
+	width: 5em;
+}
+
+/* The Comparison layout of the frame, beside the Principal one (la-selected):
+   a dashed edge in the accent colour on its rows of every figure. */
+.la-chart-row.la-versus,
+.la-table tr.la-versus > * {
+	box-shadow: inset 0 0 0 2px var(--la-accent);
+}
+
+.la-chart-row.la-versus {
+	box-shadow: none;
+	outline: 2px dashed var(--la-accent);
+	outline-offset: -2px;
+}
+
+/* The task help (an idea seen in the Layouts Wiki playground's Docs pane):
+   prose kept to a readable measure, under 80 characters a line. */
+.la-help p {
+	max-width: 66ch;
 }

@@ -4,6 +4,7 @@
 ; MODULE: Real-Time WPM Widget (shim)
 ; DESCRIPTION:
 ; Thin entry point that composes the WPM widget sub-modules:
+;   - wpm_produced_text.ahk — the erased characters a producer takes back
 ;   - wpm_display.ahk  — constants, state, ring buffer, color helpers,
 ;                        default position, show/hide, tick rendering loop
 ;   - wpm_config.ahk   — shared TOML constant loading, config persistence,
@@ -36,6 +37,7 @@
 ; ==============================================================================
 
 #Include wpm_category_color.ahk
+#Include wpm_produced_text.ahk
 #Include wpm_display.ahk
 #Include wpm_gdiplus_ownership.ahk
 #Include wpm_widget.ahk

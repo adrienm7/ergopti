@@ -68,6 +68,8 @@ local PROSE_SPELLINGS = {
 	alt = true, tab = true, space = true, enter = true, delete = true, option = true, ["return"] = true,
 	command = true, control = true, super = true, caps = true, escape = true, shift = true, meta = true,
 	insert = true, home = true, ["end"] = true,
+	-- The JIS Henkan alias; « convert » is also an English verb of the texts.
+	convert = true,
 }
 
 --- Every key spelling a row must never show: the ids and aliases of
@@ -129,10 +131,12 @@ function M.defect(text, known, allowlist, raw_keys)
 	end
 	-- A hotstring row ends with its entry count, which is no part of the label.
 	local label = text:gsub("%s*%(%d+%)$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if label == "" then return "is empty" end
 	if known[label] then return "equals an id or a config path" end
 	for word in label:gmatch("%S+") do
-		-- Segments start with a letter: « v2.2.1 » is a version, not a key.
-		if word:match("^%l[%w_]*%.%a[%w_.]*$") then return "reads as a dotted key" end
+		-- Segments start with a letter: « v2.2.1 » is a version, not a key. A
+		-- key's first segment is a word, so « e.g. » is an abbreviation.
+		if word:match("^%l[%w_]+%.%a[%w_.]*$") then return "reads as a dotted key" end
 	end
 	for word in label:gmatch("[%w_\128-\255]+") do
 		if word:match("^[%l%d]+_[%l%d_]+$") then return "reads as snake_case" end
@@ -151,7 +155,9 @@ end
 --- @param visit function Called with (text, trail).
 local function walk(rows, trail, visit)
 	for _, row in ipairs(rows) do
-		if type(row) == "table" and type(row.title) == "string" and row.title ~= SEPARATOR then
+		-- A row drawn as an image (the macOS status pill) has no text to judge.
+		if type(row) == "table" and type(row.title) == "string" and row.title ~= SEPARATOR
+			and not (row.title == "" and row.image ~= nil) then
 			visit(row.title, trail)
 			if type(row.menu) == "table" then walk(row.menu, trail .. " > " .. row.title, visit) end
 		end
@@ -186,10 +192,13 @@ end
 --- @param shared_root string Path of _shared.
 --- @param json_decode function JSON decoder.
 --- @param locale string|nil Locale of the texts; "fr" adds the punctuation rule.
+--- @param extra_ids table|nil More ids no row may show: a catalogue's category
+---   and section ids, which no manifest lists.
 --- @return table defects, number rows
-function M.defects(tray, shared_root, json_decode, locale)
+function M.defects(tray, shared_root, json_decode, locale, extra_ids)
 	local allowlist = read_json(shared_root, "tests/corpus/menu_row_text_allowlist.json", json_decode).entries
 	local known = identifiers(shared_root, json_decode)
+	for id in pairs(extra_ids or {}) do known[id] = true end
 	local raw_keys = M.raw_key_spellings(shared_root, json_decode)
 	local defects, rows = {}, 0
 	walk(tray, "tray", function(text, trail)

@@ -6,8 +6,8 @@
 ; Loads UI string translations from the shared JSON locale files in
 ; ``_shared/core/i18n/data/locales/<code>.json`` (through a self-healing .tsv fast-cache)
 ; and exposes a single ``t(key)`` accessor returning the localised string for a
-; dot-notation key, with the ``★`` placeholder substituted by the configured
-; MagicKey. Mirror of ``macos/core/i18n/engine/locale.lua``: this is the string-LOADING +
+; dot-notation key, with the ``★`` marker shown as the configured magic key's
+; display, « ★ (ù) » (hotstrings/engine/magic_key_rules.ahk). Mirror of ``macos/core/i18n/engine/locale.lua``: this is the string-LOADING +
 ; access layer; locale MANAGEMENT (selection, system detection, persistence,
 ; language menu) lives in the sibling ``core/i18n/engine/i18n.ahk``.
 ;
@@ -18,7 +18,7 @@
 ;    the EN/FR fallbacks are warmed off the critical path. Each locale is served
 ;    from a flat .tsv regenerated whenever the .json is newer (~23x faster than
 ;    re-parsing the JSON for the identical key/value set).
-; 3. ★ substitution at parse time so the cache stays MagicKey-independent.
+; 3. ★ display at parse time so the cache stays MagicKey-independent.
 ; ==============================================================================
 
 
@@ -50,8 +50,8 @@ global _I18nCacheEnLoaded := false
 global _I18nCacheFr := Map()
 global _I18nCacheFrLoaded := false
 
-; True once the EN/FR fallback caches have been warmed — eagerly by the deferred
-; I18nWarmFallbacks timer, or lazily on the first active-locale miss inside t().
+; True once the EN/FR fallback caches have been loaded, lazily on the first
+; active-locale miss inside t() or by a caller that needs the whole catalogue.
 ; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
 global _I18nFallbacksWarmed := false
 
@@ -79,8 +79,8 @@ _I18nLocalePath(Code) {
 }
 
 ; Invert _I18nWriteTsvCache's value escaping in a single left-to-right scan so
-; "\\" never collides with "\n"/"\r". Only called for values that contain a
-; backslash, so the common case pays nothing.
+; "\\" never collides with "\n"/"\r". Only called for keys and values that
+; contain a backslash, so the common case pays nothing.
 _I18nUnescapeTSV(s) {
 	out := ""
 	i := 1
@@ -121,6 +121,7 @@ _I18nUnescapeTSV(s) {
 ; post-processing the JSON path applies. A tight Loop Parse keeps this ~23x faster
 ; than the recursive-descent JsonParse for the identical key/value set.
 _I18nParseTSV(Content, MagicKey, Status := unset) {
+	Marker := MagicKeyMarker()
 	global _I18N_TSV_SENTINEL
 	if IsSet(Status) && IsObject(Status)
 		Status.Templates := Map()
@@ -139,14 +140,18 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		}
 		if (!p)
 			continue
-		k := _I18nUnescapeTSV(SubStr(line, 1, p - 1))
+		; Keys take the values' shortcut too: the per-character unescape of every
+		; key was most of the boot's i18n stage (perf-i18n-tsv-keys-2026-11-17).
+		k := SubStr(line, 1, p - 1)
+		if InStr(k, "\")
+			k := _I18nUnescapeTSV(k)
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
-		if InStr(v, "★") {
+		if InStr(v, Marker) {
 			if IsSet(Status) && IsObject(Status)
 				Status.Templates[k] := v
-			v := StrReplace(v, "★", MagicKey)
+			v := MagicKeyShownText(v, MagicKey, k)
 		}
 		m[k] := v
 	}
@@ -218,6 +223,9 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 ; key names); Fast records whether the .tsv cache was hit, for log clarity only.
 _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	TsvPath := RegExReplace(JsonPath, "\.json$", ".tsv")
+	; A whole catalogue costs a menu build that loads it about 100 million
+	; cycles: counted so the deferred build probe names that load.
+	PerfCount("i18n.locale_map_loads")
 
 	; ── Fast path: a fresh .tsv cache ──
 	if AllowFast && FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
@@ -236,6 +244,7 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	}
 
 	; ── Slow path: parse JSON, then regenerate the cache for next boot ──
+	PerfCount("i18n.locale_json_parses")
 	if !FileExist(JsonPath) {
 		try LoggerWarn("i18n", "Locale file not found: '{1}' — falling back to key names.", JsonPath)
 		return { Cache: Map(), Ok: false, Fast: false }
@@ -262,10 +271,11 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 	}
 	Out := Map()
 	Templates := Map()
+	Marker := MagicKeyMarker()
 	for Key, Val in Parsed {
-		if InStr(Val, "★") {
+		if InStr(Val, Marker) {
 			Templates[Key] := Val
-			Out[Key] := StrReplace(Val, "★", MagicKey)
+			Out[Key] := MagicKeyShownText(Val, MagicKey, Key)
 		} else
 			Out[Key] := Val
 	}
@@ -284,7 +294,7 @@ _I18nLoadFile(FilePath) {
 	global _I18nActiveCacheIdentity
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"]
-		: "★"
+		: MagicKeyMarker()
 	BeforeHash := _I18nSourceHash(FilePath)
 	; A source edit already proved by exact bytes also invalidates a TSV whose
 	; timestamp happens to survive that edit. Reload must not bless the old model
@@ -318,7 +328,7 @@ I18nActiveCacheCanReuse() {
 	global _I18nCache, _I18nCacheLoaded, _I18nActiveCacheIdentity, _I18nLocale, ScriptInformation
 	Identity := _I18nActiveCacheIdentity
 	MagicKey := IsSet(ScriptInformation) && ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"] : "★"
+		? ScriptInformation["MagicKey"] : MagicKeyMarker()
 	if !_I18nCacheLoaded || !IsObject(Identity) || Identity.Cache != _I18nCache
 			|| Identity.Locale != _I18nLocale
 			|| Identity.Path != _I18nLocalePath(_I18nLocale)
@@ -328,7 +338,7 @@ I18nActiveCacheCanReuse() {
 		return false
 	if Identity.MagicKey != MagicKey {
 		for Key, Template in Identity.Templates
-			_I18nCache[Key] := StrReplace(Template, "★", MagicKey)
+			_I18nCache[Key] := MagicKeyShownText(Template, MagicKey, Key)
 		Identity.MagicKey := MagicKey
 		try LoggerDebug("i18n", "Retained locale cache refreshed {1} magic-key template(s).", Identity.Templates.Count)
 	}
@@ -342,7 +352,8 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 		return
 	global ScriptInformation
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
-		? ScriptInformation["MagicKey"] : "★"
+		? ScriptInformation["MagicKey"] : MagicKeyMarker()
+	PerfCount("i18n.fallback_loads." . Code)
 	R := _I18nLoadLocaleMap(_I18nLocalePath(Code), MagicKey)
 	Cache := R.Cache
 	Loaded := R.Ok
@@ -391,7 +402,7 @@ _I18nEnsureLoaded() {
 ; This is the accessor for SPECULATIVE lookups — a caller walking a chain of
 ; candidate keys, where a miss is the normal control flow rather than a defect.
 ; It exists because t() below both resolves and DIAGNOSES, and those two
-; contracts collided: infra/manifest_descriptions.ahk probes up to nine candidates
+; contracts collided: menu/engine/manifest_descriptions.ahk probes up to nine candidates
 ; per menu label and expects all but one to miss, so every label emitted several
 ; warnings claiming "the raw key is being displayed to the user" when it was not.
 ; Measured 2026-07-29: 282 unique keys warned per boot, of which 281 were probes
@@ -419,8 +430,8 @@ I18nLookup(Key) {
 	; must resolve to the fallback, not to an empty string).
 	if _I18nCache.Has(Key) and _I18nCache[Key] != ""
 		return _I18nCache[Key]
-	; Miss in the active locale → consult the fallbacks. They are warmed off the
-	; boot path (I18nWarmFallbacks); if a miss arrives first, load them once now.
+	; Miss in the active locale → consult the fallbacks, loaded once at the first
+	; such miss: a complete catalogue never has one, so no timer warms them.
 	if !_I18nFallbacksWarmed
 		_I18nEnsureFallbacksLoaded()
 	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key) and _I18nCacheEn[Key] != ""
@@ -428,6 +439,30 @@ I18nLookup(Key) {
 	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key) and _I18nCacheFr[Key] != ""
 		return _I18nCacheFr[Key]
 	return ""
+}
+
+; Resolve a candidate key from the active catalogue alone, silently: the Windows
+; form of the shared locale core's has() (_shared/core/i18n/engine/core.lua).
+; Every shipped catalogue carries exactly en.json's key set and no blank value
+; (tools/test/test-locale-catalogue-complete.cjs), so a key the loaded active
+; catalogue lacks is absent from the fallbacks too. Probing through I18nLookup
+; made the first candidate miss of a boot load a whole fallback catalogue: the
+; manifest label resolver tries menu.layout.ergopti_base before the folded
+; layout.ergoptibase, and that one miss cost the Layout submenu's first open
+; 150 million cycles and 2000 page faults on CI (run 44983580030). Only an
+; active catalogue that failed to load is answered by the fallbacks.
+; @param Key string Dot-notation locale key.
+; @returns {String} The active translation, or "" when the key is not there.
+I18nProbe(Key) {
+	global _I18nCache, _I18nCacheLoaded
+	; Parse-time #HotIf criteria may ask before the caches exist (see I18nLookup).
+	if !IsSet(_I18nCache) || !IsSet(_I18nCacheLoaded)
+		return ""
+	if !_I18nCacheLoaded
+		_I18nEnsureActiveLoaded()
+	if !_I18nCacheLoaded
+		return I18nLookup(Key)
+	return _I18nCache.Get(Key, "")
 }
 
 ; Joins a translated label to its value the way the active locale spells it

@@ -475,9 +475,21 @@ TapHoldIsConfigured(TapHold, KeyId) {
 	return Entry.Has("tap_action") or Entry.Has("hold_layer") or Entry.Has("hold_modifier")
 }
 
+; A game (an application with its own « Touches de jeu » choice) skips every
+; tap-hold delay: its keys go out as they are, held for as long as the hand
+; holds them. Only the live map the hotkey criteria read answers so; the
+; desired map a write or a menu tick reads keeps the stored configuration.
+_TapHoldGameSkips(Candidate) {
+	global TapHold
+	return IsSet(TapHold) && IsObject(Candidate) && ObjPtr(Candidate) == ObjPtr(TapHold)
+		&& IsSet(GameKeys_ForegroundIsGame) && GameKeys_ForegroundIsGame()
+}
+
 ; Runtime hotkey predicate. Keep it distinct from "configured" so the menu and
 ; shared corpus can still report a disabled entry's stored configuration.
 TapHoldIsActive(TapHold, KeyId) {
+	if _TapHoldGameSkips(TapHold)
+		return false
 	return TapHoldIsEnabled(TapHold, KeyId)
 		&& TapHoldIsConfigured(TapHold, KeyId)
 }
@@ -488,6 +500,8 @@ TapHoldIsActive(TapHold, KeyId) {
 ; hotkey criterion asks here at each press, so the key is left to the application
 ; and the switch-on needs no reload.
 TapHoldTapAction(TapHold, KeyId) {
+	if _TapHoldGameSkips(TapHold)
+		return ""
 	Action := TapHoldConfiguredTapAction(TapHold, KeyId)
 	return AiActionBlocked(Action) ? "" : Action
 }
@@ -573,7 +587,7 @@ TapHoldDuration(TapHold, KeyId) {
 ; hold (e.g. plain tap-only variants like CapsLock-BackSpace or LAlt-BackSpace
 ; key-repeat where the held key simply repeats the tap action).
 TapHoldHoldModifier(TapHold, KeyId) {
-	if !TapHoldIsEnabled(TapHold, KeyId) {
+	if _TapHoldGameSkips(TapHold) || !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -586,7 +600,7 @@ TapHoldHoldModifier(TapHold, KeyId) {
 ; vs LAlt-BackSpaceLayer share tap_action "backspace" but only the latter
 ; arms the navigation layer).
 TapHoldHoldLayer(TapHold, KeyId) {
-	if !TapHoldIsEnabled(TapHold, KeyId) {
+	if _TapHoldGameSkips(TapHold) || !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]

@@ -25,14 +25,14 @@ if mode == 'close-refusal' then
 end
 local result = { target = target, mode = mode, admitted_child_layout = true }
 if module == 'local' then
- local order, servers, published = require('modules.llm.local_server_catalogue').load({})
+ local order, servers, published = require('ai.engine.local_servers.catalogue').load({})
  result.order, result.published = order, published
  result.optional_auth_allowed = require('ai.engine.local_servers.auth').entry_token_allowed('llamacpp', '', servers.llamacpp and servers.llamacpp.base_url or '', servers)
 elseif module == 'environment' then
- local rows, reason = require('modules.llm.managed_ollama_environment').load()
+ local rows, reason = require('ai.engine.ollama.managed_ollama_environment').load()
  result.rows, result.reason = rows or false, reason
 elseif module == 'profile' then
- result.profile = require('modules.llm.model_profile').recommend('unlisted:999b')
+ result.profile = require('ai.engine.local_servers.model_profile').recommend('unlisted:999b')
 else error('unknown loader') end
 io.open = open
 result.close_calls = closes

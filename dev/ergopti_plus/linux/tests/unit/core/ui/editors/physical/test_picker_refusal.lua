@@ -2,6 +2,7 @@
 
 --- Exercises genuine editor/window/picker callbacks over an exact file receipt.
 local helpers = require("tests.helpers")
+local Json = require("core.text.engine.json")
 local Writer = require("core.text.engine.toml_codec.writer")
 require("core.process.adapters.shell_runner")
 require("ui.physical_shortcuts.bridge")
@@ -9,8 +10,8 @@ require("ui.action_picker.bridge")
 
 local function with_editor(body)
 	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "core.ui.ui.webview_manager",
-		"modules.gestures.manager", "platform.input.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
-		"core.ui.ui.text_prompt", "ui.app_chooser", "core.logger.engine.shim" }
+		"gestures.engine.manager", "platform.input.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
+		"core.ui.ui.text_prompt", "apps.ui.chooser", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local path = os.tmpname()
@@ -71,7 +72,7 @@ local function with_editor(body)
 		get_picker_items = function() return {} end, get_picker_parameter_fields = function() return {} end,
 	}
 	local called, detail = xpcall(function()
-		package.loaded["core.ui.ui.webview_manager"], package.loaded["modules.gestures.manager"] = manager, catalogue
+		package.loaded["core.ui.ui.webview_manager"], package.loaded["gestures.engine.manager"] = manager, catalogue
 		package.loaded["platform.input.keyboard_hook"] = { position_capture_available = function() return false end }
 		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -83,16 +84,16 @@ local function with_editor(body)
 			if state.on_prompt then state.on_prompt() end
 			return state.parameter
 		end }
-		package.loaded["ui.app_chooser"] = { pick = package.loaded["core.ui.ui.text_prompt"].ask }
+		package.loaded["apps.ui.chooser"] = { pick = package.loaded["core.ui.ui.text_prompt"].ask }
 		host = helpers.load_module("ui.physical_shortcuts.bridge")
 		local picker = helpers.load_module("ui.action_picker.bridge")
 		function state.open()
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
-			helpers.assert_true(host.on_message({ action = "ready" }, daemon,
+			helpers.assert_true(host.on_message(Json.encode({ action = "ready" }), daemon,
 				{ app_name = "physical_shortcuts", epoch = epochs.physical_shortcuts }))
 		end
 		function state.choose()
-			return host.on_message({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } },
+			return host.on_message(Json.encode({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } }),
 				daemon, { app_name = "physical_shortcuts", epoch = epochs.physical_shortcuts })
 		end
 		function state.confirm(action)

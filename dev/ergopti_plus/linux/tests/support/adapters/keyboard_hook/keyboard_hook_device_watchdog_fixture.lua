@@ -60,7 +60,7 @@ end
 local function stub_device_finder(initial)
 	local answer = initial
 	local calls = 0
-	package.loaded["modules.hotstrings.device_finder"] = {
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_keyboard = function() calls = calls + 1 ; return answer end,
 		-- The hook asks the finder whether a path can actually produce key events
 		-- before it commits to it — /dev/null is readable, and without this check
@@ -154,7 +154,7 @@ local function aggregate_consumer_session(streams, options)
 		desired = {}
 		for _, id in ipairs(options.initial_sources) do desired[#desired + 1] = assert(paths[id]) end
 	end
-	package.loaded["modules.hotstrings.device_finder"] = {
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function() return desired, {} end,
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
@@ -231,7 +231,7 @@ local function aggregate_consumer_session(streams, options)
 		package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
 		local layout = helpers.load_module("adapters.keyboard_layout")
 		layout._set_table_for_test({ x = { keycode = 45, level = 1, mods = {} } })
-		local injector = helpers.load_module("modules.hotstrings.injector")
+		local injector = helpers.load_module("hotstrings.engine.injector")
 		package.loaded["adapters.xkb_capture"] = saved
 		injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
 		local result = injector.type_directly(text)

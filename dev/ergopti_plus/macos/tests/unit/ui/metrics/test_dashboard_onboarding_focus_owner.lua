@@ -18,8 +18,8 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 				pending[#pending + 1] = function() handle.timer = nil; callback() end
 				return handle, true
 			end
-			helpers.with_fresh_modules({ "infra.app_picker" }, function()
-				package.loaded["infra.app_picker"] = {
+			helpers.with_fresh_modules({ "apps.engine.picker" }, function()
+				package.loaded["apps.engine.picker"] = {
 					discover_apps = function() discoveries = discoveries + 1 end,
 				}
 				helpers.assert_true(dashboard.show())

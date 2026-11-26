@@ -40,6 +40,8 @@
 
 #Include ../../logger/engine/tick_count.ahk
 
+#Include system_programs.ahk
+
 
 
 ; ===================================
@@ -294,7 +296,7 @@ ShellRunner_Exec(Cmd) {
 		; a standalone probe: identical RunWait call, only the extra outer
 		; quote pair differs between a silent no-op and a working capture).
 		Started := A_TickCount
-		ExitCode := RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
+		ExitCode := RunWait(ShellRunner_SystemProgramCommand("cmd.exe", '/c "' . Cmd . ' > "' . TmpFile . '" 2>&1"'), , "Hide")
 		_SR_RecordExit(_SR_ProgramName(Cmd), ExitCode, A_TickCount - Started)
 	} catch as Err {
 		; The program name only: the command line can carry user text.
@@ -328,15 +330,6 @@ ShellRunner_Exec(Cmd) {
 ; ======= 3/ Async Subprocess =======
 ; ===================================
 ; ===================================
-
-/**
- * Windows PowerShell's executable: the one spelling a PowerShell stage shares,
- * since the antivirus surface of the compiled script counts every copy.
- * @returns {String} Absolute path under the Windows directory.
- */
-ShellRunner_WinPsPath() {
-	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
-}
 
 /**
  * The module folder of that executable. A driver started from PowerShell 7 inherits
@@ -393,15 +386,35 @@ ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
 }
 
 /**
+ * The one spelling of every PowerShell stage's argv: Leading, then the
+ * execution policy, then Args. RemoteSigned, for this process only, runs the
+ * local unsigned scripts Ergopti ships or writes, which the default Windows
+ * client policy (Restricted) refuses, and still refuses an unsigned script
+ * downloaded from the internet. A Group Policy setting overrides it either
+ * way. No stage asks for a hidden window style: each launcher hides the
+ * console itself (CREATE_NO_WINDOW or the "Hide" show command).
+ * @param {Array} Leading The items before the policy: the stage's switches,
+ *   after the executable when the caller builds a whole command line.
+ * @param {String} Args The stage's own arguments (-File or -Command first).
+ * @returns {Array}
+ */
+ShellRunner_WinPsArgv(Leading, Args*) {
+	if !(Leading is Array)
+		throw TypeError("Leading arguments must be an Array", -1, Type(Leading))
+	Out := Leading.Clone()
+	Out.Push("-ExecutionPolicy", "RemoteSigned")
+	Out.Push(Args*)
+	return Out
+}
+
+/**
  * The arguments a PowerShell stage starts with: no profile, no prompt, and
- * the execution policy its scripts and modules need, followed by Args.
+ * the execution policy, followed by Args.
  * @param {String} Args The stage's own arguments (-File or -Command first).
  * @returns {Array}
  */
 ShellRunner_WinPsArgs(Args*) {
-	Out := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
-	Out.Push(Args*)
-	return Out
+	return ShellRunner_WinPsArgv(["-NoProfile", "-NonInteractive"], Args*)
 }
 
 /**
@@ -884,7 +897,7 @@ _SR_LegacyRequestTreeKill(Pid) {
 	if Pid = 0
 		return true
 	try {
-		Run("taskkill.exe /PID " . Pid . " /T /F", , "Hide")
+		Run(ShellRunner_SystemProgramCommand("taskkill.exe", "/PID " . Pid . " /T /F"), , "Hide")
 		return true
 	} catch as Err {
 		_SR_DeferLogError("process-tree termination request failed for PID {1}: {2}",

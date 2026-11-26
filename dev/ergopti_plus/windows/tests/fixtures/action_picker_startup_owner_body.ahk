@@ -20,7 +20,7 @@ _APSO_Require(Condition, Message) {
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []
@@ -36,6 +36,8 @@ LoggerError(Owner, Template, Args*) {
 	else
 		_APSO.UnexpectedLogs += 1
 }
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
@@ -91,6 +93,8 @@ class _APSO_Controller {
 			_APSO.AliveAtClose := !!DllCall("IsWindow", "Ptr", _APSO.Hwnds[1], "Int")
 		}
 		this.Closed += 1
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1

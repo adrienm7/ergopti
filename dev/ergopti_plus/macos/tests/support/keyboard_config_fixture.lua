@@ -43,8 +43,8 @@ function M.install(assignments, before_write)
 		content = candidate
 		return true
 	end
-	package.loaded["infra.config_paths"] = { get = function() return "keyboard-fixture-config" end }
-	package.loaded["infra.preferences"] = nil
+	package.loaded["settings.engine.paths"] = { get = function() return "keyboard-fixture-config" end }
+	package.loaded["settings.engine.preferences.preferences"] = nil
 end
 
 return M

@@ -74,9 +74,9 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		queues[target][#queues[target] + 1] = InputEvent.encode(ev[1], ev[2], ev[3], nil, ev[4])
 	end
 	local grabs = { [keyboard] = { on = 0, off = 0 }, [pointer] = { on = 0, off = 0 }, [second] = { on = 0, off = 0 } }
-	local doubled, saved = { "modules.hotstrings.device_finder", "adapters.xkb_capture" }, {}
+	local doubled, saved = { "hotstrings.engine.device_finder", "adapters.xkb_capture" }, {}
 	for _, name in ipairs(doubled) do saved[name] = package.loaded[name] end
-	package.loaded["modules.hotstrings.device_finder"] = {
+	package.loaded["hotstrings.engine.device_finder"] = {
 		find_devices = function() return { keyboard }, { pointer } end,
 		is_key_device = function() return true, nil end,
 		is_interceptable_key_device = function() return true, nil end,
@@ -141,6 +141,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				if on_relative and on_relative(kh, keyboard, pointer, second, grabs, emitted) == false then return false end
 				return true
 			end,
+			onReleasePointer = function() emitted[#emitted + 1] = "release-pointer"; return true end,
 			onClick = not omit_click and function(code) if on_click then on_click(kh, code) end end or nil,
 			onPointerEvent = observer and function(kind, code, value, slot, at_us)
 				return observer(kind, code, value, slot, kh, start_options, grabs, at_us)
@@ -201,6 +202,9 @@ helpers.describe("keyboard hook: the navigation layer's mouse buttons (layer-mou
 		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1, "an unbound button still clicks")
 		helpers.assert_eq(grabs.on, 1, "the mouse is taken for the hold")
 		helpers.assert_eq(grabs.off, 1, "and given back after it")
+		-- While the pointer device exists desktops count a mouse as connected
+		-- and may disable the touchpad (KDE Plasma 6 field report, 2026-11-25).
+		helpers.assert_eq(count(emitted, "release-pointer"), 1, "giving the mouse back retires the virtual pointer")
 	end)
 end)
 
@@ -354,6 +358,42 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_true(opened, "the registered pointer observer requires a live pointer source")
 		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "press", BTN_LEFT, 1, source },
 			{ "reset", nil, nil, source } })
+	end)
+
+	-- The click callback withdraws the focused field's privacy verdict; the
+	-- metrics must see the press first, in the field the click lands in. Reported
+	-- after, every click met an unknown field and the clicks column stayed 0
+	-- (run_pointer_metrics_live.lua).
+	helpers.it("reports a button press before the click callback (pointer-press-before-click)", function()
+		local order = {}
+		drive("mouse", {}, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 3000 }, { EV_KEY, BTN_LEFT, 0, 4000 },
+		}, nil, function(kind, code)
+			if kind == "press" then order[#order + 1] = "press:" .. code end
+		end, nil, nil, function(_, code)
+			order[#order + 1] = "click:" .. code
+		end)
+		helpers.assert_eq(order, { "press:" .. BTN_LEFT, "click:" .. BTN_LEFT },
+			"one press, reported before the click callback")
+	end)
+
+	-- A finger's landing runs the click callback too, and the tap it becomes is
+	-- counted in the field that callback withdraws: the metrics must hear of
+	-- the landing first. Reported after, a single-touch pad's first report of
+	-- a touch met the withdrawn field (tap-click-touch-context).
+	helpers.it("reports a finger's landing before the click callback (tap-click-touch-context)", function()
+		local order = {}
+		drive("touchpad", {}, {
+			{ EV_KEY, 0x14a, 1, 3000000 }, { EV_KEY, 0x145, 1, 3000000 }, { EV_SYN, 0, 0, 3000000 },
+			{ EV_KEY, 0x145, 0, 3090000 }, { EV_KEY, 0x14a, 0, 3090000 }, { EV_SYN, 0, 0, 3090000 },
+		}, nil, function(kind, code, value)
+			if kind == "contact" then order[#order + 1] = "contact:" .. code .. ":" .. value end
+		end, nil, nil, function(_, code)
+			order[#order + 1] = "click:" .. code
+		end)
+		helpers.assert_eq(order, {
+			"contact:330:1", "click:330", "contact:325:1", "click:325", "contact:325:0", "contact:330:0",
+		}, "each landing is reported once, before its click callback; a lift has no callback")
 	end)
 
 	helpers.it("remaps the wheel without optional pointer observers (wheel-no-observers)", function()
@@ -547,7 +587,10 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		local reports = {}
 		local emitted = drive("mouse", HOLD, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
 			function(kind) reports[#reports + 1] = kind end, false, false, function(hook) hook.stop() end)
-		helpers.assert_eq(reports, { "reset" }, "only the source reset is published after capture stops")
+		-- The press is published first, while capture is live, so the metrics
+		-- count it in its field (pointer-press-before-click); after the click
+		-- callback stops capture, only the source reset may follow.
+		helpers.assert_eq(reports, { "press", "reset" }, "only the source reset is published after capture stops")
 		helpers.assert_true(not has(emitted, "key:" .. BTN_LEFT .. ":1"))
 	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
@@ -678,7 +721,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, {} end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 		end)
 		helpers.assert_true(changed)
@@ -693,7 +736,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard, pointer, second)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 			running = hook.isRunning()
 		end)
@@ -712,7 +755,7 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		}, function(hook, keyboard, pointer, second)
 			if changed then return end
 			changed = true
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { keyboard }, { pointer, second } end
 			for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
 		end)
 		helpers.assert_eq(count(emitted, "key:" .. BTN_LEFT .. ":1"), 1)

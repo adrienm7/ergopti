@@ -97,7 +97,7 @@ _KLPFWF_RefusalPreservesPrivacy(Field) {
 				"500", "1000", "2000", "3000", "30", "100"], Done)
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while !IsObject(Receipt) && TickElapsed(Started) < 5000 {
+		while !IsObject(Receipt) && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

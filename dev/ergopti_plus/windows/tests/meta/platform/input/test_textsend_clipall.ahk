@@ -95,7 +95,7 @@ Test("text_sender: clipboard branch uses CB_RestoreAll instead of CB_Restore (te
 _TSCA_SaveAllUsesClipboardAll() {
 	Src := _TSCA_ReadSource("clipboard.ahk")
 	Body := _TSCA_FuncBodyStripped(Src, "CB_SaveAll() {")
-	Assert(Body != "", "CB_SaveAll must exist in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_SaveAll must exist in clipboard/adapters/clipboard.ahk")
 	Assert(InStr(Body, "ClipboardAll()") > 0,
 		"CB_SaveAll must call ClipboardAll() — not A_Clipboard — to capture all clipboard formats")
 }
@@ -104,7 +104,7 @@ Test("clipboard: CB_SaveAll uses ClipboardAll() to capture all formats (textsend
 _TSCA_RestoreAllAssignsClipboard() {
 	Src := _TSCA_ReadSource("clipboard.ahk")
 	Body := _TSCA_FuncBodyStripped(Src, "CB_RestoreAll(Saved) {")
-	Assert(Body != "", "CB_RestoreAll must exist in adapters/clipboard.ahk")
+	Assert(Body != "", "CB_RestoreAll must exist in clipboard/adapters/clipboard.ahk")
 	Assert(InStr(Body, "A_Clipboard := Saved") > 0,
 		"CB_RestoreAll must assign A_Clipboard := Saved to restore all clipboard formats")
 }

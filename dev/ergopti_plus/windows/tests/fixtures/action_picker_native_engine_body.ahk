@@ -10,16 +10,14 @@
 
 #Requires AutoHotkey v2.0
 
-_APNR_Require(Condition, Message) {
-	if !Condition
-		throw Error(Message)
-}
+; The document wait and its one page budget (a unit test drives it with a fake view).
+#Include %A_LineFile%\..\action_picker_native_page_wait.ahk
 
 ; The smoke owns no user catalogue, AI settings or external program discovery.
 t(Key) => Key
 GestureActionPickerItems() => []
 GestureActionParameterPrompt(Action) => Action
-GestureSendInputErrorText(Kind) => Kind
+GestureSendKeysErrorText(Kind) => Kind
 SendKeysVocabularyJson() => "[]"
 LLM_Menu_PromptChoices() => []
 LLM_Vision_BackendChoices() => []
@@ -79,11 +77,45 @@ _APNR_Timeout() {
 
 _APNR_Hash(Path) => CryptoSha256Bytes(FSReadBytesStrict(Path))
 
+; Every file the delivered page names (its scripts and stylesheets, read from
+; index.html itself) plus the strings i18n.js fetches. A fixed list once missed
+; value_check.js: script.js stopped at its first top-level read of it, so the
+; page never registered its DOMContentLoaded listeners and a click picked nothing.
+_APNR_PageAssets() {
+	global _APNR_SourceShared
+	Page := "ui\action_picker\index.html"
+	Assets := [Page, "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
+	Html := FileRead(_APNR_SourceShared . "\" . Page, "UTF-8")
+	Position := 1
+	while Position := RegExMatch(Html, '(?:src|href)="([^"]+)"', &Match, Position) {
+		Position += Match.Len
+		Reference := Match[1]
+		_APNR_Require(!InStr(Reference, ":") && !InStr(Reference, "?"),
+			"The delivered page may name only files of the shared tree: " . Reference)
+		Parts := StrSplit("ui\action_picker\" . StrReplace(Reference, "/", "\"), "\")
+		Resolved := []
+		for Part in Parts {
+			if Part == ".."
+				Resolved.Pop()
+			else if Part != "."
+				Resolved.Push(Part)
+		}
+		Relative := ""
+		for Part in Resolved
+			Relative .= (A_Index > 1 ? "\" : "") . Part
+		Assets.Push(Relative)
+	}
+	; A pattern matching nothing would mount the page and its strings alone, and
+	; the page would stop at its first script again.
+	_APNR_Require(Assets.Length > 3, "The asset scan found no script or stylesheet in index.html.")
+	return Assets
+}
+
 _APNR_CopyAssets() {
 	global _APNR, _SharedDir, _APNR_SourceShared
-	for Relative in ["ui\action_picker\index.html", "ui\action_picker\script.js", "ui\action_picker\style.css",
-		"ui\host_bridge.js", "ui\i18n.js", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"] {
+	for Relative in _APNR_PageAssets() {
 		Source := _APNR_SourceShared . "\" . Relative, Target := _SharedDir . "\" . Relative
+		_APNR_Require(FileExist(Source), "A file the delivered page names is missing: " . Relative)
 		SplitPath(Target, , &Directory)
 		DirCreate(Directory)
 		FileCopy(Source, Target, false)
@@ -97,20 +129,6 @@ _APNR_Confirm(Id) {
 	global _APNR
 	_APNR_Require(Id == "none", "The actual page must preserve the selected action.")
 	_APNR.Confirmed += 1
-}
-
-_APNR_Script(View, Script) {
-	global _APNR
-	_APNR.ScriptCalls += 1
-	_APNR_Phase("script-submit-before")
-	Pending := View.ExecuteScriptAsync(Script)
-	_APNR_Phase("script-submit-after")
-	; Keep a rejecting native Promise observed while its genuine await pumps.
-	Pending.onSettled((*) => 0, (*) => 0)
-	_APNR_Phase("script-await-before")
-	Result := Pending.await(3000)
-	_APNR_Phase("script-await-after")
-	return JsonParse(Result)
 }
 
 ; Each observed native core proves its environment identity before we retain
@@ -148,20 +166,9 @@ _APNR_Page(Title) {
 	View := _ActPickWeb_WebView, Window := _ActPickWeb_Gui, Epoch := _ActPickWeb_SessionEpoch
 	_APNR_CaptureBrowser(View)
 	_APNR_Phase("page-browser-captured")
-	Started := A_TickCount
-	loop {
-		if IsObject(_APNR.Failure)
-			throw _APNR.Failure
-		_APNR_Require(_ActPickWeb_Gui == Window && _ActPickWeb_SessionEpoch == Epoch,
-			"The document observation must retain its exact session.")
-		Data := _APNR_Script(View, "({title:document.getElementById('title')?.textContent||'',"
-			. "none:!!document.querySelector('[data-id=none]'),source:location.href})")
-		if Data is Map && Data.Get("title", "") == Title && Data.Get("none", false)
-			break
-		_APNR_Require(((A_TickCount - Started) & 0xFFFFFFFF) < 10000,
-			"The actual frontend must render its host init payload and the none row.")
-		Sleep(10)
-	}
+	Data := _APNR_AwaitDocument(View, Title, () => _APNR_Require(
+		_ActPickWeb_Gui == Window && _ActPickWeb_SessionEpoch == Epoch,
+		"The document observation must retain its exact session."))
 	_APNR_Require(InStr(Data["source"], "https://ergopti.actionpicker/ui/action_picker/index.html?cb=") == 1,
 		"The rendered page must be the actual HTTPS virtual-host document.")
 	_APNR.Frames.Push(Map("epoch", Epoch, "hwnd", Window.Hwnd, "browser_pid", View.BrowserProcessId,

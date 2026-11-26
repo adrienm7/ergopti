@@ -213,6 +213,17 @@ local function read_file(path)
 	return content
 end
 
+--- Reads a file's bytes, for the inlined fonts.
+--- @param path string Full path to the file.
+--- @return string|nil bytes The content, or nil if unreadable.
+local function read_binary(path)
+	local ok, fh = pcall(io.open, path, "rb")
+	if not ok or not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
 --- Builds a self-contained HTML string by inlining all local <script src> and
 --- <link rel="stylesheet"> tags found in the HTML file. External URLs (http/https)
 --- are kept as-is so CDN libraries still load from the network. Using function
@@ -226,7 +237,10 @@ function M.build_injected_html(assets_dir, html_name)
 	-- built before a language switch must not be served after it.
 	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
-	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale
+	-- The reading choices are part of it too: they are written into the page.
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local reading = Reading.current()
+	local cache_key = assets_dir .. "|" .. html_name .. "|" .. active_locale .. "|" .. Reading.cache_key(reading)
 	if _html_cache[cache_key] then
 		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
 		return _html_cache[cache_key]
@@ -251,6 +265,15 @@ function M.build_injected_html(assets_dir, html_name)
 		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
 		_locales_base_url, active_locale, strings_seed(html_path)
 	)
+	-- The reader's font and spacing (Configuration menu), seeded for
+	-- a11y_prefs.js; the page has no base URL, so the chosen font comes inline.
+	local reading_head, reading_err = Reading.head_fragment(reading, Paths.shared("ui/fonts"), read_binary)
+	if reading_head == nil then
+		Logger.error(LOG, "Page '%s' is built in the default font: %s.", html_name, tostring(reading_err))
+		reading_head = Reading.head_fragment(
+			{ font = "default", spacing = reading.spacing }, Paths.shared("ui/fonts"), read_binary)
+	end
+	i18n_boot = i18n_boot .. reading_head
 	-- Use a function replacement to avoid gsub interpreting % in the boot script
 	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. i18n_boot end, 1)
 
@@ -292,6 +315,24 @@ function M.build_injected_html(assets_dir, html_name)
 	_html_cache[cache_key] = html
 	Logger.info(LOG, "Injected HTML assets built and memoised (%d bytes).", #html)
 	return html
+end
+
+--- Pushes the current reading choices into every window still open
+--- (core/ui/ui/reading_views.lua), so a change made in the Configuration menu
+--- or the setup wizard shows at once, the font inlined
+--- (core/ui/engine/webview/reading_preferences.lua).
+--- @return number|nil reached Windows the script was handed to, nil on error.
+--- @return string|nil error Why the chosen font cannot be inlined.
+function M.push_reading_preferences()
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local script, err = Reading.push_script(Reading.current(), Paths.shared("ui/fonts"), read_binary)
+	if script == nil then
+		Logger.error(LOG, "The open windows keep their font: %s.", tostring(err))
+		return nil, err
+	end
+	local reached = require("core.ui.ui.reading_views").push(script)
+	Logger.info(LOG, "The reading choices reached %d open window(s).", reached)
+	return reached, nil
 end
 
 --- Drops every memoised HTML so the next open re-reads sources from disk.
@@ -451,7 +492,21 @@ function M.get_app_geometry(app_id)
 		height     = entry.height,
 		min_width  = entry.min_width or entry.width,
 		min_height = entry.min_height or entry.height,
+		maximized  = entry.maximized == true,
 	}
+end
+
+--- Returns the frame a manifest geometry opens at: the main screen's visible
+--- frame (menu bar and Dock excluded) for a « maximized » app, else centred.
+--- @param geo table The result of M.get_app_geometry.
+--- @return table The dictionary containing x, y, w, h coordinates.
+function M.get_app_frame(geo)
+	if geo.maximized then
+		local screen = hs.screen.mainScreen()
+		local sf = screen and type(screen.frame) == "function" and screen:frame() or nil
+		if sf then return { x = sf.x, y = sf.y, w = sf.w, h = sf.h } end
+	end
+	return M.get_centered_frame(geo.width, geo.height)
 end
 
 --- Calculates a perfectly centered frame for a given width and height on the main screen.
@@ -461,6 +516,10 @@ end
 function M.get_centered_frame(w, h)
 	local screen = hs.screen.mainScreen()
 	local sf = screen and type(screen.frame) == "function" and screen:frame() or {x = 0, y = 0, w = 1920, h = 1080}
+	-- A window larger than the visible frame would put its title bar under the
+	-- menu bar or off the screen: it is kept inside the frame.
+	w = math.min(w, sf.w)
+	h = math.min(h, sf.h)
 	return {
 		x = math.floor(sf.x + (sf.w - w) / 2),
 		y = math.floor(sf.y + (sf.h - h) / 2),
@@ -1132,6 +1191,7 @@ function M.show_webview(opts)
 	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
 	if not webview_current() then return abandon_required_mutation() end
 	if _factory_build_owner == wv then _factory_build_owner = nil end
+	require("core.ui.ui.reading_views").track(wv)
 	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", view_label,
 		now_ms() - opened_ms)
 	return wv

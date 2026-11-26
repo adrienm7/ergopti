@@ -10,8 +10,10 @@ local helpers = require("tests.helpers")
 local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "core.ui.ui.tooltip",
 		"modules.keystats", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.events.timer_scheduler",
-		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage" }, function()
-		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
+		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage",
+		"core.ui.adapters.system_accessibility" }, function()
+		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false,
+			wpm = 42, spoken = {} }
 		local function phase(name)
 			if state.on_phase then state.on_phase(name) end
 		end
@@ -29,7 +31,11 @@ local function with_widget(callback, position)
 		package.loaded["modules.keystats"] = { get_live_stats = function()
 			phase("stats")
 			if state.stats_failure then error("PRIVATE_DETAIL") end
-			return { wpm = 42, last_input_time = state.last_input }
+			return { wpm = state.wpm, last_input_time = state.last_input }
+		end }
+		package.loaded["core.ui.adapters.system_accessibility"] = { announce_event = function(text)
+			state.spoken[#state.spoken + 1] = text
+			return true
 		end }
 		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
 			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }
@@ -84,12 +90,17 @@ local function with_widget(callback, position)
 		end }
 		local widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			timer = { absoluteTime = function() return state.now * 1000000000 end },
+			processInfo = { processID = 4242 },
 			screen = { mainScreen = function()
 				phase("screen")
 				return { fullFrame = function() return { x = 0, y = 0, w = 1600, h = 1000 } end }
 			end },
 			eventtap = {
-				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
+				event = {
+					types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4,
+						leftMouseDragged = 5, rightMouseDragged = 6, otherMouseDragged = 7, otherMouseDown = 8 },
+					properties = { eventSourceUnixProcessID = "pid" },
+				},
 				new = function(_, run)
 					local tap = { run = run, enabled = false }
 					function tap:start() self.enabled = true; return self end

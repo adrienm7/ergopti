@@ -32,6 +32,11 @@ TOML_ParseKeyPath(Text, Strict := false) {
 	Trimmed := Trim(Text, " " . Chr(9))
 	if RegExMatch(Trimmed, "^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\z")
 		return StrSplit(Trimmed, ".")
+	; One quoted segment with neither escape nor control character, the key of
+	; every hotstring entry, is its own text: the element scan below, one script
+	; step per character, would find the same single segment.
+	if RegExMatch(Trimmed, '^"[^"\\\x00-\x1F\x7F]*+"\z')
+		return [SubStr(Trimmed, 2, StrLen(Trimmed) - 2)]
 	Keys := TOML_SplitArrayElements(Text, ".", true)
 	if !Keys.Length
 		throw ValueError("A TOML key path requires a segment")

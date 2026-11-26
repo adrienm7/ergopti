@@ -21,10 +21,10 @@ end
 --- @param options table|nil Source mutation and legacy receipt options.
 local function observe(bytes, prefix, check, options)
 	options = options or {}
-	helpers.with_stub_scope({ "adapters.foreign_ledger_snapshot" }, function()
+	helpers.with_stub_scope({ "diagnostics.adapters.foreign_ledger_snapshot" }, function()
 		local digest = ContentDigest.create()
 		local state = { source = bytes, read_bytes = 0, closes = 0, seeks = 0, live = true }
-		local adapter = helpers.load_with_stubs("adapters.foreign_ledger_snapshot", { hash = {
+		local adapter = helpers.load_with_stubs("diagnostics.adapters.foreign_ledger_snapshot", { hash = {
 			new = function(algorithm)
 				local context = digest.new(algorithm)
 				if options.hash_context then options.hash_context(context) end
@@ -95,8 +95,8 @@ end
 helpers.describe("foreign-ledger-prefix-receipt", function()
 	local first, second, third = batch(1), batch(2), batch(3)
 	helpers.it("foreign-ledger-prefix-receipt: malformed persisted state fails before native source access", function()
-		helpers.with_stub_scope({ "adapters.foreign_ledger_snapshot" }, function()
-			local adapter = helpers.load_with_stubs("adapters.foreign_ledger_snapshot", { hash = ContentDigest.create() })
+		helpers.with_stub_scope({ "diagnostics.adapters.foreign_ledger_snapshot" }, function()
+			local adapter = helpers.load_with_stubs("diagnostics.adapters.foreign_ledger_snapshot", { hash = ContentDigest.create() })
 			local original_open, opens = io.open, 0
 			io.open = function() opens = opens + 1; error("invalid state must not access native files") end
 			local ok, err = xpcall(function()

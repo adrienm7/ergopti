@@ -31,7 +31,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- action through GestActions.execute_single. Patch the SAME table SC captured
 	-- at require time so the reference resolves to our spy.
 	local dispatched
-	package.loaded["modules.gestures.actions"].execute_single = function(a) dispatched = a end
+	package.loaded["gestures.engine.actions"].execute_single = function(a) dispatched = a end
 
 	-- Capture the eventtap handler so we can drive handle_key directly.
 	local handler
@@ -224,8 +224,8 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
-		local previous_warmup = package.loaded["modules.llm.warmup_controller"]
-		package.loaded["modules.llm.warmup_controller"] = {
+		local previous_warmup = package.loaded["ai.engine.local_servers.warmup_controller"]
+		package.loaded["ai.engine.local_servers.warmup_controller"] = {
 			stop = function() stopped = stopped + 1; return true end,
 			schedule_warmup_with_retry = function() return true end,
 		}
@@ -233,7 +233,7 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
 
-		package.loaded["modules.llm.warmup_controller"] = previous_warmup
+		package.loaded["ai.engine.local_servers.warmup_controller"] = previous_warmup
 		helpers.assert_true(stopped >= 1,
 			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
 	end)
@@ -459,7 +459,7 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 	end)
 
 	helpers.it("the central dispatcher reports whether it handled the action", function()
-		local actions = helpers.load_with_stubs("modules.gestures.actions")
+		local actions = helpers.load_with_stubs("gestures.engine.actions")
 		helpers.assert_eq(actions.execute_single("none"), true,
 			"a registered action must report that the central dispatcher owns it")
 		helpers.assert_eq(actions.execute_single("__script_control_unknown_action__"), false,

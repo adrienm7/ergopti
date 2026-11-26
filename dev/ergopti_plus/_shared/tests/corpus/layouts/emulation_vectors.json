@@ -156,11 +156,10 @@
 			]
 		},
 		{
-			"id": "magic_key_keeps_its_unshifted_press",
+			"id": "the_star_key_types_its_own_star_and_nothing_is_remapped",
 			"layout": "ergopti_plus",
-			"settings": { "magic_key": "SC02E" },
 			"steps": [
-				{ "press": "SC02E", "decides": "pass" },
+				{ "press": "SC02E", "decides": "type", "text": "★" },
 				{ "press": "SC02B", "decides": "type", "text": "" },
 				{ "press": "SC02E", "decides": "type", "text": "j" }
 			]

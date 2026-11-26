@@ -30,7 +30,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
 		package.loaded["platform.input.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 		local ax_call_count = 0
 		local clock = { now = 1000 }

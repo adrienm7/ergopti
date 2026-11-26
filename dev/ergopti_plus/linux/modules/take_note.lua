@@ -18,7 +18,7 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
 local Files = require("core.fs.adapters.file_system")
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local i18n = require("core.i18n.engine.i18n")
 local TextUtils = require("core.text.engine.utils_core")
 
@@ -50,8 +50,12 @@ function M.open(launch)
 	local path = folder .. "/Notes_" .. os.date("%d_%m_%Y") .. ".txt"
 	-- The regular-file writer refuses symlinks and non-files. Appending no bytes
 	-- creates an absent note without truncating an existing one.
-	if not Files.append(path, "") then return refuse("notify.take_note_failed") end
+	if not Files.append(path, "") then
+		Logger.error(LOG, "Daily note refused: today's note could not be created as a regular file.")
+		return refuse("notify.take_note_failed")
+	end
 	if launch("gtk-launch -- " .. Shell.quote(handler) .. " " .. Shell.quote(path)) ~= true then
+		Logger.error(LOG, "Daily note refused: the desktop text editor could not be launched.")
 		return refuse("notify.take_note_failed")
 	end
 	Logger.info(LOG, "Opening the daily note in the desktop text editor.")

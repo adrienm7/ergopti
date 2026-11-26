@@ -82,7 +82,7 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
 				FunctionName . " must retain its exact terminal settlement receipt in finally after Wait()")
 			DeliveryGuardPos := InStr(Body, "if !CaptureSettled || A_IsSuspended", true, ClearPos)
-			DeliveryPos := InStr(Body, FunctionName == "MagicKeyEditor" ? "ModifyMagicKey(" : "ModifyMagicKeySource(", true, ClearPos)
+			DeliveryPos := InStr(Body, "ModifyMagicKey(", true, ClearPos)
 			Assert(DeliveryGuardPos > ClearPos && DeliveryPos > DeliveryGuardPos,
 				FunctionName . " must reject a retired capture even after pause has resumed")
 			Assert(InStr(Lifecycle, "_MagicKeyEditorStopOwned(" . OwnerName, true) > 0,

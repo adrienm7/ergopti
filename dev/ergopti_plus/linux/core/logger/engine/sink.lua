@@ -31,20 +31,20 @@
 ---    test pins it against shell_runner.quote(). The retention purge
 ---    lists the folder in process through core/fs/engine/native_directory.lua, which
 ---    needs no logger.
---- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
----    says so; a broken handle degrades to stdout. The daemon must not die
+--- 6. Never fatal, never silent. A directory that cannot be created degrades to
+---    stdout-only and says so; a refused main or errors handle is retired, then
+---    reopened by a line once [logger] flush_interval_ms has passed, and the
+---    reopened file first counts the lines it missed. The daemon must not die
 ---    because logging failed.
 --- 7. Privacy admission. Canonical rules and the captured account identity are
 ---    admitted before output. A missing policy or identity refuses startup;
 ---    directory/write failure still degrades to redacted stdout, never raw text.
---- 8. Topical fan-out. A line that matches a pattern of _generated/
----    logger_sub_files.lua (declared once in _shared/core/logger/data/sub_files.toml
----    for all three drivers) is also appended to that topic's file, so "what did
----    the hotstrings do?" opens ErgoptiPlus_hotstrings.log here exactly as on the
----    other two drivers. Topical files carry no date in their name; like macOS,
----    the first write of a new day truncates one whose first line is from an
----    earlier day. A refusing topical handle is retired for the day and reported
----    once, and never starves the main file.
+--- 8. One daily log. Every line goes to the daily file (and WARNING/ERROR to
+---    the errors mirror) and nowhere else: the topical sub-files that copied
+---    lines by tag were retired (maintainer decision, 2026-11-25) because testers
+---    had to send dozens of files for what the daily log already held. The
+---    retention sweep deletes the retired names (app_dirs.toml
+---    retired_topical_logs) the first time it runs.
 --- 9. The logger boot. install() is also where this driver arms the core's
 ---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
 ---    and exit paths own its flushes.
@@ -70,10 +70,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 local Redact = require("diagnostics.engine.reports.redact")
 local Json = require("core.text.engine.json")
 local NativeDirectory = require("core.fs.engine.native_directory")
-
---- Topical routing table generated from _shared/core/logger/data/sub_files.toml:
---- an array of { name = "<file name>", patterns = { ... } }.
-local SUB_FILES = require("_generated.logger_sub_files")
+local Monotonic = require("core.logger.engine.monotonic")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
@@ -83,9 +80,6 @@ local LOG_EXT       = AppDirs.files.extension
 
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
-
---- Seconds in the whole day the retention window counts in.
-local DAY_SECONDS = 86400
 
 --- How many days of rolled files are kept. From the shared registry, which the
 --- other two drivers already read for the same purpose — this driver rolled a
@@ -104,6 +98,23 @@ local function retention_days()
 	if not ok_value or type(value) ~= "number" or value <= 0 then return nil end
 	_retention_days = value
 	return _retention_days
+end
+
+--- How long a refused main or errors channel waits before its next line reopens
+--- it: the registry's [logger] flush_interval_ms, the cadence at which the
+--- Windows logger retries a refused append. Read lazily for the reason above.
+local _retry_interval_ms = nil
+
+--- @return number|nil Milliseconds, or nil when the registry is unreadable (a
+---   refused channel then stays retired until the next rollover or repoint).
+local function retry_interval_ms()
+	if _retry_interval_ms ~= nil then return _retry_interval_ms end
+	local ok, Timings = pcall(require, "core.timing.engine.timings")
+	if not ok or not Timings then return nil end
+	local ok_value, value = pcall(Timings.ms, "logger", "flush_interval_ms")
+	if not ok_value or type(value) ~= "number" or value <= 0 then return nil end
+	_retry_interval_ms = value
+	return _retry_interval_ms
 end
 
 
@@ -126,10 +137,13 @@ local _date = nil
 local _main_handle   = nil
 local _errors_handle = nil
 
---- Open topical append handles keyed by file name. `false` marks a topic whose
---- handle was refused today: it stays retired until the next rollover, repoint
---- or reinstall instead of failing again on every line.
-local _topical = {}
+--- Lines the main and errors channels could not write since each last accepted
+--- one, keyed by channel; reported in the file by the next line it accepts.
+local _missed = {}
+
+--- Monotonic milliseconds at which each refused channel was retired, keyed by
+--- channel; nil while the channel accepts lines.
+local _retired_at = {}
 
 --- True once M.install() has wired the sink into the shared core.
 local _installed = false
@@ -158,7 +172,7 @@ local _config_dir = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("core.lifecycle.engine.account_name").resolve() }
+	local context = supplied or { home = require("settings.engine.paths").account_home(), user = require("core.lifecycle.engine.account_name").resolve() }
 	assert(type(context) == "table", "logger_sink: privacy identity unavailable")
 	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
 	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")
@@ -211,7 +225,7 @@ end
 --- @return string Absolute path, no trailing slash.
 function M.log_dir()
 	if _installed and _dir then return _dir end
-	return require("infra.config_paths").get_logs_dir()
+	return require("settings.engine.paths").get_logs_dir()
 end
 
 --- The folder crash dumps are written to, inside the logs folder.
@@ -305,34 +319,6 @@ local function close_handles()
 	_errors_handle = nil
 end
 
---- Closes every topical handle and forgets retirements, so the next matching
---- line decides afresh whether its file starts a new day.
-local function close_topical()
-	for _, handle in pairs(_topical) do
-		if handle then pcall(function() handle:close() end) end
-	end
-	_topical = {}
-end
-
---- io.open mode for a topical file: "a" when it is absent, empty or already
---- carries today's lines, "w" when its first line is from an earlier day. Topical
---- files have no date in their name, so this is what rotates them daily. An
---- unparsable first line is kept ("a"): a stale line is recoverable, a deleted
---- one is not.
---- @param path string Absolute topical file path.
---- @param date string "YYYY-MM-DD" of the line about to be written.
---- @return string "a" or "w".
-local function topical_mode(path, date)
-	local handle = require("core.fs.engine.regular_file_reader").open_source(path)
-	if not handle then return "a" end
-	local ok, first = pcall(handle.read, handle, "*l")
-	pcall(handle.close, handle)
-	if not ok or type(first) ~= "string" then return "a" end
-	local stamp = first:match("^(%d%d%d%d%-%d%d%-%d%d) ")
-	if stamp and stamp ~= date then return "w" end
-	return "a"
-end
-
 --- Reports lost optional mirroring without recursively invoking the logger sink.
 --- The main channel remains the durable owner; stderr failure cannot retire it.
 --- @param path string Refused mirror path.
@@ -351,7 +337,6 @@ end
 --- @param date string "YYYY-MM-DD".
 local function open_handles(date)
 	close_handles()
-	close_topical()
 	_date = date
 	if not _dir then return end
 	_main_handle = require("core.fs.engine.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
@@ -359,6 +344,10 @@ local function open_handles(date)
 	local failure
 	_errors_handle, failure = require("core.fs.engine.regular_file_writer").open(errors_path, "a")
 	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
+	-- A refused open retires its channel now, so its next retry waits the interval
+	local now = Monotonic.now_ms()
+	_retired_at.main = (not _main_handle) and now or nil
+	_retired_at.errors = (not _errors_handle) and now or nil
 end
 
 --- Whether a basename is a generated daily log for this prefix.
@@ -375,10 +364,9 @@ local function rolled_name(name, prefix)
 	return date
 end
 
-local function topical_name(name)
-	for _, sub in ipairs(SUB_FILES) do if sub.name == name then return true end end
-	return false
-end
+--- The retired topical sub-files the sweep deletes, by exact name.
+local RETIRED_TOPICAL = {}
+for _, name in ipairs(AppDirs.files.retired_topical_logs) do RETIRED_TOPICAL[name] = true end
 
 --- Reports a purge refusal on stderr: the sink cannot log through itself.
 --- @param what string What was refused.
@@ -389,6 +377,19 @@ local function report_purge_refusal(what, path, message)
 		io.stderr:write(_redact("[logger_sink] retention purge could not " .. what .. " " .. path .. ": "
 			.. tostring(message) .. " — the file is kept.\n"))
 	end)
+end
+
+--- Whether a dated archive is past retention: its date is older than today
+--- minus `days`, compared as calendar days (DST-safe through a noon anchor).
+--- @param date string "YYYY-MM-DD" from the file name.
+--- @param now number Current epoch seconds.
+--- @param days number Retention window in whole days.
+--- @return boolean expired
+function M.dated_log_expired(date, now, days)
+	local cutoff_calendar = os.date("*t", now)
+	cutoff_calendar.day = cutoff_calendar.day - math.floor(days)
+	cutoff_calendar.hour, cutoff_calendar.min, cutoff_calendar.sec, cutoff_calendar.isdst = 12, 0, 0, nil
+	return date < os.date("%Y-%m-%d", os.time(cutoff_calendar))
 end
 
 --- Deletes rolled files older than the retention window.
@@ -403,15 +404,18 @@ end
 --- of two constants that are free to change independently, and relying on it
 --- would make renaming one silently stop purging the other.
 ---
---- Daily logs age by their date; topical views have no date and age by mtime.
+--- Daily logs age by their date. The retired topical sub-files are deleted
+--- whatever their age: nothing writes them any more and every line they held
+--- is also in the daily log, so this one-time cleanup removes them on the
+--- first sweep after the upgrade and finds nothing to do afterwards.
 ---
 --- The sweep selects regular files directly in the folder (never a link or
---- folder). Daily dates older than the calendar cutoff expire; declared topical
---- names retain the historical mtime cutoff of N + 1 whole days.
+--- folder) whose name is a dated log or an exact retired topical name.
 --- A refusal the purge used to discard is now reported, and never fatal.
 local function purge_old()
+	if not _dir then return end
+	-- An unreadable registry keeps every dated log; the retired names go anyway.
 	local days = retention_days()
-	if not days or not _dir then return end
 	-- A runtime without the native directory backend raises; for the purge that
 	-- is one more refusal to report, so a log sink (and --help, which loads one
 	-- before parsing its arguments) still installs where luv is absent.
@@ -426,15 +430,10 @@ local function purge_old()
 		return
 	end
 	local now = os.time()
-	local cutoff = now - (math.floor(days) + 1) * DAY_SECONDS
-	local cutoff_calendar = os.date("*t", now)
-	cutoff_calendar.day = cutoff_calendar.day - math.floor(days)
-	cutoff_calendar.hour, cutoff_calendar.min, cutoff_calendar.sec, cutoff_calendar.isdst = 12, 0, 0, nil
-	local cutoff_date = os.date("%Y-%m-%d", os.time(cutoff_calendar))
 	for _, entry in ipairs(entries) do
 		local name = entry.name
 		local date = rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)
-		if entry.kind == "file" and (date or topical_name(name)) then
+		if entry.kind == "file" and (date or RETIRED_TOPICAL[name]) then
 			local path = NativeDirectory.join(_dir, name)
 			local inspected, stat, stat_message, stat_code = pcall(NativeDirectory.stat, path)
 			if not inspected then
@@ -444,7 +443,7 @@ local function purge_old()
 				report_purge_refusal("inspect", path, stat_message)
 			end
 			-- lstat again: the entry may have been replaced since the listing.
-			local expired = (date and date < cutoff_date) or (not date and stat and stat.modified and stat.modified < cutoff)
+			local expired = (date and days and M.dated_log_expired(date, now, days)) or (not date and RETIRED_TOPICAL[name])
 			if stat and stat.kind == "file" and expired then
 				local called, removed, remove_error = pcall(os.remove, path)
 				if not called or not removed then report_purge_refusal("delete", path, called and remove_error or removed) end
@@ -475,8 +474,9 @@ end
 --- @param handle userdata Owned append handle.
 --- @param line string
 --- @param channel string Technical diagnostic label.
+--- @param quiet boolean|nil True when the refusal was already reported.
 --- @return userdata|nil The retained handle, only after write and flush succeed.
-local function append_line(handle, line, channel)
+local function append_line(handle, line, channel, quiet)
 	local protected, accepted, failure = pcall(function()
 		local written, write_error = handle:write(line, "\n")
 		if not written then return nil, write_error end
@@ -484,38 +484,66 @@ local function append_line(handle, line, channel)
 	end)
 	if protected and accepted ~= nil and accepted ~= false then return handle end
 	pcall(function() handle:close() end)
+	if quiet then return nil end
 	local reason = protected and failure or accepted
 	-- Calling Logger here would recursively invoke this same failed sink.
 	pcall(function()
 		io.stderr:write(_redact("[logger_sink] " .. channel .. " write/flush failed: " .. tostring(reason)
-			.. " — channel retired; logging continues through other outputs.\n"))
+			.. " — channel retired until it accepts a line again; logging continues through other outputs.\n"))
 	end)
 	return nil
 end
 
---- Appends the line to every topical file whose patterns match it.
+--- Path of the main or errors file for the date the handles belong to.
+--- @param channel string "main" or "errors".
+--- @return string
+local function channel_path(channel)
+	return _dir .. "/" .. (channel == "main" and MAIN_PREFIX or ERRORS_PREFIX) .. _date .. LOG_EXT
+end
+
+--- Writes one line to the main or errors file. A channel a refusal retired is
+--- reopened by its first line once retry_interval_ms() has passed, and the
+--- lines it missed meanwhile are counted in the file first: it used to stay
+--- retired until midnight, and the file never showed that lines were missing
+--- (logger parity audit LOG-05), where the Windows logger retries on its flush
+--- tick and reports what its queue dropped.
+--- @param handle userdata|nil The channel's handle; nil when retired.
+--- @param channel string "main" or "errors".
 --- @param line string Redacted, formatted line.
-local function fan_out(line)
-	for _, sub in ipairs(SUB_FILES) do
-		local routed = false
-		for _, pattern in ipairs(sub.patterns) do
-			if line:find(pattern, 1, true) then routed = true; break end
+--- @return userdata|nil handle The handle to keep, nil when still refused.
+local function write_channel(handle, channel, line)
+	local missed = _missed[channel] or 0
+	if not handle then
+		local retired_at, interval = _retired_at[channel], retry_interval_ms()
+		local now = Monotonic.now_ms()
+		if retired_at ~= nil and (interval == nil or now - retired_at < interval) then
+			_missed[channel] = missed + 1
+			return nil
 		end
-		if routed and _topical[sub.name] ~= false then
-			local handle = _topical[sub.name]
+		local opened, reopened = pcall(require("core.fs.engine.regular_file_writer").open, channel_path(channel), "a")
+		handle = opened and reopened or nil
+		if not handle then
+			_missed[channel] = missed + 1
+			_retired_at[channel] = now
+			return nil
+		end
+		if missed > 0 then
+			local stamp = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d) ")
+				or (os.date("%Y-%m-%d %H:%M:%S") .. ":000")
+			handle = append_line(handle, string.format(
+				"%s [WARNING] [logger_sink] %d %s not written to the log file while it refused writes.",
+				stamp, missed, missed == 1 and "line was" or "lines were"), channel, true)
 			if not handle then
-				local path = _dir .. "/" .. sub.name
-				handle = require("core.fs.engine.regular_file_writer").open(path, topical_mode(path, _date))
-				if not handle then
-					pcall(function()
-						io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
-							.. " could not be opened — retired for today; logging continues through other outputs.\n"))
-					end)
-				end
+				_missed[channel] = missed + 1
+				_retired_at[channel] = Monotonic.now_ms()
+				return nil
 			end
-			_topical[sub.name] = handle and append_line(handle, line, "topical " .. sub.name) or false
 		end
 	end
+	handle = append_line(handle, line, channel, missed > 0)
+	_missed[channel] = handle and 0 or missed + 1
+	_retired_at[channel] = (not handle) and Monotonic.now_ms() or nil
+	return handle
 end
 
 --- Writes one formatted line to every configured output.
@@ -538,15 +566,10 @@ local function sink(line, variant)
 
 	rollover_if_needed()
 
-	if _main_handle then
-		_main_handle = append_line(_main_handle, line, "main")
+	if _dir then
+		_main_handle = write_channel(_main_handle, "main", line)
+		if ERROR_VARIANTS[variant] then _errors_handle = write_channel(_errors_handle, "errors", line) end
 	end
-
-	if _errors_handle and ERROR_VARIANTS[variant] then
-		_errors_handle = append_line(_errors_handle, line, "errors")
-	end
-
-	if _dir then fan_out(line) end
 end
 
 
@@ -601,7 +624,7 @@ function M.install(logger, opts)
 	_installed = true
 	-- The folder resolved now; infra.config_paths hands over every later move.
 	-- Read after the sink is live, so a line its storage read writes is redacted.
-	M.follow_config_dir(require("infra.config_paths").get_config_dir())
+	M.follow_config_dir(require("settings.engine.paths").get_config_dir())
 
 	if _stdout_only then
 		pcall(function()
@@ -671,7 +694,7 @@ end
 --- @return string|nil error_message Why the sink stayed where it was.
 function M.repoint()
 	if not _installed then return true end
-	local target = require("infra.config_paths").get_logs_dir()
+	local target = require("settings.engine.paths").get_logs_dir()
 	if target == _dir and not _stdout_only and _main_handle ~= nil then return true end
 	if not ensure_dir(target) then
 		return false, "the logs folder '" .. target .. "' could not be created"
@@ -687,9 +710,10 @@ function M.repoint()
 		return false, "the logs folder '" .. target .. "' is not writable"
 	end
 	local previous_main, previous_errors = _main_handle, _errors_handle
-	close_topical()
 	_dir, _date = target, date
 	_main_handle, _errors_handle = main, errors_ok and errors or nil
+	_retired_at.main = nil
+	_retired_at.errors = (not _errors_handle) and Monotonic.now_ms() or nil
 	_stdout_only = false
 	if not _errors_handle then report_mirror_refusal(errors_path, errors_ok and errors_failure or errors) end
 	if previous_main then pcall(function() previous_main:close() end) end
@@ -712,13 +736,14 @@ function M.uninstall(logger)
 		logger.timestamp_fn = logger.default_timestamp
 	end
 	close_handles()
-	close_topical()
 	_dir         = nil
 	_date        = nil
 	_installed   = false
 	_stdout_only = false
 	_redact = nil
 	_config_dir = nil
+	_missed = {}
+	_retired_at = {}
 end
 
 --- Follows the configuration directory the redactor masks. infra.config_paths
@@ -736,6 +761,14 @@ end
 --- @return boolean
 function M.is_file_sink_active()
 	return _installed and not _stdout_only and _main_handle ~= nil
+end
+
+--- Reports whether the sink is installed, durable or stdout-only: the entry
+--- point's boot guard then logs a failure through it, redacted, instead of
+--- falling back to the closed bootstrap record.
+--- @return boolean
+function M.is_installed()
+	return _installed
 end
 
 --- Captures this exact privacy admission without acquiring output resources.

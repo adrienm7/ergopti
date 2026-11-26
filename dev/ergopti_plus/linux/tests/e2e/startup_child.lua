@@ -181,7 +181,7 @@ end
 -- A user state: the config.toml the wizard, or an older release, left in the
 -- configuration folder the daemon resolves for this HOME.
 if SEED and SEED ~= "" then
-	local target = require("infra.config_paths").config("config.toml")
+	local target = require("settings.engine.paths").config("config.toml")
 	assert(os.execute("mkdir -p '" .. target:match("^(.*)/[^/]+$") .. "'"), "cannot create the configuration folder")
 	local source = assert(real_open(SEED, "rb"))
 	local content = source:read("*a")
@@ -209,7 +209,7 @@ hook.pump = function() return 0 end
 -- The tray: rows kept, not drawn. The delimiter steps click the latest tree it
 -- was handed, as GTK would.
 local published_menu = nil
-package.preload["platform.tray.appindicator"] = function()
+package.preload["tray.adapters.appindicator"] = function()
 	local live = false
 	return {
 		is_available = function() return true end,
@@ -240,8 +240,8 @@ end
 
 -- The menu context the tray builds, kept for the recommended restore.
 local menu_ctx = nil
-package.preload["ui.menu.builder"] = function()
-	local builder = dofile("ui/menu/builder.lua")
+package.preload["menu.ui.builder.builder"] = function()
+	local builder = dofile("menu/ui/builder/builder.lua")
 	local build = builder.build
 	builder.build = function(ctx)
 		menu_ctx = ctx
@@ -319,7 +319,7 @@ package.preload["core.events.loop"] = function()
 	end
 	local inventory_owner, inventory_pending
 	local function settle_inventory(deadline)
-		local profiles = package.loaded["modules.llm.profiles"]
+		local profiles = package.loaded["ai.engine.settings.profiles"]
 		if profiles == nil then
 			assert(inventory_owner == nil, "the inventory owner disappeared during startup")
 			return
@@ -330,11 +330,11 @@ package.preload["core.events.loop"] = function()
 			inventory_owner, inventory_pending = profiles, profiles.model_inventory_pending
 		end
 		local function pending()
-			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+			assert(package.loaded["ai.engine.settings.profiles"] == inventory_owner
 				and inventory_owner.model_inventory_pending == inventory_pending,
 				"the startup inventory owner or pending API changed")
 			local value = inventory_pending()
-			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+			assert(package.loaded["ai.engine.settings.profiles"] == inventory_owner
 				and inventory_owner.model_inventory_pending == inventory_pending,
 				"the startup inventory owner or pending API changed")
 			assert(type(value) == "boolean", "the startup inventory pending acknowledgement must be boolean")
@@ -372,7 +372,7 @@ package.preload["core.events.loop"] = function()
 			if type(menu_ctx) ~= "table" then
 				record("SCENARIO_FAILED", "the tray never built its menu context")
 			else
-				local GlobalScope = require("infra.global_scope")
+				local GlobalScope = require("settings.engine.scope.global_scope")
 				-- The layout category may settle after a child answers: the loop runs on.
 				local settled
 				GlobalScope.apply("recommended", GlobalScope.participants(menu_ctx), function(committed, report)
@@ -388,12 +388,12 @@ package.preload["core.events.loop"] = function()
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
 			local Terminators = require("layouts.engine.layers.terminators")
-			local Settings = require("modules.hotstrings.terminator_settings")
+			local Settings = require("hotstrings.engine.matcher.terminator_settings")
 			if ACTION == "delimiters_add" then
 				record("FACT", "delimiter_added=" .. tostring(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false)))
 				record("FACT", "delimiter_committed=" .. tostring(Settings.persist()))
 			end
-			local path = require("infra.config_paths").config("config.toml")
+			local path = require("settings.engine.paths").config("config.toml")
 			local source = io.open(path, "rb")
 			local bytes = source and source:read("*a") or ""
 			if source then source:close() end
@@ -413,7 +413,7 @@ package.preload["core.events.loop"] = function()
 		elseif ACTION == "delimiters_edit" or ACTION == "delimiters_verify_edit" then
 			local Terminators = require("layouts.engine.layers.terminators")
 			local Codec = require("core.text.engine.toml_codec")
-			local path = require("infra.config_paths").config("config.toml")
+			local path = require("settings.engine.paths").config("config.toml")
 			local function bytes()
 				local source = real_open(path, "rb")
 				local content = source and source:read("*a") or ""

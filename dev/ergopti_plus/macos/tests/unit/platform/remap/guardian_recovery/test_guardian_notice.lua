@@ -108,6 +108,10 @@ helpers.describe("guardian approval notice", function()
 		helpers.assert_eq(rec.sent[1].kind, "error")
 		helpers.assert_eq(#rec.error_lines, 1, "the exact status must be logged as an ERROR")
 		helpers.assert_contains(rec.error_lines[1], "'unavailable'")
+		local app_dirs = require("core.fs.engine.app_dirs")
+		helpers.assert_contains(rec.error_lines[1],
+			"~/" .. app_dirs.macos.relative .. "/" .. app_dirs.macos.launcher_log,
+			"the launcher log is named from the one folder declaration")
 
 		helpers.assert_true(not notice.observe("unavailable"), "a repeated poll is the same episode")
 		helpers.assert_true(not notice.observe(nil), "an unknown probe result does not close the episode")

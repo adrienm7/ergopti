@@ -26,10 +26,25 @@ enum UninstallFailure: Error {
 /// shared with every Karabiner on the Mac, and removing a system extension needs the
 /// user's own approval in System Settings.
 enum OwnedRuntimeUninstall {
+	/// The root-owned folder that holds the Runtime and the helper's transaction ledgers.
+	static let ownedFolder = "/Library/Application Support/ErgoptiPlus"
 	static let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime"
+	/// The ledgers a first install leaves when it stops half-way: the install journal
+	/// (OwnedRuntimeInstallJournal), which the next helper's exclusive create refuses to find, and the Core plist's
+	/// ledger (OwnedRuntimeCorePlistCustody.Job.core), which names a plist the stale step removes. The install
+	/// journal is listed last: it is removed last, so an interrupted retirement is still seen as debt.
+	static let staleLedgers = [".runtime-service-journal", ".runtime-install-journal"]
+	/// The helper's copy stage, `.runtime-install-` and an upper-case UUID (OwnedRuntimeFirstInstallOwner). The
+	/// shell's own staged helper, `.runtime-installer-<UUID>`, does not match it.
+	static let installStagePattern = ".runtime-install-????????-????-????-????-????????????"
+	/// The step a ledger held open by a live helper refuses at: another install is still running.
+	static let busyStep = "install_busy"
+	/// The Core job, which the first install refuses to find already on disk.
+	static let coreJob: (label: String, plist: String) =
+		(Identifiers.ServiceLabels.macosCore, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist")
 	/// Label and property list of each job the owned installer registers.
 	static let jobs: [(label: String, plist: String)] = [
-		(Identifiers.ServiceLabels.macosCore, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"),
+		coreJob,
 		(Identifiers.ServiceLabels.macosVirtualHid, "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"),
 	]
 
@@ -39,18 +54,54 @@ enum OwnedRuntimeUninstall {
 		return exists(runtimeDirectory) || jobs.contains(where: { exists($0.plist) })
 	}
 
-	/// The one fixed shell command run with administrator rights. It names only the
-	/// constants above, holds no caller-supplied text, and fails at the first error:
-	/// a job that is not loaded is skipped by an explicit test, not by ignoring a
-	/// failed `bootout`.
-	static func script() -> String {
-		var steps = ["set -e"]
-		for job in jobs {
+	/// Stops each job by its label, removes its job file, then removes the Runtime folder. It names only the
+	/// constants above and holds no caller-supplied text; a job that is not loaded is skipped by an explicit test,
+	/// not by ignoring a failed `bootout`.
+	/// - Parameter retired: The jobs to retire.
+	/// - Returns: The steps, in order, each one shell command.
+	static func retirementSteps(_ retired: [(label: String, plist: String)]) -> [String] {
+		var steps: [String] = []
+		for job in retired {
 			steps.append("if /bin/launchctl print system/\(job.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(job.label); fi")
 			steps.append("/bin/rm -f \(job.plist)")
 		}
 		steps.append("/bin/rm -rf '\(runtimeDirectory)'")
-		return steps.joined(separator: "; ")
+		return steps
+	}
+
+	/// The one fixed shell command run with administrator rights, which fails at the first error.
+	static func script() -> String {
+		return (["set -e"] + retirementSteps(jobs)).joined(separator: "; ")
+	}
+
+	/// Retires what an earlier install left at the Runtime path before the first install runs: the helper refuses
+	/// an existing Runtime or Core job by design, and the driver offers the install only when an installed file is
+	/// missing or unreadable, so a half-published or older Runtime refused every retry at `refused-destination`
+	/// with no way out (field report 2026-11-23). It retires the Core job and the Runtime folder with the uninstall's
+	/// own steps; the VirtualHIDDevice job is left to the install helper, which bootstraps an exact plist already
+	/// on disk. Each step ends with `; ` for the staged program that follows.
+	///
+	/// It then retires the transaction an earlier helper left (stale_install). Field report 2026-11-24: an install
+	/// that stopped after its publication intent kept `.runtime-install-journal`, which no helper ever recovers
+	/// (its rollback refuses a published transaction), so once the Runtime was retired every helper refused at its
+	/// exclusive journal create (`refused-cleanupPending` at OwnedRuntimeInstallJournal.swift:94) and the user was
+	/// stuck. Removing it is safe only when no helper holds it: a live helper keeps it open for its whole
+	/// transaction, so the shell first asks `lsof`, before it stops anything, and refuses (status 77) at
+	/// `install_busy` unless lsof answers 1 (no process has it open), so a missing lsof refuses too, and when a
+	/// ledger is not a plain file; a stage that is not a plain folder refuses at `stale_install`.
+	static func staleRuntimeProgram() -> String {
+		let busy = staleLedgers.map { ledger in
+			"task_debt='\(ownedFolder)/\(ledger)'; if [ -e \"$task_debt\" ] || [ -L \"$task_debt\" ]; then "
+				+ "[ -f \"$task_debt\" ] && [ ! -L \"$task_debt\" ] || exit 77; task_held=0; "
+				+ "/usr/sbin/lsof -t -- \"$task_debt\" >/dev/null 2>&1 || task_held=$?; [ \"$task_held\" = 1 ] || exit 77; fi; "
+		}.joined()
+		let stages = "for task_stage in '\(ownedFolder)'/\(installStagePattern); do "
+			+ "if [ -e \"$task_stage\" ] || [ -L \"$task_stage\" ]; then "
+			+ "[ -d \"$task_stage\" ] && [ ! -L \"$task_stage\" ] || exit 77; /bin/rm -rf \"$task_stage\"; fi; done; "
+		let ledgers = staleLedgers.map { "/bin/rm -f '\(ownedFolder)/\($0)'; " }.joined()
+		return "task_step=\(busyStep); " + busy
+			+ "task_step=stale_runtime; " + retirementSteps([coreJob]).map { $0 + "; " }.joined()
+			+ "task_step=stale_install; " + stages + ledgers
 	}
 
 	/// The AppleScript that asks macOS for the administrator prompt.

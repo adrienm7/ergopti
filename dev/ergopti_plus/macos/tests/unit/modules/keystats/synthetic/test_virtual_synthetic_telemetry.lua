@@ -135,7 +135,7 @@ helpers.describe("keystats: virtual synthetic telemetry for clipboard output", f
 		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
 	end)
 
-	helpers.it("keeps only the new synthetic session after a reset", function()
+	helpers.it("keeps only the new synthetic WPM samples after a reset", function()
 		local fixture = fixture_module.load_keystats()
 		fixture.state.is_enabled = true
 		local original_clock = fixture.hs.timer.absoluteTime
@@ -152,8 +152,8 @@ helpers.describe("keystats: virtual synthetic telemetry for clipboard output", f
 		helpers.assert_eq(new.events[1][1], "n")
 		helpers.assert_eq(#old.events, 3)
 		helpers.assert_eq(#new.events, 3)
-		helpers.assert_eq(fixture.state.session_start_time, 2000)
-		helpers.assert_eq(fixture.state.session_last_active, 2000)
+		helpers.assert_eq(fixture.state.session_start_time, 0, "synthetic text opens no typing session")
+		helpers.assert_eq(fixture.state.session_last_active, 0)
 		helpers.assert_eq(fixture.state.recent_typing_eff, { 2000, 2000, 2000 })
 	end)
 

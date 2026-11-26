@@ -34,7 +34,7 @@ local RAW_TIMER_NEW_OWNERS = {
 	["core.lifecycle.engine.launcher_guard"] = "runs before TimerScheduler and publishes before start",
 	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
 	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
-	["modules.keymap"] = "legacy tap-watchdog owner pending migration",
+	["hotstrings.engine.expander"] = "legacy tap-watchdog owner pending migration",
 	["platform.remap.watchers"] = "legacy layout-poll owner pending migration",
 }
 

@@ -26,6 +26,10 @@ end
 ---    refused end the worker, which the daemon reads as "unknown".
 --- 4. Bounded fields: an oversized or malformed argument is refused, never
 ---    truncated into a different identity.
+--- 5. GNOME names a missing reporter: the worker asks GNOME Shell for the
+---    extension's state once ready and again when no report came within the
+---    silence bound, so a missing, disabled, out-of-date or stale extension is
+---    a stated outcome rather than a session with no focus report at all.
 --- ==============================================================================
 
 local M = {}
@@ -43,6 +47,15 @@ local KWIN_SCRIPT_ID = "ergopti-focus"
 -- Exposed so the shipped desktop files are checked against the values this
 -- worker serves rather than against a copy of its text.
 M.KWIN_SCRIPT_ID = KWIN_SCRIPT_ID
+
+-- GNOME Shell's ExtensionState numbers (js/misc/extensionUtils.js; 45 renamed
+-- ENABLED and DISABLED to ACTIVE and INACTIVE, keeping the numbers). An
+-- extension enabling counts as active, one initialized or disabling as
+-- inactive, one downloading or uninstalled as absent.
+M.GNOME_EXTENSION_STATES = {
+	[1] = "active", [2] = "inactive", [3] = "error", [4] = "out_of_date", [5] = "absent",
+	[6] = "inactive", [7] = "inactive", [8] = "active", [99] = "absent",
+}
 
 
 
@@ -79,6 +92,48 @@ end
 
 
 
+--- The "extension" record for one GetExtensionInfo answer.
+--- @param info table|nil The answer's dictionary as { state = number|nil }
+---   (empty when GNOME Shell knows no such extension), nil when it gave none.
+--- @param silent boolean True for the check after the silence bound.
+--- @return table record
+function M.extension_record(info, silent)
+	local state
+	if type(info) ~= "table" then
+		state = "unanswered"
+	elseif info.state == nil then
+		state = "absent"
+	else
+		state = M.GNOME_EXTENSION_STATES[info.state] or "unknown"
+	end
+	return { kind = "extension", state = state, silent = silent == true }
+end
+
+--- Asks GNOME Shell for the extension's state at start and once more if no
+--- report arrived within the silence bound.
+--- @param read_info function () -> table|nil, the bus query (a test's fake).
+--- @param emit function record -> nil.
+--- @return table monitor { check(silent), admitted(), silence_elapsed() }
+function M.new_extension_monitor(read_info, emit)
+	assert(type(read_info) == "function" and type(emit) == "function", "extension monitor needs a reader and a writer")
+	local reported = false
+	local monitor = {}
+	function monitor.check(silent) emit(M.extension_record(read_info(), silent)) end
+	--- A call from the current GNOME Shell owner arrived: the extension runs.
+	function monitor.admitted() reported = true end
+	--- The silence bound passed: asks again only when nothing was reported.
+	--- @return boolean asked
+	function monitor.silence_elapsed()
+		if reported then return false end
+		monitor.check(true)
+		return true
+	end
+	return monitor
+end
+
+
+
+
 -- ======================================
 -- ======================================
 -- ======= 2/ Native Bus ================
@@ -103,10 +158,13 @@ M.INTROSPECTION = INTROSPECTION
 --- Serves the bus name until the parent, the bus or stdout goes away.
 --- @param service string org.gnome.Shell or org.kde.KWin.
 --- @param parent_pid number The daemon's process id.
+--- @param silence_ms number How long GNOME Shell may stay silent before the
+---   extension's state is asked again.
 --- @return boolean completed False when the worker had to stop on a failure.
-function M.run(service, parent_pid)
+function M.run(service, parent_pid, silence_ms)
 	local Focus = require("platform.focus.compositor_focus")
 	assert(Focus.is_desktop_service(service), "unsupported desktop service")
+	assert(type(silence_ms) == "number" and silence_ms >= 1 and silence_ms % 1 == 0, "silence bound unavailable")
 	require("jit").off()
 	local ffi = require("ffi")
 	local Json = require("core.text.engine.json")
@@ -137,6 +195,9 @@ function M.run(service, parent_pid)
 		void *g_variant_get_child_value(void *value, size_t index);
 		const char *g_variant_get_string(void *value, size_t *length);
 		uint32_t g_variant_get_uint32(void *value);
+		int g_variant_get_boolean(void *value);
+		double g_variant_get_double(void *value);
+		void *g_variant_lookup_value(void *dictionary, const char *key, const void *expected_type);
 		void g_variant_unref(void *value);
 		void g_error_free(ErgoptiGError *error);
 		void g_object_unref(void *object);
@@ -218,6 +279,29 @@ function M.run(service, parent_pid)
 		return owner
 	end
 
+	--- GNOME Shell's answer for the Ergopti extension, as extension_record reads it.
+	local function read_extension_info()
+		local reply = call(Focus.SERVICES.gnome, "/org/gnome/Shell", "org.gnome.Shell.Extensions", "GetExtensionInfo",
+			{ gio.g_variant_new_string(Focus.GNOME_EXTENSION_UUID) })
+		if reply == nil then return nil end
+		local info = nil
+		if ffi.string(gio.g_variant_get_type_string(reply)) == "(a{sv})" then
+			info = {}
+			local dictionary = gio.g_variant_get_child_value(reply, 0)
+			local state = gio.g_variant_lookup_value(dictionary, "state", nil)
+			if state ~= nil then
+				if ffi.string(gio.g_variant_get_type_string(state)) == "d" then
+					info.state = tonumber(gio.g_variant_get_double(state))
+				end
+				gio.g_variant_unref(state)
+			end
+			gio.g_variant_unref(dictionary)
+		end
+		gio.g_variant_unref(reply)
+		return info
+	end
+	local extension = service == Focus.SERVICES.gnome and M.new_extension_monitor(read_extension_info, emit) or nil
+
 	local method_callback = ffi.cast("ErgoptiMethodCall", function(_, sender, _, _, method, parameters, invocation)
 		local accepted, failure = pcall(function()
 			local caller = sender ~= nil and ffi.string(sender) or ""
@@ -226,6 +310,7 @@ function M.run(service, parent_pid)
 					"only the desktop shell may report focus")
 				return
 			end
+			if extension then extension.admitted() end
 			local name = ffi.string(method)
 			local record, reason = nil, "unknown method"
 			if name == "Cleared" then
@@ -260,17 +345,53 @@ function M.run(service, parent_pid)
 		return 1
 	end)
 	glib.g_timeout_add(LIVENESS_INTERVAL_MS, liveness, nil)
+	-- One shot: a report that arrives later clears the daemon's problem itself.
+	local silence = extension and ffi.cast("int (*)(void *)", function()
+		local checked_ok, failure = pcall(extension.silence_elapsed)
+		if not checked_ok then stop(tostring(failure)) end
+		return 0
+	end) or nil
 
 	emit({ kind = "ready" })
+	if extension then
+		-- The daemon names an extension GNOME Shell does not run: otherwise
+		-- every window stays unknown in silence.
+		extension.check(false)
+		glib.g_timeout_add(silence_ms, silence, nil)
+	end
 	if service == Focus.SERVICES.kde then
 		-- A KWin script runs once when loaded and reports the active window
 		-- then; reloading it now tells a daemon started after KWin which window
 		-- is active. A refusal only means "unknown until the next activation".
-		local unloaded = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "unloadScript",
-			{ gio.g_variant_new_string(KWIN_SCRIPT_ID) })
-		if unloaded ~= nil then gio.g_variant_unref(unloaded) end
-		local started = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", "start", nil)
-		if started ~= nil then gio.g_variant_unref(started) end
+		local function scripting(method, children)
+			local reply = call("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", method, children)
+			if reply == nil then return nil end
+			local answer = true
+			if ffi.string(gio.g_variant_get_type_string(reply)) == "(b)" then
+				local value = gio.g_variant_get_child_value(reply, 0)
+				answer = gio.g_variant_get_boolean(value) ~= 0
+				gio.g_variant_unref(value)
+			end
+			gio.g_variant_unref(reply)
+			return answer
+		end
+		local function loaded() return scripting("isScriptLoaded", { gio.g_variant_new_string(KWIN_SCRIPT_ID) }) end
+		scripting("unloadScript", { gio.g_variant_new_string(KWIN_SCRIPT_ID) })
+		scripting("start", nil)
+		local state = loaded()
+		if state == false then
+			-- KWin reads kwinrc's [Plugins] once per session: a script enabled
+			-- by the installer during the session stays unloaded until KWin
+			-- reparses its configuration, which reconfigure does (field
+			-- report, Plasma 6.8 Wayland, 2026-11-25: no focus report ever).
+			local reconfigured = call("org.kde.KWin", "/KWin", "org.kde.KWin", "reconfigure", nil)
+			if reconfigured ~= nil then gio.g_variant_unref(reconfigured) end
+			scripting("start", nil)
+			state = loaded()
+		end
+		-- The daemon names a script KWin does not run: otherwise every window
+		-- stays unknown in silence.
+		emit({ kind = "script", loaded = state == true and true or false, answered = state ~= nil })
 	end
 	if not failed then glib.g_main_loop_run(loop) end
 
@@ -279,6 +400,7 @@ function M.run(service, parent_pid)
 	gio.g_object_unref(connection)
 	method_callback:free()
 	liveness:free()
+	if silence then silence:free() end
 	if failed and failed ~= "parent exited" then
 		io.stderr:write("Compositor focus worker stopped: " .. failed .. "\n")
 		return false
@@ -297,7 +419,7 @@ if type(arg) == "table" and type(arg[0]) == "string"
 	else
 		package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
 	end
-	local ok, completed = pcall(M.run, arg[1], tonumber(arg[2]))
+	local ok, completed = pcall(M.run, arg[1], tonumber(arg[2]), tonumber(arg[4]))
 	if not ok then io.stderr:write("Compositor focus worker refused: " .. tostring(completed) .. "\n") end
 	if not ok or completed ~= true then os.exit(1) end
 end

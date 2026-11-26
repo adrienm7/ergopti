@@ -36,9 +36,19 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "hook.start") < position(state.events, "layout.publish"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "hook.pump"))
 		helpers.assert_true(position(state.events, "diagnostics.prepare") < position(state.events, "hook.start"))
+		-- The typing path's settings and catalogues are read before the first key can arrive.
+		for _, read in ipairs({ "typing.settings", "typing.repeat_key", "typing.media_policy", "typing.tap_keys" }) do
+			helpers.assert_true(position(state.events, read) < position(state.events, "hook.start"), read)
+		end
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
+		-- Withheld input is told as it happens from the ready announcement to the
+		-- exit summary, and the observer is released once that summary is logged.
+		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "withheld.observe"))
+		helpers.assert_true(position(state.events, "withheld.observe") < position(state.events, "daemon.ready"))
+		helpers.assert_true(position(state.events, "withheld.summary") < position(state.events, "withheld.unobserve"))
+		helpers.assert_eq(state.withheld_observer, nil)
 		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
 		-- An update watcher keeps the new installation only once the boot is complete.
@@ -57,6 +67,31 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_type(state.callbacks.on_usr1, "function")
 		-- The collector's field run session starts with the daemon's own pid.
 		helpers.assert_eq(state.field_run and state.field_run.pid, 4242)
+	end)
+	helpers.it("(metrics-sources-before-tray) the tray is built after the pointer source is bound", function()
+		-- The tray used to be built before the cursor position source was bound,
+		-- so its Metrics submenu drew the unbound tracker's raw reason.
+		local state = MainStartup.run()
+		helpers.assert_true(state.ok, tostring(state.error))
+		helpers.assert_true(position(state.events, "metrics.pointer_bound") < position(state.events, "tray"))
+	end)
+	helpers.it("(metrics-platform-limit) Wayland's missing cursor and geometry are INFO, an X11 loss a WARNING", function()
+		-- A KDE Plasma Wayland field log warned on every boot about what no
+		-- Wayland client can read; a warning is for what must be investigated.
+		local function unmeasured(state)
+			local found = {}
+			for _, message in ipairs(state.warnings) do
+				if message:find("is not measured in this session", 1, true)
+					and not message:find("desktop changes", 1, true) then found[#found + 1] = message end
+			end
+			return found
+		end
+		local wayland = MainStartup.run()
+		helpers.assert_true(wayland.ok, tostring(wayland.error))
+		helpers.assert_eq(unmeasured(wayland), {})
+		local x11 = MainStartup.run({ display = "x11" })
+		helpers.assert_true(x11.ok, tostring(x11.error))
+		helpers.assert_eq(#unmeasured(x11), 2, table.concat(unmeasured(x11), " | "))
 	end)
 	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
 		-- The E2E children count the active libuv signal handles before playing a
@@ -436,7 +471,7 @@ helpers.describe("shutdown coordinator: startup preparation token", function()
 	helpers.it("(startup-late-grab) preserves the first parked diagnostic and emergency reason", function()
 		local reason, emergency
 		local factory = helpers.load_module_with_dependency("core.lifecycle.engine.shutdown.coordinator", "core.logger.engine.shim", {
-			start = function(_, _, value) reason = value end, done = function() end,
+			start = function(_, _, value) reason = value end, success = function() end,
 		})
 		local coordinator = factory.new({ pre_wait = {}, keyboard_hook = {
 			isRunning = function() return true end, stop = function() error("Emergency cleanup is owned by the first request") end,
@@ -678,7 +713,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 				shutdown_runtime = function() state.stops = state.stops + 1; return state.closed end,
 				cancel = function() state.cancelled = state.cancelled + 1 end,
 			},
-			package = { loaded = { ["modules.llm.local_servers"] = {
+			package = { loaded = { ["ai.engine.local_servers.local_servers"] = {
 				shutdown = native_stop("discovery"),
 			}, ["modules.keymap.layout_registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
 			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
@@ -999,13 +1034,13 @@ end)
 
 helpers.describe("shutdown coordinator: final native output acknowledgement", function()
 	local function with_output(mode, check)
-		local names = { "platform.input.uinput_writer", "platform.input.modifier_broker", "modules.hotstrings.injector" }
+		local names = { "platform.input.uinput_writer", "platform.input.modifier_broker", "hotstrings.engine.injector" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, why = pcall(function()
 			local writer = require("platform.input.uinput_writer")
 			local broker = require("platform.input.modifier_broker")
-			local injector = require("modules.hotstrings.injector")
+			local injector = require("hotstrings.engine.injector")
 			local calls = { destroy = 0, close = 0, success = 0, writes = 0 }
 			writer._set_backend({
 				open = function() return 47 end,
@@ -1428,7 +1463,7 @@ helpers.describe("actual Main layout helper retirement", function()
 			prediction_engine = false,
 			package = { loaded = { ["modules.keymap.layout_registry"] = loaded and layout or nil } },
 			require = function(name)
-				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+				assert(name == "ai.engine.agent.connectors" or name == "ai.engine.agent.learning",
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
@@ -1520,7 +1555,7 @@ helpers.describe("actual Main HTTP transport retirement", function()
 			prediction_engine = false,
 			package = { loaded = { ["core.network.adapters.http_client"] = loaded and http or nil } },
 			require = function(name)
-				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+				assert(name == "ai.engine.agent.connectors" or name == "ai.engine.agent.learning",
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
@@ -1602,28 +1637,37 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		local function record(event) state.events[#state.events + 1] = event end
 		local noop = function() end
 		local modules = {}
-		for _, name in ipairs({ "infra.version", "modules.hotstrings.engine", "modules.hotstrings.hotstrings_config",
-			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
-			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
-			"modules.hotstrings.device_finder", "platform.input.event", "core.logger.engine.monotonic", "infra.manifest_reader",
-			"infra.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
-			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "infra.diagnostic_snapshot" }) do
+		for _, name in ipairs({ "infra.version", "hotstrings.engine.engine", "hotstrings.engine.catalogue.config",
+			"hotstrings.engine.injector", "adapters.keyboard_layout", "hotstrings.engine.magic_key",
+			"modules.shortcuts.star_key_source", "hotstrings.engine.repeat_key", "modules.shortcuts.keyboard_shortcuts",
+			"hotstrings.engine.device_finder", "platform.input.event", "core.logger.engine.monotonic", "menu.engine.manifest_reader",
+			"settings.engine.scope.script_settings", "core.timing.engine.timings", "modules.shortcuts.script_actions", "diagnostics.engine.reports.crash_reporter",
+			"modules.keystats.focus_guard", "platform.input.capture_gate", "core.logger.engine.boot_profiler", "diagnostics.engine.reports.snapshot" }) do
 			modules[name] = {}
 		end
 		modules["core.lifecycle.engine.shutdown.session_lock"] = { protect = function() return true end }
 		-- Main lets config.toml's [script] rows win before the error window starts.
-		modules["infra.script_scope"] = { adopt_configured = function() return {} end }
+		modules["settings.engine.scope.script_scope"] = { adopt_configured = function() return {} end }
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["core.logger.engine.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["core.lifecycle.engine.compat.utf8"] = { install = function() return false end }
 		-- Main reserves WebKit's collector signal before anything else it loads.
 		modules["core.lifecycle.engine.shutdown.signal_handlers"] = { reserve_webkit_gc_signal = function() return true end }
+		-- Main restores the session's environment for host programs before it
+		-- can start one; the isolated Main runs without a launcher record, so,
+		-- like the real owner, it installs nothing, and only once.
+		local host_environment_installs = 0
+		modules["core.process.adapters.host_environment"] = { install = function()
+			host_environment_installs = host_environment_installs + 1
+			assert(host_environment_installs == 1, "host environment restoration installed twice")
+			return false
+		end }
 		-- Main moves the legacy folders first; the isolated Main moves none.
-		modules["infra.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
+		modules["settings.engine.migration.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
 		modules["core.logger.engine.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["core.logger.engine.sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
-		modules["modules.llm.agent_learning"] = { flush = noop }
+		modules["ai.engine.agent.learning"] = { flush = noop }
 		modules["core.events.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
 		modules["platform.input.keyboard_hook"] = {
 			isRunning = function() return state.running end,
@@ -1637,7 +1681,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		} or nil
 		modules["core.lifecycle.engine.runtime_guard"] = { optional_require = function(name)
 			if name == "core.ui.ui.webview_manager" then return manager end
-			if name == "modules.llm.prediction_engine" then return runtime end
+			if name == "ai.engine.prediction.engine" then return runtime end
 		end }
 		modules["core.lifecycle.engine.shutdown.coordinator"] = { new = function(options)
 			local coordinator = ShutdownCoordinator.new(options)

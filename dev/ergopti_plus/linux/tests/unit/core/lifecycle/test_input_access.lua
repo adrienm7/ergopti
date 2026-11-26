@@ -33,9 +33,64 @@ helpers.describe("input_access: telling the user", function()
 				return key == Access.BODY_KEY and "Repair: {1}" or "Title"
 			end },
 			script_dir = "/opt/Ergopti user's % directory",
+			getenv = function() return nil end,
 			print = function(line) lines[#lines + 1] = line end,
 		}, "denied")
 		helpers.assert_eq(lines[2], "Repair: bash '/opt/Ergopti user'\\''s % directory/install.sh' --setup-perms")
+	end)
+
+	helpers.it("names the AppImage itself, not its vanishing mount, as the repair (field report, Arch)", function()
+		-- The AppImage's driver root is a temporary mount: the install.sh it
+		-- named was gone once the image exited. Relaunching the image runs the
+		-- launcher, which asks once for the authorization.
+		local Access = helpers.load_module("platform.input.access")
+		local lines = {}
+		Access.report({
+			i18n = { init = function() end, get = function(key)
+				return key == Access.BODY_KEY and "Repair: {1}" or "Title"
+			end },
+			script_dir = "/tmp/.mount_ErgoptXYZ/usr/lib/ergopti",
+			getenv = function(name) return name == "APPIMAGE" and "/home/u/Apps/Ergopti Plus.AppImage" or nil end,
+			print = function(line) lines[#lines + 1] = line end,
+		}, "denied")
+		helpers.assert_eq(lines[2], "Repair: '/home/u/Apps/Ergopti Plus.AppImage'")
+	end)
+
+	helpers.it("names the host's copy of the Flatpak's setup script, never the sandbox's /app", function()
+		-- /app exists only inside the sandbox, and nothing run there can add a
+		-- host group: the repair named bash '/app/lib/ergopti/install.sh'.
+		local Access = helpers.load_module("platform.input.access")
+		local deployment = "/var/lib/flatpak/app/fr.ergopti.Plus/x86_64/stable/0a1b2c/files"
+		local command = Access.setup_command({
+			script_dir = "/app/lib/ergopti",
+			getenv = function(name) return name == "FLATPAK_ID" and "fr.ergopti.Plus" or nil end,
+			read_file = function(path)
+				helpers.assert_eq(path, "/.flatpak-info")
+				return "[Application]\nname=fr.ergopti.Plus\n\n[Instance]\ninstance-id=42\napp-path="
+					.. deployment .. "\nbranch=stable\n"
+			end,
+		})
+		helpers.assert_eq(command,
+			"sudo bash '" .. deployment .. "/lib/ergopti/install/setup_permissions.sh' --user \"$(id -u)\"")
+		helpers.assert_true(command:find("'/app/", 1, true) == nil, "no sandbox path")
+		local ok = pcall(Access.setup_command, {
+			getenv = function(name) return name == "FLATPAK_ID" and "fr.ergopti.Plus" or nil end,
+			read_file = function() return "[Application]\nname=fr.ergopti.Plus\n" end,
+		})
+		helpers.assert_eq(ok, false, "a Flatpak whose deployment is unknown is refused, not sent to /app")
+	end)
+
+	helpers.it("the AppImage's tray launch goes through the permission launcher", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/../../../tools/build/build-linux-appimage.sh", "r"))
+		local builder = fh:read("*a")
+		fh:close()
+		local apprun = builder:match("cat > \"%$APPDIR/AppRun\" << 'APPRUN_EOF'\n(.-)\nAPPRUN_EOF")
+		helpers.assert_true(apprun ~= nil, "the AppRun heredoc")
+		local launcher = apprun:find('exec bash "$DRIVER_ROOT/install/launch.sh" "$@"', 1, true)
+		local direct = apprun:find('exec "$LUAJIT_BIN" "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"', 1, true)
+		helpers.assert_true(launcher ~= nil and direct ~= nil and launcher < direct,
+			"a --tray launch reaches launch.sh before the direct daemon start")
+		helpers.assert_true(apprun:find("export ERGOPTI_PORTABLE_LAUNCH=1", 1, true) ~= nil)
 	end)
 
 	helpers.it("notifies with the translated title and body", function()
@@ -113,7 +168,13 @@ helpers.describe("input_access: a tray launch stays visible", function()
 	--- A tray adapter double that records what the user would see.
 	local function fake_tray(backend)
 		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false, windows = {} }
-		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
+		-- The degraded tray creates its icon as the daemon does (TRAY-04): a
+		-- setIcon without an image file is refused and would show nothing.
+		function tray.start()
+			tray.calls[#tray.calls + 1] = "start"
+			return backend ~= nil
+		end
+		function tray.setIcon() error("the degraded tray must create its icon with start()") end
 		function tray.getBackend() return backend end
 		-- Flattens the fallback builder's arguments into the rows a click reaches;
 		-- the adapter's own suite pins the separators it adds.
@@ -257,6 +318,34 @@ helpers.describe("input_access: the service does not loop on it", function()
 		local declared = unit:match("\nRestartPreventExitStatus=(%d+)")
 		helpers.assert_eq(tonumber(declared), Access.EXIT_ACCESS,
 			"systemd would restart the daemon every 3 s and repeat the notification")
+	end)
+
+	helpers.it("bounds the restarts of a failure that repeats at every start", function()
+		-- The default burst (5 in 10 s) never trips with RestartSec=3s, so an exit
+		-- status other than 78 (no device, unopenable /dev/uinput, unreadable
+		-- keymap) restarted the daemon every three seconds for the whole session.
+		local unit = read("ergopti-hotstrings.service")
+		local unit_section = unit:match("\n%[Unit%]\n(.-)\n%[Service%]")
+		local interval = tonumber(unit_section:match("\nStartLimitIntervalSec=(%d+)"))
+		local burst = tonumber(unit_section:match("\nStartLimitBurst=(%d+)"))
+		local delay = tonumber(unit:match("\nRestartSec=(%d+)s"))
+		helpers.assert_true(interval ~= nil and burst ~= nil, "the [Unit] section declares the start limit")
+		helpers.assert_true((burst - 1) * delay < interval,
+			"the burst must be reachable at the restart delay, or the limit never trips")
+	end)
+
+	helpers.it("an unwritable /dev/uinput exits with the access status, not the restarted 1", function()
+		-- The report's status was dropped and the error unwound to os.exit(1),
+		-- which the unit restarts: a missing uinput group or module looped all session.
+		local src = read("ergopti_hotstrings.lua")
+		local refusal = src:find("Cannot open /dev/uinput", 1, true)
+		helpers.assert_true(refusal ~= nil, "the uinput refusal is where this test reads it")
+		local branch = src:sub(refusal, (src:find("\n\tend\n", refusal, true)))
+		helpers.assert_contains(branch, 'startup_refusal_status = require("platform.input.access").report(')
+		helpers.assert_contains(src, "os.exit(startup_refusal_status or 1)")
+		local declared = src:find("\nlocal startup_refusal_status = nil\n", 1, true)
+		helpers.assert_true(declared ~= nil and declared < refusal,
+			"declared above its writer, or the write lands in a nil global")
 	end)
 
 	helpers.it("is what the daemon reports at every access check", function()

@@ -40,8 +40,24 @@ helpers.describe("owned runtime uninstall: scope", function()
 		helpers.assert_true(block:find("org.pqrs", 1, true) == nil)
 		helpers.assert_true(block:find("Karabiner", 1, true) == nil)
 		local _, recursive = block:gsub("/bin/rm %-rf", "")
-		helpers.assert_eq(recursive, 1, "exactly one recursive removal: the runtime directory")
+		helpers.assert_eq(recursive, 2, "exactly two recursive removals: the runtime directory and the install stages")
 		helpers.assert_true(block:find("/bin/rm -rf '\\(runtimeDirectory)'", 1, true) ~= nil,
 			"the recursive removal names the constant, never a computed path")
+		-- The install's stale step (field report 2026-11-24) removes only the helper's copy stages: a loop
+		-- over the constant UUID pattern in the owned folder, each entry a plain folder, never a computed path.
+		helpers.assert_true(block:find("for task_stage in '\\(ownedFolder)'/\\(installStagePattern); do ", 1, true) ~= nil,
+			"the stage loop names the owned folder and the stage pattern constants")
+		helpers.assert_true(block:find('[ -d \\"$task_stage\\" ] && [ ! -L \\"$task_stage\\" ] || exit 77; '
+			.. '/bin/rm -rf \\"$task_stage\\"', 1, true) ~= nil, "a stage is removed only when it is a plain folder")
+		helpers.assert_true(block:find('installStagePattern = ".runtime-install-????????-????-????-????-????????????"', 1, true)
+			~= nil, "the stage pattern is the helper's UUID stage, never the shell's own .runtime-installer- stage")
+	end)
+
+	helpers.it("names the owned folder that holds the runtime directory", function()
+		package.loaded["platform.remap.ke_paths"] = nil
+		local owned = require("platform.remap.ke_paths").OWNED
+		local source = assert(SourceFile.read(helpers.driver_root() .. "/launcher/Sources/ErgoptiPlus/UninstallWorker.swift"))
+		local folder = assert(owned.RUNTIME_DIR:match("^(.+)/Runtime$"), "the runtime directory sits in the owned folder")
+		helpers.assert_true(source:find('ownedFolder = "' .. folder .. '"', 1, true) ~= nil)
 	end)
 end)

@@ -105,7 +105,7 @@ MetricsFiltersApplyManifestDefaults() {
 ; ==================================
 ; ==================================
 
-; Persistence is delegated to infra/config_shortcuts.ahk (CS_Load / CS_Save)
+; Persistence is delegated to settings/engine/shortcuts.ahk (CS_Load / CS_Save)
 ; which owns the [metrics] section inside <config_dir>/config.toml.
 ; Explicit candidates use the process-wide configuration gateway so a terminal
 ; transition can refuse before any live metrics state is inspected or changed.

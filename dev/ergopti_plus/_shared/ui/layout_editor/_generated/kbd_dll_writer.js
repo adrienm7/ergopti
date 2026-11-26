@@ -2,7 +2,7 @@
 
 // ==========================================
 // AUTO-GENERATED — do not edit manually
-// Sources: tools/lib/kbd-dll/{constants.cjs,model.cjs,emit-c.cjs,source.cjs,pe-writer.cjs}
+// Sources: tools/lib/kbd-dll/{constants.cjs,model.cjs,emit-c.cjs,shortcut-keys.cjs,source.cjs,pe-writer.cjs,layout-ini.cjs}
 // Run: npm run codegen:layout-editor-kbd-dll:js
 // ==========================================
 
@@ -219,6 +219,33 @@ const KBD_VERSION = 1;
 const SC_FLAGS = Object.freeze({ EXT: 0x0100, MULTIVK: 0x0200, SPECIAL: 0x0400, NUMPAD: 0x0800 });
 // The keyboard type of a standard 101/102-key PC keyboard (dwType = 4).
 const KEYBOARD_TYPE = 4;
+// The KBDTABLES dwType and dwSubType of each keyboard a model can name
+// (`keyboard_type`): kbd.h's KEYBOARD_TYPE_GENERIC_101 (4) by default, and for
+// a JIS keyboard KEYBOARD_TYPE_JAPAN (7) with the sub-type MICROSOFT_KBD_106_TYPE
+// (2), the pair Windows' own Japanese 106/109-key tables state
+// (KBD106.DLL in System32, read on 2026-11-17). An ABNT keyboard is a 101/102-key
+// keyboard to Windows: its two extra keys are in the type-4 table (0x73
+// VK_ABNT_C1, 0x7E VK_ABNT_C2), as in Microsoft's KBDBR.DLL.
+const KEYBOARD_TYPES = Object.freeze({
+	generic: Object.freeze({ type: KEYBOARD_TYPE, subtype: 0 }),
+	jis: Object.freeze({ type: 7, subtype: 2 })
+});
+// The virtual keys of the JIS keys the type-4 table gives none (0x70, 0x79,
+// 0x7D) or an unrelated one (0x7B, VK_OEM_PA1): Katakana/Hiragana, Henkan and
+// Muhenkan as KBD106.DLL sends them (VK_DBE_HIRAGANA, which kbd.h also names
+// VK_OEM_COPY, VK_CONVERT, VK_NONCONVERT; without KBD106's KBDSPECIAL flag, a
+// flag only its NLS functions read), and Yen VK_OEM_AX: KBD106's VK_OEM_5 is
+// the type-4 table's Backslash key, and VK_OEM_AX, the Japanese AX keyboard's
+// key, is the one OEM virtual key no type-4 key holds.
+const JIS_VKS = Object.freeze({
+	0x70: VK.OEM_COPY,
+	0x79: VK.CONVERT,
+	0x7b: VK.NONCONVERT,
+	0x7d: VK.OEM_AX
+});
+// The JIS input-method keys: a JIS layout sends their virtual keys even when it
+// gives them no character, so the input method still reads them.
+const JIS_IME_SCANCODES = Object.freeze([0x70, 0x79, 0x7b]);
 // The string resource holding the layout's display name (Layout Display Name).
 const DISPLAY_NAME_RESOURCE = 1000;
 
@@ -442,6 +469,9 @@ module.exports = {
 	KBD_VERSION,
 	SC_FLAGS,
 	KEYBOARD_TYPE,
+	KEYBOARD_TYPES,
+	JIS_VKS,
+	JIS_IME_SCANCODES,
 	DISPLAY_NAME_RESOURCE,
 	DEFAULT_SCANCODES,
 	DEFAULT_E0,
@@ -552,6 +582,9 @@ function check(model) {
 	const flags = model.flags || [];
 	if (!Array.isArray(flags) || flags.some((f) => !Object.hasOwn(C.LOCALE_FLAGS, f)))
 		fail('kbd_flag_unknown', 'flags');
+	// Absent for the 101/102-key keyboard every layout is for unless it says so.
+	if (model.keyboard_type !== undefined && model.keyboard_type !== 'jis')
+		fail('kbd_keyboard_type', 'keyboard_type');
 	const columns = model.columns;
 	if (!Array.isArray(columns) || columns.length === 0 || columns.length > MAX_COLUMNS)
 		fail('kbd_columns', 'columns');
@@ -684,6 +717,18 @@ function modifierNames(model) {
 	);
 }
 
+/** The KBDTABLES keyboard type and sub-type of a model (constants KEYBOARD_TYPES). */
+function keyboardType(model) {
+	return C.KEYBOARD_TYPES[model.keyboard_type || 'generic'];
+}
+
+/** The scan-code table: the standard type-4 one with the model's `scancodes` moves. */
+function scanTable(model) {
+	const scan = C.DEFAULT_SCANCODES.slice();
+	for (const entry of model.scancodes || []) scan[entry.sc] = entry.vk;
+	return scan;
+}
+
 /** The locale flags word: KLLF bits low, KBD_VERSION high. */
 function localeFlags(model) {
 	const bits = (model.flags || []).reduce((a, f) => a | C.LOCALE_FLAGS[f], 0);
@@ -700,6 +745,8 @@ module.exports = {
 	modifierNames,
 	modifierKeys,
 	e0Table,
+	scanTable,
+	keyboardType,
 	localeFlags
 };
 	};
@@ -724,9 +771,12 @@ module.exports = {
  *    kbd.h's KBD_LONG_POINTER makes them under BUILD_WOW6432), x64 and arm64.
  *    A wow64 pointer is a 32-bit pointer followed by a zero word, 8-aligned: the
  *    64-bit layout, filled by a 32-bit image's relocations.
- * 2. Every table is const, so it lands in read-only data; static assertions pin
+ * 2. KbdLayerDescriptor returns kbd.h's KBD_LONG_POINTER: 64 bits in EDX:EAX
+ *    for wow64 (mov eax, imm32; cdq; ret, the code of Microsoft's SysWOW64
+ *    layouts and of MSVC), the native pointer elsewhere.
+ * 3. Every table is const, so it lands in read-only data; static assertions pin
  *    each structure's size to the layout the reader checks independently.
- * 3. Deterministic: the same model gives the same text.
+ * 4. Deterministic: the same model gives the same text.
  * ==============================================================================
  */
 
@@ -791,14 +841,6 @@ function modNumbers(model) {
 		const index = model.columns.indexOf(bits);
 		return index >= 0 ? index : C.SHFT_INVALID;
 	});
-}
-
-/** The scan-code to virtual-key table with the layout's moves applied. */
-function scanTable(model) {
-	const table = C.DEFAULT_SCANCODES.slice();
-	// A moved character key carries no scan-code flag.
-	for (const entry of model.scancodes || []) table[entry.sc] = entry.vk;
-	return table;
 }
 
 /**
@@ -949,7 +991,7 @@ function emitC(input) {
 		line('};');
 	}
 	line('');
-	const scan = scanTable(model);
+	const scan = Model.scanTable(model);
 	line(`static const WORD ausVSCtoVK[${scan.length}] = {`);
 	for (let i = 0; i < scan.length; i += 8)
 		line(
@@ -993,12 +1035,25 @@ function emitC(input) {
 	line(`\t${lgMax},`);
 	line(`\t${lgMax ? 'sizeof(LIGATURE_N)' : '0'},`);
 	line(`\tKP(${lgMax ? 'aLigature' : '0'}),`);
-	line(`\t${C.KEYBOARD_TYPE},`);
-	line('\t0');
+	line(`\t${Model.keyboardType(model).type},`);
+	line(`\t${Model.keyboardType(model).subtype}`);
 	line('};');
 	line('');
 	line('/* The one export (ordinal 1): the system calls it to get the tables. */');
+	line('#if defined(KBD_WOW64)');
+	line('/* kbd.h returns a KBD_LONG_POINTER, 64 bits wide under BUILD_WOW6432: EDX:EAX, the high');
+	line(
+		"   half the sign of EAX, as Microsoft's SysWOW64 layouts do (mov eax, imm32; cdq; ret). */"
+	);
+	line('unsigned long long __stdcall KbdLayerDescriptor(void)');
+	line('{');
+	line('\tunsigned long long tables;');
+	line('\t__asm__("movl %1, %%eax\\n\\tcltd" : "=A"(tables) : "i"(&KbdTables));');
+	line('\treturn tables;');
+	line('}');
+	line('#else');
 	line('const KBDTABLES *__stdcall KbdLayerDescriptor(void) { return &KbdTables; }');
+	line('#endif');
 	return `${out.join('\n')}\n`;
 }
 
@@ -1081,7 +1136,92 @@ function emitDef(input) {
 	return `LIBRARY ${model.dll_name}\nEXPORTS\n\tKbdLayerDescriptor @1\n`;
 }
 
-module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers, scanTable };
+module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers };
+	};
+	factories['./shortcut-keys.cjs'] = function (module, exports, require) {
+// tools/lib/kbd-dll/shortcut-keys.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Windows Shortcut Keys (Virtual-Key Exchange)
+ * DESCRIPTION:
+ * Carries a layout source's `keys.<physical>.shortcut_key` into a Windows
+ * keyboard layout: Windows matches Ctrl, Alt and Win shortcuts on the virtual
+ * key a physical key sends, so the key takes the virtual key of the key it
+ * names. The KLC generator (tools/codegen/lib/windows-keyboard-layout.cjs) and
+ * the DLL tables (source.cjs) both apply this one rule.
+ *
+ * FEATURES & RATIONALE:
+ * 1. An exchange, never a share: kbd.h keys every character table by virtual
+ *    key, so two physical keys of one virtual key would type the same
+ *    characters. The named key takes a virtual key a claiming key frees; when
+ *    the two keys name each other the exchange is exact, otherwise the named
+ *    key's own shortcuts move, which the result lists as `displaced`.
+ * 2. Fail fast and say it: a pair whose key or named key types no character
+ *    (no row of its own), or whose named key another pair already took, is
+ *    refused with a stable reason instead of being approximated.
+ * 3. Pure and dependency-free: the layout editor page loads it in both bundles.
+ * ==============================================================================
+ */
+
+'use strict';
+
+/**
+ * The virtual key of every key once the shortcut keys are carried.
+ * @param {{code: string, vk: *}[]} keys - The character keys in row order, each
+ *   with the virtual key the layout gives it; every vk is distinct.
+ * @param {{key: string, shortcut_key: string}[]} pairs - The source's shortcut keys.
+ * @returns {{vks: Map<string, *>, carried: object[], displaced: object[], refused: object[]}}
+ *   vks: code -> virtual key; carried: {key, shortcut_key, vk}; displaced: {key, vk, by}
+ *   (a named key that now sends another virtual key); refused: {key, shortcut_key, reason}.
+ */
+function exchangeVirtualKeys(keys, pairs) {
+	const vks = new Map(keys.map((key) => [key.code, key.vk]));
+	if (vks.size !== keys.length) throw new Error('a character key is listed twice');
+	if (new Set(vks.values()).size !== keys.length)
+		throw new Error('two character keys share a virtual key');
+	const carried = [];
+	const refused = [];
+	const claimedVk = new Map();
+	for (const pair of pairs) {
+		if (!vks.has(pair.key) || !vks.has(pair.shortcut_key)) {
+			refused.push(Object.assign({}, pair, { reason: 'shortcut_key_not_a_character_key' }));
+			continue;
+		}
+		const vk = vks.get(pair.shortcut_key);
+		if (claimedVk.has(vk)) {
+			refused.push(Object.assign({}, pair, { reason: 'shortcut_key_virtual_key_taken' }));
+			continue;
+		}
+		claimedVk.set(vk, pair.key);
+		carried.push({ key: pair.key, shortcut_key: pair.shortcut_key, vk });
+	}
+	const claimers = new Set(carried.map((entry) => entry.key));
+	// The virtual keys claimers free, in row order, go to the keys that lost theirs.
+	const freed = keys.filter((key) => claimers.has(key.code) && !claimedVk.has(key.vk));
+	const losers = keys.filter((key) => !claimers.has(key.code) && claimedVk.has(key.vk));
+	const displaced = losers.map((key, index) => ({
+		key: key.code,
+		vk: freed[index].vk,
+		by: claimedVk.get(key.vk)
+	}));
+	for (const entry of carried) vks.set(entry.key, entry.vk);
+	for (const entry of displaced) vks.set(entry.key, entry.vk);
+	return { vks, carried, displaced, refused };
+}
+
+/**
+ * The shortcut-key pairs of a validated layout source, in key order.
+ * @param {object} source - A validated structured source.
+ * @returns {{key: string, shortcut_key: string}[]}
+ */
+function shortcutPairs(source) {
+	return Object.entries(source.keys || {})
+		.filter(([, fields]) => typeof fields.shortcut_key === 'string')
+		.map(([key, fields]) => ({ key, shortcut_key: fields.shortcut_key }));
+}
+
+module.exports = { exchangeVirtualKeys, shortcutPairs };
 	};
 	factories['./source.cjs'] = function (module, exports, require) {
 // tools/lib/kbd-dll/source.cjs
@@ -1115,6 +1255,7 @@ module.exports = { ARCHES, emitC, emitRc, emitDef, mainRows, modNumbers, scanTab
 
 const C = require('./constants.cjs');
 const Model = require('./model.cjs');
+const ShortcutKeys = require('./shortcut-keys.cjs');
 
 // The modifier ids of a column's bits; AltGr (Ctrl+Alt) is the right Alt key.
 const COLUMN_IDS = [
@@ -1185,9 +1326,19 @@ const NUM_LOCK_VK = new Map([
 ]);
 const keypad = (sc) => Boolean(C.DEFAULT_SCANCODES[sc] & C.SC_FLAGS.NUMPAD);
 
-/** The virtual key a scan code types characters with, without the layout's moves. */
-const defaultVk = (sc) =>
-	keypad(sc) && NUM_LOCK_VK.has(sc) ? NUM_LOCK_VK.get(sc) : C.DEFAULT_SCANCODES[sc] & 0xff;
+/** The virtual key of a scan code in the standard table (0: none), keypad keys under Num Lock. */
+function defaultVk(sc) {
+	if (keypad(sc) && NUM_LOCK_VK.has(sc)) return NUM_LOCK_VK.get(sc);
+	const vk = C.DEFAULT_SCANCODES[sc] & 0xff;
+	return vk === C.VK_FOLLOW_ROW ? 0 : vk;
+}
+
+/**
+ * The virtual key a character key on a scan code takes unless the source names
+ * one: the standard table's, or for a JIS key the one constants JIS_VKS gives
+ * (Yen has none in the standard table, Muhenkan an unrelated one).
+ */
+const characterVk = (sc) => (Object.hasOwn(C.JIS_VKS, sc) ? C.JIS_VKS[sc] : defaultVk(sc));
 
 /** The modifier ids of a column bit mask, or null when Windows types no character there. */
 function columnIds(mask, altgr) {
@@ -1270,7 +1421,7 @@ function toSource(model, options) {
 		const entry = {};
 		if (key.attributes & C.ATTRIBUTES.caplok) entry.caps_lock = 'shift';
 		if (key.attributes & C.ATTRIBUTES.caplokaltgr) entry.caps_altgr = true;
-		if (defaultVk(sc) !== key.vk) entry.virtual_key = key.vk;
+		if (characterVk(sc) !== key.vk) entry.virtual_key = key.vk;
 		if (Object.keys(entry).length) keys[code] = entry;
 	});
 	for (const [field, extended] of [
@@ -1303,7 +1454,7 @@ function toSource(model, options) {
 		format: 'ergopti-layout',
 		version: 1,
 		layout: { id: options.id, name: options.name || model.layout_text },
-		physical: { base: 'iso' },
+		physical: model.keyboard_type === 'jis' ? { base: 'iso', keyboard: 'jis' } : { base: 'iso' },
 		layers
 	};
 	if (Object.keys(keys).length) source.keys = keys;
@@ -1435,15 +1586,53 @@ function fromSource(source, options = {}) {
 	const keys = [];
 	const scancodes = [];
 	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-	for (const code of [...byCode.keys()].filter((c) => codes.has(c))) {
+	const placedCodes = [...byCode.keys()].filter((c) => codes.has(c));
+	// An E0 key (keypad divide, keypad Enter…) keeps its standard virtual key.
+	const e0Of = (sc) =>
+		sc >= 0x100 ? C.DEFAULT_E0.find(([low]) => low === (sc & 0xff)) : undefined;
+	const ownVk = new Map();
+	for (const code of placedCodes) {
 		const sc = byCode.get(code);
 		const fields = keyFields[code] || {};
-		// An E0 key (keypad divide, keypad Enter…) keeps its standard virtual key.
-		const e0 = sc >= 0x100 ? C.DEFAULT_E0.find(([low]) => low === (sc & 0xff)) : undefined;
+		const e0 = e0Of(sc);
 		if (sc >= 0x100 && (e0 === undefined || own(fields, 'virtual_key')))
 			fail('source_extended_character_key', code);
-		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : defaultVk(sc);
+		const vk = e0
+			? e0[1] & 0xff
+			: own(fields, 'virtual_key')
+				? fields.virtual_key
+				: characterVk(sc);
 		if (!vk) fail('source_key_without_vk', code);
+		ownVk.set(code, vk);
+	}
+	// A key's shortcut_key: it takes the named key's virtual key, which Windows
+	// matches its shortcuts on (shortcut-keys.cjs). Only a plain, non-keypad key
+	// with its own row can move; two keys of one virtual key share one row.
+	const movable = placedCodes.filter((code) => {
+		const sc = byCode.get(code);
+		return sc < 0x100 && !keypad(sc);
+	});
+	const firstOfVk = new Map();
+	for (const code of movable)
+		if (!firstOfVk.has(ownVk.get(code))) firstOfVk.set(ownVk.get(code), code);
+	const exchange = ShortcutKeys.exchangeVirtualKeys(
+		movable
+			.filter((code) => firstOfVk.get(ownVk.get(code)) === code)
+			.map((code) => ({ code, vk: ownVk.get(code) })),
+		ShortcutKeys.shortcutPairs(source)
+	);
+	for (const entry of exchange.refused)
+		omitted.push({ path: `keys.${entry.key}.shortcut_key`, reason: entry.reason });
+	for (const entry of exchange.displaced)
+		omitted.push({
+			path: `keys.${entry.by}.shortcut_key`,
+			reason: 'shortcut_key_displaces_virtual_key'
+		});
+	for (const code of placedCodes) {
+		const sc = byCode.get(code);
+		const e0 = e0Of(sc);
+		const fields = keyFields[code] || {};
+		const vk = exchange.vks.has(code) ? exchange.vks.get(code) : ownVk.get(code);
 		if (!e0 && vk !== defaultVk(sc)) {
 			if (keypad(sc)) fail('source_keypad_virtual_key', `keys.${code}`);
 			scancodes.push({ sc, vk });
@@ -1556,9 +1745,12 @@ function fromSource(source, options = {}) {
 			seen.set(key, entry);
 			rules.push(entry);
 		}
-		// Windows needs one entry: Space then types the terminator's first character.
+		// Windows needs one entry: Space then types the terminator's first
+		// character, or the dead key's own private character when the terminator
+		// is empty (Neo's chained dead keys), which `omitted` already says.
 		if (!rules.length) {
-			rules.push({ base: 0x20, result: unitsOf(dead.terminator)[0] });
+			const terminator = unitsOf(dead.terminator);
+			rules.push({ base: 0x20, result: terminator.length ? terminator[0] : deadUnit.get(dead.id) });
 			omitted.push({ path: `dead_keys.${dead.id}`, reason: 'dead_key_without_windows_rule' });
 		}
 		return Object.assign(
@@ -1579,6 +1771,12 @@ function fromSource(source, options = {}) {
 		if (sc >= 0x100) extra.scancodes_e0 = [{ sc: sc & 0xff, vk: C.VK.OEM_8 }];
 		else scancodes.push({ sc, vk: C.VK.OEM_8 });
 	}
+	// A JIS layout sends the input-method keys' virtual keys even where it types
+	// nothing on them, so the input method still reads them.
+	const jis = source.physical.keyboard === 'jis';
+	if (jis)
+		for (const sc of C.JIS_IME_SCANCODES)
+			if (!scancodes.some((move) => move.sc === sc)) scancodes.push({ sc, vk: C.JIS_VKS[sc] });
 	const model = {
 		format: Model.FORMAT,
 		version: Model.VERSION,
@@ -1590,6 +1788,7 @@ function fromSource(source, options = {}) {
 		copyright: windows.copyright || '',
 		company: windows.company || '',
 		flags: altgr ? ['altgr'] : [],
+		...(jis ? { keyboard_type: 'jis' } : {}),
 		columns,
 		scancodes,
 		keys,
@@ -1625,7 +1824,7 @@ module.exports = { toSource, fromSource, SourceMappingError };
  * Writes the four Windows keyboard layout DLL images of a kbd tables model
  * directly, with no compiler, linker or resource compiler, so a page or a PC
  * without the LLVM toolchain can build them. The tables are the C emitter's
- * (emit-c.cjs mainRows, modNumbers, scanTable), laid out as the C structures
+ * (emit-c.cjs mainRows, modNumbers; model.cjs scanTable), laid out as the C structures
  * that emitter declares: natural alignment, pointers of 4 bytes (x86) or 8
  * (x64, arm64, and wow64, whose kbd.h pointers are 64 bits wide in a 32-bit
  * image). The resources are the ones emitRc describes: string 1000 (the
@@ -1637,8 +1836,10 @@ module.exports = { toSource, fromSource, SourceMappingError };
  *    ordinal 1 returning &KbdTables, base relocations for every table pointer
  *    (HIGHLOW in a 32-bit image, DIR64 in a 64-bit one) and the PE checksum.
  * 2. The same code the clang build produces for KbdLayerDescriptor: mov eax /
- *    ret (x86), lea rax,[rip] / ret (x64), adrp / add / ret (arm64), which the
- *    independent reader (reader.cjs) decodes.
+ *    ret (x86), mov eax / cdq / ret (wow64: kbd.h returns a KBD_LONG_POINTER,
+ *    64 bits wide under BUILD_WOW6432, in EDX:EAX, as Microsoft's SysWOW64
+ *    layouts and the MSVC build do), lea rax,[rip] / ret (x64), adrp / add /
+ *    ret (arm64), which the independent reader (reader.cjs) decodes.
  * 3. Deterministic: the same model gives the same bytes (no timestamp).
  * ==============================================================================
  */
@@ -1753,7 +1954,7 @@ function tableObjects(model) {
 				flags: rule.dead ? C.DKF_DEAD : 0
 			});
 	const named = model.dead_keys.filter((dead) => dead.name);
-	const scan = Emit.scanTable(model);
+	const scan = Model.scanTable(model);
 	const objects = [];
 	const add = (name, alignment, write) => objects.push({ name, align: alignment, write });
 	const wchars = (area, text) => {
@@ -1876,8 +2077,8 @@ function tableObjects(model) {
 		a.u8(lgMax ? 4 + 2 * lgMax : 0);
 		a.pad(P.align);
 		ptr(lgMax ? 'aLigature' : null);
-		a.u32(C.KEYBOARD_TYPE);
-		a.u32(0);
+		a.u32(Model.keyboardType(model).type);
+		a.u32(Model.keyboardType(model).subtype);
 		a.pad(P.align);
 	});
 	return objects;
@@ -1946,7 +2147,10 @@ function rdata(model, image, rva) {
 /** KbdLayerDescriptor's code: return &KbdTables. */
 function descriptorCode(image, codeRva, tablesRva) {
 	if (image.machine === 0x014c) {
-		const code = Bytes.of([0xb8, 0, 0, 0, 0, 0xc3]);
+		// cdq: the wow64 descriptor is 64 bits wide, its high half EAX's sign (0 below 2 GB).
+		const code = Bytes.of(
+			image.width === 8 ? [0xb8, 0, 0, 0, 0, 0x99, 0xc3] : [0xb8, 0, 0, 0, 0, 0xc3]
+		);
 		Bytes.u32(code, image.base + tablesRva, 1);
 		return { code, relocations: [{ rva: codeRva + 1, type: REL_HIGHLOW }] };
 	}
@@ -2144,7 +2348,8 @@ function writeImage(model, arch) {
 	const image = IMAGES[arch];
 	if (!image) throw new Model.ModelError('kbd_arch_unknown', arch);
 	const codeRva = SECTION_ALIGN;
-	const codeSize = image.machine === 0x014c ? 6 : image.machine === 0x8664 ? 8 : 12;
+	const codeSize =
+		image.machine === 0x014c ? (image.width === 8 ? 7 : 6) : image.machine === 0x8664 ? 8 : 12;
 	const rdataRva = codeRva + align(codeSize, SECTION_ALIGN);
 	const data = rdata(model, image, rdataRva);
 	const code = descriptorCode(image, codeRva, data.tablesRva);
@@ -2246,12 +2451,83 @@ function writeDlls(input) {
 
 module.exports = { IMAGES, writeDlls, writeImage, peChecksum };
 	};
+	factories['./layout-ini.cjs'] = function (module, exports, require) {
+// tools/lib/kbd-dll/layout-ini.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Generic Installer Layout File
+ * DESCRIPTION:
+ * Writes the layout.ini the generic Windows layout installer
+ * (installer.cjs emitStubNsis) reads beside it: the layout file name, its
+ * language, its text and its publisher. The layout editor writes it in the
+ * page through the bundled DLL writer (_generated/kbd_dll_writer.js), so the
+ * site and the app build the same package.
+ *
+ * FEATURES & RATIONALE:
+ * 1. One exact shape: a [layout] section with four keys in a fixed order, in
+ *    UTF-16LE with a BOM and CRLF line ends; the installer rebuilds that text
+ *    from what it read and refuses any other file.
+ * 2. Fail fast: a name the installer would refuse (empty, too long, a control
+ *    character, a quote, « = » or a bracket, outer spaces) is refused here.
+ * 3. Pure: no file or process access.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const Model = require('./model.cjs');
+
+// The keys of layout.ini, in the order the installer rebuilds them.
+const STUB_INI_KEYS = Object.freeze(['dll_name', 'lcid', 'layout_text', 'company']);
+// The longest layout text and company name the installer accepts.
+const STUB_MAX_TEXT = 64;
+
+/**
+ * The layout.ini a generic installer reads beside it, for one model.
+ * @param {object} model - A checked kbd tables model.
+ * @returns {Uint8Array} UTF-16LE with a BOM and CRLF line ends.
+ * @throws {Error} kbd_installer_text: a name the installer would refuse.
+ */
+function layoutIni(model) {
+	Model.check(model);
+	const values = {
+		dll_name: model.dll_name,
+		lcid: model.lcid,
+		layout_text: model.layout_text,
+		company: model.company || 'Ergopti'
+	};
+	for (const key of ['layout_text', 'company'])
+		if (
+			values[key].length === 0 ||
+			values[key].length > STUB_MAX_TEXT ||
+			/[\u0000-\u001f"=[\]]/.test(values[key]) ||
+			values[key] !== values[key].trim()
+		)
+			throw new Error(`kbd_installer_text: ${key}`);
+	const text = ['[layout]', ...STUB_INI_KEYS.map((key) => `${key}=${values[key]}`), ''].join(
+		'\r\n'
+	);
+	const bytes = new Uint8Array(2 + text.length * 2);
+	bytes[0] = 0xff;
+	bytes[1] = 0xfe;
+	for (let i = 0; i < text.length; i++) {
+		const unit = text.charCodeAt(i);
+		bytes[2 + i * 2] = unit & 0xff;
+		bytes[3 + i * 2] = unit >> 8;
+	}
+	return bytes;
+}
+
+module.exports = { layoutIni, STUB_INI_KEYS, STUB_MAX_TEXT };
+	};
 	var Source = load('./source.cjs');
 	var Writer = load('./pe-writer.cjs');
 	return {
 		Model: load('./model.cjs'),
 		fromSource: Source.fromSource,
 		writeDlls: Writer.writeDlls,
-		IMAGES: Writer.IMAGES
+		IMAGES: Writer.IMAGES,
+		layoutIni: load('./layout-ini.cjs').layoutIni
 	};
 })();

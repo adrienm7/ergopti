@@ -30,7 +30,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
@@ -40,7 +40,7 @@ local NativePath = require("core.fs.engine.native_path")
 local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a parameter binding belongs to the tap-hold domain: the daemon runs
 --- tap actions under the binding "tap_hold"; per-key bindings keep its prefix.
@@ -101,7 +101,7 @@ function M.new(options)
 	local manager = options.manager or require("platform.remap.tap_hold_manager")
 	local loader = options.loader or require("platform.remap.tap_hold_loader")
 	local writer = options.writer or require("platform.remap.tap_hold_writer")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	local files = options.files or require("core.fs.adapters.file_system")
 	local owner, held, legacy, source, layer = {}, false, {}, nil, nil
 	local layer_debt = false
@@ -240,7 +240,7 @@ end
 local function paths()
 	_sequence = _sequence + 1
 	local stamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
-	local config_path = require("infra.config_paths").config("config.toml")
+	local config_path = require("settings.engine.paths").config("config.toml")
 	local tap_hold_path = require("platform.remap.tap_hold_manager").user_path()
 	return config_path, config_path .. ".tap_holds-" .. stamp .. ".bak",
 		tap_hold_path, tap_hold_path .. ".tap_holds-" .. stamp .. ".bak"

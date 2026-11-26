@@ -250,12 +250,13 @@ helpers.describe("layout manager bridge: the emulation follows a changed layout"
 	end)
 
 	helpers.it("(lmh-001-002-emulation-reload) the macOS host reloads the emulated layout and the menu", function()
-		local menu = assert(helpers.read_module_source("ui.menu"))
+		local menu = assert(helpers.read_module_source("menu.ui"))
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_layout_change_handler(function(id)')
 		helpers.assert_contains(menu, "if Emulation.status().id ~= id then return end")
 		local host = assert(helpers.read_module_source("ui.layout_manager"))
 		helpers.assert_contains(menu, 'require("ui.layout_manager").set_extension_reloader(function()')
-		helpers.assert_contains(host, "reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end")
+		helpers.assert_contains(host, "reload_extensions = function(id) return M._reload_extensions(id) end")
+		helpers.assert_contains(host, "return _extension_reloader ~= nil and _extension_reloader(id) == true")
 		helpers.assert_contains(host, "if _layout_change_handler then _layout_change_handler(id) end")
 	end)
 end)
@@ -396,6 +397,8 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 			helpers.assert_eq(payload.chars, { e = 7 }, "hotstring expansions are not keystrokes")
 			helpers.assert_eq(payload.bigrams, { es = 4 })
 			helpers.assert_eq(payload.trigrams, { est = 2 })
+			helpers.assert_eq(payload.final.chars, { e = 9 }, "the final text keeps the hotstring expansions")
+			helpers.assert_eq(payload.final.total, 9)
 		end)
 		package.loaded["hs.sqlite3"] = saved_sqlite
 		package.loaded["modules.keystats.sqlite_reader"] = saved_reader
@@ -409,6 +412,63 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 		helpers.assert_contains(host, 'read = require("modules.keystats.sqlite_reader").read_studio_ngrams,')
 		helpers.assert_contains(host, 'path = require("modules.keystats.log_manager").get_sqlite_path(),')
 		helpers.assert_contains(host, 'local rev = require("modules.keystats.export").get_db_rev()')
+		-- The saved read reaches the page first; the store is read on a later turn.
+		helpers.assert_contains(host, 'snapshot = require("modules.keystats.studio_snapshot").ports(),')
+		helpers.assert_contains(host, 'defer = function(work) DeferredWork.after(0, work, "layout_manager.read_keystats_fresh") end,')
+		helpers.assert_contains(host, "}, on_done)")
+	end)
+
+	helpers.it("the saved read goes through the atomic file port and is retired by name (studio-saved-read-first)", function()
+		local saved_fs, saved_snapshot = package.loaded["core.fs.adapters.file_system"], package.loaded["modules.keystats.studio_snapshot"]
+		local files, deleted = {}, {}
+		package.loaded["core.fs.adapters.file_system"] = {
+			read_with_status = function(path)
+				if files[path] == nil then return nil, "absent" end
+				return files[path], "ok"
+			end,
+			write = function(path, text) files[path] = text; return true end,
+			delete = function(path) deleted[#deleted + 1] = path; files[path] = nil; return true end,
+		}
+		package.loaded["modules.keystats.studio_snapshot"] = nil
+		local ok, err = pcall(function()
+			local Snapshot = require("modules.keystats.studio_snapshot")
+			local StudioNgrams = require("metrics.engine.view.studio_ngrams")
+			local ports = Snapshot.ports()
+			local path = StudioNgrams.snapshot_path("/Users/u/Library/Caches/Ergopti/dev/db.sqlite")
+			helpers.assert_eq(path, "/Users/u/Library/Caches/Ergopti/dev/" .. StudioNgrams.SNAPSHOT.file,
+				"the saved read sits beside db.sqlite")
+			helpers.assert_eq(select(2, ports.read(path)), "absent")
+			helpers.assert_true(ports.write(path, "x"))
+			helpers.assert_eq({ ports.read(path) }, { "x", "ok" })
+			helpers.assert_true(Snapshot.retire("/Users/u/Library/Caches/Ergopti/dev/db.sqlite"))
+			helpers.assert_eq(deleted, { path })
+			helpers.assert_true(Snapshot.retire(nil), "no store, nothing saved")
+		end)
+		package.loaded["core.fs.adapters.file_system"] = saved_fs
+		package.loaded["modules.keystats.studio_snapshot"] = saved_snapshot
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("the metrics purge, the dashboard reset and a rebuilt cache retire the saved read (studio-saved-read-purge)", function()
+		local manager = assert(helpers.read_module_source("modules.keystats.log_manager"))
+		local advance = manager:match("_advance_maintenance = function%(db, settled%)(.-)\nend\n")
+		helpers.assert_true(advance ~= nil, "_advance_maintenance must be found")
+		local found = advance:find("if found then", 1, true)
+		local retire = advance:find('require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path)', 1, true)
+		local finish = advance:find("return _finish_maintenance(request, retired)", 1, true)
+		helpers.assert_true(found ~= nil and retire ~= nil and finish ~= nil and found < retire and retire < finish,
+			"a committed purge reports success only once the saved read is gone")
+		local fresh = manager:find("local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil", 1, true)
+		local rebuilt = manager:find('if cache_was_fresh and not require("modules.keystats.studio_snapshot").retire(_paths.sqlite_path) then', 1, true)
+		helpers.assert_true(fresh ~= nil and rebuilt ~= nil and fresh < rebuilt,
+			"a rebuilt cache, whose revision starts again, drops the previous saved read")
+		local dashboard = assert(helpers.read_module_source("ui.metrics_typing"))
+		local reset = dashboard:match("local function reset_caches%(generation, webview%)(.-)\nend\n")
+		helpers.assert_true(reset ~= nil, "reset_caches must be found")
+		local removed = reset:find("local removed = Snapshot.remove()", 1, true)
+		local studio = reset:find('removed = require("modules.keystats.studio_snapshot").retire(_get_log_manager().get_sqlite_path())', 1, true)
+		helpers.assert_true(removed ~= nil and studio ~= nil and removed < studio,
+			"the dashboard reset retires the Studio's saved read with its own cache")
 	end)
 end)
 
@@ -569,6 +629,44 @@ helpers.describe("Ergopti Studio personal layouts through the controller (studio
 		helpers.assert_true(manager.on_message({ action = "studio_layouts", request = 1 }) == false)
 	end)
 
+	helpers.it("keeps the editor's workspace through the Studio window only (studio-editor-workspace)", function()
+		local saved = {}
+		local registry = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			source_open = function(on_done) on_done({}) end,
+			source_save = function(_, on_done) on_done(true) end,
+			studio_workspace_load = function(on_done) on_done(true, '{"schema":1,"tabs":[]}') end,
+			studio_workspace_save = function(payload, on_done)
+				saved[#saved + 1] = payload
+				on_done(false, "studio_write_failed", "disk full")
+			end,
+		}
+		local function controller(editor_window)
+			local pushes = {}
+			local instance = ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+				strings = function() return {} end, open_url = function() end, close = function() end,
+				log = function() end })
+			return instance, pushes
+		end
+		local instance, pushes = controller(true)
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(pushes[1].payload.studio_workspace == true)
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_load", request = 3 }) == true)
+		helpers.assert_eq(pushes[#pushes], { name = "studioWorkspace",
+			payload = { request = 3, ok = true, workspace = '{"schema":1,"tabs":[]}' } })
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_save", request = 4, text = '{"tabs":[]}' }) == true)
+		helpers.assert_eq(saved, { { text = '{"tabs":[]}', reset = false } })
+		helpers.assert_eq(pushes[#pushes], { name = "studioWorkspaceResult",
+			payload = { request = 4, ok = false, code = "studio_write_failed", detail = "disk full" } })
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_load" }) == false, "a request number is required")
+		local manager, manager_pushes = controller(false)
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_pushes[1].payload.studio_workspace == false)
+		helpers.assert_true(manager.on_message({ action = "studio_workspace_load", request = 1 }) == false)
+	end)
+
 	helpers.it("runs a built-in corpus's tables in the Studio page before answering (studio-corpus-tables)", function()
 		local events, run_result = {}, true
 		local registry = {
@@ -606,5 +704,70 @@ helpers.describe("Ergopti Studio personal layouts through the controller (studio
 			request = 1, id = "fr_swann" }) == false, "only the Studio window runs corpus tables")
 		helpers.assert_true(controller(true, nil).on_message({ action = "studio_corpus",
 			request = 1, id = "fr_swann" }) == false, "a host that cannot run a script refuses it")
+	end)
+end)
+
+helpers.describe("Layout editor export step (lua-export-host)", function()
+	local ExportStep = require("layouts.engine.composer.export_step")
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local defaults = Json.decode(assert(io.open(Paths.shared("layouts/data/defaults.json"), "rb")):read("*a"))
+
+	helpers.it("runs the shared adapter's steps on JSON text, bounded, and refuses anything else", function()
+		local settings = assert(ExportStep.settings(defaults))
+		local ok, output = ExportStep.run(settings, "read", '{"xml":"<keyboard/>"}')
+		helpers.assert_true(ok, tostring(output))
+		local result = Json.decode(output)
+		helpers.assert_eq(result.ok, false, "the adapter's own refusal is passed on as it is")
+		helpers.assert_eq(type(result.reason), "string")
+		for _, case in ipairs({ { "write", '{"xml":""}' }, { "read", "" }, { "read", "[1]" }, { "read", "{broken" },
+			{ nil, '{"xml":""}' } }) do
+			local refused, code = ExportStep.run(settings, case[1], case[2])
+			helpers.assert_eq(refused, false, tostring(case[1]) .. " " .. tostring(case[2]))
+			helpers.assert_eq(code, "target_export_refused")
+		end
+		local small = { max_bytes = 8, failure = settings.failure }
+		local over, code, detail = ExportStep.run(small, "read", '{"xml":"<keyboard/>"}')
+		helpers.assert_eq(over, false)
+		helpers.assert_eq(code, "target_export_refused")
+		helpers.assert_true(detail:find("bound", 1, true) ~= nil, detail)
+		helpers.assert_eq(ExportStep.settings({ source = { failures = {} } }), nil, "settings without a bound")
+	end)
+
+	helpers.it("the editor window answers lua_export with its request number, the manager refuses it", function()
+		local ManagerBridge = require("layouts.engine.manager_bridge")
+		local settings = assert(ExportStep.settings(defaults))
+		local registry = {
+			snapshot = function() return { platform = "test", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			source_export_step = function(payload, on_done) on_done(ExportStep.run(settings, payload.step, payload.input)) end,
+		}
+		local function controller(editor_window)
+			local pushes = {}
+			local instance = ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+				strings = function() return {} end, open_url = function() end, close = function() end,
+				log = function() end })
+			return instance, pushes
+		end
+		local instance, pushes = controller(true)
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(pushes[1].payload.lua_export == true, "the editor window offers lua_export")
+		helpers.assert_true(instance.on_message({ action = "lua_export", request = 3, step = "read",
+			input = '{"xml":"<keyboard/>"}' }) == true)
+		local answer = pushes[#pushes]
+		helpers.assert_eq(answer.name, "luaExportResult")
+		helpers.assert_eq(answer.payload.request, 3)
+		helpers.assert_eq(answer.payload.ok, true)
+		helpers.assert_eq(Json.decode(answer.payload.output).ok, false)
+		helpers.assert_true(instance.on_message({ action = "lua_export", request = 4, step = "write", input = "{}" }) == true)
+		helpers.assert_eq(pushes[#pushes].payload, { request = 4, ok = false, code = "target_export_refused",
+			detail = "the export step is not read or xkb" })
+		helpers.assert_true(instance.on_message({ action = "lua_export", step = "read", input = "{}" }) == false,
+			"a request number is required")
+		local manager, manager_pushes = controller(false)
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_pushes[1].payload.lua_export == false)
+		helpers.assert_true(manager.on_message({ action = "lua_export", request = 1, step = "read", input = "{}" }) == false)
 	end)
 end)

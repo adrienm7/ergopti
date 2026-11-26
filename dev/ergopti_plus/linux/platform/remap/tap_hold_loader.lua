@@ -48,7 +48,7 @@ local TomlCodec = require("core.text.engine.toml_codec")
 local Writer = require("core.text.engine.toml_codec.writer")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Outdated = require("settings.engine.migration.outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local Migration = require("platform.remap.tap_hold_migration")
@@ -246,7 +246,7 @@ function M.preset_keys(defaults_path)
 end
 
 --- The config.toml beside a tap_hold.toml, where the switch and the timings
---- live: infra/config_paths.lua keeps every configuration file of a folder
+--- live: settings/engine/paths.lua keeps every configuration file of a folder
 --- together.
 --- @param path string The tap_hold.toml path.
 --- @return string

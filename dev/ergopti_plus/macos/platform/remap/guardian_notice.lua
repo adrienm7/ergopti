@@ -29,10 +29,14 @@
 ---    announces itself twice.
 --- ==============================================================================
 
+local AppDirs = require("core.fs.engine.app_dirs")
+
 local M = {}
 
 local REQUIRES_APPROVAL = "requires_approval"
 local UNAVAILABLE = "unavailable"
+-- The launcher writes its log to the default logs folder whatever LogsDirPath says.
+local LAUNCHER_LOG = "~/" .. AppDirs.macos.relative .. "/" .. AppDirs.macos.launcher_log
 
 --- Creates the notice owned by one remap bridge lifecycle.
 --- @param deps table { notify = fn(msg, body, kind, on_click), text = fn(key) -> string,
@@ -93,8 +97,8 @@ function M.new(deps)
 		if status == UNAVAILABLE and logged ~= status then
 			deps.logger.error(deps.log,
 				"Remap guardian status is '%s': the background helper is not registered, so tap-holds and remaps"
-					.. " stay inert; ~/Library/Logs/Ergopti/launcher.log names the registration cause.",
-				status)
+					.. " stay inert; %s names the registration cause.",
+				status, LAUNCHER_LOG)
 		end
 		logged = status
 		if status == REQUIRES_APPROVAL and deps.present_approval() == true then

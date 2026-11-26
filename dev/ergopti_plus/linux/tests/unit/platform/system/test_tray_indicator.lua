@@ -42,6 +42,49 @@ local function fake_binding()
 		return w
 	end
 
+	--- One "activate" emission: GTK's class handler toggles a check item once,
+	--- then every unblocked handler runs in connection order.
+	--- @param instance table
+	--- @return function
+	local function activation(instance)
+		return function()
+			if instance.kind == "check" then instance.active = instance.active == 1 and 0 or 1 end
+			local handlers = {}
+			for index, connected in ipairs(instance.handlers or {}) do handlers[index] = connected end
+			for _, connected in ipairs(handlers) do
+				if not connected.blocked then connected.handler(instance, connected.data) end
+			end
+		end
+	end
+
+	--- Adds a child to a menu shell: at a 0-based position, as gtk_menu_shell_insert
+	--- does, or last, as gtk_menu_shell_append does.
+	--- @param shell table
+	--- @param child table
+	--- @param position integer|nil
+	local function attach(shell, child, position)
+		log.appends[#log.appends + 1] = { shell = shell, child = child, position = position }
+		-- libdbusmenu-gtk exports a check item when it is added to a menu:
+		-- toggle-type from draw-as-radio, toggle-state from active, and an
+		-- activate handler connected after the row's own that publishes
+		-- toggle-state only when it changes (parser.c).
+		if child.kind == "check" then
+			local export = { toggle_type = child.draw_as_radio and "radio" or "checkmark",
+				toggle_state = child.active, updates = 0 }
+			child.export = export
+			child.handlers = child.handlers or {}
+			child.handlers[#child.handlers + 1] = { handler = function()
+				if export.toggle_state ~= child.active then
+					export.toggle_state, export.updates = child.active, export.updates + 1
+				end
+			end }
+			child.activate = activation(child)
+		end
+		shell.children = shell.children or {}
+		table.insert(shell.children, position and position + 1 or #shell.children + 1, child)
+		child.parent = shell
+	end
+
 	local gtk = {
 		gtk_menu_new = function() return widget("menu") end,
 		gtk_menu_item_new_with_label = function(label) return widget("item", label) end,
@@ -51,27 +94,44 @@ local function fake_binding()
 			-- GTK implements a changed programmatic check through activate too.
 			if w.active ~= active and w.activate then w.activate() else w.active = active end
 		end,
+		gtk_check_menu_item_set_draw_as_radio = function(w, radio) w.draw_as_radio = radio == 1 end,
 		gtk_menu_item_set_submenu = function(item, submenu)
 			log.submenus[#log.submenus + 1] = { item = item, submenu = submenu }
 			item.submenu = submenu
 		end,
-		gtk_menu_shell_append = function(shell, child)
-			log.appends[#log.appends + 1] = { shell = shell, child = child }
-			shell.children = shell.children or {}
-			shell.children[#shell.children + 1] = child
-			child.parent = shell
-		end,
+		gtk_menu_shell_append = function(shell, child) attach(shell, child, nil) end,
+		gtk_menu_shell_insert = function(shell, child, position) attach(shell, child, position) end,
 		gtk_widget_set_sensitive = function(w, sensitive) w.sensitive = sensitive end,
 		gtk_widget_show_all = function() log.calls[#log.calls + 1] = "show_all" end,
 		gtk_widget_show = function(w) w.shown = true end,
 		gtk_widget_destroy = function(w)
-			w.destroyed = true
+			-- GTK destroys a row's submenu and a menu's rows along with it.
+			local function release(node)
+				node.destroyed = true
+				if node.submenu then release(node.submenu) end
+				for _, child in ipairs(node.children or {}) do release(child) end
+			end
+			release(w)
 			local siblings = w.parent and w.parent.children or {}
 			for index, child in ipairs(siblings) do
 				if child == w then table.remove(siblings, index) break end
 			end
 		end,
 		gtk_init_check = function() return 1 end,
+		-- The status window: one window and its label, recorded.
+		gtk_window_new = function() return widget("window") end,
+		gtk_window_set_title = function(w, title) w.title = title end,
+		gtk_window_set_position = function() end,
+		gtk_window_set_default_size = function() end,
+		gtk_container_set_border_width = function() end,
+		gtk_label_new = function(text) return widget("label", text) end,
+		gtk_label_set_text = function(w, text) w.label = text end,
+		gtk_label_set_line_wrap = function() end,
+		gtk_label_set_max_width_chars = function() end,
+		gtk_label_set_selectable = function() end,
+		gtk_container_add = function(window, child) window.child = child end,
+		gtk_window_present = function() end,
+		gtk_widget_hide_on_delete = function() end,
 		gtk_events_pending = function()
 			log.pending_polls = (log.pending_polls or 0) + 1
 			-- Two events then quiet, so the drain both runs and terminates.
@@ -110,10 +170,9 @@ local function fake_binding()
 				if not entry.blocked then return handler(instance, data) end
 			end
 			if signal == "activate" then
-				-- A parent row's activate opens its submenu; GTK runs every
-				-- handler of the signal, so the fake chains them too.
-				local previous = instance.activate
-				instance.activate = previous and function() previous(); entry.fire() end or entry.fire
+				instance.handlers = instance.handlers or {}
+				instance.handlers[#instance.handlers + 1] = entry
+				instance.activate = activation(instance)
 			else
 				instance[signal] = entry.fire
 			end
@@ -154,7 +213,7 @@ end
 --- Loads the indicator with a recording backend.
 --- @return table indicator, table log
 local function with_fake()
-	local ind = helpers.load_module("platform.tray.appindicator")
+	local ind = helpers.load_module("tray.adapters.appindicator")
 	local binding, log = fake_binding()
 	ind._set_binding_for_test(binding)
 	return ind, log
@@ -227,6 +286,21 @@ helpers.describe("tray indicator: creation", function()
 		ind._set_binding_for_test(nil)
 	end)
 
+	helpers.it("shows each problem's own text in the one status window", function()
+		-- Two tray problem rows share the window; the second opened with the
+		-- first one's explanation.
+		local ind, log = with_fake()
+		ind.create("ergopti-plus", "input-keyboard", "Ergopti+")
+		helpers.assert_true(ind.show_window("Windows", "Install lua51-lgi"))
+		helpers.assert_true(ind.show_window("Keyboard", "Log out and back in"))
+		local windows = {}
+		for _, w in ipairs(log.widgets) do if w.kind == "window" then windows[#windows + 1] = w end end
+		helpers.assert_eq(#windows, 1, "the window is reused")
+		helpers.assert_eq(windows[1].title, "Keyboard")
+		helpers.assert_eq(windows[1].child.label, "Log out and back in")
+		ind._set_binding_for_test(nil)
+	end)
+
 	helpers.it("is idempotent", function()
 		local ind, log = with_fake()
 		ind.create("ergopti-plus", "input-keyboard", "Ergopti+")
@@ -237,7 +311,7 @@ helpers.describe("tray indicator: creation", function()
 	end)
 
 	helpers.it("reports unavailability instead of pretending", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		ind._set_binding_for_test(false)
 		helpers.assert_eq(ind.is_available(), false, "no library means no tray")
 		helpers.assert_eq(ind.create("x", "y", "z"), false,
@@ -468,7 +542,7 @@ helpers.describe("tray indicator: pump", function()
 	end)
 
 	helpers.it("is bounded even when events never stop arriving", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		local binding, log = fake_binding()
 		binding.gtk.gtk_events_pending = function() return 1 end
 		ind._set_binding_for_test(binding)
@@ -528,7 +602,7 @@ helpers.describe("tray indicator: destroy", function()
 	end)
 
 	helpers.it("refused extra-item removal retains its native handle and actions for retry", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		local binding, log = fake_binding()
 		ind._set_binding_for_test(binding)
 		local clicks = 0
@@ -644,7 +718,12 @@ helpers.describe("tray indicator: lazy submenus and in-place rows", function()
 		ind.destroy(); ind._set_binding_for_test(nil)
 	end)
 
-	helpers.it("(tray-lazy) a changed title rebuilds only its own submenu", function()
+	-- libdbusmenu-glib announces every layout change on the root (parent 0) and
+	-- KDE Plasma then refetches the root's own rows only: a submenu it already
+	-- holds is fetched again only under a NEW row id. The field report of
+	-- 2026-11-25 (Arch, Plasma 6, Wayland): after one click the next ones did
+	-- nothing until Reload, because the submenu was rebuilt under its old row.
+	helpers.it("(tray-stale-submenu) a reshaped open submenu replaces its top-level row in place", function()
 		local ind, log = with_fake()
 		ind.create("id", "icon", "title")
 		local counter = { toggled = 0, slot = 0 }
@@ -654,16 +733,63 @@ helpers.describe("tray indicator: lazy submenus and in-place rows", function()
 		open(log, "Section 3")
 		local renamed_slot = widget_named(log, "Slot 1.5")
 		local kept = widget_named(log, "Slot 3.5")
-		local top = widget_named(log, "Section 1")
+		local top, sibling = widget_named(log, "Section 1"), widget_named(log, "Section 3")
 		tree = big_tree(false, counter)
 		tree[2].menu[5].title = "Renamed slot"
 		ind.set_menu(tree)
-		helpers.assert_true(renamed_slot.destroyed, "the changed submenu was rebuilt")
+		local replaced = widget_named(log, "Section 1")
+		helpers.assert_true(top.destroyed and replaced ~= top,
+			"the top-level row holding the reshaped submenu is a new row: a new id for the panel's root refresh")
+		helpers.assert_true(log.menu.children[2] == replaced, "at the same place in the root menu")
+		helpers.assert_eq(#rows_of(log.menu), 4, "no row is added or lost")
+		helpers.assert_true(renamed_slot.destroyed, "the stale submenu went with its row")
+		helpers.assert_nil(widget_named(log, "Renamed slot"), "the new submenu is built when it is opened")
+		open(log, "Section 1")
 		helpers.assert_eq(widget_named(log, "Renamed slot").shown, true)
-		helpers.assert_true(not kept.destroyed, "an unchanged submenu keeps its widgets")
-		helpers.assert_true(widget_named(log, "Section 1") == top, "the parent row itself stays")
+		helpers.assert_true(not kept.destroyed and widget_named(log, "Section 3") == sibling,
+			"an unchanged submenu keeps its row and its widgets")
 		renamed_slot.activate()
 		helpers.assert_eq(counter.slot, 0, "a destroyed row runs nothing")
+		widget_named(log, "Renamed slot").activate()
+		helpers.assert_eq(counter.slot, 1, "the new row runs its action")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-submenu) a reshape two submenus deep replaces the top-level ancestor", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local function tree(label)
+			return { { title = "Group", menu = { { title = "Inner", menu = { { title = label, fn = function() end } } } } },
+				{ title = "Other", menu = { { title = "Other child", fn = function() end } } } }
+		end
+		ind.set_menu(tree("Before"))
+		open(log, "Group")
+		open(log, "Inner")
+		open(log, "Other")
+		local group, inner, other = widget_named(log, "Group"), widget_named(log, "Inner"), widget_named(log, "Other")
+		ind.set_menu(tree("After"))
+		helpers.assert_true(group.destroyed and inner.destroyed,
+			"a panel refreshes no submenu it holds under an unchanged id, at any depth")
+		helpers.assert_true(widget_named(log, "Other") == other, "the sibling top-level row stays")
+		helpers.assert_true(log.menu.children[1] == widget_named(log, "Group"), "the new row takes the old one's place")
+		ind.destroy(); ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-submenu) a check change in an open submenu keeps every row", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local function tree(on)
+			return { { title = "Group", checked = on, menu = { { title = "Switch", checked = on, fn = function() end },
+				{ title = "Child", disabled = not on, fn = function() end } } } }
+		end
+		ind.set_menu(tree(true))
+		open(log, "Group")
+		local group, switch, child = widget_named(log, "Group"), widget_named(log, "Switch"), widget_named(log, "Child")
+		ind.set_menu(tree(false))
+		helpers.assert_true(widget_named(log, "Group") == group and widget_named(log, "Switch") == switch
+			and widget_named(log, "Child") == child, "a same-shaped submenu is updated in place")
+		helpers.assert_eq(switch.active, 0)
+		helpers.assert_eq(child.sensitive, 0)
 		ind.destroy(); ind._set_binding_for_test(nil)
 	end)
 
@@ -805,5 +931,166 @@ helpers.describe("tray indicator: authoritative checks", function()
 		helpers.assert_eq(calls, 100)
 		helpers.assert_eq(widget_named(log, "Refused").active, 0)
 		indicator.destroy()
+	end)
+end)
+
+helpers.describe("tray indicator: dbusmenu toggle export (tray-radio-export)", function()
+	helpers.it("(tray-hover-keeps-check) hovering a checked submenu row keeps its tick", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local runs = 0
+		indicator.set_menu({ { title = "Hotstrings", checked = true, menu = {
+			{ title = "Inside", fn = function() runs = runs + 1 end } } } })
+		local parent = widget_named(log, "Hotstrings")
+		-- Plasma sends AboutToShow on hover; libdbusmenu-gtk turns it into activate.
+		for _ = 1, 3 do open(log, "Hotstrings") end
+		helpers.assert_eq(parent.active, 1, "a hover is not a click: the feature must stay ticked")
+		helpers.assert_eq(parent.export.toggle_state, 1, "the panel is told the published tick")
+		helpers.assert_true(widget_named(log, "Inside") ~= nil, "the hover still opens the submenu")
+		helpers.assert_eq(runs, 0)
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-hover-keeps-check) an activated disabled or inert check row keeps its mark", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "Input source", checked = true, disabled = true, fn = function() end },
+			{ title = "Status", checked = false } })
+		widget_named(log, "Input source").activate()
+		widget_named(log, "Status").activate()
+		helpers.assert_eq(widget_named(log, "Input source").active, 1)
+		helpers.assert_eq(widget_named(log, "Status").active, 0)
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-stale-check) a click that changes nothing republishes the row's mark", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "None", checked = true, radio = true, fn = function() return true end } })
+		local row = widget_named(log, "None")
+		local before = row.export.updates
+		row.activate()
+		helpers.assert_eq(row.active, 1)
+		helpers.assert_true(row.export.updates > before,
+			"a panel that unticked the row locally must receive its toggle-state again")
+		helpers.assert_eq(row.export.toggle_state, 1, "the last exported state is the published one")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-radio-export) a single-choice group is exported as radio items", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "A", checked = true, radio = true, fn = function() end },
+			{ title = "Switch", checked = true, fn = function() end } })
+		helpers.assert_eq(widget_named(log, "A").export.toggle_type, "radio")
+		helpers.assert_eq(widget_named(log, "Switch").export.toggle_type, "checkmark",
+			"an independent switch stays a checkmark")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-radio-export) exactly one row is ticked after any sequence of clicks", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local current = "none"
+		local function tree()
+			local rows = {}
+			for _, value in ipairs({ "none", "ergopti", "bepo" }) do
+				rows[#rows + 1] = { title = value, checked = current == value, radio = true,
+					fn = function() current = value end }
+			end
+			return { { title = "Layout to emulate: " .. current, menu = rows } }
+		end
+		-- The rows of the submenu the panel shows now (GTK destroys a replaced
+		-- submenu with its parent row).
+		local function choice(name)
+			for _, child in ipairs(rows_of(widget_named(log, "Layout to emulate: " .. current).submenu)) do
+				if child.label == name then return child end
+			end
+			error("no choice " .. name)
+		end
+		indicator.set_menu(tree())
+		for _, value in ipairs({ "bepo", "bepo", "none", "ergopti", "none", "none" }) do
+			open(log, "Layout to emulate: " .. current)
+			choice(value).activate()
+			indicator.set_menu(tree())
+			open(log, "Layout to emulate: " .. current)
+			local ticked = {}
+			for _, name in ipairs({ "none", "ergopti", "bepo" }) do
+				local widget = choice(name)
+				if widget.active == 1 then ticked[#ticked + 1] = name end
+				helpers.assert_eq(widget.export.toggle_state, widget.active, name .. " exported as drawn")
+				helpers.assert_eq(widget.export.toggle_type, "radio")
+			end
+			helpers.assert_eq(table.concat(ticked, ","), value, "after choosing " .. value)
+		end
+		indicator.destroy(); indicator._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(emulation-quick-picker) the recent layouts export as one radio group above « Others… »", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local EmulationRows = require("layouts.engine.emulation.menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
+		local index = { layouts = { { id = "ergopti", name = "Ergopti" }, { id = "bepo", name = "bépo" },
+			{ id = "ergol", name = "Ergo-L" }, { id = "qwerty_lafayette", name = "Lafayette" } } }
+		local current, recents, opened = "ergol", { "ergol", "bepo", "ergopti" }, 0
+		local function tree()
+			local data = EmulationRows.choice_rows({ t = function(key) return key end,
+				settings = { id = current ~= "none" and current or nil, recents = recents },
+				snapshot = { index = index },
+				choose = function(choice)
+					current = choice
+					recents = require("layouts.engine.emulation.recents").after(recents, choice)
+				end,
+				open_picker = function() opened = opened + 1 end, others_rows = function(open)
+					return ManifestMenu.template_rows("layout_emulation_others_commands", { layout_emulation_others = open }, {}, {})
+				end })
+			return ManifestMenu.render_rows(data, "layout_emulation")
+		end
+		-- The rows of the « Layout to emulate » submenu the panel shows now.
+		local function submenu()
+			for _, widget in ipairs(log.widgets) do
+				if widget.submenu and not widget.destroyed and type(widget.label) == "string"
+						and widget.label:find("menu.layout.emulated_layout", 1, true) == 1 then
+					widget.activate()
+					return rows_of(widget.submenu)
+				end
+			end
+			error("no « Layout to emulate » row")
+		end
+		indicator.set_menu(tree())
+		for _, value in ipairs({ "bépo", "onboarding.layout.emulated_none", "onboarding.layout.emulated_ergopti", "Ergo-L" }) do
+			local rows = submenu()
+			local names, ticked, others = {}, {}, nil
+			for _, child in ipairs(rows) do
+				if child.kind == "check" then
+					helpers.assert_eq(child.export.toggle_type, "radio", child.label .. " is one choice of the group")
+					names[#names + 1] = child.label
+					if child.active == 1 then ticked[#ticked + 1] = child.label end
+				elseif child.kind == "item" then
+					helpers.assert_eq(child.label, require("core.i18n.engine.i18n").get("menu.layout.emulation_others"))
+					helpers.assert_nil(child.export, "« Others… » exports no toggle")
+					others = child
+				end
+			end
+			helpers.assert_true(#names <= 4, "None and the three layouts chosen last")
+			helpers.assert_eq(names[1], "onboarding.layout.emulated_none")
+			helpers.assert_eq(#ticked, 1, "exactly one row of the group is ticked")
+			helpers.assert_true(others ~= nil and rows[#rows] == others, "« Others… » closes the submenu")
+			helpers.assert_eq(rows[#rows - 1].kind, "separator", "after a separator")
+			local target = nil
+			for _, child in ipairs(rows) do if child.label == value then target = child end end
+			assert(target, "no quick choice " .. value)
+			target.activate()
+			indicator.set_menu(tree())
+			local after = {}
+			for _, child in ipairs(submenu()) do
+				if child.kind == "check" and child.active == 1 then after[#after + 1] = child.label end
+			end
+			helpers.assert_eq(table.concat(after, ","), value, "the click's choice is the one ticked")
+		end
+		submenu()[#submenu()].activate()
+		helpers.assert_eq(opened, 1, "« Others… » opens the picker")
+		indicator.destroy(); indicator._set_binding_for_test(nil)
 	end)
 end)

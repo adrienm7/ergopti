@@ -20,13 +20,15 @@
 #Include ../../core/logger/engine/tick_count.ahk
 #Include ../../core/logger/engine/wall_clock.ahk
 #Include ../../core/logger/engine/logger.ahk
+#Include ../../core/text/engine/toml/helpers.ahk
+#Include ../../core/timing/engine/config.ahk
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/crypto/crypto.ahk
 #Include ../../core/ui/adapters/webview_profiles.ahk
 #Include ../../core/ui/engine/webview/utils.ahk
-#Include ../../infra/config_transition.ahk
-#Include ../../infra/config_transition_runtime.ahk
+#Include ../../settings/engine/migration/transition.ahk
+#Include ../../settings/engine/migration/transition_runtime.ahk
 #Include ../../core/lifecycle/engine/reload/terminal_handoff.ahk
 #Include ../../modules/keystats/keystats_json.ahk
 #Include ../../modules/keystats/keystats_walker_core.ahk
@@ -46,9 +48,16 @@ class _MVSP_PassiveCoreProbe {
 global _MVSP := {Phase: "arguments", Root: "", Profile: "", Gui: 0, Controller: 0,
 	View: 0, Sender: 0, HostSubscription: 0, ObserverSubscription: 0, BrowserHandle: 0,
 	BrowserPid: 0, BrowserRetired: false, ProfileRetired: false, Closed: false,
-	NativeValid: false, Received: false, AsyncError: 0, Calls: 0, Spawns: 0, Starts: 0, Stops: 0, Receipt: Map()}
+	NativeValid: false, Received: false, AsyncError: 0, Calls: 0, Spawns: 0, Starts: 0, Stops: 0, Receipt: Map(),
+	ControllerAt: 0, NavigatedAt: 0, NavigationSubscription: 0, ProcessSubscription: 0}
 global _ConfigDir := ""
+; How long a terminated browser may take to exit, and its profile to be
+; deleted after it, on a saturated runner (see _MVSP_AwaitExit).
+global _MVSP_RETIREMENT_MS := 40000
 OnError(_MVSP_Error)
+; The profile owner retries a deletion a descendant still blocks after a
+; registry delay (webview_profile_cleanup_ms), as the driver does after boot.
+TimingsLoadShared(A_ScriptDir . "\..\..\..\_shared")
 OnExit(_MVSP_Exit)
 _MVSP_Main()
 
@@ -184,6 +193,20 @@ _MVSP_ObserveOther(Sender, Args) {
 	Other.Received := true
 }
 
+; The default page posts its message once loaded, so a navigation that fails, or
+; a browser process that dies, can never deliver it: each fails at once with its
+; WebView2 status instead of waiting for the deadline.
+_MVSP_Navigated(Sender, Args) {
+	global _MVSP
+	_MVSP.NavigatedAt := A_TickCount
+	if !Args.IsSuccess
+		_MVSP_Error(Error("The private document navigation failed (web error status " . Args.WebErrorStatus . ")."))
+}
+
+_MVSP_ProcessFailed(Sender, Args) {
+	_MVSP_Error(Error("A WebView2 process failed before the native message (kind " . Args.ProcessFailedKind . ")."))
+}
+
 _MVSP_Navigation(State, Sender, Args) {
 	_MVSP_Require(Args.IsSuccess, "The actual private document navigation failed.")
 	State.Done := true
@@ -277,10 +300,27 @@ _MVSP_RetireOtherBrowser() {
 	if State == 258 {
 		_MVSP_Require(DllCall("TerminateProcess", "Ptr", Other.BrowserHandle, "UInt", 0),
 			"The unexpected second browser could not be retired.")
-		State := DllCall("WaitForSingleObject", "Ptr", Other.BrowserHandle, "UInt", 5000, "UInt")
+		State := _MVSP_AwaitExit(Other.BrowserHandle)
 	}
 	_MVSP_Require(State == 0, "The unexpected second browser exit was not observed.")
 	DllCall("CloseHandle", "Ptr", Other.BrowserHandle), Other.BrowserHandle := 0
+}
+
+; Waits for a terminated process to exit, pumping messages so the WebView2
+; exit events still reach their owners. A terminated process exits only once
+; each of its threads runs its own rundown: on a runner whose cores the other
+; test workers saturate, the browser took 10 to 20 s, past the former 5 s bound,
+; and the child then exited with descendants still holding its Job.
+; @param Handle {Integer} A SYNCHRONIZE handle of the terminated process.
+; @returns {Integer} The last WaitForSingleObject result, 0 once it exited.
+_MVSP_AwaitExit(Handle) {
+	Started := A_TickCount
+	loop {
+		State := DllCall("WaitForSingleObject", "Ptr", Handle, "UInt", 0, "UInt")
+		if State != 258 || TickElapsed(Started) >= _MVSP_RETIREMENT_MS
+			return State
+		Sleep(10)
+	}
 }
 
 _MVSP_Error(Failure, *) {
@@ -294,7 +334,13 @@ _MVSP_Error(Failure, *) {
 
 _MVSP_Deadline() {
 	global _MVSP
-	FileAppend("Native metrics sender prerequisite deadline at " . _MVSP.Phase . ".`n", "**", "UTF-8-RAW")
+	; Name where the time went: a stall before the page loaded is not one after.
+	Detail := ""
+	if _MVSP.HasOwnProp("ControllerAt") && _MVSP.ControllerAt
+		Detail := " (" . TickElapsed(_MVSP.ControllerAt) . " ms since the controller request; "
+			. (_MVSP.NavigatedAt ? "navigation completed after " . TickElapsed(_MVSP.ControllerAt, _MVSP.NavigatedAt) . " ms"
+			: "navigation never completed") . ")"
+	FileAppend("Native metrics sender prerequisite deadline at " . _MVSP.Phase . Detail . ".`n", "**", "UTF-8-RAW")
 	ExitApp(2)
 }
 
@@ -339,6 +385,7 @@ _MVSP_Main() {
 		_MVSP.Gui.Show("w480 h320 NoActivate")
 		_MVSP.Phase := "controller"
 		SetTimer(_MVSP_Deadline, -30000)
+		_MVSP.ControllerAt := A_TickCount
 		_MVSP.Controller := WebView2.create(_MVSP.Gui.Hwnd, , 0, _MVSP.Profile, "", 0,
 			A_ScriptDir . "\..\..\vendor\64bit\WebView2Loader.dll")
 		_MVSP.View := _MVSP.Controller.CoreWebView2
@@ -370,8 +417,11 @@ _MVSP_Main() {
 		_MVSP.Phase := "native-message"
 		if _MVSP.Mode == "other-core"
 			_MVSP_RunOtherCore()
-		else
+		else {
+			_MVSP.NavigationSubscription := _MVSP.View.NavigationCompleted(_MVSP_Navigated)
+			_MVSP.ProcessSubscription := _MVSP.View.ProcessFailed(_MVSP_ProcessFailed)
 			_MVSP.View.Navigate(_MVSP.Url)
+		}
 		while !_MVSP.Received
 			Sleep(10)
 		if IsObject(_MVSP.AsyncError)
@@ -433,6 +483,8 @@ _MVSP_Close() {
 	SetTimer(_MVSP_Deadline, 0)
 	_MVSP_CloseOther()
 	_MVSP.HostSubscription := 0, _MVSP.ObserverSubscription := 0
+	; The controller's own retirement below ends its browser: not a failure.
+	_MVSP.NavigationSubscription := 0, _MVSP.ProcessSubscription := 0
 	KLWV.windows := Map()
 	if _MVSP.HasOwnProp("Entry")
 		_MVSP.Entry := 0
@@ -447,16 +499,19 @@ _MVSP_Close() {
 		_MVSP.Gui.Destroy()
 	if _MVSP.BrowserHandle {
 		State := DllCall("WaitForSingleObject", "Ptr", _MVSP.BrowserHandle, "UInt", 0, "UInt")
+		WaitStarted := A_TickCount
 		if State == 258 {
 			_MVSP_Require(DllCall("TerminateProcess", "Ptr", _MVSP.BrowserHandle, "UInt", 0),
 				"The exact private browser could not be terminated.")
-			State := DllCall("WaitForSingleObject", "Ptr", _MVSP.BrowserHandle, "UInt", 5000, "UInt")
+			State := _MVSP_AwaitExit(_MVSP.BrowserHandle)
 		}
-		_MVSP_Require(State == 0, "The owned browser process exit was not observed.")
+		_MVSP_Require(State == 0, "The owned browser process exit was not observed within "
+			. TickElapsed(WaitStarted) . " ms of its termination (wait " . State . ").")
 		DllCall("CloseHandle", "Ptr", _MVSP.BrowserHandle), _MVSP.BrowserHandle := 0
 		_MVSP.BrowserRetired := true
 		Started := A_TickCount
-		while (DirExist(_MVSP.Profile) || FileExist(_MVSP.Profile . ".retired")) && TickElapsed(Started) < 5000
+		while (DirExist(_MVSP.Profile) || FileExist(_MVSP.Profile . ".retired"))
+				&& TickElapsed(Started) < _MVSP_RETIREMENT_MS
 			Sleep(10)
 		_MVSP_Require(!DirExist(_MVSP.Profile) && !FileExist(_MVSP.Profile . ".retired"),
 			"The native browser exit did not retire its private profile.")

@@ -27,7 +27,7 @@
 ;   split (334b5c04a) turned hotstring_prefix_watcher.ahk and
 ;   hotstring_engine_main.ahk into thin shims that #Include their sub-modules
 ;   (hotstring_inputhook.ahk and hotstring_dispatch.ahk respectively), so both
-;   FileReads below are folded together with infra/hotstrings dir concat.
+;   FileReads below are folded together with hotstrings/engine dir concat.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -63,18 +63,29 @@ _MetaCheckInputSerialization() {
 	; RemapKey must BIND _RemapEmit, not a bare reorder-prone SendEvent lambda.
 	Assert(InStr(Lay, "_RemapEmit.Bind("),
 		"RemapKey must bind _RemapEmit for its remap hotkeys")
+	; The plain press tries the held key first (« Touches de jeu »), under the
+	; same Critical, and falls back to the serialized emit.
+	Assert(InStr(Lay, "_RemapHeldEmit.Bind(ScanCode"),
+		"RemapKey must bind _RemapHeldEmit for its plain-press hotkeys")
+	Held := _DriverFuncBody("_RemapHeldEmit")
+	Assert(Held != "", "layout.ahk must define _RemapHeldEmit(ScanCode, SendStr, KeyChar, *)")
+	HeldCrit := InStr(Held, 'Critical("On")')
+	Assert(HeldCrit > 0 && HeldCrit < InStr(Held, "GameKeys_TryHold("),
+		"_RemapHeldEmit must enter Critical before it sends a held key")
+	Assert(InStr(Held, "_RemapEmit(SendStr, KeyChar)"),
+		"_RemapHeldEmit must fall back to the serialized _RemapEmit")
 	Assert(!InStr(Lay, '(*) => SendEvent("{Blind}"'),
 		"the bare '(*) => SendEvent(...)' per-key remap must be gone -- it reorders under fast typing")
 
 	; --- Watcher: the match -> fire -> buffer region must be Critical ---
-	WatcherFile := WindowsDir . "\infra\hotstrings\hotstring_prefix_watcher.ahk"
+	WatcherFile := WindowsDir . "\hotstrings\engine\matcher\prefix_watcher.ahk"
 	WShim := ""
 	try WShim := FileRead(WatcherFile)
 	Assert(WShim != "", "hotstring_prefix_watcher.ahk must be readable")
 	; hotstring_prefix_watcher.ahk is a shim (#Include hotstring_inputhook.ahk +
 	; hotstring_registry.ahk) -- _OnPrefixChar / _PrefixRenderFlush live in the
-	; included sub-module, so fold in the whole infra/hotstrings dir.
-	W := WShim . _DriverDirConcat("infra/hotstrings")
+	; included sub-module, so fold in the whole hotstrings/engine dir.
+	W := WShim . _DriverDirsConcat("hotstrings/engine/catalogue", "hotstrings/engine/matcher")
 
 	Watcher := _DriverFuncBody("_OnPrefixChar")
 	Assert(Watcher != "", "watcher must define _OnPrefixChar")
@@ -109,7 +120,7 @@ _MetaCheckInputSerialization() {
 	AtomicBlock := SubStr(DispatchBody, AtomicStart)
 	AtomicCritical := InStr(AtomicBlock, 'Critical("On")')
 	HookSend := InStr(AtomicBlock, 'Hook("SendFinalResult", Burst, false)')
-	DirectSend := InStr(AtomicBlock, "_AHK_SendInput.Bind(Burst)")
+	DirectSend := InStr(AtomicBlock, "_HSE_SendBurstUnpaced(Burst)")
 	Assert(AtomicCritical > 0 and HookSend > AtomicCritical
 		and DirectSend > AtomicCritical,
 		"both atomic sender implementations must run after their branch enters Critical")
@@ -193,7 +204,7 @@ _MIS_CheckLayerDispatchCritical() {
 	; Sleep is ever reintroduced into ActivateHotstrings, this fails and forces the
 	; serialization decision to be revisited instead of silently breaking no-yield.
 	Activate := _DriverFuncBody("ActivateHotstrings")
-	Assert(Activate != "", "ActivateHotstrings must exist in infra/hotstrings/hotstring_send.ahk")
+	Assert(Activate != "", "ActivateHotstrings must exist in hotstrings/engine/matcher/send.ahk")
 	Assert(InStr(Activate, "Sleep(") = 0,
 		"ActivateHotstrings must not Sleep: the Shift layer now runs its callbacks under Critical, and a Sleep under Critical breaks the no-yield guarantee (revisit F28 if this changes)")
 }

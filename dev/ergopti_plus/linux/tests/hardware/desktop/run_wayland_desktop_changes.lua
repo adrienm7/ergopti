@@ -24,17 +24,28 @@ local uv = require("luv")
 local Display = require("core.ui.engine.display_server")
 local Monotonic = require("core.logger.engine.monotonic")
 local Navigation = require("keyboard.engine.desktop_navigation")
-local Switcher = require("modules.gestures.workspace_switcher")
-local SystemMetrics = require("modules.keystats.system_metrics")
+local Switcher = require("gestures.adapters.workspace_switcher")
+local SystemMetrics = require("modules.keystats.system.system_metrics")
 
 local UNMEASURED_REASON = "platform_reason.desktop_changes_need_workspace_interface"
 -- Past the switcher's 1 s reuse window, so each observation is a fresh query.
 local SETTLE_MS = 1150
+-- Past the query's own one-second bound, so a started query has answered.
+local ANSWER_MS = 1050
+-- The reader, bound below; answered() needs it first.
+local read_workspace
 
 local function sleep_ms(ms)
 	local timer = uv.new_timer()
 	timer:start(ms, 0, function() timer:close() end)
 	uv.run()
+end
+
+--- Starts a due query and runs the loop until its asynchronous child has
+--- answered: the reader never waits, the daemon tick reads it later.
+local function answered()
+	read_workspace()
+	sleep_ms(ANSWER_MS)
 end
 
 local function never_press(combo)
@@ -50,6 +61,7 @@ SystemMetrics.bind_event_capture(function() return true end)
 -- The binding exactly as ergopti_hotstrings.lua makes it on a session with no
 -- X11 desktop.
 local read, reason = Switcher.current_workspace_source(Monotonic.now_ms)
+read_workspace = read
 SystemMetrics.bind_desktop_source(read, not read and UNMEASURED_REASON or nil)
 
 if mode == "gnome" then
@@ -68,6 +80,7 @@ local backend = assert(Switcher.detect())
 print("BACKEND " .. backend.name)
 assert(SystemMetrics.space_change_availability().measured == true, "a bound source is measured")
 SystemMetrics.sample()
+answered()
 assert(SystemMetrics.observe_desktop() == false, "the first answer is the baseline")
 local day = assert(SystemMetrics.current(), "a sampled day")
 local baseline = day.space_switches
@@ -78,6 +91,7 @@ for index, direction in ipairs(switches) do
 	local outcome = Switcher.switch(direction, true, never_press)
 	assert(outcome == "switched", "switch " .. index .. " answered " .. outcome)
 	sleep_ms(SETTLE_MS)
+	answered()
 	assert(SystemMetrics.observe_desktop() == true, "switch " .. index .. " must be one change")
 	assert(day.space_switches == baseline + index, "the count must rise by one per switch")
 	assert(SystemMetrics.observe_desktop() == false, "an unchanged workspace is no switch")
@@ -88,6 +102,7 @@ end
 -- The documented limit: a round trip inside the reuse window is not seen.
 local counted = day.space_switches
 sleep_ms(SETTLE_MS)
+answered()
 local here = read()
 assert(Switcher.switch(Navigation.NEXT, true, never_press) == "switched")
 assert(Switcher.switch(Navigation.PREVIOUS, true, never_press) == "switched")

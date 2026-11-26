@@ -50,7 +50,7 @@ function M.new(backend, listing_max_output_bytes, ollama_zstd)
 		if ollama_zstd == true then
 			if mode ~= "extract" or type(work_dir) ~= "string" or work_dir:sub(1, 1) ~= "/"
 				or work_dir:find("\0", 1, true) then return nil end
-			local zstd = require("infra.owned_programs").zstd_tar_option()
+			local zstd = require("settings.engine.preferences.owned_programs").zstd_tar_option()
 			if not zstd then return nil end
 			args = { zstd, "--extract", "--file", "-", "--directory", work_dir,
 				"--no-same-owner", "--no-same-permissions" }

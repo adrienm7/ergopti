@@ -834,8 +834,8 @@ for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
 end
 
 it("SQLite open distinguishes absent executable from refused store", function()
-	local prior_programs, prior_writer = package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"]
-	package.loaded["infra.owned_programs"] = { available = function() return false end, path = function() return "sqlite3" end }
+	local prior_programs, prior_writer = package.loaded["settings.engine.preferences.owned_programs"], package.loaded["modules.keystats.sqlite_writer"]
+	package.loaded["settings.engine.preferences.owned_programs"] = { available = function() return false end, path = function() return "sqlite3" end }
 	package.loaded["modules.keystats.sqlite_writer"] = nil
 	local ok, detail = pcall(function()
 		local writer = require("modules.keystats.sqlite_writer")
@@ -844,6 +844,6 @@ it("SQLite open distinguishes absent executable from refused store", function()
 		local rejected, why_rejected = writer.open_db("")
 		helpers.assert_eq(rejected, false); helpers.assert_eq(why_rejected, "store_refused")
 	end)
-	package.loaded["infra.owned_programs"], package.loaded["modules.keystats.sqlite_writer"] = prior_programs, prior_writer
+	package.loaded["settings.engine.preferences.owned_programs"], package.loaded["modules.keystats.sqlite_writer"] = prior_programs, prior_writer
 	if not ok then error(detail, 0) end
 end)

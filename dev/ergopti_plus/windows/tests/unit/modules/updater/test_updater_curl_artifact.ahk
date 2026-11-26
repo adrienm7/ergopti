@@ -679,14 +679,17 @@ _ArtifactQueuedTlsShutdownControls() {
 			}
 		}
 		AssertEqual(0, Observed[1]["exit"])
-		AssertEqual("OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:7", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:11", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
 		if IsObject(Handle)
 			AssertTrue(Handle.terminate(), "owned close source component Job retires")
 	}
 }
-Test("artifact curl: queued peer TLS close is processed without a peer wait or error waiver", _ArtifactQueuedTlsShutdownControls)
+; The fixture server half-closes after its own TLS close and waits, within a
+; bound, for the client's close: closing first reset the connection (10054)
+; under curl and SSPI while the client's close was still in flight.
+Test("artifact curl: queued peer TLS close is processed, then the client's close is awaited within a bound, with no error waiver (tls-peer-close-wait)", _ArtifactQueuedTlsShutdownControls)
 
 
 ; The native scenario uses the existing shared receipt owner, just as the
@@ -727,7 +730,7 @@ Test("artifact curl: canonical receipt ownership preserves filesystem stage and 
 
 
 ; Failure facts contain only the exact controlled Case identity and bounded scalars.
-; Original native errors, the seven-case census and the 15000ms caller stay authoritative.
+; Original native errors, the eleven-case census and the 15000ms caller stay authoritative.
 _ArtifactQueuedTlsFailureFact(Out) {
 	if !(Out is String) || StrLen(Out) > 131072
 		return 0
@@ -738,8 +741,8 @@ _ArtifactQueuedTlsFailureFact(Out) {
 			return 0
 	Candidate := 0
 	Number := "(-?(?:0|[1-9][0-9]{0,9}))"
-	Pattern := "^OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=([0-6])"
-		. " phase=(assert_(?:queued|tls|calls|fact|input|bytes|retired|duplicate|output)|closed|unavailable)"
+	Pattern := "^OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=(10|[0-9])"
+		. " phase=(assert_(?:queued|tls|calls|peer|wait|fact|input|bytes|retired|duplicate|output)|closed|unavailable)"
 		. " family=(socket|io|invalid_data|invalid_operation|other)"
 	for Field in ["code", "hresult", "fact", "sequence", "called", "result", "error", "received", "written", "close_written", "pending", "network_closed", "calls", "errors", "input"]
 		Pattern .= " " . Field . "=" . Number
@@ -796,7 +799,7 @@ _ArtifactQueuedTlsFailureFactControls() {
 	AssertEqual(StrLen(Raw) + 1, StrLen(Raw . Chr(0)), "the negative fixture contains an actual terminal NUL")
 	for Bad in [Raw . "`n" . Raw, Raw . " secret=x", "prefix " . Raw, Raw . Chr(0),
 		Chr(0) . Raw, "private" . Chr(0) . "`n" . Raw, Raw . "`n" . Chr(0) . "private",
-		StrReplace(Raw, "case=6", "case=7"), StrReplace(Raw, "phase=closed", "phase=private"),
+		StrReplace(Raw, "case=6", "case=11"), StrReplace(Raw, "phase=closed", "phase=private"),
 		StrReplace(Raw, "code=10054", "code=010054"), StrReplace(Raw, "code=10054", "code=+10054"),
 		StrReplace(Raw, "code=10054", "code=2147483648"), StrReplace(Raw, "hresult=-2146232800", "hresult=-2147483649"),
 		StrReplace(Raw, "family=socket", "family=other"), StrReplace(Raw, "fact=1", "fact=0"),

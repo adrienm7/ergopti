@@ -4,7 +4,7 @@
 ; MODULE: TOML Loader
 ; DESCRIPTION:
 ; Lightweight TOML reader used by ErgoptiPlus to load hotstring payloads and
-; feature metadata from ``..\..\..\..\infra\hotstrings\*.toml`` files, making the TOML the
+; feature metadata from ``..\..\..\..\hotstrings\engine\*.toml`` files, making the TOML the
 ; single source of truth for hotstrings, menu titles and submenu ordering.
 ;
 ; FEATURES & RATIONALE:
@@ -20,7 +20,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\..\..\_generated\config_keys.ahk
-#Include ../../../../infra/hotstrings/common_autocorrection_migration.ahk
+#Include ../../../../hotstrings/engine/catalogue/common_autocorrection_migration.ahk
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
 ; session, keyed by absolute file path. Large category files (autocorrection.toml,
@@ -55,7 +55,7 @@ global _HOTSTRING_SIMPLE_ENTRY_PATTERN :=
 ; `[[snippets]]` are both valid and both register hotstrings.
 ;
 ; Named and shared because the extension-pack PREVIEW indexer
-; (infra/hotstrings/hotstring_registry.ahk) parses the same files and used to
+; (hotstrings/engine/matcher/registry.ahk) parses the same files and used to
 ; accept double brackets only, resetting its current section on anything else.
 ; A pack written with single-bracket headers therefore expanded — the engine
 ; accepted it here — while never being indexed for the tooltip, so it could never
@@ -67,28 +67,109 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 
 
 
-; Builds the inline-table entry pattern: `output` is required, every flag and
-; `priority` optional and in any order (maintainer decision HSE-002, 2026-11-12:
+; Builds the inline-table entry pattern: `output` is required unless the entry
+; runs an action (action_entry.ahk), every flag, `priority` and the action
+; fields optional and in any order (maintainer decision HSE-002, 2026-11-12:
 ; the Lua reader defaults a missing flag to false, and an entry the editor or a
 ; user wrote in another order used to be dropped here). Each lookahead walks the
 ; table member by member, so a key spelled inside the output text is never read
-; as a flag. Group 1 is the trigger, 2 the output, then one group per name of
-; CapturedKeys in order (empty when the key is absent).
+; as a flag. Group 1 is the trigger, 2 the output (empty when absent), then one
+; group per name of CapturedKeys in order (empty when the key is absent).
 ; @param CapturedKeys {Array} Flag names (or "priority") to capture.
 ; @returns {String} The case-insensitive pattern, anchored at the line start.
 HS_EntryPattern(CapturedKeys) {
 	StrBody := '[^"\\]*(?:\\.[^"\\]*)*'
 	Member := '(?:output\s*=\s*"' . StrBody . '"'
 		. '|(?:is_word|auto_expand|is_case_sensitive|final_result|is_case_sensitive_strict)\s*=\s*(?:true|false)'
-		. '|priority\s*=\s*[0-9]+)'
+		. '|priority\s*=\s*[0-9]+'
+		. '|(?:action|workflow)\s*=\s*"' . StrBody . '"|erase_trigger\s*=\s*(?:true|false))'
 	Skip := '\{\s*(?:' . Member . '\s*,\s*)*?'
+	; The output when there is one, then the proof the entry types or runs something.
 	Pattern := 'i)^(?|"(' . StrBody . ')"|([A-Za-z0-9_\-]+))\s*=\s*'
-		. '(?=' . Skip . 'output\s*=\s*"(' . StrBody . ')")'
+		. '(?=(?:' . Skip . 'output\s*=\s*"(' . StrBody . ')")?)'
+		. '(?=' . Skip . '(?:output|action|workflow|erase_trigger)\s*=)'
 	for Key in CapturedKeys {
 		Value := (Key == "priority") ? "([0-9]+)" : "(true|false)"
 		Pattern .= '(?=(?:' . Skip . Key . '\s*=\s*' . Value . ')?)'
 	}
 	return Pattern . '\{\s*' . Member . '(?:\s*,\s*' . Member . ')*\s*\}'
+}
+
+
+
+
+
+/**
+ * The action fields of an entry whose booleans are AutoHotkey 0/1 or TOML_Bool
+ * (the personal model, a decoded TOML row), checked by HSE_ActionEntryFields.
+ * @param {Map} Entry The entry.
+ * @param {String} Refusal Set to the refusal of HSE_ActionEntryFields, "" otherwise.
+ * @returns {Map|Integer} The action fields, or 0 for an entry that runs no action.
+ */
+HS_EntryActionFields(Entry, &Refusal := "") {
+	global JSON_TRUE, JSON_FALSE
+	Probe := Map()
+	for Key in ["action", "workflow"]
+		if Entry.Has(Key)
+			Probe[Key] := Entry[Key]
+	if Entry.Has("erase_trigger") {
+		Erase := Entry["erase_trigger"]
+		if Erase is TOML_Bool
+			Erase := Erase.Value
+		Probe["erase_trigger"] := (Erase is Integer && (Erase == 0 || Erase == 1))
+			? (Erase ? JSON_TRUE : JSON_FALSE) : Erase
+	}
+	return HSE_ActionEntryFields(Probe, &Refusal)
+}
+
+/**
+ * The action fields of an entry line the entry pattern matched, read through
+ * the typed document reader so a key spelled inside the output is never one.
+ * @param {String} Line The entry line.
+ * @param {String} Refusal Set to the refusal of HSE_ActionEntryFields, or
+ *   no_output for an entry that neither types nor runs anything.
+ * @returns {Map|Integer} The action fields, or 0 for a text entry.
+ */
+HS_EntryLineAction(Line, &Refusal := "") {
+	Refusal := ""
+	if !RegExMatch(Line, "i)(?:action|workflow|erase_trigger)\s*=")
+		return 0
+	Delimiter := _TOML_AssignmentDelimiter(Line)
+	if !Delimiter
+		throw ValueError("A hotstring entry line has no assignment.")
+	Value := _TOML_DocumentValue(TOML_StripInlineComment(SubStr(Line, Delimiter + 1)))
+	if !(Value is Map)
+		throw ValueError("A hotstring entry is not an inline table.")
+	Fields := HS_EntryActionFields(Value, &Refusal)
+	if Refusal == "" && !IsObject(Fields) && !Value.Has("output")
+		Refusal := "no_output"
+	return Refusal == "" ? Fields : 0
+}
+
+/**
+ * Registers the action fields of one entry line on its options, or says why
+ * the entry is skipped; an action entry is a final result, so nothing chains
+ * off it (action_entry.ahk).
+ * @param {String} Line The entry line.
+ * @param {Map} Options The registration options, given "Action" and "FinalResult".
+ * @param {String} Where The section, for the log line.
+ * @returns {Boolean} Whether the entry is registered.
+ */
+HS_EntryApplyAction(Line, Options, Where) {
+	Refusal := ""
+	try Fields := HS_EntryLineAction(Line, &Refusal)
+	catch as Err
+		Refusal := Err.Message
+	if Refusal != "" {
+		try LoggerWarn("TomlLoader", "Section [{1}]: an entry is skipped, its action fields are refused ({2}).",
+			Where, Refusal)
+		return false
+	}
+	if IsObject(Fields) {
+		Options["Action"] := Fields
+		Options["FinalResult"] := true
+	}
+	return true
 }
 
 
@@ -240,7 +321,7 @@ ReadTomlFile(FilePath, ReadOwner := 0) {
 
 ; Helper to warm the section counts cache for a specific file.
 _TomlWarmFileCounts(FilePath) {
-		global _TomlFileSectionCounts, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
+		global _TomlFileSectionCounts
 		PreviousCritical := Critical("On")
 		try {
 				if _TomlFileSectionCounts.Has(FilePath)
@@ -249,50 +330,21 @@ _TomlWarmFileCounts(FilePath) {
 		} finally Critical(PreviousCritical)
 		Owner := _TomlLoaderBeginCacheRead(FilePath)
 		try {
+			; A bundled file the hotstring cache compiled is counted from the rows
+			; it admitted at registration: scanning it again cost every bundled
+			; catalogue line before the boot could publish the tray menu.
+			Admitted := HotstringsCacheSectionCounts(FilePath)
+			if Admitted is Map {
+					_TomlLoaderPublishCounts(Owner, FilePath, Admitted, Cache)
+					return Admitted
+			}
 			Counts := Map()
 			if !FileExist(FilePath) {
 					_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
 					return Counts
 			}
 
-			CurrentSec := ""
-			loop parse, ReadTomlFile(FilePath, Owner), "`n", "`r" {
-					Line := Trim(A_LoopField, " `t")
-					if (Line == "" or SubStr(Line, 1, 1) == "#")
-							continue
-						
-					; [[section]] or [section] header.
-					; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
-					; a header carrying a trailing comment simply fails to match: the line
-					; then falls through to the entry parser, fails that too, and continues —
-					; leaving CurrentSec on the PREVIOUS section, so every entry below is
-					; counted against the wrong one. That is why the menu's hotstring count
-					; could disagree with the number of entries actually registered.
-					if (SubStr(Line, 1, 1) == "["
-					and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
-							CurrentSec := StrLower(Trim(SectionMatch[1]))
-							if !Counts.Has(CurrentSec)
-									Counts[CurrentSec] := 0
-							continue
-					}
-				
-					; Match hotstring entry: key = value or key = { ... }
-					; Skip every metadata block, not just the two flat forms: equality checks
-					; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
-					; written by the config window slip through, so its delay/color/priority lines
-					; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
-					; Count a line only when it matches one of the two shapes the loaders
-					; actually register: the full inline-table entry (LoadHotstringsSection /
-					; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
-					; fallback). A looser `key =` test over-counted non-entry lines, so the
-					; displayed count could exceed the registered/cached row count.
-					if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
-							if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
-							or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
-									Counts[CurrentSec] := Counts[CurrentSec] + 1
-							}
-					}
-			}
+			Counts := TomlCountSectionEntries(ReadTomlFile(FilePath, Owner))
 
 			; Never memoise a count derived from a read that failed. ReadTomlFile
 			; deliberately leaves an unreadable path uncached so the next caller retries;
@@ -304,6 +356,57 @@ _TomlWarmFileCounts(FilePath) {
 			_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
 			return Counts
 		} finally _TomlLoaderEndCacheRead(Owner)
+}
+
+/**
+ * Counts the hotstring entries of every section of a TOML text, the way the
+ * menu counts a file no cache admitted.
+ * @param {string} Content - Whole TOML file.
+ * @returns {Map} Lowercase section -> number of entries.
+ */
+TomlCountSectionEntries(Content) {
+		global _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
+		PerfCount("toml.section_count_scan")
+		Counts := Map()
+		CurrentSec := ""
+		loop parse, Content, "`n", "`r" {
+			Line := Trim(A_LoopField, " `t")
+			if (Line == "" or SubStr(Line, 1, 1) == "#")
+					continue
+
+			; [[section]] or [section] header.
+			; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
+			; a header carrying a trailing comment simply fails to match: the line
+			; then falls through to the entry parser, fails that too, and continues —
+			; leaving CurrentSec on the PREVIOUS section, so every entry below is
+			; counted against the wrong one. That is why the menu's hotstring count
+			; could disagree with the number of entries actually registered.
+			if (SubStr(Line, 1, 1) == "["
+			and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
+					CurrentSec := StrLower(Trim(SectionMatch[1]))
+					if !Counts.Has(CurrentSec)
+							Counts[CurrentSec] := 0
+					continue
+			}
+
+			; Match hotstring entry: key = value or key = { ... }
+			; Skip every metadata block, not just the two flat forms: equality checks
+			; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
+			; written by the config window slip through, so its delay/color/priority lines
+			; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
+			; Count a line only when it matches one of the two shapes the loaders
+			; actually register: the full inline-table entry (LoadHotstringsSection /
+			; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
+			; fallback). A looser `key =` test over-counted non-entry lines, so the
+			; displayed count could exceed the registered/cached row count.
+			if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
+					if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
+					or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
+							Counts[CurrentSec] := Counts[CurrentSec] + 1
+					}
+			}
+		}
+		return Counts
 }
 
 ; Count hotstring entries inside a specific [[section]] of a TOML category file.
@@ -489,9 +592,6 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 				if FeatureConfig.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
 						_V1Compat.TimeActivationSeconds := FeatureConfig[ConfigLeaf.TIME_ACTIVATION_SECONDS]
 				}
-				if FeatureConfig.Has(ConfigLeaf.PATTERN_MAX_LENGTH) {
-						_V1Compat.PatternMaxLength := FeatureConfig[ConfigLeaf.PATTERN_MAX_LENGTH]
-				}
 				FeatureConfig := _V1Compat
 		}
 
@@ -514,7 +614,7 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 		}
 
 		; Fast path — bundled categories served from the self-healing .tsv cache.
-		; HotstringsCacheEnsure (infra/hotstrings/hotstrings_cache.ahk) loads the cache
+		; HotstringsCacheEnsure (hotstrings/engine/catalogue/cache.ahk) loads the cache
 		; once and populates _GENERATED_HOTSTRINGS with a registrar per cached section;
 		; a cache miss leaves the map empty so we fall through to the TOML parse below.
 		HotstringsCacheEnsure()
@@ -532,7 +632,7 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 }
 
 ; Register every hotstring of a given [[section]] defined inside a TOML file
-; located under ..\..\..\..\infra\hotstrings\<CategoryName>.toml (relative to the script).
+; located under ..\..\..\..\hotstrings\engine\<CategoryName>.toml (relative to the script).
 ; Hotstrings flagged as commented-out in TOML (line starting with "#") are
 ; skipped, mirroring AHK source lines starting with ";".
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
@@ -576,28 +676,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 
 		TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 		TargetSection := StrLower(SectionName)
-		CurrentSection := ""
 
 		FileContent := ReadTomlFile(FilePath)
-		loop parse, FileContent, "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#") {
-						continue
-				}
-				; Comment cut first — this pattern is anchored, so a commented header
-				; would not match, would fall through as a non-key line, and would leave
-				; CurrentSection pointing at the PREVIOUS section.
-				if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
-						CurrentSection := StrLower(Trim(SectionMatch[1]))
-						continue
-				}
-				if (CurrentSection != TargetSection) {
-						continue
-				}
-				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
-						continue
-				}
-
+		for Entry in HotstringsSectionEntries(FilePath, FileContent, TargetSection) {
+				Line := Entry.Line
+				Match := Entry.Match
 				Trigger := UnescapeTomlString(Match[1])
 				Output := UnescapeTomlString(Match[2])
 				Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
@@ -636,12 +719,54 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 				Options["Category"] := CategoryName
 				Options["Section"] := SectionName
 				Options["Priority"] := EntryPriority
+				if !HS_EntryApplyAction(Line, Options, HotstringCategoryLogName(CategoryName) . "." . SectionName)
+						continue
 
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				Loaded += 1
 		}
 		try LoggerDone("TomlLoader", "Section [{1}.{2}]: {3} entry(ies) loaded.",
 				HotstringCategoryLogName(CategoryName), SectionName, Loaded)
+}
+
+/**
+ * The entry lines of one section of a hotstring file, from an index of every
+ * section built in one pass while the text read is unchanged. A layout extension
+ * binds about sixteen sections to its files and the personal file has several,
+ * and each section load scanned the whole file again, about 120 ms of the
+ * hotstring stage on the maintainer's PC (perf-hotstring-section-index-2026-11-17).
+ * An edited text is indexed again on its next read.
+ * @param {String} FilePath The file's path, the identity of its index.
+ * @param {String} FileContent The file's text, as the caller just read it.
+ * @param {String} Section The lowercase section name.
+ * @returns {Array} { Line, Match } per entry, in file order; empty for an absent section.
+ */
+HotstringsSectionEntries(FilePath, FileContent, Section) {
+		global _HOTSTRING_ENTRY_PATTERN
+		static Known := Map()
+		if !Known.Has(FilePath) || !(Known[FilePath].Text == FileContent) {
+				Sections := Map()
+				CurrentSection := ""
+				loop parse, FileContent, "`n", "`r" {
+						Line := Trim(A_LoopField, " `t")
+						if (Line == "" or SubStr(Line, 1, 1) == "#")
+								continue
+						; Comment cut first — this pattern is anchored, so a commented header
+						; would not match, would fall through as a non-key line, and would leave
+						; CurrentSection pointing at the PREVIOUS section.
+						if RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch) {
+								CurrentSection := StrLower(Trim(SectionMatch[1]))
+								continue
+						}
+						if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match)
+								continue
+						if !Sections.Has(CurrentSection)
+								Sections[CurrentSection] := []
+						Sections[CurrentSection].Push({ Line: Line, Match: Match })
+				}
+				Known[FilePath] := { Text: FileContent, Sections: Sections }
+		}
+		return Known[FilePath].Sections.Get(Section, [])
 }
 
 ; Register admitted sections together so physical TOML order survives boundaries.
@@ -804,6 +929,8 @@ LoadExtTomlFile(FilePath, CategoryLabel, SelectedSection := "", PersonalSource :
 					Options["Priority"] := _ParseEntryPriority(Line, Resolved.Priority)
 					Options["TimeActivationSeconds"] := Resolved.Delay
 				}
+				if !HS_EntryApplyAction(Line, Options, CurrentSection)
+						continue
 				HSE_RegisterFromTomlFlags(IsCaseSens, Flags, Trigger, Output, Options)
 				TotalLoaded += 1
 		}
@@ -922,6 +1049,11 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 							if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
 									and HotstringsTryPriority(ParsedPriority, &Priority)
 									Config.Priority := Priority
+							} else if RegExMatch(Line, "^(glyph|glyph_name_key)\s*=\s*(.+)$", &GlyphMatch) {
+									; Kept as typed, an own property only when declared: the
+									; resolver (category_glyph.ahk) refuses what is not one symbol.
+									GlyphProp := (GlyphMatch[1] == "glyph") ? "Glyph" : "GlyphNameKey"
+									Config.%GlyphProp% := TOML_CoerceValue(GlyphMatch[2], true)
 							}
 					} else if (Mode == "meta_section" and CurrentSec != "") {
 							Sec := Config.Sections[CurrentSec]

@@ -13,11 +13,11 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"core.fs.engine.file_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.fs.engine.file_watchers", "menu.engine.ui_restore", "diagnostics.engine.reports.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
-	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
+	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "hotstrings.ui.hotstring_editor",
 }
 
 local BASE_ROOT = "/Users/test/Ergopti"
@@ -89,9 +89,9 @@ local function with_watchers(callback)
 				end,
 				read = function() return nil end,
 			}
-			package.loaded["ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
+			package.loaded["hotstrings.ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
 			local Watchers = require("core.fs.engine.file_watchers")
-			local Restore = require("infra.ui_restore")
+			local Restore = require("menu.engine.ui_restore")
 			local Scheduler = require("core.events.timer_scheduler")
 			_G.script_watchers = nil
 			local body_ok, body_failure = xpcall(function()
@@ -228,6 +228,11 @@ helpers.describe("personal file watchers measure their private boot window in aw
 			helpers.assert_eq(world.reloads, 0)
 			helpers.assert_nil(active_timer(world, 1), "a Git-held burst must not enter the UI queue")
 			world.git_locked = false
+			local released = active_timer(world, 0.5)
+			helpers.assert_not_nil(released, "a Git-held burst keeps its settle poll")
+			advance(world, 0.5)
+			released:fire()
+			helpers.assert_nil(active_timer(world, 1), "the released lock restarts the quiet window")
 			settle_and_close_ui(world)
 		end)
 	end)

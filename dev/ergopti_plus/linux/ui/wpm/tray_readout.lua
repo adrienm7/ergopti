@@ -25,9 +25,9 @@ local TableUtil = require("core.text.engine.table_util")
 local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("core.timing.engine.timings")
-local Manifest  = require("infra.manifest_reader")
+local Manifest  = require("menu.engine.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Shell     = require("core.process.adapters.shell_runner")
 local Model     = require("metrics.engine.wpm_widget_model")
 local Widget    = require("ui.wpm.widget")
@@ -102,7 +102,7 @@ end
 
 local function tray()
 	if _tray then return _tray end
-	local ok, Indicator = pcall(require, "platform.tray.appindicator")
+	local ok, Indicator = pcall(require, "tray.adapters.appindicator")
 	if not ok or type(Indicator) ~= "table" then return nil end
 	_tray = Indicator
 	return _tray

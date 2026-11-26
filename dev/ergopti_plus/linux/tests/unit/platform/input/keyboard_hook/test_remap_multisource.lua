@@ -14,7 +14,7 @@ local function roster_session(s, initial)
 	assert(s.hook.set_remapper(s.engine))
 	local paths = {}
 	for _, id in ipairs(initial) do paths[#paths + 1] = s.paths[id] end
-	package.loaded["modules.hotstrings.device_finder"].find_devices = function() return paths, {} end
+	package.loaded["hotstrings.engine.device_finder"].find_devices = function() return paths, {} end
 	s.hook.start(s.start_options); helpers.assert_true(s.hook.isRunning())
 	return function(ids)
 		paths = {}; for _, id in ipairs(ids) do paths[#paths + 1] = s.paths[id] end
@@ -149,7 +149,7 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 		Fixture.with_session({ on_capture_reacquired = function() return true end,
 			keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = .3 } } }, function(s)
 			s.edge("a", 58, 1, 1); s.edge("b", 58, 1, 2)
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.b }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.b }, {} end
 			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 			local before = #s.rows
 			s.edge("b", 56, 1, 4); s.edge("b", 56, 0, 5)
@@ -353,7 +353,7 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 	helpers.it("(remap-multisource) retains an ordinary repeat after an unrelated keyboard departs", function()
 		Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 			s.edge("a", 30, 1, 1)
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.a }, {} end
 			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 			s.edge("a", 30, 2, 2); s.edge("a", 30, 0, 3)
 			helpers.assert_true(s.hook.isRunning())
@@ -378,10 +378,13 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 		end)
 	end)
 
-	helpers.it("(remap-multisource) cannot borrow a foreign source's ordered prefix", function()
+	-- A pair combines keys from any keyboard, as on Windows and macOS
+	-- (maintainer decision KCD-7 of 2026-11-21).
+	helpers.it("(remap-multisource) combines a foreign source's ordered prefix into its pair", function()
 		Fixture.with_session({}, function(s)
 			s.edge("a", 58, 1, 0); s.edge("b", 15, 1, 10); s.edge("b", 15, 0, 100)
-			helpers.assert_eq(s.action, nil); helpers.assert_eq(s.armed, nil)
+			helpers.assert_eq(s.action, "one_shot_shift"); helpers.assert_eq(s.binding, "combination__caps_lock_then_tab")
+			helpers.assert_eq(s.armed, true)
 		end)
 	end)
 
@@ -510,7 +513,7 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 			Fixture.with_session({}, function(s)
 				s.hook.stop(); assert(s.hook.set_remapper(s.engine))
 				local pointers = direction == "remove" and { s.paths.b } or {}
-				package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a }, pointers end
+				package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.a }, pointers end
 				s.hook.start({ intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
 					onClick = function() end, onCaptureReacquired = function() return true end })
 				helpers.assert_true(s.hook.isRunning())
@@ -535,7 +538,7 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 			Fixture.with_session({}, function(s)
 				s.hook.stop(); assert(s.hook.set_remapper(s.engine))
 				local pointers = {}
-				package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, pointers end
+				package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, pointers end
 				s.hook.start({ intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
 					onClick = function() end, onCaptureReacquired = function() return true end })
 				helpers.assert_true(s.hook.isRunning()); both(s)
@@ -560,7 +563,7 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 	helpers.it("(remap-multisource) retains global fail-closed retirement on keyboard removal", function()
 		Fixture.with_session({ on_capture_reacquired = function() return true end }, function(s)
 			both(s)
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.b }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.b }, {} end
 			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 			helpers.assert_eq(s.rows, { { 29, 1 }, { 29, 0 } })
 			s.edge("b", 58, 2, 30); s.edge("b", 58, 0, 40)
@@ -732,41 +735,6 @@ helpers.describe("retained remap provenance across keyboard roster changes", fun
 	end)
 end)
 
-helpers.describe("physical magic key post-output failure", function()
-	helpers.it("does not replay the physical key after the injected character was delivered", function()
-		local SourceFixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
-		SourceFixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
-			local session, entered, seen, dispatched = nil, false, nil, false
-			local ok, err = pcall(function()
-				Fixture.with_session({ on_consume = function(_, detail) seen = detail; return Source.on_key(detail) end }, function(s)
-					session = s
-					package.loaded["adapters.xkb_capture"].source_generation = function() return 0 end
-					Source.init({ is_active = function() return true end, replace_on = function() return true end,
-						magic_key = function() return "★" end, can_type = function() return true end,
-						type_text = function()
-							entered = true
-							assert(session.writer.emit(2, 1)); assert(session.writer.emit(2, 0)); return true
-						end,
-						end_selection = function() end,
-						dispatch_char = function() dispatched = true; error("controlled downstream failure") end,
-						can_capture = function() return true end, key_text = function() return "j" end,
-						defer = function() return true end })
-					helpers.assert_eq(Source.evdev_code(), 36, "the configured magic source must be KeyJ")
-					s.edge("a", 36, 1, 1)
-					helpers.assert_true(dispatched, "the downstream exception must actually occur after output")
-					helpers.assert_eq(s.hook.isRunning(), false, "the downstream exception must actually stop the hook")
-					helpers.assert_true(seen ~= nil, "the hook must invoke its consumer")
-					helpers.assert_true(entered, "the magic owner must have attempted the replacement, code=" .. tostring(seen.code) .. " ctrl=" .. tostring(seen.mods.ctrl) .. " shift=" .. tostring(seen.mods.shift))
-					helpers.assert_eq(s.rows, { { 2, 1 }, { 2, 0 } },
-						"the already-replaced physical press must not be salvaged")
-				end)
-			end)
-			Source._reset_for_test()
-			if not ok then error(err, 0) end
-		end)
-	end)
-end)
-
 helpers.describe("keyboard source loss with a shared physical modifier", function()
 	for _, lost in ipairs({ "a", "b" }) do
 		helpers.it("keeps Shift down for the surviving keyboard after losing " .. lost, function()
@@ -783,4 +751,31 @@ helpers.describe("keyboard source loss with a shared physical modifier", functio
 			end)
 		end)
 	end
+end)
+
+helpers.describe("the keymap role of a held key", function()
+	helpers.it("(twd2-keymap-role) gives the physical callback the role the live keymap gave the press", function()
+		local seen, source_of = {}, nil
+		Fixture.with_session({
+			before_hook = function()
+				-- RightCtrl (97) carries ISO_Level5_Shift, RightAlt (100) is Alt_R.
+				package.loaded["adapters.xkb_capture"].modifier_role = function(code)
+					if code == 97 then return "altgr" end
+					if code == 100 then return "alt" end
+					return require("platform.input.evdev_codes").MODIFIER_OF[code]
+				end
+			end,
+			on_physical = function(s, code, _, _, value, source)
+				if value == 1 then seen[code] = s.hook.held_modifier_role(source, code); source_of = source end
+			end,
+		}, function(s)
+			s.edge("a", 97, 1, 10); s.edge("a", 100, 1, 20); s.edge("a", 30, 1, 30)
+			helpers.assert_eq(seen[97], "altgr", "a fifth-level key on the Ctrl position is a level modifier")
+			helpers.assert_eq(seen[100], "alt", "Right Alt as Alt_R is a shortcut Alt")
+			helpers.assert_eq(seen[30], false, "a letter is held as no modifier")
+			helpers.assert_eq(s.hook.held_modifier_role(source_of, 97), "altgr", "the role lasts while the key is held")
+			s.edge("a", 30, 0, 40); s.edge("a", 100, 0, 50); s.edge("a", 97, 0, 60)
+			helpers.assert_eq(s.hook.held_modifier_role(source_of, 97), false, "a released key holds no role")
+		end)
+	end)
 end)

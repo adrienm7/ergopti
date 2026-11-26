@@ -1,0 +1,41 @@
+{
+	"_comment": "End-character vectors for the French punctuation ':' and ';' (maintainer decision HCD-2, 2026-11-21). A bare ':' or ';' ends a trigger on the three OS, and the no-break space (U+202F or U+00A0) the Ergopti layout types before them is looked past and replaced with the trigger. Replayed by the shared engine (linux/tests/unit/hotstrings/engine/engine/test_shared_hotstring_engine.lua), the Windows matcher (windows/tests/unit/hotstrings/engine/engine/test_end_character_vectors.ahk) and the macOS expander (macos/tests/unit/hotstrings/engine/expander/terminators/test_end_character_vectors.lua). Each vector registers `mappings` (absent flags are false), types `typed` one character at a time, ' ', ':' and ';' being end characters, and states whether the last character fires; `backspace_count` counts the codepoints the expansion replaces: the trigger, the stripped space and the end character.",
+	"vectors": [
+		{
+			"id": "bare_colon_ends_a_trigger",
+			"mappings": [{ "trigger": "ab", "replacement": "cd" }],
+			"typed": ["a", "b", ":"],
+			"expected": { "fires": true, "replacement": "cd", "backspace_count": 3 }
+		},
+		{
+			"id": "bare_semicolon_ends_a_trigger",
+			"mappings": [{ "trigger": "ab", "replacement": "cd" }],
+			"typed": ["a", "b", ";"],
+			"expected": { "fires": true, "replacement": "cd", "backspace_count": 3 }
+		},
+		{
+			"id": "narrow_no_break_space_before_colon_is_replaced",
+			"mappings": [{ "trigger": "ab", "replacement": "cd" }],
+			"typed": ["a", "b", " ", ":"],
+			"expected": { "fires": true, "replacement": "cd", "backspace_count": 4 }
+		},
+		{
+			"id": "no_break_space_before_semicolon_is_replaced",
+			"mappings": [{ "trigger": "ab", "replacement": "cd" }],
+			"typed": ["a", "b", " ", ";"],
+			"expected": { "fires": true, "replacement": "cd", "backspace_count": 4 }
+		},
+		{
+			"id": "colon_after_other_text_fires_nothing",
+			"mappings": [{ "trigger": "ab", "replacement": "cd" }],
+			"typed": ["x", "y", ":"],
+			"expected": { "fires": false }
+		},
+		{
+			"id": "auto_trigger_ending_in_colon_fires_on_its_colon",
+			"mappings": [{ "trigger": "todo:", "replacement": "TODO:", "auto_expand": true }],
+			"typed": ["t", "o", "d", "o", ":"],
+			"expected": { "fires": true, "replacement": "TODO:", "backspace_count": 5 }
+		}
+	]
+}

@@ -47,7 +47,7 @@ _UST_BuilderLaunchesBundledWorkerWithFile() {
 	try {
 		Assert(RegExMatch(Transport.Prefix, "\AERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+\z"),
 			"the transport prefix is a private unique environment namespace")
-		Expected := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		Expected := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned",
 			"-File", _Updater_StagingWorkerPath(), "-TransportPrefix", Transport.Prefix]
 		AssertEqual(Expected.Length, Transport.Args.Length,
 			"the staging launch is exactly the bundled worker with its prefix")

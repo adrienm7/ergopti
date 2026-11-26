@@ -33,7 +33,7 @@ M.TAP_BINDING_PREFIX = "tap_key__"
 M.TAP_OWNER = "tap"
 M.TAP_MODULE = "modules.shortcuts.tap_keys"
 
-local ACTION_CATALOGUE_MODULE = "modules.gestures.manager"
+local ACTION_CATALOGUE_MODULE = "gestures.engine.manager"
 
 
 

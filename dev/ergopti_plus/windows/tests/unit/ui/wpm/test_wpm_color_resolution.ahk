@@ -46,11 +46,17 @@ _WCR_WithCategory(Body) {
 	DirCreate(Root . "\diagnostics\data")
 	FileCopy(SavedShared . "\hotstrings\data\catalogue\_index.toml", Root . "\hotstrings\data\catalogue\_index.toml")
 	FileCopy(SavedShared . "\diagnostics\data\redaction.json", Root . "\diagnostics\data\redaction.json")
+	; The logger admits its privacy policy once per shared source and refuses a
+	; later swap, so the body runs under a policy admitted from the temporary root
+	; (a missing-file read logs) and the inherited admission comes back after it.
+	Policy := _LoggerPrivacyState(), SavedPolicy := [Policy["config"], Policy["root"]]
 	try {
 		_SharedDir := Root
+		Policy["config"] := 0, Policy["root"] := ""
 		Body.Call(Category, File)
 	} finally {
 		_SharedDir := SavedShared
+		Policy["config"] := SavedPolicy[1], Policy["root"] := SavedPolicy[2]
 		_HotstringsOverrides.Delete(Category)
 		HotstringsResolveBumpGen()
 		DirDelete(Root, true)

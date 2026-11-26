@@ -59,6 +59,14 @@ return function(helpers, Json, ports)
 				return { declaration = DECLARATION, keylayout = KEYLAYOUT }
 			end,
 		}, state))
+		if extra.levels then
+			-- Records each line's level, then lets the driver's own logger write it.
+			local log = env.log
+			env.log = function(level, message, ...)
+				extra.levels[#extra.levels + 1] = level
+				return log(level, message, ...)
+			end
+		end
 		local report = Report.new_report(Check.CHECK_ID)
 		local finished = 0
 		Check.run(env, report, function() finished = finished + 1 end)
@@ -148,12 +156,84 @@ return function(helpers, Json, ports)
 		end)
 
 		helpers.it("fails when a recorded copy is gone (composer-check)", function()
+			-- The snapshot lists a layout only while its copy exists, as the layout
+			-- manager does: a vanished copy is a layout that is not installed.
 			local registry, deps, state = fresh()
 			save_fixture(registry, deps)
 			state.files[ports.installed_copy] = nil
 			local steps, result = run_check(registry, deps, state)
-			helpers.assert_true(steps:find("composer_mode=info:existing composer_install=skip:kept composer_copy=fail:unreadable", 1, true) ~= nil, steps)
+			helpers.assert_true(steps:find("composer_mode=info:existing composer_install=skip:kept composer_copy=fail:not_installed", 1, true) ~= nil, steps)
 			helpers.assert_true(not result.passed)
+		end)
+
+		helpers.it("fails when a listed copy cannot be read (composer-check)", function()
+			local registry, deps, state = fresh()
+			save_fixture(registry, deps)
+			local env_read = deps.read
+			deps.read = function(path)
+				if path == ports.installed_copy then return nil end
+				return env_read(path)
+			end
+			local steps, result = run_check(registry, deps, state)
+			helpers.assert_true(steps:find("composer_copy=fail:unreadable composer_ready=skip:no_copy", 1, true) ~= nil, steps)
+			helpers.assert_true(not result.passed)
+		end)
+
+		helpers.it("names a saved composition whose installation failed as not installed (composer-check)", function()
+			-- The field report of 2026-11-25: the user's composition was saved, its
+			-- installation failed, and the check called the missing record unreadable.
+			local registry, deps, state = fresh()
+			state.files[DECLARATION_PATH] = DECLARATION
+			local steps, result = run_check(registry, deps, state)
+			helpers.assert_eq(steps, "composer_fixture=pass composer_mode=info:existing composer_install=skip:kept "
+				.. "composer_copy=fail:not_installed composer_ready=skip:no_copy composer_cleanup=skip:kept")
+			helpers.assert_true(not result.passed)
+		end)
+	end)
+
+	-- The field run of 2026-11-25 (Arch Linux): the user's saved, uninstalled
+	-- composition was logged at ERROR, which opened the error window a reload
+	-- killed five seconds later. A finding is the verdict's, never an ERROR.
+	helpers.describe("composer check (" .. ports.name .. "): findings are warnings", function()
+		--- Runs one scenario and returns the levels its lines used.
+		local function levels_of(prepare, extra)
+			local registry, deps, state = fresh()
+			prepare(registry, deps, state)
+			extra = extra or {}
+			extra.levels = {}
+			local steps, result = run_check(registry, deps, state, extra)
+			helpers.assert_true(not result.passed, steps)
+			return table.concat(extra.levels, ","), steps
+		end
+
+		helpers.it("logs a saved, uninstalled composition as a warning (composer-finding-level)", function()
+			local levels, steps = levels_of(function(_, _, state) state.files[DECLARATION_PATH] = DECLARATION end)
+			helpers.assert_true(steps:find("composer_copy=fail:not_installed", 1, true) ~= nil, steps)
+			helpers.assert_eq(levels, "warn")
+		end)
+
+		helpers.it("logs a copy that fails its record as a warning (composer-finding-level)", function()
+			local levels, steps = levels_of(function(registry, deps, state)
+				save_fixture(registry, deps)
+				state.files[ports.installed_copy] = state.files[ports.installed_copy] .. " "
+			end)
+			helpers.assert_true(steps:find("composer_copy=fail:digest_mismatch", 1, true) ~= nil, steps)
+			helpers.assert_eq(levels, "warn")
+		end)
+
+		helpers.it("logs a composition the composer refused as a warning (composer-finding-level)", function()
+			local levels, steps = levels_of(function() end, {
+				read_fixture = function()
+					return { declaration = DECLARATION, keylayout = KEYLAYOUT:gsub("Composer Check", "Other", 1) }
+				end,
+			})
+			helpers.assert_true(steps:find("composer_install=fail:invalid", 1, true) ~= nil, steps)
+			helpers.assert_true(levels:find("error", 1, true) == nil, levels)
+		end)
+
+		helpers.it("keeps ERROR for the check's own missing files (composer-finding-level)", function()
+			local levels = levels_of(function() end, { read_fixture = function() return nil, "missing" end })
+			helpers.assert_eq(levels, "error")
 		end)
 	end)
 

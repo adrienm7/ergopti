@@ -193,7 +193,7 @@ _TQA_DriverWiring() {
 		"a vetoed superseding retry answers the owed Quit")
 	Assert(InStr(_DriverFuncBody("_LifecycleAbandonExitRetry"), "QuitRequest_RetryAbandoned(") > 0,
 		"a retry that gave up answers the owed Quit")
-	Assert(InStr(FileRead(_DriverDir . "\modules\gestures\actions.ahk", "UTF-8"), "Fn: (*) => ExitApp()") == 0,
+	Assert(InStr(FileRead(_DriverDir . "\gestures\engine\actions.ahk", "UTF-8"), "Fn: (*) => ExitApp()") == 0,
 		"the script_quit action is a Quit like the tray's row")
 }
 Test("quit admission: the tray and script_quit reach it, and retries answer it (PAR-45)", _TQA_DriverWiring)
@@ -239,6 +239,18 @@ _TQA_Notices() {
 		AssertEqual("warning", PauseNotice[1][2], "the pause is a warning")
 		AssertEqual(t("script_control.resumed"), PauseNotice[2][1], "the resume names itself")
 		AssertEqual("success", PauseNotice[2][2], "the resume is a success")
+		; A click refused while paused is told once per action and window
+		; (paused-refusal-notice): a dead click was all the user saw.
+		Refused := []
+		RefusedFn := (Text, Opts) => (Refused.Push([Text, Opts["level"]]), true)
+		What := "Paused refusal probe " . A_TickCount
+		AssertTrue(NotifyPausedRefusal(What, RefusedFn), "the first refusal is told")
+		AssertEqual(t("notify.paused_refused"), Refused[1][1], "the one locale key")
+		AssertEqual("warning", Refused[1][2])
+		AssertFalse(NotifyPausedRefusal(What, RefusedFn), "a repeat inside the window is folded")
+		AssertEqual(1, Refused.Length)
+		AssertTrue(NotifyPausedRefusal(What . " other", RefusedFn), "another action is told on its own")
+		AssertEqual(2, Refused.Length)
 		for Name in ["Ergopti_OnSuspendEnter", "Ergopti_OnSuspendResume"] {
 			Body := _DriverFuncBody(Name)
 			Assert(Body != "", Name . " must exist")

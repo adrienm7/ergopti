@@ -8,7 +8,7 @@
 --- to align model predictions perfectly with the user's active buffer. This is
 --- the canonical cross-driver implementation of the diff-coloring contract:
 --- shared between the Hammerspoon driver and any future Lua-based driver (Linux);
---- the AutoHotkey port is windows/modules/llm/parser.ahk, and both are pinned to
+--- the AutoHotkey port is windows/ai/engine/api/parser.ahk, and both are pinned to
 --- the _shared/tests/corpus/llm/process_prediction_vectors.json golden corpus.
 ---
 --- This module is platform-neutral and reads its fixed shared resource policy
@@ -17,7 +17,7 @@
 --- threaded in through the `opts` table of process_prediction (the macOS shim
 --- reads them from its settings store; a Linux driver would read its own config).
 --- Each driver re-exports
---- this module through a thin shim (macOS modules/llm/parser.lua), exactly like
+--- this module through a thin shim (macOS ai/engine/api/parser.lua), exactly like
 --- core/text/engine/utils.lua re-exports shared text_utils.
 ---
 --- FEATURES & RATIONALE:

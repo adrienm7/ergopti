@@ -15,7 +15,7 @@ local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 --- @param body function body(context)
 local function with_owner(domain, body)
 	local module_name = domain == "tap" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_chords"
-	local names = { "infra.config_paths", "modules.gestures.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
+	local names = { "settings.engine.paths", "gestures.engine.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local source = '[shortcuts.tap_keys]\nnumber_row_left = "screen_capture"\n'
 		.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "screen_capture"\n'
@@ -28,15 +28,15 @@ local function with_owner(domain, body)
 				if line:find("fired", 1, true) and ctx.on_log then ctx.on_log() end
 			end)
 			package.loaded["core.logger.engine.shim"] = Logger
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			-- Each persist revalidates every slot, so the catalogue also accepts
 			-- the manifest defaults of the slots the source leaves unset.
 			local assignable = { screen_capture = true, send_text = true, script_pause_toggle = true }
-			local Manifest, section = require("infra.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
+			local Manifest, section = require("menu.engine.manifest_reader"), require("settings.engine.keys").KEY.SHORTCUTS_SCRIPT_CONTROL
 			for _, slot in ipairs(require("modules.shortcuts.script_chords").slots()) do
 				assignable[Manifest.default_for(section .. "." .. slot.id)] = true
 			end
-			package.loaded["modules.gestures.manager"] = {
+			package.loaded["gestures.engine.manager"] = {
 				is_assignable = function(id) return assignable[id] == true end,
 				execute_action = function(action, binding) ctx.executed[#ctx.executed + 1] = { action, binding } end,
 			}
@@ -45,7 +45,7 @@ local function with_owner(domain, body)
 			ctx.owner = owner
 			ctx.id = domain == "tap" and "number_row_left" or "script_altgr_enter"
 			ctx.binding = owner.binding_id(ctx.id)
-			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true } }
+			ctx.detail = domain == "tap" and { code = 41, mods = {} } or { code = 28, mods = { altgr = true }, prior_role = "altgr" }
 			local function observe()
 				if ctx.on_admission then ctx.on_admission() end
 				return ctx.paused

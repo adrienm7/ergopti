@@ -337,7 +337,7 @@ local _python_resolver_chunk = nil
 --- @return table resolver
 function M.healthy_python_resolver()
 	if _python_resolver_chunk == nil then
-		_python_resolver_chunk = assert(loadfile(M.driver_root() .. "adapters/python_interpreter.lua"))
+		_python_resolver_chunk = assert(loadfile(M.driver_root() .. "ai/adapters/python_interpreter.lua"))
 	end
 	local resolver = _python_resolver_chunk()
 	local universal = "\202\254\186\190" .. "\0\0\0\2"
@@ -385,8 +385,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
 	-- Foreign ledger readers retain the native hash API across ingest turns.
-	loaded["adapters.foreign_ledger_snapshot"] = nil
-	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
+	loaded["diagnostics.adapters.foreign_ledger_snapshot"] = nil
+	if module_name == "modules.keystats.export" or module_name == "diagnostics.adapters.foreign_ledger_snapshot" then
 		loaded["core.timing.engine.paced_job"] = nil
 		loaded["core.events.timer_scheduler"] = nil
 	end
@@ -400,13 +400,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- consumes the replay module's exact commitment, and replay correctly refuses
 	-- rebinding to a different CoreState. Reloading only the parent would therefore
 	-- create an impossible hybrid fixture (fresh parent, stale child).
-	if module_name == "modules.keymap.expander" then
-		loaded["modules.keymap.terminator_replay"] = nil
-	end
-	-- The keymap applies the physical magic key its child owns: a fresh keymap
-	-- must not inherit a key the previous fixture chose.
-	if module_name == "modules.keymap" or module_name == "modules.keymap.init" then
-		loaded["modules.keymap.magic_key_source"] = nil
+	if module_name == "hotstrings.engine.expander.expander" then
+		loaded["hotstrings.engine.expander.terminator_replay"] = nil
 	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
@@ -417,23 +412,28 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
-	if module_name == "modules.shortcuts.actions.text" or module_name == "modules.keymap.utils" then
-		loaded["adapters.clipboard"] = nil
+	-- The Shortcuts facade starts and stops the navigation layer's wheel owner:
+	-- a fresh facade must not inherit the previous fixture's bound scroll tap.
+	if module_name == "modules.shortcuts" or module_name == "modules.shortcuts.init" then
+		loaded["modules.shortcuts.layer_wheel"] = nil
+	end
+	if module_name == "modules.shortcuts.actions.text" or module_name == "hotstrings.engine.expander.utils" then
+		loaded["clipboard.adapters.clipboard"] = nil
 	end
 	-- Every screen-capture owner shares the flow's once-per-process permission
 	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
 	if module_name == "modules.shortcuts.actions.system"
 		or module_name == "modules.shortcuts.actions.system_pixel"
 		or module_name == "modules.shortcuts.actions.screenshot_save"
-		or module_name == "modules.gestures.actions" then
+		or module_name == "gestures.engine.actions" then
 		loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	end
 	-- Dependency checkers and their backend-local pause controller form one
 	-- stateful ownership unit. A fresh checker must never inherit the previous
 	-- fixture's registered owner, epoch token, or resume-stage timer.
-	if module_name == "modules.llm.mlx_deps_checker"
-		or module_name == "modules.llm.ollama_deps_checker" then
-		loaded["modules.llm.dependency_bootstrap_pause_owner"] = nil
+	if module_name == "ai.engine.local_servers.mlx_deps_checker"
+		or module_name == "ai.engine.ollama.deps_checker" then
+		loaded["ai.engine.bootstrap.dependency_bootstrap_pause_owner"] = nil
 	end
 	loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
@@ -502,7 +502,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 
 	-- Clipboard borrowing admission is process-global: each test starts with no
 	-- borrower registered by a previous test's module instances.
-	loaded["infra.clipboard_borrowers"] = nil
+	loaded["clipboard.borrowers"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
@@ -513,23 +513,23 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["modules.keymap.input_sources"]  = nil
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
-	loaded["ui.console_window"] = nil
+	loaded["diagnostics.ui.console_window"] = nil
 	-- The Accessibility adapter remembers which application left a read
 	-- unanswered and captures hs: each test starts with no cooldown.
 	loaded["adapters.accessibility_permission"] = nil
 
-	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
+	-- Drop every cached hotstrings.engine.expander.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
-	-- at require-time; when a test file requires only "modules.keymap.registry" (which
+	-- at require-time; when a test file requires only "hotstrings.engine.expander.registry" (which
 	-- itself requires the two split files), load_with_stubs's first line only clears
 	-- the exact module_name key, leaving registry_index/registry_groups cached from
 	-- whatever earlier test file first required them — bound to THAT test's now
 	-- disconnected hs stub instance. Registry.is_section_enabled then silently
 	-- reads/writes hs.settings against a stale store for the rest of the run
 	-- (F-HIGH-23 fix). Pattern-based like the ui.menu sweep above so any future split
-	-- under modules.keymap.registry* is covered automatically.
+	-- under hotstrings.engine.expander.registry* is covered automatically.
 	for name in pairs(loaded) do
-		if type(name) == "string" and name:match("^modules%.keymap%.registry") then
+		if type(name) == "string" and name:match("^hotstrings%.engine%.expander%.registry") then
 			loaded[name] = nil
 		end
 	end
@@ -541,8 +541,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- the full run.lua suite was order/GC-dependently RED at menu_karabiner.lua:317
 	-- (i18n.section nil), masking real regressions behind a flaky failure (F-T1).
 	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
+	-- The menu modules sit under ui.menu before the structure moves and under each
+	-- feature's ui/menu (settings.ui.menu.paths, updater.ui.menu_about) and the menu
+	-- feature itself after them, so the sweep reads a name's first two segments
+	-- rather than one prefix a structure step would respell.
 	for name in pairs(loaded) do
-		if type(name) == "string" and name:match("^ui%.menu") then
+		local first, second
+		if type(name) == "string" then first, second = name:match("^([%w_]+)%.?([%w_]*)") end
+		if first and ((first == "ui" and second == "menu") or (first == "menu" and second == "ui")
+			or name:find("^[%w_]+%.ui%.menu")) then
 			loaded[name] = nil
 		end
 	end
@@ -607,8 +614,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- lacks. Every other module under test gets the REAL resolver over a
 	-- modelled Apple silicon Mac whose developer tools hold a universal python3
 	-- (HEALTHY_PYTHON); a test of a refusal replaces its deps with _set_deps.
-	if module_name ~= "adapters.python_interpreter" then
-		loaded["adapters.python_interpreter"] = M.healthy_python_resolver()
+	if module_name ~= "ai.adapters.python_interpreter" then
+		loaded["ai.adapters.python_interpreter"] = M.healthy_python_resolver()
 	end
 
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
@@ -744,6 +751,35 @@ function M.read_driver_source(symbol)
 		if not symbol or body:find(symbol, 1, true) then
 			parts[#parts + 1] = body
 		end
+	end
+	if #parts == 0 then return nil end
+	return table.concat(parts, "\n")
+end
+
+--- Whether a driver-relative path is a menu source: under ui/menu before the
+--- structure moves, then a feature's ui/menu/ or ui/menu_<x> and the menu
+--- feature's ui/ tree. Read by segments, which no structure step respells.
+--- @param path string Driver-relative path, forward slashes.
+--- @return boolean
+local function is_menu_source_path(path)
+	local segments = {}
+	for segment in path:gmatch("[^/]+") do segments[#segments + 1] = segment end
+	if segments[1] == "menu" and segments[2] == "ui" then return true end
+	for index = 1, #segments - 1 do
+		local following = segments[index + 1]
+		if segments[index] == "ui" and (following == "menu" or following:find("^menu_")) then return true end
+	end
+	return false
+end
+
+--- Returns the concatenated source of every production menu module, found by
+--- the path its header names, wherever its feature folder keeps it.
+--- @return string|nil source nil when no menu module is found.
+function M.read_menu_source()
+	local parts = {}
+	for _, body in ipairs(production_sources()) do
+		local header = body:match("^%-%-%- (%S+)")
+		if header and is_menu_source_path(header) then parts[#parts + 1] = body end
 	end
 	if #parts == 0 then return nil end
 	return table.concat(parts, "\n")
@@ -1028,5 +1064,152 @@ end
 --- Reports timing admission failure without changing assertion counters.
 --- @return boolean failed True if clock or output diagnostics were incomplete.
 function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
+
+--- The modules of a feature family a test forgets or stubs as one set: the
+--- names that once shared one prefix (modules.keymap, modules.llm). The
+--- structure plan moves them into several feature folders over several steps,
+--- so no prefix pattern follows them; each member is listed by its module name,
+--- which every step respells. A name under the family's original prefix (a
+--- module not moved yet, or a stub's made-up name) belongs to it too.
+local MODULE_FAMILIES = {
+	["hotstrings.engine.expander"] = {
+		"hotstrings.engine.expander",
+		"modules.keymap.composer_check",
+		"hotstrings.engine.expander.control_sentinels",
+		"hotstrings.engine.expander.expander",
+		"modules.keymap.input_sources",
+		"modules.keymap.layout",
+		"modules.keymap.layout_emulation",
+		"modules.keymap.layout_install",
+		"modules.keymap.layout_registry",
+		"modules.keymap.layout_rows_build",
+		"modules.keymap.layout_sources_cache",
+		"ai.engine.bridge",
+		"ai.engine.api.context",
+		"modules.keymap.number_row_live",
+		"modules.keymap.one_shot_shift",
+		"modules.keymap.pending_layout_activation",
+		"hotstrings.engine.expander.registry",
+		"hotstrings.engine.expander.registry_groups",
+		"hotstrings.engine.expander.registry_index",
+		"hotstrings.engine.expander.section_keys",
+		"hotstrings.engine.expander.selftest_gate",
+		"hotstrings.engine.expander.state",
+		"hotstrings.engine.expander.tap_copy",
+		"hotstrings.engine.expander.terminator_replay",
+		"hotstrings.engine.expander.terminators",
+		"hotstrings.engine.expander.utils",
+	},
+	["ai.engine"] = {
+		"ai.engine",
+		"ai.engine.agent.connectors",
+		"ai.engine.agent.learning",
+		"ai.engine.agent.runner",
+		"ai.engine.api.common",
+		"ai.engine.api.mlx",
+		"ai.engine.api.mlx_discovery",
+		"ai.engine.api.mlx_fetch",
+		"ai.engine.api.mlx_inference",
+		"ai.engine.api.ollama",
+		"ai.engine.api.remote",
+		"ai.engine.api.token_crypto",
+		"ai.engine.prediction.app_filter",
+		"ai.engine.api.backend_detector",
+		"ai.engine.bootstrap.boot_cleanup",
+		"ai.engine.bootstrap.exit_signal",
+		"ai.engine.bootstrap.output",
+		"ai.engine.bootstrap.retry_generated",
+		"ai.engine.bootstrap.dependency_bootstrap_pause_owner",
+		"ai.engine.ollama.local_model_offer",
+		"ai.engine.local_servers.ports",
+		"ai.engine.local_servers.local_servers",
+		"ai.engine.bootstrap.managed_native_python",
+		"ai.engine.bootstrap.managed_pyobjc",
+		"ai.engine.local_servers.mlx_bootstrap_diagnosis",
+		"ai.engine.local_servers.mlx_deps_checker",
+		"ai.engine.local_servers.mlx_stream_retirement",
+		"ai.engine.api.network_env",
+		"ai.engine.ollama.binary",
+		"ai.engine.ollama.deps_checker",
+		"ai.engine.ollama.endpoint",
+		"ai.engine.ollama.server_command",
+		"ai.engine.api.opaque_network_admission",
+		"ai.engine.api.parser",
+		"ai.engine.prediction.engine",
+		"ai.engine.settings.profiles",
+		"ai.engine.prediction.progressive_reveal",
+		"ai.engine.prediction.prompt_builder",
+		"ai.engine.api.provider_uses",
+		"ai.engine.api.proxy_relay_receipt",
+		"ai.engine.bootstrap.pty_process_group",
+		"ai.engine.prediction.screen_answer",
+		"ai.engine.prediction.selection_publication",
+		"ai.engine.prediction.selection_translation",
+		"ai.engine.api.stream_payload_cleanup",
+		"ai.engine.api.streaming_handler",
+		"ai.engine.api.thinking_families",
+		"ai.engine.prediction.tone_rewrite",
+		"ai.engine.local_servers.warmup_controller",
+	},
+	["ai.ui.menu"] = {
+		"ai.ui.menu",
+		"ai.ui.menu.activation_pause_owner",
+		"ai.ui.menu.panels.agent_panel",
+		"ai.ui.menu.panels.api_panel",
+		"ai.ui.menu.backend_labels",
+		"ai.ui.menu.panels.backend_panel",
+		"ai.ui.menu.config_guard",
+		"ai.ui.menu.models.custom_models",
+		"ai.ui.menu.panels.local_server_panel",
+		"ai.ui.menu.layout",
+		"ai.ui.menu.models.mlx_repair_offer",
+		"ai.ui.menu.models.selector_page",
+		"ai.ui.menu.models.switcher",
+		"ai.ui.menu.models.manager",
+		"ai.ui.menu.models.manager_mlx",
+		"ai.ui.menu.models.manager_mlx_download",
+		"ai.ui.menu.models.manager_mlx_hf",
+		"ai.ui.menu.models.manager_mlx_repo",
+		"ai.ui.menu.models.manager_mlx_server",
+		"ai.ui.menu.models.manager_ollama",
+		"ai.ui.menu.models.ollama_enable_probe",
+		"ai.ui.menu.prediction_lock_registry",
+		"ai.ui.menu.profile_label",
+		"ai.ui.menu.profiles_manager",
+		"ai.ui.menu.requirement_operation_registry",
+		"ai.ui.menu.runtime_install_offer",
+		"ai.ui.menu.scope_runtime",
+		"ai.ui.menu.settings_manager",
+		"ai.ui.menu.startup_controller",
+		"ai.ui.menu.panels.streaming_panel",
+		"ai.ui.menu.panels.temperature_panel",
+		"ai.ui.menu.trigger_orchestrator",
+		"ai.ui.menu.panels.trigger_panel",
+		"ai.ui.menu.unreachable_backend_offer",
+		"ai.ui.menu.warmup_controller",
+	},
+}
+local _family_members = {}
+for family, members in pairs(MODULE_FAMILIES) do
+	local set = {}
+	for _, name in ipairs(members) do set[name] = true end
+	_family_members[family] = set
+end
+
+--- Whether a module name belongs to a feature family of MODULE_FAMILIES.
+--- @param name any A package.loaded key.
+--- @param family string The family's original prefix, as MODULE_FAMILIES keys it.
+--- @param members_only boolean|nil true excludes the family's own root module name.
+--- @return boolean
+function M.in_module_family(name, family, members_only)
+	local members = assert(_family_members[family], "unknown module family " .. tostring(family))
+	if type(name) ~= "string" then return false end
+	if name == family then return not members_only end
+	if members[name] then return true end
+	-- A prefix that ends a name segment (infra.llm_) continues it; any other is a parent.
+	local stem = family:sub(-1) == "_" and family or family .. "."
+	return name:sub(1, #stem) == stem
+end
+
 
 return M

@@ -9,10 +9,12 @@ Run the corresponding npm script to regenerate.
 | `terminators.ahk`        | `npm run codegen:terminators`                | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk`                      |
 | `personal_shortcuts.ahk` | generated at runtime by `PersonalTomlEditor` | ✅ Wired — loaded dynamically                                     |
 | `prompt_builder.ahk`     | `npm run codegen:prompt-builder:ahk`         | ✅ Wired — `#Include`'d in tests, used by `prediction_engine.ahk` |
-| `llm_profiles_data.ahk`  | `npm run codegen:llm-profiles-data:ahk`      | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/llm/profiles.ahk` (DL-2/DL-3) |
-| `touchpad_registry.ahk`  | `npm run codegen:touchpad-registry`          | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `modules/gestures/touchpad_registry.ahk` |
-| `native_theme.ahk`       | `node tools/codegen/codegen-native-theme.cjs` | ✅ Wired — `#Include`'d by `ui/hotstrings_config_window/hcw_helpers.ahk` |
-| `unicode_title.ahk`      | `npm run codegen:unicode-case`               | ✅ Wired — `#Include`'d by `infra/text_case.ahk` |
+| `llm_profiles_data.ahk`  | `npm run codegen:llm-profiles-data:ahk`      | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `ai/engine/settings/profiles.ahk` (DL-2/DL-3) |
+| `touchpad_registry.ahk`  | `npm run codegen:touchpad-registry`          | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` before `gestures/adapters/touchpad_registry.ahk` |
+| `native_theme.ahk`       | `node tools/codegen/codegen-native-theme.cjs` | ✅ Wired — `#Include`'d by `hotstrings/ui/hotstrings_config_window/hcw_helpers.ahk` |
+| `unicode_title.ahk`      | `npm run codegen:unicode-case`               | ✅ Wired — `#Include`'d by `hotstrings/engine/text_case.ahk` |
+| `exe_version_info.ahk`   | `npm run codegen:exe-version-info`           | ✅ Wired — `#Include`'d in `ErgoptiPlus.ahk` right after `core/lifecycle/engine/bundle.ahk` (Ahk2Exe directives only) |
+| `registry_limits.ahk`    | `npm run codegen:registry-constants`         | ✅ Wired — `#Include`'d by `modules/keystats/keystats_reader_db.ahk` (read before the timing registry loads) |
 
 > **Removed (audit 2026-06-26, GEN-1/2):** `registry.ahk` and `expander.ahk` were
 > orphaned codegen ports of the `Registry.spec.js` / `Expander.spec.js` domain

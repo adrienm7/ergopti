@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Keyboard Layout Menu
 --- DESCRIPTION:
---- Provides the "Disposition clavier" submenu in the Hammerspoon menu bar.
+--- Provides the « Dispositions et émulation » submenu in the Hammerspoon menu bar.
 --- Lets the user install the bundled Ergopti keyboard layout (user or system),
 --- open the macOS input-source preferences, pick the menubar icon variant,
 --- and inspect / activate any of the input sources currently enabled in macOS.
@@ -24,17 +24,18 @@ local M = {}
 local hs            = hs
 local Logger        = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
-local Manifest      = require("infra.manifest_reader")
+local Manifest      = require("menu.engine.manifest_reader")
 local DeferredWork  = require("core.timing.engine.deferred_work")
 local Timings       = require("core.timing.engine.timings")
 local PhaseStats    = require("infra.phase_stats")
 local notifications = require("core.ui.engine.notifications")
 local i18n          = require("core.i18n.engine.i18n")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
+local KeymapLifecycle = require("menu.ui.keyboard.keymap_lifecycle")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
+-- The disk half of the « sources » stage, kept between rebuilds while watched.
+local LayoutSourcesCache = require("modules.keymap.layout_sources_cache")
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local PauseSwitchPolicy = require("layouts.engine.layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
@@ -51,10 +52,10 @@ M.DEFAULT_STATE = {
 }
 
 -- The phases one build records, so the field run's menu step names the one
--- that costs (number_row and magic_key run inside rows).
+-- that costs (number_row runs inside rows).
 M.PHASES = {
 	"menu_keyboard_layout.sources", "menu_keyboard_layout.bundles", "menu_keyboard_layout.variants",
-	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row", "menu_keyboard_layout.magic_key",
+	"menu_keyboard_layout.rows", "menu_keyboard_layout.number_row",
 }
 
 
@@ -143,7 +144,7 @@ M._version_gt        = version_gt
 --- ==================================
 --- ==================================
 
---- Builds the complete "Disposition clavier" submenu item.
+--- Builds the complete « Dispositions et émulation » submenu item.
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.
 --- @return table A single hs.menubar item with a populated submenu.
 --- Schedules a deferred menu rebuild. macOS reloads its input-source list
@@ -208,6 +209,42 @@ local function variant_label(name)
 	return format_ergopti_display(unversioned) or name
 end
 
+--- Removes the user copy of an Ergopti bundle. Its layouts leave the enabled
+--- input sources first, one TIS mutation after the other, so no removed layout
+--- stays listed; then the bundle leaves the user folder and the menu is rebuilt.
+--- @param bundle_name string Basename of the installed user bundle.
+--- @param update_menu function|nil Menu rebuild callback.
+local function run_remove_and_refresh(bundle_name, update_menu)
+	local bundle_path = NativePath.without_trailing_separators(USER_LAYOUTS_DIR) .. "/" .. bundle_name
+	local variants = install.bundle_variants(bundle_path)
+	local function finish()
+		local removed, reason = install.remove_user(bundle_name)
+		if removed then
+			pcall(notifications.notify, i18n.get("menu.layout.removed_user"), nil, "success")
+		else
+			Logger.error(LOG, "The user bundle %s was not removed (%s).", bundle_name, tostring(reason))
+			pcall(notifications.notify, i18n.get("menu.layout.remove_failed"), nil, "error")
+		end
+		schedule_menu_refresh(update_menu)
+	end
+	local function disable_from(index)
+		local variant = variants[index]
+		if variant == nil then
+			finish()
+			return
+		end
+		input_sources.disable_keylayout_source_async(variant.name, variant_label(variant.name), function(ok, _, reason)
+			if not ok then
+				-- The bundle leaving the folder still takes the layout away: macOS drops a
+				-- stale enabled entry at its next input-source reread.
+				Logger.warn(LOG, "Layout '%s' could not leave the input sources: %s.", variant.name, tostring(reason))
+			end
+			disable_from(index + 1)
+		end)
+	end
+	return defer_tis_call(function() disable_from(1) end)
+end
+
 --- Admits one genuine Layout child through its exact shared presentation declaration.
 --- @param section string Complete declared frame.
 --- @param commands table Native callbacks.
@@ -215,7 +252,7 @@ end
 --- @param children table|nil Genuine provider children.
 --- @return table|nil row
 local function layout_declared_row(section, commands, getters, children)
-	local renderer = require("infra.manifest_menu")
+	local renderer = require("menu.engine.manifest_menu")
 	local rows = type(renderer.template_rows) == "function"
 		and renderer.template_rows(section, commands or {}, getters or {}, children or {}) or nil
 	if type(rows) ~= "table" or #rows ~= 1 then return nil end
@@ -229,44 +266,6 @@ local function layout_native_choice(caption, selected, ready, callback)
 		layout_native_selected = function() return selected == true end,
 		layout_native_ready = function() return ready == true end,
 	})
-end
-
---- The custom layout picker: the registry layouts the layout manager
---- installed, the one of the current input source checked; choosing one
---- makes it the current input source.
---- @param update_menu function|nil Menu rebuild callback.
---- @param renderer table Native manifest binding.
---- @return table Rows for the `custom_layouts` provider.
-local function custom_layout_rows(update_menu, renderer)
-	local rows = {}
-	local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
-	local picked_ok, picker = false, nil
-	if ok then picked_ok, picker = pcall(LayoutRegistry.picker) end
-	if not picked_ok or type(picker) ~= "table" then
-		Logger.error(LOG, "The installed layouts could not be listed: %s.", tostring(picker))
-		picker = { layouts = {}, active = "" }
-	end
-	for _, entry in ipairs(picker.layouts) do
-		local id = entry.id
-		local row = layout_native_choice(type(entry.name) == "string" and entry.name or id, picker.active == id, true, function()
-				defer_tis_call(function()
-					LayoutRegistry.select(id, function(selected)
-						if not selected then
-							pcall(notifications.notify, i18n.get("layout_manager.failure_other"), nil, "error")
-						end
-						schedule_menu_refresh(update_menu)
-					end)
-				end)
-			end)
-		if not row then return nil end
-		rows[#rows + 1] = row
-	end
-	if #rows == 0 then
-		if type(renderer) ~= "table" or type(renderer.status_rows) ~= "function" then return {} end
-		local status = renderer.status_rows("layout_menu", "custom_layouts", "none_installed")
-		return type(status) == "table" and status or {}
-	end
-	return rows
 end
 
 --- Builds an install/update menu item for one scope (user or system).
@@ -307,7 +306,7 @@ end
 --- @param render_ctx table The renderer context holding the row commands.
 --- @return table rows
 local function number_row_rows(state, save_prefs, update_menu, render_ctx)
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	if type(state) ~= "table" then return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local Live = require("modules.keymap.number_row_live")
 	-- Timed here rather than around the call: the menu parity proofs read the
@@ -315,8 +314,9 @@ local function number_row_rows(state, save_prefs, update_menu, render_ctx)
 	local started = PhaseStats.now()
 	local available, reason = Live.available()
 	PhaseStats.stop("menu_keyboard_layout.number_row", started)
-	-- An emulation typing the number row applies the ordering itself.
-	local emulating = require("modules.keymap.layout_emulation").status().active == true
+	-- An emulation typing the number row applies the ordering itself; one with
+	-- its base layer or its number row off leaves the row to the system layout.
+	local emulating = require("modules.keymap.layout_emulation").status().number_row == true
 	available = available or emulating
 	local function stored()
 		return { order = state.layout_number_row_mode, edges = state.layout_number_row_reorder_edges == true }
@@ -360,6 +360,8 @@ function M.build(ctx)
 	-- appended here. The menubar icon is the manifest's `choice` row: this
 	-- driver supplies only its current value and what choosing one does.
 	local bundle_rows    = {}
+	-- The user bundle removal row, drawn under the user scope install row.
+	local user_remove_row = nil
 	-- Which layout to switch to when the driver pauses and when it resumes. Three
 	-- more rows this driver alone has, for the same reason as the two above: they
 	-- name macOS input sources.
@@ -377,7 +379,14 @@ function M.build(ctx)
 	-- Both Keyboard Layouts scopes, listed once for the whole build: four
 	-- readers below each listed both again (eight directory scans and their
 	-- plist probes per rebuild), all with the same answer.
-	local installed  = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
+	-- Read from the disk only when the scope folders changed since the last
+	-- rebuild (layout_sources_cache: FSEvents and the driver's own installs).
+	local sources    = LayoutSourcesCache.read(function()
+		local scopes = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
+		local map, variants = build_kl_name_to_tis_id(scopes)
+		return { installed = scopes, kl_name_to_tis = map, variants = variants }
+	end)
+	local installed  = sources.installed
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
 	-- it is truly active; no need to read HIToolbox separately.
@@ -386,8 +395,7 @@ function M.build(ctx)
 	-- NOT a TIS ID. We map it to a stable TIS ID via the installed bundle's keylayout files.
 	-- Records whose KeyboardLayout Name doesn't match any installed variant are orphan entries
 	-- (old bundle, different version) — we flag them so the menu can offer an upgrade.
-	local kl_name_to_tis, installed_variants = build_kl_name_to_tis_id(installed)
-	kl_name_to_tis = kl_name_to_tis or {}
+	local kl_name_to_tis, installed_variants = sources.kl_name_to_tis or {}, sources.variants
 	local active_id_set_pre = {}
 	local legacy_active     = {}
 	for _, r in ipairs(records) do
@@ -450,6 +458,17 @@ function M.build(ctx)
 				)
 			end
 		)
+		-- The user copy can be removed as it was installed; the system copy needs
+		-- administrator rights this driver cannot bind yet (install_system_unlocked).
+		if user_best then
+			local removed_name, removed_version = user_best.name, version_str(user_best.version)
+			user_remove_row = layout_declared_row("layout_bundle_remove", {
+				layout_remove = function() run_remove_and_refresh(removed_name, update_menu) end,
+			}, {
+				layout_install_scope = function() return i18n.get("menu.layout.scope_user") end,
+				layout_install_old = function() return removed_version end,
+			})
+		end
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
 	end
@@ -630,7 +649,7 @@ function M.build(ctx)
 	local function active_layout_rows()
 		local rows = {}
 	if #records == 0 then
-		local ManifestMenu = require("infra.manifest_menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
 			[require("settings.engine.keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
 				local ok, started = pcall(function()
@@ -677,7 +696,7 @@ function M.build(ctx)
 
 	local function build_layout_switching_rows()
 		if not state then return {} end
-		local ManifestMenu = require("infra.manifest_menu")
+		local ManifestMenu = require("menu.engine.manifest_menu")
 		local feature_on = state.layout_pause_switch_enabled and true or false
 		local cur_pause, cur_resume = state.layout_on_pause, state.layout_on_resume
 		local function target_label(current)
@@ -772,7 +791,7 @@ function M.build(ctx)
 	-- Rendered LAST, once every provider list is filled. The providers are read
 	-- when the renderer reaches their row, so a build issued before the
 	-- pause/resume pickers were collected drew an empty `layout_switching`.
-	local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+	local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 	if not ok_mm or type(ManifestMenu.build) ~= "function" then
 		-- Loud: the rows would simply be absent, and a layout list that
 		-- silently disappears reads as "macOS has no layouts installed".
@@ -830,8 +849,6 @@ function M.build(ctx)
 		return true
 	end
 	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
-	-- « Create or edit a layout… » opens the same window straight on the layout editor.
-	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.editor_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
@@ -847,14 +864,14 @@ function M.build(ctx)
 	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
-		local function user_provider() return latest and {bundle_rows[2]} or {} end
+		local function user_provider() return latest and {bundle_rows[2], user_remove_row} or {} end
 		local function status_provider() return {bundle_rows[#bundle_rows]} end
 		local rows = ManifestMenu.template_rows("layout_bundle_frame", {}, {}, {
 			layout_bundle_system = system_provider,
 			layout_bundle_user = user_provider,
 			layout_bundle_status = status_provider,
 		})
-		if type(rows) ~= "table" or #rows ~= #bundle_rows then return nil end
+		if type(rows) ~= "table" or #rows ~= #bundle_rows + (user_remove_row and 1 or 0) then return nil end
 		if latest then return rows end
 		-- The optional inert status may be withdrawn independently of the admitted
 		-- bundle frame. Refusal never replaces it with a native caption or action.
@@ -866,8 +883,6 @@ function M.build(ctx)
 	end
 	local declared_bundle_rows = bundle_frame_rows()
 	if declared_bundle_rows == nil then return nil end
-	local custom_rows = custom_layout_rows(update_menu, ManifestMenu)
-	if custom_rows == nil then return nil end
 	local active_rows = active_layout_rows()
 	if active_rows == nil then return nil end
 	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
@@ -913,6 +928,12 @@ function M.build(ctx)
 			return { items = child_rows }
 		end,
 	}
+	-- One write for the radio rows and the picker window: saved, then applied live.
+	local function choose_emulation(choice)
+		local committed = require("infra.layout_emulation_preferences").choose(state, save_prefs, choice)
+		emulation_changed(committed)
+		return committed
+	end
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, group_builders, render_ctx, {
 		["layout_emulation"] = function()
 			local Preferences = require("infra.layout_emulation_preferences")
@@ -921,7 +942,13 @@ function M.build(ctx)
 				settings = Preferences.settings(state),
 				status = require("modules.keymap.layout_emulation").status(),
 				snapshot = require("modules.keymap.layout_registry").snapshot(),
-				choose = function(choice) emulation_changed(Preferences.choose(state, save_prefs, choice)) end,
+				choose = choose_emulation,
+				-- « Others… »: every layout, searchable, in the shared picker window.
+				open_picker = require("ui.emulation_picker").open,
+				others_rows = function(open)
+					return ManifestMenu.template_rows("layout_emulation_others_commands",
+						{ [require("settings.engine.keys").COMMAND.LAYOUT_EMULATION_OTHERS] = open }, {}, {})
+				end,
 			})
 		end,
 		["layout_features_base"] = function()
@@ -931,17 +958,27 @@ function M.build(ctx)
 			return { emulation_switch(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
 		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
-		["custom_layouts"]   = function() return custom_rows end,
+		-- « Touches de jeu »: the global choice and the front application's own.
+		["layout_game_keys"] = function()
+			local Preferences = require("infra.layout_emulation_preferences")
+			local GameKeys = require("layouts.engine.emulation.game_keys")
+			local settings = Preferences.game_keys(state)
+			local front = require("platform.focus.window_info").frontmost_application()
+			local app = front and front.bundle_id or nil
+			local own, overridden = GameKeys.choice_for(settings, "macos", app)
+			local mode = require("modules.keymap.layout_emulation").status().active and GameKeys.MODE_EMULATION
+				or GameKeys.MODE_INSTALLED
+			return EmulationRows.game_keys_rows({
+				t = i18n.get, settings = settings, app = app, app_name = front and require("platform.focus.window_info").frontmost_application_name() or nil,
+				app_choice = overridden and own or nil,
+				route = function(choice, game) return GameKeys.route("macos", mode, choice, { game = game }) end,
+				choose = function(choice) emulation_changed(Preferences.set_game_keys(state, save_prefs, nil, choice)) end,
+				choose_app = function(choice) emulation_changed(Preferences.set_game_keys(state, save_prefs, app, choice)) end,
+			})
+		end,
 		["active_layouts"]   = function() return active_rows end,
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
-		-- The physical magic key, chosen by pressing it or from the candidates.
-		[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
-			return MagicKeySourceMenu.rows({
-				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
-				update_menu = update_menu, paused = ctx and ctx.paused,
-			})
-		end,
 	})
 
 	-- `submenu`, not `items`: these rows are already materialised. The tray
@@ -1057,7 +1094,7 @@ function M.capture_scope(state, source)
 		end
 	end
 	local result = {}
-	local Preferences = require("infra.preferences")
+	local Preferences = require("settings.engine.preferences.preferences")
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
 		local key = assert(Preferences.flat_key_for(row.section .. "." .. row.key), "layout preference owner missing")
 		result[#result + 1] = { key = key, value = state[key] }
@@ -1071,7 +1108,7 @@ end
 --- @return boolean applied Terminal policy acknowledgement.
 function M.apply_scope(state, rows)
 	if M.scope_pending() then return false end
-	local Preferences, values = require("infra.preferences"), {}
+	local Preferences, values = require("settings.engine.preferences.preferences"), {}
 	local allowed = {}
 	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
 		allowed[row.section .. "." .. row.key] = true

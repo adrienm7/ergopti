@@ -77,30 +77,6 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 		end)
 	end)
 
-	helpers.it("contains timer-owned routing failures and reports them off the HID path", function()
-		Fixture.with_fixture(function()
-			local context = new_context()
-			configure(context)
-			context.transport.enqueue("route-me", "info")
-			context.state.route_mode = "throw"
-			local pump_ok, pump_err = pcall(context.state.pump)
-			helpers.assert_true(pump_ok, "timer callback must contain routing exceptions: " .. tostring(pump_err))
-			helpers.assert_eq(#context.state.sends, 1,
-				"a record with no valid route payload cannot cross the socket boundary")
-			helpers.assert_eq(context.transport.status().queued, 1)
-			helpers.assert_eq(#context.state.failures, 1,
-				"the async failure must reach the injected off-hotpath reporter")
-			helpers.assert_contains(context.state.failures[1], "routing failure")
-
-			context.state.route_mode = nil
-			context.state.clock = context.state.clock + 0.51
-			context.state.pump()
-			helpers.assert_eq(context:payload().sequence, 1)
-			context:ack(1)
-			helpers.assert_eq(context.transport.status().queued, 0)
-		end)
-	end)
-
 	helpers.it("contains delivery-hook exceptions after exact dequeue", function()
 		Fixture.with_fixture(function()
 			local context = new_context()

@@ -37,6 +37,14 @@ helpers.describe("SecureFieldDetector: tri-state verdicts", function()
 			"the legacy boolean port must fail closed while the verdict is unknown")
 	end)
 
+	-- The shared port vector (SecureFieldDetector.spec.js) the three drivers mirror.
+	helpers.it("fails closed after a refresh that classifies nothing (isSecureField_unclassified_returns_true)", function()
+		local adapter = fresh(function() error("AT-SPI2 bus unavailable") end)
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), true,
+			"isSecureField_unclassified_returns_true: a raised probe must read as secure")
+	end)
+
 	helpers.it("says once, at warning level, that text is withheld", function()
 		-- An inconclusive probe blocks every expansion. At debug level that was
 		-- indistinguishable from a daemon doing nothing.

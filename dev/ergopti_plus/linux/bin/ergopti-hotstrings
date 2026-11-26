@@ -38,7 +38,7 @@ _has() {
 # WHY ydotool IS NOT IN THIS LIST.
 # It used to be, as a hard failure — on machines where install.sh had just
 # refused to install it. The daemon writes struct input_event to its own
-# /dev/uinput device (modules/hotstrings/injector.lua); ydotool assumed a US
+# /dev/uinput device (hotstrings/engine/injector.lua); ydotool assumed a US
 # layout, needed a root daemon and forked once per event, which is what made the
 # keyboard grab unaffordable. Its only surviving mentions are the unwired
 # shell-outs in adapters/text_sender.lua, which no daemon path requires and whose

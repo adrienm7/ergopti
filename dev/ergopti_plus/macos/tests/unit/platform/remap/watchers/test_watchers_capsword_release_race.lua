@@ -37,7 +37,7 @@ local function fresh_harness(options)
 	package.loaded["platform.remap.watchers"] = nil
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
-	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
 	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
@@ -186,7 +186,7 @@ local function fresh_harness(options)
 		},
 	}
 
-	h.sentinels = require("modules.keymap.control_sentinels")
+	h.sentinels = require("hotstrings.engine.expander.control_sentinels")
 	local register_listener = h.sentinels.set_listener
 	h.sentinels.set_listener = function(name, callback)
 		if callback then h.signal_listener = callback end

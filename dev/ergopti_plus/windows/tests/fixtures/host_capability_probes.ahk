@@ -44,6 +44,18 @@ TestTopRowLetterReceipt(Vk) {
 			. " switch to a layout such as US QWERTY or French AZERTY to execute it here")
 }
 
+; Receipt for a case that launches and later ends its own Windows Notepad. That
+; Notepad opens every launched file in its running process, so while another
+; Notepad runs a private one cannot be had without touching the user's.
+; @param RunningPid {Integer} ProcessExist("notepad.exe") read before the case.
+; @return {Map}
+TestPrivateNotepadReceipt(RunningPid) {
+	State := !(RunningPid is Integer) ? "unknown" : RunningPid != 0 ? "absent" : "present"
+	return Map("state", State, "hosted_ci", "required", "name", "a private Windows Notepad",
+		"why", "Notepad process " . RunningPid . " is already running and would receive the probe's documents;"
+			. " close every Notepad window to execute it here")
+}
+
 ; Receipt for the plain character the OS layout types on SC012.
 ; @param KeyText {Object} KS_KeyTextNoStateChange's { Count, Text } for SC012.
 ; @return {Map}

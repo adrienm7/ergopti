@@ -26,7 +26,7 @@ local utf8     = utf8
 local Logger   = require("core.logger.engine.logger")
 local Timings  = require("core.timing.engine.timings")
 local WPMActivity = require("metrics.engine.wpm.activity")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("core.i18n.engine.i18n")
@@ -49,9 +49,10 @@ local ClipboardTelemetry = require("modules.keystats.clipboard_telemetry")
 local Metrics        = require("metrics.engine.metrics")
 local TriggerRoi     = require("metrics.engine.privacy.trigger_roi")
 local Watchers       = require("modules.keystats.watchers")
+local SessionMachine = require("modules.keystats.session_machine")
 local ProcessLifecycle = require("core.process.adapters.lifecycle")
 local KeyboardHook   = require("platform.input.keyboard_hook")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TableUtil = require("core.text.engine.table_util")
 local LOG            = "keystats"
@@ -73,6 +74,8 @@ local LOG            = "keystats"
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keystats", "micro_idle_timeout_ms")
 -- Typing session idle threshold before the session is considered fully ended (5 min)
 local SESSION_TIMEOUT_MS         = Timings.ms("keystats", "session_timeout_ms")
+-- The two session limits, as the session machine takes them.
+local SESSION_LIMITS = { micro_idle_ms = MICRO_IDLE_TIMEOUT_MS, session_timeout_ms = SESSION_TIMEOUT_MS }
 -- Rolling window used to compute live WPM (15 s)
 local WPM_WINDOW_MS              = Timings.ms("keystats", "wpm_window_ms")
 -- Minimum time window for WPM calculation to avoid division by near-zero (2 s)
@@ -188,9 +191,9 @@ M.DEFAULT_STATE = {
 local CoreState = {
 	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
 	-- Resolved at module-load time via the central menu_paths module
-	LOG_DIR = require("infra.config_paths").metrics_dir(),
+	LOG_DIR = require("settings.engine.paths").metrics_dir(),
 	-- The SQLite mirror's persistent cache root (survives a reboot, L64).
-	CACHE_DIR = require("infra.config_paths").metrics_cache_dir(),
+	CACHE_DIR = require("settings.engine.paths").metrics_cache_dir(),
 
 	-- Enablement
 	options    = { encrypt = false },
@@ -212,7 +215,8 @@ local CoreState = {
 	current_session_pause = 0,
 	session_start_time    = 0,
 	session_generation    = 0,
-	session_last_active   = 0,
+	session_last_active   = 0,       -- last key or pointer input of the open session
+	typing_last_active    = 0,       -- last typed character, for the live WPM
 	is_micro_idle         = false,
 
 	-- Mouse and environment
@@ -666,6 +670,17 @@ end
 --- @param flags table The modifier flags from the key event.
 --- @param keycode number The raw keycode.
 --- @return boolean True when this event is a shortcut candidate.
+--- The macOS role index of the typing burst rule (TWD-2), nil when the shared
+--- files cannot be read; the first failure is logged.
+--- @return table|nil
+local function burst_index()
+	local index, err, first_failure = require("metrics.engine.wpm.typing_keys").native_index("hs")
+	if first_failure then
+		Logger.error(LOG, "Typing burst keys unreadable (%s): no key ends a burst until a reload.", tostring(err))
+	end
+	return index
+end
+
 local function is_shortcut_candidate(flags, keycode)
 	if MODIFIER_KEYCODES[keycode] then return false end
 	-- Nav keys (arrows, Home, End…) are never shortcuts — always recorded as bracket markers
@@ -783,6 +798,11 @@ end
 -- ======= 5/ Event Tap Interceptor =======
 -- ========================================
 -- ========================================
+
+--- Hands a session row to the log manager.
+--- @param entry table One events_session entry.
+--- @return boolean accepted
+local function append_session_log(entry) return LogManager.append_log(entry) end
 
 --- Main eventtap callback. Processes all keyboard and mouse events.
 --- Wrapped in pcall to prevent any Lua error from locking the OS keyboard.
@@ -909,14 +929,9 @@ local function handle_key(event_obj)
 
 		local now      = hs.timer.absoluteTime() / 1000000
 
-		-- Resume from micro-idle on any activity
-		if CoreState.is_micro_idle then
-			CoreState.is_micro_idle = false
-			LogManager.append_log({
-				type        = "idle_end",
-				duration_ms = math.max(0, now - (CoreState.session_last_active + MICRO_IDLE_TIMEOUT_MS)),
-			})
-		end
+		-- Any input ends an idle span and keeps an open session alive; only a
+		-- typed key, below, opens one.
+		SessionMachine.input(CoreState, append_session_log, SESSION_LIMITS, now, false)
 
 		-- A middle/auxiliary click can move the insertion point without a key.
 		if evt_type == hs.eventtap.event.types.otherMouseDown then
@@ -969,7 +984,9 @@ local function handle_key(event_obj)
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
-					WPMActivity.record_input(CoreState.wpm_activity, now)
+					-- A modifier never starts a typing burst; tapped alone it ends one (TWD-2).
+					local index = burst_index()
+					WPMActivity.observe_key(CoreState.wpm_activity, index and index[keycode] or "modifier", keycode, false, now)
 					if credits then
 						LogManager.log_modifier_press(keycode, current_cached_app_name())
 					end
@@ -977,6 +994,7 @@ local function handle_key(event_obj)
 					-- Release — compute hold duration and feed the manifest
 					local hold_ms = math.floor(now - down_at)
 					CoreState.modifier_down_at[keycode] = nil
+					WPMActivity.observe_release(CoreState.wpm_activity, keycode, now)
 					if credits then
 						LogManager.log_modifier_hold(keycode, current_cached_app_name(), hold_ms)
 					end
@@ -991,7 +1009,18 @@ local function handle_key(event_obj)
 
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
-		if not SILENT_KEYCODES[keycode] then WPMActivity.record_input(CoreState.wpm_activity, now) end
+		-- Only text starts or keeps a typing burst; a shortcut or an ending key
+		-- (arrows, F-keys, Escape) ends it, as on Windows and Linux (TWD-2).
+		if not SILENT_KEYCODES[keycode] then
+			local index = burst_index()
+			local role = index and index[keycode] or nil
+			local shortcut = is_shortcut_candidate(flags, keycode)
+			if role == nil and not shortcut then
+				WPMActivity.record_input(CoreState.wpm_activity, now)
+			else
+				WPMActivity.observe_key(CoreState.wpm_activity, role, keycode, shortcut, now)
+			end
+		end
 
 		-- Shortcuts: flush then log immediately without entering the typing pipeline.
 		-- Current-process shortcuts (including paste-backed replacements) already
@@ -1030,11 +1059,8 @@ local function handle_key(event_obj)
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
 
-		-- Mark session start on the first keystroke after a long idle
-		if CoreState.session_start_time == 0 then
-			CoreState.session_start_time = now
-			LogManager.append_log({ type = "session_start" })
-		end
+		-- The first keystroke after a long idle opens the session
+		SessionMachine.input(CoreState, append_session_log, SESSION_LIMITS, now, true)
 
 		-- Capture context on the first keystroke of a new buffer
 		if #CoreState.buffer_events == 0 then
@@ -1084,7 +1110,7 @@ local function handle_key(event_obj)
 			table.insert(CoreState.recent_typing_eff,  now)
 			table.insert(CoreState.recent_typing_phys, now)
 		end
-		CoreState.session_last_active = now
+		CoreState.typing_last_active = now
 
 		-- Build modifier and metadata record for this event
 		local active_mods = {}
@@ -1537,16 +1563,8 @@ function M.reset_session()
 		return false
 	end
 	LogManager.flush_buffer()
-	if CoreState.session_start_time > 0 then
-		LogManager.append_log({
-			type        = "session_end",
-			duration_ms = math.max(0, CoreState.session_last_active - CoreState.session_start_time),
-		})
-	end
-	CoreState.session_generation = CoreState.session_generation + 1
-	CoreState.session_start_time  = 0
-	CoreState.session_last_active = 0
-	CoreState.is_micro_idle       = false
+	SessionMachine.close(CoreState, append_session_log)
+	CoreState.typing_last_active  = 0
 	CoreState.recent_typing_eff   = {}
 	CoreState.recent_typing_phys  = {}
 	CoreState.wpm_activity = WPMActivity.new(Timings.ms("ui", "wpm_color_hold_ms"))
@@ -1665,19 +1683,17 @@ local function build_deferred_synthetic_snapshot(operation)
 		end
 	end
 
-	-- A queued historical snapshot must not reopen a session reset meanwhile.
+	-- A queued historical snapshot must not feed the live WPM of a session reset
+	-- meanwhile. The typing session itself is left to the keys and the pointer
+	-- (session_machine.lua): synthetic text opens and extends none, as on
+	-- Windows and Linux, so no session can open without its session_start.
 	if operation.session_generation == CoreState.session_generation then
 		for _ = 1, operation.deletes do
 			remove_effective_timestamp_at_or_before(operation.timestamp_ms)
 		end
 		insert_effective_timestamps(operation.timestamp_ms, char_count)
 		if char_count > 0 then
-			CoreState.session_last_active = math.max(
-				CoreState.session_last_active or 0, operation.timestamp_ms)
-			if CoreState.session_start_time == 0
-				or CoreState.session_start_time > operation.timestamp_ms then
-				CoreState.session_start_time = operation.timestamp_ms
-			end
+			CoreState.typing_last_active = math.max(CoreState.typing_last_active, operation.timestamp_ms)
 		end
 	end
 
@@ -1756,8 +1772,8 @@ function M.get_live_stats()
 		table.remove(CoreState.recent_typing_phys, 1)
 	end
 
-	local is_idle = (CoreState.session_last_active == 0)
-		or ((now - CoreState.session_last_active) > WPM_IDLE_RESET_MS)
+	local is_idle = (CoreState.typing_last_active == 0)
+		or ((now - CoreState.typing_last_active) > WPM_IDLE_RESET_MS)
 
 	local wpm_eff, wpm_phys = 0, 0
 	if not is_idle then
@@ -2182,6 +2198,17 @@ local function teardown_runtime(opts)
 			end,
 		},
 		{
+			-- A stop ends the open session as the idle timeout would, before the
+			-- log manager that stores its session_end stops.
+			name = "typing-session",
+			run = function()
+				if CoreState.session_start_time > 0 then
+					SessionMachine.close(CoreState, append_session_log)
+				end
+				return true
+			end,
+		},
+		{
 			name = "process-lifecycle",
 			run = function()
 				if not _process_lifecycle_cleanup_required then return true end
@@ -2368,7 +2395,7 @@ function M.start(script_control)
 		if subscribed ~= true then error("input-source subscription failed") end
 	
 		-- Cache the keymap module reference once to avoid pcall(require, ...) per keystroke
-		local ok_km, km = pcall(require, "modules.keymap")
+		local ok_km, km = pcall(require, "hotstrings.engine.expander")
 		if ok_km and type(km) == "table" then
 			_keymap_mod = km
 			Logger.debug(LOG, "Keymap module cached for shift-side detection.")

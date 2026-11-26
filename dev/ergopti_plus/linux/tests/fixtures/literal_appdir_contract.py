@@ -102,8 +102,9 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
     for name in (
         "lib/lua/5.1/posix/sys/stat.so",
         "share/lua/5.1/posix/init.lua",
-        "lib/gio/modules/libgiolibproxy.so",
-        "share/glib-2.0/schemas/gschemas.compiled",
+        "lib/lua/5.1/lgi/corelgilua51.so",
+        "share/lua/5.1/lgi.lua",
+        "lib/girepository-1.0/GObject-2.0.typelib",
     ):
         path = usr / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -246,7 +247,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         run(
             [
                 usr / "bin/luajit",
-                driver / "adapters/desktop_opener_worker.lua",
+                driver / "apps/adapters/desktop_opener_worker.lua",
                 "https://example.invalid/",
                 "1000",
             ],

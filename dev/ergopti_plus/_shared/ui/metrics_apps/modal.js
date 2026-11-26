@@ -5,6 +5,20 @@
 
 let _appModalChart = null;
 
+// The control that opened the drill-down, which gets the focus back on close.
+let _appModalOpener = null;
+
+/**
+ * Makes everything but the drill-down inert, or live again: while the modal
+ * is open the keyboard and assistive technology stay in it (WCAG 2.4.3).
+ * @param {boolean} inert
+ */
+function setAppModalBackgroundInert(inert) {
+	Array.from(document.body.children).forEach((node) => {
+		if (node.id !== 'app_drilldown_modal' && node.tagName !== 'SCRIPT') node.inert = inert;
+	});
+}
+
 /**
  * Aggregates the manifest for a single app within the active period and
  * renders the drill-down modal: 6 stat tiles, an hourly chart, top
@@ -84,11 +98,11 @@ function openAppDrilldown(appName) {
 	document.getElementById('app_modal_tiles').innerHTML = tiles
 		.map(
 			(t) =>
-				`<div class="app-modal-tile">
-			<div class="app-modal-tile-label">${escapeHtml(t.label)}</div>
-			<div class="app-modal-tile-value">${escapeHtml(t.value)}</div>
-			${t.detail ? `<div class="app-modal-tile-detail">${escapeHtml(t.detail)}</div>` : ''}
-		</div>`
+				`<li class="app-modal-tile">
+			<p class="app-modal-tile-label">${escapeHtml(t.label)}</p>
+			<p class="app-modal-tile-value">${escapeHtml(t.value)}</p>
+			${t.detail ? `<p class="app-modal-tile-detail">${escapeHtml(t.detail)}</p>` : ''}
+		</li>`
 		)
 		.join('');
 
@@ -140,10 +154,10 @@ function openAppDrilldown(appName) {
 					.slice(0, 8)
 					.map(
 						([dest, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}</span></div>`
+							`<li class="pair"><bdi>${escapeHtml(dest)}</bdi><data value="${n}">${n}</data></li>`
 					)
 					.join('')
-			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
+			: `<li class="muted">${_t('ui_apps.kpi_no_backslash_out')}</li>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
 	// Layouts are projected with the same admitted app/day rows as the tiles.
@@ -154,63 +168,83 @@ function openAppDrilldown(appName) {
 					.sort((x, y) => y[1] - x[1])
 					.map(
 						([id, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}×</span></div>`
+							`<li class="pair"><bdi>${escapeHtml(id)}</bdi><data value="${n}">${n}×</data></li>`
 					)
 					.join('')
-			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
+			: `<li class="muted">${_t('ui_apps.kpi_no_layout')}</li>`;
 	document.getElementById('app_modal_layouts').innerHTML = layouts_html;
 
 	// Records
 	const recs = [];
 	if (a.session_longest_ms > 0) {
 		recs.push(
-			`<div>${_t('ui_apps.modal_record_session')
+			`${_t('ui_apps.modal_record_session')
 				.replace('{dur}', formatDuration(a.session_longest_ms))
-				.replace('{chars}', '')}</div>`
+				.replace('{chars}', '')}`
 		);
 	}
 	if (a.session_longest_chars > 0) {
-		recs.push(
-			`<div>${_t('ui_typing.lbl_longest_chars')}: ${format_int(a.session_longest_chars)}</div>`
-		);
+		recs.push(`${_t('ui_typing.lbl_longest_chars')}: ${format_int(a.session_longest_chars)}`);
 	}
 	if ((a.burst_max_cpm || 0) > 0) {
-		recs.push(
-			`<div>${_t('ui_apps.modal_record_burst').replace('{n}', a.burst_max_cpm.toFixed(0))}</div>`
-		);
+		recs.push(`${_t('ui_apps.modal_record_burst').replace('{n}', a.burst_max_cpm.toFixed(0))}`);
 	}
 	if ((a.cascade_count || 0) > 0) {
-		recs.push(`<div>${_t('ui_apps.modal_record_cascade').replace('{n}', a.cascade_count)}</div>`);
+		recs.push(`${_t('ui_apps.modal_record_cascade').replace('{n}', a.cascade_count)}`);
 	}
 	const rec_html =
 		recs.length > 0
-			? recs.map((r) => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
-			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
+			? recs.map((r) => `<li>${r}</li>`).join('')
+			: `<li class="muted">${_t('ui_apps.kpi_no_record')}</li>`;
 	document.getElementById('app_modal_records').innerHTML = rec_html;
 
 	// Hotstrings & IA
 	const hs_pct = (a.chars || 0) > 0 ? (a.hs_chars / a.chars) * 100 : 0;
 	const llm_pct = (a.chars || 0) > 0 ? (a.llm_chars / a.chars) * 100 : 0;
 	document.getElementById('app_modal_assist').innerHTML =
-		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_hs_line')
+		`<li>${_t('ui_apps.modal_hs_line')
 			.replace('{n}', format_int(a.hs_chars || 0))
-			.replace('{pct}', hs_pct.toFixed(1))}</div>` +
-		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line')
+			.replace('{pct}', hs_pct.toFixed(1))}</li>` +
+		`<li>${_t('ui_apps.modal_llm_line')
 			.replace('{n}', format_int(a.llm_chars || 0))
-			.replace('{pct}', llm_pct.toFixed(1))}</div>` +
-		`<div style="font-size:12px;padding:3px 0;color:${ThemeTokens.color('grey-888')};">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
+			.replace('{pct}', llm_pct.toFixed(1))}</li>` +
+		`<li class="muted">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</li>`;
 
+	// A click on the backdrop, outside the card, closes it too (bound once).
+	if (!modal._backdropBound) {
+		modal.addEventListener('click', (event) => {
+			if (event.target === modal) window.closeAppDrilldown();
+		});
+		modal._backdropBound = true;
+	}
+
+	// A redraw of an open drill-down keeps the control that first opened it.
+	if (modal.style.display !== 'flex') _appModalOpener = document.activeElement;
+	setAppModalBackgroundInert(true);
 	modal.style.display = 'flex';
+	document.getElementById('app_modal_close').focus();
 }
 
 window.openAppDrilldown = openAppDrilldown;
 window.closeAppDrilldown = function () {
 	const modal = document.getElementById('app_drilldown_modal');
-	if (modal) modal.style.display = 'none';
+	if (!modal || modal.style.display === 'none') return;
+	modal.style.display = 'none';
+	setAppModalBackgroundInert(false);
+	const opener = _appModalOpener;
+	_appModalOpener = null;
+	if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus();
 };
 
+// Escape closes the drill-down, as every dialog does.
+document.addEventListener('keydown', (event) => {
+	if (event.key === 'Escape') window.closeAppDrilldown();
+});
+
+// Integers in the interface language the host seeded, as the dates are; it
+// was French for every locale (MET-07).
 function format_int(n) {
-	return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0));
+	return new Intl.NumberFormat(window._i18n_locale || undefined).format(Math.round(n || 0));
 }
 
 document.addEventListener('DOMContentLoaded', initDashboard);

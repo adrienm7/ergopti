@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MUTATED = {
-	"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
+	"modules.shortcuts.actions.text", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 }
 

@@ -6,11 +6,11 @@
 		"ahk": "AutoHotkey v2 hotkey name: SCnnn scan code for keys, the key name for mouse buttons and wheel directions.",
 		"ahk_send": "AutoHotkey Send name for a layout-independent key, or null for a character key (a Send of a character key uses {SCnnn} so the active layout cannot change which key is pressed).",
 		"evdev": "Linux input-event-codes.h KEY_* / BTN_* code; null for a wheel direction (a REL_WHEEL / REL_HWHEEL motion, described by axis and direction).",
-		"hs": "macOS virtual keycode (kVK_*) for keys, the NSEvent button number for mouse buttons; null for a wheel direction.",
+		"hs": "macOS virtual keycode (kVK_*) for keys, the NSEvent button number for mouse buttons; null for a wheel direction, and for the JIS keys macOS never reports (Henkan, Muhenkan, Katakana/Hiragana: IOHIDFamily's Cosmo_USB2ADB.c maps HID usages 0x88, 0x8A and 0x8B to no keycode).",
 		"karabiner": "Karabiner-Elements event object ({key_code}, {consumer_key_code} or {pointing_button}); null for a wheel direction, which Karabiner cannot take as input.",
-		"kanata": "kanata key name, in the short form every kanata release accepts.",
+		"kanata": "kanata key name, in the short form every kanata release accepts (IntlYen is ¥: kanata reads yen as the Backslash key).",
 		"macos_iso": "Overrides for macOS on an ISO keyboard: macOS reports the key left of 1 and the key left of Z with swapped codes (kVK_ISO_Section / kVK_ANSI_Grave, and non_us_backslash / grave_accent_and_tilde in Karabiner).",
-		"geometry": "Per form factor (ansi, iso): row (0 = function row), col (left edge, in key units), width, and for a key taller than one row its height; the ISO Enter also gives bottom_col and bottom_width for its narrower lower row. A form a key is absent from has no entry.",
+		"geometry": "Per form factor (ansi, iso): row (0 = function row), col (left edge, in key units), width, and for a key taller than one row its height; the ISO Enter also gives bottom_col and bottom_width for its narrower lower row. A form a key is absent from has no entry. The keys only JIS and ABNT keyboards have (IntlYen, IntlRo, NonConvert, Convert, KanaMode, NumpadComma) have an empty geometry: they sit on no ANSI or ISO board. The JIS and ABNT boards are keyboard_forms.json, which no driver parses: a jis and an abnt entry on every key here made the Windows boot parse of this file about 40 % slower (2026-11-17), the six records alone a few percent.",
 		"axis": "Wheel only: vertical or horizontal.",
 		"direction": "Wheel only: +1 for up/right, -1 for down/left."
 	},
@@ -1450,6 +1450,72 @@
 				"ansi": { "row": 5, "col": 20.5, "width": 1 },
 				"iso": { "row": 5, "col": 20.5, "width": 1 }
 			}
+		},
+		"IntlYen": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC07D",
+			"ahk_send": null,
+			"evdev": 124,
+			"hs": 93,
+			"karabiner": { "key_code": "international3" },
+			"kanata": "¥",
+			"geometry": {}
+		},
+		"IntlRo": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC073",
+			"ahk_send": null,
+			"evdev": 89,
+			"hs": 94,
+			"karabiner": { "key_code": "international1" },
+			"kanata": "ro",
+			"geometry": {}
+		},
+		"NonConvert": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC07B",
+			"ahk_send": null,
+			"evdev": 94,
+			"hs": null,
+			"karabiner": { "key_code": "international5" },
+			"kanata": "mhnk",
+			"geometry": {}
+		},
+		"Convert": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC079",
+			"ahk_send": null,
+			"evdev": 92,
+			"hs": null,
+			"karabiner": { "key_code": "international4" },
+			"kanata": "henk",
+			"geometry": {}
+		},
+		"KanaMode": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC070",
+			"ahk_send": null,
+			"evdev": 93,
+			"hs": null,
+			"karabiner": { "key_code": "international2" },
+			"kanata": "katakanahiragana",
+			"geometry": {}
+		},
+		"NumpadComma": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC07E",
+			"ahk_send": null,
+			"evdev": 121,
+			"hs": 95,
+			"karabiner": { "key_code": "keypad_comma" },
+			"kanata": "kp,",
+			"geometry": {}
 		},
 		"AudioVolumeMute": {
 			"kind": "key",

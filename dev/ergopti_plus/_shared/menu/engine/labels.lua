@@ -15,7 +15,7 @@
 --- 2. decorate_section: frames a section header title for disabled menu
 ---    header rows. The frame is data, _shared/menu/data/section_header.json,
 ---    generated into menu.section_header_data here and into the constants
----    MenuSectionTitle (windows/infra/menu_helpers.ahk) reads, so one edit
+---    MenuSectionTitle (windows/menu/engine/helpers.ahk) reads, so one edit
 ---    restyles every header of the three drivers.
 ---
 --- Windows cannot require Lua modules; a JS drift gate keeps its formatters
@@ -47,6 +47,22 @@ function M.fmt_count(n)
 		r = r .. s:sub(i, i)
 	end
 	return r
+end
+
+
+
+
+--- Whether a hotstring family's parent row (a category whose sections open
+--- in its submenu) is drawn checked: its gate open and at least one of its
+--- hotstrings active. Maintainer decision of 2026-11-25: never « checked
+--- (0) », which read as on while nothing fired; the gate itself stays the
+--- submenu's own switch. Windows holds the same rule as HS_FamilyChecked
+--- (windows/menu/engine/helpers.ahk).
+--- @param gate_open boolean Whether the category's gate is open.
+--- @param active_count number The active hotstrings the row's label counts.
+--- @return boolean
+function M.family_checked(gate_open, active_count)
+	return gate_open == true and (tonumber(active_count) or 0) > 0
 end
 
 

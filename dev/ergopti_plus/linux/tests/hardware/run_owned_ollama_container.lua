@@ -43,7 +43,7 @@ end
 
 -- The refusal dialog: pick the row the user would click to start Ergopti's Ollama.
 local dialog_rows = {}
-package.loaded["ui.llm_enable_refusal"] = { show = function(_, rows)
+package.loaded["ai.ui.enable_refusal"] = { show = function(_, rows)
 	local wanted = require("core.i18n.engine.i18n").get("ollama.runtime_start")
 	local selected
 	for _, row in ipairs(rows) do
@@ -59,10 +59,10 @@ package.loaded["core.ui.ui.webview_manager"] = {
 	is_visible = function() return true end, set_daemon_state = function() end,
 }
 
-local Bridge = require("infra.llm_bridge")
-local Profiles = require("modules.llm.profiles")
-local Engine = require("modules.llm.prediction_engine")
-local Download = require("modules.llm.model_download")
+local Bridge = require("ai.engine.bridge")
+local Profiles = require("ai.engine.settings.profiles")
+local Engine = require("ai.engine.prediction.engine")
+local Download = require("ai.engine.local_servers.model_download")
 local Window = require("ui.download_window.bridge")
 local Http = require("core.network.adapters.http_client")
 local EventLoop = require("core.events.loop")
@@ -94,7 +94,7 @@ for _, entry in ipairs(served) do
 	result.served[#result.served + 1] = { executable = entry.executable, ollama_host = hosts,
 		proxy = proxies, running = entry.operation:is_running() == true }
 end
-result.direct_fallback = require("modules.llm.ollama_install_state").direct_fallback(result.base_url)
+result.direct_fallback = require("ai.engine.ollama.install_state").direct_fallback(result.base_url)
 
 local tag = os.getenv("ERGOPTI_PROOF_PULL_TAG")
 if result.enabled and tag and tag ~= "" then

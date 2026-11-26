@@ -1,0 +1,1 @@
+import{n as e}from"../chunks/XKyaHtl9.js";import{n as t}from"../chunks/CVuXACa6.js";import"../chunks/Ci8JmZkJ.js";import{t as n}from"../chunks/yNNqIl2d.js";var r=e({load:()=>i,prerender:()=>!0});function i(){n(308,t(`/ergopti-plus`))}export{r as universal};

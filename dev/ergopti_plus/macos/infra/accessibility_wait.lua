@@ -15,22 +15,25 @@
 ---    boot of an install resets: a reload or relaunch of the same install that
 ---    reset at every boot erased the entry the user had just added (field report
 ---    2026-11-05), so the reset is remembered by install identity.
---- 2. macOS's own prompt, with the Settings pane opened behind it. Its
----    button adds and selects the right entry; a second Ergopti dialog asking
----    to find the app with Cmd+Shift+G and + only competed with it (field
----    report 2026-11-05).
+--- 2. macOS's own prompt, the Settings pane and the steps. macOS's prompt
+---    adds an entry named "Hammerspoon", the runtime nested in the app; on a
+---    first install, turning that entry on did not start the driver, and
+---    nothing said that ErgoptiPlus.app itself had to be added with + (field
+---    report 2026-11-23). The steps (show_guide) therefore always name the app
+---    and its install path, and say how to add it.
 --- 3. Other copies first: a copy signed differently (a local build beside
 ---    the installed prerelease) shares the bundle identifier, so the switch
 ---    the user turns on can be its own. Resetting then only erased that
 ---    switch at every reload. When the probe finds such copies the entry is
----    left alone and a dialog names their paths; a failed probe falls back to
----    the reset, which a lone copy needs.
---- 4. No relaunch: trust is polled, and the boot continues as soon as it is
----    granted. A bounded deadline keeps an ignored request from leaving a
----    process with no input and no menu running forever.
---- 5. Never a dead end: the prompt can be dismissed, and there is no menu yet
----    to bring it back. Opening ErgoptiPlus again while the wait runs asks
----    macOS for its prompt again instead of doing nothing.
+---    left alone and the steps also name their paths; a failed probe falls
+---    back to the reset, which a lone copy needs.
+--- 4. No relaunch and no reload: trust is polled, and the boot continues as
+---    soon as it is granted. The user is never asked to reload a runtime whose
+---    menu they do not know. A bounded deadline keeps an ignored request from
+---    leaving a process with no input and no menu running forever.
+--- 5. Never a dead end: the prompt and the steps can be dismissed, and there
+---    is no menu yet to bring them back. Opening ErgoptiPlus again while the
+---    wait runs asks macOS for its prompt and shows the steps again.
 --- ==============================================================================
 
 local M = {}
@@ -62,7 +65,7 @@ local function validate(opts)
 			error("accessibility_wait.start: permission." .. name .. " must be a function", 3)
 		end
 	end
-	for _, name in ipairs({ "every", "cancel", "watch_reopen", "name_other_copies", "on_trusted", "on_timeout" }) do
+	for _, name in ipairs({ "every", "cancel", "watch_reopen", "show_guide", "on_trusted", "on_timeout" }) do
 		if type(opts[name]) ~= "function" then
 			error("accessibility_wait.start: " .. name .. " must be a function", 3)
 		end
@@ -88,22 +91,50 @@ local function prompt_user(permission)
 	end
 end
 
+--- Shows the steps, naming the other copies when the probe found some. A
+--- failure costs the steps only: the poll keeps running.
+--- @param state table The active wait.
+--- @param opts table Wait options (show_guide).
+local function guide_user(state, opts)
+	local ok, close = xpcall(opts.show_guide, debug.traceback, state.other_copies or {})
+	if ok and type(close) == "function" then
+		state.close_guide = close
+	else
+		Logger.error(LOG, "The Accessibility steps did not open: %s.", tostring(close))
+	end
+end
+
+--- Asks macOS for its prompt, opens the pane and shows the steps.
+--- @param permission table Accessibility permission adapter.
+--- @param state table The active wait.
+--- @param opts table Wait options (show_guide).
+local function prompt_and_guide(permission, state, opts)
+	state.guided = true
+	prompt_user(permission)
+	guide_user(state, opts)
+end
+
 --- Clears this app's stale entry once per install, then prompts once tccutil has settled.
 --- @param permission table Accessibility permission adapter.
 --- @param state table The active wait.
 --- @param opts table Wait options (install_identity, reset_memory).
 local function reset_then_prompt(permission, state, opts)
 	if opts.reset_memory.get() == opts.install_identity then
+		-- No tccutil runs, so nothing can revoke a grant: the poll may resume.
+		-- Left pending, every boot after an install's first (a reload, a
+		-- relaunch) ignored the grant until its deadline, so the user had to
+		-- reload once more (field report 2026-11-23).
+		state.reset_pending = false
 		Logger.info(LOG, "Accessibility entry already reset for install %s; keeping the user's entry.",
 			opts.install_identity)
-		prompt_user(permission)
+		prompt_and_guide(permission, state, opts)
 		return
 	end
 	local bundle_id, bundle_err = permission.bundle_id()
 	if bundle_id == nil then
 		state.reset_pending = false
 		Logger.warn(LOG, "Stale Accessibility grant not reset: %s.", tostring(bundle_err))
-		prompt_user(permission)
+		prompt_and_guide(permission, state, opts)
 		return
 	end
 	Logger.start(LOG, "Resetting the Accessibility entry of %s…", bundle_id)
@@ -119,12 +150,12 @@ local function reset_then_prompt(permission, state, opts)
 		else
 			Logger.warn(LOG, "Accessibility entry of %s not reset: %s.", bundle_id, tostring(detail))
 		end
-		prompt_user(permission)
+		prompt_and_guide(permission, state, opts)
 	end)
 	if started ~= true then
 		state.reset_pending = false
 		Logger.warn(LOG, "tccutil could not be started; prompting without resetting %s.", bundle_id)
-		prompt_user(permission)
+		prompt_and_guide(permission, state, opts)
 	end
 end
 
@@ -132,7 +163,7 @@ end
 --- switch, and names those copies; otherwise resets once per install.
 --- @param permission table Accessibility permission adapter.
 --- @param state table The active wait.
---- @param opts table Wait options (name_other_copies, install_identity, reset_memory).
+--- @param opts table Wait options (show_guide, install_identity, reset_memory).
 local function check_copies_then_reset(permission, state, opts)
 	local started, start_err = permission.other_copies(function(paths, detail)
 		if state.finished then
@@ -152,14 +183,8 @@ local function check_copies_then_reset(permission, state, opts)
 		state.reset_pending = false
 		Logger.warn(LOG, "%d other copies signed differently can hold the Accessibility switch: %s; not resetting.",
 			#paths, table.concat(paths, ", "))
-		prompt_user(permission)
 		state.other_copies = paths
-		local ok, close = xpcall(opts.name_other_copies, debug.traceback, paths)
-		if ok and type(close) == "function" then
-			state.close_copies_dialog = close
-		else
-			Logger.error(LOG, "The dialog naming the other copies did not open: %s.", tostring(close))
-		end
+		prompt_and_guide(permission, state, opts)
 	end)
 	if started ~= true then
 		Logger.warn(LOG, "Other copies of the app could not be listed (%s); resetting as for a lone copy.",
@@ -180,7 +205,7 @@ local function finish(state, opts, continuation)
 		Logger.warn(LOG, "Accessibility poll timer did not settle on cancel.")
 	end
 	if state.stop_reopen_watch ~= nil then state.stop_reopen_watch() end
-	if state.close_copies_dialog ~= nil then state.close_copies_dialog() end
+	if state.close_guide ~= nil then state.close_guide() end
 	continuation()
 end
 
@@ -194,8 +219,10 @@ end
 --- Starts waiting for Accessibility trust.
 --- @param opts table {permission, every(seconds, fn) -> handle, committed,
 ---        cancel(handle) -> settled, watch_reopen(fn) -> stop|nil, detail (calls fn each time the user
----        opens ErgoptiPlus again), name_other_copies(paths) -> close|nil (shows
----        the copies that can hold the switch), on_trusted(), on_timeout(elapsed_seconds),
+---        opens ErgoptiPlus again), show_guide(copies) -> close|nil (shows the
+---        steps that add and turn on the app; copies lists the other copies
+---        that can hold the switch, empty for a lone copy), on_trusted(),
+---        on_timeout(elapsed_seconds),
 ---        install_identity (this install's code identity), reset_memory
 ---        {get() -> identity|nil, set(identity) -> ok} (the install whose stale
 ---        entry was last reset), poll_seconds?, deadline_seconds?}.
@@ -237,10 +264,8 @@ function M.start(opts)
 		if state.finished then return end
 		Logger.info(LOG, "ErgoptiPlus was opened again while waiting; asking macOS for its prompt again.")
 		prompt_user(opts.permission)
-		if state.other_copies ~= nil then
-			local ok, err = xpcall(opts.name_other_copies, debug.traceback, state.other_copies)
-			if not ok then Logger.error(LOG, "The dialog naming the other copies raised: %s.", tostring(err)) end
-		end
+		-- Before the first prompt, the probe's answer shows the steps itself.
+		if state.guided then guide_user(state, opts) end
 	end)
 	if type(stop_watch) == "function" then
 		state.stop_reopen_watch = stop_watch

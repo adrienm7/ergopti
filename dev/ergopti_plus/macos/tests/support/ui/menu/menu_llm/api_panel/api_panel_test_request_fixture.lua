@@ -56,7 +56,7 @@ local function install_doubles(args)
 			return true
 		end,
 	}
-	package.loaded["modules.llm"] = { api_remote = api_remote }
+	package.loaded["ai.engine"] = { api_remote = api_remote }
 	-- The two body templates mirror the en.json shapes so the substitution
 	-- wiring is exercised; every other key echoes itself.
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
@@ -96,13 +96,13 @@ local function install_doubles(args)
 		},
 		logger = helpers.make_logger_stub(),
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		command_row = command_renderer.command_row,
 		template_rows = command_renderer.template_rows,
 		get_array = command_renderer.get_array,
 		render_rows = function(rows) return rows end,
 	}
-	package.loaded["ui.menu.menu_llm.api_panel"] = nil
+	package.loaded["ai.ui.menu.panels.api_panel"] = nil
 	return api_remote, calls, notifications
 end
 
@@ -116,7 +116,7 @@ end
 
 
 local function with_api_add_locale(scenario)
-	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired

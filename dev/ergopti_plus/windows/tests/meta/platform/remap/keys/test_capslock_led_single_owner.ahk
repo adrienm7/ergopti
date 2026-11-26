@@ -130,7 +130,7 @@ _CLSO_NativeCaseMatrix() {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Observe)
 		AssertTrue(Handle.start(), "the actual native CapsLock probe must start")
 		Started := A_TickCount
-		while Receipts.Length == 0 && TickElapsed(Started) < 5000 {
+		while Receipts.Length == 0 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

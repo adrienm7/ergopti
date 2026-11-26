@@ -95,14 +95,22 @@ local shell = connect()
 check(call(shell, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "RequestName",
 	{ Focus.SERVICES.gnome }, 4), "the stand-in Shell owns org.gnome.Shell")
 
+-- The silence bound the daemon passes (compositor_focus.lua), from the same
+-- timing registry: the worker refuses to start without one.
+local silence_ms = require("core.timing.engine.timings").ms("adapters", "desktop_focus_silence_ms")
 local worker_command = "exec luajit platform/focus/compositor_focus_worker.lua " .. Focus.SERVICES.gnome .. " "
-	.. tostring(ffi.C.getpid()) .. " ../_shared"
+	.. tostring(ffi.C.getpid()) .. " ../_shared " .. tostring(silence_ms)
 local worker = assert(io.popen(worker_command, "r"))
 local function next_record()
 	local line = worker:read("*l")
 	return line and Json.decode(line) or nil
 end
 check((next_record() or {}).kind == "ready", "the worker owns its name and says so")
+-- The stand-in Shell serves no org.gnome.Shell.Extensions: the worker's start
+-- check reads the extension's state as unanswered, before any report.
+local start_check = next_record() or {}
+check(start_check.kind == "extension" and start_check.state == "unanswered" and start_check.silent == false,
+	"the worker asks GNOME Shell for the extension's state at start")
 
 check(report(shell, "Activated", { "org.gnome.Nautilus", "Documents", "4242", "17" }),
 	"the desktop's report is acknowledged")

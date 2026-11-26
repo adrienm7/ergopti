@@ -50,7 +50,7 @@ end
 --- @return boolean
 function M.streaming_capable(platform, backend)
 	return (platform == "hs" and (backend == "ollama" or backend == "mlx"))
-		or (platform == "linux" and backend == "ollama")
+		or ((platform == "ahk" or platform == "linux") and backend == "ollama")
 end
 
 --- Whether a fresh native snapshot admits changing token streaming.

@@ -59,7 +59,7 @@ _PEWO_Case(Surface, OpenFn, StateFn) {
 		if InStr(Line, "[ERROR]") && InStr(Line, "The " . Surface . " cannot open: WebView2 is required")
 			Errors.Push(Line)
 	AssertEqual(1, Errors.Length, "the refusal must be logged once at ERROR")
-	AssertContains(Errors[1], "WebView2Loader.dll is missing", "the logged reason must name what failed")
+	AssertContains(Errors[1], "the WebView2 binding is not loaded", "the logged reason must name what failed")
 }
 
 Test("Personal hotstrings editor: an absent WebView2 shows the required message and builds no native Gui (personal-editors-webview-only)",

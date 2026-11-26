@@ -287,11 +287,11 @@ local function run_hold(transition, expected, options)
 			privacy_owners = {},
 			keystats = logger,
 			script_actions = { is_paused = function() return state.paused end },
-			MagicKeySource = { cancel_capture = noop },
 			TapHold = { set_paused = noop, observe_copy_activity = noop },
 			Logger = helpers.make_logger_stub(),
 			engine = { reset = noop },
-			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end },
+			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end,
+				text_automation = function() return true, "field", "field_admitted" end },
 		}
 		local block = assert(main:match("input_capture_gate = InputCaptureGate.new%({%s*on_block = function(.-)\n\t\tend,"))
 		local gate = require("platform.input.capture_gate").new({ on_block = source_callback(block, environment) })
@@ -325,7 +325,7 @@ local function run_hold(transition, expected, options)
 		environment.InputEvent = require("platform.input.event")
 		environment.Monotonic = clock
 		environment._cached_app_id = "code"
-		local startup = assert(main:match("keyboard_hook.start%(%{(.-)\n\t%}%)"))
+		local startup = assert(main:match("local hook_start_options = %{(.-)\n\t%}\n\tkeyboard_hook%.start%(hook_start_options%)"))
 		local physical_binding = assert(startup:match("onPhysical%s*=%s*([%w_]+),"))
 		local hold_binding = assert(startup:match("onHold%s*=%s*([%w_]+),"))
 		local admission_binding = assert(startup:match("onHoldAdmission%s*=%s*([%w_]+),"))
@@ -339,6 +339,8 @@ local function run_hold(transition, expected, options)
 
 		if options.before then options.before(logger, state) end
 		local hook = helpers.load_module("platform.input.keyboard_hook")
+		-- The genuine physical callback asks the hook which modifiers are held (TWD-2).
+		environment.keyboard_hook = hook
 		local forwarded = {}
 		local changed = false
 		local code = options.code or 30

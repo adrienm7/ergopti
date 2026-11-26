@@ -41,7 +41,7 @@ func openProxy(t *testing.T) string {
 func TestProbePrintsOneJSONLine(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"probe", "--upstream", openProxy(t), "--authority", "registry.ollama.ai:443",
-		"--dial-timeout-ms", "1000", "--handshake-timeout-ms", "1000"}, &stdout, &stderr)
+		"--dial-timeout-ms", "1000", "--handshake-timeout-ms", "1000"}, strings.NewReader(""), &stdout, &stderr)
 	var line map[string]any
 	if code != exitOK || json.Unmarshal(stdout.Bytes(), &line) != nil || line["status"] != "not_needed" || line["schema"] != 1.0 {
 		t.Fatalf("code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
@@ -62,14 +62,36 @@ func TestInvalidArgumentsExitTwoByName(t *testing.T) {
 		{"run", "--upstream", proxy, "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1", "--idle-timeout-ms", "1", "--", "true"},
 		{"run", "--upstream", proxy, "--variable", "HTTPS_PROXY", "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1", "--", "true"},
 		{"probe", "--unknown"},
+		{"listen", "--upstream", proxy, "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1"},
+		{"listen", "--upstream", proxy, "--variable", "HTTPS_PROXY", "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1", "--idle-timeout-ms", "1"},
+		{"listen", "--upstream", proxy, "--authority", "a:443", "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1", "--idle-timeout-ms", "1"},
+		{"listen", "--upstream", proxy, "--dial-timeout-ms", "1", "--handshake-timeout-ms", "1", "--idle-timeout-ms", "1", "--", "true"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if code := run(arguments, &stdout, &stderr); code != exitInvalidArguments {
+		if code := run(arguments, strings.NewReader(""), &stdout, &stderr); code != exitInvalidArguments {
 			t.Fatalf("%v exited %d", arguments, code)
 		}
 		if strings.Contains(stderr.String(), "secret") || !strings.Contains(stderr.String(), "relay_refused") {
 			t.Fatalf("%v stderr %q", arguments, stderr.String())
 		}
+	}
+}
+
+// listen is the macOS managed daemon's sibling: one line on stdout for its
+// owner, the token there only, and an exit once stdin reaches EOF.
+func TestListenPrintsItsLineAndEndsAtEOF(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"listen", "--upstream", openProxy(t), "--dial-timeout-ms", "1000",
+		"--handshake-timeout-ms", "1000", "--idle-timeout-ms", "1000"}, strings.NewReader(""), &stdout, &stderr)
+	var line proxyrelay.ListenLine
+	if code != exitOK || json.Unmarshal(stdout.Bytes(), &line) != nil || line.Schema != 1 || line.Port <= 0 || len(line.Token) != 64 {
+		t.Fatalf("code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
+	}
+	if strings.Count(stdout.String(), "\n") != 1 || strings.Contains(stderr.String(), line.Token) {
+		t.Fatalf("stdout %q stderr %q", stdout.String(), stderr.String())
+	}
+	if stderr.String() != "ergopti-proxy-relay: relay_started\nergopti-proxy-relay: relay_stopped\n" {
+		t.Fatalf("stderr %q", stderr.String())
 	}
 }
 
@@ -79,7 +101,7 @@ func TestRefusedProbeExitsThree(t *testing.T) {
 	listener.Close()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"probe", "--upstream", "http://" + address, "--authority", "a.example:443",
-		"--dial-timeout-ms", "500", "--handshake-timeout-ms", "500"}, &stdout, &stderr)
+		"--dial-timeout-ms", "500", "--handshake-timeout-ms", "500"}, strings.NewReader(""), &stdout, &stderr)
 	if code != exitRefused || !strings.Contains(stdout.String(), `"reason":"upstream_unreachable"`) {
 		t.Fatalf("code %d stdout %q", code, stdout.String())
 	}

@@ -23,7 +23,7 @@ function M.install()
 			and receipt.window_id == current.window_id and receipt.element == current.element
 	end
 	function boundary.revoke() current = nil end
-	package.loaded["modules.keymap.utils"] = boundary
+	package.loaded["hotstrings.engine.expander.utils"] = boundary
 	return boundary
 end
 

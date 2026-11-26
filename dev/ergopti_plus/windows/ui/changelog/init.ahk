@@ -27,6 +27,9 @@
 ;    posts restore_backup; the driver reloads on the restored configuration.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\reading_preferences.ahk
+
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
 
 
@@ -136,12 +139,10 @@ _CLW_OpenCapturedRequest(Channel, Request) {
 	_CLW_Ready   := false
 	_CLW_Queue   := []
 
-	; Bail early if WebView2 is unavailable, or if free RAM is too low to absorb
-	; the Chromium cold start — fall back to the lighter native changelog window.
-	if (!_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()) {
-		_Updater_OpenChangelogWindow(Channel, Request)
-		return
-	}
+	; There is no native Versions window: without WebView2 the opening refuses
+	; in words before building anything (maintainer decision 2026-11-21).
+	if !WebView_RequireAvailable("Versions window")
+		return false
 
 	_CLW_BuildWindow(Channel, Request)
 }
@@ -185,9 +186,9 @@ _CLW_BuildWindow(Channel, Request) {
 	g.MarginY   := 0
 
 	; Full-window placeholder that WebView2.Fill() will cover.
-	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x580, SSoT);
+	; Geometry mirrors _shared/ui/apps.manifest.json (changelog 860x620, SSoT);
 	; pinned by tools/test/test-webview-geometry-single-source.cjs.
-	Placeholder := g.Add("Text", "x0 y0 w860 h580", "")
+	Placeholder := g.Add("Text", "x0 y0 w860 h620", "")
 
 	g.OnEvent("Close",  _CLW_OnClose)
 	g.OnEvent("Escape", _CLW_OnClose)
@@ -208,7 +209,7 @@ _CLW_BuildWindow(Channel, Request) {
 		try g.Destroy()
 		return false
 	}
-	try g.Show("w860 h580")
+	try g.Show("w860 h620")
 	catch as Err {
 		; Native destruction during Show is an ordinary retired opening.
 		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
@@ -246,9 +247,10 @@ _CLW_BuildWindow(Channel, Request) {
 			if SavedGui
 				SavedGui.Destroy()
 		}
-		; The epoch belongs to this retirement, before any abort/COM/native callout.
+		; The epoch belongs to this retirement, before any abort/COM/native callout:
+		; only this exact failed opening refuses, a newer one speaks for itself.
 		if SavedGui && ResetEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui)
-			_Updater_OpenChangelogWindow(Channel, Request)
+			WebView_RefuseUnavailable("Versions window", Err.Message)
 		return false
 	}
 	RequestCurrent := _Updater_RequestMayPublish(Request)
@@ -296,6 +298,7 @@ _CLW_BuildWindow(Channel, Request) {
 	session     := _CLW_BridgeSessionToken
 	seed := "window.__i18n_base='" . locales_url . "';"
 		. "window._i18n_locale='" . locale_code . "';"
+		. ReadingPrefs_SeedScript()
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
 		. "window.__changelog_channel="  . _CLW_JsStr(Channel)  . ";"
@@ -303,6 +306,7 @@ _CLW_BuildWindow(Channel, Request) {
 		. "window.__channel_switch_restarts=true;"
 		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 		. _CLW_InstallSeed()
+	ReadingPrefs_Track(_CLW_WebView)
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.
@@ -327,6 +331,7 @@ _CLW_BuildWindow(Channel, Request) {
 
 	; Fill the WebView2 to cover the entire window client area.
 	try _CLW_Controller.Fill()
+	WebView_TakeFocus(_CLW_Controller)
 
 	; Safety flush in case the "ready" message from JS never fires.
 	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
@@ -923,7 +928,7 @@ _CLW_InstallDeps(Request) {
 		"blocked", _CLW_InstallBlocked,
 		"find", _CLW_FindRelease,
 		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
-		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
+		"asset", _CLW_ReleaseAsset,
 		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
 		"report", _CLW_ReportInstall,
 		"failure_owner", () => Owner,
@@ -951,17 +956,72 @@ _CLW_RetryUpdatePath(Owner, Observer) {
 }
 
 /**
- * Finds a release in the list this window last fetched from the GitHub API.
+ * The asset a release installs from: the authenticated one of an API release,
+ * or the conventional URL of a feed release, whose size and digest the update
+ * path takes from its required signature.
+ * @param {Object} Release
+ * @returns {Object|Integer} The asset, or 0 when the release has none for Windows.
+ */
+_CLW_ReleaseAsset(Release) {
+	global BUNDLE_RELEASE_ASSET
+	if Release.HasProp("FeedOnly") && Release.FeedOnly == true {
+		Url := AssetSignature_FeedAssetUrl(BUNDLE_RELEASE_ASSET, Release.Tag)
+		return Url == "" ? 0 : {Url: Url}
+	}
+	return _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag)
+}
+
+/**
+ * Finds the release of a feed-only list that may install: the newest release
+ * of the channel on screen when the shared offer rule offers it, as macOS hands
+ * that one release to Sparkle. The feed names no files and no digests, so the
+ * release installs only through its detached signature: without a provisioned
+ * key every row keeps the no-details refusal.
  * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @param {Func|Integer} AvailableFn - Replaces the signing-key probe (tests only).
  * @returns {Map} Map("release", Release) or Map("reason", page locale key).
  */
-_CLW_FindRelease(Tag) {
+_CLW_FindFeedRelease(Tag, Channel, AvailableFn := 0) {
+	global _CLW_LastList, RELEASE_INSTALL_REASONS, UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(IsObject(AvailableFn) ? AvailableFn.Call() : AssetSignature_FeedInstallAvailable())
+		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+	if !(Channel is String) || Channel == "" || UpdateChannels_ForTag(Tag) == ""
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	List := _Updater_ParseReleaseFeed(_CLW_LastList["json"], UPDATER_GH_OWNER, UPDATER_GH_REPO, &Detail)
+	if (List == "")
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Wanted := _Updater_NormalizeTag(Tag)
+	Listed := false
+	for _, Row in Updater_ParseReleasesList(List)
+		if (_Updater_NormalizeTag(Row.Tag) == Wanted)
+			Listed := true
+	if !Listed
+		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
+	Newest := _Updater_SelectChannelRelease(List, Channel, _Updater_ReleaseListIndex(List))
+	NewestTag := (Newest is String && Newest != "") ? Updater_ParseTagName(Newest) : ""
+	if (NewestTag == "" || _Updater_NormalizeTag(NewestTag) != Wanted
+			|| !UpdateChannels_ShouldOffer(NewestTag, Updater_CurrentVersion(), Channel, _Updater_InstalledChannel()))
+		return Map("reason", RELEASE_INSTALL_REASONS["feed_not_newest"])
+	try LoggerInfo("Changelog", "Release {1} is the newest of channel {2} in the public feed: it installs only once its detached signature verifies.",
+		NewestTag, Channel)
+	return Map("release", {Tag: NewestTag, RawJson: Newest, FeedOnly: true, Body: "",
+		HtmlUrl: "", PublishedAt: "", Prerelease: false})
+}
+
+/**
+ * Finds a release in the list this window last fetched.
+ * @param {string} Tag
+ * @param {string} Channel - Registry channel on screen, posted by the page.
+ * @returns {Map} Map("release", Release) or Map("reason", page locale key).
+ */
+_CLW_FindRelease(Tag, Channel := "") {
 	global _CLW_LastList, _CLW_RequestEpoch, RELEASE_INSTALL_REASONS
 	if !(_CLW_LastList is Map) || _CLW_LastList.Get("request_epoch", 0) != _CLW_RequestEpoch
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	; The Atom feed carries no asset list and no digest.
 	if (_CLW_LastList["kind"] != "json")
-		return Map("reason", RELEASE_INSTALL_REASONS["no_details"])
+		return _CLW_FindFeedRelease(Tag, Channel)
 	if (UpdateChannels_ForTag(Tag) == "")
 		return Map("reason", RELEASE_INSTALL_REASONS["unknown_release"])
 	Wanted := _Updater_NormalizeTag(Tag)
@@ -1345,16 +1405,6 @@ _CLW_ReleaseActiveRequest(Context) {
 _CLW_AbortRequest(Request) {
 	if IsObject(Request)
 		try Request.Abort()
-}
-
-/**
- * Returns true when WebView2 is available and the loader DLL exists.
- * @returns {boolean}
- */
-_CLW_WebView2Available() {
-	global _VendorDir
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	return IsSet(WebView2) && FileExist(loader)
 }
 
 /**

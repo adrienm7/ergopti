@@ -45,7 +45,7 @@ local function importing_remap(fixture)
 		disk.expected[#disk.expected + 1] = expected or false
 		return save(state, path, overwrite, expected)
 	end
-	package.loaded["infra.config_paths"].get = function(key)
+	package.loaded["settings.engine.paths"].get = function(key)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return RUNNING
 	end

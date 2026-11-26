@@ -195,7 +195,7 @@ local function start_real_keystats()
 	package.loaded["core.fs.adapters.ledger_append"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 	-- KC file draining and hardware sensor collection are independent of the
 	-- privacy pipeline under test. Their doubles still model committed lifecycle

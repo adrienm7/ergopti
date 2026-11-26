@@ -17,6 +17,11 @@ global _ConfigTomlSnapshots := Map()
 ; Monotonic count of snapshot reads. Each one compares the whole snapshot with
 ; its shadow, so tests pin how many a step spends.
 global _ConfigTomlSnapshotReads := 0
+; Snapshot reads per caller<parent since the last interval publication. Each one
+; compares the whole snapshot with its shadow, so the startup smoke names the
+; owners a boot reads through instead of capping their count. Bounded like the
+; document parse owners.
+global _ConfigTomlSnapshotReadOwners := Map()
 ; The snapshot the open boot read stretch serves (ConfigTomlBootSnapshot), or 0.
 global _ConfigTomlBootReadMemo := 0
 
@@ -66,6 +71,28 @@ ConfigTomlBootSnapshot(Cache) {
 		throw Error("The early configuration reader lost its admitted cache")
 	_ConfigTomlBootReadMemo := Stretch ? Snapshot : 0
 	return Snapshot
+}
+
+/**
+ * The snapshot of Path, served by the open boot read stretch when it already
+ * admitted the published generation, read afresh otherwise. A boot consumer that
+ * reads config.toml by path (the logger, the feature loader, the metrics
+ * settings) re-proved the unchanged image with two whole-snapshot comparisons;
+ * ConfigTomlBootReadsRelease still proves the served image when the stretch
+ * closes. Outside the stretch, or for any other path, nothing changes.
+ * @param {String} Path - Configuration source path.
+ * @returns {Object} The typed snapshot ConfigTomlReadSnapshot describes.
+ */
+ConfigTomlReadBootServedSnapshot(Path) {
+	global ConfigurationFile, _ParseTomlCache, _ConfigTomlSnapshots
+	global ConfigMigrateBootReadProof, _ConfigTomlBootReadMemo
+	Served := _ConfigTomlBootReadMemo
+	if IsObject(Served) && IsSet(ConfigMigrateBootReadProof) && ConfigMigrateBootReadProof.open
+			&& IsSet(ConfigurationFile) && Path == ConfigurationFile
+			&& _ConfigTomlSnapshots.Has(Path) && _ConfigTomlSnapshots[Path] == Served
+			&& _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Served.Cache
+		return Served
+	return ConfigTomlReadSnapshot(Path)
 }
 
 /**
@@ -240,6 +267,30 @@ ConfigTomlDecodeSnapshotShared(Source) {
 	return Snapshot
 }
 
+/**
+ * The typed document of an exact configuration text, for READ-ONLY consumers.
+ * When the text is the one the published config.toml snapshot admitted, that
+ * snapshot's own document is served: the boot already parsed it, and a consumer
+ * that rereads the unchanged file paid a whole parse again. Any other text has
+ * the shared document parse. The result is shared and must not be mutated.
+ * @param {String} Source - Exact configuration text the caller read.
+ * @returns {Map} The semantic document of Source; malformed input throws.
+ */
+ConfigTomlSourceDocument(Source) {
+	global ConfigurationFile, _ConfigTomlSnapshots, _ParseTomlCache
+	if !(Source is String)
+		throw TypeError("Configuration source must be a String")
+	; Only the published generation: a snapshot whose cache was retired no longer
+	; owns the file, whatever text it holds.
+	if IsSet(ConfigurationFile) && _ConfigTomlSnapshots.Has(ConfigurationFile)
+			&& _ParseTomlCache.Has(ConfigurationFile) {
+		Admitted := _ConfigTomlSnapshots[ConfigurationFile]
+		if _ParseTomlCache[ConfigurationFile] == Admitted.Cache && Admitted.Source == Source
+			return Admitted.Document
+	}
+	return TOML_ParseDocumentShared(Source)
+}
+
 ; Reuses the actual inline-table owner to preserve each child literal spelling.
 ; Typed rendering alone would manufacture legacy Boolean intent from signed zero.
 _ConfigTomlRawTree(Value, Raw) {
@@ -301,6 +352,7 @@ ConfigTomlReadSnapshot(Path) {
 	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache, _ConfigTomlSnapshotReads
 	_ConfigTomlSnapshotReads += 1
 	PerfCount("config.snapshot_read")
+	_ConfigTomlSnapshotReadOwnerCount(Error("", -2).What . "<" . Error("", -3).What)
 	global _TomlReadFailures, _TomlUnreadableFiles
 	static Generations := Map()
 	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
@@ -537,4 +589,27 @@ _ConfigTomlSnapshotEqual(Left, Right) {
 		return true
 	}
 	return Left is String ? StrCompare(Left, Right, true) == 0 : Left == Right
+}
+
+/**
+ * Counts one snapshot read for its owner, within the document parse owner bound.
+ * @param {String} Owner - "caller<parent" as Error().What reports them.
+ */
+_ConfigTomlSnapshotReadOwnerCount(Owner) {
+	global _ConfigTomlSnapshotReadOwners, TOML_DOCUMENT_PARSE_OWNER_LIMIT
+	if _ConfigTomlSnapshotReadOwners.Has(Owner)
+		_ConfigTomlSnapshotReadOwners[Owner] += 1
+	else if _ConfigTomlSnapshotReadOwners.Count < TOML_DOCUMENT_PARSE_OWNER_LIMIT
+		_ConfigTomlSnapshotReadOwners[Owner] := 1
+}
+
+/**
+ * Returns and clears the snapshot read owners counted since the last call.
+ * @returns {Map} Owner to read count.
+ */
+ConfigTomlSnapshotReadOwnersTake() {
+	global _ConfigTomlSnapshotReadOwners
+	Owners := _ConfigTomlSnapshotReadOwners
+	_ConfigTomlSnapshotReadOwners := Map()
+	return Owners
 }

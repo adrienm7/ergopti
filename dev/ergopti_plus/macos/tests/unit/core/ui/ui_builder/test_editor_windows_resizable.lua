@@ -17,9 +17,9 @@ local helpers = require("tests.helpers")
 -- Each window owner and the mask expression it builds its window with.
 local OWNERS = {
 	["ui.action_picker"]        = '{ "titled", "closable", "resizable", "utility" }',
-	["ui.prompt_editor"]        = '{"titled", "closable", "resizable", "utility"}',
-	["ui.personal_info_editor"] = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
-	["ui.menu.menu_paths"]      = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
+	["ai.ui.prompt_editor"]        = '{"titled", "closable", "resizable", "utility"}',
+	["hotstrings.ui.personal_info_editor"] = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
+	["settings.ui.menu.paths"]      = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
 	["ui.onboarding"]           = '(masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8)',
 }
 

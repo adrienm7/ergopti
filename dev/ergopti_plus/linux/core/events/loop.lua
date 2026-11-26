@@ -108,6 +108,7 @@ local _external_closes = {} -- A handle invalidated during startup has another c
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
 local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield_idle().
+local _wake_requested = false -- The next idle tick skips its wait; see M.wake().
 
 local Monotonic = require("core.logger.engine.monotonic")
 local Perf = require("core.logger.engine.perf_counters")
@@ -164,14 +165,48 @@ local function _run_idle_handlers()
 	end
 end
 
+-- The idle wait's libuv half (handed to the supplied wait): the loop's backend
+-- descriptor (epoll on Linux, kqueue on BSD) is readable while a handle libuv
+-- watches has an event it has not dispatched yet. The tick sleeps inside an idle
+-- callback, before libuv polls, so without it a socket, pipe or thread-pool
+-- completion waited out the idle wait first: an owned archive download, which
+-- reads one 64 KiB chunk per filesystem write acknowledgement, ran at 3 MB/s.
+-- One record, reused, so a wait allocates nothing.
+local POLLIN = 1
+local _backend_records = { [0] = { fd = -1, events = POLLIN, revents = 0 } }
+
+--- Opens the libuv half of one idle wait.
+--- @return table records pollfd-shaped, indexed from 0.
+--- @return integer count
+local function _backend_begin()
+	local fd = luv.backend_fd()
+	-- A loop without a pollable backend cannot take part; the wait retires
+	-- the companion after this one report and keeps polling the others.
+	if type(fd) ~= "number" or fd < 0 then error("libuv exposes no pollable backend descriptor", 0) end
+	_backend_records[0].fd = fd
+	return _backend_records, 1
+end
+
+--- Nothing to release: libuv dispatches the event on its own poll, right after
+--- the idle tick that the wait ended.
+local function _backend_finish() end
+
+local _backend_companion = luv and { begin = _backend_begin, finish = _backend_finish } or nil
+
 --- Yields the CPU at the end of an idle tick. With a supplied input wait the tick
---- sleeps until a descriptor is readable (at most IDLE_WAIT_MS); without one, or
---- when the wait declines (nil), it sleeps a fixed millisecond, as the pump
---- fallback does. A stop() from a callback returns at once.
+--- sleeps until a descriptor is readable (at most IDLE_WAIT_MS), the loop's own
+--- backend descriptor included; without one, or when the wait declines (nil), it
+--- sleeps a fixed millisecond, as the pump fallback does. A stop() from a
+--- callback returns at once.
 local function _yield_idle()
 	if not _running then return end
+	if _wake_requested then
+		_wake_requested = false
+		Perf.count("loop.idle_wakes_requested")
+		return
+	end
 	if _idle_wait then
-		local ok, ready = pcall(_idle_wait, IDLE_WAIT_MS)
+		local ok, ready = pcall(_idle_wait, IDLE_WAIT_MS, _backend_companion)
 		if not ok then
 			-- Dropped after one report: the fixed yield below keeps the loop
 			-- correct, and a raising wait must not log on every tick.
@@ -404,7 +439,7 @@ function M.run(opts)
 
 	local options = type(opts) == "table" and opts or {}
 	if options.idleWait ~= nil and type(options.idleWait) ~= "function" then
-		error("idleWait must be a function(timeout_ms) -> boolean|nil", 2)
+		error("idleWait must be a function(timeout_ms, loop_companion) -> boolean|nil", 2)
 	end
 
 	-- Guard: an empty loop would spin forever with nothing to stop it.
@@ -421,6 +456,7 @@ function M.run(opts)
 		error("Event loop native cleanup remains pending", 0)
 	end
 	_running = true
+	_wake_requested = false
 	_idle_wait = options.idleWait
 	local ran, run_error
 
@@ -465,6 +501,17 @@ function M.stop()
 	end
 
 	Logger.debug(LOG, "stop() called — event loop will exit at next iteration.")
+end
+
+--- Ends the next idle tick without its wait.
+---
+--- libuv registers a watcher started from a callback (a read_start after a
+--- pause) only on its next poll, which comes after the idle tick: no descriptor
+--- the wait polls can announce it, so the tick slept its whole wait first. A
+--- callback that restarts a watcher it expects to be ready at once calls this;
+--- the tick after it waits again. Safe from any callback on the loop's thread.
+function M.wake()
+	if _running then _wake_requested = true end
 end
 
 --- Returns true when the event loop is running (blocking in run()).

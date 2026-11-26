@@ -47,6 +47,24 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		end)
 	end)
 
+	-- An hs.alert banner has no accessibility element: VoiceOver heard nothing
+	-- when keep-awake turned on or off (a11y-macos-alert).
+	helpers.it("(a11y-macos-alert) says each banner it shows to VoiceOver", function()
+		with_fixture(function()
+			local spoken = {}
+			package.loaded["core.ui.adapters.system_accessibility"] = {
+				announce_event = function(text) spoken[#spoken + 1] = text; return true end,
+			}
+			local sys, show_calls = make_sys_with_alert_spy()
+			sys.toggle_awake()
+			helpers.assert_eq(spoken, { show_calls[#show_calls].msg }, "the on-banner is said")
+			sys.toggle_awake()
+			helpers.assert_eq(#spoken, 2)
+			helpers.assert_eq(spoken[2], show_calls[#show_calls].msg, "the off-banner is said")
+			helpers.assert_true(spoken[1] ~= spoken[2])
+		end)
+	end)
+
 	helpers.it("closes the banner on manual toggle OFF", function()
 		with_fixture(function()
 			package.loaded["platform.input.keycodes"] = nil
@@ -160,7 +178,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["platform.input.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		local sys = load_system()
 		local hs  = _G.hs
 
@@ -254,7 +272,7 @@ local function fake_activity_event()
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["platform.input.synthetic_input"] = nil
-			package.loaded["adapters.event_provenance"] = nil
+			package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 			-- Drive the production adapter all the way through its deferred Quartz
 			-- pump. Looking only at a mocked emit_key_stroke call would stay green if
@@ -288,7 +306,7 @@ local function fake_activity_event()
 			local hs = _G.hs
 
 			local synthetic = require("platform.input.synthetic_input")
-			local provenance = require("adapters.event_provenance")
+			local provenance = require("diagnostics.adapters.event_provenance")
 			local epoch_before = synthetic.current_action_epoch()
 
 			sys._emit_activity_keystroke()
@@ -340,7 +358,7 @@ local function fake_activity_event()
 			-- Do not leak an adapter captured against this test's hs table into later
 			-- system-action fixtures, which intentionally install partial hs overrides.
 			package.loaded["platform.input.synthetic_input"] = nil
-			package.loaded["adapters.event_provenance"] = nil
+			package.loaded["diagnostics.adapters.event_provenance"] = nil
 		end)
 	end)
 

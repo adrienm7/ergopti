@@ -27,7 +27,7 @@ local function with_editor(module_name, callback)
 			"program_providers", "core.process.adapters.task_environment", "core.lifecycle.engine.compat.utf8", "diagnostics.engine.runtime_log",
 			"adapters.apple_shortcuts", "core.process.adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"core.timing.engine.deferred_work", "core.lifecycle.engine.launcher_environment", "core.events.timer_scheduler", "app_dirs",
-			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "infra.config_paths",
+			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "settings.engine.paths",
 			"core.logger.engine.log_folders", "program_parameter", "user_action_parameter", "text_utils", "core.process.adapters.program_providers",
 			"core.fs.adapters.file_system", "json",
 			"core.text.engine.toml.codec", "toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.basic_string",
@@ -204,6 +204,24 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 		end)
 	end)
 
+	helpers.it("pck-07: refuses a confirmation that names no action and stays open", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local confirmed = {}
+			picker.open({ title = "Target", items = {} }, function(id)
+				confirmed[#confirmed + 1] = id
+				return true
+			end)
+			local bridge = state.bridges[1]
+			bridge.callback(native_message(state.views[1], { action = "confirm" }))
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = "" }))
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = 7 }))
+			helpers.assert_eq(#confirmed, 0, "a confirmation without an action never means none")
+			helpers.assert_true(not state.views[1].deleted, "the picker stays open")
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = "none" }))
+			helpers.assert_eq(confirmed, { "none" }, "the page's own specials pass unchanged")
+		end)
+	end)
+
 	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
 		with_editor("ui.action_picker", function(picker, state)
 			local attempts = 0
@@ -286,7 +304,7 @@ end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
 	helpers.it("retains a reentrant prompt candidate whose rollback raises", function()
-		with_editor("ui.prompt_editor", function(editor, state)
+		with_editor("ai.ui.prompt_editor", function(editor, state)
 			state.close_during_create = true
 			state.delete_throws = true
 			helpers.assert_eq(editor.open(nil, function() end), false)
@@ -309,7 +327,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("retains an accepted prompt until its exact native close succeeds", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local saves = 0
 			editor.open(nil, function()
 				saves = saves + 1
@@ -349,7 +367,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("keeps a refused save open and logs a throwing retry", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local attempts = 0
 			editor.open(nil, function()
 				attempts = attempts + 1
@@ -385,7 +403,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("settles one create context before a re-entrant save can replay it", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local bridge
 			local save_message
 			local saved_profiles = {}
@@ -422,7 +440,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 	end)
 
 	helpers.it("rejects stale epochs and preserves a context opened by on_save", function()
-		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+		with_editor("ai.ui.prompt_editor", function(editor, state, hs_stub)
 			local saves_a, saves_b, saves_c = 0, 0, 0
 			local profile_a = { id = "profile-a", label = "A", raw_prompt = "Prompt A" }
 			local profile_b = { id = "profile-b", label = "B", raw_prompt = "Prompt B" }

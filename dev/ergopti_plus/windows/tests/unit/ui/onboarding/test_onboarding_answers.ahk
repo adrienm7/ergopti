@@ -179,23 +179,26 @@ Test("onboarding answers: any invalid answer refuses the whole batch (onboarding
 ; sparse row like any answer, a neutral value a deletion (neutral-layout-wizard).
 _TOAN_LayoutControlsBecomeRows() {
 	Index := OnboardingCatalogue()
-	for Path in ["layout.ergopti_base", "layout.ergopti_variant", "layout.emulated_layout",
+	for Path in ["layout.ergopti_variant", "layout.emulated_layout",
 			"layout.ergopti_alt_gr", "layout.emulate_number_row", "layout.direct_access_digits"]
 		AssertEqual("control", Index["entries"][Path]["kind"], Path . " is answered by a layout control")
+	; The selection is the gate (2026-11-23): no layout choice writes a layer switch.
+	AssertFalse(Index["entries"].Has("layout.ergopti_base")
+		&& Index["entries"]["layout.ergopti_base"]["kind"] == "control", "no layout control writes the base layer switch")
 	Rows := OnboardingAnswerRows(Index, [
-		_TOAN_Op("layout.ergopti_base", true),
 		_TOAN_Op("layout.ergopti_variant", "ergopti_plus"),
+		_TOAN_Op("layout.ergopti_alt_gr", false),
 		_TOAN_Op("layout.emulate_number_row", false),
 		_TOAN_Op("layout.direct_access_digits", "native")
 	])
 	AssertTrue(Rows is Array, "control answers produce rows: " . (Rows is String ? Rows : ""))
-	AssertEqual(1, _TOAN_RowFor(Rows, "layout", "ergopti_base").Value)
 	AssertEqual("ergopti_plus", _TOAN_RowFor(Rows, "layout", "ergopti_variant").Value)
+	AssertEqual(0, _TOAN_RowFor(Rows, "layout", "ergopti_alt_gr").Value)
 	AssertEqual(0, _TOAN_RowFor(Rows, "layout", "emulate_number_row").Value)
 	Native := _TOAN_RowFor(Rows, "layout", "direct_access_digits")
 	AssertTrue(Native.HasOwnProp("Delete") && Native.Delete == 1, "the native order is the neutral value: a deletion")
 	for Probe in [["layout.direct_access_digits", "sideways"], ["layout.ergopti_variant", "bepo"],
-			["layout.emulated_layout", "ergol"], ["layout.ergopti_base", "true"]] {
+			["layout.emulated_layout", "ergol"], ["layout.ergopti_alt_gr", "true"]] {
 		Why := OnboardingAnswerRows(Index, [_TOAN_Op(Probe[1], Probe[2])])
 		AssertTrue(Why is String, Probe[1] . " refuses a value no choice writes")
 		AssertContains(Why, "one of the values its choices write")
@@ -723,7 +726,7 @@ _TOAN_PrebootChosenTargetUsesActualWizardWal(Current := false) {
 		Acquired := ConfigTransitionAcquireLifecycleBundle(PathsFile, [Chosen, PathsFile])
 		AssertTrue(ConfigTransitionResultIs(Acquired, "bundle_acquired"))
 		Bundle := Acquired["bundle"]
-		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([_TOAN_Op("layout.ergopti_base", true)], "fr", Folder . "\chosen"))
+		Plan := _OnbWeb_FinishPlan(_TOAN_Answers([_TOAN_Op("layout.ergopti_variant", "ergopti_plus")], "fr", Folder . "\chosen"))
 		AssertTrue(Plan is Map)
 		Target := _TOAN_PrepareNativeWizardTarget(Chosen,
 			_Onboarding_CommitUpdates(Plan["locale"], Plan["rows"]), Bundle)
@@ -739,7 +742,8 @@ _TOAN_PrebootChosenTargetUsesActualWizardWal(Current := false) {
 		AssertTrue(ConfigTransitionResultIs(Committed, "committed_new"), "the actual guarded native WAL publishes the wizard target and locator before later Boot")
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Chosen))
 		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
-		AssertTrue(Document["layout"]["ergopti_base"].Value)
+		; The parsed document wraps only booleans (TOML_Bool); a string is native.
+		AssertEqual("ergopti_plus", Document["layout"]["ergopti_variant"])
 		if Current
 			AssertEqual("independent", Document["private"]["keep"])
 		AssertEqual(Locator, FSReadUtf8Exact(PathsFile), "the stable locator is the final actual native target")

@@ -58,6 +58,15 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "vendor",
 	DRIVER_ROOT .. "_generated",
 	DRIVER_ROOT .. "core",
+	DRIVER_ROOT .. "settings",
+	DRIVER_ROOT .. "menu",
+	DRIVER_ROOT .. "tray",
+	DRIVER_ROOT .. "ai",
+	DRIVER_ROOT .. "apps",
+	DRIVER_ROOT .. "clipboard",
+	DRIVER_ROOT .. "diagnostics",
+	DRIVER_ROOT .. "gestures",
+	DRIVER_ROOT .. "hotstrings",
 	helpers.shared(""),
 }
 

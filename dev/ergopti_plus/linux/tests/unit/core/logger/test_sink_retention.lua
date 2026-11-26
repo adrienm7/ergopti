@@ -11,9 +11,10 @@
 --- -mtime +N -delete` once per prefix: two forks at every daemon start (measured
 --- with `ergopti_hotstrings.lua --help`, before any boot stage) and two more on
 --- the logging path itself at each midnight rollover. The in-process sweep
---- restricts that historical selection to generated daily and topical names:
---- regular files directly in the folder, never a link or folder, older than
---- N + 1 whole days.
+--- restricts that historical selection to generated daily names and the
+--- retired topical sub-files: regular files directly in the folder, never a link
+--- or folder; a daily file older than the calendar cutoff, a retired topical
+--- file whatever its age (one daily log, maintainer decision 2026-11-25).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Differential: expected generated files are selected by GNU find before
@@ -94,7 +95,8 @@ end
 --- @return table set
 local function find_selection(dir, days)
 	local selected = {}
-	local topical = {}; for _, sub in ipairs(require("_generated.logger_sub_files")) do topical[sub.name] = true end
+	local topical = {}
+	for _, name in ipairs(require("core.fs.engine.app_dirs").files.retired_topical_logs) do topical[name] = true end
 	for _, prefix in ipairs({ "ErgoptiPlus_", "ErgoptiPlus_errors_" }) do
 		local pipe = assert(io.popen(string.format("find %s -maxdepth 1 -type f -name %s -mtime +%d -print0",
 			Shell.quote(dir), Shell.quote(prefix .. "*.log"), days)))
@@ -196,6 +198,31 @@ helpers.describe("log retention purge deletes aged generated files", function()
 			local kept = assert(io.open(foreign, "rb")); helpers.assert_eq(kept:read("*a"), "user notes"); assert(kept:close())
 			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_2000-01-01.log", "rb"))
 			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_hotstrings.log", "rb"))
+		end)
+		Sink.uninstall(logger)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+	end)
+
+	-- The topical sub-files were retired: every line they held is in the daily
+	-- log, so the sweep removes them on its first run, written today or not.
+	helpers.it("linux-retired-topical-cleanup: a retired topical file is removed at install whatever its age", function()
+		if ON_WINDOWS then return end
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local now = os.date("*t")
+		local since_midnight = now.hour * 3600 + now.min * 60 + now.sec
+		local stale, fresh = dir .. "/ErgoptiPlus_hotstrings.log", dir .. "/ErgoptiPlus_gestures.log"
+		for _, path in ipairs({ stale, fresh }) do
+			local file = assert(io.open(path, "w")); assert(file:write("a line\n")); assert(file:close())
+		end
+		aged(stale, since_midnight + 60)
+		local Sink, logger = helpers.load_module("core.logger.engine.sink"), fake_logger()
+		local ok, err = pcall(function()
+			helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }))
+			helpers.assert_nil(io.open(stale, "rb"), "yesterday's retired topical file must be removed")
+			helpers.assert_nil(io.open(fresh, "rb"), "today's retired topical file must be removed too")
 		end)
 		Sink.uninstall(logger)
 		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))

@@ -99,7 +99,7 @@ _WPMF_CheckRows() {
 
 _WPMF_Main() {
 	global _WPMF
-	if A_Args.Length != 4
+	if A_Args.Length != 5
 		ExitApp(2)
 	_WPMF := {Mode: A_Args[1], Now: 0, Phase: "setup", Armed: false, Failure: 0,
 		PushReads: 0, CalcReads: 0, CapturedNow: 0, BoundaryEntered: false,
@@ -111,7 +111,9 @@ _WPMF_Main() {
 	try {
 		WPMWidgetConst.WINDOW_MS := Integer(A_Args[3])
 		WPMWidgetConst.WPM_MIN_DURATION_MS := Integer(A_Args[4])
-		_WPMF_Require(WPMWidgetConst.WINDOW_MS == 15000 && WPMWidgetConst.WPM_MIN_DURATION_MS == 2000,
+		WPMWidgetConst.IDLE_RESET_MS := Integer(A_Args[5])
+		_WPMF_Require(WPMWidgetConst.WINDOW_MS == 15000 && WPMWidgetConst.WPM_MIN_DURATION_MS == 2000
+			&& WPMWidgetConst.IDLE_RESET_MS == 5000,
 			"The native child must use the actual shared rolling-window and minimum-duration contract.")
 		_WPMF_Require(WPMWidget._ring.Length == 0 && WPMWidget._ring_head == 0,
 			"Fresh genuine state must be empty before either public producer runs.")

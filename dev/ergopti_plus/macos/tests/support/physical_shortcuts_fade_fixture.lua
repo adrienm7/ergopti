@@ -11,6 +11,10 @@
 local helpers = require("tests.helpers")
 require("core.logger.engine")
 
+-- The host decodes each page message with the real lossless decoder; only
+-- the packets it sends are stubbed.
+local RealJson = require("core.text.engine.json")
+
 local function with_host(scenario)
 	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
 		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "core.ui.ui.builder", "core.ui.ui.webview_close_owner",
@@ -32,7 +36,8 @@ local function with_host(scenario)
 		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
 		package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
-		package.loaded["core.text.engine.json"] = { encode = function() return "{}" end }
+		package.loaded["core.text.engine.json"] = { encode = function() return "{}" end,
+			decode_lossless = RealJson.decode_lossless }
 		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }
 		package.loaded["shortcuts.engine.physical_editor_window"] = { new = function(options)
 			return { retire = function()

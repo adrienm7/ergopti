@@ -296,10 +296,11 @@ _KLRNul_TokenKeysStayDistinct() {
 Test("Keystats reader: a NUL token stays a distinct JSON key (windows-reader-nul-json-keys)",
 	_KLRNul_TokenKeysStayDistinct)
 
-; Ergopti Studio counts only the keystrokes typed on the keyboard: the shared
-; fixture's shared-token (6 typed, 5 hotstring, 1 AI) and other-token (2 typed,
-; 2 synthetic) contribute nothing, a manual row counts in full, and a token of
-; another family never leaks in.
+; Ergopti Studio's keys typed count only the keystrokes typed on the keyboard:
+; the shared fixture's shared-token (6 typed, 5 hotstring, 1 AI) and
+; other-token (2 typed, 2 synthetic) contribute nothing, a manual row counts in
+; full, and a token of another family never leaks in. Its final text (schema 2)
+; counts every source.
 _KLRSource_StudioCountsPhysicalKeystrokes() {
 	db := _KLRSource_OpenFixture()
 	try {
@@ -314,7 +315,18 @@ _KLRSource_StudioCountsPhysicalKeystrokes() {
 			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
 			. SQLite_Q("est") . ",4," . SQLite_Q("{}") . ");"))
 		Contract := KLR_StudioContract()
-		Json := KLR_BuildStudioNgramsJson(db, Contract)
+		; (studio-read-one-pass) One grouping per family gives both texts: the
+		; read grouped every table twice, 3.8 s against 1.7 s on a 1.1 GB image.
+		Queries := []
+		Counted(Handle, Sql) {
+			Queries.Push(Sql)
+			return SQLite_Query(Handle, Sql)
+		}
+		Json := KLR_BuildStudioNgramsJson(db, Contract, Counted)
+		AssertEqual(Contract["families"].Length, Queries.Length, "one query per family")
+		for Sql in Queries
+			AssertEqual(1, StrLen(Sql) - StrLen(StrReplace(Sql, "GROUP BY", "GROUP B")), "one grouping per query: " . Sql)
+		AssertEqual(Json, KLR_BuildStudioNgramsJson(db, Contract), "SQLite_Query is the default port")
 		Payload := JsonParse(Json)
 		AssertEqual(Contract["schema"], Payload["schema"])
 		AssertEqual("keystats", Payload["source"])
@@ -323,11 +335,20 @@ _KLRSource_StudioCountsPhysicalKeystrokes() {
 		AssertEqual(2, Payload["bigrams"]["es"], "the AI share of a bigram is subtracted")
 		AssertEqual(0, Payload["trigrams"].Count, "a word is not a trigram")
 		AssertEqual(7, Payload["total"])
+		; The final text (schema 2): every source counted, the same families.
+		Final := Payload[Contract["final_field"]]
+		AssertEqual(3, Final["chars"].Count, "the final text keeps the synthetic tokens: " . Json)
+		AssertEqual(6, Final["chars"]["shared-token"], "a hotstring and AI token counts in full")
+		AssertEqual(2, Final["chars"]["other-token"])
+		AssertEqual(7, Final["chars"]["e"])
+		AssertEqual(3, Final["bigrams"]["es"], "the AI share of a bigram is kept")
+		AssertEqual(0, Final["trigrams"].Count, "a word is not a trigram in the final text either")
+		AssertEqual(15, Final["total"])
 	} finally {
 		try SQLite_Close(db)
 	}
 }
-Test("Keystats reader: Ergopti Studio reads the physical keystrokes of three families (studio-keystats-bridge)",
+Test("Keystats reader: Ergopti Studio reads the keys typed and the final text of three families (studio-keystats-bridge)",
 	_KLRSource_StudioCountsPhysicalKeystrokes)
 
 ; The Ergopti Studio window answers keystats_ngrams: an absent keystats folder
@@ -343,7 +364,7 @@ _KLRSource_StudioWindowAnswers() {
 	DirCreate(Dir)
 	try {
 		Outcome := Map("status", "ok", "stage", Dir . "\stage.json")
-		FileAppend('{"schema":1,"chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
 		Stamp := Map("value", "rev-1")
 		Deps := Map(
 			"metrics_dir", Dir . "\absent",
@@ -351,13 +372,16 @@ _KLRSource_StudioWindowAnswers() {
 			"request_studio", (MetricsDir, OnTerminal) => (Requests.Push(MetricsDir),
 				OnTerminal.Call(Outcome["status"], Outcome["stage"]), true),
 			"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
-			"read_stage", FSRead)
+			"read_stage", FSRead,
+			"read_snapshot", KLR_StudioSnapshotRead,
+			"write_snapshot", KLR_StudioSnapshotWrite,
+			"purge_generation", () => 0)
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["absent"] . '"}', Pushed[1])
 		AssertEqual(0, Requests.Length, "an absent store starts no worker")
 		Deps["metrics_dir"] := Dir
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"e":7}}}', Pushed[2])
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"e":7}}}', Pushed[2])
 		AssertEqual(Dir, Requests[1])
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
 		AssertEqual(Pushed[2], Pushed[3], "an unchanged store answers from the cached projection")
@@ -365,7 +389,8 @@ _KLRSource_StudioWindowAnswers() {
 		Stamp["value"] := "rev-2"
 		Outcome["status"] := "failed", Outcome["stage"] := ""
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
-		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[4])
+		AssertEqual(Pushed[2], Pushed[4], "a changed store shows the saved read first")
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[5])
 		AssertEqual(2, Requests.Length, "a changed store is read again")
 		AssertTrue(LAYOUT_EDITOR_WINDOW_ACTIONS.Has("keystats_ngrams"), "the page's action is allowlisted")
 	} finally {
@@ -375,6 +400,190 @@ _KLRSource_StudioWindowAnswers() {
 }
 Test("Layout editor window: Ergopti Studio answers keystats_ngrams with the worker's read (studio-keystats-bridge)",
 	_KLRSource_StudioWindowAnswers)
+
+; A Studio window ports around a real keystats folder; the worker's terminal is
+; held in Terminals until the test ends the read.
+_KLRSource_StudioSnapshotDeps(Dir, Stamp, Pushed, Terminals, Generation) {
+	return Map(
+		"metrics_dir", Dir,
+		"stamp", (MetricsDir) => Stamp["value"],
+		"request_studio", (MetricsDir, OnTerminal) => (Terminals.Push(OnTerminal), true),
+		"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
+		"read_stage", FSRead,
+		"read_snapshot", KLR_StudioSnapshotRead,
+		"write_snapshot", KLR_StudioSnapshotWrite,
+		"purge_generation", () => Generation["value"])
+}
+
+; (studio-saved-read-first) After a restart the resident has no projection in
+; memory: the read saved by the last window is pushed at once, before the
+; worker starts, then the worker's fresh read replaces it and is saved in turn.
+_KLRSource_StudioSavedReadFirst() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_saved_" . A_TickCount
+	DirCreate(Dir . "\by_device\pc")
+	try {
+		FileAppend("-- ledger", Dir . "\by_device\pc\data.sql", "UTF-8-RAW")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-old", '{"schema":2,"source":"keystats","chars":{"a":1}}'))
+		Stamp := Map("value", "rev-new")
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Stamp, Pushed, Terminals, Map("value", 0))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(1, Pushed.Length, "the saved read is pushed before the worker ends")
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"a":1}}}', Pushed[1])
+		AssertEqual(1, Terminals.Length, "a changed store still starts the worker")
+		FileAppend('{"schema":2,"source":"keystats","chars":{"a":2}}', Dir . "\stage.json", "UTF-8-RAW")
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":2,"source":"keystats","chars":{"a":2}}}', Pushed[2],
+			"the fresh read follows")
+		Saved := KLR_StudioSnapshotRead(Dir)
+		AssertEqual("rev-new", Saved["stamp"], "the fresh read is saved with its stamp")
+		AssertEqual('{"schema":2,"source":"keystats","chars":{"a":2}}', Saved["json"])
+		; A restart on the unchanged store: the saved read is the answer, no worker.
+		_LayEdWin_StudioCache := 0
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(Pushed[2], Pushed[3])
+		AssertEqual(3, Pushed.Length)
+		AssertEqual(1, Terminals.Length, "a saved read of the unchanged store starts no worker")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: Ergopti Studio shows its saved read at once, then the fresh one (studio-saved-read-first)",
+	_KLRSource_StudioSavedReadFirst)
+
+; The saved read's file and header come from the shared contract (snapshot),
+; not from a name this driver types.
+_KLRSource_StudioSavedReadFollowsContract() {
+	Snapshot := KLR_StudioContract()["snapshot"]
+	Dir := A_Temp . "\ergopti_studio_contract_" . A_TickCount
+	DirCreate(Dir . "\cache")
+	try {
+		Path := KLR_StudioSnapshotPath(Dir)
+		AssertEqual(Snapshot["file"], SubStr(Path, StrLen(Path) - StrLen(Snapshot["file"]) + 1),
+			"the saved read is the file the contract names")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, "rev-9", '{"schema":2,"source":"keystats"}'))
+		Text := FileRead(Path, "UTF-8")
+		AssertEqual(Snapshot["format"] . " rev-9`n", SubStr(Text, 1, InStr(Text, "`n")),
+			"its header line is the contract's format, then the store stamp")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("keystats ngrams: the saved Studio read follows the shared contract", _KLRSource_StudioSavedReadFollowsContract)
+
+; A saved read that is not in its format is logged and ignored: the worker reads
+; the store, and its read replaces the file.
+_KLRSource_StudioBrokenSavedRead() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_broken_" . A_TickCount
+	DirCreate(Dir . "\cache")
+	try {
+		FileAppend('{"schema":2,"source":"keystats"}', KLR_StudioSnapshotPath(Dir), "UTF-8-RAW")
+		AssertThrows(() => KLR_StudioSnapshotRead(Dir), "a file without its header is refused")
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Map("value", 0))
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(0, Pushed.Length, "a broken saved read is not shown")
+		AssertEqual(1, Terminals.Length)
+		FileAppend('{"schema":2,"source":"keystats","chars":{"b":3}}', Dir . "\stage.json", "UTF-8-RAW")
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual('{"schema":2,"source":"keystats","chars":{"b":3}}', KLR_StudioSnapshotRead(Dir)["json"])
+		AssertTrue(KLR_StudioSnapshotRetire(Dir), "the saved read can be retired")
+		AssertEqual(0, KLR_StudioSnapshotRead(Dir), "no saved read is left")
+		AssertTrue(KLR_StudioSnapshotRetire(Dir), "retiring an absent read succeeds")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Keystats reader: a saved Ergopti Studio read out of its format is ignored and replaced (studio-saved-read-first)",
+	_KLRSource_StudioBrokenSavedRead)
+
+; (studio-saved-read-vectors) The saved read is one format for the three
+; drivers: macOS and Linux replay the same vectors
+; (_shared/tests/lua/metrics/studio_ngrams_snapshot_contract.lua).
+_KLRSource_StudioSnapshotVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\metrics\studio_ngrams_snapshot_vectors.json"))
+	Contract := KLR_StudioContract()
+	AssertEqual(Contract["snapshot"]["format"], Corpus["format"], "the vectors follow the contract's format")
+	AssertEqual(Contract["schema"], Corpus["schema"], "and its schema")
+	Assert(Corpus["reads"].Length >= 10, "the corpus lists its read vectors")
+	for Vector in Corpus["reads"] {
+		Text := Vector["text"]
+		if Vector.Has("stamp") {
+			Saved := KLR_StudioSnapshotDecode(Text)
+			AssertEqual(Vector["stamp"], Saved["stamp"], Vector["id"])
+			AssertEqual(SubStr(Text, InStr(Text, "`n") + 1), Saved["json"], Vector["id"] . " (payload)")
+		} else
+			AssertThrows(() => KLR_StudioSnapshotDecode(Text), Vector["id"])
+	}
+	for Vector in Corpus["writes"] {
+		Stamp := Vector["stamp"], Json := Vector["json"]
+		if Vector.Has("text")
+			AssertEqual(Vector["text"], KLR_StudioSnapshotEncode(Stamp, Json), Vector["id"])
+		else
+			AssertThrows(() => KLR_StudioSnapshotEncode(Stamp, Json), Vector["id"])
+	}
+}
+Test("Keystats reader: the saved Ergopti Studio read follows the shared vectors (studio-saved-read-vectors)",
+	_KLRSource_StudioSnapshotVectors)
+
+; (studio-saved-read-purge) A metrics purge that overlapped the worker's read:
+; that read may hold what the purge deleted, so it is neither pushed nor saved,
+; and the store is read again.
+_KLRSource_StudioPurgeOverlap() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Dir := A_Temp . "\ergopti_studio_purge_" . A_TickCount
+	DirCreate(Dir . "\by_device\pc")
+	try {
+		FileAppend("-- ledger", Dir . "\by_device\pc\data.sql", "UTF-8-RAW")
+		Generation := Map("value", 4)
+		Pushed := [], Terminals := []
+		Deps := _KLRSource_StudioSnapshotDeps(Dir, Map("value", "rev-1"), Pushed, Terminals, Generation)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		FileAppend('{"schema":2,"source":"keystats","chars":{"p":9}}', Dir . "\stage.json", "UTF-8-RAW")
+		Generation["value"] := 6
+		Terminals[1].Call("ok", Dir . "\stage.json")
+		AssertEqual(0, Pushed.Length, "the overlapped read is not shown")
+		AssertEqual(0, KLR_StudioSnapshotRead(Dir), "nor saved")
+		AssertEqual(2, Terminals.Length, "the store is read again")
+		Terminals[2].Call("ok", Dir . "\stage.json")
+		AssertEqual(1, Pushed.Length, "a read after the purge is shown")
+		AssertEqual("rev-1", KLR_StudioSnapshotRead(Dir)["stamp"], "and saved")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: a Studio read that overlapped a metrics purge is read again (studio-saved-read-purge)",
+	_KLRSource_StudioPurgeOverlap)
+
+; The purge and the dashboard's cache reset retire the saved Studio read, and
+; the purge bumps its generation on both ends (KL_RunMetricsMaintenance needs
+; the live writer, so its order is pinned on the source).
+_KLRSource_StudioPurgeRetiresSavedRead() {
+	Body := _DriverFuncBody("KL_RunMetricsMaintenance")
+	Assert(Body != "", "KL_RunMetricsMaintenance must be found")
+	Tombstone := InStr(Body, "the tombstone is not in the replayed ledger")
+	Retire := InStr(Body, "KLR_StudioSnapshotRetire(MetricsDir)")
+	Assert(Tombstone > 0 && Retire > Tombstone, "the purge retires the saved read once its tombstone is replayed")
+	First := InStr(Body, "KLMaintenance.purge_generation += 1")
+	Assert(First > 0 && First < Tombstone, "the purge bumps the generation before its tombstone")
+	Assert(InStr(Body, "KLMaintenance.purge_generation += 1", , First + 1) > Retire,
+		"and again when it ends")
+	Reset := _DriverFuncBody("KLWV_OnWebMessage")
+	Assert(Reset != "", "KLWV_OnWebMessage must be found")
+	Assert(InStr(Reset, 'KLR_StudioSnapshotRetire(entry["metrics_dir"])') > InStr(Reset, 'KLR_CacheRetire(entry["metrics_dir"])'),
+		"the dashboard's cache reset retires the saved read with the reader image")
+}
+Test("Keystats maintenance: a purge and a cache reset retire the saved Studio read (studio-saved-read-purge)",
+	_KLRSource_StudioPurgeRetiresSavedRead)
 
 ; The Studio stamp changes when a keystats file grows and stays put otherwise.
 _KLRSource_StudioStampFollowsTheStore() {
@@ -386,6 +595,21 @@ _KLRSource_StudioStampFollowsTheStore() {
 		First := KLR_StudioStoreStamp(Dir)
 		Assert(First != "", "a folder with a journal has a stamp")
 		AssertEqual(First, KLR_StudioStoreStamp(Dir), "an unchanged folder keeps its stamp")
+		; The cache folder holds derived projections only: the worker's reader
+		; image and the saved Studio read must not make the read look stale.
+		DirCreate(Dir . "\cache")
+		FileAppend("image", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
+		AssertTrue(KLR_StudioSnapshotWrite(Dir, First, '{"schema":2,"source":"keystats"}'))
+		AssertEqual(First, KLR_StudioStoreStamp(Dir), "the cache folder is not part of the stamp")
+		; Loop Files normalizes a full path (8.3 names such as a CI runner's
+		; RUNNER~1, separators): the cache stays out however the folder is spelled.
+		Spelled := StrReplace(Dir, "\", "/")
+		AssertEqual(KLR_StudioStoreStamp(Spelled), KLR_StudioStoreStamp(Spelled . "/"),
+			"the stamp does not depend on a trailing separator")
+		Bare := KLR_StudioStoreStamp(Spelled)
+		FileAppend("more", Dir . "\cache\reader.sqlite", "UTF-8-RAW")
+		AssertEqual(Bare, KLR_StudioStoreStamp(Spelled),
+			"the cache folder is not part of the stamp of a folder spelled otherwise")
 		FileAppend("b", Dir . "\device\data.sql", "UTF-8-RAW")
 		Assert(KLR_StudioStoreStamp(Dir) != First, "a grown journal changes the stamp")
 	} finally {
@@ -410,25 +634,30 @@ _KLRSource_StudioOpensHttpsLinks() {
 Test("Layout editor window: Ergopti Studio opens only https links (studio-open-link)",
 	_KLRSource_StudioOpensHttpsLinks)
 
-; The analysis panels mounted in the Studio read their layout_analysis.* keys
-; from the strings the Windows host sends with sourceData, like the editor's.
+; The Studio reads keys of every family it draws (the analysis panels'
+; layout_analysis.*, the optimizer's layout_optimizer.*, the key names'
+; layer_editor.key.*, the action labels) from the strings the Windows host
+; sends with sourceData, so the host sends the whole catalogue, as macOS and
+; Linux seed it: a prefix filter showed layer_editor.key.shift for Shift.
 _KLRSource_StudioSendsAnalysisStrings() {
-	global _I18nCache
+	global _I18nCache, _I18nCacheEn
 	_I18nEnsureLoaded()
-	AssertFalse(_I18nCache.Has("layout_analysis.studio_probe"), "the probe key is the test's own")
-	_I18nCache["layout_analysis.studio_probe"] := "Probe"
+	AssertFalse(_I18nCache.Has("studio_probe.family"), "the probe key is the test's own")
+	_I18nCache["studio_probe.family"] := "Probe"
 	try {
 		Strings := LayoutManager_EditorStrings()
-		AssertTrue(Strings.Has("layout_analysis.studio_probe"), "the analysis keys reach the Studio page")
-		AssertTrue(Strings.Has("layout_editor.title"), "the editor keys still do")
-		for Key in Strings
-			Assert(SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis.",
-				"only the editor's and the analysis panels' keys are sent: " . Key)
+		AssertEqual("Probe", Strings.Get("studio_probe.family", ""), "a key of any family reaches the Studio page")
+		AssertEqual(t("layer_editor.key.shift"), Strings.Get("layer_editor.key.shift", ""),
+			"the key names reach the Studio page, translated")
+		Assert(Strings.Get("layer_editor.key.shift", "") != "", "the Shift key name is not empty")
+		for Cache in [_I18nCache, _I18nCacheEn]
+			for Key in Cache
+				Assert(Strings.Has(Key), "every catalogue key is sent: " . Key)
 	} finally {
-		_I18nCache.Delete("layout_analysis.studio_probe")
+		_I18nCache.Delete("studio_probe.family")
 	}
 }
-Test("Layout editor window: the Studio page receives the analysis panels' strings (studio-analysis-strings)",
+Test("Layout editor window: the Studio page receives the whole catalogue (studio-analysis-strings)",
 	_KLRSource_StudioSendsAnalysisStrings)
 
 ; The Studio window answers the Comparer's store with the page's request numbers.
@@ -502,3 +731,160 @@ _KLRSource_StudioProfileMessages() {
 }
 Test("Layout editor window: Ergopti Studio keeps the Comparer's fingering profile (studio-fingering-profile)",
 	_KLRSource_StudioProfileMessages)
+
+; The Studio window keeps the editor's workspace (its tabs) with the page's request numbers.
+_KLRSource_StudioWorkspaceMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load", "request", 2), Deps))
+	AssertContains(Pushed[1], 'studioWorkspace {')
+	AssertFalse(InStr(Pushed[1], '"workspace"'), "nothing saved yet is an empty workspace")
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_save", "request", 3,
+		"text", '{"tabs":[]}'), Deps))
+	AssertContains(Pushed[2], 'studioWorkspaceResult {')
+	AssertContains(Pushed[2], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load", "request", 4), Deps))
+	AssertContains(Pushed[3], '"workspace":"{\"tabs\":[]}"')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_save", "request", 5,
+		"reset", true), Deps))
+	AssertContains(Pushed[4], '"code":"studio_invalid_layout"', "the page never clears the workspace")
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the editor's tabs (studio-editor-workspace)",
+	_KLRSource_StudioWorkspaceMessages)
+
+; The export step host's ports, with every effect recorded: the staged input,
+; the spawned command, the timer and the pushed answers.
+_KLRSource_LuaExportDeps(VendorDir, Log) {
+	Log["pushed"] := [], Log["inputs"] := Map(), Log["removed"] := [], Log["spawned"] := 0, Log["timer"] := 0
+	Log["terminated"] := false, Log["start_ok"] := true
+	WriteInput(Text) {
+		Path := VendorDir . "\input_" . (Log["inputs"].Count + 1) . ".json"
+		Log["inputs"][Path] := Text
+		return Path
+	}
+	Spawn(Exe, Args, OnDone) {
+		Log["spawned"] := Map("exe", Exe, "args", Args, "done", OnDone)
+		Handle := {}
+		Handle.start := (*) => Log["start_ok"]
+		Handle.terminate := (*) => (Log["terminated"] := true)
+		return Handle
+	}
+	return Map(
+		"push", (Name, Payload) => (Log["pushed"].Push(Name . " " . _LayMgrWeb_Json(Payload)), true),
+		"vendor_dir", VendorDir,
+		"shared_dir", "C:\shared",
+		"export_settings", () => Map("timeout_ms", 30000, "failure", "target_export_refused"),
+		"write_input", WriteInput,
+		"remove_input", (Path) => Log["removed"].Push(Path),
+		"spawn", Spawn,
+		"after", (Ms, Fn) => (Log["timer"] := Map("ms", Ms, "fn", Fn)))
+}
+
+; Writes a stand-in host executable and the identity naming its digest.
+_KLRSource_LuaExportVendor(Dir, Digest := "") {
+	FileAppend("MZ stand-in host", Dir . "\ergopti_lua_export.exe", "UTF-8-RAW")
+	if (Digest == "")
+		Digest := CryptoSha256Bytes(FSReadBytesStrict(Dir . "\ergopti_lua_export.exe"))
+	FileAppend('{"schema_version":1,"exe_sha256":"' . Digest . '"}', Dir . "\ergopti_lua_export.json", "UTF-8-RAW")
+}
+
+; Without its identity, or with an executable that does not match it, the
+; host is not offered and refuses lua_export without running anything.
+_KLRSource_LuaExportRefused() {
+	Dir := A_Temp . "\ergopti_lua_export_test_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Log := Map()
+		Deps := _KLRSource_LuaExportDeps(Dir, Log)
+		Message := Map("action", "lua_export", "request", 1, "step", "xkb", "input", "{}")
+		AssertFalse(LayoutEditorWindow_LuaExportHost(Dir) is Map, "no identity: no host")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Message, Deps), "no identity: lua_export is refused")
+		_KLRSource_LuaExportVendor(Dir, Format("{:064}", 0))
+		AssertContains(LayoutEditorWindow_LuaExportHost(Dir), "does not match its identity")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Message, Deps), "a mismatched executable is refused")
+		AssertEqual(0, Log["pushed"].Length, "nothing is pushed for a refused export step")
+		AssertEqual(0, Log["spawned"], "nothing is run for a refused export step")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "step", "xkb", "input", "{}"), Deps),
+			"a request number is required")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: without a matching export step host, lua_export is refused (lua-export-host)",
+	_KLRSource_LuaExportRefused)
+
+; A matching host runs the step on a staged input and answers luaExportResult:
+; its output, its refusal line, a timeout, or a host that does not start.
+_KLRSource_LuaExportRuns() {
+	Dir := A_Temp . "\ergopti_lua_export_run_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		_KLRSource_LuaExportVendor(Dir)
+		AssertTrue(LayoutEditorWindow_LuaExportHost(Dir) is Map, "a matching executable is offered")
+		Log := Map()
+		Deps := _KLRSource_LuaExportDeps(Dir, Log)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 7, "step", "xkb",
+			"input", '{"a":1}'), Deps))
+		Spawned := Log["spawned"]
+		AssertEqual(Dir . "\ergopti_lua_export.exe", Spawned["exe"])
+		AssertEqual("C:\shared", Spawned["args"][1])
+		AssertEqual("xkb", Spawned["args"][2])
+		AssertEqual('{"a":1}', Log["inputs"][Spawned["args"][3]], "the input is staged as given")
+		AssertEqual(30000, Log["timer"]["ms"], "the step is bounded by the defaults' timeout")
+		Spawned["done"].Call(0, '{"symbols":"x"}', "")
+		AssertEqual(1, Log["pushed"].Length)
+		AssertContains(Log["pushed"][1], 'luaExportResult {')
+		AssertContains(Log["pushed"][1], '"ok":true')
+		AssertContains(Log["pushed"][1], '"request":7')
+		AssertContains(Log["pushed"][1], '"output":"{\"symbols\":\"x\"}"')
+		AssertEqual(Spawned["args"][3], Log["removed"][1], "the staged input is removed")
+		Log["timer"]["fn"].Call()
+		AssertEqual(1, Log["pushed"].Length, "a step that ended answers once")
+
+		; The host's refusal line names its code and detail.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 8, "step", "read",
+			"input", "[1]"), Deps))
+		Log["spawned"]["done"].Call(1, "target_export_refused`tthe export step's input is not a JSON object`n", "")
+		AssertContains(Log["pushed"][2], '"ok":false')
+		AssertContains(Log["pushed"][2], '"code":"target_export_refused"')
+		AssertContains(Log["pushed"][2], "is not a JSON object")
+
+		; A step past its timeout is stopped and refused once.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 9, "step", "xkb",
+			"input", "{}"), Deps))
+		Log["timer"]["fn"].Call()
+		AssertTrue(Log["terminated"], "the late host is stopped")
+		AssertContains(Log["pushed"][3], '"code":"target_export_refused"')
+		AssertContains(Log["pushed"][3], "did not end in time")
+		Log["spawned"]["done"].Call(0, "{}", "")
+		AssertEqual(3, Log["pushed"].Length, "a stopped step answers once")
+
+		; SNU-07: the host's own failure reaches the page as the export code the
+		; macOS and Linux hosts answer (layout_editor.error.target_export_refused),
+		; never as lua_export_host, which no locale names.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 11, "step", "xkb",
+			"input", "{}"), Deps))
+		Log["spawned"]["done"].Call(3, "lua_export_host`tmodule layouts.engine.composer.export_step cannot be opened`n", "")
+		AssertContains(Log["pushed"][4], '"code":"target_export_refused"', "the page receives the shared export code")
+		AssertFalse(InStr(Log["pushed"][4], "lua_export_host"), "the host's own code stays out of the page")
+		AssertContains(Log["pushed"][4], "cannot be opened", "the detail keeps the host's cause")
+
+		; A host that does not start is refused at once, its input removed.
+		Log["start_ok"] := false
+		Removed := Log["removed"].Length
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 10, "step", "xkb",
+			"input", "{}"), Deps))
+		AssertContains(Log["pushed"][5], "could not be started")
+		AssertEqual(Removed + 1, Log["removed"].Length)
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: a matching export step host runs lua_export, bounded (lua-export-run)",
+	_KLRSource_LuaExportRuns)

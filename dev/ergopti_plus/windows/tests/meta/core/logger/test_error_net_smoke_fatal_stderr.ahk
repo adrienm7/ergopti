@@ -71,7 +71,7 @@ Test("error net smoke: the stderr line names the fault, its site and the phase (
 ; The smoke branch hands that line to the process exit, after the log flush.
 _ENSF_SmokeExitCarriesTheLine() {
 	Body := _StripFullLineComments(_DriverFuncBody("ErgoptiGlobalErrorHandler"))
-	Assert(Body != "", "ErgoptiGlobalErrorHandler must exist in infra/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler must exist in diagnostics/engine/reports/error_net.ahk")
 	FlushPos := InStr(Body, "_LoggerFlush(true)")
 	ExitPos := InStr(Body, "PLC_ExitProcessNow(1, ErrorNet_StartupSmokeFatalLine(Exc, _DriverBootPhase))")
 	Assert(ExitPos > 0,

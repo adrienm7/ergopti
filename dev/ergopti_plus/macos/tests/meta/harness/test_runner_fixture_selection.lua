@@ -70,7 +70,7 @@ helpers.describe("Focused fixture registration (fixture-only-selection)", functi
 	end
 
 	helpers.it("retains the real shared gesture registration source", function()
-		local module_name = "tests.unit.modules.gestures.actions.test_dispatch_fences"
+		local module_name = "tests.unit.gestures.engine.actions.test_dispatch_fences"
 		local path = helpers.driver_root() .. module_name:gsub("%.", "/") .. ".lua"
 		local handle = assert(io.open(path, "rb"))
 		local source = assert(handle:read("*a"))

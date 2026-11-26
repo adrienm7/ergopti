@@ -6,7 +6,7 @@ local uv, ffi = require("luv"), require("ffi")
 ffi.cdef[[ int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5); ]]
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "literal program fixture requires owned child-subreaper support")
 local Runner = require("core.process.adapters.program_runner")
-local Owner = require("modules.gestures.program_owner")
+local Owner = require("gestures.engine.program_owner")
 local Shell = require("core.process.adapters.shell_runner")
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")

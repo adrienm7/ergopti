@@ -16,18 +16,18 @@ local Version = require("infra.version")
 local Installation = require("core.lifecycle.engine.installation")
 local VersionLabel = require("updater.engine.version_label")
 local Schedule = require("updater.engine.schedule")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local separator_modules = package.loaded
 local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
 local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")
 local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local shell_quote = require("ui.menu.menu_dialogs").shell_quote
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local ask_yes_no = require("ui.menu.menu_dialogs").ask_yes_no
+local _fill = require("menu.ui.builder.dialogs")._fill
+local shell_quote = require("menu.ui.builder.dialogs").shell_quote
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "ui.menu.menu_about"
 
@@ -36,7 +36,7 @@ local LOG = "ui.menu.menu_about"
 local function uninstall_caption_facade_current()
 	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
 		and rawget(package, "loaded") == separator_modules
-		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu
 		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
 		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
 		and rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n
@@ -126,11 +126,12 @@ local function _about_update_rows(ctx)
 	-- could tell whether the automatic update exists. The manifest's
 	-- `disabled_when = ["installed_build"]` greys the two choices.
 	local source_run = Installation.is_source_run()
-	-- A system package never self-updates either, so it gets the same greyed rows
-	-- with its own reason (the key the Versions window already shows).
+	-- A system package, an AppImage or a Flatpak never self-updates either, so it
+	-- gets the same greyed rows with its own origin's reason (the key the Versions
+	-- window already shows).
 	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil
-	if not source_run and type(up.installation_kind) == "function" and up.installation_kind() == "package" then
-		update_blocked_reason = "changelog_window.install_blocked_package"
+	if not source_run and type(up.installation_kind) == "function" then
+		update_blocked_reason = require("modules.updater.install_origin").update_blocked_key(up.installation_kind())
 	end
 	local frequency_row = _frequency_picker(ctx, up)
 
@@ -222,8 +223,10 @@ local function _about_update_rows(ctx)
 	end
 
 
-	-- A system package is an installed build, so only its own reason is applied here.
-	if update_blocked_reason and not source_run then
+	-- A system package is an installed build, so only its own reason is applied
+	-- here. An AppImage keeps its frequency: its checks still announce releases.
+	if update_blocked_reason and not source_run
+		and not require("modules.updater.install_origin").checks_for_releases(up.installation_kind()) then
 		frequency_row.items = nil
 		frequency_row.disabled = true
 		frequency_row.disabled_reason_key = update_blocked_reason
@@ -235,7 +238,7 @@ end
 
 
 --- The action of the Uninstall row: the confirmed removal transaction of
---- ui/menu/uninstall.lua, which quits the daemon through ctx.on_quit once the
+--- menu/ui/transactions/uninstall.lua, which quits the daemon through ctx.on_quit once the
 --- removal worker owns the files.
 --- @param ctx table Menu context.
 --- @return function
@@ -244,7 +247,7 @@ local function _uninstall_command(ctx)
 	if uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end
 	return function()
 		if not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end
-		local run = require("ui.menu.uninstall").run
+		local run = require("menu.ui.transactions.uninstall").run
 		local title = receive()
 		if title == nil or not uninstall_caption_facade_current() or not current() then return false end
 		local confirmation = i18n_safe("dialog.uninstall.confirm")
@@ -345,11 +348,17 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	-- One helper run per build answers both getters (start_at_login.snapshot).
+	local startup = nil
+	local function startup_state()
+		startup = startup or require("ui.menu.start_at_login").snapshot()
+		return startup
+	end
 	getters["startup_command_available"] = function()
-		return require("ui.menu.start_at_login").command_available() ~= false
+		return startup_state().command_available ~= false
 	end
 	getters["start_at_login_enabled"] = function()
-		return require("ui.menu.start_at_login").enabled() == true
+		return startup_state().enabled == true
 	end
 	render_ctx.state_getters = getters
 

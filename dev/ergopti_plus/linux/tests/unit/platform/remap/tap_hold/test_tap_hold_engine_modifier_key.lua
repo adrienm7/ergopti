@@ -582,6 +582,43 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 			"Alt stays up, the hand's Shift is lifted around the Delete")
 	end)
 
+	-- The shared thumb Backspace vectors, which Windows' BackSpaceLogic and
+	-- the macOS Karabiner rules replay too (THD-4 of 2026-11-21).
+	helpers.it("replays the shared thumb Backspace vectors (thumb-backspace-vectors)", function()
+		local path = helpers.driver_root() .. "/../_shared/tests/corpus/tap_hold/thumb_backspace_vectors.json"
+		local handle = assert(io.open(path, "r"), "cannot open " .. path)
+		local corpus = assert(require("core.text.engine.json").decode(handle:read("*a")))
+		handle:close()
+		helpers.assert_eq(#corpus.vectors, 8, "every thumb Backspace vector is replayed")
+		local CODE = { left_ctrl = LCTRL, shift = LSHIFT, right_ctrl = RCTRL }
+		local CTRL_CODES = { [LCTRL] = true, [RCTRL] = true }
+		for _, vector in ipairs(corpus.vectors) do
+			local keys = vector.right_ctrl_tap == "one_shot_shift" and { right_ctrl = DEFAULTS.right_ctrl } or {}
+			local held, ctrl = {}, false
+			for _, key in ipairs(vector.held) do
+				held[#held + 1] = CODE[key]
+				-- A plain RCtrl or LCtrl passes through as Ctrl; the one-shot holds Shift.
+				if key == "left_ctrl" or (key == "right_ctrl" and keys.right_ctrl == nil) then ctrl = true end
+			end
+			local deleted, previous, edges = {}, nil, 0
+			-- Each edge arrow is three UTF-8 bytes, which a Lua class cannot hold.
+			for code, edge in lalt_tap(keys, held):gmatch("(%d+)(\226\134[\145\147])") do
+				edges = edges + 1
+				code = tonumber(code)
+				if CTRL_CODES[code] then ctrl = edge == "↓"
+				elseif edge == "↓" and (code == 14 or code == 111) then
+					deleted = { key = code, ctrl = ctrl, after_right = previous == 106 }
+				end
+				if edge == "↓" then previous = code end
+			end
+			helpers.assert_true(edges > 0, "the thumb tap emits key edges the pattern reads")
+			local got = deleted.key == nil and "char_back"
+				or ((deleted.ctrl and "word" or "char")
+					.. ((deleted.key == 111 or deleted.after_right) and "_forward" or "_back"))
+			helpers.assert_eq(got, vector.expected, vector.id)
+		end
+	end)
+
 end)
 
 

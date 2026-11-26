@@ -30,8 +30,8 @@
 	--le-sub: var(--theme-sub);
 	--le-accent: var(--theme-accent);
 	--le-accent-soft: var(--theme-accent-soft);
-	--le-danger: var(--theme-danger);
-	--le-ok: var(--theme-green);
+	--le-danger: var(--theme-bad-text);
+	--le-ok: var(--theme-good-text);
 	--le-radius: 8px;
 	--le-gap: 16px;
 	background: var(--le-bg);
@@ -83,7 +83,7 @@ body {
 	border-radius: 6px;
 	color: inherit;
 	font: inherit;
-	min-height: 32px;
+	min-height: var(--theme-target-min);
 	padding: 4px 10px;
 }
 
@@ -113,8 +113,8 @@ body {
 }
 
 .layout-editor button.primary {
-	background: var(--le-accent);
-	border-color: var(--le-accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 	font-weight: 600;
 }
@@ -150,6 +150,9 @@ body {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px 12px;
+	/* A menu element: no list margins or markers. */
+	list-style: none;
+	margin: 0;
 	padding: 8px;
 	position: sticky;
 	top: 0;
@@ -158,23 +161,193 @@ body {
 
 .le-toolbar-group {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 6px;
-}
-
-.le-toolbar-spacer {
-	flex: 1 1 0;
+	max-width: 100%;
+	min-width: 0;
 }
 
 .le-doc-state {
 	color: var(--le-sub);
-	max-width: 40ch;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	/* The layout's name and what follows it sit at the toolbar's end. A long
+	   name wraps rather than being cut: larger text or wider spacing must not
+	   hide it (WCAG 1.4.12). */
+	margin-inline-start: auto;
+	max-width: min(40ch, 100%);
+	overflow-wrap: anywhere;
 }
 
 .le-doc-state.dirty {
 	color: var(--le-text);
+}
+
+/* The open layouts, one tab each, above the toolbar; long names wrap inside
+   their tab, the row wraps. */
+.le-layout-tabs {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-bottom: 8px;
+}
+
+/* A document tab bar: every tab and « + » share one height. The chosen tab is
+   filled, bold and carries an accent bar along its foot (not colour alone);
+   its « Duplicate » and « Close » are small icon buttons inside it, spaced
+   evenly and kept off its border, so hover and focus never cut its outline
+   (maintainer, 2026-11-19). The height holds the 44 px icon buttons of
+   theme.css 2 px inside the tab's 1 px border. */
+.le-layout-tab-list {
+	--le-tab-height: calc(var(--theme-target-min) + 6px);
+	align-items: center;
+	display: flex;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	gap: 8px;
+	min-width: 0;
+}
+
+.le-layout-tab-item {
+	align-items: center;
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	display: inline-flex;
+	gap: 4px;
+	max-width: 100%;
+	min-height: var(--le-tab-height);
+	min-width: 0;
+	padding: 0 4px 0 0;
+	position: relative;
+	transition:
+		background-color 0.12s,
+		border-color 0.12s;
+}
+
+.le-layout-tab-item:hover {
+	border-color: var(--le-accent);
+}
+
+.le-layout-tab-item.active {
+	background: var(--le-accent-soft);
+	border-color: var(--le-accent);
+}
+
+/* The chosen tab's bar, inside its border so the outline stays whole. */
+.le-layout-tab-item.active::after {
+	background: var(--le-accent);
+	border-radius: 3px 3px 0 0;
+	bottom: 0;
+	content: '';
+	height: 3px;
+	left: 10px;
+	pointer-events: none;
+	position: absolute;
+	right: 10px;
+}
+
+.layout-editor .le-layout-tab-item button {
+	background: transparent;
+	border: 0;
+	min-height: var(--theme-target-min);
+}
+
+.layout-editor .le-layout-tab {
+	align-self: stretch;
+	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
+	max-width: min(24ch, 100%);
+	overflow-wrap: anywhere;
+	padding: 4px 8px 4px 14px;
+}
+
+.le-layout-tab-item.active .le-layout-tab {
+	font-weight: 600;
+}
+
+/* Focus rings drawn inside their control: the tab's border stays unbroken. */
+.layout-editor .le-layout-tab-item button:focus-visible,
+.layout-editor .le-layout-tab-rename:focus-visible {
+	outline-offset: -3px;
+}
+
+/* « Duplicate » (ux-study item 20) and « Close »: 44 px icon buttons (the
+   target of theme.css), as far from each other as the last one is from the
+   tab's edge. */
+.layout-editor .le-tab-icon-button {
+	align-items: center;
+	border-radius: 6px;
+	color: var(--le-sub);
+	display: inline-flex;
+	flex: none;
+	height: var(--theme-target-min);
+	justify-content: center;
+	padding: 0;
+	width: var(--theme-target-min);
+}
+
+.layout-editor .le-tab-icon-button:hover:not(:disabled) {
+	background: var(--le-surface-2);
+	color: var(--le-text);
+}
+
+.le-layout-tab-item.active .le-tab-icon-button {
+	color: var(--le-text);
+}
+
+.layout-editor .le-layout-tab-item.active .le-tab-icon-button:hover:not(:disabled) {
+	background: var(--le-surface);
+}
+
+.layout-editor .le-layout-tab-close:hover:not(:disabled) {
+	color: var(--le-danger);
+}
+
+.le-tab-icon {
+	fill: none;
+	height: 16px;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.6;
+	width: 16px;
+}
+
+/* « + » opens a new tab: a square of the tabs' height. */
+.layout-editor .le-layout-tab-add {
+	align-items: center;
+	color: var(--le-accent);
+	display: inline-flex;
+	height: var(--le-tab-height);
+	justify-content: center;
+	padding: 0;
+	width: var(--le-tab-height);
+}
+
+.layout-editor .le-layout-tab-add .le-tab-icon {
+	height: 18px;
+	stroke-width: 2;
+	width: 18px;
+}
+
+/* The name field takes the tab's place while it is renamed. */
+.layout-editor .le-layout-tab-rename {
+	align-self: stretch;
+	background: var(--le-bg);
+	border: 0;
+	border-radius: calc(var(--le-radius) - 1px) 0 0 calc(var(--le-radius) - 1px);
+	font: inherit;
+	min-height: var(--theme-target-min);
+	padding: 0 10px;
+	width: 18ch;
+}
+
+.le-autosave {
+	color: var(--le-sub);
+	font-size: 0.9em;
+}
+
+.le-autosave.failed {
+	color: var(--le-danger);
 }
 
 /* =============================== */
@@ -198,7 +371,21 @@ body {
 .le-check {
 	align-items: center;
 	display: inline-flex;
+	flex-wrap: wrap;
 	gap: 6px;
+	max-width: 100%;
+}
+
+/* A drop-down as wide as its longest choice wraps under its label and
+   shrinks to the row on a phone or under a larger text (WCAG 1.4.10). */
+.le-inline select {
+	max-width: 100%;
+	min-width: 0;
+}
+
+/* « Swap with the key » is a paragraph: no margins of its own. */
+.le-swap {
+	margin: 0;
 }
 
 .le-field {
@@ -250,6 +437,7 @@ body {
 	background: var(--le-surface-2);
 	border: 1px solid var(--le-border);
 	border-radius: var(--le-radius);
+	color: inherit;
 	margin: 0;
 	padding: 8px 12px;
 }
@@ -257,6 +445,17 @@ body {
 .le-confirm button,
 .le-preserved button {
 	margin-right: 6px;
+}
+
+/* An open dialog in the flow of the messages, not over the page: no UA
+   positioning or sizing. */
+.le-confirm {
+	height: auto;
+	inset: auto;
+	max-height: none;
+	max-width: none;
+	position: static;
+	width: auto;
 }
 
 .le-tab.active,
@@ -286,11 +485,20 @@ body {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px 12px;
+	margin: 0;
+	max-width: 100%;
+	min-width: 0;
 }
 
 .le-label {
 	color: var(--le-sub);
 	font-weight: 600;
+}
+
+/* The layer bar's heading reads as a label, not as a section title. */
+.layout-editor .le-label {
+	font-size: inherit;
+	margin: 0;
 }
 
 .le-layerbar .le-tabs {
@@ -330,6 +538,103 @@ body {
 /* ======= 5/ Workspace ========== */
 /* =============================== */
 /* =============================== */
+
+/* Text for screen readers only (the score chip's live region). */
+.le-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+/* The score chip: above the board, held just under the sticky toolbar while
+   the page scrolls, so an edit's effect shows beside the keys. */
+.le-score-chip {
+	align-self: flex-start;
+	margin: 0;
+	max-width: 100%;
+	position: sticky;
+	top: calc(var(--le-toolbar-height, 0px) + 8px);
+	z-index: 2;
+}
+
+/* The editor prefix outranks the page's button rule (border, radius). */
+.layout-editor .le-score-open {
+	align-items: center;
+	background: var(--le-surface);
+	background-image: linear-gradient(var(--le-accent-soft), var(--le-accent-soft));
+	border: 1px solid var(--le-accent);
+	border-radius: 999px;
+	box-shadow: 0 2px 10px color-mix(in srgb, var(--le-text) 12%, transparent);
+	color: var(--le-text);
+	cursor: pointer;
+	display: flex;
+	flex-wrap: wrap;
+	font: inherit;
+	gap: 6px 14px;
+	max-width: 100%;
+	padding: 8px 18px;
+	text-align: left;
+}
+
+.le-score-label {
+	color: var(--le-sub);
+	font-size: 0.85em;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.le-score-value {
+	color: var(--le-accent);
+	font-size: 1.5em;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.le-score-rank {
+	color: var(--le-sub);
+	/* A small element: the rank keeps the chip's size. */
+	font-size: inherit;
+}
+
+.le-score-change {
+	align-items: center;
+	border-radius: 999px;
+	display: inline-flex;
+	font-style: normal;
+	gap: 6px;
+	padding: 2px 10px;
+}
+
+.le-score-change:empty {
+	display: none;
+}
+
+.le-score-better {
+	background: color-mix(in srgb, var(--le-ok) 14%, transparent);
+	color: var(--le-ok);
+}
+
+.le-score-worse {
+	background: color-mix(in srgb, var(--le-danger) 14%, transparent);
+	color: var(--le-danger);
+}
+
+.le-score-same {
+	background: var(--le-surface-2);
+	color: var(--le-sub);
+}
+
+.le-score-mark {
+	font-size: 0.85em;
+	font-weight: inherit;
+}
 
 .le-workspace {
 	align-items: start;
@@ -378,8 +683,10 @@ body {
 	min-width: 0;
 }
 
-/* The slot sizes what it holds: the analysis panel fills it in any column. */
-.le-side-slot > * {
+/* The slot sizes what it holds: the analysis panel fills it in any column. The
+   workspace prefix outranks the panel's own 420 px cap, which analysis_panel.css
+   declares later with the same specificity. */
+.le-workspace > .le-side-slot > * {
 	flex: none;
 	max-width: none;
 	width: 100%;
@@ -436,13 +743,16 @@ body {
 	}
 }
 
-.le-key {
-	align-items: flex-start;
+/* Under the page as a selector, so the editor's generic button rule
+   (.layout-editor button: 4 px by 10 px padding) does not take 20 px of a
+   40 px key from its legend, which a reader's text spacing then cut. */
+.layout-editor .le-key {
+	align-items: stretch;
 	border-radius: 6px;
 	display: flex;
 	flex-direction: column;
 	height: calc(var(--le-unit) * var(--h) - 4px);
-	justify-content: space-between;
+	justify-content: flex-start;
 	left: calc(var(--le-unit) * var(--x));
 	min-height: 0;
 	overflow: hidden;
@@ -473,6 +783,94 @@ body {
 
 .le-key.pickable {
 	cursor: crosshair;
+}
+
+/* The analysis panel's key colours: --le-heat runs from 0 (blue, costs
+   nothing) to 1 (red, the key that costs the most) on the Studio's one heat
+   scale (theme.css), the gradient's colour at that point under the key. */
+.le-key.le-heat {
+	background: var(--theme-chart-heat-scale) calc(var(--le-heat) * 100%) 0 / 10000% 100% no-repeat;
+	color: var(--theme-chart-heat-ink);
+}
+
+.le-key.le-heat .le-code {
+	color: inherit;
+}
+
+/*
+ * The ISO Enter, an L (editor_page.js keyOutline, key_shape.js): the button is
+ * clipped to the L, so a click in its notch reaches the key there, and its SVG
+ * path draws the fill and the border the other keys take from the button; the
+ * heat colour stays the button's background, clipped to the L.
+ */
+.le-key.le-key-l {
+	background: none;
+}
+
+.le-key.le-key-l,
+.layout-editor .le-key.le-key-l:hover,
+.le-key.le-key-l.selected {
+	border-color: transparent;
+	clip-path: polygon(
+		0 0,
+		100% 0,
+		100% 100%,
+		calc(var(--notch-x) * 100%) 100%,
+		calc(var(--notch-x) * 100%) calc(var(--notch-y) * 100%),
+		0 calc(var(--notch-y) * 100%)
+	);
+}
+
+.le-key-shape {
+	height: 100%;
+	inset: 0;
+	overflow: visible;
+	pointer-events: none;
+	position: absolute;
+	width: 100%;
+	z-index: -1;
+}
+
+.le-key-l {
+	isolation: isolate;
+}
+
+.le-key-shape path {
+	stroke-width: 1px;
+	vector-effect: non-scaling-stroke;
+}
+
+.le-key-shape .le-key-body {
+	fill: var(--le-surface);
+	stroke: var(--le-border);
+}
+
+.le-key-l.mapped .le-key-body,
+.le-key-l.overridden .le-key-body {
+	fill: var(--le-accent-soft);
+}
+
+.le-key-l.platform .le-key-body {
+	stroke: var(--le-accent);
+	stroke-dasharray: 4 3;
+}
+
+.le-key-l.overridden .le-key-body,
+.le-key-l:hover:not(:disabled) .le-key-body {
+	stroke: var(--le-accent);
+}
+
+.le-key-l.selected .le-key-body {
+	stroke: var(--le-accent);
+	stroke-width: 2px;
+}
+
+.le-key.le-key-l.le-heat {
+	background: var(--theme-chart-heat-scale) calc(var(--le-heat) * 100%) 0 / 10000% 100% no-repeat;
+}
+
+.le-key-l.le-heat .le-key-body {
+	fill: none;
 }
 
 .le-act-as {
@@ -508,13 +906,37 @@ body {
 	border: 2px solid var(--le-accent);
 }
 
+/*
+ * The legend is centred in the key, both ways (maintainer, 2026-11-15): its
+ * automatic margins centre it in the space the key-name label leaves below it,
+ * which is the whole key on a character key, whose label is empty.
+ */
 .le-legend {
 	display: block;
+	flex: none;
 	font-size: calc(var(--le-unit) * 0.38);
 	line-height: 1.15;
+	margin: auto 0;
 	overflow: hidden;
+	text-align: center;
 	white-space: nowrap;
 	width: 100%;
+}
+
+/* A dead key: its bare accent in the accent colour, and a corner mark on the key. */
+.le-legend.key-legend-dead,
+.le-magnifier-glyph.key-legend-dead {
+	color: var(--le-accent);
+}
+
+.le-key.dead::before {
+	border-color: var(--le-accent) var(--le-accent) transparent transparent;
+	border-style: solid;
+	border-width: 4px;
+	content: '';
+	position: absolute;
+	right: 2px;
+	top: 2px;
 }
 
 /* A label too long even at the smallest size (editor_page.js, fitLegends). */
@@ -522,13 +944,95 @@ body {
 	text-overflow: ellipsis;
 }
 
+/* A key's name (« Pg préc ») wraps inside its key rather than being cut by
+   an ellipsis: a reader's wider letter spacing (WCAG 1.4.12) must not hide
+   it. The legend below it then fits the height left (fitLegends). */
 .le-code {
 	color: var(--le-sub);
+	flex: none;
 	font-size: max(8px, calc(var(--le-unit) * 0.2));
 	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	overflow-wrap: break-word;
+}
+
+/* The layout as a table, the board's text alternative: it scrolls inside its
+   own focusable box, never the page. */
+.le-board-table {
+	margin-top: 8px;
+}
+
+.le-board-table > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 4px 0;
+}
+
+.le-board-table-wrap {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.le-board-table table {
+	border-collapse: collapse;
+}
+
+.le-board-table th,
+.le-board-table td {
+	border-bottom: 1px solid var(--le-border);
+	padding: 3px 8px;
+	text-align: left;
 	white-space: nowrap;
+}
+
+.le-board-table thead th {
+	background: var(--le-surface);
+	position: sticky;
+	top: 0;
+}
+
+/* « Versions »: the saved versions and a version's differences with the
+   layout, tables that scroll in their own box like the board's table. */
+.le-versions table {
+	border-collapse: collapse;
+}
+
+.le-versions th,
+.le-versions td {
+	border-bottom: 1px solid var(--le-border);
+	padding: 3px 8px;
+	text-align: left;
+	vertical-align: middle;
+}
+
+.le-versions thead th {
+	background: var(--le-surface);
+	position: sticky;
+	top: 0;
+}
+
+.le-version-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+/* The versions' branch graph: a version sits under the one it came from,
+   indented by its depth with a branch mark (the base says so in words). */
+.le-version-node {
+	padding-inline-start: calc(0.5em + var(--le-version-depth, 0) * 1.25em);
+}
+
+.le-version-shown > th {
+	font-weight: 700;
+}
+
+.le-version-diff {
+	margin-top: 12px;
+}
+
+/* « Help »: prose kept to a readable measure, under 80 characters a line. */
+.le-help p {
+	max-width: 66ch;
 }
 
 /* =============================== */
@@ -557,8 +1061,10 @@ body {
 	border: 1px solid transparent;
 	border-bottom: none;
 	border-radius: 6px 6px 0 0;
-	flex: 0 0 auto;
-	white-space: nowrap;
+	flex: 0 1 auto;
+	/* One line while the row holds it; a name longer than the row wraps
+	   instead of widening the page (WCAG 1.4.10). */
+	max-width: 100%;
 }
 
 .le-tool-tabs .le-tool-tab.active {
@@ -598,9 +1104,16 @@ body {
 	display: grid;
 	gap: 2px;
 	grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
-	margin-top: 6px;
+	list-style: none;
+	margin: 6px 0 0;
 	max-height: 200px;
 	overflow-y: auto;
+	padding: 0;
+}
+
+/* Each character's item is its cell: the button fills it. */
+.le-palette-grid > li {
+	display: grid;
 }
 
 .le-glyph {
@@ -615,6 +1128,30 @@ body {
 	padding: 2px 8px;
 }
 
+/* A repeat or magic key's fields: 44 px pointer targets (WCAG 2.5.5), each
+   field on its own line with its visible label. */
+.layout-editor .le-context-target {
+	min-height: 44px;
+	min-width: 44px;
+}
+
+.le-context-field {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.le-magic {
+	border-top: 1px solid var(--le-border);
+	margin-top: 8px;
+	padding-top: 8px;
+}
+
+.le-magic h4 {
+	margin: 0 0 6px;
+}
+
 .le-preview {
 	background: var(--le-surface-2);
 	border: 1px solid var(--le-border);
@@ -622,18 +1159,119 @@ body {
 	padding: 12px;
 }
 
-.le-preview input {
-	width: min(100%, 420px);
+/*
+ * « Essayer »: one input bar (maintainer, 2026-11-15). The bar looks like the
+ * site's fields (rounded border, padding, placeholder, accent focus ring) in
+ * the theme's light and dark colours; the transparent field over it takes the
+ * key presses, the result shows inside it, and the clear button sits at its end.
+ */
+.le-try {
+	align-items: flex-start;
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: 999px;
+	display: flex;
+	gap: 8px;
+	min-height: 40px;
+	padding: 8px 8px 8px 16px;
+	position: relative;
+	transition:
+		border-color 0.12s,
+		box-shadow 0.12s;
+}
+
+.le-try:focus-within {
+	border-color: var(--le-accent);
+	box-shadow: 0 0 0 3px var(--le-accent-soft);
+}
+
+.le-try:hover {
+	border-color: var(--le-accent);
+}
+
+/* A result over several lines (Enter) turns the pill into a rounded box. */
+.le-try:has(.le-preview-output:not(:empty)) {
+	border-radius: 20px;
 }
 
 .le-preview-output {
-	background: var(--le-surface);
-	border-radius: var(--le-radius);
-	display: block;
-	margin: 8px 0;
-	min-height: 2.2em;
-	padding: 6px 8px;
+	flex: 1;
+	line-height: 22px;
+	min-height: 22px;
+	min-width: 0;
+	overflow-wrap: anywhere;
 	white-space: pre-wrap;
+}
+
+/* Out of the flow, so the caret of an empty bar sits at its start, as in a field. */
+.le-preview-output:empty::before {
+	color: var(--le-sub);
+	content: attr(data-placeholder);
+	left: 16px;
+	overflow: hidden;
+	pointer-events: none;
+	position: absolute;
+	right: 40px;
+	text-overflow: ellipsis;
+	top: 8px;
+	white-space: nowrap;
+}
+
+/* The caret the transparent field cannot show. */
+.le-try:focus-within .le-preview-output::after {
+	animation: le-caret 1s steps(1) infinite;
+	border-left: 2px solid var(--le-accent);
+	content: '';
+	margin-left: 1px;
+}
+
+@keyframes le-caret {
+	50% {
+		border-color: transparent;
+	}
+}
+
+.layout-editor .le-try-keys {
+	background: transparent;
+	border: 0;
+	caret-color: transparent;
+	color: transparent;
+	cursor: text;
+	height: 100%;
+	inset: 0;
+	min-height: 0;
+	opacity: 0;
+	padding: 0;
+	position: absolute;
+	width: 100%;
+}
+
+.layout-editor .le-try-clear {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	border-radius: 50%;
+	color: var(--le-sub);
+	display: flex;
+	flex: none;
+	font-size: 18px;
+	height: 24px;
+	justify-content: center;
+	line-height: 1;
+	padding: 0;
+	position: relative;
+	width: 24px;
+	z-index: 1;
+}
+
+.layout-editor .le-try-clear:hover:not(:disabled) {
+	background: var(--le-surface-2);
+	color: var(--le-text);
+}
+
+/* Nothing to clear: the button gives its place back to the placeholder. */
+.le-preview-output:empty ~ .le-try-clear {
+	visibility: hidden;
 }
 
 .le-report {
@@ -662,6 +1300,32 @@ body {
 	border: 1px solid var(--le-border);
 	border-radius: var(--le-radius);
 	padding: 12px;
+}
+
+/* Every layout of the library: a search field over a sorted list. */
+.le-start-library {
+	display: grid;
+	gap: 8px;
+	margin-top: 12px;
+	max-width: 420px;
+}
+
+.le-start-library h3 {
+	font-size: 1em;
+	margin: 0;
+}
+
+.le-start-library select {
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: 6px;
+	color: inherit;
+	font: inherit;
+	width: 100%;
+}
+
+.le-start-library button {
+	justify-self: start;
 }
 
 /* =============================== */
@@ -735,6 +1399,7 @@ body {
 .le-magnifier-glyph {
 	font-size: 56px;
 	line-height: 1.2;
+	margin: 0;
 	min-height: 72px;
 	overflow-wrap: anywhere;
 	text-align: center;
@@ -775,6 +1440,11 @@ body {
 		display: none;
 	}
 
+	/* The name hidden, « Close » still sits at the end. */
+	.le-toolbar-close {
+		margin-inline-start: auto;
+	}
+
 	.le-layerbar {
 		align-items: stretch;
 		flex-direction: column;
@@ -783,4 +1453,127 @@ body {
 	.le-tool-panel {
 		padding: 12px;
 	}
+}
+
+/* The list of open layouts only carries its meaning: its items and the add
+   button stay one flex row of .le-layout-tab-list. */
+.le-layout-tab-roles {
+	display: contents;
+}
+
+/* « Paste a layout… »: a modal dialog outside the rendered tree (it keeps
+   its text across renders), so it reads the theme's tokens directly. */
+.le-paste-dialog {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 12px;
+	border-top: 6px solid var(--theme-chart-cat-2);
+	box-sizing: border-box;
+	color: var(--theme-text);
+	max-width: min(720px, calc(100vw - 32px));
+	padding: 20px 24px;
+	width: 720px;
+}
+
+.le-paste-dialog::backdrop {
+	background: rgb(0 0 0 / 45%);
+}
+
+.le-paste-dialog h2 {
+	font-size: 1.2rem;
+	margin: 0 0 8px;
+}
+
+.le-paste-dialog label {
+	display: block;
+	font-weight: 600;
+	margin: 14px 0 6px;
+}
+
+.le-paste-help {
+	color: var(--theme-sub);
+	margin: 0;
+}
+
+.le-paste-text {
+	background: var(--theme-surface-2);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	box-sizing: border-box;
+	color: var(--theme-text);
+	font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+	padding: 8px 10px;
+	resize: vertical;
+	width: 100%;
+}
+
+.le-paste-detected {
+	margin: 8px 0 0;
+	min-height: 1.4em;
+}
+
+.le-paste-detected.ok {
+	color: var(--theme-good-text);
+	font-weight: 600;
+}
+
+.le-paste-detected.none {
+	color: var(--theme-sub);
+}
+
+.le-paste-refusal {
+	background: var(--theme-surface-2);
+	border-left: 4px solid var(--theme-bad-text);
+	border-radius: 6px;
+	color: var(--theme-bad-text);
+	margin: 10px 0 0;
+	padding: 8px 12px;
+}
+
+.le-paste-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	justify-content: flex-end;
+	margin: 16px 0 0;
+}
+
+.le-paste-actions button {
+	border-radius: 8px;
+	min-height: var(--theme-target-min);
+	padding: 6px 14px;
+}
+
+.le-paste-actions .le-primary {
+	background: var(--theme-accent-fill);
+	border: 1px solid var(--theme-accent-fill);
+	color: var(--theme-white);
+}
+
+.le-paste-actions .le-primary:disabled {
+	opacity: 0.55;
+}
+
+/* Files dragged over the editor: the whole editor is the drop target, and
+   says what a drop does. */
+.layout-editor.le-drop-active {
+	outline: 3px dashed var(--le-accent);
+	outline-offset: -3px;
+	position: relative;
+}
+
+.layout-editor.le-drop-active::after {
+	background: var(--le-surface);
+	border: 2px solid var(--le-accent);
+	border-radius: 10px;
+	box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+	content: attr(data-drop-hint);
+	font-weight: 600;
+	left: 50%;
+	padding: 12px 18px;
+	pointer-events: none;
+	position: fixed;
+	top: 40%;
+	transform: translateX(-50%);
+	z-index: 10;
 }

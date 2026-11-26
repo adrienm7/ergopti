@@ -42,12 +42,12 @@ Every file below references the `Features` global or uses `IniCacheGet`. The cut
 13. `lib/metrics/wpm_widget.ahk` — `IniCacheGet("Script", "WpmWidget…")` → DELETED (WpmWidget dropped from AHK in v2)
 14. `lib/toml/toml_helpers.ahk` — utility, may need v2 awareness
 15. `modules/gestures.ahk` — reads `Features["Gestures"]…` + `IniCacheGet("Gestures", …)` + `IniCacheGet("Shortcuts.Actions", …)`
-16. `modules/hotstrings.ahk` — reads `Features["DistancesReduction"|"SFBsReduction"|"Rolls"|"Autocorrection"|"MagicKey"]…` (~99 occurrences)
+16. `hotstrings/hotstrings.ahk` — reads `Features["DistancesReduction"|"SFBsReduction"|"Rolls"|"Autocorrection"|"MagicKey"]…` (~99 occurrences)
 17. `modules/layout.ahk` — reads `Features["Layout"]…`
 18. `modules/shortcuts.ahk` — reads `Features["Shortcuts"]…` (~42 occurrences)
 19. `platform/remap.ahk` — reads `Features["TapHolds"]…` (~70 occurrences) — see Section 7 for the structural change
 20. `modules/keystats/keystats_prefetch.ahk` — reads `Features["Personal"]…`
-21. `ui/tray_menu.ahk` — reads `Features[…]` extensively (~20 occurrences) + `IniCacheGet("LLM", …)`
+21. `menu/ui/tray_menu.ahk` — reads `Features[…]` extensively (~20 occurrences) + `IniCacheGet("LLM", …)`
 22. `tests/test_toml_loader.ahk`, `tests/test_config.ahk` — rewrite to test v2 loader
 
 ## Top-level section renames
@@ -184,15 +184,15 @@ v1 `Features["SFBsReduction"]["IÉ"].Enabled` → v2 `Features["hotstrings"]["sf
 
 Group is renamed from `DynamicHotstrings` to `dynamic` (the parent section already says `hotstrings`, so the `Hotstrings` suffix is redundant).
 
-| v1 id                              | v2 id                                 | Extra fields                                      |
-| ---------------------------------- | ------------------------------------- | ------------------------------------------------- |
-| `Date`                             | `date`                                | —                                                 |
-| `DateFr`                           | `date_fr`                             | —                                                 |
-| `DateLongFr`                       | `date_long_fr`                        | —                                                 |
-| `IbanPrefixes`                     | `iban_prefixes`                       | —                                                 |
-| `PhonePrefixes`                    | `phone_prefixes`                      | —                                                 |
-| `SsnPrefixes`                      | `ssn_prefixes`                        | —                                                 |
-| `TextExpansionPersonalInformation` | `text_expansion_personal_information` | `pattern_max_length = 1` (was `PatternMaxLength`) |
+| v1 id                              | v2 id                                 | Extra fields                                        |
+| ---------------------------------- | ------------------------------------- | --------------------------------------------------- |
+| `Date`                             | `date`                                | —                                                   |
+| `DateFr`                           | `date_fr`                             | —                                                   |
+| `DateLongFr`                       | `date_long_fr`                        | —                                                   |
+| `IbanPrefixes`                     | `iban_prefixes`                       | —                                                   |
+| `PhonePrefixes`                    | `phone_prefixes`                      | —                                                   |
+| `SsnPrefixes`                      | `ssn_prefixes`                        | —                                                   |
+| `TextExpansionPersonalInformation` | `text_expansion_personal_information` | `PatternMaxLength` retired (2026-11-16): fixed at 1 |
 
 ### 2.7 Personal — `[Hotstrings.Personal]` → `[hotstrings.personal.<entry>]`
 
@@ -206,7 +206,7 @@ Group is renamed from `DynamicHotstrings` to `dynamic` (the parent section alrea
 
 ## 3. LLM — `[LLM]` → `[llm.*]`
 
-**Major restructuring**: the flat `[LLM]` section is split into six sub-sections: `display`, `generation`, `models`, `profiles`, `trigger`, `navigation`. All `IniCacheGet(_IniCache, "LLM", …)` calls (mostly in `ui/tray_menu.ahk`) become direct `Features["llm"][…]` reads.
+**Major restructuring**: the flat `[LLM]` section is split into six sub-sections: `display`, `generation`, `models`, `profiles`, `trigger`, `navigation`. All `IniCacheGet(_IniCache, "LLM", …)` calls (mostly in `menu/ui/tray_menu.ahk`) become direct `Features["llm"][…]` reads.
 
 | v1 TOML key                                     | v2 path                                                                         | Note                                                                                                                                                                           |
 | ----------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -480,7 +480,7 @@ All `IniCacheGet(Cache, "Section", "Key")` calls below disappear in v2 (the valu
 | `lib/onboarding.ahk:527`                       | `IniCacheGet(Cache, "Hotstrings", "MagicKey")`                                   | `Features["hotstrings"]["trigger_char"]`                                                |
 | `lib/updater.ahk:104, 135`                     | `IniCacheGet(_IniCache, UPDATER_INI_SECTION, …)`                                 | **KEEP AS-IS** — updater uses its own INI file, not the user config                     |
 | `lib/metrics/wpm_widget.ahk:*`                 | `IniCacheGet("Script", "WpmWidget…")`                                            | **DELETED** — file is removed (HS-only widget)                                          |
-| `ui/tray_menu.ahk:1111-1140`                   | `IniCacheGet(_IniCache, "LLM", …)` (7 calls)                                     | `Features["llm"][…]` — see Section 3 for the per-key mapping                            |
+| `menu/ui/tray_menu.ahk:1111-1140`              | `IniCacheGet(_IniCache, "LLM", …)` (7 calls)                                     | `Features["llm"][…]` — see Section 3 for the per-key mapping                            |
 | `modules/gestures.ahk:660, 676, 678, 725, 726` | `IniCacheGet(_IniCache, "Shortcuts.Actions", …)`                                 | Read from `Features["shortcuts"]["<shortcut>"]["<param>"]` directly (see Section 6.8)   |
 | `modules/gestures.ahk:1601`                    | `IniCacheGet(_IniCache, "Gestures", Slot)`                                       | `Features["gestures"][Slot]`                                                            |
 | `modules/gestures.ahk:1804`                    | `IniCacheGet(_IniCache, "Gestures", "AutoConfigureOnNextStart")`                 | State, not config — keep in INI or move to state file                                   |
@@ -533,10 +533,10 @@ When you start the cut-over, do these in order:
    5. `modules/gestures.ahk` (~7 sites + `IniCacheGet`)
    6. `lib/dispatchers.ahk` (~1 site)
    7. `modules/shortcuts.ahk` (~42 sites — the biggest single-file impact after `hotstrings.ahk`)
-   8. `modules/hotstrings.ahk` (~99 sites — by far the biggest)
+   8. `hotstrings/hotstrings.ahk` (~99 sites — by far the biggest)
    9. `lib/hotstrings/personal_toml_editor.ahk` (~2 sites)
    10. `modules/keystats/keystats_prefetch.ahk` (~3 sites)
-   11. `ui/tray_menu.ahk` (~20 sites + 7 `IniCacheGet`)
+   11. `menu/ui/tray_menu.ahk` (~20 sites + 7 `IniCacheGet`)
    12. `lib/i18n.ahk` (~1 `IniCacheGet`)
    13. `lib/onboarding.ahk` (~6 `IniCacheGet`)
    14. `platform/remap.ahk` (~70 sites — but **NOT mechanical**, see Section 7.4)

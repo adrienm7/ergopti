@@ -72,15 +72,19 @@ function initDashboard() {
 	precomputeIconColors().then(() => renderDashboard());
 }
 
-/** Activates a tab by name, toggling visibility of all `[data-tab]` sections.
+/** Activates a tab by name and shows its panel alone (WAI-ARIA tabs pattern).
  *  Triggers a fresh render after activation so any Chart.js instance whose canvas
  *  was 0×0 while the tab was hidden gets recomputed against the now-visible layout. */
 function activateTab(name) {
-	document.querySelectorAll('[data-tab]').forEach((el) => {
-		el.classList.toggle('tab-active', el.getAttribute('data-tab') === name);
-	});
-	document.querySelectorAll('.tab-btn').forEach((btn) => {
-		btn.classList.toggle('active', btn.getAttribute('data-tab-target') === name);
+	// The shown tab reads as selected, not by its colour alone (WCAG 1.4.1, 4.1.2),
+	// and is the tab list's one Tab stop (roving tabindex).
+	document.querySelectorAll('.tab-btn[role="tab"]').forEach((btn) => {
+		const shown = btn.getAttribute('data-tab-target') === name;
+		btn.classList.toggle('active', shown);
+		btn.setAttribute('aria-selected', shown ? 'true' : 'false');
+		btn.tabIndex = shown ? 0 : -1;
+		const panel = document.getElementById(btn.getAttribute('aria-controls'));
+		if (panel) panel.hidden = !shown;
 	});
 	// Re-render so newly-visible canvases get a non-zero size before Chart.js
 	// computes their dimensions. setTimeout(0) waits for the layout pass.
@@ -91,13 +95,26 @@ function activateTab(name) {
 	}, 0);
 }
 
-/** Wires click handlers on the tab buttons (idempotent). */
+/** Wires the tabs: a click, or the arrow, Home and End keys (idempotent). */
 function wireTabs() {
 	if (wireTabs._bound) return;
-	const buttons = document.querySelectorAll('.tab-btn[data-tab-target]');
+	const buttons = [...document.querySelectorAll('.tab-btn[data-tab-target]')];
 	if (buttons.length === 0) return;
-	buttons.forEach((btn) => {
+	buttons.forEach((btn, index) => {
 		btn.addEventListener('click', () => activateTab(btn.getAttribute('data-tab-target')));
+		btn.addEventListener('keydown', (event) => {
+			const last = buttons.length - 1;
+			const target = {
+				ArrowRight: index === last ? 0 : index + 1,
+				ArrowLeft: index === 0 ? last : index - 1,
+				Home: 0,
+				End: last
+			}[event.key];
+			if (target === undefined) return;
+			event.preventDefault();
+			buttons[target].focus();
+			activateTab(buttons[target].getAttribute('data-tab-target'));
+		});
 	});
 	// Default to the first tab so something is visible on first paint
 	activateTab('overview');
@@ -129,7 +146,7 @@ function rebuildFilterButtons() {
 		catBox.innerHTML = catList
 			.map((c) => {
 				const active = !currentCategoryFilter || currentCategoryFilter.has(c);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button>`;
+				return `<li><button type="button" class="filter-btn${active ? ' active' : ''}" aria-pressed="${active}" data-cat="${escapeHtml(c)}" style="padding:3px 9px;font-size:11px;">${escapeHtml(c)}</button></li>`;
 			})
 			.join('');
 		[...catBox.querySelectorAll('button[data-cat]')].forEach((btn) => {
@@ -156,7 +173,7 @@ function rebuildFilterButtons() {
 		wkBox.innerHTML = wkLabels
 			.map((label, idx) => {
 				const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button>`;
+				return `<li><button type="button" class="filter-btn${active ? ' active' : ''}" aria-pressed="${active}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button></li>`;
 			})
 			.join('');
 		[...wkBox.querySelectorAll('button[data-dow]')].forEach((btn) => {
@@ -380,6 +397,7 @@ function updateCharts(appsArray, aggregatedData) {
 }
 
 function renderDashboard() {
+	let failed = false;
 	try {
 		const aggData = getAggregatedData();
 		// Cache so toolbar toggles (heatmap mode, future filters) can re-render
@@ -445,7 +463,7 @@ function renderDashboard() {
 
 		const elProd = $id('kpi-productivity');
 		if (elProd) {
-			elProd.innerHTML = `<span class="score-badge ${scoreClass}" style="font-size: 1.2em; padding: 5px 15px;">${Math.round(finalProd)}%</span>`;
+			elProd.innerHTML = `<strong class="score-badge ${scoreClass}" style="font-size: 1.2em; padding: 5px 15px;">${Math.round(finalProd)}%</strong>`;
 		}
 
 		$id('kpi-switches').textContent = totalSwitches;
@@ -809,10 +827,11 @@ function renderDashboard() {
 				const pPos = (ps.positive_ms / psSum) * 100;
 				const pNeu = (ps.neutral_ms / psSum) * 100;
 				const pNeg = (ps.negative_ms / psSum) * 100;
+				// Drawn segments; their shares are the detail line's text.
 				elProdBar.innerHTML =
-					`<div title="${escapeHtml(_t('ui_apps.prod_positive'))}" style="background:${ThemeTokens.color('green-dark')};width:${pPos}%"></div>` +
-					`<div title="${escapeHtml(_t('ui_apps.prod_neutral'))}" style="background:${ThemeTokens.color('gray')};width:${pNeu}%"></div>` +
-					`<div title="${escapeHtml(_t('ui_apps.prod_negative'))}" style="background:${ThemeTokens.color('red-dark')};width:${pNeg}%"></div>`;
+					`<rect x="0" y="0" width="${pPos}" height="1" fill="${ThemeTokens.color('green-dark')}"></rect>` +
+					`<rect x="${pPos}" y="0" width="${pNeu}" height="1" fill="${ThemeTokens.color('gray')}"></rect>` +
+					`<rect x="${pPos + pNeu}" y="0" width="${pNeg}" height="1" fill="${ThemeTokens.color('red-dark')}"></rect>`;
 				setText(
 					'kpi-prod-bar-detail',
 					_t('ui_apps.kpi_productive')
@@ -950,7 +969,7 @@ function renderDashboard() {
 			setText('kpi-goal-value', `${goalMin} min`);
 			setText('kpi-goal-progress', `${todayMin.toFixed(0)} / ${goalMin} min`);
 			const bar = document.getElementById('kpi-goal-bar');
-			if (bar) bar.style.width = `${pct}%`;
+			if (bar) bar.value = pct;
 			setText(
 				'kpi-goal-detail',
 				pct >= 100
@@ -1103,12 +1122,14 @@ function renderDashboard() {
 
 			const tdName = document.createElement('td');
 			tdName.className = 'app-name-cell';
-			tdName.innerHTML = `<strong>${escapeHtml(app.name)}</strong>`;
+			// The keyboard reaches the drill-down and the category editor through
+			// buttons (WCAG 2.1.1); their clicks reach the row's and the cell's handlers.
+			tdName.innerHTML = `<button type="button" class="app-cell-btn app-name-btn">${escapeHtml(app.name)}</button>`;
 			tr.appendChild(tdName);
 
 			const tdCat = document.createElement('td');
 			tdCat.className = 'app-cat-cell';
-			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="${escapeHtml(_t('ui_apps.cat_edit_tooltip'))}">${escapeHtml(app.category)} ✎</span>`;
+			tdCat.innerHTML = `<button type="button" class="app-cell-btn app-cat-btn" title="${escapeHtml(_t('ui_apps.cat_edit_tooltip'))}">${escapeHtml(app.category)} ✎</button>`;
 			tdCat.addEventListener('click', (ev) => {
 				ev.stopPropagation();
 				postBridge({ action: 'edit', app: app.name, cat: app.category, score: app.score });
@@ -1151,7 +1172,7 @@ function renderDashboard() {
 
 			// #51 SFB max for this app on the period
 			const tdSfb = document.createElement('td');
-			tdSfb.style.textAlign = 'right';
+			tdSfb.style.textAlign = 'end';
 			const _sfbApp = aggData.apps[app.name] || {};
 			tdSfb.textContent =
 				(_sfbApp.same_finger_streak_max || 0) > 0 ? String(_sfbApp.same_finger_streak_max) : '—';
@@ -1159,7 +1180,7 @@ function renderDashboard() {
 
 			// #52 Modifier hold mean ms for this app
 			const tdHold = document.createElement('td');
-			tdHold.style.textAlign = 'right';
+			tdHold.style.textAlign = 'end';
 			const _hSum = _sfbApp.kc_hold_sum_ms || 0;
 			const _hCnt = _sfbApp.kc_hold_count || 0;
 			tdHold.textContent =
@@ -1174,27 +1195,53 @@ function renderDashboard() {
 			if (tbody) tbody.appendChild(tr);
 		});
 	} catch (err) {
+		failed = true;
 		safeLog('error', 'Error rendering dashboard', err);
 		// Surface the exception visibly — the WebView has no devtools so otherwise it's silent.
 		let banner = document.getElementById('render-error-banner');
 		if (!banner) {
-			banner = document.createElement('div');
+			banner = document.createElement('p');
 			banner.id = 'render-error-banner';
-			banner.style.cssText =
-				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:' +
-				ThemeTokens.color('white') +
-				';font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
+			banner.className = 'render-error';
+			// Announced at once: the dashboard stopped drawing.
+			banner.setAttribute('role', 'alert');
 			document.body.appendChild(banner);
 		}
+		// The reader gets the cause; the stack goes to the log above.
 		banner.textContent = _t('ui_apps.render_error').replace(
 			'{detail}',
-			String(err && err.stack ? err.stack : err)
+			err instanceof Error ? err.message : String(err)
 		);
+	} finally {
+		// A good render, the empty period's included, retires the alert an
+		// earlier failure left on screen (MET-14).
+		const stale = failed ? null : document.getElementById('render-error-banner');
+		if (stale) stale.remove();
 	}
 }
 
 // =====================================================
 // =====================================================
+
+// A card's explanation shows on hover and on focus; Escape hides it until the
+// pointer or the focus moves to another card (WCAG 1.4.13 dismissible).
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Escape') return;
+	document
+		.querySelectorAll('.stat-card:hover, .stat-card:focus')
+		.forEach((card) => card.classList.add('tip-dismissed'));
+});
+document.addEventListener('focusin', (event) => {
+	document.querySelectorAll('.stat-card.tip-dismissed').forEach((card) => {
+		if (!card.contains(event.target)) card.classList.remove('tip-dismissed');
+	});
+});
+document.addEventListener('pointerover', (event) => {
+	document.querySelectorAll('.stat-card.tip-dismissed').forEach((card) => {
+		if (!card.contains(event.target) && card !== document.activeElement)
+			card.classList.remove('tip-dismissed');
+	});
+});
 
 // Native locale deliveries can arrive after the page data. Preserve the
 // selected category identities while rebuilding labels and derived charts.

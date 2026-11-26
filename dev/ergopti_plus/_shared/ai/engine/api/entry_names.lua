@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One rule for the three drivers: macOS and Linux call this module, and
----    Windows ports it (ui/menu/menu_llm/menu_api_entries.ahk). All three
+---    Windows ports it (ai/ui/menu/api_entries.ahk). All three
 ---    replay _shared/tests/corpus/llm/api_entry_names_vectors.json.
 --- 2. The caller resolves each entry first: the model and the base URL the
 ---    requests use, the provider's defaults standing in for empty fields.

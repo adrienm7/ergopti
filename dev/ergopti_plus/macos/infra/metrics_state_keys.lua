@@ -4,7 +4,7 @@
 --- MODULE: Metrics Menu State Keys
 --- DESCRIPTION:
 --- The flat names under which the Metrics preferences live in the menu state
---- and in the preference map (infra/preferences.lua), declared once. They keep
+--- and in the preference map (settings/engine/preferences/preferences.lua), declared once. They keep
 --- the `keystats_` spelling from before the rename to Metrics: the TOML side
 --- is clean (`[metrics]`), so these names exist only in memory and in the
 --- manifest rows that read them (`checked_when`, `disabled_when`).

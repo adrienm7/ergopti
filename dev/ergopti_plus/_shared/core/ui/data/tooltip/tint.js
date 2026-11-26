@@ -44,6 +44,15 @@ const DEFAULT_SATURATION = 0.85;
  */
 const DEFAULT_BG = { r: 0x24 / 255, g: 0x24 / 255, b: 0x24 / 255 };
 
+/**
+ * Below this chroma (max - min channel, 0..1) an accent counts as grey. The
+ * mix imposes a saturation of 0.85, so even the faint blue of the palette's
+ * grey (6e6e73, chroma 0.02) became a navy panel no reader could tell from
+ * the indigo one; 0.05 (13 of 255) keeps every palette hue, the brown's 0.16
+ * included. Mirrored by tint.lua and _TooltipMixTintHex.
+ */
+const ACHROMATIC_CHROMA = 0.05;
+
 // ===========================================
 // ===========================================
 // ======= 1/ Core tint-mixing algorithm =======
@@ -53,7 +62,7 @@ const DEFAULT_BG = { r: 0x24 / 255, g: 0x24 / 255, b: 0x24 / 255 };
 /**
  * Extracts the hue from an RGB color.
  * Returns a value in [0.0, 1.0) where 0 = red, 1/6 = yellow, 2/6 = green, etc.
- * Returns 0 for achromatic colors (r = g = b).
+ * Returns 0 for achromatic colors (chroma under ACHROMATIC_CHROMA).
  * @param {number} r - Red component [0.0, 1.0].
  * @param {number} g - Green component [0.0, 1.0].
  * @param {number} b - Blue component [0.0, 1.0].
@@ -64,7 +73,7 @@ function extractHue(r, g, b) {
 	const minC = Math.min(r, g, b);
 	const delta = maxC - minC;
 
-	if (delta < 0.0001) {
+	if (delta < ACHROMATIC_CHROMA) {
 		// Achromatic — no meaningful hue.
 		return 0;
 	}
@@ -153,7 +162,7 @@ function mixTint(accent, lightness = DEFAULT_LIGHTNESS, saturation = DEFAULT_SAT
 	const hue = extractHue(r, g, b);
 
 	// Achromatic accent — no hue to carry, fall back to neutral background.
-	if (Math.max(r, g, b) - Math.min(r, g, b) < 0.0001) {
+	if (Math.max(r, g, b) - Math.min(r, g, b) < ACHROMATIC_CHROMA) {
 		return { ...DEFAULT_BG };
 	}
 
@@ -288,6 +297,12 @@ function tintTestVectors() {
 			id: 'achromatic',
 			description: 'Achromatic (gray) accent → falls back to default dark background.',
 			accent_hex: '#808080',
+			expected_hex: toHex(DEFAULT_BG)
+		},
+		{
+			id: 'near_gray',
+			description: 'The palette grey, a faint blue → default dark background, not navy.',
+			accent_hex: toHex({ r: 0x6e / 255, g: 0x6e / 255, b: 0x73 / 255 }),
 			expected_hex: toHex(DEFAULT_BG)
 		},
 		{

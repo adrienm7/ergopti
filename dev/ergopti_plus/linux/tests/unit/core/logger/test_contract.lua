@@ -159,4 +159,37 @@ describe("Logger contract: shared cross-driver vectors", function()
 	end
 end)
 
+-- LOG-07: the print fallback of logger.shim printed "[WARN]" and let a format
+-- error escape into its caller
+describe("logger shim print fallback", function()
+	it("prints the shared labels and marks a failed format", function()
+		-- The shim's second candidate, the macOS driver logger, is no Linux module:
+		-- refusing the shared core alone leaves the shim on its print fallback.
+		assert_true(package.searchpath("core.logger.engine.logger", package.path) == nil,
+			"Linux has no driver logger module for the shim to find")
+		local saved_core = package.loaded["core.logger.engine"]
+		local saved_preload_core = package.preload["core.logger.engine"]
+		local saved_print = print
+		local printed = {}
+		package.loaded["core.logger.engine"] = nil
+		package.preload["core.logger.engine"] = function() error("core unavailable in this fixture") end
+		print = function(line) printed[#printed + 1] = line end
+		local ok, err = pcall(function()
+			local fallback = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/shim.lua")
+			fallback.warn("probe", "careful %s", "now")
+			fallback.info("probe", "value=%d tail", {})
+		end)
+		print = saved_print
+		package.preload["core.logger.engine"] = saved_preload_core
+		package.loaded["core.logger.engine"] = saved_core
+		assert_true(ok, tostring(err))
+		assert_eq(2, #printed)
+		assert_true(printed[1]:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:000 %[WARNING%] %[probe%] careful now$") ~= nil,
+			tostring(printed[1]))
+		assert_true(printed[2]:find("[INFO] [probe] value=%d tail  [!! log format failed: ", 1, true) ~= nil,
+			tostring(printed[2]))
+		assert_true(printed[2]:find(" arg(s) not substituted]", 1, true) ~= nil, tostring(printed[2]))
+	end)
+end)
+
 require("tests.lua.diagnostics.adapter_errors_contract").register(helpers)

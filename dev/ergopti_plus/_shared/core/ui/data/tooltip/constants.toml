@@ -96,6 +96,18 @@ hint_spacing = 4
 # the shortcut column of the AI tooltip (layout units).
 label_gap = 16
 
+# The chip a hotstring preview row draws its category glyph in, the first
+# cell of the row, before the output: a filled chip in the glyph grey, the
+# glyph knocked out in the row's tint, so it reads as an annotation and not as
+# part of what the expansion types. Square: rounding it on Windows needs a
+# window region per row, which cost as much as the chip itself. Space between
+# the glyph and the chip's edge across and down, and the gap between the chip
+# and the output text (layout units). The geometry rule is
+# _shared/hotstrings/engine/category_glyph.lua badge_geometry.
+glyph_badge_pad_x = 4
+glyph_badge_pad_y = 1
+glyph_badge_gap = 8
+
 # Widest the prediction block of the AI tooltip grows, shortcut column included
 # (layout units). A longer line is cut with an ellipsis in front of the column:
 # past this the panel would run off the screen with its chords. Accepting a
@@ -198,11 +210,23 @@ sep_alpha_ahk = 0.25   # alpha-blended onto 0x1A → 0x54 (#545454) in AHK
 sep_alpha_hs  = 0.09   # hs.canvas fillColor alpha (darker on macOS)
 sep_alpha_linux = 0.09 # cairo fill alpha
 
+# Main text of a tooltip row, white. AHK turns it into the grey it paints;
+# macOS and Linux draw the same white from their RGBA tables.
+text_white = 1.0
+
 # Trigger-label color (★ ↵ symbols, right column in stacked tooltips).
 label_white = 0.45
 label_alpha = 1.0
 # AHK hex alias for Gui.SetFont color option.
 label_hex = "#AAAAAA"
+
+# The fill of a hotstring preview row's glyph chip, in the trigger label's grey;
+# the glyph is drawn in the row's own tint on it. Text on a fill, so 4.5:1
+# against the plain background and every tint at [tint] lightness and
+# saturation, whatever the hue (test-tooltip-style-single-source.cjs). A dimmed
+# row dims the chip as its label. AHK turns it into the grey it paints, as
+# text_white: label_hex.
+glyph_badge_white = 0.667
 
 # Dimmed / non-firing alternate rows.
 dim_white = 0.55
@@ -211,14 +235,16 @@ dim_alpha = 1.0
 dim_hex = "#8C8C8C"
 
 # Hint line color (navigation instructions below the predictions).
-hint_white = 0.40
+# Text, so 4.5:1 on the background at least (WCAG 1.4.3): 0.40 was 2.7:1.
+hint_white = 0.60
 hint_alpha = 1.0
-hint_hex = "#666666"
+hint_hex = "#999999"
 
-# Info bar (model + TTFT/TTLT timing).
-info_white = 0.30
+# Info bar (model + TTFT/TTLT timing). The dimmest text, still 4.5:1 on the
+# background (0.30 was 1.8:1).
+info_white = 0.56
 info_alpha = 1.0
-info_hex = "#4D4D4D"
+info_hex = "#8F8F8F"
 
 # "Generation in progress" label on the violet loading panel.
 loading_text_white = 0.80
@@ -361,6 +387,11 @@ shortcut_joiner_linux = "+"
 
 # Vertical gap between stacked prediction lines (HS canvas gap font size).
 prediction_line_gap_hs = 3
+
+# The hotstring category whose delay override sets an AI suggestion's lifetime:
+# the Delays submenu's AI row stores the user's value under this name. Linux
+# reads it here (core/ui/ui/tooltip/config.lua); Windows and macOS still spell it.
+delay_category = "llm_prediction"
 
 # Navigation hints of the footer. Their words are locale text
 # (llm.tooltip.hint_accept_single, hint_accept_center, hint_or), and each key is

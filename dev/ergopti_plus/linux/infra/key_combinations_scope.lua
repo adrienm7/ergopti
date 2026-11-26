@@ -9,9 +9,11 @@ local Codec = require("core.text.engine.toml_codec")
 local KeyPath = require("core.text.engine.toml_codec.key_path")
 local Updates = require("shortcuts.engine.physical_availability")
 local ConfigKeys = require("settings.engine.keys")
+local Logger = require("core.logger.engine.shim")
+local LOG = "infra.key_combinations_scope"
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
-require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
+require("settings.engine.scope.registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
 --- Creates one exact ordered-pair publication owner. Native and source
 --- inverses retain their lease until literal acknowledgement.
 --- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
@@ -21,14 +23,14 @@ require("infra.scope_registry").register("key_combinations_scope", function() re
 function M.new(options)
 	assert(type(options) == "table")
 	local combinations = options.combinations or require("modules.shortcuts.key_combinations")
-	local parameters = options.parameters or require("modules.gestures.manager")
+	local parameters = options.parameters or require("gestures.engine.manager")
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
 		assert(type(combinations[name]) == "function", "combination configuration owner is incomplete")
 	end
-	local manifest = options.manifest or require("infra.manifest_reader")
+	local manifest = options.manifest or require("menu.engine.manifest_reader")
 	local function declared()
 		if type(manifest.find_entry_by_path) ~= "function" then return false end
-		local entry = manifest.find_entry_by_path("category_enabled.key_combinations")
+		local entry = manifest.find_entry_by_path(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 		return type(entry) == "table" and entry.type == "boolean" and entry.default == true
 	end
 	local gate_value, frame, published_frame, publication_acked
@@ -145,7 +147,7 @@ function M.new(options)
 		files=options.files or require("core.fs.adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
-				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }
+				return { presets = {}, operations = {manifest.sparse_operation(ConfigKeys.KEY.CATEGORY_ENABLED_KEY_COMBINATIONS,gate_value)} }
 			end
 			if scope == "key_combinations_chord" then
 				assert(mode == "configured" and type(chord_operations) == "table")
@@ -282,20 +284,30 @@ function M.new(options)
 	function owner.copy_taps_to_chords()
 		if not chord_declared() or type(combinations.configuration_entries) ~= "function"
 			or type(combinations.chord_settings) ~= "function" then return false end
+		-- Every known participant must be admitted by the actual source owner.
+		local function admitted_by_every(kind,action)
+			for _,entry in ipairs(combinations.configuration_entries()) do
+				if combinations.validate_slot(kind,entry.id,action) ~= true then return false end
+			end
+			return true
+		end
 		return perform(function()
 			local captured = combinations.configuration_source(owner)
 			if type(captured) ~= "table" then return false end
 			local plan = Shared.plan_chord_copy(captured.status=="ok" and captured.content or "",{
 				entries=combinations.configuration_entries(),settings=combinations.chord_settings(),tap_section=Shared.TAP_SECTION,
+				-- A stored slot holds an action some pair slot admits; a copied tap
+				-- must also be one a chord runs, else its pair keeps its chord.
 				is_action=function(action)
-					-- Every known participant must be admitted by the actual source owner.
-					for _,entry in ipairs(combinations.configuration_entries()) do
-						if combinations.validate_slot("combo",entry.id,action) ~= true then return false end
-					end
-					return true
+					return admitted_by_every("tap",action) or admitted_by_every("combo",action)
 				end,
+				is_chord_action=function(action) return admitted_by_every("combo",action) end,
 			})
 			if combinations.configuration_source_matches(owner,captured) ~= true then return false end
+			for _,skip in ipairs(plan.skipped) do
+				Logger.warn(LOG,"Pair '%s' tap '%s' cannot run as a chord — its chord is left as it is.",
+					skip.id,skip.action)
+			end
 			if plan.changes == 0 then
 				local doc=captured.status=="ok" and Codec.decode(captured.content) or {}
 				if parameters.parameter_configuration_matches(owner,doc,function() return true end)~=true
@@ -359,7 +371,7 @@ local function session(expected_source)
 	if retained and retained.pending() and retained.retry_restore() ~= true then return nil end
 	if retained and retained.release() ~= true then return nil end
 	sequence = sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",expected_source=expected_source})
 	return retained
 end

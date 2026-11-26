@@ -10,6 +10,8 @@
 --- The layout editor has its own window (_shared/ui/layout_editor_window, bridge
 --- "layout_editor_window_bridge"): M.editor is its handler, built by the same
 --- factory, and the manager page's open_editor shows it.
+--- When the manager window cannot open, on_window_unavailable offers its
+--- essential Ergopti actions without it (ui/layout_manager/tray_actions.lua).
 --- ==============================================================================
 
 local Json          = require("core.text.engine.json")
@@ -17,6 +19,7 @@ local Logger        = require("core.logger.engine.shim")
 local Paths         = require("core.fs.engine.paths")
 local FileSystem    = require("core.fs.adapters.file_system")
 local ManagerBridge = require("layouts.engine.manager_bridge")
+local LayoutChange  = require("ui.layout_manager.layout_change")
 
 local LOG = "bridge.layout_manager"
 
@@ -65,6 +68,10 @@ local function page_strings(i18n, strings_file)
 	return strings
 end
 
+-- The module, declared before the handlers: the manager window's « Layout
+-- editor » asks the editor window's handler for its tab.
+local M
+
 --- Builds the bridge handler of one window.
 --- @param spec table MANAGER_SPEC or EDITOR_SPEC.
 --- @return table handler { bridge_name, on_message, on_window_closed, _reset }
@@ -72,6 +79,10 @@ local function new_handler(spec)
 	local H = { bridge_name = spec.bridge_name }
 	-- Registry work can outlive a page; its UI callbacks retain that exact owner.
 	local _controller, _controller_owner, _registry_observer = nil, nil, nil
+	-- Whether a « Navigation layer » entry waits for this window's page.
+	local _nav_wanted = false
+	-- The Studio tab an entry waits for this window's page to show.
+	local _tab_wanted = nil
 
 	--- The controller wired to this daemon.
 	--- @param state table
@@ -129,7 +140,8 @@ local function new_handler(spec)
 		-- The composer's and the layout editor's operations take their callback last.
 		for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "composer_emulate", "source_open",
 			"source_save", "source_export", "studio_list", "studio_save", "studio_remove", "studio_corpus",
-			"studio_profile_load", "studio_profile_save" }) do
+			"studio_profile_load", "studio_profile_save", "studio_workspace_load", "studio_workspace_save",
+			"source_export_step" }) do
 			local operation = registry[method]
 			if type(operation) == "function" then
 				owned_registry[method] = function(...)
@@ -145,15 +157,22 @@ local function new_handler(spec)
 		end
 		local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
-		local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
-		if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
+		local nav_layer_save = dependency(state, "nav_layer_save", "modules.keymap.nav_layer_save")
+		if nav_layer_save and type(nav_layer_save.apply_text) ~= "function" then nav_layer_save = nil end
 		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
 		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local studio_snapshot = dependency(state, "studio_snapshot", "modules.keystats.studio_snapshot")
+		if studio_snapshot and type(studio_snapshot.ports) ~= "function" then studio_snapshot = nil end
+		local event_loop = dependency(state, "event_loop", "core.events.loop")
+		if event_loop and type(event_loop.defer) ~= "function" then event_loop = nil end
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		local keystats_writer = dependency(state, "keystats_writer", "modules.keystats.sqlite_writer")
 		if keystats_writer and type(keystats_writer.get_revision) ~= "function" then keystats_writer = nil end
 		local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")
 		local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
+		-- A changed layout reloads the emulation whether or not « Emulate without
+		-- installing » is offered.
+		local layout_emulation = emulation
 		if not (preferences and type(preferences.choose) == "function" and emulation
 			and type(emulation.reload_if_started) == "function") then
 			preferences, emulation = nil, nil
@@ -182,9 +201,25 @@ local function new_handler(spec)
 			end or nil,
 			strings = function() return page_strings(i18n, spec.strings_file) end,
 			editor_window = spec.editor_window,
+			-- The navigation layer a « Navigation layer » entry asked for, read
+			-- when the page takes it (modules/keymap/nav_layer_save.lua).
+			take_tab = spec.editor_window and function()
+				local tab = _tab_wanted
+				_tab_wanted = nil
+				return tab
+			end or nil,
+			take_nav = spec.editor_window and function()
+				if not _nav_wanted then return nil end
+				_nav_wanted = false
+				local read, nav = pcall(nav_layer_save.studio_nav, state)
+				if read then return nav end
+				Logger.error(LOG, "The navigation layer could not be read for the Studio: %s.", tostring(nav))
+				return { error = tostring(nav) }
+			end or nil,
 			-- The manager page's « Layout editor » shows the editor's own window.
 			open_editor_window = not spec.editor_window and function()
 				if not current() or type(manager.show) ~= "function" then return false end
+				M.editor.want_tab("edit")
 				return manager.show(EDITOR_SPEC.app_name) ~= false
 			end or nil,
 			open_url = function(url)
@@ -209,30 +244,23 @@ local function new_handler(spec)
 			-- emulation: an uninstalled one stays chosen and stops, a reinstalled one
 			-- resumes (maintainer decision, 2026-11-12), and the tray shows its state
 			-- (LMH-001, LMH-002).
-			layout_changed = function(id)
-				if not emulation or type(emulation.status) ~= "function" or emulation.status().id ~= id then return end
-				emulation.reload_if_started()
-				if type(state.on_config_changed) == "function" then state.on_config_changed() end
-			end,
-			-- The extension catalogue is read once per boot: a layout whose
-			-- extension was installed or removed loads or drops its hotstrings
-			-- through a daemon reload, as Windows' _LayMgrWeb_After does (LMH-004).
-			reload_extensions = function()
-				if type(state.on_reload) ~= "function" then return false end
-				return state.on_reload() == true
-			end,
+			layout_changed = function(id) LayoutChange.apply(state, layout_emulation, id, false) end,
+			-- A layout whose extension was installed or removed loads or drops its
+			-- hotstrings in place, never through a daemon restart, which closed
+			-- this window (LMH-004, maintainer decision of 2026-11-25).
+			reload_extensions = function(id) return LayoutChange.apply(state, layout_emulation, id, true) end,
 			-- The layout editor applies a source's navigation layer through the
-			-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
-			apply_nav = layer_editor and function(text, done)
+			-- window-free layers.toml save (modules/keymap/nav_layer_save.lua).
+			apply_nav = nav_layer_save and function(text, done)
 				if not current() then return false end
-				local result = layer_editor.apply_text(text, state)
+				local result = nav_layer_save.apply_text(text, state)
 				if current() then done(result) end
 			end or nil,
 			-- Ergopti Studio reads the user's own typing from the local keystats
 			-- store, read only, for this window alone (metrics/engine/view/studio_ngrams.lua).
 			read_keystats = spec.editor_window and keystats_reader and function(done)
 				if not current() then return false end
-				local result = require("metrics.engine.view.studio_ngrams").read({
+				require("metrics.engine.view.studio_ngrams").read({
 					path = config_paths and config_paths.metrics_path() or nil,
 					exists = FileSystem.exists,
 					read = keystats_reader.read_studio_ngrams,
@@ -241,8 +269,18 @@ local function new_handler(spec)
 						local rev = keystats_writer.get_revision()
 						return rev ~= nil and tostring(rev) or nil
 					end or nil,
-				})
-				if current() then done(result) end
+					-- The last complete read, saved beside metrics.sqlite, private like it.
+					snapshot = studio_snapshot and studio_snapshot.ports() or nil,
+					log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+					-- The saved read reaches the page before the daemon reads the store.
+					defer = event_loop and function(work)
+						if not event_loop.defer(function() if current() then work() end end) then
+							error("the fresh Ergopti Studio read could not be queued", 0)
+						end
+					end or nil,
+				}, function(result)
+					if current() then done(result) end
+				end)
 			end or nil,
 			-- « Emulate without installing »: the composed layout becomes the emulated
 			-- one, as the menu's « Layout to emulate » stores it, and the emulation
@@ -296,27 +334,60 @@ local function new_handler(spec)
 		_controller, _controller_owner = nil, nil
 	end
 
+	--- Asks this window's page to show the navigation layer: at once when its
+	--- page is ready, else when it says so.
+	function H.want_nav()
+		_nav_wanted = true
+		if _controller then _controller.show_nav() end
+	end
+
+	--- Asks this window's page to show one of its tabs: at once when its page
+	--- is ready, else when it says so.
+	--- @param tab string « edit », « compare » or « optimize ».
+	function H.want_tab(tab)
+		_tab_wanted = tab
+		if _controller then _controller.show_tab() end
+	end
+
 	--- Test seam: forgets the controller and revokes all retained callbacks.
 	function H._reset()
 		_controller, _controller_owner, _registry_observer = nil, nil, nil
+		_nav_wanted = false
+		_tab_wanted = nil
 	end
 
 	return H
 end
 
-local M = new_handler(MANAGER_SPEC)
+M = new_handler(MANAGER_SPEC)
 M.editor = new_handler(EDITOR_SPEC)
+
+--- Answers the webview manager when the layout manager window cannot open
+--- (lgi or WebKitGTK 4.1 missing, or the window refused): the layout manager is
+--- core, so its essential actions are offered without it (install and activate
+--- Ergopti, or activate it), through the same registry operations as the page
+--- (ui/layout_manager/tray_actions.lua).
+--- @param info table { app_name, component, locale, detail } from the webview manager.
+--- @return boolean delivered
+function M.on_window_unavailable(info)
+	return require("ui.layout_manager.tray_actions").offer_without_window(info)
+end
 
 --- Opens the layout editor in its own window (the menu's « Create or edit a
 --- layout… »), or brings the open one to the front: its controller answers the
 --- page's ready with the last saved source, and an open editor keeps its work.
 --- @param manager table The webview manager (ui.webview_manager).
+--- @param opts table|nil { nav = true } opens it on the navigation layer: the
+---   « Navigation layer » menu row, gesture and shortcut (open_layer_editor);
+---   { tab = "edit" } on the editor's tab, which an open Studio may have left.
 --- @return boolean shown
-function M.open_editor_window(manager)
+function M.open_editor_window(manager, opts)
 	if type(manager) ~= "table" or type(manager.show) ~= "function" then
 		Logger.error(LOG, "No webview manager — the layout editor window cannot open.")
 		return false
 	end
+	if type(opts) == "table" and opts.nav == true then M.editor.want_nav() end
+	if type(opts) == "table" and type(opts.tab) == "string" then M.editor.want_tab(opts.tab) end
 	return manager.show(EDITOR_SPEC.app_name) ~= false
 end
 

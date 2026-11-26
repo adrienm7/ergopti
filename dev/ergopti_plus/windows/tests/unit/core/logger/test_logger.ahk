@@ -22,16 +22,15 @@ global _TLOG_FIRST_CASE := TEST_REGISTRY.Length + 1
 
 _TLOG_CaptureLoggerState() {
 	global LOGGER_MIN_LEVEL, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_PENDING_CAP
-	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_SUB_FILES
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
 	return {
 		MinLevel: LOGGER_MIN_LEVEL, LogPath: LOGGER_LOG_PATH,
 		ErrorsLogPath: LOGGER_ERRORS_LOG_PATH, PendingCap: LOGGER_PENDING_CAP,
-		Ring: LOGGER_RING_BUFFER, RingCursor: LOGGER_RING_CURSOR, SubFiles: LOGGER_SUB_FILES,
+		Ring: LOGGER_RING_BUFFER, RingCursor: LOGGER_RING_CURSOR,
 		Pending: _LOGGER_PENDING, PendingErrors: _LOGGER_PENDING_ERRORS,
-		SubPending: _LOGGER_SUB_PENDING, SubPaths: _LOGGER_SUB_PATHS,
 		DedupKey: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL,
 		DedupCount: _LOGGER_DEDUP_COUNT, LastErrTime: _LastErrTime,
 		FlushActive: _LOGGER_FLUSH_ACTIVE, ForceFlushPending: _LOGGER_FORCE_FLUSH_PENDING,
@@ -41,8 +40,8 @@ _TLOG_CaptureLoggerState() {
 
 _TLOG_RestoreLoggerState(State) {
 	global LOGGER_MIN_LEVEL, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_PENDING_CAP
-	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_SUB_FILES
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
 	LOGGER_MIN_LEVEL := State.MinLevel
@@ -51,11 +50,8 @@ _TLOG_RestoreLoggerState(State) {
 	LOGGER_PENDING_CAP := State.PendingCap
 	LOGGER_RING_BUFFER := State.Ring
 	LOGGER_RING_CURSOR := State.RingCursor
-	LOGGER_SUB_FILES := State.SubFiles
 	_LOGGER_PENDING := State.Pending
 	_LOGGER_PENDING_ERRORS := State.PendingErrors
-	_LOGGER_SUB_PENDING := State.SubPending
-	_LOGGER_SUB_PATHS := State.SubPaths
 	_LOGGER_DEDUP_KEY := State.DedupKey
 	_LOGGER_DEDUP_LEVEL := State.DedupLevel
 	_LOGGER_DEDUP_COUNT := State.DedupCount
@@ -196,71 +192,6 @@ _ResetLogger() {
 	_LOGGER_DROPPED_LINES := 0
 	_LoggerRefreshFastFlags()
 }
-
-global _LOGGER_FANOUT_RACE_DETACHED := Map()
-global _LOGGER_FANOUT_RACE_SWAPPED := false
-
-_LoggerFanOutRaceDetachPending() {
-	global _LOGGER_SUB_PENDING, _LOGGER_FANOUT_RACE_DETACHED
-	global _LOGGER_FANOUT_RACE_SWAPPED
-	_LOGGER_FANOUT_RACE_DETACHED := _LOGGER_SUB_PENDING
-	_LOGGER_SUB_PENDING := Map()
-	_LOGGER_FANOUT_RACE_SWAPPED := true
-}
-
-_LoggerFanOutRaceYield(*) {
-	SetTimer(_LoggerFanOutRaceDetachPending, -1)
-	Sleep(20)
-}
-
-_LoggerFanOutRaceQueue(Name, Line) {
-	return _LoggerQueueSubLine(Name, Line, _LoggerFanOutRaceYield)
-}
-
-_LoggerFanOutRaceLineCount(Queues, Name) {
-	return Queues.Has(Name) ? Queues[Name].Length : 0
-}
-
-TestLogger_FanOutQueueSurvivesFlushSwap() {
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
-	global _LOGGER_FANOUT_RACE_DETACHED, _LOGGER_FANOUT_RACE_SWAPPED
-	SavedFiles := LOGGER_SUB_FILES
-	SavedPaths := _LOGGER_SUB_PATHS
-	SavedPending := _LOGGER_SUB_PENDING
-	ErrorText := "", ContractThrew := false
-	DetachedCount := 0
-	CurrentCount := 0
-	try {
-		LOGGER_SUB_FILES := [Map("name", "race.log", "tags", ["[Race]"])]
-		_LOGGER_SUB_PATHS := Map("race.log", "unused")
-		_LOGGER_SUB_PENDING := Map("race.log", [])
-		_LOGGER_FANOUT_RACE_DETACHED := Map()
-		_LOGGER_FANOUT_RACE_SWAPPED := false
-		try _LoggerFanOut("Race", "2026-08-30 [Race] line", _LoggerFanOutRaceQueue)
-		catch as Err {
-			ContractThrew := true
-			ErrorText := Err.Message
-		}
-		Sleep(20)
-		DetachedCount := _LoggerFanOutRaceLineCount(
-			_LOGGER_FANOUT_RACE_DETACHED, "race.log")
-		CurrentCount := _LoggerFanOutRaceLineCount(_LOGGER_SUB_PENDING, "race.log")
-	} finally {
-		SetTimer(_LoggerFanOutRaceDetachPending, 0)
-		LOGGER_SUB_FILES := SavedFiles
-		_LOGGER_SUB_PATHS := SavedPaths
-		_LOGGER_SUB_PENDING := SavedPending
-	}
-
-	AssertTrue(_LOGGER_FANOUT_RACE_SWAPPED,
-		"the regression must actually detach the pending-map owner")
-	AssertFalse(ContractThrew,
-		"a flush swap between queue lookup and push must not crash logger fan-out: " . ErrorText)
-	AssertEqual(1, DetachedCount + CurrentCount,
-		"the routed line must belong to exactly one pre- or post-swap snapshot")
-}
-Test("Logger: fan-out queue owns lookup and push atomically (logger-fanout-queue-ownership)",
-	TestLogger_FanOutQueueSurvivesFlushSwap)
 
 TestLogger_FailedFlushRequeuesSnapshot() {
 	global _LOGGER_PENDING, LOGGER_LOG_PATH
@@ -413,8 +344,8 @@ TestLogger_AllFlushSinksUseCompleteAppend() {
 		DatedCount += 1
 		Pos := Found + 1
 	}
-	Assert(Count >= 2 && DatedCount >= 2,
-		"main and errors must share the dated complete append helper, and topical queues must use the same complete append boundary")
+	Assert(Count >= 1 && DatedCount >= 2,
+		"main and errors must share the dated complete append helper")
 	Assert(InStr(CombinedBody, "FileAppend(") = 0 && InStr(CombinedBody, ".Write(") = 0,
 		"_LoggerFlush must not bypass byte-count and stable-flush verification")
 }
@@ -1022,6 +953,32 @@ TestLogger_ErrorsPathIsSeparate() {
 }
 Test("Errors sink: WARNING and ERROR are written to the dedicated errors file; INFO/DEBUG are not",
 	TestLogger_ErrorsPathIsSeparate)
+
+; A WARNING is batched: forcing a synchronous flush on it wrote the errors file
+; twice when the buffered flush ran in the same tick, and the errors file was
+; once written inline (logger-sync-double-write-on-warning). Only an ERROR
+; forces the flush, and it carries the batched warning with it.
+TestLogger_WarningIsBatchedUntilAnError() {
+	global LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
+	_ResetLogger()
+	ErrorsTmp := A_Temp . "\ergopti_test_errors_batched_" . A_Now . "_" . A_TickCount . ".log"
+	LOGGER_ERRORS_LOG_PATH := ErrorsTmp
+	try FileDelete(ErrorsTmp)
+	try {
+		LoggerWarn("SyncWarn", "batched-warning-line")
+		AssertFalse(FileExist(ErrorsTmp),
+			"a WARNING must neither force a flush nor write the errors file inline (logger-sync-double-write-on-warning)")
+		AssertEqual(1, _LOGGER_PENDING_ERRORS.Length, "the warning waits in the errors batch")
+		LoggerError("SyncWarn", "forcing-error-line")
+		Content := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
+		AssertContains(Content, "batched-warning-line", "the forced flush of an ERROR carries the batched warning")
+		AssertContains(Content, "forcing-error-line", "an ERROR forces a synchronous flush of the errors file")
+	} finally {
+		try FileDelete(ErrorsTmp)
+	}
+}
+Test("Errors sink: a WARNING is batched and only an ERROR forces the flush (logger-sync-double-write-on-warning)",
+	TestLogger_WarningIsBatchedUntilAnError)
 
 TestLogger_ErrorsPathEmptyWhenNotSet() {
 	; If LOGGER_ERRORS_LOG_PATH remains "", the errors fan-out must be a no-op

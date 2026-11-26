@@ -22,7 +22,7 @@
 --- @param helpers table Driver test helpers.
 --- @param driver string "linux" or "macos".
 return function(helpers, driver)
-	local owner_module = driver == "macos" and "core.logger.engine.logger" or "infra.script_settings"
+	local owner_module = driver == "macos" and "core.logger.engine.logger" or "settings.engine.scope.script_settings"
 
 	--- The live numeric threshold, read from the logger this driver owns.
 	local function live()

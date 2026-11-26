@@ -8,11 +8,13 @@
 // not the presence of implementation strings.
 //
 // FEATURES & RATIONALE:
-// 1. Exact fan-out: unified, errors-only, and topical sinks receive one record.
+// 1. Exact sinks: the daily log and the errors mirror receive one record, and a
+//    record naming a retired topical sub-file is refused.
 // 2. Retry idempotence: duplicate sequences ACK without duplicate bytes.
 // 3. Ordering/session fences: gaps and stale reload sessions cannot mutate files.
 // 4. Real UDP boundary: a loopback client reaches the pre-bound launcher worker.
-// 5. Native retention: dated archives and stale topical views purge off Lua.
+// 5. Native retention: dated archives and the retired topical sub-files purge
+//    off Lua, and nothing else in the folder.
 // 6. Receive fairness: empty datagrams cannot monopolize the serial worker queue.
 // 7. Latency: kept descriptors are reused until their inode is unlinked,
 //    replaced or rotated, and a slow datagram is reported with its cost.
@@ -60,7 +62,6 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 			"sequence": 1,
 			"line": "14h00min00s000ms [WARN] [llm.api] failed once",
 			"variant": "warn",
-			"topics": ["ErgoptiPlus_llm.log"],
 			"calendar_date": "2026-08-14",
 		])
 		let firstAck = response(processor.handle(record, sourceIsLoopback: true))
@@ -70,13 +71,14 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		XCTAssertEqual(firstAck["session"] as? String, "session-a")
 
 		let expected = "14h00min00s000ms [WARN] [llm.api] failed once\n"
-		for name in [
-			"ErgoptiPlus_2026-08-14.log",
-			"ErgoptiPlus_errors_2026-08-14.log",
-			"ErgoptiPlus_llm.log",
-		] {
+		for name in ["ErgoptiPlus_2026-08-14.log", "ErgoptiPlus_errors_2026-08-14.log"] {
 			XCTAssertEqual(try String(contentsOf: directory.appendingPathComponent(name)), expected)
 		}
+		XCTAssertEqual(
+			try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted(),
+			["ErgoptiPlus_2026-08-14.log", "ErgoptiPlus_errors_2026-08-14.log"],
+			"an [llm] line goes to the daily log and the errors mirror only"
+		)
 	}
 
 	func testBatchValidatesEveryRecordBeforeWritingAndAcknowledgesTheFinalSequence() throws {
@@ -334,6 +336,19 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 				"topics": ["../escaped.log"],
 				"calendar_date": "2026-08-14",
 			]),
+			// One daily log is the only log: a record still naming a retired
+			// topical sub-file comes from a stale runtime and writes nothing.
+			request([
+				"v": 1,
+				"token": "secret",
+				"kind": "record",
+				"session": "session-a",
+				"sequence": 1,
+				"line": "retired topic",
+				"variant": "info",
+				"topics": ["ErgoptiPlus_llm.log"],
+				"calendar_date": "2026-08-14",
+			]),
 		] {
 			let rejection = response(processor.handle(malformed, sourceIsLoopback: true))
 			XCTAssertEqual(rejection["reason"] as? String, "record_rejected")
@@ -382,7 +397,7 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		XCTAssertFalse(sink.append(
 			line: "retry-me",
 			variant: "warn",
-			topics: ["ErgoptiPlus_llm.log"],
+			topics: [],
 			calendarDate: "2026-08-14",
 			operationId: "session-a:1"
 		))
@@ -390,16 +405,12 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		XCTAssertTrue(sink.append(
 			line: "retry-me",
 			variant: "warn",
-			topics: ["ErgoptiPlus_llm.log"],
+			topics: [],
 			calendarDate: "2026-08-14",
 			operationId: "session-a:1"
 		))
 
-		for name in [
-			"ErgoptiPlus_2026-08-14.log",
-			"ErgoptiPlus_errors_2026-08-14.log",
-			"ErgoptiPlus_llm.log",
-		] {
+		for name in ["ErgoptiPlus_2026-08-14.log", "ErgoptiPlus_errors_2026-08-14.log"] {
 			XCTAssertEqual(try String(contentsOf: directory.appendingPathComponent(name)), "retry-me\n")
 		}
 	}
@@ -408,7 +419,6 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		let targetNames = [
 			"ErgoptiPlus_2026-08-14.log",
 			"ErgoptiPlus_errors_2026-08-14.log",
-			"ErgoptiPlus_llm.log",
 		]
 		let now = try fixedDate(year: 2026, month: 8, day: 14)
 		for failureTarget in targetNames {
@@ -447,7 +457,7 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 			XCTAssertFalse(sink.append(
 				line: "short-write-retry",
 				variant: "warn",
-				topics: ["ErgoptiPlus_llm.log"],
+				topics: [],
 				calendarDate: "2026-08-14",
 				operationId: "session-a:1"
 			))
@@ -461,7 +471,7 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 			XCTAssertTrue(sink.append(
 				line: "short-write-retry",
 				variant: "warn",
-				topics: ["ErgoptiPlus_llm.log"],
+				topics: [],
 				calendarDate: "2026-08-14",
 				operationId: "session-a:1"
 			))
@@ -594,277 +604,6 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 		XCTAssertEqual(try String(contentsOf: unified), "sync-debt-retry\n")
 	}
 
-	func testReloadSessionAppendsToTodaysTopicalViewInsteadOfTruncatingIt() throws {
-		let directory = try makeLogDirectory()
-		let now = try fixedDate(year: 2026, month: 8, day: 14)
-		let processor = LoggerDatagramProcessor(
-			token: "secret",
-			sink: LoggerRecordSink(now: { now })
-		)
-		_ = processor.handle(configure(directory, session: "session-a"), sourceIsLoopback: true)
-		_ = processor.handle(request([
-			"v": 1,
-			"token": "secret",
-			"kind": "record",
-			"session": "session-a",
-			"sequence": 1,
-			"line": "before-reload",
-			"variant": "info",
-			"topics": ["ErgoptiPlus_llm.log"],
-			"calendar_date": "2026-08-14",
-		]), sourceIsLoopback: true)
-		_ = processor.handle(configure(
-			directory,
-			session: "session-b",
-			previousSession: "session-a"
-		), sourceIsLoopback: true)
-		_ = processor.handle(request([
-			"v": 1,
-			"token": "secret",
-			"kind": "record",
-			"session": "session-b",
-			"sequence": 1,
-			"line": "after-reload",
-			"variant": "info",
-			"topics": ["ErgoptiPlus_llm.log"],
-			"calendar_date": "2026-08-14",
-		]), sourceIsLoopback: true)
-
-		XCTAssertEqual(
-			try String(contentsOf: directory.appendingPathComponent("ErgoptiPlus_llm.log")),
-			"before-reload\nafter-reload\n"
-		)
-	}
-
-	func testFreshLauncherPreservesAnExistingSameDayTopicalView() throws {
-		let directory = try makeLogDirectory()
-		let now = try fixedDate(year: 2026, month: 8, day: 14)
-		let topical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		try Data("prior-process\n".utf8).write(to: topical)
-		try FileManager.default.setAttributes(
-			[.modificationDate: now],
-			ofItemAtPath: topical.path
-		)
-		let freshSink = LoggerRecordSink(now: { now })
-		XCTAssertTrue(freshSink.configure(directoryPath: directory.path, retentionDays: 14))
-
-		XCTAssertTrue(freshSink.append(
-			line: "new-process",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-14",
-			operationId: "session-new:1"
-		))
-		XCTAssertEqual(try String(contentsOf: topical), "prior-process\nnew-process\n")
-	}
-
-	func testFirstRecordAfterMidnightReplacesThePriorDayTopicalView() throws {
-		let directory = try makeLogDirectory()
-		let now = try fixedDate(year: 2026, month: 8, day: 14)
-		let priorDay = try fixedDate(year: 2026, month: 8, day: 13)
-		let topical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		try Data("prior-day\n".utf8).write(to: topical)
-		try FileManager.default.setAttributes(
-			[.modificationDate: priorDay],
-			ofItemAtPath: topical.path
-		)
-		let sink = LoggerRecordSink(now: { now })
-		// Configure's purge normally removes this old view. Recreate it after the
-		// handshake to exercise a live worker crossing midnight without restart.
-		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-		sink.performDeferredMaintenance()
-		try Data("prior-day\n".utf8).write(to: topical)
-		try FileManager.default.setAttributes(
-			[.modificationDate: priorDay],
-			ofItemAtPath: topical.path
-		)
-
-		XCTAssertTrue(sink.append(
-			line: "new-day",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-14",
-			operationId: "session-a:1"
-		))
-		XCTAssertEqual(try String(contentsOf: topical), "new-day\n")
-	}
-
-	func testObservedCalendarTransitionRotatesTopicalEvenWhenOldRecordHasNewDayMtime() throws {
-		let directory = try makeLogDirectory()
-		let newDay = try fixedDate(year: 2026, month: 8, day: 14)
-		let topical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		let sink = LoggerRecordSink(now: { newDay })
-		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-
-		XCTAssertTrue(sink.append(
-			line: "queued-before-midnight",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-13",
-			operationId: "session-a:1"
-		))
-		// The queued old-day record reached disk after midnight. Its kernel mtime
-		// therefore claims the topical view already belongs to the new day.
-		try FileManager.default.setAttributes(
-			[.modificationDate: newDay],
-			ofItemAtPath: topical.path
-		)
-
-		XCTAssertTrue(sink.append(
-			line: "first-new-day-record",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-14",
-			operationId: "session-a:2"
-		))
-		XCTAssertEqual(try String(contentsOf: topical), "first-new-day-record\n")
-	}
-
-	func testSameDirectoryReconfigureRetainsObservedTopicalCalendarTransition() throws {
-		let directory = try makeLogDirectory()
-		let newDay = try fixedDate(year: 2026, month: 8, day: 14)
-		let topical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		let sink = LoggerRecordSink(now: { newDay })
-		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-		XCTAssertTrue(sink.append(
-			line: "queued-before-midnight",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-13",
-			operationId: "session-a:1"
-		))
-		try FileManager.default.setAttributes(
-			[.modificationDate: newDay],
-			ofItemAtPath: topical.path
-		)
-		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 30))
-
-		XCTAssertTrue(sink.append(
-			line: "first-new-day-record",
-			variant: "info",
-			topics: ["ErgoptiPlus_llm.log"],
-			calendarDate: "2026-08-14",
-			operationId: "session-b:1"
-		))
-		XCTAssertEqual(try String(contentsOf: topical), "first-new-day-record\n",
-			"a retention-only reconfigure must not erase the observed date transition")
-	}
-
-	func testReplacedDirectoryAtSamePathDoesNotReuseTopicalInitializationState() throws {
-		let directory = try makeLogDirectory()
-		let replacedDirectory = directory.deletingLastPathComponent().appendingPathComponent(
-			"ergopti-logger-replaced-\(UUID().uuidString)",
-			isDirectory: true
-		)
-		addTeardownBlock { try? FileManager.default.removeItem(at: replacedDirectory) }
-		let today = try fixedDate(year: 2026, month: 8, day: 14)
-		let priorDay = try fixedDate(year: 2026, month: 8, day: 13)
-		let topical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		let processor = LoggerDatagramProcessor(
-			token: "secret",
-			sink: LoggerRecordSink(now: { today })
-		)
-		XCTAssertEqual(response(processor.handle(
-			configure(directory, session: "session-a"),
-			sourceIsLoopback: true
-		))["ack"] as? Int, 0)
-		XCTAssertEqual(response(processor.handle(request([
-			"v": 1,
-			"token": "secret",
-			"kind": "record",
-			"session": "session-a",
-			"sequence": 1,
-			"line": "old-inode",
-			"variant": "info",
-			"topics": ["ErgoptiPlus_llm.log"],
-			"calendar_date": "2026-08-14",
-		]), sourceIsLoopback: true))["ack"] as? Int, 1)
-
-		try FileManager.default.moveItem(at: directory, to: replacedDirectory)
-		try FileManager.default.createDirectory(
-			at: directory,
-			withIntermediateDirectories: false,
-			attributes: [.posixPermissions: 0o700]
-		)
-		try Data("new-inode-prior-day\n".utf8).write(to: topical)
-		try FileManager.default.setAttributes(
-			[.modificationDate: priorDay],
-			ofItemAtPath: topical.path
-		)
-
-		XCTAssertEqual(response(processor.handle(
-			configure(directory, session: "session-a"),
-			sourceIsLoopback: true
-		))["ack"] as? Int, 0,
-			"an idempotent configure must revalidate the pathname's exact directory inode")
-		XCTAssertEqual(response(processor.handle(request([
-			"v": 1,
-			"token": "secret",
-			"kind": "record",
-			"session": "session-a",
-			"sequence": 2,
-			"line": "new-inode-today",
-			"variant": "info",
-			"topics": ["ErgoptiPlus_llm.log"],
-			"calendar_date": "2026-08-14",
-		]), sourceIsLoopback: true))["ack"] as? Int, 2)
-		XCTAssertEqual(try String(contentsOf: topical), "new-inode-today\n",
-			"topical state belongs to the exact directory inode, not its pathname")
-		XCTAssertEqual(try String(contentsOf: replacedDirectory.appendingPathComponent(
-			"ErgoptiPlus_llm.log"
-		)), "old-inode\n", "new records must not follow the stale directory descriptor")
-	}
-
-	func testTopicalRotationUsesMetadataObservedAfterWaitingForTheWriteLock() throws {
-		let directory = try makeLogDirectory()
-		let priorDay = try fixedDate(year: 2026, month: 8, day: 13)
-		let today = try fixedDate(year: 2026, month: 8, day: 14)
-		let topicalName = "ErgoptiPlus_llm.log"
-		let topical = directory.appendingPathComponent(topicalName)
-		try Data("prior-day\n".utf8).write(to: topical)
-		try FileManager.default.setAttributes(
-			[.modificationDate: priorDay],
-			ofItemAtPath: topical.path
-		)
-		var racedWriterDidRun = false
-		let sink = LoggerRecordSink(
-			now: { today },
-			beforeLock: { _, fileName in
-				guard fileName == topicalName, !racedWriterDidRun else { return }
-				racedWriterDidRun = true
-				let writer = Darwin.open(topical.path, O_WRONLY | O_APPEND | O_CLOEXEC)
-				XCTAssertGreaterThanOrEqual(writer, 0)
-				guard writer >= 0 else { return }
-				XCTAssertEqual(ergoptiFlock(writer, LOCK_EX), 0)
-				XCTAssertEqual(Darwin.ftruncate(writer, 0), 0)
-				XCTAssertTrue(writeLauncherLogData(
-					Data("same-day-writer\n".utf8),
-					descriptor: writer
-				))
-				try! FileManager.default.setAttributes(
-					[.modificationDate: today],
-					ofItemAtPath: topical.path
-				)
-				XCTAssertEqual(ergoptiFlock(writer, LOCK_UN), 0)
-				Darwin.close(writer)
-			}
-		)
-		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
-
-		XCTAssertTrue(sink.append(
-			line: "native-writer",
-			variant: "info",
-			topics: [topicalName],
-			calendarDate: "2026-08-14",
-			operationId: "session-a:1"
-		))
-		XCTAssertTrue(racedWriterDidRun)
-		XCTAssertEqual(
-			try String(contentsOf: topical),
-			"same-day-writer\nnative-writer\n"
-		)
-	}
-
 
 
 
@@ -939,20 +678,21 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 	// ============================================
 	// ============================================
 
-	func testConfigurePurgesExpiredDailyAndStaleTopicalFiles() throws {
+	func testConfigurePurgesExpiredDailyAndRetiredTopicalFiles() throws {
 		let directory = try makeLogDirectory()
 		let oldDaily = directory.appendingPathComponent("ErgoptiPlus_2026-07-01.log")
 		let oldErrors = directory.appendingPathComponent("ErgoptiPlus_errors_2026-07-01.log")
 		let currentDaily = directory.appendingPathComponent("ErgoptiPlus_2026-08-14.log")
-		let oldTopical = directory.appendingPathComponent("ErgoptiPlus_llm.log")
-		for file in [oldDaily, oldErrors, currentDaily, oldTopical] {
+		let userFile = directory.appendingPathComponent("ErgoptiPlus_notes.txt")
+		let retired = kRetiredTopicalLogNames.sorted().map { directory.appendingPathComponent($0) }
+		XCTAssertEqual(retired.count, 13)
+		for file in [oldDaily, oldErrors, currentDaily, userFile] + retired.dropFirst() {
 			try Data("existing\n".utf8).write(to: file)
 		}
-		let oldDate = try fixedDate(year: 2026, month: 7, day: 1)
-		try FileManager.default.setAttributes(
-			[.modificationDate: oldDate],
-			ofItemAtPath: oldTopical.path
-		)
+		// A link named like a retired file is never followed or removed.
+		let linkTarget = directory.appendingPathComponent("kept-target.txt")
+		try Data("kept\n".utf8).write(to: linkTarget)
+		try FileManager.default.createSymbolicLink(at: retired[0], withDestinationURL: linkTarget)
 
 		let now = try fixedDate(year: 2026, month: 8, day: 14)
 		let sink = LoggerRecordSink(now: { now })
@@ -961,8 +701,13 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 
 		XCTAssertFalse(FileManager.default.fileExists(atPath: oldDaily.path))
 		XCTAssertFalse(FileManager.default.fileExists(atPath: oldErrors.path))
-		XCTAssertFalse(FileManager.default.fileExists(atPath: oldTopical.path))
+		for file in retired.dropFirst() {
+			XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), file.lastPathComponent)
+		}
+		XCTAssertNotNil(try? FileManager.default.destinationOfSymbolicLink(atPath: retired[0].path))
+		XCTAssertTrue(FileManager.default.fileExists(atPath: linkTarget.path))
 		XCTAssertTrue(FileManager.default.fileExists(atPath: currentDaily.path))
+		XCTAssertTrue(FileManager.default.fileExists(atPath: userFile.path))
 	}
 
 	func testFirstRecordOnNewWallClockDayRearmsRetentionWithoutReconfigure() throws {

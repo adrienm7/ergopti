@@ -596,7 +596,7 @@ _required_dependency_package() {
 		xbps:sqlite3) echo "sqlite" ;;
 		apk:sqlite3) echo "sqlite" ;;
 		# Remote API keys live in the desktop secret service, through
-		# secret-tool (modules/llm/api_token_store.lua); without it a key is
+		# secret-tool (ai/engine/settings/api_token_store.lua); without it a key is
 		# refused, never written in plaintext. Only Debian and openSUSE split the
 		# command from the library.
 		apt:secret-tool) echo "libsecret-tools" ;;
@@ -605,7 +605,22 @@ _required_dependency_package() {
 		pacman:secret-tool) echo "libsecret" ;;
 		xbps:secret-tool) echo "libsecret" ;;
 		apk:secret-tool) echo "libsecret" ;;
-		# The tray icon. platform/tray/appindicator.lua binds this library
+		# The clipboard, on both display servers: a GNOME login offers Wayland
+		# and X11 sessions, and the injector pastes what the keymap cannot
+		# type through whichever one runs (clipboard/adapters/clipboard.lua).
+		apt:xclip) echo "xclip" ;;
+		dnf:xclip) echo "xclip" ;;
+		zypper:xclip) echo "xclip" ;;
+		pacman:xclip) echo "xclip" ;;
+		xbps:xclip) echo "xclip" ;;
+		apk:xclip) echo "xclip" ;;
+		apt:wl-copy) echo "wl-clipboard" ;;
+		dnf:wl-copy) echo "wl-clipboard" ;;
+		zypper:wl-copy) echo "wl-clipboard" ;;
+		pacman:wl-copy) echo "wl-clipboard" ;;
+		xbps:wl-copy) echo "wl-clipboard" ;;
+		apk:wl-copy) echo "wl-clipboard" ;;
+		# The tray icon. tray/adapters/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
 		dnf:tray) echo "libayatana-appindicator-gtk3" ;;
@@ -622,13 +637,13 @@ _required_dependency_package() {
 		xbps:webkit) echo "libwebkit2gtk41" ;;
 		apk:webkit) echo "webkit2gtk-4.1" ;;
 		# GNOME Shell hosts no tray icon on its own: an SNI host extension must be
-		# enabled. Ubuntu ships and enables its own; the others do not.
+		# enabled. Ubuntu ships and enables its own; the others do not. openSUSE
+		# (Tumbleweed and Leap), Alpine and Void package no such extension
+		# (checked against their indexes on 2026-11-25): there the user installs
+		# it from extensions.gnome.org, so no name is guessed for them.
 		apt:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		dnf:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		zypper:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		pacman:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		xbps:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
-		apk:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		*) return 1 ;;
 	esac
 }
@@ -843,6 +858,10 @@ _check_or_install xdg-open
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
 _check_or_install xkbcli
+# The packages require both clipboard tools; a source install without them had
+# no clipboard at all, so every character the keymap cannot type was lost.
+_check_or_install xclip
+_check_or_install wl-copy
 # Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
 # optional desktop convenience makes the privacy filter fail closed forever.
 _check_or_install_library libatspi.so.0
@@ -891,6 +910,24 @@ _ensure_desktop_backend() {
 # i.e. every GNOME that is not Ubuntu's. Enabling takes effect at the next
 # login, which the input groups already require.
 GNOME_TRAY_EXTENSION="appindicatorsupport@rgcjonas.gmail.com"
+GNOME_TRAY_EXTENSION_PAGE="https://extensions.gnome.org/extension/615/appindicator-support/"
+
+# Whether the extension's files are on disk, for the user or system-wide. A
+# package installed during this session is not yet in `gnome-extensions list`,
+# but its metadata.json is already where the next shell will look for it.
+_gnome_tray_extension_installed() {
+	local data_dirs="${XDG_DATA_HOME:-${HOME}/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+	local data_dir
+	local IFS=":"
+	for data_dir in ${data_dirs}; do
+		[ -n "${data_dir}" ] || continue
+		if [ -f "${data_dir}/gnome-shell/extensions/${GNOME_TRAY_EXTENSION}/metadata.json" ]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
 _ensure_gnome_tray_host() {
 	case "${XDG_CURRENT_DESKTOP:-}" in
 		*GNOME*|*gnome*) ;;
@@ -914,6 +951,13 @@ _ensure_gnome_tray_host() {
 	fi
 	if gnome-extensions enable "${GNOME_TRAY_EXTENSION}" 2>/dev/null; then
 		ergopti_msg_with "  ✔  " install.gnome_extension_enabled
+		return 0
+	fi
+	# Writing the setting for an extension that is not on disk would report
+	# « enabled at the next login » while the next login shows no icon: the
+	# package does not exist (openSUSE) or its install failed.
+	if ! _gnome_tray_extension_installed; then
+		ergopti_msg_with "  ⚠  " install.gnome_extension_not_installed "${GNOME_TRAY_EXTENSION_PAGE}" >&2
 		return 0
 	fi
 	# A package installed during this session is unknown to the running shell,
@@ -969,7 +1013,7 @@ _lua_module_candidates() {
 		dnf:luv)      echo "luajit2.1-luv lua5.1-luv compat-lua-luv" ;;
 		dnf:lfs)      echo "lua5.1-filesystem compat-lua-filesystem luajit2.1-filesystem" ;;
 		dnf:posix)    echo "lua5.1-posix compat-lua-posix luajit2.1-posix" ;;
-		dnf:lgi)      echo "lua5.1-lgi compat-lua-lgi luajit2.1-lgi" ;;
+		dnf:lgi)      echo "lua-lgi-compat" ;;
 		zypper:luv)   echo "luajit-luv lua51-luv" ;;
 		zypper:lfs)   echo "luajit-luafilesystem lua51-luafilesystem" ;;
 		zypper:posix) echo "luajit-luaposix lua51-luaposix" ;;
@@ -1052,6 +1096,12 @@ _section install.section_files
 # shellcheck source=install/layout_registry.sh
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
+# The layout manager's XKB helpers (conversion data, user XKB installer) travel
+# below the installed driver too, resolved before the first copy for the same
+# reason: without them no keyboard layout can be installed.
+# shellcheck source=install/xkb_helpers.sh
+source "${SRC_DRIVER}/install/xkb_helpers.sh"
+SRC_XKB_HELPERS="$(xkb_helpers_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
 # Carry prior startup receipts when their files remain under the menu owner.
 # The menu compares the old desktop digest before renewing ownership.
@@ -1263,19 +1313,48 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 fi
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"
+# A registry or XKB helpers copied from the checkout are the installer's too, so
+# uninstall.sh removes them with the driver.
+EXTRA_OWNED_TREES=()
+if [ -n "${SRC_REGISTRY}" ]; then
+	EXTRA_OWNED_TREES+=("${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}")
+fi
+if [ -n "${SRC_XKB_HELPERS}" ]; then
+	# Staged first, so the receipt hashes exactly the files that were installed.
+	XKB_HELPERS_STAGE="$(mktemp -d)"
+	trap 'rm -rf -- "$XKB_HELPERS_STAGE"' EXIT
+	stage_xkb_helpers "${SRC_XKB_HELPERS}" "${XKB_HELPERS_STAGE}" || exit 1
+	cp -r "${XKB_HELPERS_STAGE}/." "${LIB_DIR}/linux/"
+	EXTRA_OWNED_TREES+=(
+		"${XKB_HELPERS_STAGE}/${XKB_HELPERS_DATA_FOLDER}" "linux/${XKB_HELPERS_DATA_FOLDER}"
+		"${XKB_HELPERS_STAGE}/${XKB_HELPERS_INSTALLER_FOLDER}" "linux/${XKB_HELPERS_INSTALLER_FOLDER}"
+	)
+fi
 install -d "${LIB_DIR}/bin"
 install -m 755 "${SRC_DRIVER}/install/standalone_launcher.sh" "${LIB_DIR}/bin/ergopti-hotstrings"
-# A registry copied from the checkout is the installer's too, so uninstall.sh
-# removes it with the driver.
-if [ -n "${SRC_REGISTRY}" ]; then
-	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}" \
-		"${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}"
-else
-	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
-fi
+bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}" "${EXTRA_OWNED_TREES[@]}"
 for startup_receipt in "${PRESERVED_STARTUP_RECEIPTS[@]}"; do
 	printf '%s\n' "$startup_receipt" >> "${LIB_DIR}/.ergopti-owned-files"
 done
+
+# A git checkout carries no build stamp, so the installed daemon reported its
+# commit as unknown in every diagnostic. Its copy is stamped with the commit of
+# the checkout it was installed from, marked as a checkout copy so it stays a
+# local version (tools/build/write_build_stamp.sh write-checkout); the receipt
+# owns that file like the payload. A release bundle ships its own stamp.
+CHECKOUT_ROOT="$(cd -- "${DRIVERS_ROOT}/../.." && pwd -P)"
+CHECKOUT_STAMP_WRITER="${CHECKOUT_ROOT}/tools/build/write_build_stamp.sh"
+if [ -f "$CHECKOUT_STAMP_WRITER" ] \
+	&& [ "$(git -C "$CHECKOUT_ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$CHECKOUT_ROOT" ]; then
+	SOURCE_STAMP="$(bash "$CHECKOUT_STAMP_WRITER" path "$SRC_SHARED")" || exit 1
+	if [ ! -e "$SOURCE_STAMP" ] && [ ! -L "$SOURCE_STAMP" ]; then
+		CHECKOUT_STAMP="$(bash "$CHECKOUT_STAMP_WRITER" path "$DEST_SHARED")" || exit 1
+		ERGOPTI_BUILD_VERSION= bash "$CHECKOUT_STAMP_WRITER" write-checkout "$DEST_SHARED" >/dev/null || exit 1
+		CHECKOUT_STAMP_DIGEST="$(sha256sum < "$CHECKOUT_STAMP")" || exit 1
+		printf '%s\t%s/%s\n' "${CHECKOUT_STAMP_DIGEST%% *}" "$OWNERSHIP_SHARED_TREE" "${CHECKOUT_STAMP##*/}" \
+			>> "${LIB_DIR}/.ergopti-owned-files" || exit 1
+	fi
+fi
 
 if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# This generated checkout artifact is outside the input source tree, so its
@@ -1473,7 +1552,8 @@ if $INSTALL_SERVICE; then
 			*) ergopti_msg install.startup_choice_unreadable >&2; exit 1 ;;
 		esac
 		STARTUP_OWNER="user-choice"
-	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 \
+		&& systemctl --user is-active --quiet graphical-session.target; then
 		# Retire a previous non-systemd fallback before enabling the unit. Leaving
 		# both files active starts two daemons at the next graphical login, and both
 		# compete for the same evdev grab.
@@ -1485,6 +1565,17 @@ if $INSTALL_SERVICE; then
 		STARTUP_OWNER="systemd"
 		ergopti_msg_with "  ✔  " install.service_started
 
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+		# A user bus whose session never starts graphical-session.target: i3,
+		# Openbox, Xfce, Cinnamon, sway without uwsm. The unit is WantedBy that
+		# target, so enabling it and retiring the XDG entry left nothing to start
+		# the daemon at the next login. XDG owns startup there; a unit enabled by
+		# an earlier install is disabled so a later GNOME or Plasma login, which
+		# runs both, does not start two daemons competing for the grab.
+		if systemctl --user is-enabled --quiet ergopti-hotstrings.service; then
+			systemctl --user disable ergopti-hotstrings.service
+		fi
+		ergopti_msg_with "  ⚠  " install.session_without_graphical_target "${BIN_DIR}/ergopti-hotstrings"
 	elif command -v systemctl >/dev/null 2>&1; then
 		ergopti_msg_with "  ⚠  " install.systemd_without_bus
 		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then

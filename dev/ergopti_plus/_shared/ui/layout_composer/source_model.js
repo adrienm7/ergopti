@@ -93,11 +93,20 @@ var LayoutSource = (function () {
 		'shortcuts',
 		// config-key-literal-ok: field of the versioned layout format, not application config.
 		'tap_holds',
-		'windows'
+		'windows',
+		'magic'
 	];
+	// A layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
+	// how far back a repeat key reaches and the longest context of a magic rule.
+	// The values of _shared/layouts/data/analysis/analysis_model.json « context_keys »,
+	// which the Studio's analysis reads (tools/test/test-layout-context-keys.cjs pins
+	// them equal): this classic script has no data file of its own.
+	const CONTEXT_KEYS = Object.freeze({ repeat_depths: Object.freeze([1, 2]), context_max: 2 });
 	// The ISO key left of Z, and where the ANSI derivation moves it by default.
 	const ISO_EXTRA_KEY = 'IntlBackslash';
 	const ANSI_EXTRA_KEY = 'Backquote';
+	// The keyboards physical.keyboard can name (keyboard_forms.json's forms).
+	const KEYBOARDS = ['jis', 'abnt'];
 	const MACOS_EXPORT_STRINGS = [
 		'internal_name',
 		'ansi_internal_name',
@@ -173,18 +182,39 @@ var LayoutSource = (function () {
 		requireValue(names.has(value), path, 'source_reference');
 	}
 
-	/** Validate a text, dead-state, action, physical chord or disabled mapping. */
-	function mapping(value, path, deadKeys, modifiers) {
+	/**
+	 * Validate a text, dead-state, action, physical chord, disabled, repeat or
+	 * magic mapping; magicUsed collects the magic tables the mappings name.
+	 */
+	function mapping(value, path, deadKeys, modifiers, magicTables, magicUsed) {
 		record(
 			value,
-			['text', 'compose', 'compose_as', 'dead_key', 'action', 'key', 'modifiers', 'disabled'],
+			[
+				'text',
+				'compose',
+				'compose_as',
+				'dead_key',
+				'action',
+				'key',
+				'modifiers',
+				'disabled',
+				'repeat',
+				'magic'
+			],
 			[],
 			path
 		);
-		const kinds = ['text', 'dead_key', 'action', 'key', 'disabled'].filter((kind) =>
-			own(value, kind)
+		const kinds = ['text', 'dead_key', 'action', 'key', 'disabled', 'repeat', 'magic'].filter(
+			(kind) => own(value, kind)
 		);
 		requireValue(kinds.length === 1, path);
+		// A repeat key types the character typed `repeat` places back.
+		if (own(value, 'repeat'))
+			requireValue(CONTEXT_KEYS.repeat_depths.includes(value.repeat), `${path}.repeat`);
+		if (own(value, 'magic')) {
+			reference(value.magic, magicTables, `${path}.magic`);
+			magicUsed.add(value.magic);
+		}
 		if (own(value, 'text')) string(value.text, `${path}.text`, true);
 		if (own(value, 'dead_key')) reference(value.dead_key, deadKeys, `${path}.dead_key`);
 		if (own(value, 'action')) identifier(value.action, `${path}.action`);
@@ -256,8 +286,20 @@ var LayoutSource = (function () {
 		for (const field of ['description', 'author'])
 			if (own(source.layout, field)) string(source.layout[field], `layout.${field}`, true);
 		if (own(source.layout, 'languages')) list(source.layout.languages, 'layout.languages', string);
-		record(source.physical, ['base', 'ansi_extra_key', 'ansi_swaps'], ['base'], 'physical');
+		record(
+			source.physical,
+			['base', 'keyboard', 'ansi_extra_key', 'ansi_swaps'],
+			['base'],
+			'physical'
+		);
 		requireValue(['iso', 'ansi'].includes(source.physical.base), 'physical.base');
+		// The hardware the layout is for beyond ISO and ANSI: a JIS or ABNT keyboard,
+		// whose extra keys (keyboard_forms.json) sit on an ISO-like board.
+		if (own(source.physical, 'keyboard'))
+			requireValue(
+				KEYBOARDS.includes(source.physical.keyboard) && source.physical.base === 'iso',
+				'physical.keyboard'
+			);
 		if (own(source.physical, 'ansi_extra_key'))
 			keyCode(source.physical.ansi_extra_key, 'physical.ansi_extra_key');
 		if (own(source.physical, 'ansi_swaps')) {
@@ -354,6 +396,43 @@ var LayoutSource = (function () {
 				},
 				(rule) => (own(rule, 'input') ? `text:${rule.input}` : `dead:${rule.input_dead_key}`)
 			);
+		// The magic keys' tables: each rule's context (one to context_max
+		// characters of output text) is unique, each output one character.
+		const magicTables = new Set();
+		const magicUsed = new Set();
+		const oneCharacter = (text) => Array.from(text).length === 1 && !CONTROL.test(text);
+		if (own(source, 'magic'))
+			list(
+				source.magic,
+				'magic',
+				(entry, at) => {
+					record(entry, ['id', 'rules', 'fallback'], ['id', 'rules'], at);
+					identifier(entry.id, `${at}.id`);
+					list(
+						entry.rules,
+						`${at}.rules`,
+						(rule, where) => {
+							record(rule, ['after', 'types'], ['after', 'types'], where);
+							string(rule.after, `${where}.after`);
+							requireValue(
+								Array.from(rule.after).length <= CONTEXT_KEYS.context_max &&
+									!CONTROL.test(rule.after),
+								`${where}.after`,
+								'source_magic_context'
+							);
+							string(rule.types, `${where}.types`);
+							requireValue(oneCharacter(rule.types), `${where}.types`);
+						},
+						(rule) => rule.after
+					);
+					if (own(entry, 'fallback')) {
+						string(entry.fallback, `${at}.fallback`, true);
+						requireValue(entry.fallback === '' || oneCharacter(entry.fallback), `${at}.fallback`);
+					}
+					magicTables.add(entry.id);
+				},
+				(entry) => entry.id
+			);
 		const layers = new Set();
 		if (own(source, 'layers'))
 			list(
@@ -378,7 +457,7 @@ var LayoutSource = (function () {
 					requireValue(table(entry.keys), `${at}.keys`);
 					for (const [key, value] of Object.entries(entry.keys)) {
 						keyCode(key, `${at}.keys.${key}`);
-						mapping(value, `${at}.keys.${key}`, deadKeys, modifiers);
+						mapping(value, `${at}.keys.${key}`, deadKeys, modifiers, magicTables, magicUsed);
 					}
 					// The ANSI variant's own mappings where the derivation rule is not enough
 					// (Bépo's ANSI hardware map), applied after it, on every platform.
@@ -386,7 +465,7 @@ var LayoutSource = (function () {
 						requireValue(table(entry.ansi_keys), `${at}.ansi_keys`);
 						for (const [key, value] of Object.entries(entry.ansi_keys)) {
 							keyCode(key, `${at}.ansi_keys.${key}`);
-							mapping(value, `${at}.ansi_keys.${key}`, deadKeys, modifiers);
+							mapping(value, `${at}.ansi_keys.${key}`, deadKeys, modifiers, magicTables, magicUsed);
 						}
 					}
 					if (own(entry, 'platform_keys')) {
@@ -396,7 +475,7 @@ var LayoutSource = (function () {
 							requireValue(table(bindings), where);
 							for (const [key, value] of Object.entries(bindings)) {
 								keyCode(key, `${where}.${key}`);
-								mapping(value, `${where}.${key}`, deadKeys, modifiers);
+								mapping(value, `${where}.${key}`, deadKeys, modifiers, magicTables, magicUsed);
 							}
 						}
 					}
@@ -495,7 +574,7 @@ var LayoutSource = (function () {
 						at
 					);
 					keyCode(entry.key, `${at}.key`);
-					mapping(entry.tap, `${at}.tap`, deadKeys, modifiers);
+					mapping(entry.tap, `${at}.tap`, deadKeys, modifiers, magicTables, magicUsed);
 					requireValue(own(entry, 'hold_layer') !== own(entry, 'hold_modifier'), at);
 					if (own(entry, 'hold_layer')) reference(entry.hold_layer, layers, `${at}.hold_layer`);
 					if (own(entry, 'hold_modifier'))
@@ -507,6 +586,9 @@ var LayoutSource = (function () {
 				},
 				(entry) => entry.key
 			);
+		// A magic table no key types is a typo or a leftover: refused like an unknown one.
+		for (const id of magicTables)
+			requireValue(magicUsed.has(id), `magic.${id}`, 'source_magic_unused');
 		if (own(source, 'windows')) {
 			record(source.windows, ['flags', 'nls', 'key_names', 'kana_key'], [], 'windows');
 			// The physical key that holds the Kana level on Windows (Right Alt by default).
@@ -716,7 +798,9 @@ var LayoutSource = (function () {
 		shortcutKeyCombinations,
 		ISO_EXTRA_KEY,
 		ANSI_EXTRA_KEY,
+		KEYBOARDS,
 		BUILTIN_MODIFIERS,
+		CONTEXT_KEYS,
 		SourceError,
 		validate,
 		importKeylayout,

@@ -25,7 +25,7 @@ local SCAN_MS = Timings.ms("keystats", "av_state_slow_tick_ms")
 --- @param opts table|nil { topology = false } to run without a topology source.
 local function scripted(opts)
 	opts = opts or {}
-	local Topology = helpers.load_module("modules.keystats.topology_metrics")
+	local Topology = helpers.load_module("modules.keystats.system.topology_metrics")
 	local rows, now, observation, names = {}, 0, nil, {}
 	local sampler = Topology.new({
 		record = function(kind, fields)
@@ -100,7 +100,7 @@ helpers.describe("Linux window topology: the shared reducer", function()
 	end)
 
 	it("linux-topology-unmeasured: without a source nothing is read and the menu names the reason", function()
-		local Topology = helpers.load_module("modules.keystats.topology_metrics")
+		local Topology = helpers.load_module("modules.keystats.system.topology_metrics")
 		Topology.bind_topology_source(nil, "platform_reason.window_topology_needs_x11")
 		helpers.assert_eq(Topology.window_topology_availability(),
 			{ measured = false, reason = "platform_reason.window_topology_needs_x11" })
@@ -144,7 +144,7 @@ helpers.describe("Linux capture-program presence", function()
 	end)
 
 	it("linux-capture-procfs: the scan reads numeric entries' comm, bounded, without forking", function()
-		local Topology = helpers.load_module("modules.keystats.topology_metrics")
+		local Topology = helpers.load_module("modules.keystats.system.topology_metrics")
 		local reads = 0
 		local function list() return { { name = "self" }, { name = "12" }, { name = "13" }, { name = "14" } } end
 		local function read(path)

@@ -78,8 +78,8 @@ def main() -> int:
                     errors.append(f"model_prices.{model}.{key} must be a non-negative number")
 
     root = CATALOG.parent.parent.parent  # static/ergopti_plus
-    ahk = root / "windows" / "modules" / "llm" / "api_remote.ahk"
-    lua = root / "macos" / "modules" / "llm" / "api_remote.lua"
+    ahk = root / "windows" / "ai" / "engine" / "api" / "remote.ahk"
+    lua = root / "macos" / "ai" / "engine" / "api" / "remote.lua"
     for path, label in ((ahk, "AHK"), (lua, "HS")):
         if not path.is_file():
             errors.append(f"{label} driver file missing: {path}")

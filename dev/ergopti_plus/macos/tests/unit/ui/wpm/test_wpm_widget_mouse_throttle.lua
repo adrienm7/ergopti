@@ -37,6 +37,38 @@ helpers.describe("WPM widget physical input visibility", function()
 			helpers.assert_true(widget.stop())
 		end)
 	end)
+	-- TWD-2, decided by the maintainer on 2026-11-16: any pointer movement, a single
+	-- pixel included, a drag, a click or a wheel or touchpad scroll hides the
+	-- widget, and the next key shows it again; a move this process posted itself
+	-- (a cursor restore) does not.
+	helpers.it("(twd2-pointer-hides) every pointer event hides the widget, never this process's own", function()
+		with_widget(function(widget, state)
+			helpers.assert_true(widget.start(false))
+			local canvas = state.canvases[1]
+			local function event(pid)
+				return { getProperty = function(_, key) return key == "pid" and pid or nil end }
+			end
+			state.now, state.last_input = 1.02, 1.02
+			state.timers[1].run()
+			helpers.assert_eq(canvas.hidden, false, "a real key shows the widget")
+			state.now = 1.03
+			state.taps[1].run(event(4242))
+			state.timers[1].run()
+			helpers.assert_eq(canvas.hidden, false, "a cursor move this process posted keeps it")
+			state.now = 1.04
+			state.taps[1].run(event(77))
+			state.timers[1].run()
+			helpers.assert_eq(canvas.hidden, true, "a one-pixel user move hides it")
+			state.now, state.last_input = 1.05, 1.05
+			state.timers[1].run()
+			helpers.assert_eq(canvas.hidden, false, "the next key shows it again")
+			state.now = 1.06
+			state.taps[1].run(event(77))
+			state.timers[1].run()
+			helpers.assert_eq(canvas.hidden, true, "a scroll hides it too")
+			helpers.assert_true(widget.stop())
+		end)
+	end)
 	helpers.it("(wpm-pointer-parity) keeps the canvas visible until its active drag releases", function()
 		with_widget(function(widget, state)
 			helpers.assert_true(widget.start(false))

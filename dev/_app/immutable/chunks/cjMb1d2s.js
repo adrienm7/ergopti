@@ -1,0 +1,1 @@
+var e=Object.freeze({ArrowLeft:-1,ArrowRight:1,Home:`first`,End:`last`});function t(t,n,r,i){let a=e[t.key];if(a===void 0)return;t.preventDefault();let o=a===`first`?0:a===`last`?r-1:(n+a+r)%r;i(o);let s=t.currentTarget.closest(`[role="tablist"]`);if(!s)throw Error(`A tab must sit inside its role="tablist"`);s.querySelectorAll(`[role="tab"]`)[o].focus()}export{t};

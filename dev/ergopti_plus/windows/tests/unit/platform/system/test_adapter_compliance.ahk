@@ -77,10 +77,16 @@ _SFD_SecureApps_Shared() {
 	AssertTrue(SFD_IsSecureApp("RoboForm.exe"), "RoboForm is secure")
 	Saved := SFD_SECURE_APPS, SavedRoot := SFD_SECURE_APP_ROOT.Clone()
 	try {
-		SFD_SECURE_APP_ROOT["hwnd"] := 0
-		SFD_ProcessNameOf.DefineProp("Call", { Call: (Self, Root) => "RoboForm.exe" })
-		try AssertTrue(SFD_IsSecureField(A_ScriptHwnd), "a RoboForm.exe window is secure")
-		finally SFD_ProcessNameOf.DeleteProp("Call")
+		; SFC-05: SFD_IsSecureField(A_ScriptHwnd) is true for any process (the script
+		; window is no Edit control and the field path fails closed), so the case
+		; asserts the application axis, with notepad.exe as the negative control.
+		for ProcName, Expected in Map("RoboForm.exe", true, "notepad.exe", false) {
+			SFD_SECURE_APP_ROOT["hwnd"] := 0
+			SFD_ProcessNameOf.DefineProp("Call", { Call: ((Name, Self, Root) => Name).Bind(ProcName) })
+			try AssertEqual(Expected, !!SFD_IsSecureAppWindow(A_ScriptHwnd),
+				"a " . ProcName . " window is " . (Expected ? "" : "not ") . "a secure application (sfc-05)")
+			finally SFD_ProcessNameOf.DeleteProp("Call")
+		}
 		SFD_SECURE_APPS := -1
 		AssertTrue(SFD_IsSecureApp("notepad.exe"), "an unreadable list makes every application secure")
 	} finally {
@@ -89,6 +95,52 @@ _SFD_SecureApps_Shared() {
 	}
 }
 Test("SFD secure applications: the shared list, a RoboForm.exe window is secure (ADD-1)", _SFD_SecureApps_Shared)
+
+; The system keychain row covers Keychain Access on macOS and seahorse on Linux.
+; Its Windows counterpart is the Windows Security credential prompt, hosted by
+; CredentialUIBroker.exe; the row used to name "credential_guard", which no
+; process is called, so that prompt was secure only field by field.
+; SFD_IsSecureField cannot carry this check: the script window is no Edit
+; control, so the field path already fails closed. The application axis is
+; asserted alone, against an ordinary process.
+_SFD_SecureApps_CredentialPrompt() {
+	global SFD_SECURE_APP_ROOT
+	SavedRoot := SFD_SECURE_APP_ROOT.Clone()
+	try {
+		for ProcName, Expected in Map("CredentialUIBroker.exe", true, "notepad.exe", false) {
+			SFD_SECURE_APP_ROOT["hwnd"] := 0
+			; Bound, not closed over: a closure would read the loop variable after
+			; the for loop restores it.
+			SFD_ProcessNameOf.DefineProp("Call", { Call: ((Name, Self, Root) => Name).Bind(ProcName) })
+			try AssertEqual(Expected, !!SFD_IsSecureAppWindow(A_ScriptHwnd),
+				"a " . ProcName . " window is " . (Expected ? "" : "not ") . "a secure application")
+			finally SFD_ProcessNameOf.DeleteProp("Call")
+		}
+	} finally {
+		SFD_SECURE_APP_ROOT := SavedRoot
+	}
+}
+Test("SFD secure applications: the Windows credential prompt is the system keychain row (ADD-1)", _SFD_SecureApps_CredentialPrompt)
+
+; SFC-04 (decided by the maintainer on 2026-11-19): Yubico Authenticator runs as
+; authenticator.exe since its Flutter build 6 and as yubioath-desktop.exe in its
+; Qt build 5; both windows are secure applications as a whole.
+_SFD_SecureApps_YubicoAuthenticator() {
+	global SFD_SECURE_APP_ROOT
+	SavedRoot := SFD_SECURE_APP_ROOT.Clone()
+	try {
+		for ProcName, Expected in Map("authenticator.exe", true, "yubioath-desktop.exe", true, "notepad.exe", false) {
+			SFD_SECURE_APP_ROOT["hwnd"] := 0
+			SFD_ProcessNameOf.DefineProp("Call", { Call: ((Name, Self, Root) => Name).Bind(ProcName) })
+			try AssertEqual(Expected, !!SFD_IsSecureAppWindow(A_ScriptHwnd),
+				"a " . ProcName . " window is " . (Expected ? "" : "not ") . "a secure application (sfc-04)")
+			finally SFD_ProcessNameOf.DeleteProp("Call")
+		}
+	} finally {
+		SFD_SECURE_APP_ROOT := SavedRoot
+	}
+}
+Test("SFD secure applications: a Yubico Authenticator window is secure (SFC-04)", _SFD_SecureApps_YubicoAuthenticator)
 
 ; Refresh must revoke negative focused-element verdicts. Otherwise a caller
 ; asking for a refresh can keep authorising an old browser field until TTL.

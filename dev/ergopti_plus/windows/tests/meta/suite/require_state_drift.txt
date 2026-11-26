@@ -1,0 +1,30 @@
+# Unguarded module-level state admitted by test_require_state_pattern.ahk.
+# Untriaged drift frozen on 2026-11-22: a lazy cache, self-initialising flag or
+# test seam until shown otherwise (see the test's module header). One driver
+# path per line. The list only shrinks: a new unguarded file fails, and so does
+# a line whose file is guarded, allowlisted, moved or gone.
+ai/adapters/automation.ahk
+ai/adapters/ollama_identity.ahk
+ai/engine/agent/connectors.ahk
+ai/ui/menu/_index.ahk
+apps/engine/picker.ahk
+core/fs/engine/sqlite3.ahk
+core/i18n/engine/i18n.ahk
+core/lifecycle/engine/boot.ahk
+core/timing/engine/config.ahk
+core/ui/engine/webview/reading_preferences.ahk
+diagnostics/engine/reports/crash_reporter.ahk
+diagnostics/ui/field_check/network_check.ahk
+diagnostics/ui/healthcheck/collection.ahk
+hotstrings/engine/catalogue/config.ahk
+hotstrings/engine/matcher/engine.ahk
+infra/nav_layer_helpers.ahk
+infra/suppressive_inputhook_ownership.ahk
+infra/tap_keys.ahk
+menu/engine/helpers.ahk
+modules/keymap/keylayout/layout_registry.ahk
+platform/remap/nav_layer_table.ahk
+platform/remap/space.ahk
+platform/system/notifier.ahk
+settings/engine/preferences/feature_state.ahk
+ui/onboarding/answers.ahk

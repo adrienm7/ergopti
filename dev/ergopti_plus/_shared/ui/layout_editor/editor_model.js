@@ -31,9 +31,8 @@ var LayoutEditorModel = (function () {
 	// ======= 1/ Constants =======
 	// ============================
 
-	const HISTORY_LIMIT = 200;
 	const PLATFORMS = ['windows', 'macos', 'linux'];
-	const MAPPING_KINDS = ['text', 'dead_key', 'action', 'key', 'disabled'];
+	const MAPPING_KINDS = ['text', 'dead_key', 'action', 'key', 'disabled', 'repeat', 'magic'];
 	const CAPS_MODES = ['unaffected', 'shift', 'separate'];
 
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
@@ -102,6 +101,12 @@ var LayoutEditorModel = (function () {
 	 */
 	function setMapping(doc, layerId, code, mapping, platform) {
 		const next = editable(doc);
+		place(next, layerId, code, mapping, platform);
+		return commit(withMagicTables(doc, next));
+	}
+
+	/** Sets or clears one cell of an editable copy, without validating it. */
+	function place(next, layerId, code, mapping, platform) {
 		const layer = next.layers[layerIndex(next, layerId)];
 		if (platform && !PLATFORMS.includes(platform))
 			throw new EditError('platform_unknown', String(platform));
@@ -116,7 +121,40 @@ var LayoutEditorModel = (function () {
 		if (platform && Object.keys(target).length === 0) delete layer.platform_keys[platform];
 		if (layer.platform_keys && Object.keys(layer.platform_keys).length === 0)
 			delete layer.platform_keys;
-		return commit(next);
+	}
+
+	/**
+	 * A magic table belongs to the keys that name it: the first magic key
+	 * naming a new table creates it empty, and the edit that changes the last
+	 * key naming a table removes it, as the format refuses a table no key types
+	 * (source_magic_unused) and a key naming a missing one. Undo brings it back.
+	 */
+	function withMagicTables(before, next) {
+		const used = magicUsed(next);
+		const tables = (next.magic || []).filter(
+			(entry) => used.has(entry.id) || !magicUsed(before).has(entry.id)
+		);
+		for (const id of used)
+			if (!tables.some((entry) => entry.id === id)) tables.push({ id, fallback: '', rules: [] });
+		if (tables.length) next.magic = tables;
+		else delete next.magic;
+		return next;
+	}
+
+	/** The magic tables the key tables and tap-hold taps of a document name. */
+	function magicUsed(doc) {
+		const used = new Set();
+		const visit = (table) => {
+			for (const mapping of Object.values(table || {}))
+				if (mapping && own(mapping, 'magic')) used.add(mapping.magic);
+		};
+		for (const layer of doc.layers || []) {
+			visit(layer.keys);
+			visit(layer.ansi_keys);
+			for (const table of Object.values(layer.platform_keys || {})) visit(table);
+		}
+		for (const entry of doc.tap_holds || []) visit({ tap: entry.tap });
+		return used;
 	}
 
 	/** Adds a layer reached by holding its required modifiers. */
@@ -167,7 +205,7 @@ var LayoutEditorModel = (function () {
 		if (used.length) throw new EditError('layer_in_use', used[0]);
 		const next = editable(doc);
 		next.layers.splice(layerIndex(next, id), 1);
-		return commit(next);
+		return commit(withMagicTables(doc, next));
 	}
 
 	// ============================================
@@ -215,6 +253,40 @@ var LayoutEditorModel = (function () {
 		entry.rules = entry.rules.filter((rule) => rule.input !== input);
 		if (result !== null) entry.rules.push(Object.assign({ input }, copy(result)));
 		return commit(next);
+	}
+
+	/**
+	 * Sets one rule of a magic key's table: after this context, the key types
+	 * that character.
+	 * @param {string} after - One or two characters of text typed before.
+	 * @param {string|null} types - One character; null removes the rule.
+	 */
+	function setMagicRule(doc, id, after, types) {
+		const next = editable(doc);
+		const entry = magicTable(next, id);
+		entry.rules = entry.rules.filter((rule) => rule.after !== after);
+		if (types !== null) entry.rules.push({ after, types });
+		return commit(next);
+	}
+
+	/** Replaces every rule of a magic key's table at once (an imported table). */
+	function setMagicRules(doc, id, rules) {
+		const next = editable(doc);
+		magicTable(next, id).rules = rules.map((rule) => ({ after: rule.after, types: rule.types }));
+		return commit(next);
+	}
+
+	/** What a magic key types when no rule's context ends the text typed. */
+	function setMagicFallback(doc, id, fallback) {
+		const next = editable(doc);
+		magicTable(next, id).fallback = fallback;
+		return commit(next);
+	}
+
+	function magicTable(doc, id) {
+		const entry = (doc.magic || []).find((candidate) => candidate.id === id);
+		if (!entry) throw new EditError('magic_unknown', `magic.${id}`);
+		return entry;
 	}
 
 	function removeDeadKey(doc, id) {
@@ -285,14 +357,14 @@ var LayoutEditorModel = (function () {
 		const next = editable(doc);
 		next.tap_holds = (next.tap_holds || []).filter((e) => e.key !== entry.key);
 		next.tap_holds.push(copy(entry));
-		return commit(next);
+		return commit(withMagicTables(doc, next));
 	}
 
 	function removeTapHold(doc, key) {
 		const next = editable(doc);
 		next.tap_holds = (next.tap_holds || []).filter((e) => e.key !== key);
 		if (next.tap_holds.length === 0) delete next.tap_holds;
-		return commit(next);
+		return commit(withMagicTables(doc, next));
 	}
 
 	/** Changes the layout metadata (name, description, author). */
@@ -302,6 +374,17 @@ var LayoutEditorModel = (function () {
 			if (value === '' && field !== 'name') delete next.layout[field];
 			else next.layout[field] = value;
 		}
+		return commit(next);
+	}
+
+	/**
+	 * Sets the keyboard the layout is for beyond ISO (physical.keyboard: 'jis'
+	 * or 'abnt'), or clears it with '' (an ISO keyboard).
+	 */
+	function setKeyboard(doc, keyboard) {
+		const next = copy(doc);
+		if (keyboard === '') delete next.physical.keyboard;
+		else next.physical.keyboard = keyboard;
 		return commit(next);
 	}
 
@@ -325,9 +408,12 @@ var LayoutEditorModel = (function () {
 		const source = mappingAt(doc, layerId, from, platform);
 		const target = mappingAt(doc, layerId, to, platform);
 		const pick = (found) => (found && found.scope === (platform || 'all') ? found.mapping : null);
-		let next = setMapping(doc, layerId, to, pick(source), platform);
-		if (!keep) next = setMapping(next, layerId, from, pick(target), platform);
-		return next;
+		// Both cells change before the magic tables are counted: swapping two
+		// magic keys keeps both tables and their rules.
+		const next = editable(doc);
+		place(next, layerId, to, pick(source), platform);
+		if (!keep) place(next, layerId, from, pick(target), platform);
+		return commit(withMagicTables(doc, next));
 	}
 
 	/**
@@ -383,7 +469,7 @@ var LayoutEditorModel = (function () {
 		const target = next.layers[layerIndex(next, to)];
 		Object.assign(target.keys, copy(source.keys));
 		if (!keep) source.keys = {};
-		return commit(next);
+		return commit(withMagicTables(doc, next));
 	}
 
 	/** Replaces the Windows layout flags (KLLF and similar identifiers). */
@@ -570,52 +656,69 @@ var LayoutEditorModel = (function () {
 		};
 	}
 
-	/** The kind of a mapping (text, dead_key, action, key or disabled). */
+	/** The kind of a mapping (text, dead_key, action, key, disabled, repeat or magic). */
 	function kindOf(mapping) {
 		return MAPPING_KINDS.find((kind) => own(mapping, kind));
+	}
+
+	// =============================
+	// ======= 5b/ Differences =====
+	// =============================
+
+	/** A key table's entries, each OS's overrides kept under their scope. */
+	function keyEntries(layer) {
+		const entries = new Map();
+		for (const [code, mapping] of Object.entries(layer.keys || {}))
+			entries.set(`all|${code}`, mapping);
+		for (const platform of PLATFORMS) {
+			const overrides = (layer.platform_keys || {})[platform] || {};
+			for (const [code, mapping] of Object.entries(overrides))
+				entries.set(`${platform}|${code}`, mapping);
+		}
+		return entries;
+	}
+
+	/**
+	 * The keys two documents map differently (a saved version against the
+	 * current layout), layer by layer in the first document's order then the
+	 * second's new layers, keys in code order within a layer.
+	 * @param {object} before - The older document (a saved version).
+	 * @param {object} after - The newer one (the layout shown).
+	 * @returns {{layer: string, code: string, scope: string, before: object|null, after: object|null}[]}
+	 *   scope is 'all' or the OS of an override; a missing layer counts its
+	 *   keys as added or removed.
+	 */
+	function differences(before, after) {
+		const layersOf = (doc) => new Map((doc.layers || []).map((layer) => [layer.id, layer]));
+		const old = layersOf(before);
+		const next = layersOf(after);
+		const ids = [...old.keys()].concat([...next.keys()].filter((id) => !old.has(id)));
+		const found = [];
+		for (const id of ids) {
+			const a = old.has(id) ? keyEntries(old.get(id)) : new Map();
+			const b = next.has(id) ? keyEntries(next.get(id)) : new Map();
+			const keys = [...new Set([...a.keys(), ...b.keys()])].sort();
+			for (const key of keys) {
+				const first = a.has(key) ? a.get(key) : null;
+				const second = b.has(key) ? b.get(key) : null;
+				if (JSON.stringify(first) === JSON.stringify(second)) continue;
+				const [scope, code] = key.split('|');
+				found.push({ layer: id, code, scope, before: first, after: second });
+			}
+		}
+		return found;
 	}
 
 	// =============================
 	// ======= 6/ History ==========
 	// =============================
 
-	/** Undo and redo over document snapshots. */
+	/**
+	 * Undo and redo over document snapshots, each step named (the Studio's
+	 * one history, _shared/ui/edit_history.js, bounded by its HISTORY_LIMIT).
+	 */
 	function createHistory(doc) {
-		const past = [];
-		const future = [];
-		let present = doc;
-		return {
-			current: () => present,
-			push(next) {
-				past.push(present);
-				if (past.length > HISTORY_LIMIT) past.shift();
-				future.length = 0;
-				present = next;
-				return present;
-			},
-			reset(next) {
-				past.length = 0;
-				future.length = 0;
-				present = next;
-				return present;
-			},
-			canUndo: () => past.length > 0,
-			canRedo: () => future.length > 0,
-			undo() {
-				if (past.length) {
-					future.push(present);
-					present = past.pop();
-				}
-				return present;
-			},
-			redo() {
-				if (future.length) {
-					past.push(present);
-					present = future.pop();
-				}
-				return present;
-			}
-		};
+		return ERGOPTI_EDIT_HISTORY.create(doc);
 	}
 
 	return {
@@ -634,6 +737,9 @@ var LayoutEditorModel = (function () {
 		setDeadKey,
 		setDeadRule,
 		removeDeadKey,
+		setMagicRule,
+		setMagicRules,
+		setMagicFallback,
 		setKeyProperties,
 		setShortcutKey,
 		setRemap,
@@ -642,6 +748,7 @@ var LayoutEditorModel = (function () {
 		setTapHold,
 		removeTapHold,
 		setLayout,
+		setKeyboard,
 		setExport,
 		transferMapping,
 		caseLayer,
@@ -654,6 +761,7 @@ var LayoutEditorModel = (function () {
 		simulate,
 		previewTypist,
 		kindOf,
+		differences,
 		createHistory
 	};
 })();

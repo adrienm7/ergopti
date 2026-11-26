@@ -547,7 +547,7 @@ function compute_manifest_metrics() {
 	document.getElementById('hs_loading').style.display = 'none';
 	document.getElementById('hs_details').style.display = 'flex';
 	document.getElementById('hs_val').innerHTML =
-		`${format_number(global_hs_triggers)} <span class="stat-unit">activations</span>`;
+		`${format_number(global_hs_triggers)} <span class="stat-unit">${_t('ui_typing.unit_activations')}</span>`;
 	document.getElementById('hs_net_val').innerHTML = format_number(hs_chars_total);
 
 	let hs_pct = global_hs_suggested > 0 ? (global_hs_triggers / global_hs_suggested) * 100 : 0;
@@ -563,7 +563,7 @@ function compute_manifest_metrics() {
 	document.getElementById('llm_loading').style.display = 'none';
 	document.getElementById('llm_details').style.display = 'flex';
 	document.getElementById('llm_val').innerHTML =
-		`${format_number(global_llm_triggers)} <span class="stat-unit">activations</span>`;
+		`${format_number(global_llm_triggers)} <span class="stat-unit">${_t('ui_typing.unit_activations')}</span>`;
 	document.getElementById('llm_net_val').innerHTML = format_number(llm_chars_total);
 
 	let llm_pct = global_llm_suggested > 0 ? (global_llm_triggers / global_llm_suggested) * 100 : 0;
@@ -574,6 +574,17 @@ function compute_manifest_metrics() {
 	document.getElementById('llm_trend').innerHTML = get_trend_svg(
 		llm_points.map((p) => p.y).filter((y) => y > 0)
 	);
+
+	// What each figure of the two cards counts, as on every other card.
+	for (const [id, key] of [
+		['hs_info', 'ui_typing.tooltip_hs'],
+		['llm_info', 'ui_typing.tooltip_llm']
+	]) {
+		const info = document.getElementById(id);
+		if (info && typeof INFO_SVG === 'string') {
+			info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t(key)}</small>`;
+		}
+	}
 
 	// --- Render global WPM KPI card (ONLY place allowed to write this KPI) ---
 	document.getElementById('wpm_trend').innerHTML = get_trend_svg(
@@ -586,29 +597,27 @@ function compute_manifest_metrics() {
 	const wpm_val_elem = document.getElementById('wpm_val');
 	if (wpm_val_elem) {
 		wpm_val_elem.innerHTML =
-			`<div style="display:flex;flex-direction:column;justify-content:center;">` +
-			`<div style="display:flex;align-items:center;gap:6px;">` +
+			`<span class="stat-value-line">` +
 			`<span>${format_number(manifest_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_mpm')}</span></span>` +
-			`</div>` +
-			`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
+			`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext">${_t('ui_typing.tooltip_mpm')}</small></button>` +
+			`</span>` +
+			`<span class="stat-value-line" style="font-size:0.65em;margin-top:5px;">` +
 			`<span>${format_number(manifest_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_cpm_simple')}</span></span>` +
-			`</div>` +
-			`</div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext">${_t('ui_typing.tooltip_cpm_simple')}</small></button>` +
+			`</span>`;
 	}
 
 	const global_details = document.getElementById('global_details');
 	if (global_details) {
 		global_details.innerHTML =
-			`<div style="margin-top:5px;">` +
+			`<li style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_raw_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
-			`</div>` +
-			`<div style="margin-top:3px;">` +
+			`</li>` +
+			`<li style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_output_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
-			`</div>`;
+			`</li>`;
 	}
 
 	render_charts();
@@ -817,30 +826,28 @@ function recompute_speed_kpi() {
 				.replace('{chars_total}', format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
-		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
-		`<div style="display:flex;align-items:center;gap:6px;">` +
+		`<span class="stat-value-line">` +
 		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
-		`</div>` +
-		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${formula_tooltip}</small></button>` +
+		`</span>` +
+		`<span class="stat-value-line" style="font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
-		`</div>` +
-		`</div>`;
+		`<button type="button" class="tooltip stat-inline-tooltip">${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${formula_tooltip}</small></button>` +
+		`</span>`;
 
 	const global_details = document.getElementById('global_details');
 	if (global_details) {
 		const total_trig = totals.hs_input_chars + totals.llm_input_chars;
 		const output_chars = totals.manual_chars + totals.hs_chars + totals.llm_chars - total_trig;
 		global_details.innerHTML =
-			`<div style="margin-top:5px;">` +
+			`<li style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(totals.manual_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
-			`</div>` +
-			`<div style="margin-top:3px;">` +
+			`</li>` +
+			`<li style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(output_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
-			`</div>`;
+			`</li>`;
 	}
 }
 
@@ -1032,6 +1039,27 @@ function apply_local_filters() {
 	render_current_tab();
 }
 
+/**
+ * Shows a card's figures, or the line in their place: « Computing… » until
+ * the range read has landed, then the empty state. An empty range or app
+ * selection kept « Computing… » for good (MET-13). The data-i18n key moves
+ * with the text, so a later locale keeps the right line.
+ * @param {string} prefix - The card's id prefix (`<prefix>_loading`, `<prefix>_details`).
+ * @param {boolean} has_data - Whether the selection holds anything this card counts.
+ */
+function show_card_state(prefix, has_data) {
+	const loading = document.getElementById(`${prefix}_loading`);
+	const details = document.getElementById(`${prefix}_details`);
+	if (loading) {
+		loading.style.display = has_data ? 'none' : '';
+		if (!has_data && app_state.range_data_landed) {
+			loading.setAttribute('data-i18n', 'ui_typing.no_data');
+			loading.textContent = _t('ui_typing.no_data');
+		}
+	}
+	if (details) details.style.display = has_data ? 'flex' : 'none';
+}
+
 // =============================================
 // =============================================
 // ======= 4/ Repetitions KPI Rendering =======
@@ -1090,11 +1118,12 @@ function render_repetitions_kpi() {
 	const val_el = document.getElementById('rep_val');
 	if (val_el) {
 		val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
-			`<span>${format_number(rep_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</span>` +
-			`</span></div>`;
+			(total_count > 0
+				? `<span>${format_number(rep_pct.toFixed(1))}<span class="stat-unit">%</span></span>`
+				: '—') +
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-rep-color);">${INFO_SVG}` +
+			`<small class="tooltiptext">${_t('ui_typing.tooltip_rep_pct')}</small>` +
+			`</button>`;
 	}
 
 	// Raw count as secondary detail
@@ -1153,16 +1182,16 @@ function render_rep_table() {
 	} else {
 		rows_html = sorted
 			.map((d) => {
-				const key_html = `<span class="seq-chips">${format_seq_chips(d.key)}</span>`;
+				const key_html = `<kbd class="seq-chips">${format_seq_chips(d.key)}</kbd>`;
 				const star_html =
 					d.star > 0
 						? format_number(d.star)
 						: `<span style="color:var(--text-muted)">\u2014</span>`;
 				return `<tr>
 				<td>${key_html}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.total)}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.manual)}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${star_html}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.total)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.manual)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${star_html}</td>
 			</tr>`;
 			})
 			.join('');
@@ -1170,10 +1199,10 @@ function render_rep_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_rep_table('key')">${h_key}</th>
-				<th onclick="sort_rep_table('total')" style="text-align:right">${h_total}</th>
-				<th onclick="sort_rep_table('manual')" style="text-align:right">${h_manual}</th>
-				<th onclick="sort_rep_table('star')" style="text-align:right">${h_star}</th>
+				<th><button type="button" class="th-sort" onclick="sort_rep_table('key')">${h_key}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('total')">${h_total}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('manual')">${h_manual}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_rep_table('star')">${h_star}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1409,11 +1438,12 @@ function render_sfb_kpi() {
 	// Primary KPI: raw SFB rate with raw count below
 	if (val_el) {
 		val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
-			`<span>${format_number(sfb_pct.toFixed(1))}<span class="stat-unit">%</span></span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-sfb-color);">${INFO_SVG}` +
-			`<span class="tooltiptext">${_t('ui_typing.tooltip_sfb_pct')}</span>` +
-			`</span></div>`;
+			(bigram_total > 0
+				? `<span>${format_number(sfb_pct.toFixed(1))}<span class="stat-unit">%</span></span>`
+				: '—') +
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-sfb-color);">${INFO_SVG}` +
+			`<small class="tooltiptext">${_t('ui_typing.tooltip_sfb_pct')}</small>` +
+			`</button>`;
 	}
 
 	// Raw count + avoided count as secondary detail
@@ -1515,10 +1545,10 @@ function render_sfb_table() {
 				// The finger label is intentionally kept whole in every language.
 				const doigt_str = d.finger || '';
 				const main_str = d.hand || '';
-				const pair_html = `<span class="seq-chips">${format_seq_chips(d.pair)}</span>`;
+				const pair_html = `<kbd class="seq-chips">${format_seq_chips(d.pair)}</kbd>`;
 				return `<tr>
 				<td>${pair_html}</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${format_number(d.count)}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${format_number(d.count)}</td>
 				<td style="color:var(--text-muted);">${escape_html(doigt_str)}</td>
 				<td style="text-align:center;">${escape_html(main_str)}</td>
 			</tr>`;
@@ -1528,10 +1558,10 @@ function render_sfb_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_sfb_table('pair')">${h_pair}</th>
-				<th onclick="sort_sfb_table('count')" style="text-align:right">${h_count}</th>
-				<th onclick="sort_sfb_table('finger')">${h_finger}</th>
-				<th onclick="sort_sfb_table('hand')" style="text-align:center">${h_hand}</th>
+				<th><button type="button" class="th-sort" onclick="sort_sfb_table('pair')">${h_pair}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_sfb_table('count')">${h_count}</button></th>
+				<th><button type="button" class="th-sort" onclick="sort_sfb_table('finger')">${h_finger}</button></th>
+				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_sfb_table('hand')">${h_hand}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1748,11 +1778,10 @@ function render_distance_kpi() {
 		// and keeps the display consistent across sessions regardless of distance magnitude.
 		const unit_str = `${format_number(total_km.toFixed(3))} <span class="stat-unit">km</span>`;
 		dist_val_el.innerHTML =
-			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<span>${unit_str}</span>` +
-			`<span class="tooltip stat-inline-tooltip" style="color:var(--kpi-dist-color);">${INFO_SVG}` +
-			`<span class="tooltiptext" style="text-align:left;">${FINGER_DISTANCE_TOOLTIP_HTML}</span>` +
-			`</span></div>`;
+			`<button type="button" class="tooltip stat-inline-tooltip" style="color:var(--kpi-dist-color);">${INFO_SVG}` +
+			`<small class="tooltiptext" style="text-align:start;">${FINGER_DISTANCE_TOOLTIP_HTML}</small>` +
+			`</button>`;
 	}
 
 	// Identify the most-active finger
@@ -1822,10 +1851,10 @@ function render_dist_table() {
 						<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">
 							<div style="height:100%;width:${bar_width}%;background:${bar_color};"></div>
 						</div>
-						<span style="min-width:42px;text-align:right;">${pct_str}</span>
+						<span style="min-width:42px;text-align:end;">${pct_str}</span>
 					</div>
 				</td>
-				<td style="text-align:right;font-variant-numeric:tabular-nums;">${km_str}</td>
+				<td style="text-align:end;font-variant-numeric:tabular-nums;">${km_str}</td>
 			</tr>`;
 			})
 			.join('');
@@ -1833,10 +1862,10 @@ function render_dist_table() {
 
 	container.innerHTML = `<table class="ekpi-table">
 			<thead><tr>
-				<th onclick="sort_dist_table('label')">${h_name}</th>
-				<th onclick="sort_dist_table('hand')" style="text-align:center">${h_hand}</th>
-				<th onclick="sort_dist_table('usage_pct')">${h_usage}</th>
-				<th onclick="sort_dist_table('km')" style="text-align:right">${h_km}</th>
+				<th><button type="button" class="th-sort" onclick="sort_dist_table('label')">${h_name}</button></th>
+				<th style="text-align:center"><button type="button" class="th-sort" onclick="sort_dist_table('hand')">${h_hand}</button></th>
+				<th><button type="button" class="th-sort" onclick="sort_dist_table('usage_pct')">${h_usage}</button></th>
+				<th style="text-align:end"><button type="button" class="th-sort" onclick="sort_dist_table('km')">${h_km}</button></th>
 			</tr></thead>
 			<tbody>${rows_html}</tbody>
 		</table>`;
@@ -1890,10 +1919,8 @@ function render_avg_words_kpi() {
 	}
 
 	sub_el.innerHTML =
-		`<div style="margin-top:5px;">` +
 		`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_words)}</strong>` +
-		` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.unit_words_typed')}</span>` +
-		`</div>`;
+		` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.unit_words_typed')}</span>`;
 }
 
 // ===================================================
@@ -2057,15 +2084,12 @@ function render_ergo_bigram_kpi() {
 	set('ergo_lsb_pct', `${pct(lsb).toFixed(2)}%`);
 	set('ergo_scissor_pct', `${pct(scissor).toFixed(2)}%`);
 
-	const loading = document.getElementById('ergo_bigram_loading');
-	const details = document.getElementById('ergo_bigram_details');
-	if (loading) loading.style.display = total > 0 ? 'none' : '';
-	if (details) details.style.display = total > 0 ? 'flex' : 'none';
+	show_card_state('ergo_bigram', total > 0);
 
 	// Info tooltip — concise glossary so users can self-serve the meaning.
 	const info = document.getElementById('ergo_bigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_bigram')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_ergo_bigram')}</small>`;
 	}
 
 	// Build a sortable detail table — the 12 worst pairs from each "bad" group
@@ -2105,16 +2129,16 @@ function render_ergo_bigram_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
+				`<td style="text-align:center;color:var(--text-muted);">${d.kind}</td></tr>`
 		)
 		.join('');
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_ergo_bigram_table('pair')" style="cursor:pointer;">Bigramme${arrow('pair')}</th>` +
-		`<th onclick="sort_ergo_bigram_table('count')" style="cursor:pointer;text-align:right;">Occurrences${arrow('count')}</th>` +
-		`<th onclick="sort_ergo_bigram_table('kind')" style="cursor:pointer;text-align:center;">Type${arrow('kind')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('pair')">Bigramme${arrow('pair')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_bigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2241,20 +2265,20 @@ function render_ergo_trigram_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('ergo_trigram_val', `${pct(redir).toFixed(2)}<span class="stat-unit">% Redir.</span>`);
+	set(
+		'ergo_trigram_val',
+		`${pct(redir).toFixed(2)}<span class="stat-unit">% ${_t('ui_typing.lbl_redir')}</span>`
+	);
 	set('ergo_sfs_pct', `${pct(sfs).toFixed(2)}%`);
 	set('ergo_sks_pct', `${pct(sks).toFixed(2)}%`);
 	set('ergo_redir_pct', `${pct(redir).toFixed(2)}%`);
 	set('ergo_bad_redir_pct', `${pct(bad_redir).toFixed(2)}%`);
 
-	const loading = document.getElementById('ergo_trigram_loading');
-	const details = document.getElementById('ergo_trigram_details');
-	if (loading) loading.style.display = total > 0 ? 'none' : '';
-	if (details) details.style.display = total > 0 ? 'flex' : 'none';
+	show_card_state('ergo_trigram', total > 0);
 
 	const info = document.getElementById('ergo_trigram_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_ergo_trigram')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_ergo_trigram')}</small>`;
 	}
 
 	const top_n = (arr, n) => arr.sort((a, b) => b.count - a.count).slice(0, n);
@@ -2290,16 +2314,16 @@ function render_ergo_trigram_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.seq)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:center;color:${ThemeTokens.color('grey-aaa')};">${d.kind}</td></tr>`
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
+				`<td style="text-align:center;color:var(--text-muted);">${d.kind}</td></tr>`
 		)
 		.join('');
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_ergo_trigram_table('seq')" style="cursor:pointer;">Trigramme${arrow('seq')}</th>` +
-		`<th onclick="sort_ergo_trigram_table('count')" style="cursor:pointer;text-align:right;">Occurrences${arrow('count')}</th>` +
-		`<th onclick="sort_ergo_trigram_table('kind')" style="cursor:pointer;text-align:center;">Type${arrow('kind')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('seq')">Trigramme${arrow('seq')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('count')">Occurrences${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:center;"><button type="button" class="th-sort" onclick="sort_ergo_trigram_table('kind')">Type${arrow('kind')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2362,7 +2386,10 @@ function render_errors_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('errors_val', `${overall_rate.toFixed(2)}<span class="stat-unit">% taux global</span>`);
+	set(
+		'errors_val',
+		`${overall_rate.toFixed(2)}<span class="stat-unit">${_t('ui_typing.unit_global_rate')}</span>`
+	);
 	set('errors_total', format_number(total_errs));
 
 	const worst = rows.slice().sort((a, b) => b.rate - a.rate)[0];
@@ -2393,14 +2420,11 @@ function render_errors_kpi() {
 			: '—'
 	);
 
-	const loading = document.getElementById('errors_loading');
-	const details = document.getElementById('errors_details');
-	if (loading) loading.style.display = total_errs > 0 ? 'none' : '';
-	if (details) details.style.display = total_errs > 0 ? 'flex' : 'none';
+	show_card_state('errors', total_errs > 0);
 
 	const info = document.getElementById('errors_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_errors')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_errors')}</small>`;
 	}
 
 	_err_data = rows;
@@ -2411,7 +2435,7 @@ function render_errors_table() {
 	const container = document.getElementById('errors_bigrams_container');
 	if (!container) return;
 	if (_err_data.length === 0) {
-		container.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:12px;">${_t('ui_typing.errors_no_data')}</div>`;
+		container.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:12px;margin:0;">${_t('ui_typing.errors_no_data')}</p>`;
 		return;
 	}
 
@@ -2430,19 +2454,19 @@ function render_errors_table() {
 		.map(
 			(d) =>
 				`<tr><td>${escape_html(d.pair)}</td>` +
-				`<td style="text-align:right;">${format_number(d.count)}</td>` +
-				`<td style="text-align:right;color:${ThemeTokens.color('hue-f87171')};">${format_number(d.errors)}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('hue-f87171')};"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
+				`<td style="text-align:end;">${format_number(d.count)}</td>` +
+				`<td style="text-align:end;color:var(--ekpi-errors-ink);">${format_number(d.errors)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--ekpi-errors-ink);"><b>${(d.rate * 100).toFixed(1)}%</b></td>` +
 				`</tr>`
 		)
 		.join('');
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_errors_table('pair')" style="cursor:pointer;">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</th>` +
-		`<th onclick="sort_errors_table('count')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_occ')}${arrow('count')}</th>` +
-		`<th onclick="sort_errors_table('errors')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</th>` +
-		`<th onclick="sort_errors_table('rate')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_errors_table('pair')">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('count')">${_t('ui_typing.errors_table_occ')}${arrow('count')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('errors')">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_errors_table('rate')">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2562,15 +2586,11 @@ function render_roi_kpi() {
 			: '—'
 	);
 
-	const loading = document.getElementById('roi_loading');
-	const details = document.getElementById('roi_details');
-	const has_data = hs_chars + llm_chars > 0;
-	if (loading) loading.style.display = has_data ? 'none' : '';
-	if (details) details.style.display = has_data ? 'flex' : 'none';
+	show_card_state('roi', hs_chars + llm_chars > 0);
 
 	const info = document.getElementById('roi_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_roi')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_roi')}</small>`;
 	}
 }
 
@@ -2633,14 +2653,11 @@ function render_lexical_kpi() {
 	set('lexical_avg_len', `${avg_len.toFixed(2)} ${escape_html(_t('ui_typing.col_chars'))}`);
 	set('lexical_top', top_word ? `${escape_html(top_word)} (${format_number(top_count)})` : '—');
 
-	const loading = document.getElementById('lexical_loading');
-	const details = document.getElementById('lexical_details');
-	if (loading) loading.style.display = total_words > 0 ? 'none' : '';
-	if (details) details.style.display = total_words > 0 ? 'flex' : 'none';
+	show_card_state('lexical', total_words > 0);
 
 	const info = document.getElementById('lexical_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_lexical')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_lexical')}</small>`;
 	}
 
 	// Histogram of word lengths — horizontal bars normalised to the max bucket.
@@ -2658,18 +2675,18 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
 				`</tr>`
 		);
 	}
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_word_length_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_word_length_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars_html.join('')}</tbody></table>`;
 }
 
@@ -2770,14 +2787,11 @@ function render_rhythm_kpi() {
 	set('rhythm_mean_delay', inter_count > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
 	set('rhythm_cv', inter_count > 0 ? cv.toFixed(2) : '—');
 
-	const loading = document.getElementById('rhythm_loading');
-	const details = document.getElementById('rhythm_details');
-	if (loading) loading.style.display = total_bursts > 0 ? 'none' : '';
-	if (details) details.style.display = total_bursts > 0 ? 'flex' : 'none';
+	show_card_state('rhythm', total_bursts > 0);
 
 	const info = document.getElementById('rhythm_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_rhythm')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_rhythm')}</small>`;
 	}
 
 	const container = document.getElementById('rhythm_distribution_container');
@@ -2796,19 +2810,19 @@ function render_rhythm_kpi() {
 			const label = `${k === '500+' ? '> 500' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);width:78px;">${label}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(56, 189, 248);"></div>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;width:60px;">${format_number(n)}</td>` +
 				`</tr>`
 			);
 		})
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_burst_length_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_burst_length_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${bars}</tbody></table>`;
 }
 
@@ -2865,14 +2879,11 @@ function render_sessions_kpi() {
 	);
 	set('sessions_avg_time', avg_ms > 0 ? _fmt_duration_ms(avg_ms) : '—');
 
-	const loading = document.getElementById('sessions_loading');
-	const details = document.getElementById('sessions_details');
-	if (loading) loading.style.display = count > 0 ? 'none' : '';
-	if (details) details.style.display = count > 0 ? 'flex' : 'none';
+	show_card_state('sessions', count > 0);
 
 	const info = document.getElementById('sessions_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_sessions')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_sessions')}</small>`;
 	}
 }
 
@@ -2997,14 +3008,11 @@ function render_records_kpi() {
 	);
 
 	const has_data = max_burst > 0 || max_session_ms > 0 || best_day_chars > 0;
-	const loading = document.getElementById('records_loading');
-	const details = document.getElementById('records_details');
-	if (loading) loading.style.display = has_data ? 'none' : '';
-	if (details) details.style.display = has_data ? 'flex' : 'none';
+	show_card_state('records', has_data);
 
 	const info = document.getElementById('records_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_records')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_records')}</small>`;
 	}
 }
 
@@ -3084,14 +3092,11 @@ function render_charmix_kpi() {
 			: `—`
 	);
 
-	const loading = document.getElementById('charmix_loading');
-	const details = document.getElementById('charmix_details');
-	if (loading) loading.style.display = grand > 0 ? 'none' : '';
-	if (details) details.style.display = grand > 0 ? 'flex' : 'none';
+	show_card_state('charmix', grand > 0);
 
 	const info = document.getElementById('charmix_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_charmix')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_charmix')}</small>`;
 	}
 
 	// Stacked horizontal bar — segments proportional to each category's share,
@@ -3119,8 +3124,8 @@ function render_charmix_kpi() {
 		)
 		.join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_charmix_dist').replace('%s', format_number(grand))}</div>` +
-		`<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;">${bar_html}</div>`;
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_charmix_dist').replace('%s', format_number(grand))}</p>` +
+		`<div role="img" aria-label="${segments.map((s) => s.tooltip).join(', ')}" style="display:flex;height:24px;border-radius:6px;overflow:hidden;">${bar_html}</div>`;
 }
 
 // =================================================
@@ -3192,13 +3197,13 @@ function render_apps_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('apps_val', `${format_number(_apps_data.length)}<span class="stat-unit">apps actives</span>`);
+	set(
+		'apps_val',
+		`${format_number(_apps_data.length)}<span class="stat-unit">${_t('ui_typing.unit_active_apps')}</span>`
+	);
 
 	if (_apps_data.length === 0) {
-		const loading = document.getElementById('apps_loading');
-		const details = document.getElementById('apps_details');
-		if (loading) loading.style.display = '';
-		if (details) details.style.display = 'none';
+		show_card_state('apps', false);
 		const container = document.getElementById('apps_table_container');
 		if (container) container.innerHTML = '';
 		return;
@@ -3275,14 +3280,11 @@ function render_apps_kpi() {
 		set('apps_top_mod_hold', '—');
 	}
 
-	const loading = document.getElementById('apps_loading');
-	const details = document.getElementById('apps_details');
-	if (loading) loading.style.display = 'none';
-	if (details) details.style.display = 'flex';
+	show_card_state('apps', true);
 
 	const info = document.getElementById('apps_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_apps')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_apps')}</small>`;
 	}
 
 	render_apps_table();
@@ -3324,11 +3326,11 @@ function render_apps_table() {
 				`<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">` +
 				`<div style="height:100%;width:${bar_pct}%;background:rgb(232, 121, 249);"></div>` +
 				`</div>` +
-				`<span style="min-width:64px;text-align:right;">${format_number(d.chars)}</span>` +
+				`<span style="min-width:64px;text-align:end;">${format_number(d.chars)}</span>` +
 				`</div>` +
 				`</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};">${fmt_dur(d.time_ms)}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;">${d.cpm > 0 ? d.cpm.toFixed(0) : '—'}</td>` +
+				`<td style="text-align:end;font-variant-numeric:tabular-nums;color:var(--text-muted);">${fmt_dur(d.time_ms)}</td>` +
 				`</tr>`
 			);
 		})
@@ -3336,10 +3338,10 @@ function render_apps_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_apps_table('name')" style="cursor:pointer;">${_t('ui_typing.col_app')}${arrow('name')}</th>` +
-		`<th onclick="sort_apps_table('chars')" style="cursor:pointer;">${_t('ui_typing.col_chars')}${arrow('chars')}</th>` +
-		`<th onclick="sort_apps_table('cpm')" style="cursor:pointer;text-align:right;">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</th>` +
-		`<th onclick="sort_apps_table('time_ms')" style="cursor:pointer;text-align:right;">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('name')">${_t('ui_typing.col_app')}${arrow('name')}</button></th>` +
+		`<th style="cursor:pointer;"><button type="button" class="th-sort" onclick="sort_apps_table('chars')">${_t('ui_typing.col_chars')}${arrow('chars')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_apps_table('cpm')">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</button></th>` +
+		`<th style="cursor:pointer;text-align:end;"><button type="button" class="th-sort" onclick="sort_apps_table('time_ms')">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</button></th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -3455,13 +3457,13 @@ function render_wellness_kpi() {
 	if (total_chars > 0) {
 		if (long_sessions >= 2 || max_finger_streak >= 8) {
 			signal_label = _t('ui_typing.signal_vigilance');
-			signal_color = 'color:rgb(248,113,113);';
+			signal_color = 'color:var(--ekpi-errors-ink);';
 		} else if (long_sessions >= 1 || max_finger_streak >= 6 || max_hand_streak >= 12) {
 			signal_label = _t('ui_typing.signal_surveille');
-			signal_color = 'color:rgb(251,191,36);';
+			signal_color = 'color:var(--ekpi-lexical-ink);';
 		} else {
 			signal_label = _t('ui_typing.signal_equilibre');
-			signal_color = 'color:rgb(74,222,128);';
+			signal_color = 'color:var(--ekpi-roi-ink);';
 		}
 	}
 	set('wellness_val', `<span style="${signal_color}">${signal_label}</span>`);
@@ -3485,14 +3487,11 @@ function render_wellness_kpi() {
 	set('wellness_passive_ms', passive_ms > 0 ? fmt_dur(passive_ms) : '—');
 
 	const has_data = total_chars > 0 || total_strokes > 0;
-	const loading = document.getElementById('wellness_loading');
-	const details = document.getElementById('wellness_details');
-	if (loading) loading.style.display = has_data ? 'none' : '';
-	if (details) details.style.display = has_data ? 'flex' : 'none';
+	show_card_state('wellness', has_data);
 
 	const info = document.getElementById('wellness_info');
 	if (info && typeof INFO_SVG === 'string') {
-		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${_t('ui_typing.tooltip_wellness')}</span>`;
+		info.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${_t('ui_typing.tooltip_wellness')}</small>`;
 	}
 
 	// Cumulative finger load: horizontal bar showing each finger's share of
@@ -3527,22 +3526,22 @@ function render_wellness_kpi() {
 		const text_color = pct > 18 ? 'color:rgb(248,113,113);font-weight:600;' : '';
 		return (
 			`<tr>` +
-			`<td style="color:${ThemeTokens.color('grey-aaa')};width:90px;">${label}</td>` +
+			`<td style="color:var(--text-muted);width:90px;">${label}</td>` +
 			`<td style="text-align:center;width:24px;">${f.startsWith('l') ? 'G' : 'D'}</td>` +
 			`<td style="padding:2px 6px;">` +
 			`<div style="display:flex;align-items:center;gap:6px;">` +
 			`<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;min-width:40px;">` +
 			`<div style="height:100%;width:${bar_pct}%;background:${hand_color};"></div>` +
 			`</div>` +
-			`<span style="min-width:48px;text-align:right;${text_color}">${pct.toFixed(1)}%</span>` +
+			`<span style="min-width:48px;text-align:end;${text_color}">${pct.toFixed(1)}%</span>` +
 			`</div>` +
 			`</td>` +
-			`<td style="text-align:right;font-variant-numeric:tabular-nums;width:80px;">${format_number(n)}</td>` +
+			`<td style="text-align:end;font-variant-numeric:tabular-nums;width:80px;">${format_number(n)}</td>` +
 			`</tr>`
 		);
 	}).join('');
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_finger_load_dist')}</div>` +
+		`<p style="font-size:11px;color:var(--text-muted);margin:8px 0 4px 0;">${_t('ui_typing.label_finger_load_dist')}</p>` +
 		`<table style="width:100%;border-collapse:collapse;font-size:12px;"><tbody>${rows}</tbody></table>`;
 }
 
@@ -3553,33 +3552,55 @@ function render_wellness_kpi() {
 // ============================================
 
 /**
- * Retires old range ownership and requests an explicit cache purge. The polling
- * host keeps Reset ahead of range delivery until the actual purge completes.
+ * Retires old range ownership and requests an explicit cache purge. Every host
+ * answers this Reset's id with its outcome (complete_cache_reset); the page
+ * keeps Reset ahead of range delivery until then. Windows and Linux had no id:
+ * their failed purge reached nobody (MET-19).
  */
 function request_cache_reset() {
 	invalidate_typing_projection_cache();
 	complete_range_request(app_state.active_range_request_id, 'superseded');
 	window._prefetch_data = null;
+	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
+	const reset_id = ++app_state.cache_reset_sequence;
+	app_state.active_cache_reset_id = reset_id;
+	app_state.cache_reset_pending_range = null;
+	app_state.cache_reset_watchdog = setTimeout(
+		() => complete_cache_reset(reset_id, false),
+		RANGE_REQUEST_WATCHDOG_MS
+	);
+	const request = { action: 'clear_cache', reset_id };
 	if (window.chrome?.webview) {
-		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
+		try {
+			window.chrome.webview.postMessage(JSON.stringify(request));
+		} catch (error) {
+			console.error('request_cache_reset: the host is unreachable:', error);
+			fail_unsent_cache_reset(reset_id);
+		}
 		return;
 	}
 	if (
 		hostHasCapability('document_bridge') &&
 		window.webkit?.messageHandlers?.metrics_typing_bridge
 	) {
-		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
+		try {
+			window.webkit.messageHandlers.metrics_typing_bridge.postMessage(request);
+		} catch (error) {
+			console.error('request_cache_reset: the host is unreachable:', error);
+			fail_unsent_cache_reset(reset_id);
+		}
 		return;
 	}
-	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
-	const reset_id = ++app_state.cache_reset_sequence;
-	app_state.active_cache_reset_id = reset_id;
-	app_state.cache_reset_pending_range = null;
-	window._lua_request = JSON.stringify({ action: 'clear_cache', reset_id });
-	app_state.cache_reset_watchdog = setTimeout(
-		() => complete_cache_reset(reset_id, false),
-		RANGE_REQUEST_WATCHDOG_MS
-	);
+	window._lua_request = JSON.stringify(request);
+}
+
+/**
+ * Fails a Reset no host received, once its caller (reset_filters) has asked
+ * for its range: that range then fails with it instead of being sent.
+ * @param {number} reset_id - The unsent Reset.
+ */
+function fail_unsent_cache_reset(reset_id) {
+	setTimeout(() => complete_cache_reset(reset_id, false), 0);
 }
 
 /**
@@ -3607,9 +3628,31 @@ function complete_cache_reset(reset_id, succeeded) {
 		if (pending_range) pending_range();
 	} else {
 		complete_range_request(app_state.active_range_request_id, 'failed');
+		// Said after the range's own failure, which it replaces: the figures
+		// on screen are the ones the purge was meant to rebuild.
+		show_range_status('ui_typing.reset_failed');
 	}
 	return true;
 }
+
+/**
+ * Says what became of the selected period's read. The loader alone was the
+ * only sign of a request and a failure put the previous table back silently,
+ * under the new selection, with a loader text that was French on every locale
+ * (MET-06).
+ * @param {string} key - The i18n key of the state, or '' to clear it.
+ */
+function show_range_status(key) {
+	const status = document.getElementById('range_status');
+	if (!status) return;
+	// The region stays in the tree, empty, so a screen reader hears each change.
+	status.textContent = key ? _t(key) : '';
+}
+
+const RANGE_STATUS_KEYS = Object.freeze({
+	failed: 'ui_typing.range_failed',
+	timeout: 'ui_typing.range_timeout'
+});
 
 /**
  * Completes only the currently-owned range request. Native responses can race
@@ -3645,6 +3688,9 @@ function complete_range_request(request_id, status = 'failed') {
 		const table_body = document.getElementById('metrics_table_body');
 		if (table_body && previous_html !== null) table_body.innerHTML = previous_html;
 	}
+	// A superseded request hands the status to its replacement, which sets it.
+	if (status !== 'superseded')
+		show_range_status(restore_loader ? RANGE_STATUS_KEYS[status] || '' : '');
 	return true;
 }
 
@@ -3692,8 +3738,10 @@ function request_range_data(show_loader = true) {
 		app_state.range_request_previous_table_html = table_body.innerHTML;
 		table_body.innerHTML =
 			'<tr><td colspan="8" style="text-align:center;padding:30px;">' +
-			'<div class="loader-spinner"></div> R\u00E9cup\u00E9ration et d\u00E9chiffrement depuis la DB...' +
+			'<div class="loader-spinner" aria-hidden="true"></div> ' +
+			_t('ui_typing.range_loading') +
 			'</td></tr>';
+		show_range_status('ui_typing.range_loading');
 	} else {
 		app_state.range_request_previous_table_html = null;
 	}
@@ -3861,6 +3909,8 @@ function receive_range_data(payload, request_id = null) {
 	app_state.today_live_data = merge_partial_today_data(prior_today, payload.today, partial_types);
 	app_state.today_partial_types = partial_types;
 	app_state.today_live_date = day;
+	// From here an empty card is empty, no longer computing.
+	app_state.range_data_landed = true;
 	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();
 	return true;

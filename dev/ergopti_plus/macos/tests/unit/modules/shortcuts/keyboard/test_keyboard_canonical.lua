@@ -4,19 +4,19 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
-	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "platform.input.hotkey_registrar", "infra.preferences",
-		"core.fs.engine.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
+	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.preferences.preferences",
+		"core.fs.engine.paths", "settings.engine.paths", "gestures.engine.actions", "modules.shortcuts.keyboard_shortcuts" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0, handles = {}, fired = {} }
 	local subject
 	local ok, err = pcall(function()
-		helpers.load_with_stubs("infra.preferences")
+		helpers.load_with_stubs("settings.engine.preferences.preferences")
 		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical owner must not read legacy storage") end
 		end })
 		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
-		package.loaded["infra.config_paths"] = { get = function() return "keyboard-config" end }
+		package.loaded["settings.engine.paths"] = { get = function() return "keyboard-config" end }
 		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local f = assert(io.open(path, "rb")); local raw = f:read("*a"); f:close(); return raw
@@ -40,12 +40,12 @@ local function with_subject(source, body)
 			setEnabled = function(handle, enabled) handle.enabled = enabled; return true end,
 			unbind = function(handle) handle.enabled = false; return true end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			is_assignable = function(id) return id == "none" or id == "send_text" or id == "screen_capture" end,
 			execute_single = function(action) control.fired[#control.fired + 1] = action; return true end,
 		}
-		package.loaded["infra.preferences"], package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil, nil
-		local preferences = require("infra.preferences"); preferences.load("keyboard-config")
+		package.loaded["settings.engine.preferences.preferences"], package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil, nil
+		local preferences = require("settings.engine.preferences.preferences"); preferences.load("keyboard-config")
 		subject = require("modules.shortcuts.keyboard_shortcuts")
 		body(subject, preferences, control)
 	end)
@@ -74,10 +74,10 @@ helpers.describe("canonical keyboard shortcut ownership", function()
 			subject.mark_config_reads(Codec.decode(control.content), function(...) marks[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(marks, { ["shortcuts.keyboard.primary_a"] = true })
 			helpers.assert_eq(subject.get_owned_config_paths(), {
-				"shortcuts.keyboard.magic_editor", "shortcuts.keyboard.primary_a",
+				"shortcuts.keyboard.primary_a", "shortcuts.keyboard.secondary_star",
 			})
 			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
-				require("ui.menu.unused_keys_cleanup").collect)
+				require("settings.ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(#scan.keys, 2)
 			for _, key in ipairs(scan.keys) do helpers.assert_true(key.key ~= "primary_a") end
 			helpers.assert_eq(subject.set_action("cmd_not_a_key", "send_text"), false)

@@ -66,7 +66,7 @@ API_KEY = "container-proof-key"
 PORT = 18000 + os.getpid() % 1000
 
 PREPARE = r"""
-assert(require("infra.llm_preferences").set_many({ ["llm.trigger.inline_autotype"] = true }),
+assert(require("ai.engine.preferences").set_many({ ["llm.trigger.inline_autotype"] = true }),
 	"the inline switch must reach canonical preferences")
 """
 
@@ -199,7 +199,9 @@ def proof():
         editor, _ = session.editor_state()
         cs.check(editor == expected, "the editor is unchanged by the password-field typing")
     except cs.ProofFailure:
-        session.dump_log()
+        # The whole log: a prediction never asked is decided by the AI path's
+        # debug lines (held, not armed, withheld), which can lie far above the end.
+        session.dump_log(lines=None)
         raise
     finally:
         session.stop()

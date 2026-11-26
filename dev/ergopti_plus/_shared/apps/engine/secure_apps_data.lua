@@ -111,7 +111,7 @@ return {
 		{
 			["id"] = "system_keychain",
 			["windows"] = {
-				"credential_guard",
+				"CredentialUIBroker.exe",
 			},
 			["macos"] = {
 				"Keychain Access",
@@ -133,8 +133,13 @@ return {
 		},
 		{
 			["id"] = "yubikey_manager",
-			["windows"] = {},
-			["macos"] = {},
+			["windows"] = {
+				"authenticator.exe",
+				"yubioath-desktop.exe",
+			},
+			["macos"] = {
+				"Yubico Authenticator",
+			},
 			["linux"] = {
 				"yubikey-manager",
 			},

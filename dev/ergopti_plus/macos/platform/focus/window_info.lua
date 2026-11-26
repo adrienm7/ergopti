@@ -95,6 +95,12 @@ function M.getFocused()
 	return result or empty_info()
 end
 
+--- The hs.application object in front, read from NSWorkspace; nil when none.
+local function frontmost_app()
+	return hs.application and hs.application.frontmostApplication
+		and hs.application.frontmostApplication()
+end
+
 --- Returns the frontmost application's process id and bundle identifier. Not
 --- part of the WindowInfo port: a caller reads it before a dialog of the
 --- driver takes the front. Read from NSWorkspace, never through the
@@ -104,8 +110,7 @@ end
 --- when the application has no bundle identifier.
 function M.frontmost_application()
 	local ok, result = pcall(function()
-		local app = hs.application and hs.application.frontmostApplication
-			and hs.application.frontmostApplication()
+		local app = frontmost_app()
 		if not app then return nil end
 		local pid, bundle_id = app:pid(), app:bundleID()
 		if type(pid) ~= "number" or type(bundle_id) ~= "string" or bundle_id == "" then return nil end
@@ -113,6 +118,24 @@ function M.frontmost_application()
 	end)
 	if not ok then
 		Logger.error(LOG, "frontmost_application(): unexpected error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+--- Returns the name a person reads for the frontmost application (« Terminal »,
+--- not « com.apple.Terminal »), for a menu row. Not part of the WindowInfo
+--- port: frontmost_application stays the identity every caller compares.
+--- @return string|nil name Nil when unreadable or unnamed.
+function M.frontmost_application_name()
+	local ok, result = pcall(function()
+		local app = frontmost_app()
+		if not app or type(app.name) ~= "function" then return nil end
+		local name = app:name()
+		return type(name) == "string" and name ~= "" and name or nil
+	end)
+	if not ok then
+		Logger.error(LOG, "frontmost_application_name(): unexpected error — %s", tostring(result))
 		return nil
 	end
 	return result

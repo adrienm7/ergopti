@@ -14,10 +14,10 @@
 local M = {}
 
 local i18n            = require("core.i18n.engine.i18n")
-local ManifestMenu    = require("infra.manifest_menu")
+local ManifestMenu    = require("menu.engine.manifest_menu")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
 local CapsWordPolicy  = require("keyboard.engine.caps_word_auto_off")
-local Manifest        = require("infra.manifest_reader")
+local Manifest        = require("menu.engine.manifest_reader")
 
 --- Builds the group's rows.
 --- @param ctx table Menu context (state, save_prefs, updateMenu, state_getters).

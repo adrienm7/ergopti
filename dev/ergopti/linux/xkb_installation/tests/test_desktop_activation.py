@@ -7,6 +7,7 @@ pins one of the reasons that could happen again.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -495,6 +496,95 @@ class OwningDesktopTests(unittest.TestCase):
         output = "\n".join(printed)
         self.assertTrue(applied)
         self.assertIn("localectl set-x11-keymap fr pc105 Ergopti_v2_2_1", output)
+
+
+def hyprctl_session(initial: dict[str, str], writes: list[tuple[str, str]], accept: bool = True):
+    """A fake ``subprocess.run`` playing ``hyprctl`` over an in-memory option store.
+
+    ``getoption`` prints the JSON Hyprland prints (an empty string as
+    ``[[EMPTY]]``); ``keyword`` answers ``ok`` and stores the value unless
+    ``accept`` is false, when it answers like a refused keyword."""
+    state = dict(initial)
+
+    def fake_run(command, **kwargs):
+        if command[:3] == ["hyprctl", "-j", "getoption"]:
+            value = state.get(command[3], "")
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps({"option": command[3], "str": value or "[[EMPTY]]", "set": True}),
+            )
+        if command[:2] == ["hyprctl", "keyword"]:
+            writes.append((command[2], command[3]))
+            if not accept:
+                return SimpleNamespace(returncode=0, stdout="config option <> does not exist.")
+            state[command[2]] = command[3]
+            return SimpleNamespace(returncode=0, stdout="ok")
+        return SimpleNamespace(returncode=1, stdout="")
+
+    return fake_run, state
+
+
+class HyprlandApplyTests(unittest.TestCase):
+    """hyprland-live-select: Hyprland's runtime setting is written, read back,
+    and written in the order that never pairs a layout with a foreign variant."""
+
+    ENVIRON = {"XDG_CURRENT_DESKTOP": "Hyprland", "XDG_SESSION_TYPE": "wayland"}
+
+    def run_activation(self, initial, accept=True):
+        writes: list[tuple[str, str]] = []
+        printed: list[str] = []
+        run, state = hyprctl_session(initial, writes, accept)
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
+        ), mock.patch.object(activation, "subprocess", fake_subprocess(run)), mock.patch.object(
+            activation.shutil, "which", return_value=None
+        ), mock.patch.object(activation, "running_as_root", return_value=False):
+            applied = activation.activate_layout([ERGOPTI], self.ENVIRON)
+        return applied, "\n".join(printed), writes, state
+
+    def test_the_layout_goes_first_and_the_variants_are_written_before_it(self):
+        applied, output, writes, state = self.run_activation(
+            {"input:kb_layout": "us", "input:kb_variant": "intl"}
+        )
+        self.assertTrue(applied)
+        self.assertEqual(writes, [("input:kb_variant", ",intl"), ("input:kb_layout", "ergopti,us")])
+        self.assertEqual(state["input:kb_layout"], "ergopti,us")
+        self.assertNotIn("hyprland.conf", output, "no manual block once Hyprland took it")
+        self.assertIn("Disposition activée", output)
+
+    def test_a_refused_keyword_is_not_an_activation(self):
+        applied, output, _, _ = self.run_activation(
+            {"input:kb_layout": "us", "input:kb_variant": ""}, accept=False
+        )
+        self.assertFalse(applied)
+        self.assertIn("hyprland.conf", output)
+
+    def test_hyprland_is_a_live_desktop_and_sway_is_not(self):
+        self.assertEqual(activation.wayland_live_desktop(self.ENVIRON), "hyprland")
+        sway = {"XDG_CURRENT_DESKTOP": "sway", "XDG_SESSION_TYPE": "wayland"}
+        self.assertIsNone(activation.wayland_live_desktop(sway))
+        x11 = {"XDG_CURRENT_DESKTOP": "Hyprland", "XDG_SESSION_TYPE": "x11"}
+        self.assertIsNone(activation.wayland_live_desktop(x11))
+
+    def test_deactivation_drops_the_layout_and_writes_the_layouts_first(self):
+        writes: list[tuple[str, str]] = []
+        run, state = hyprctl_session(
+            {"input:kb_layout": "ergopti,us", "input:kb_variant": ",intl"}, writes
+        )
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation, "subprocess", fake_subprocess(run)
+        ), mock.patch.object(
+            activation.shutil, "which", side_effect=lambda name: name if name == "hyprctl" else None
+        ), mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "Hyprland"}):
+            status = activation.deactivate_hyprland(activation.is_ergopti_spec)
+        self.assertIs(status, activation.CleanupStatus.CHANGED)
+        self.assertEqual(writes, [("input:kb_layout", "us"), ("input:kb_variant", "intl")])
+
+    def test_deactivation_outside_hyprland_owes_nothing(self):
+        with mock.patch.dict(os.environ, {"XDG_CURRENT_DESKTOP": "GNOME"}):
+            status = activation.deactivate_hyprland(activation.is_ergopti_spec)
+        self.assertIs(status, activation.CleanupStatus.ABSENT)
 
 
 class SetxkbmapTests(unittest.TestCase):

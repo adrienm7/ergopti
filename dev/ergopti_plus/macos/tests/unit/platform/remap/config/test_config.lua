@@ -171,6 +171,7 @@ local function stub_files(model)
 		if next(rows) ~= nil then part.tap_holds = rows end
 	end
 	part.mod_combos, tap.mod_combos = tap.mod_combos, nil
+	part.category_enabled, tap.category_enabled = tap.category_enabled, nil
 	Config._load_toml_file = function(path)
 		if model == nil then return nil, "absent", { path = path, status = "absent" } end
 		return tap, nil, { path = path, status = "ok", content = "" }
@@ -391,6 +392,35 @@ helpers.describe("Config: the key-combinations switch", function()
 			local loaded = Config.load_user_config({}, {}, "/tmp/tap_hold.toml")
 			restore()
 			helpers.assert_eq(loaded.mod_combos_enabled, case.stored)
+		end
+	end)
+end)
+
+-- Maintainer decision KCD-6 of 2026-11-21: the master of the key combinations
+-- is `[category_enabled] key_combinations` in config.toml, as on Windows and
+-- Linux; macOS used to read [mod_combos] enabled as the master and had no
+-- reader of this leaf at all.
+helpers.describe("Config: the key-combinations master (kcd-6-master-leaf)", function()
+	helpers.it("persists [category_enabled] key_combinations apart from the chord switch (kcd-6-master-leaf)", function()
+		local state = Config.build_default_state({}, {})
+		helpers.assert_nil(state.key_combinations_enabled, "a fresh install leaves the master absent")
+		helpers.assert_nil(row_value(config_rows_of(state), "category_enabled", "key_combinations"),
+			"an inherited master is not written")
+		state.key_combinations_enabled = false
+		local rows = config_rows_of(state)
+		helpers.assert_eq(row_value(rows, "category_enabled", "key_combinations"), false)
+		helpers.assert_nil(row_value(rows, "mod_combos", "enabled"), "the master never writes the chord switch")
+
+		for _, case in ipairs({ { stored = false }, { stored = true }, {} }) do
+			local restore = stub_files({
+				tap_holds = { enabled = true, config = {} },
+				mod_combos = { enabled = true, config = {} },
+				category_enabled = { key_combinations = case.stored },
+			})
+			local loaded = Config.load_user_config({}, {}, "/tmp/tap_hold.toml")
+			restore()
+			helpers.assert_eq(loaded.key_combinations_enabled, case.stored)
+			helpers.assert_eq(loaded.mod_combos_enabled, true, "the chord switch is read on its own")
 		end
 	end)
 end)

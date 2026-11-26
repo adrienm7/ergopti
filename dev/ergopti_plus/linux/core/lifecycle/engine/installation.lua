@@ -13,8 +13,9 @@
 --- FEATURES & RATIONALE:
 --- 1. An install layout is an installed build. The system packages stage the
 ---    driver flat under /usr/lib/ergopti; install.sh puts it at
----    <prefix>/lib/ergopti/linux. install.sh copies a checkout without writing
----    a build stamp, so an unstamped tree there is still installed.
+---    <prefix>/lib/ergopti/linux. install.sh stamps a checkout copy only with
+---    its commit (source=checkout, no release version), so that tree is still
+---    a local version, installed.
 --- 2. A build stamp is a build, wherever it runs from: the release packages and
 ---    bundles carry the stamp tools/build/write_build_stamp.sh writes.
 --- 3. Anything else is a source run: an unstamped tree outside every install
@@ -26,8 +27,10 @@ local M = {}
 local Paths   = require("core.fs.engine.paths")
 local Version = require("infra.version")
 
+-- The flat driver folder a package stages under its install prefix.
+local PACKAGED_DIR = "/lib/ergopti"
 -- Where the system packages (.deb, .rpm, PKGBUILD) stage the driver.
-M.SYSTEM_ROOT = "/usr/lib/ergopti"
+M.SYSTEM_ROOT = "/usr" .. PACKAGED_DIR
 
 
 
@@ -47,6 +50,15 @@ function M.layout(root)
 	if root == M.SYSTEM_ROOT then return { system = true } end
 	local prefix = type(root) == "string" and root:match("^(.*)/lib/ergopti/linux$") or nil
 	return { system = false, prefix = prefix }
+end
+
+--- The flat driver root a package stages under one install prefix: /usr for
+--- the system packages, the host deployment of a Flatpak's /app.
+--- @param prefix string Absolute install prefix.
+--- @return string root
+function M.packaged_root(prefix)
+	assert(type(prefix) == "string" and prefix:sub(1, 1) == "/", "an absolute install prefix")
+	return prefix .. PACKAGED_DIR
 end
 
 --- Whether this daemon is a local version run from source.

@@ -238,7 +238,7 @@ helpers.describe("text sender restores only its exact native pasteboard owner", 
 			end
 			f.write_refusal = "throw"
 			local receipt = {}
-			local written, returned = require("adapters.clipboard").write("PAYLOAD", receipt)
+			local written, returned = require("clipboard.adapters.clipboard").write("PAYLOAD", receipt)
 			helpers.assert_eq(written, false)
 			helpers.assert_true(returned == receipt)
 			helpers.assert_eq(receipt.count, 1, "capture before Logger can change the board")

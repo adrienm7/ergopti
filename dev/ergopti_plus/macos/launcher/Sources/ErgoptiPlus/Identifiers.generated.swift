@@ -9,6 +9,7 @@ enum Identifiers {
 		static let ahk = "ErgoptiPlus.ahk"
 		static let exe = "ErgoptiPlus.exe"
 		static let bundle = "ErgoptiPlus.app"
+		static let displayName = "Ergopti+"
 	}
 	enum BundleIds {
 		static let launcher = "com.ergoptiplus.app"

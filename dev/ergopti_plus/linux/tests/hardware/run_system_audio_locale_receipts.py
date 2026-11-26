@@ -15,7 +15,7 @@ import time
 
 WORKER = r"""
 local Calendar = require("modules.keystats.calendar")
-local Metrics = require("modules.keystats.system_metrics")
+local Metrics = require("modules.keystats.system.system_metrics")
 local interval = Metrics._sample_interval_ms()
 local date = "2026-01-02"
 -- The sampler reads its own producer clock and needs the collector's

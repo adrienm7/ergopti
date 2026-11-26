@@ -16,7 +16,7 @@ local M = {}
 local hs = hs
 local Logger = require("core.logger.engine.logger")
 local TimerScheduler = require("core.events.timer_scheduler")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local Keycodes = require("platform.input.keycodes")
 local LOG = "tooltip_hotstring"
@@ -59,6 +59,9 @@ local _dequeue_opts = {
 	expire_field   = "expire_at",
 	timeout_decrement_sec = Config.timing.timeout_decrement_sec,
 	timeout_floor_sec     = Config.timing.timeout_floor_sec,
+	-- A row with no delay inside a stack of timed rows leaves after the shared
+	-- safety lifetime, as a lone no-delay preview does (TWD-1).
+	safety_timeout_sec    = Config.timing.safety_timeout_sec,
 }
 
 --- Invalidates work classified against an older tooltip render.

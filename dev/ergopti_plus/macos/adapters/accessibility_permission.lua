@@ -24,7 +24,7 @@
 ---    lets the next prompt add a switch that matches the running binary.
 --- 5. Other copies: a second copy signed differently shares the bundle
 ---    identifier and can hold the one switch; the wait asks for them before
----    any reset (adapters/accessibility_copies.lua).
+---    any reset (clipboard/adapters/accessibility_copies.lua).
 --- 6. Bounded waits: every Accessibility call runs on the main thread, where
 ---    the keyboard event taps also run. macOS lets a call to an application
 ---    that does not answer wait six seconds; the taps then time out, macOS
@@ -191,8 +191,9 @@ function M.bundle_id()
 	return require("adapters.tcc_grant").bundle_id()
 end
 
---- Returns the path of the running app, the one the Accessibility list shows
---- (as "Hammerspoon") and the one to add with + when the entry is missing.
+--- Returns the path of the running runtime bundle. Packaged, it is the
+--- Hammerspoon.app nested in ErgoptiPlus.app, which macOS lists as
+--- "Hammerspoon".
 --- @return string|nil path Nil when the running process reports none.
 --- @return string|nil detail Exact reason when path is nil.
 function M.bundle_path()
@@ -202,6 +203,28 @@ function M.bundle_path()
 		return nil, "hs.processInfo.bundlePath is unavailable"
 	end
 	return path
+end
+
+--- Returns the app the user turns on in the Accessibility list, and adds with
+--- + when it is missing. Packaged, it is ErgoptiPlus.app, the launcher that
+--- starts the runtime from inside its own bundle: a first install's grant to
+--- the "Hammerspoon" entry alone left the driver untrusted, and it started
+--- once ErgoptiPlus.app was added and turned on (field report 2026-11-23).
+--- @return string|nil path Nil when the running process reports none.
+--- @return string|nil detail Exact reason when path is nil.
+function M.grant_app_path()
+	local path, err = M.bundle_path()
+	if path == nil then return nil, err end
+	return require("clipboard.adapters.accessibility_copies").app_path(path)
+end
+
+--- Returns the Finder icon of an app, for the steps that name it: the icon
+--- shown is the one of the app the user adds with +.
+--- @param path string Absolute .app path.
+--- @return userdata|nil image Nil when macOS has no icon for it.
+function M.app_icon(path)
+	assert(type(path) == "string" and path ~= "", "accessibility_permission: app_icon needs a path")
+	return hs.image.iconForFile(path)
 end
 
 --- Finds the other registered copies of this app whose signature differs: the
@@ -214,7 +237,7 @@ function M.other_copies(on_done)
 	if bundle_id == nil then return false, id_err end
 	local path, path_err = M.bundle_path()
 	if path == nil then return false, path_err end
-	if require("adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
+	if require("clipboard.adapters.accessibility_copies").find(bundle_id, path, on_done) ~= true then
 		return false, "the copy probe could not be started"
 	end
 	return true

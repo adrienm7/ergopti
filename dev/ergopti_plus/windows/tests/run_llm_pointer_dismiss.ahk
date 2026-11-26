@@ -69,7 +69,7 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
 	return true
 }
 
-#Include ../modules/keymap/llm_bridge.ahk
+#Include ../ai/engine/bridge.ahk
 
 ; The prefix watcher owns the modifier predicate; this isolated suite keeps its
 ; production membership (Shift, Ctrl, Alt, Win in every sided form).

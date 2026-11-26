@@ -87,20 +87,20 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../core/ui/engine/native_dialogs.ahk
 #Include ../../core/ui/engine/style.ahk
 #Include ../../_generated/app_dirs.ahk
-#Include ../../infra/app_folders.ahk
-#Include ../../infra/legacy_folder_migration.ahk
+#Include ../../apps/engine/folders.ahk
+#Include ../../settings/engine/migration/legacy_folder_migration.ahk
 #Include ../../core/logger/engine/wall_clock.ahk
 #Include ../../core/logger/engine/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 
 #Include ../../core/ui/engine/window_utils.ahk
 #Include ../../core/text/engine/utils.ahk
-#Include ../../infra/hotstrings/hotstring_engine.ahk
-#Include ../../infra/hotstrings/hotstring_engine_main.ahk
+#Include ../../hotstrings/engine/matcher/engine.ahk
+#Include ../../hotstrings/engine/matcher/engine_main.ahk
 ; Project the same shipped terminator catalogue that production boot loads.
 ; The bare engine's parser defaults omit the configurable magic terminator.
 #Include ../../_generated/terminators.ahk
-#Include ../../infra/hotstrings/hotstrings_catalogue.ahk
+#Include ../../hotstrings/engine/catalogue/catalogue.ahk
 global HSE_Terminators := Terminators()
 global HSE_WORD_TERMINATORS := HSE_TerminatorDefaultWordDelimiters()
 global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
@@ -118,7 +118,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/lifecycle/engine/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
-#Include ../../infra/manifest_reader.ahk
+#Include ../../menu/engine/manifest_reader.ahk
 #Include ../../modules/keymap/layout/layout_ergopti.ahk
 #Include ../../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../../_shared/settings/data/features/number_row_policy.ahk
@@ -131,7 +131,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../../core/crypto/crypto.ahk
 #Include ../../modules/keymap/keylayout/layout_registry.ahk
-#Include ../../infra/magic_editor.ahk
+#Include ../../infra/star_slot.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()
@@ -148,6 +148,11 @@ InstallHotstringHooks()
 
 ; Magic sentinel used by the engine (mirrors ErgoptiPlus.ahk).
 global E2E_MAGIC_KEY := Chr(0x2605)  ; ★ U+2605
+
+; Upper bound for a fired dispatch's deferred suppression release, in multiples
+; of HSE_SUPPRESS_RELEASE_DELAY_MS: generous for a loaded CI runner, yet a
+; release that never comes still fails the scenario instead of hanging it.
+global E2E_SUPPRESSION_RELEASE_FACTOR := 20
 
 
 ; Load the canonical corpus; missing/empty data must fail instead of skipping.
@@ -176,8 +181,10 @@ E2E_RunScenarioPure(Scenario, NativeControl := unset) {
     SavedConsumed := HSE_CONSUMED_DELIMITERS
     HSE_RegistryClear()
     HSE_HardReset()
-    HSE_FeedReset(true)
+    ; Release before the reset: HSE_FeedReset ignores a suppressed feed, so a
+    ; level still held here would leave the buffer start an unknown boundary.
     HSE_Suppress(false)
+    HSE_FeedReset(true)
     ResetHotstringRecorders()
     SimulateRegularApp()
     Trigger := Scenario["trigger"]
@@ -225,6 +232,8 @@ E2E_RunScenarioPure(Scenario, NativeControl := unset) {
             ReplayedEnd := EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)
             LogicalBackspaces += EmittedBackspaces - (ReplayedEnd ? _TextCodepointLength(EndChar) : 0)
         }
+        if DispatchCount > 0
+            _E2E_AwaitSuppressionRelease()
         return Map("matched", DispatchCount > 0, "document", Document,
             "backspace_count", LogicalBackspaces, "dispatch_count", DispatchCount)
     } finally {
@@ -233,6 +242,18 @@ E2E_RunScenarioPure(Scenario, NativeControl := unset) {
         HSE_CONSUMED_DELIMITERS := SavedConsumed
         HSE_RegistryClear()
         HSE_HardReset()
+    }
+}
+
+; A fired dispatch releases its suppression on a timer, which only runs once
+; this thread yields. Left pending, it made the next scenario's HSE_FeedReset a
+; no-op, so a word trigger flush at the buffer start never fired there.
+_E2E_AwaitSuppressionRelease() {
+    global HSE_Suppressed, HSE_SUPPRESS_RELEASE_DELAY_MS, E2E_SUPPRESSION_RELEASE_FACTOR
+    Deadline := A_TickCount + HSE_SUPPRESS_RELEASE_DELAY_MS * E2E_SUPPRESSION_RELEASE_FACTOR
+    while HSE_Suppressed > 0 {
+        AssertTrue(A_TickCount < Deadline, "a fired dispatch must release its deferred suppression")
+        Sleep(HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
 }
 
@@ -360,6 +381,22 @@ _E2E_AssertScenario(Sc, Result) {
 for _Sc in E2E_SCENARIOS {
     Test("e2e[pure] " . _Sc["id"], _E2E_RunPureTest.Bind(_Sc))
 }
+
+; A word trigger flush at the buffer start must fire right after a scenario
+; that fired, whatever order the corpus lists them in: the earlier fire's
+; deferred suppression once swallowed the next scenario's feed reset.
+_E2E_WordStartAfterFire(Runner := _E2E_RunPureTest) {
+    Fired := Map("trigger", "btw", "buffer", "btw", "replacement", "by the way",
+        "terminator", " ", "auto_expand", true,
+        "expected", Map("matched", true, "replacement", "by the way", "backspace_count", 3))
+    WordStart := Map("trigger", "coeur", "buffer", "coeur", "replacement", "c" . Chr(0x153) . "ur",
+        "terminator", " ", "auto_expand", true, "is_word", true,
+        "expected", Map("matched", true, "replacement", "c" . Chr(0x153) . "ur", "backspace_count", 5))
+    _E2E_AssertScenario(Fired, Runner.Call(Fired))
+    _E2E_AssertScenario(WordStart, Runner.Call(WordStart))
+}
+Test("e2e[pure] a word trigger at the buffer start fires right after a fired scenario",
+    _E2E_WordStartAfterFire)
 
 
 ; Supplementary characters must exercise the same actual sender replay.

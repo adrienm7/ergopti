@@ -1,0 +1,35 @@
+# JIS keyboard fixture (tools/test/test-layout-jis-abnt.cjs): a layout for a
+# Japanese 106/109-key keyboard. Yen (IntlYen) and Ro (IntlRo) type characters,
+# Muhenkan (NonConvert) types one too, and the input-method keys Henkan and
+# Katakana/Hiragana type nothing: on Windows they keep their own virtual keys.
+format = "ergopti-layout"
+version = 1
+
+[layout]
+id = "jis_fixture"
+name = "JIS Fixture"
+
+[physical]
+base = "iso"
+keyboard = "jis"
+
+[[layers]]
+id = "base"
+required = []
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "q" }, KeyA = { text = "a" }, Digit1 = { text = "1" }, Comma = { text = "," }, IntlYen = { text = "¥" }, IntlRo = { text = "\\" }, NonConvert = { text = "_" } }
+
+[[layers]]
+id = "shift"
+required = ["shift"]
+optional = ["caps_lock"]
+keys = { KeyQ = { text = "Q" }, KeyA = { text = "A" }, Digit1 = { text = "!" }, Comma = { text = "<" }, IntlYen = { text = "|" }, IntlRo = { text = "_" } }
+
+[exports.windows]
+locale = "ja-JP"
+layout_id = "00000411"
+dll_name = "kbdjisfx"
+
+[exports.linux]
+name = "jis_fixture"
+description = "JIS Fixture"

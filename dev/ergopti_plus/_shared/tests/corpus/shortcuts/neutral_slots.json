@@ -250,6 +250,12 @@
 		},
 		{
 			"driver": "windows",
+			"modifiers": ["ctrl"],
+			"key": "o",
+			"slot": "primary_o"
+		},
+		{
+			"driver": "windows",
 			"modifiers": ["ctrl", "shift"],
 			"key": "v",
 			"slot": "primary_shift_v"
@@ -351,6 +357,12 @@
 			"slot": "meta_space"
 		},
 		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "star",
+			"slot": "meta_star"
+		},
+		{
 			"driver": "macos",
 			"modifiers": ["ctrl"],
 			"key": "a",
@@ -391,6 +403,12 @@
 			"modifiers": ["ctrl"],
 			"key": "m",
 			"slot": "secondary_m"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "b",
+			"slot": "secondary_b"
 		},
 		{
 			"driver": "macos",
@@ -466,15 +484,27 @@
 		},
 		{
 			"driver": "macos",
-			"modifiers": ["cmd"],
-			"key": "star",
-			"slot": "primary_star"
+			"modifiers": ["ctrl"],
+			"key": "space",
+			"slot": "secondary_space"
 		},
 		{
 			"driver": "macos",
 			"modifiers": ["ctrl"],
-			"key": "space",
-			"slot": "secondary_space"
+			"key": "star",
+			"slot": "secondary_star"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["ctrl"],
+			"key": "b",
+			"slot": "primary_b"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["ctrl"],
+			"key": "o",
+			"slot": "primary_o"
 		},
 		{
 			"driver": "linux",
@@ -487,6 +517,12 @@
 			"modifiers": ["super"],
 			"key": "space",
 			"slot": "meta_space"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["super"],
+			"key": "star",
+			"slot": "meta_star"
 		}
 	],
 	"pending_keys": ["star"],

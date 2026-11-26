@@ -57,7 +57,10 @@ def owned_children():
 
 def check_case(root, interpreter, name, state):
     wrapper, receipt = root / "wrapper", root / "receipt"
-    wrapper.write_text('#!/bin/sh\nprintf "%s" "$1" > "$2"\n')
+    # The receipt appears only once complete: the shell creates a redirect
+    # target before printf writes it, so a direct "> $2" let the poll below
+    # read an empty receipt and report changed argument bytes.
+    wrapper.write_text('#!/bin/sh\nprintf "%s" "$1" > "$2.partial" && mv "$2.partial" "$2"\n')
     wrapper.chmod(0o700)
     ready_read, ready_write = os.pipe()
     release_read, release_write = os.pipe()

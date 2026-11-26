@@ -5,7 +5,9 @@
 ; DESCRIPTION:
 ; The AutoHotkey engine (modules/keymap/keylayout/source_emulation.ahk) replays
 ; the shared typing vectors the web and Lua engines replay
-; (_shared/tests/corpus/layouts/source/emulation_vectors.json), refuses the
+; (_shared/tests/corpus/layouts/source/emulation_vectors.json, and for a
+; layout's own repeat and magic keys context_vectors.json and
+; _shared/tests/corpus/layouts/magic_vectors.json), refuses the
 ; malformed tables they refuse, and keylayout_emulation.ahk performs it for the
 ; composed layout: the composer-folder fallback of the boot, the hotkeys it
 ; registers before the layout's own, and what each action sends.
@@ -76,7 +78,7 @@ _LSE_Replay(Table, Steps) {
 			Held := Map()
 			for Id in Step["held"]
 				Held[Id] := true
-			Got := SourceEmulation_Press(Session, Step["press"], Held, Step["at"])
+			Got := SourceEmulation_Press(Session, Step["press"], Held, Step["at"], Step.Get("before", 0))
 		} else if Step.Has("release") {
 			Got := SourceEmulation_Release(Session, Step["release"], Step["at"])
 		} else if Step.Has("tick") {
@@ -146,6 +148,99 @@ _LSE_ReplayCanFailCase() {
 	Assert(false, "the corpus holds a vector with an action")
 }
 
+Test("layout source emulation: Neo 2's Mod3 and Mod4 on Caps Lock and AltGr and their dead keys type as on the web (layout-levels-emulation)",
+	_LSE_NeoLevelsCase)
+
+_LSE_NeoLevelsCase() {
+	Vectors := JsonParse(FileRead(_LSE_CorpusDir() . "neo2_vectors.json", "UTF-8"))
+	Tables := JsonParse(FileRead(_LSE_CorpusDir() . Vectors["table"], "UTF-8"))
+	Replayed := 0, Failures := []
+	for Platform in Vectors["platforms"] {
+		Model := SourceEmulation_Compile(Tables[Platform])
+		AssertTrue(SourceEmulation_HoldsModifierKey(Model, "AltRight"), Platform . ": AltGr holds Mod4")
+		AssertEqual(Platform != "macos", SourceEmulation_HoldsModifierKey(Model, "CapsLock"),
+			Platform . ": Caps Lock holds Mod3 where the hook sees it held")
+		for Vector in Vectors["cases"] {
+			if Vector.Has("platforms") {
+				Listed := false
+				for Name in Vector["platforms"]
+					Listed := Listed || Name == Platform
+				if !Listed
+					continue
+			}
+			Replayed += 1
+			Mismatch := _LSE_Replay(Tables[Platform], Vector["steps"])
+			if Mismatch != ""
+				Failures.Push(Platform . ": " . Vector["name"] . ": " . Mismatch)
+		}
+	}
+	Assert(Replayed >= 3 * 16, "every Neo vector is replayed on the three platforms")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("layout source emulation: a layout's repeat and magic keys type from the text typed before (layout-context-keys-emulation)",
+	_LSE_ContextKeysCase)
+
+_LSE_ContextKeysCase() {
+	Vectors := JsonParse(FileRead(_LSE_CorpusDir() . "context_vectors.json", "UTF-8"))
+	Tables := JsonParse(FileRead(_LSE_CorpusDir() . Vectors["table"], "UTF-8"))
+	Replayed := 0, Failures := []
+	for Platform in Vectors["platforms"] {
+		for Vector in Vectors["cases"] {
+			Replayed += 1
+			Mismatch := _LSE_Replay(Tables[Platform], Vector["steps"])
+			if Mismatch != ""
+				Failures.Push(Platform . ": " . Vector["name"] . ": " . Mismatch)
+		}
+		Session := SourceEmulation_NewSession(SourceEmulation_Compile(Tables[Platform]))
+		Refused := false
+		try SourceEmulation_Press(Session, "Quote", Map(), 0)
+		catch Error as Err
+			Refused := InStr(Err.Message, "needs the text typed before it") > 0
+		AssertTrue(Refused, Platform . ": a magic key without the text before is refused")
+	}
+	Assert(Replayed >= 3 * 7, "every context vector is replayed on the three platforms")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("layout source emulation: a repeat or magic key types what the shared magic vectors say (layout-context-keys-emulation)",
+	_LSE_MagicVectorsCase)
+
+_LSE_MagicVectorsCase() {
+	Vectors := JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\magic_vectors.json", "UTF-8"))
+	Failures := []
+	for Vector in Vectors["vectors"] {
+		Action := Vector["action"]
+		Mapping := Action.Has("magic") ? Map("magic", Action["magic"]) : Map("repeat", Action["repeat"])
+		Got := SourceEmulation_ContextText(Vectors["magic"], Mapping, Vector["before"])
+		if Got !== Vector["types"]
+			Failures.Push("after [" . Vector["before"] . "]: [" . Got . "] != [" . Vector["types"] . "]")
+	}
+	Assert(Vectors["vectors"].Length >= 20, "the corpus holds at least 20 vectors")
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
+Test("layout source emulation: the Ergopti layouts leave Caps Lock and AltGr to Windows and emulate no dead key (ergopti-emulation-unchanged)",
+	_LSE_ErgoptiUnchangedCase)
+
+_LSE_ErgoptiUnchangedCase() {
+	Pinned := JsonParse(FileRead(_LSE_CorpusDir() . "ergopti_emulation.json", "UTF-8"))
+	Checked := 0
+	for File, Tables in Pinned
+		for Platform, Table in Tables {
+			Where := File . " on " . Platform
+			AssertFalse(Table.Has("dead_keys"), Where . ": no dead key is emulated")
+			Model := SourceEmulation_Compile(Table)
+			for Key in ["CapsLock", "AltRight"] {
+				AssertFalse(SourceEmulation_HoldsModifierKey(Model, Key), Where . ": " . Key . " keeps its role")
+				Got := SourceEmulation_Press(SourceEmulation_NewSession(Model), Key, Map(), 0)
+				AssertTrue(!Got["consumed"] && !Got["actions"].Length, Where . ": " . Key . " goes to Windows")
+			}
+			Checked += 1
+		}
+	Assert(Checked >= 5 * 3, "every Ergopti table is checked on the three platforms")
+}
+
 Test("layout source emulation: a malformed table is refused when compiled, never on a key (layout-source-emulation)",
 	_LSE_RefusalsCase)
 
@@ -157,7 +252,7 @@ _LSE_RefusalsCase() {
 		["hold layer", (T) => T["tap_holds"][1]["hold_layer"] := "missing", "unknown layer 'missing'"],
 		["two holds", (T) => T["tap_holds"][1]["hold_modifier"] := "shift", "needs one hold"],
 		["threshold", (T) => T["tap_holds"][1]["threshold_ms"] := 0, "malformed tap-hold"],
-		["mapping", (T) => T["layers"][1]["keys"]["KeyX"] := Map("dead_key", "acute"), "malformed mapping at layers.base.KeyX"],
+		["mapping", (T) => T["layers"][1]["keys"]["KeyX"] := Map("dead_key", "undeclared"), "malformed mapping at layers.base.KeyX"],
 		["shared key", (T) => T["modifiers"][2]["keys"].Push("IntlBackslash"), "share the key"],
 		["two roles", (T) => T["tap_holds"][1]["key"] := "IntlBackslash", "two roles"]
 	]
@@ -219,9 +314,72 @@ _LSE_RegistrationCase() {
 		; An emulated layer takes every alphanumeric key; the modifiers stay the OS's.
 		AssertTrue(Names.Has("*SC015 I0"), "KeyY, unmapped, is taken while an emulated layer is selected")
 		AssertFalse(Names.Has("*SC02A I0"), "Shift is never taken")
+		; The JIS character keys are taken, its input-method keys stay the IME's.
+		AssertTrue(Names.Has("*SC073 I0"), "IntlRo is taken while an emulated layer is selected")
+		AssertTrue(Names.Has("*SC07D I0"), "IntlYen is taken while an emulated layer is selected")
+		for Sc in ["SC079", "SC07B", "SC070"]
+			AssertFalse(Names.Has("*" . Sc . " I0"), Sc . " (an input-method key) is never taken")
 		AssertFalse(Names.Has("install"), "the composed layout is never downloaded")
 		AssertTrue(KLE_SourceSession is Map, "the session is loaded")
 	} finally KeylayoutEmulation_SourceUnload()
+}
+
+Test("layout source emulation: Caps Lock and AltGr holding Neo's Mod3 and Mod4 are taken as plain keys (layout-levels-emulation)",
+	() => _KLT_WithEmulation(_LSE_NeoModifierKeysCase))
+
+_LSE_NeoModifierKeysCase() {
+	Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
+	Neo := JsonParse(FileRead(_LSE_CorpusDir() . "neo2_emulation.json", "UTF-8"))["windows"]
+	Callbacks := Map()
+	KeylayoutEmulation_SourceUnload()
+	try {
+		KeylayoutEmulation_SourceLoad(SourceEmulation_Compile(Neo), Registry,
+			(Name, Callback, Options) => Callbacks[Name] := Callback, (Criterion := 0) => 0)
+		for Name in ["*SC03A", "*SC03A up", "*SC138", "*SC138 up", "+SC138", "*SC02B", "*SC056"]
+			AssertTrue(Callbacks.Has(Name), Name . " is registered")
+		AssertFalse(Callbacks.Has("*SC02A"), "Shift is never taken")
+		AssertFalse(Callbacks.Has("*SC01D"), "the LCtrl an AltGr layout adds stays Windows'")
+		; The suppressed Caps Lock press holds Mod3 and never reaches Windows as the lock.
+		Callbacks["*SC03A"].Call()
+		AssertTrue(SourceEmulation_Active(KLE_SourceSession, "mod3"), "Caps Lock holds Mod3")
+		Callbacks["*SC03A up"].Call()
+		AssertFalse(SourceEmulation_Active(KLE_SourceSession, "mod3"), "its release returns to the base level")
+		; AltGr holds Mod4; the LCtrl the AltGr layout adds to it is no Control.
+		Callbacks["*SC138"].Call()
+		AssertTrue(SourceEmulation_Active(KLE_SourceSession, "mod4"), "AltGr holds Mod4")
+		Callbacks["*SC138"].Call()
+		AssertTrue(SourceEmulation_Active(KLE_SourceSession, "mod4"), "its auto-repeat keeps Mod4 held")
+		Physical := (Key) => (Key == "LControl" || Key == "RAlt")
+		Held := KeylayoutEmulation_SourceHeld(Physical, () => false, () => false)
+		AssertFalse(Held.Has("control"), "AltGr's own LCtrl is not the user's Control")
+		Held := KeylayoutEmulation_SourceHeld(Physical, () => false, () => true)
+		AssertTrue(Held.Has("control"), "a Control the user holds with it is kept")
+		Callbacks["*SC138 up"].Call()
+		AssertFalse(SourceEmulation_Active(KLE_SourceSession, "mod4"), "its release ends Mod4")
+		Held := KeylayoutEmulation_SourceHeld(Physical, () => false, () => false)
+		AssertTrue(Held.Has("control"), "without Mod4 on AltGr, a held LCtrl is a Control as before")
+	} finally KeylayoutEmulation_SourceUnload()
+}
+
+Test("layout source emulation: the Ergopti layouts never take Caps Lock or AltGr (ergopti-emulation-unchanged)",
+	() => _KLT_WithEmulation(_LSE_ErgoptiModifierKeysCase))
+
+_LSE_ErgoptiModifierKeysCase() {
+	Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
+	Pinned := JsonParse(FileRead(_LSE_CorpusDir() . "ergopti_emulation.json", "UTF-8"))
+	for File, Tables in Pinned {
+		Names := Map()
+		KeylayoutEmulation_SourceUnload()
+		try {
+			Model := SourceEmulation_Compile(Tables["windows"])
+			AssertFalse(_KLE_SourceHoldsModifierKey(Model, "CapsLock") || _KLE_SourceHoldsModifierKey(Model, "AltRight"),
+				File . ": neither key holds a modifier")
+			KeylayoutEmulation_SourceLoad(Model, Registry, (Name, Callback, Options) => Names[Name] := true,
+				(Criterion := 0) => 0)
+			for Name in ["*SC03A", "*SC138"]
+				AssertFalse(Names.Has(Name), File . ": " . Name . " keeps its own role")
+		} finally KeylayoutEmulation_SourceUnload()
+	}
 }
 
 Test("layout source emulation: the boot reads the source stored in the composer folder (layout-source-emulation)",

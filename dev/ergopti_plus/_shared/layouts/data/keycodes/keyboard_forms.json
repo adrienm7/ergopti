@@ -1,0 +1,43 @@
+{
+	"_description": "The JIS and ABNT keyboards, drawn from the ISO board of physical_keys.json: each form names the ISO keys it lacks and gives the geometry of the keys it moves or adds, the other keys keep their ISO place. Read by the tooling and the web pages only (the layout editor's board, the layout analysis keyboards, the generators); no driver parses it, so the registry every driver loads at boot does not grow by a jis and an abnt entry per key. Key positions follow the W3C UI Events KeyboardEvent code values (https://www.w3.org/TR/uievents-code/, §2.1.6 Brazilian « 104 » and §2.1.7 Japanese « 106 » keyboard layouts, §3.1 writing system keys): IntlYen right of Equal and IntlRo right of Slash on JIS, IntlRo right of Slash and NumpadComma (labelled « . », NumpadDecimal then types « , ») under a shortened NumpadAdd on the Brazilian ABNT 2, NonConvert, Convert and KanaMode around a shorter space bar on JIS. Windows scan codes 0x7D, 0x73, 0x7B, 0x79, 0x70 and 0x7E come from Microsoft's Keyboard Scan Code Specification (its Japanese and Brazilian keys) and are the ahk column of physical_keys.json. tools/test/test-physical-keys-registry.cjs checks every form as it checks ANSI and ISO: no overlap, a gap-free main block 15 units wide.",
+	"_fields": {
+		"base": "The physical_keys.json form the keyboard starts from.",
+		"absent": "Keys of the base form this keyboard does not have.",
+		"keys": "Code -> geometry ({row, col, width} and optional height, bottom_col, bottom_width, as in physical_keys.json) of every key the keyboard moves, resizes or adds."
+	},
+	"schema_version": 1,
+	"forms": {
+		"jis": {
+			"base": "iso",
+			"absent": ["IntlBackslash"],
+			"keys": {
+				"IntlYen": { "row": 1, "col": 13, "width": 1 },
+				"Backspace": { "row": 1, "col": 14, "width": 1 },
+				"ShiftLeft": { "row": 4, "col": 0, "width": 2.25 },
+				"IntlRo": { "row": 4, "col": 12.25, "width": 1 },
+				"ShiftRight": { "row": 4, "col": 13.25, "width": 1.75 },
+				"ControlLeft": { "row": 5, "col": 0, "width": 1.25 },
+				"MetaLeft": { "row": 5, "col": 1.25, "width": 1 },
+				"AltLeft": { "row": 5, "col": 2.25, "width": 1.25 },
+				"NonConvert": { "row": 5, "col": 3.5, "width": 1 },
+				"Space": { "row": 5, "col": 4.5, "width": 4.5 },
+				"Convert": { "row": 5, "col": 9, "width": 1 },
+				"KanaMode": { "row": 5, "col": 10, "width": 1 },
+				"AltRight": { "row": 5, "col": 11, "width": 1 },
+				"MetaRight": { "row": 5, "col": 12, "width": 1 },
+				"ContextMenu": { "row": 5, "col": 13, "width": 1 },
+				"ControlRight": { "row": 5, "col": 14, "width": 1 }
+			}
+		},
+		"abnt": {
+			"base": "iso",
+			"absent": [],
+			"keys": {
+				"IntlRo": { "row": 4, "col": 12.25, "width": 1 },
+				"ShiftRight": { "row": 4, "col": 13.25, "width": 1.75 },
+				"NumpadAdd": { "row": 2, "col": 21.5, "width": 1 },
+				"NumpadComma": { "row": 3, "col": 21.5, "width": 1 }
+			}
+		}
+	}
+}

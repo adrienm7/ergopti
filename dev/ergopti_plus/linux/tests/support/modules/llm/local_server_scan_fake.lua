@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Synchronous Local Server Port Scan Fake
 --- DESCRIPTION:
---- Replaces modules/llm/local_server_ports.lua before local_servers loads, so
+--- Replaces ai/engine/local_servers/ports.lua before local_servers loads, so
 --- a rescan dispatches its probes before it returns. By default every
 --- catalogue server runs at its catalogue address; a test passes per-server
 --- overrides to model a stopped server or another port.
@@ -37,7 +37,7 @@ function M.install(overrides)
 		end)
 		return operation
 	end
-	package.loaded["modules.llm.local_server_ports"] = ports
+	package.loaded["ai.engine.local_servers.ports"] = ports
 	return scans
 end
 

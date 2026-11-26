@@ -15,7 +15,7 @@ The ErgoptiPlus daemon runs this module to install what it converted, in Lua
 (``layouts/xkb_converter.lua``), from a registry ``.keylayout``:
 
     user_layout_installer.py install --layout-id ergol --display-name "Ergo-L" \
-        --source-dir ~/.config/ergopti_plus/layouts/ergol
+        --source-dir ~/.config/ergopti/layouts/ergol
     user_layout_installer.py uninstall --layout-id ergol
     user_layout_installer.py activate --layout-id ergol
 
@@ -64,6 +64,7 @@ from desktop_activation import (  # noqa: E402
     read_desktop_selection,
     running_as_root,
     select_live_slot,
+    session_type,
     wayland_live_desktop,
 )
 from layout_package import (  # noqa: E402
@@ -97,7 +98,7 @@ LAYOUT_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 MANIFEST_NAME = ".ergopti_plus_layouts.json"
 # The Compose input method state the daemon's layout menu reads
-# (linux/ui/menu/compose_input_method_row.lua pins this name).
+# (linux/menu/ui/compose_input_method_row.lua pins this name).
 COMPOSE_STATE_NAME = ".ergopti_plus_compose_input_method"
 MANIFEST_SCHEMA = 1
 RULES_MARKER = "// ErgoptiPlus managed rules: registry layouts"
@@ -514,22 +515,29 @@ def activate(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = Non
     """Makes one installed layout the first input source of the session.
 
     Its live slot (``apply_wayland``) leaves the desktop's list: the two hold
-    the same build, and listing both would show the layout twice."""
+    the same build, and listing both would show the layout twice. A Wayland
+    session with no setting this module can write (Sway, niri, river, ...)
+    is refused with ``session_unsupported``: the layout stays installed, and
+    the compositor's own configuration file selects it."""
     refuse_xorg_session(environ)
     installed = read_manifest(root)
     if layout_id not in installed:
         raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
-    applied = activate_layout([LayoutSpec(layout_id)])
+    applied = activate_layout([LayoutSpec(layout_id)], environ)
     sibling = live_slots(layout_id)[1]
     if applied and sibling in installed:
         applied = (
             deactivate_layouts(lambda spec: spec.layout == sibling) is not CleanupStatus.FAILED
         )
-    return {
+    report = {
         "ok": bool(applied),
         "verified": None,
         "detail": "activated" if applied else "the desktop did not accept the layout",
     }
+    if not applied and session_type(environ) == "wayland" and wayland_live_desktop(environ) is None:
+        report["code"] = WAYLAND_SESSION_UNSUPPORTED
+        report["detail"] = "this compositor selects its layout only in its own configuration file"
+    return report
 
 
 def apply_x11(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
@@ -556,7 +564,7 @@ def apply_wayland(
     home: Path,
     environ: Optional[Dict[str, str]] = None,
 ) -> dict:
-    """Replaces a layout live on a GNOME or KDE Wayland session.
+    """Replaces a layout live on a GNOME, KDE or Hyprland Wayland session.
 
     The converted files are installed under the live slot the desktop does not
     use (``live_slots``), the desktop setting moves to it, and the report is a

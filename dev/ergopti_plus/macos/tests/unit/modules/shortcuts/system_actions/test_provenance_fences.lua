@@ -35,13 +35,13 @@ end
 --- Publishes the sentinel Karabiner taps on entering the navigation layer, as
 --- the keymap tap that claims it does.
 local function enter_layer()
-	require("modules.keymap.control_sentinels").claim_key(
+	require("hotstrings.engine.expander.control_sentinels").claim_key(
 		require("platform.input.keycodes").F20_LAYER_NAV_ENTERED, true, {})
 end
 
 --- Publishes the sentinel Karabiner taps on leaving the navigation layer.
 local function exit_layer()
-	require("modules.keymap.control_sentinels").claim_key(
+	require("hotstrings.engine.expander.control_sentinels").claim_key(
 		require("platform.input.keycodes").F19_LAYER_NAV_EXITED, true, {})
 end
 
@@ -67,27 +67,6 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 				"an Ergopti-owned @ must not be reinterpreted as a physical screenshot command")
 			helpers.assert_eq(#fixture.hs.timer.__timers, timers_before,
 				"the ignored owned event must not schedule a screenshot action")
-		end)
-	end)
-
-	helpers.it("an owned Cmd+star cannot recurse into Cmd+S (HS-H-01)", function()
-		with_fixture(function()
-			local fixture = load_h01_system()
-			local trigger_count = 0
-			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
-			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
-			local event = owned_key_down(fixture, "*", 28, "*", { cmd = true, shift = true })
-			local pending_before = fixture.synthetic.stats().pending
-			local timers_before = #fixture.hs.timer.__timers
-
-			local consume, returned = tap.fn(event)
-
-			helpers.assert_true(not consume)
-			helpers.assert_nil(returned)
-			helpers.assert_eq(trigger_count, 0)
-			helpers.assert_eq(fixture.synthetic.stats().pending, pending_before,
-				"the owned chord must not queue a second synthetic shortcut")
-			helpers.assert_eq(#fixture.hs.timer.__timers, timers_before)
 		end)
 	end)
 
@@ -400,59 +379,6 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		end)
 	end)
 
-	helpers.it("Cmd+star returns older output before scheduling its replacement and telemetry (HS-H-01)", function()
-		with_fixture(function()
-			local fixture = load_h01_system()
-			local trigger_count = 0
-			fixture.system.bind_cmd_star(function() trigger_count = trigger_count + 1 end)
-			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
-			fixture.synthetic.emit_key_stroke({}, "a", 0)
-
-			local consume, fence_events = tap.fn(
-				physical_key_down(fixture, 28, "*", { cmd = true, shift = true }))
-			helpers.assert_true(consume)
-			helpers.assert_true(type(fence_events) == "table" and #fence_events == 2)
-			helpers.assert_eq(fixture.synthetic.stats().pending, 0,
-				"the older batch is adopted into the callback return, not left in the pump")
-			helpers.assert_eq(trigger_count, 0,
-				"telemetry must not execute on the eventtap or before its ordering fence")
-
-			fire_post_callback_actions(fixture.hs)
-			helpers.assert_eq(trigger_count, 1)
-			helpers.assert_eq(fixture.synthetic.stats().pending, 1,
-				"the Cmd+S replacement is queued only after the older batch was handed off")
-		end)
-	end)
-
-	helpers.it("Cmd+star contains telemetry errors after queueing its replacement (HS-016)", function()
-		with_fixture(function()
-			local failures = {}
-			local logger = helpers.make_logger_stub()
-			logger.callback = function(_, label, fn, ...)
-				local results = table.pack(xpcall(fn, debug.traceback, ...))
-				if not results[1] then
-					failures[#failures + 1] = tostring(label) .. ": " .. tostring(results[2])
-				end
-				return table.unpack(results, 1, results.n)
-			end
-			local fixture = load_h01_system({logger = logger})
-			fixture.system.bind_cmd_star(function() error("telemetry exploded") end)
-			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
-
-			local consumed = tap.fn(
-				physical_key_down(fixture, 28, "*", {cmd = true, shift = true}))
-			fire_post_callback_actions(fixture.hs)
-
-			helpers.assert_true(consumed)
-			helpers.assert_eq(fixture.synthetic.stats().pending, 1,
-				"the user-visible Cmd+S replacement must survive telemetry failure")
-			helpers.assert_eq(#failures, 1)
-			helpers.assert_contains(failures[1], "Cmd-star telemetry")
-			helpers.assert_contains(failures[1], "telemetry exploded")
-			helpers.assert_contains(failures[1], "stack traceback")
-		end)
-	end)
-
 	helpers.it("the real tagged pump trigger cannot auto-disable keep-awake (HS-H-01)", function()
 		with_fixture(function()
 			local posted_trigger = nil
@@ -526,13 +452,6 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 						fixture.system.bind_tap_keys(nil, capture_on_keycode_10(fixture.system))
 					end,
 					keycode = 10, characters = "@", flags = {},
-				},
-				{
-					name = "cmd-star",
-					bind = function(fixture, effects)
-						fixture.system.bind_cmd_star(function() effects.count = effects.count + 1 end)
-					end,
-					keycode = 28, characters = "*", flags = { cmd = true, shift = true },
 				},
 				{
 					name = "wrap",

@@ -223,6 +223,17 @@ helpers.describe("updater restart: starting the installed version", function()
 		helpers.assert_true(observed, "a reused pid must not delay the new daemon")
 	end)
 
+	helpers.it("(webview-own-stop) names a requested restart as this process's own stop, never a refused one", function()
+		local Fresh = helpers.fresh_module("modules.updater.restarter")
+		helpers.assert_eq(Fresh.own_stop_requested(), false, "no stop before a restart is asked")
+		helpers.assert_nil(Fresh.restart({ wrapper = "/x", args = {}, cgroup = UNIT_CGROUP, run = function() return false end }))
+		helpers.assert_eq(Fresh.own_stop_requested(), false, "a refused restart stops nothing")
+		helpers.assert_eq(Fresh.restart({ wrapper = "/x", args = {}, cgroup = UNIT_CGROUP, run = function() return true end }), "systemd")
+		helpers.assert_eq(Fresh.own_stop_requested(), true, "the stop systemd now carries out is this process's own")
+		helpers.assert_true(Fresh.cancel("systemd", { run = function() return true end }))
+		helpers.assert_eq(Fresh.own_stop_requested(), true, "a Quit that replaced the restart still stops this process")
+	end)
+
 	helpers.it("asks systemd to restart the unit that runs the daemon", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray" },
@@ -324,7 +335,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			helpers.assert_eq(calls, 0, "unreadable cgroup must not dispatch a guessed relay")
 			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {},
-				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				installation = function() return { kind = "standalone", wrapper = "/x", launcher = "/x" } end,
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(outer)
 			helpers.assert_eq(calls, 0, "the daemon must also refuse an unknown cgroup")
@@ -342,7 +353,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			helpers.assert_nil(how)
 			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {}, cgroup = cgroup,
-				installation = function() return { kind = "standalone", wrapper = "/x" } end,
+				installation = function() return { kind = "standalone", wrapper = "/x", launcher = "/x" } end,
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(outer)
 			helpers.assert_eq(calls, 0)
@@ -425,7 +436,7 @@ end
 		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return source_run == true end
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
 		local title = require("core.i18n.engine.i18n").get("menu.about.title")
@@ -615,6 +626,34 @@ helpers.describe("Main restart pause wiring", function()
 			helpers.assert_true(shutdowns)
 		end
 	end)
+
+	-- UPD-09: the hook told « installed, restarting » and then ignored what the
+	-- restart answered, so a refused restart left that notice up.
+	for _, armed in ipairs({ true, false }) do
+		helpers.it("upd-09: the completion hook notifies only after the restart answered (armed=" .. tostring(armed) .. ")", function()
+			local source = main_source()
+			local marker = "on_update_finished = function(installed, tag, stage)"
+			local first = assert(source:find(marker, 1, true))
+			local last = assert(source:find("\n\t\t\tend,\n", first, true))
+			local text = "return function(installed, tag, stage)" .. source:sub(first + #marker, last + 6)
+			local order = {}
+			local environment = setmetatable({
+				ok_i18n = true, i18n_mod = { get = function(key) return key .. " {1}" end },
+				notifier = { send = function(body, opts) order[#order + 1] = { body = body, level = opts.level } end },
+				script_actions = { is_paused = function() return false end },
+				restart_on_installed_release = function() order[#order + 1] = "restart"; return armed end,
+			}, { __index = _G })
+			local chunk
+			if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+			else chunk = assert(load(text, "update completion hook", "t", environment)) end
+			local hook = chunk()
+			helpers.assert_eq(hook(true, "v9.9.9", "install"), armed, "the hook answers whether the restart was armed")
+			helpers.assert_eq(order[1], "restart", "the restart is tried before anything is told")
+			helpers.assert_eq(order[2].body, (armed and "updater.installed_restarting" or "updater.installed_restart_refused")
+				.. " v9.9.9")
+			helpers.assert_eq(order[2].level, armed and "info" or "warning")
+		end)
+	end
 
 	helpers.it("captures current pause at all three complete-restart callsites", function()
 		local source = main_source()

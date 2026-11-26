@@ -36,16 +36,16 @@ local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
 local Paths  = require("core.fs.engine.paths")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local TextCase = require("core.text.engine.unicode_case")
 local WrapPair = require("keyboard.engine.wrap_pair")
 local WrapSettings = require("modules.shortcuts.wrap_symbol_settings")
 local SendInput = require("platform.input.send_input")
 local TomlCodec = require("core.text.engine.toml_codec")
-local Clipboard = require("adapters.clipboard")
+local Clipboard = require("clipboard.adapters.clipboard")
 local EventLoop = require("core.events.loop")
-local ComboEmitter = require("modules.gestures.combo_emitter")
-local Injector = require("modules.hotstrings.injector")
+local ComboEmitter = require("gestures.engine.combo_emitter")
+local Injector = require("hotstrings.engine.injector")
 local EvdevCodes = require("platform.input.evdev_codes")
 local Monotonic = require("core.logger.engine.monotonic")
 local CapsWordPolicy = require("keyboard.engine.caps_word_auto_off")
@@ -1058,7 +1058,7 @@ function M.init(opts)
 	end_caps_word("shortcuts re-initialised")
 	_caps_word_policy, _caps_word_last_ms = nil, nil
 	_caps_word_session = _caps_word_session + 1
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_persist = opts.persist == true
 
 	local enabled = DEFAULT_ENABLED
@@ -1183,7 +1183,7 @@ local collision_admitted = M.configuration_admitted
 --- @return table|nil frame Original source/runtime guards and detached claims.
 function M.capture_collision_inventory()
 	if not collision_initialized or not _persist or _configuration_owner ~= nil or not wrap_source then return nil end
-	local Routes = require("infra.config_paths")
+	local Routes = require("settings.engine.paths")
 	local route = Routes.config
 	local path, epoch, enabled, wrap = _config_path, collision_generation, _enabled, _wrap_on_type
 	local source = wrap_source
@@ -1192,7 +1192,7 @@ function M.capture_collision_inventory()
 			and _configuration_owner == nil and collision_initialized and _persist and _config_path == path
 			and collision_generation == epoch and _enabled == enabled and _wrap_on_type == wrap
 			and rawequal(wrap_source, source) and wrap_pairs_equal(WRAP_PAIRS, source.pairs)
-			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
+			and rawequal(package.loaded["settings.engine.paths"], Routes) and Routes.config == route
 			and rawequal(package.loaded["core.fs.engine.paths"], Paths) and Paths.shared == collision_shared
 			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
 			and rawequal(package.loaded["core.text.engine.toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode

@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local InputEvent = require("platform.input.event")
-local AbsoluteMotion = require("infra.absolute_motion")
+local AbsoluteMotion = require("gestures.engine.absolute_motion")
 
 helpers.describe("absolute pointer motion tracker", function()
 	helpers.it("ignores the initial report and an unchanged coordinate, reports a change", function()

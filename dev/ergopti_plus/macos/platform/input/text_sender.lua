@@ -15,7 +15,7 @@
 --- 2. Direct mode: the tagged synthetic-input adapter drives character-by-character
 ---    injection — required when clipboard is inaccessible (e.g., password fields).
 --- 3. Clipboard port: the clipboard path delegates to the Clipboard adapter
----    (adapters/clipboard.lua) via save/write/restore instead of touching
+---    (clipboard/adapters/clipboard.lua) via save/write/restore instead of touching
 ---    hs.pasteboard directly — keeps the interaction testable and centralises
 ---    all clipboard I/O in a single adapter.
 --- 4. Callback semantics: the callback is always invoked synchronously after the
@@ -28,8 +28,8 @@ local M = {}
 local hs       = hs
 local Logger   = require("core.logger.engine.logger")
 local Timings  = require("core.timing.engine.timings")
-local Clipboard = require("adapters.clipboard")
-local ClipboardBorrowers = require("infra.clipboard_borrowers")
+local Clipboard = require("clipboard.adapters.clipboard")
+local ClipboardBorrowers = require("clipboard.borrowers")
 local SyntheticInput = require("platform.input.synthetic_input")
 local TimerScheduler = require("core.events.timer_scheduler")
 local CapsWordOutput = require("infra.capsword_output")
@@ -411,7 +411,7 @@ function M.send(text, opts, callback)
 			local write_generation = _paste_generation
 			_paste_mutations = _paste_mutations + 1
 			local ok_write, written = pcall(function()
-				local accepted = Clipboard.write(text, receipt)
+				local accepted = Clipboard.write_transient(text, receipt)
 				if receipt.attempted ~= false then
 					_paste_owned_count = receipt.count_ok == true and receipt.count or nil
 				end

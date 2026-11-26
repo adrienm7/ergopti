@@ -22,6 +22,13 @@
 ---    asset inlining and i18n injection.
 --- 4. Daemon state injection: passes engine, keystats, hotstrings_config, and
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
+--- 5. A refused window is delivered or explained, never a raw error: its
+---    bridge's on_window_unavailable() delivers the content another way, or a
+---    notice names the missing component (lgi, WebKitGTK 4.1), or, with both
+---    present, a notice says the window could not open and where to look.
+--- 6. While the start check recorded a component missing (gui_stack), the
+---    tray rows that open a window without such a delivery are drawn greyed,
+---    naming it (command_unavailable_reason, read by the menu renderer).
 --- ==============================================================================
 
 local M = {}
@@ -132,7 +139,6 @@ local webkit_host = require("core.ui.ui.webkit_host")
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
 local Json = require("core.text.engine.json")
-local ConfigKeys = require("settings.engine.keys")
 
 
 -- =========================================
@@ -160,6 +166,14 @@ local _native_ready = false
 local _native_query_generation = 0
 local _shutting_down = false
 local _shutdown_gate_owner = nil
+
+--- Whether this daemon is stopping on its own: the web view manager's
+--- shutdown has begun, or the daemon asked for its own restart
+--- (modules/updater/restarter.lua).
+--- @return boolean
+local function own_stop_in_progress()
+	return _shutting_down or require("modules.updater.restarter").own_stop_requested()
+end
 
 -- Monotonic identity for each newly-created page context. A late blur or crash
 -- callback from an older WebView must not release ownership acquired by its
@@ -341,33 +355,35 @@ end
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
 local BRIDGE_MODULES = {
-	config_cleanup        = "ui.config_cleanup.bridge",
+	config_cleanup        = "settings.ui.cleanup",
 	action_picker         = "ui.action_picker.bridge",
 	physical_shortcuts     = "ui.physical_shortcuts.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
-	error_dialog          = "ui.error_dialog.bridge",
-	healthcheck           = "ui.healthcheck.bridge",
-	hotstring_editor      = "ui.hotstring_editor.bridge",
+	emulation_picker      = "ui.emulation_picker.bridge",
+	error_dialog          = "diagnostics.ui.error_dialog",
+	field_report          = "diagnostics.ui.field_check.field_report",
+	healthcheck           = "diagnostics.ui.healthcheck.bridge",
+	hotstring_editor      = "hotstrings.ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
 	-- which gave that name a working bridge and no page: resolve_app_dir() looks
 	-- for _shared/ui/<name>/index.html and there is no _shared/ui/hotstrings_config,
 	-- so every caller using it got a window rendering "Error: app not found" while
 	-- the bridge behind it was perfectly healthy. A half-registered name is worse
 	-- than an unregistered one — it looks supported at the only place anyone checks.
-	hotstrings_config_window = "ui.hotstrings_config_window.bridge",
-	layer_editor          = "ui.layer_editor.bridge",
+	hotstrings_config_window = "hotstrings.ui.hotstrings_config_window.bridge",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
-	model_browser         = "ui.model_browser.bridge",
+	model_browser         = "ai.ui.model_browser.bridge",
 	onboarding            = "ui.onboarding.bridge",
 	layout_manager        = "ui.layout_manager.bridge",
 	layout_editor_window  = "ui.layout_manager.editor_bridge",
-	paths_editor          = "ui.paths_editor.bridge",
-	personal_info_editor  = "ui.personal_info_editor.bridge",
+	paths_editor          = "settings.ui.paths_editor.bridge",
+	personal_info_editor  = "hotstrings.ui.personal_info_editor.bridge",
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
-	prompt_editor         = "ui.prompt_editor.bridge",
-	token_prompt          = "core.ui.ui.token_prompt",
+	prompt_editor         = "ai.ui.prompt_editor.bridge",
+	user_workflows        = "ui.user_workflows_bridge",
+	keep_awake_library    = "core.ui.ui.keep_awake_library_bridge",
 	update_check          = "ui.update_check.bridge",
 }
 
@@ -443,6 +459,146 @@ end
 -- Exported for the pure-Lua lifecycle regression harness.
 M._release_app_ownership = _release_app_ownership
 
+--- The start check's own probe, so a refusal at a click names the same
+--- component as the notice at start.
+--- @return string|nil The missing component, nil when lgi and WebKitGTK 4.1 load.
+local function probe_missing_component()
+	return require("core.ui.engine.gui_stack").windows_missing()
+end
+local _missing_component_probe = probe_missing_component
+
+--- Replaces the missing-component probe; tests only (nil restores it).
+--- @param probe function|nil Returns the missing component name, or nil.
+function M._set_missing_component_probe_for_test(probe)
+	_missing_component_probe = probe or probe_missing_component
+end
+
+-- The tray's reason for each component a window can lack.
+local UNAVAILABLE_REASON_KEYS = {
+	[require("core.ui.engine.gui_stack").LGI_COMPONENT] = "platform_reason.windows_need_lgi",
+	[require("core.ui.engine.gui_stack").WEBKIT_COMPONENT] = "platform_reason.windows_need_webkit",
+}
+
+--- The page each tray command opens, by manifest command id. A row whose page
+--- cannot open is drawn greyed with the missing component's reason; the
+--- webview manager tests hold every page here to a registered one.
+M.TRAY_COMMAND_PAGES = {
+	about_changelog = "changelog",
+	config_folder = "paths_editor",
+	edit_nav_layer = "layout_editor_window",
+	ergopti_studio = "layout_editor_window",
+	hotstrings_config_window = "hotstrings_config_window", -- config-key-literal-ok: the page directory, named like its row
+	layout_manager = "layout_manager", -- config-key-literal-ok: the page directory, named like its row
+	llm_model_selector = "model_browser",
+	personal_hotstring_open_editor = "hotstring_editor",
+	physical_shortcuts_editor = "physical_shortcuts",
+	setup_wizard = "onboarding",
+	show_apps = "metrics_apps",
+	show_typing = "metrics_typing",
+}
+
+--- Why a page cannot open now: nil while windows can open, or when its bridge
+--- delivers it without one (on_window_unavailable: the diagnostics, the layout
+--- manager), else the locale key of the reason naming the missing component.
+--- @param app_name string The shared UI app directory name.
+--- @return string|nil reason_key
+function M.page_unavailable_reason(app_name)
+	local missing = require("core.ui.engine.gui_stack").recorded_windows_missing()
+	if missing == nil then return nil end
+	local handler = _load_handler(app_name)
+	if type(handler) == "table" and type(handler.on_window_unavailable) == "function" then return nil end
+	return UNAVAILABLE_REASON_KEYS[missing]
+end
+
+--- The reason a tray command cannot run now: its page's, when it opens one.
+--- @param command_id string A manifest command id.
+--- @return string|nil reason_key
+function M.command_unavailable_reason(command_id)
+	local page = M.TRAY_COMMAND_PAGES[command_id]
+	if page == nil then return nil end
+	return M.page_unavailable_reason(page)
+end
+
+--- Tells the user, in their language, that a window needs a missing component.
+--- @param app_name string The refused page.
+--- @param component string The missing component (a product name, untranslated).
+--- @return boolean admitted Whether the notification was handed to the desktop.
+local function notify_missing_component(app_name, component)
+	local loaded, admitted = pcall(function()
+		-- M._app_title is read at call time: its local is declared further down
+		local title = M._app_title(app_name)
+		local body = require("core.i18n.engine.i18n").get("notify.window_unavailable")
+			:gsub("{1}", function() return title end)
+			:gsub("{2}", function() return component end)
+		return require("platform.focus.application_notifier").send(body, { title = title, level = "warning" })
+	end)
+	if not loaded then
+		Logger.error(LOG, "show(): the missing-component notice for '%s' failed: %s", app_name, tostring(admitted))
+	end
+	return loaded and admitted == true
+end
+
+--- Tells the user, in their language, that a window could not open although
+--- its components are present, and where the cause is named.
+--- @param app_name string The refused page.
+--- @return boolean admitted Whether the notification was handed to the desktop.
+local function notify_window_failed(app_name)
+	local loaded, admitted = pcall(function()
+		local title = M._app_title(app_name)
+		local body = require("core.i18n.engine.i18n").get("notify.window_failed")
+			:gsub("{1}", function() return title end)
+		return require("platform.focus.application_notifier").send(body, { title = title, level = "warning" })
+	end)
+	if not loaded then
+		Logger.error(LOG, "show(): the window failure notice for '%s' failed: %s", app_name, tostring(admitted))
+	end
+	return loaded and admitted == true
+end
+
+--- Hands a page the native window refused to its windowless delivery. A page's
+--- bridge may declare on_window_unavailable(info) and answer true once it
+--- delivered its content another way (a file in the browser, a dialog); every
+--- other page is explained by a notice naming the missing component. The
+--- diagnostics must never depend on the component they diagnose, and the raw
+--- refusal the error notice used to show told the user nothing to act on.
+--- @param app_name string The refused page.
+--- @param handler table Its bridge handler.
+--- @param active_locale string The locale the page would have opened in.
+--- @param detail string Why the native window was refused.
+--- @return boolean answered Whether the user received the content or an explanation.
+local function deliver_without_window(app_name, handler, active_locale, detail)
+	local probed, missing = pcall(_missing_component_probe)
+	if not probed then
+		Logger.error(LOG, "show(): the desktop component probe raised for '%s': %s", app_name, tostring(missing))
+		missing = nil
+	end
+	if type(missing) ~= "string" or missing == "" then missing = nil end
+	if type(handler.on_window_unavailable) == "function" then
+		local called, delivered = xpcall(handler.on_window_unavailable, debug.traceback,
+			{ app_name = app_name, component = missing, locale = active_locale, detail = detail })
+		if not called then
+			Logger.error(LOG, "show(): the windowless delivery of '%s' raised: %s", app_name, tostring(delivered))
+		elseif delivered == true then
+			Logger.warn(LOG, "show(): '%s' has no native window (%s); its bridge delivered it without one.",
+				app_name, missing and ("missing " .. missing) or detail)
+			return true
+		end
+	end
+	if missing then
+		Logger.warn(LOG, "show(): '%s' cannot open: windows need %s, which this system does not provide.",
+			app_name, missing)
+		notify_missing_component(app_name, missing)
+		return true
+	end
+	-- Both components load and the window still did not open (a display the
+	-- toolkit refused, a page that failed to build): a translated notice, as
+	-- every other refusal gets, and a WARN carrying the native detail. The
+	-- ERROR this logged opened the error window with an English line.
+	Logger.warn(LOG, "show(): the native window for '%s' could not open (%s).", app_name, detail)
+	notify_window_failed(app_name)
+	return true
+end
+
 --- Builds the HTML a window loads for a shared UI app, with the page's
 --- strings: active locale over English over French, so a key the active
 --- locale lacks reads as English, not as a key. show() and the WebKitGTK
@@ -487,7 +643,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 		local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
-			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
+			active_locale = require("core.text.engine.identifiers").locales.system_fallback
 		end
 	end
 
@@ -562,8 +718,15 @@ function M.show(app_name, active_locale, contextual_receipt)
 	end, debug.traceback)
 	owned.acquiring = false
 	if not create_ok or created ~= true or owned.cancelled or _windows[app_name] ~= owned then
+		-- A page closed or replaced while acquiring was withdrawn, not refused
+		local withdrawn = owned.cancelled or _windows[app_name] ~= owned
 		owned.failed = true
 		if _windows[app_name] == owned then M.hide(app_name, owned.epoch) end
+		local detail = create_ok and tostring(create_err or "the native creator declined") or tostring(created)
+		if not withdrawn and not _shutting_down and contextual_title_live(app_name, contextual_receipt)
+			and deliver_without_window(app_name, handler, active_locale, detail) then
+			return false
+		end
 		Logger.error(LOG, "show(): native window acquisition refused for '%s'.", app_name)
 		if DOCUMENT_APPS[app_name] then
 			notify_document_refusal(function()
@@ -810,6 +973,41 @@ function M.eval_js(app_name, js_code)
 	return true
 end
 
+--- The apps that have a window, sorted.
+--- @return string[]
+function M.open_app_names()
+	local seen, names = {}, {}
+	for _, owners in ipairs({ _windows, _document_windows }) do
+		for app_name in pairs(owners) do
+			if not seen[app_name] then seen[app_name] = true; names[#names + 1] = app_name end
+		end
+	end
+	table.sort(names)
+	return names
+end
+
+--- Pushes the current reading choices into every open window, so a change
+--- made in the Configuration menu or the setup wizard shows at once, the font
+--- inlined as in the page's own head (core/ui/engine/webview/reading_preferences.lua).
+--- @return number|nil reached Windows the script was handed to, nil on error.
+--- @return string|nil error Why the chosen font cannot be inlined.
+function M.push_reading_preferences()
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local fonts_dir = webkit_host.resolve_ui_root(_driver_root()) .. "/fonts"
+	local function read_bytes(path) return require("core.fs.engine.regular_file_reader").read_source(path) end
+	local script, err = Reading.push_script(Reading.current(), fonts_dir, read_bytes)
+	if script == nil then
+		Logger.error(LOG, "The open windows keep their font: %s.", tostring(err))
+		return nil, err
+	end
+	local reached = 0
+	for _, app_name in ipairs(M.open_app_names()) do
+		if M.eval_js(app_name, script) then reached = reached + 1 end
+	end
+	Logger.info(LOG, "The reading choices reached %d open window(s).", reached)
+	return reached, nil
+end
+
 --- The live WebKit view for an app, or nil when it has no window.
 ---
 --- Published for the hardware harness, which has to read a value BACK out of the
@@ -959,7 +1157,7 @@ end
 
 --- Reads per-app geometry from _shared/ui/apps.manifest.json.
 --- @param app_name string The app directory name.
---- @return table { width, height, min_width, min_height }
+--- @return table { width, height, min_width, min_height, maximized }
 local function _read_app_geometry(app_name)
 	local defaults = { width = 800, height = 600, min_width = 400, min_height = 300 }
 	-- One resolver, no "try the other depth" dance. The alternate path this used
@@ -978,6 +1176,7 @@ local function _read_app_geometry(app_name)
 			height     = app.height     or defaults.height,
 			min_width  = app.min_width  or defaults.min_width,
 			min_height = app.min_height or defaults.min_height,
+			maximized  = app.maximized == true,
 		}
 	end
 	return defaults
@@ -1086,6 +1285,15 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 		end)
 		if not ok_size then
 			Logger.warn(LOG, "Minimum size not applied to '%s': %s.", app_name, tostring(size_err))
+		end
+
+		-- A manifest « maximized » app fills the work area and keeps its title bar
+		-- and buttons; its default size is the size it restores to.
+		if geometry.maximized then
+			local ok_max, max_err = pcall(function() window:maximize() end)
+			if not ok_max then
+				Logger.warn(LOG, "Maximize not applied to '%s': %s.", app_name, tostring(max_err))
+			end
 		end
 
 		-- Register only the capability owned by this page. A UserContentManager is
@@ -1288,7 +1496,14 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 				elseif not attempt.acquiring and not attempt.retiring then
 					M._destroy_gtk_window(app_name, window_epoch)
 				end
-				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+				-- Ergopti's own restart or shutdown ends the web processes with
+				-- the daemon (systemd stops the unit's whole cgroup, often before
+				-- this process handles its own TERM): that is no renderer crash.
+				if own_stop_in_progress() then
+					Logger.info(LOG, "WebKit process for '%s' ended with Ergopti's own stop.", app_name)
+				else
+					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+				end
 			end
 		end)
 

@@ -181,6 +181,10 @@ _HCSC_CharacterScanCodes() {
 			continue
 		if !(Rec["ahk"] is String) || !RegExMatch(Rec["ahk"], "^SC[0-9A-F]{3}$")
 			continue
+		; The JIS and ABNT keys sit on no ISO board: the layout emulation, whose
+		; keys this rule is about, types on the ISO and ANSI character keys only.
+		if Rec.Has("geometry") && (Rec["geometry"] is Map) && !Rec["geometry"].Has("iso")
+			continue
 		Keys[Rec["ahk"]] := Code
 	}
 	return Keys

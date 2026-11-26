@@ -1,0 +1,17 @@
+{
+	"_comment": "The names of « Touches de jeu » (layout.game_keys), the single source of the three drivers (Rule A, docs/design/structure-plan.md). The choices are the enum of layout.game_keys in _shared/settings/data/config_schema/config.schema.json and are not repeated here. modes are the Ergopti modes a route is asked for; strategies how a driver honours a choice (native: the OS carries the identity; held_base_key: the system layout's key, held, Windows and Linux; split_event: one injected event with the physical scan code and the Ergopti letter's VK, Windows; switch_to_installed: the installed Ergopti layout while the application is in front; rewrite_keycode: the event's key code rewritten, the string kept, macOS); reasons the locale key of each reason, shown on the row it greys or notes. tools/codegen/codegen-game-keys.cjs projects this file to _shared/layouts/engine/emulation/game_keys_data.lua (read by game_keys.lua) and windows/_generated/game_keys_names.ahk (class GameKeysName, whose unknown member fails).",
+	"modes": ["emulation", "installed", "system"],
+	"strategies": [
+		"native",
+		"held_base_key",
+		"split_event",
+		"switch_to_installed",
+		"rewrite_keycode"
+	],
+	"reasons": {
+		"physical_needs_installed_layout": "platform_reason.game_keys_physical_needs_installed_layout",
+		"letters_needs_base_layout": "platform_reason.game_keys_letters_needs_base_layout",
+		"vk_games_follow_letters": "platform_reason.game_keys_vk_games_follow_letters",
+		"hid_games_are_physical": "platform_reason.game_keys_hid_games_are_physical"
+	}
+}

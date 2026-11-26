@@ -6,8 +6,8 @@
 --- The runtime API over the generated `_generated/features_manifest.lua`
 --- (`npm run build:manifest`, from the single source of truth at
 --- `_shared/settings/data/features/manifest.toml`) that the macOS and Linux drivers
---- bind in infra/manifest_reader.lua. The AutoHotkey twin is
---- `windows/infra/manifest_reader.ahk`.
+--- bind in menu/engine/manifest_reader.lua. The AutoHotkey twin is
+--- `windows/menu/engine/manifest_reader.ahk`.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Fail fast: a missing or malformed manifest, or a lookup for an unknown

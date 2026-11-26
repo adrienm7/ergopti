@@ -27,7 +27,7 @@ local function updater(version, stored)
 	local configured = stored and stored["updater.channel"]
 	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		exists = function(path)
-			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
+			if path == require("settings.engine.paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return fs.exists(path)
 		end,
 		read = function(path)

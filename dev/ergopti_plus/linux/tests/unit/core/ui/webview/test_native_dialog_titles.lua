@@ -16,10 +16,10 @@ local DIALOG = require("core.ui.ui.native_dialog").command()
 --- Owns module replacements and pipe restoration for one completed scenario.
 --- @param body function Receives effect observations and a shell authority.
 local function scenario(body)
-	local names = { "core.ui.ui.text_prompt", "ui.app_chooser", "ui.config_dir_picker", "ui.gesture_conflicts",
-		"modules.gestures.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
+	local names = { "core.ui.ui.text_prompt", "apps.ui.chooser", "settings.ui.dir_picker", "gestures.ui.conflicts",
+		"gestures.engine.system_actions", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "core.ui.ui.modal",
 		"core.fs.adapters.storage", "core.events.loop", "platform.input.keyboard_hook",
-		"ui.menu.programmatic_hotstrings", "infra.hotstring_preferences", "infra.manifest_menu" }
+		"hotstrings.ui.menu.programmatic_hotstrings", "hotstrings.engine.matcher.preferences", "menu.engine.manifest_menu" }
 	local saved, observed = {}, { commands = {}, modals = 0, queued = {}, writes = {} }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local original_popen = io.popen
@@ -99,7 +99,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	h.it("(linux-native-titles) the application chooser keeps its filter and id", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/usr/share/applications/org.example.Native.desktop", 0
-			h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application", { resolve = function()
+			h.assert_eq(require("apps.ui.chooser").pick(shell, "Choose application", { resolve = function()
 				return observed.answer, "found"
 			end }), "org.example.Native")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --title='ErgoptiPlus — Choose application'"
@@ -111,7 +111,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		scenario(function(observed, shell)
 			observed.answer, observed.status = "/owned/chosen/", 0
 			local paths = { default_config_dir = function() return "/owned/default" end }
-			local value = require("ui.config_dir_picker").pick(shell, paths, require("core.i18n.engine.i18n"), "/owned/current")
+			local value = require("settings.ui.dir_picker").pick(shell, paths, require("core.i18n.engine.i18n"), "/owned/current")
 			h.assert_eq(value, "/owned/chosen")
 			h.assert_eq(observed.commands[1], DIALOG .. " --file-selection --directory"
 				.. " --title='ErgoptiPlus — Select configuration folder' --filename='/owned/current/' 2>/dev/null")
@@ -120,7 +120,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	end)
 	h.it("(linux-native-titles) system confirmation preserves safe cancellation and command chaining", function()
 		scenario(function()
-			local command = require("modules.gestures.system_actions").confirmed_command("Owned action", "printf owned")
+			local command = require("gestures.engine.system_actions").confirmed_command("Owned action", "printf owned")
 			h.assert_eq(command:sub(1, #DIALOG + 1), DIALOG .. " ", "the owned dialog asks, never a host tool")
 			h.assert_true(command:find("ErgoptiPlus — Confirm action", 1, true) ~= nil)
 			h.assert_true(command:find("dialog.confirm_action.message", 1, true) ~= nil)
@@ -130,7 +130,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	end)
 	h.it("(linux-native-titles) gesture conflict chrome is branded without changing cancellation persistence", function()
 		scenario(function(observed)
-			local admitted = require("ui.gesture_conflicts").show({ key = "swipe_3", slot = "swipe_3_left" })
+			local admitted = require("gestures.ui.conflicts").show({ key = "swipe_3", slot = "swipe_3_left" })
 			h.assert_eq(admitted, true)
 			h.assert_eq(#observed.commands, 0)
 			observed.queued[1]()
@@ -145,18 +145,18 @@ end)
 
 h.describe("native menu dialog captions", function()
 	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation, keeps it across a pause", function()
-		local names = { "ui.menu.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "core.ui.ui.modal" }
+		local names = { "menu.ui.builder.builder", "ai.ui.menu.llm", "ai.ui.menu.backend_rows", "core.ui.ui.modal" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local previous_execute, options, deletions, live, paused = os.execute, nil, 0, true, false
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			bind_page = function(_, bound) options = bound end,
 			caption = function() return "model" end,
 		}
 		package.loaded["core.ui.ui.modal"] = { run = function(fn) return fn() end }
 		os.execute = function() live = false; return 0 end
 		local ok, err = xpcall(function()
-			require("ui.menu.builder").build({ _version = "9.9.9", paused = false,
+			require("menu.ui.builder.builder").build({ _version = "9.9.9", paused = false,
 				is_paused = function() return paused end, on_quit = function() end,
 				llm = { is_enabled = function() return false end,
 					delete_model = function() deletions = deletions + 1; return true end } })
@@ -177,7 +177,7 @@ h.describe("native menu dialog captions", function()
 
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
 		-- The prompt captures its Shell owner; load it under this scenario's authority.
-		local names = { "ui.menu.builder", "ui.menu.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ui.menu.llm_backend_rows",
+		local names = { "menu.ui.builder.builder", "menu.ui.transactions.uninstall", "core.lifecycle.engine.installation", "core.ui.ui.modal", "ai.ui.menu.backend_rows",
 			"core.ui.ui.text_prompt" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -185,13 +185,13 @@ h.describe("native menu dialog captions", function()
 		local logger = require("core.logger.engine.shim")
 		local original_error, original_info = logger.error, logger.info
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
-		package.loaded["ui.menu.llm_backend_rows"] = {
+		package.loaded["ai.ui.menu.backend_rows"] = {
 			bind_page = function(_, options) dialogs = options.dialogs end,
 			caption = function() return "model button" end,
 		}
 		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
 		package.loaded["core.ui.ui.modal"] = { run = function(fn) modals = modals + 1; return fn() end }
-		package.loaded["ui.menu.uninstall"] = { run = function(opts)
+		package.loaded["menu.ui.transactions.uninstall"] = { run = function(opts)
 			accepted = opts.confirm(opts.title, "Preserved <confirmation>")
 			opts.fail("Preserved <failure>")
 		end }
@@ -201,7 +201,7 @@ h.describe("native menu dialog captions", function()
 		end
 		local ok, err = xpcall(function()
 			local i18n = require("core.i18n.engine.i18n")
-			local items = require("ui.menu.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
+			local items = require("menu.ui.builder.builder").build({ _version = "9.9.9", on_quit = function() end, llm = { is_enabled = function() return false end } })
 			local found
 			for _, item in ipairs(items) do
 				for _, row in ipairs(item.menu or {}) do
@@ -272,7 +272,7 @@ h.describe("programmable source problems open no dialog", function()
 				}
 				local ctx = { dyn_hotstrings = native, paused = false, is_paused = function() return false end,
 					on_menu_changed = function() calls.changed = calls.changed + 1 end }
-				package.loaded["infra.hotstring_preferences"] = { get = function(key)
+				package.loaded["hotstrings.engine.matcher.preferences"] = { get = function(key)
 					if key == "hotstrings.dynamic.user_code.enabled" then return true end
 					h.assert_eq(key, "hotstrings.dynamic.user_code.time_activation_seconds")
 					return 0.5
@@ -284,7 +284,7 @@ h.describe("programmable source problems open no dialog", function()
 					observed.commands[#observed.commands + 1] = command
 					return false
 				end
-				local rows = require("ui.menu.programmatic_hotstrings").build(ctx)
+				local rows = require("hotstrings.ui.menu.programmatic_hotstrings").build(ctx)
 				h.assert_eq(#rows, 4, "the actual manifest renderer must expose all declared source controls")
 				local title = rows[1].title
 				if problem then
@@ -310,7 +310,7 @@ h.describe("one-click check report caption (linux-native-titles)", function()
 	h.it("(linux-native-titles) the check report brands its caption and keeps the body plain text", function()
 		scenario(function(observed)
 			observed.status = 1
-			local runner = require("ui.field_check.window").new({
+			local runner = require("diagnostics.ui.field_check.window").new({
 				label = "Owned check", log = "owned_check", check_id = "owned", title_key = "Native 'check'",
 				steps = function(_, _, finish) finish() end, env = function() return {} end,
 				unusable_step = "owned_env",
@@ -336,16 +336,16 @@ h.describe("native caption consumer inventory", function()
 			["core.ui.ui.text_prompt"] = 1,
 			-- The picker, its verification error and the open_path picker retain
 			-- their composed caption; test_app_chooser proves the error dialog.
-			["ui.app_chooser"] = 3,
-			["ui.config_dir_picker"] = 1,
-			["ui.gesture_conflicts"] = 1,
-			["modules.gestures.system_actions"] = 1,
-			["ui.menu.menu_dialogs"] = 3,
-			["modules.llm.local_model_offer"] = 1,
+			["apps.ui.chooser"] = 3,
+			["settings.ui.dir_picker"] = 1,
+			["gestures.ui.conflicts"] = 1,
+			["gestures.engine.system_actions"] = 1,
+			["menu.ui.builder.dialogs"] = 3,
+			["ai.engine.ollama.local_model_offer"] = 1,
 			-- The enable refusal tests prove the policy-owned native caption and modal receipts.
-			["ui.llm_enable_refusal"] = 1,
+			["ai.ui.enable_refusal"] = 1,
 			-- The one-click check runner owns the caption of every check report.
-			["ui.field_check.window"] = 1,
+			["diagnostics.ui.field_check.window"] = 1,
 			-- The list prompt's caption is proven by the choice prompt case.
 			["core.ui.ui.choice_prompt"] = 1,
 			-- The bundled apps' entry, question, message and file dialogs compose
@@ -405,9 +405,9 @@ local function picker_exit_receipt(status, output, application_root)
 			.. "local modals = 0\n"
 			.. "package.loaded['core.ui.ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application', {resolve=function() return "
+			.. (application_root and "local value = require('apps.ui.chooser').pick(shell, 'Choose application', {resolve=function() return "
 				.. string.format("%q", output:gsub("\n$", "")) .. ", 'found' end})\n"
-				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
+				or "local value = require('settings.ui.dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")
 		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
@@ -482,8 +482,9 @@ h.describe("native application picker record admission", function()
 			os.remove(prefix); os.remove(selected)
 			assert(Shell.run("rmdir -- " .. Shell.quote(applications) .. " " .. Shell.quote(directory)))
 			if not ok then error(receipt, 0) end
-			h.assert_eq(receipt, "refused|modal:1",
-				"an unsupported desktop-file id must be refused, never turned into another installed app")
+			-- The second modal is the error dialog that says nothing was bound (PCK-09).
+			h.assert_eq(receipt, "refused|modal:2",
+				"an unsupported desktop-file id must be refused and said, never turned into another installed app")
 		end)
 	end
 end)
@@ -495,7 +496,7 @@ h.describe("configuration filesystem root", function()
 			scenario(function(observed, shell)
 				observed.answer, observed.status = "/\n", 0
 				local paths = { default_config_dir = function() return "/owned/default" end }
-				local picker = require("ui.config_dir_picker")
+				local picker = require("settings.ui.dir_picker")
 				h.assert_eq(picker.pick(shell, paths, require("core.i18n.engine.i18n"), "/"), "/")
 				h.assert_eq(picker.normalize(paths, "///"), "/")
 				h.assert_eq(picker.normalize(paths, ""), "/owned/default")

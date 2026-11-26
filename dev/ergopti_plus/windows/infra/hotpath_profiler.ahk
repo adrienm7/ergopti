@@ -585,11 +585,14 @@ HotPath_StartStatistics() {
 	Owner := _HotPathStatisticsOwner()
 	if Owner.Started
 		throw Error("Latency statistics already started")
+	IntervalMs := TimingsGet("logger", "hotpath_statistics_interval_ms")
+	if (IntervalMs <= 0)
+		throw ValueError(Format("[logger] hotpath_statistics_interval_ms must be positive, got {1}.", IntervalMs))
 	Owner.Started := true
 	Owner.Timer := HotPath_FlushStatistics
-	; One minute retains distributions without turning normal typing into log I/O.
-	SetTimer(Owner.Timer, 60000, -1)
-	try LoggerInfo("HotPath", "Latency statistics started (interval=60000 ms, labels={1}).", Owner.Stats.Limit)
+	; The period is read at the call so the fast-timer inventory resolves it.
+	SetTimer(Owner.Timer, TimingsGet("logger", "hotpath_statistics_interval_ms"), -1)
+	try LoggerInfo("HotPath", "Latency statistics started (interval={1} ms, labels={2}).", IntervalMs, Owner.Stats.Limit)
 }
 
 /** Detaches the numeric snapshot before logging can pump callbacks into the next window. */
@@ -763,6 +766,25 @@ PerfCounters_Flush() {
 		ParseOwners := TOML_DocumentParseOwnersTake()
 		if ParseOwners.Count > 0
 			try LoggerEvidence("Perf", "Document parses by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(ParseOwners))
+	}
+	; A text a reader parsed twice in one interval, by the owner of the second parse.
+	if IsSet(TOML_ParseRepeatOwnersTake) {
+		for Reader, Label in Map("document", "Document", "flat", "Flat") {
+			Repeats := TOML_ParseRepeatOwnersTake(Reader)
+			if Repeats.Count > 0
+				try LoggerEvidence("Perf", "{1} re-parses by owner ({2} ms): {3}.", Label, IntervalMs, PerfCountersText(Repeats))
+		}
+	}
+	; Whole-image proofs by the owner that asked for each.
+	if IsSet(ConfigTomlSnapshotReadOwnersTake) {
+		Owners := ConfigTomlSnapshotReadOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Snapshot reads by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
+	}
+	if IsSet(ConfigMigrateDeepCompareOwnersTake) {
+		Owners := ConfigMigrateDeepCompareOwnersTake()
+		if Owners.Count > 0
+			try LoggerEvidence("Perf", "Registry deep compares by owner ({1} ms): {2}.", IntervalMs, PerfCountersText(Owners))
 	}
 	State := PerfProcessState()
 	; The log-volume figures ride on this record as they ride on the macOS memory

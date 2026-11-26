@@ -40,7 +40,7 @@ package.loaded["infra.metrics_preferences"] = require("tests.support.metrics_pre
 } })
 local Keystats = require("modules.keystats.keystats")
 assert(Keystats.init({ log_dir = root, sqlite_path = root .. "/metrics.sqlite3" }) ~= false)
-local engine = require("modules.hotstrings.engine").new()
+local engine = require("hotstrings.engine.engine").new()
 local resets, focus_changes = 0, 0
 local Guard = require("modules.keystats.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, now_ms = Clock.now_ms,

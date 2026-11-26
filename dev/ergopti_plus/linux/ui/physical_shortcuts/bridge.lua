@@ -44,7 +44,7 @@ function M.open(options)
 	if type(options) ~= "table" or not M.available(options.scope) then return false end
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("core.ui.ui.webview_manager")
-	local Gestures = require("modules.gestures.manager")
+	local Gestures = require("gestures.engine.manager")
 	local Hook = require("platform.input.keyboard_hook")
 	local capture_position, cancel_position, position_available = rawget(Hook, "capture_position"),
 		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")
@@ -162,13 +162,13 @@ function M.open(options)
 					local spec = Gestures.get_action_parameter_spec(id)
 					if spec and parameter == nil then
 						if spec == "app" then
-							parameter = require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
+							parameter = require("apps.ui.chooser").pick(require("core.process.adapters.shell_runner"),Gestures.get_action_parameter_prompt(id))
 						elseif require("ui.user_action_editor").KINDS[spec] then
 							parameter = require("ui.user_action_editor").ask(spec,I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
 						elseif spec == "llm_vision" then
 							-- A backend is picked from a list, as on the action picker page.
-							parameter = require("ui.vision_parameter_prompt").ask(I18n.get("physical_shortcuts.window_title"),
+							parameter = require("ai.ui.vision_parameter_prompt").ask(I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter(binding,id))
 						else
 							parameter = require("core.ui.ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
@@ -232,7 +232,11 @@ function M.on_message(payload,state,context)
 	if context.epoch == nil or context.epoch ~= candidate.current_epoch(APP) then return false end
 	if candidate.epoch == nil and candidate.constructing then candidate.epoch = context.epoch end
 	if candidate.epoch ~= context.epoch then return false end
-	local message = type(payload) == "string" and Json.decode(payload) or payload
+	-- The page sends JSON text: decoded keeping null, an explicit null is refused,
+	-- never read as absence (physical_editor_contract.lua).
+	if type(payload) ~= "string" then return false end
+	local message = Json.decode_lossless(payload)
+	if type(message) ~= "table" then return false end
 	if candidate.constructing then
 		if type(message) == "table" and message.action == "ready" then candidate.pending_ready = true; return true end
 		return false

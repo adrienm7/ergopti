@@ -24,6 +24,13 @@
 ---    through the adapters (macos/modules/keymap/composer_check.lua,
 ---    linux/modules/keymap/composer_check.lua).
 --- 4. Settle once: finish runs exactly once, even if a port calls back twice.
+--- 5. A finding is a WARNING, never an ERROR: what the check observes about the
+---    layout under test (a composition saved but not installed, a copy that
+---    fails its record, an install the composer refused) is recorded as a
+---    failed step in the evidence record, which is the verdict. An ERROR line
+---    opens the error window, and the field run reloads the daemon seconds
+---    later, killing it. ERROR is kept for the check's own faults: shipped
+---    files missing, a probe that raised, its own composition left behind.
 --- ==============================================================================
 
 local Report = require("diagnostics.engine.field_check.report")
@@ -100,9 +107,18 @@ function M.run(env, report, finish)
 	verify = function(info)
 		local snapshot = env.snapshot()
 		local entry = (snapshot.installed or {})[env.composer_id]
+		-- A composition saved while its installation failed has no record: that is
+		-- the failed install to look at, not an unreadable file.
+		if entry == nil then
+			env.log("warn", "The composition is saved but was never installed: no installed layout records it.")
+			step("composer_copy", FAIL, "not_installed")
+			step("composer_ready", SKIP, "no_copy")
+			cleanup()
+			return
+		end
 		local text = env.read_copy()
-		if entry == nil or type(text) ~= "string" then
-			env.log("error", "The installed composition is missing or unreadable.")
+		if type(text) ~= "string" then
+			env.log("warn", "The installed composition is recorded but its file is missing or unreadable.")
 			step("composer_copy", FAIL, "unreadable")
 			step("composer_ready", SKIP, "no_copy")
 			cleanup()
@@ -110,7 +126,7 @@ function M.run(env, report, finish)
 		end
 		env.sha256(text, function(digest)
 			if digest ~= entry.sha256 then
-				env.log("error", "The installed composition no longer matches its record.")
+				env.log("warn", "The installed composition no longer matches its record.")
 				step("composer_copy", FAIL, "digest_mismatch")
 				step("composer_ready", SKIP, "no_copy")
 				cleanup()
@@ -156,7 +172,7 @@ function M.run(env, report, finish)
 
 	local snapshot = env.snapshot()
 	if snapshot.record_error ~= nil then
-		env.log("error", "The installed layouts cannot be read: %s", tostring(snapshot.record_error))
+		env.log("warn", "The installed layouts cannot be read: %s", tostring(snapshot.record_error))
 		step("composer_mode", FAIL, "record_unreadable")
 		done()
 		return
@@ -190,7 +206,7 @@ function M.run(env, report, finish)
 				return
 			end
 			if not ok then
-				env.log("error", "The check composition was not installed (%s).", tostring(code))
+				env.log("warn", "The check composition was not installed (%s).", tostring(code))
 				step("composer_install", FAIL, code or "failed")
 				cleanup()
 				return

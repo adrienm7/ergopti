@@ -27,9 +27,12 @@
 	--filter-text: var(--text-muted);
 	--filter-hover: var(--th-hover);
 
-	--kpi-hs-rgb: 217, 48, 37;
+	/* Text colours too (card headings, values): the red and orange hold 7:1 on
+	   their tinted card (WCAG 1.4.6), where rgb(196, 39, 29) and
+	   rgb(160, 82, 0) were 5.7:1 and the system ones 4.1:1 and 2.3:1. */
+	--kpi-hs-rgb: 150, 25, 18;
 	--kpi-llm-rgb: 138, 62, 184;
-	--kpi-wpm-rgb: 230, 140, 0;
+	--kpi-wpm-rgb: 115, 58, 0;
 
 	--kpi-hs-color: rgb(var(--kpi-hs-rgb));
 	--kpi-llm-color: rgb(var(--kpi-llm-rgb));
@@ -44,11 +47,15 @@
 	--global-border: rgba(var(--kpi-wpm-rgb), 0.5);
 
 	--strong-color: var(--theme-metrics-strong);
+	/* The chart cards' ground: a dark veil turned the light page grey and
+	   held their headings at 6.4:1 (WCAG 1.4.6 asks for 7:1). */
+	--chart-panel: rgba(0, 0, 0, 0.04);
 
 	/* Score badge colors */
 	--score-pos-color: var(--theme-green);
 	--score-neg-color: var(--theme-red);
-	--score-neutral-color: var(--theme-hue-86868b);
+	/* The muted text grey: #86868b read 2.8:1 on the tinted productivity card. */
+	--score-neutral-color: var(--text-muted);
 	--score-pos-bg: rgba(52, 199, 89, 0.08);
 	--score-neg-bg: rgba(255, 59, 48, 0.08);
 	--score-neutral-bg: rgba(0, 0, 0, 0.04);
@@ -56,7 +63,7 @@
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--kpi-hs-rgb: 255, 69, 58;
+		--kpi-hs-rgb: 255, 165, 158;
 		--kpi-llm-rgb: 191, 90, 242;
 		--kpi-wpm-rgb: 255, 214, 10;
 
@@ -64,6 +71,7 @@
 		--kpi-llm-color: rgb(var(--kpi-llm-rgb));
 		--kpi-wpm-color: rgb(var(--kpi-wpm-rgb));
 
+		--chart-panel: rgba(30, 30, 30, 0.4);
 		--hs-bg: rgba(var(--kpi-hs-rgb), 0.1);
 		--llm-bg: rgba(var(--kpi-llm-rgb), 0.1);
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
@@ -110,10 +118,8 @@ body {
 }
 
 .header {
-	align-items: center;
-	display: flex;
-	justify-content: center;
 	margin: 0 0 15px 0;
+	text-align: center;
 }
 
 h1 {
@@ -137,6 +143,90 @@ h1 {
 	justify-content: flex-start;
 	margin-bottom: 15px;
 	padding: 10px 15px;
+}
+
+.filters-bar .field {
+	margin: 0;
+}
+
+/* The refresh button pushes the actions after it to the bar's end. */
+.push-end {
+	margin-inline-start: auto;
+}
+
+/* A filter row: its name, then its toggle buttons. The legend floats so the
+   fieldset lays it out as a flex item, beside the buttons. */
+.filter-group {
+	align-items: center;
+	border: 0;
+	display: flex;
+	gap: 6px;
+	margin: 0;
+	min-inline-size: 0;
+	padding: 0;
+}
+.filter-label {
+	color: var(--text-muted);
+	float: left;
+	font-size: 12px;
+	padding: 0;
+}
+.pill-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+/* A flex item, so the button inside sits without a line box under it. */
+.pill-list li {
+	display: flex;
+}
+
+.tab-bar {
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0 0 14px 0;
+}
+
+.compare-title {
+	color: var(--strong-color);
+	font-size: 13px;
+	margin: 0;
+}
+.compare-window {
+	margin: 0;
+}
+.compare-rows {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.compare-card {
+	background: rgba(0, 0, 0, 0.25);
+	border-radius: 6px;
+	padding: 8px;
+}
+.compare-card p {
+	margin: 0;
+}
+.compare-label {
+	color: var(--text-muted);
+	font-size: 11px;
+	margin-bottom: 4px !important;
+}
+.compare-value {
+	color: var(--strong-color);
+	font-size: 18px;
+	font-weight: 600;
+}
+.compare-delta {
+	font-size: 11px;
+}
+.compare-before {
+	color: var(--text-muted);
+	font-size: 10px;
 }
 
 .filters-bar label {
@@ -164,9 +254,11 @@ h1 {
 	padding: 8px 12px;
 }
 
+/* White on the dark appearance's accent was 3.6:1 (WCAG 1.4.3): the fill
+   accent holds 4.5:1 behind white in both appearances. */
 .filter-btn.active {
-	background: var(--accent);
-	border-color: var(--accent);
+	background: var(--theme-accent-fill);
+	border-color: var(--theme-accent-fill);
 	color: var(--theme-white);
 	font-weight: bold;
 }
@@ -181,7 +273,9 @@ h1 {
 	display: grid;
 	gap: 15px;
 	grid-template-columns: repeat(3, 1fr);
-	margin-bottom: 20px;
+	list-style: none;
+	margin: 0 0 20px 0;
+	padding: 0;
 }
 
 /* Second KPI row holds smaller, denser cards (6 across) for time / rhythm */
@@ -193,7 +287,7 @@ h1 {
 .stats-grid-secondary .stat-card {
 	padding: 12px 14px;
 }
-.stats-grid-secondary .stat-card h2 {
+.stats-grid-secondary .stat-card h3 {
 	color: var(--text-muted);
 	font-size: 12px;
 	letter-spacing: 0.5px;
@@ -201,7 +295,7 @@ h1 {
 	text-transform: uppercase;
 }
 .stats-grid-secondary .stat-value {
-	color: var(--theme-white);
+	color: var(--strong-color);
 	font-size: 1.4em;
 	font-weight: 600;
 }
@@ -248,7 +342,7 @@ h1 {
 .app-modal-close {
 	background: transparent;
 	border: 0;
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	cursor: pointer;
 	font-size: 24px;
 	line-height: 1;
@@ -261,7 +355,9 @@ h1 {
 	display: grid;
 	gap: 10px;
 	grid-template-columns: repeat(6, 1fr);
-	margin-bottom: 16px;
+	list-style: none;
+	margin: 0 0 16px 0;
+	padding: 0;
 }
 .app-modal-tile {
 	background: rgba(255, 255, 255, 0.03);
@@ -270,27 +366,49 @@ h1 {
 	padding: 10px 12px;
 }
 .app-modal-tile-label {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 10px;
 	letter-spacing: 0.5px;
+	margin: 0;
 	text-transform: uppercase;
 }
 .app-modal-tile-value {
 	color: var(--theme-white);
 	font-size: 16px;
 	font-weight: 600;
-	margin-top: 2px;
+	margin: 2px 0 0 0;
 }
 .app-modal-tile-detail {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 10px;
-	margin-top: 2px;
+	margin: 2px 0 0 0;
+}
+/* The drill-down's lists: a name and its count per row, or a line each. */
+.modal-list {
+	font-size: 12px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.modal-list li {
+	padding: 3px 0;
+}
+.modal-list .pair {
+	display: flex;
+	justify-content: space-between;
+}
+.modal-list data {
+	color: var(--theme-grey-ccc);
+}
+.modal-list .muted {
+	color: var(--theme-hue-c8c8cc);
+	padding: 0;
 }
 .app-modal-section {
 	margin-top: 14px;
 }
 .app-modal-section h3 {
-	color: var(--theme-grey-888);
+	color: var(--theme-hue-c8c8cc);
 	font-size: 12px;
 	letter-spacing: 0.5px;
 	margin: 0 0 8px 0;
@@ -308,6 +426,24 @@ h1 {
 #apps-table tbody tr:hover {
 	background: rgba(255, 255, 255, 0.04);
 }
+/* The row's own buttons look like its text: the name opens the drill-down,
+   the category its editor. */
+.app-cell-btn {
+	background: none;
+	border: 0;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+	text-align: start;
+}
+.app-name-btn {
+	font-weight: bold;
+}
+.app-cat-btn {
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
 
 .stat-card {
 	background: var(--panel-bg);
@@ -316,6 +452,156 @@ h1 {
 	display: flex;
 	flex-direction: column;
 	padding: 20px;
+	position: relative;
+}
+
+/* A card's explanation, shown on hover and on keyboard focus, hoverable,
+   and dismissed with Escape (WCAG 1.4.13): it was a title only a mouse read. */
+.stat-tip {
+	background: var(--bg-color);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+	color: var(--text-color);
+	display: none;
+	font-size: 12px;
+	font-weight: normal;
+	left: 0;
+	letter-spacing: normal;
+	margin: 0;
+	max-width: 320px;
+	padding: 8px 10px;
+	position: absolute;
+	text-transform: none;
+	top: calc(100% - 1px);
+	width: max(100%, 220px);
+	z-index: 20;
+}
+.stat-card:hover > .stat-tip,
+.stat-card:focus > .stat-tip {
+	display: block;
+}
+.stat-card.tip-dismissed > .stat-tip {
+	display: none;
+}
+
+/* The context card: three label and value rows. */
+.card-context {
+	justify-content: center;
+}
+.context-list {
+	align-items: baseline;
+	display: grid;
+	grid-template-columns: 1fr auto;
+	margin: 0;
+	row-gap: 8px;
+}
+.context-list dt {
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+.context-list dd {
+	margin: 0;
+	text-align: end;
+}
+.context-list strong {
+	color: var(--strong-color);
+}
+
+/* The daily goal: its value edits it, a bar shows the day's progress. */
+.goal-row {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+	margin: 6px 0;
+}
+.goal-edit {
+	background: none;
+	border: 0;
+	cursor: pointer;
+	font-family: inherit;
+	margin: 0 !important;
+	padding: 0;
+}
+.goal-row .goal-progress {
+	margin-inline-start: auto;
+}
+.goal-bar {
+	appearance: none;
+	background: rgba(255, 255, 255, 0.05);
+	border: 0;
+	border-radius: 6px;
+	display: block;
+	height: 14px;
+	overflow: hidden;
+	width: 100%;
+}
+.goal-bar::-webkit-progress-bar {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 6px;
+}
+.goal-bar::-webkit-progress-value {
+	background: linear-gradient(90deg, var(--theme-blue-dark), var(--theme-green-dark));
+	border-radius: 0;
+	transition: width 0.3s;
+}
+
+/* The productivity split, drawn; its shares are written in the line below. */
+.prod-bar {
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 6px;
+	display: block;
+	height: 22px;
+	margin: 6px 0;
+	overflow: hidden;
+	width: 100%;
+}
+
+/* Chart figures and their parts. */
+.chart-container,
+.table-container {
+	margin: 0;
+}
+.mode-group {
+	display: flex;
+	gap: 6px;
+	margin: 0;
+}
+.chart-empty {
+	color: var(--text-muted);
+	font-size: 12px;
+	margin: 0;
+	padding: 10px;
+}
+.chart-caption {
+	color: var(--text-muted);
+	font-size: 11px;
+	margin: 0 0 6px 0;
+}
+.chart-caption.below {
+	margin: 6px 0 0 0;
+}
+.legend-list {
+	color: var(--text-muted);
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 11px;
+	gap: 10px;
+	list-style: none;
+	margin: 10px 0 0 0;
+	padding: 0;
+}
+.legend-list li {
+	align-items: center;
+	display: inline-flex;
+	gap: 5px;
+}
+.legend-list li::before {
+	background: var(--swatch);
+	border-radius: 3px;
+	content: '';
+	height: 12px;
+	width: 12px;
 }
 
 .stat-card.card-hs {
@@ -331,20 +617,20 @@ h1 {
 	border-color: var(--global-border);
 }
 
-.stat-card.card-hs h2,
+.stat-card.card-hs h3,
 .stat-card.card-hs .stat-value {
 	color: var(--kpi-hs-color);
 }
-.stat-card.card-llm h2,
+.stat-card.card-llm h3,
 .stat-card.card-llm .stat-value {
 	color: var(--kpi-llm-color);
 }
-.stat-card.card-global h2,
+.stat-card.card-global h3,
 .stat-card.card-global .stat-value {
 	color: var(--kpi-wpm-color);
 }
 
-.stat-card h2 {
+.stat-card h3 {
 	font-size: 16px;
 	margin: 0 0 10px 0;
 }
@@ -358,6 +644,7 @@ h1 {
 .stat-details {
 	color: var(--text-muted);
 	font-size: 0.95em;
+	margin: 0;
 }
 
 .stat-details strong {
@@ -414,7 +701,7 @@ th {
 	border-bottom: 1px solid var(--border);
 	font-weight: 600;
 	padding: 12px;
-	text-align: left;
+	text-align: start;
 }
 
 td {
@@ -427,13 +714,40 @@ tr:hover td {
 	background: var(--td-hover);
 }
 
-/* Tabs (#57): hide non-active sections. */
-.main-content > [data-tab] {
-	display: none;
+/* The render error, shown at the window's foot. */
+.render-error {
+	/* White holds 4.5:1 on this red (WCAG 1.4.3). */
+	background: rgb(176, 28, 20);
+	border-radius: 6px;
+	bottom: 8px;
+	color: var(--theme-white);
+	font: 12px/1.4 system-ui;
+	left: 8px;
+	margin: 0;
+	max-height: 160px;
+	overflow: auto;
+	padding: 8px 12px;
+	position: fixed;
+	right: 8px;
+	white-space: pre-wrap;
+	z-index: 9999;
 }
-.main-content > [data-tab].tab-active {
-	display: block;
+
+/* The apps table's column explanations, folded under it. */
+.column-help {
+	font-size: 0.9em;
+	margin-top: 10px;
 }
-.main-content > .stats-grid[data-tab].tab-active {
+.column-help > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+.column-help dl {
 	display: grid;
+	gap: 4px 12px;
+	grid-template-columns: max-content 1fr;
+	margin: 8px 0 0;
+}
+.column-help dd {
+	margin: 0;
 }

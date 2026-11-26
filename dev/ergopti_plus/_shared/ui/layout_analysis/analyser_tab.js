@@ -15,8 +15,17 @@
  *    its state: the same layouts, corpus and keyboard.
  * 2. Lazy: nothing is scored until the view is shown, then one layout per
  *    idle slice, so the Comparer stays responsive (every analyser, both
- *    fingerings, costs about 70 ms per layout).
+ *    fingerings, costs about 370 ms per layout on 2026-11-19), and only the
+ *    best ANALYSED_MAX of the ranking: a minute for the whole library, which
+ *    the Comparer compares by default. The table is drawn again at most every
+ *    RENDER_MS.
  * 3. Every string is a locale key; numbers use the page's locale.
+ * 4. Scores or ranks: each analyser's rank of the layouts beside the
+ *    Comparer's, the cell shaded on one blue ramp (rank 1 darkest), the rank
+ *    always written; every column sorts from a header button (aria-sort).
+ * 5. Each analyser's header says how faithful its score is on the Comparer's
+ *    corpus (a text or n-gram tables alone); a cell scored on another kind
+ *    of corpus says its own in its tooltip.
  * ==============================================================================
  */
 
@@ -31,20 +40,34 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		official: () => t('layout_analysis.analysers.official'),
 		custom: () => t('layout_analysis.analysers.custom')
 	};
+	// What the cells show: each analyser's score, or the rank it gives.
+	const VIEWS = ['scores', 'ranks'];
+	const VIEW_LABEL = {
+		scores: () => t('layout_analysis.analysers.view_scores'),
+		ranks: () => t('layout_analysis.analysers.view_ranks')
+	};
+	// The best layouts of the Comparer's ranking this view scores, every analyser
+	// costing some 370 ms a layout (a minute for the whole library).
+	const ANALYSED_MAX = 40;
+	// The table is drawn again at most this often while the layouts are scored (ms).
+	const RENDER_MS = 500;
+	// A rank cell at least this share of the darkest is dark enough for light ink.
+	const STRONG_SHARE = 0.55;
 	const DIRECTION_LABEL = {
 		higher: () => t('layout_analysis.analysers.better.higher'),
 		lower: () => t('layout_analysis.analysers.better.lower'),
 		none: () => t('layout_analysis.analysers.better.none')
 	};
 
-	/** Translates a locale key; an unknown key shows itself so the gap is visible. */
-	function t(key, values) {
-		const strings = window._i18n_strings || {};
-		let text = typeof strings[key] === 'string' ? strings[key] : key;
-		for (const [name, value] of Object.entries(values || {}))
-			text = text.split(`{${name}}`).join(String(value));
-		return text;
-	}
+	// How faithful each score is on the corpus it read (analyser_models.json, per corpus).
+	const FIDELITY_LABEL = {
+		exact: () => t('layout_analysis.analysers.fidelity.exact'),
+		close: () => t('layout_analysis.analysers.fidelity.close'),
+		approximate: () => t('layout_analysis.analysers.fidelity.approximate')
+	};
+
+	/** Translates a locale key (info_popover.js t(): numbers as every number shown). */
+	const t = (key, values) => window.LAYOUT_ANALYSIS_INFO.t(key, values);
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -53,18 +76,18 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		return node;
 	}
 
-	const format = (value, digits) =>
-		Number(value).toLocaleString(window._i18n_locale || undefined, {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
+	// Every number in the language of the page's strings; info_popover.js loads
+	// after this script, so it is read when a number is written.
+	const format = (value, digits) => window.LAYOUT_ANALYSIS_INFO.format(value, digits);
+	// A number and its unit, tied by a no-break space.
+	const measure = (value, digits, unit) => window.LAYOUT_ANALYSIS_INFO.measure(value, digits, unit);
 
 	/**
 	 * Draws the view in a container and follows the Comparer.
 	 * @param {HTMLElement} container - Where the view goes (the owner places it).
 	 * @param {{comparer?: object}} [options] - The mounted Comparer (default
 	 *   window.LAYOUT_ANALYSIS_COMPARER). The user's finger model is
-	 *   LAYOUT_ANALYSIS_FINGERING.current(); a change re-scores.
+	 *   LAYOUT_ANALYSIS_FINGERING.current(keyboard); a change re-scores.
 	 * @throws {Error} On a missing container or Comparer.
 	 */
 	function attach(container, options) {
@@ -83,31 +106,65 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		const title = el('h2');
 		const intro = el('p', 'la-muted');
 		const status = el('p', 'la-muted');
-		const wrap = el('div', 'la-table-wrap');
-		const table = el('table', 'la-table la-analysers-table');
+		const viewField = el('label', 'la-filter-field');
+		// The field's words are the label's own text, before its select.
+		const viewName = document.createTextNode('');
+		const view = el('select');
+		view.id = 'la-analysers-view';
+		viewField.append(viewName, view);
+		const viewCaption = el('p', 'la-muted');
+		// The scrolling box is the region named by the tab's title.
+		const wrap = el('section', 'la-table-wrap');
+		wrap.tabIndex = 0;
+		title.id = 'la-analysers-title';
+		wrap.setAttribute('aria-labelledby', title.id);
+		const table = el('table', 'la-table la-heat-table la-analysers-table');
 		wrap.append(table);
-		section.append(title, intro, status, wrap);
+		section.append(title, intro, viewField, viewCaption, status, wrap);
 		container.append(section);
 		container.hidden = false;
 
 		const state = {
 			results: [],
+			// How many layouts the Comparer ranked, of which results holds the best.
+			total: 0,
 			layouts: new Map(),
 			tables: null,
 			keyboard: 'iso',
 			scores: new Map(),
 			sort: null,
-			job: 0
+			view: VIEWS[0],
+			job: 0,
+			// What the header drawn says: its sort and its words (render()).
+			head: null
 		};
+		view.addEventListener('change', () => {
+			state.view = view.value;
+			render();
+		});
 		const FINGERING = window.LAYOUT_ANALYSIS_FINGERING;
+
+		/** An analyser's fidelity on the Comparer's corpus. */
+		const fidelityOf = (a) => S.fidelity(a.id, state.tables);
+
+		/**
+		 * A cell's tooltip words for its fidelity, when its layout's own corpus
+		 * (a « + » layout types another text) differs from the header's.
+		 */
+		function otherFidelity(a, r) {
+			if (!r || !state.tables || r.fidelity === fidelityOf(a)) return '';
+			return FIDELITY_LABEL[r.fidelity]();
+		}
 
 		/** The text of one score: its value, or the headline statistics of a score-less analyser. */
 		function cellText(a, r) {
 			if (!r) return '…';
-			if (a.better !== 'none') return format(r.value, a.digits);
+			if (a.better !== 'none')
+				return measure(r.value, a.digits, window.LAYOUT_ANALYSIS_INFO.analyserUnit(a));
 			return a.headline
 				.map(
-					(part) => `${t(`layout_analysis.analysers.part.${part}`)} ${format(r.parts[part], 1)} %`
+					(part) =>
+						`${t(`layout_analysis.analysers.part.${part}`)} ${measure(r.parts[part], 1, '%')}`
 				)
 				.join(' · ');
 		}
@@ -116,22 +173,73 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			const thead = el('thead');
 			const top = el('tr');
 			const sub = el('tr');
-			top.append(el('th', '', t('layout_analysis.analysers.layout')));
-			sub.append(el('th'));
+			const name = el('th', '', t('layout_analysis.analysers.layout'));
+			name.scope = 'col';
+			top.append(name);
+			sub.append(el('td'));
 			for (const a of analysers) {
 				const th = el('th', 'la-analyser');
+				th.scope = 'colgroup';
 				th.colSpan = FINGERINGS.length;
-				th.append(el('span', '', a.name), INFO.button(`analyser.${a.id}`));
+				th.append(a.name, INFO.button(`analyser.${a.id}`));
 				th.append(el('small', 'la-muted', DIRECTION_LABEL[a.better]()));
+				// The Comparer's corpus decides it: genkey is exact on a text only.
+				if (state.tables)
+					th.append(el('small', 'la-muted la-fidelity', FIDELITY_LABEL[fidelityOf(a)]()));
 				top.append(th);
 				for (const fingering of FINGERINGS) {
-					const cell = el('th', 'la-sortable', FINGERING_LABEL[fingering]());
-					if (a.better !== 'none') cell.addEventListener('click', () => sortBy(a, fingering));
+					const cell = el('th', 'la-sortable');
+					cell.scope = 'col';
+					// A score-less analyser has nothing to sort by.
+					if (a.better === 'none') cell.textContent = FINGERING_LABEL[fingering]();
+					else {
+						// The sort is a button, so the keyboard reaches it.
+						const button = el('button', 'la-sort', FINGERING_LABEL[fingering]());
+						button.type = 'button';
+						button.dataset.sort = `${a.id}.${fingering}`;
+						button.addEventListener('click', () => {
+							sortBy(a, fingering);
+							const again = table.querySelector(`button[data-sort="${a.id}.${fingering}"]`);
+							if (again) again.focus();
+						});
+						cell.append(button);
+						if (state.sort && state.sort.id === a.id && state.sort.fingering === fingering)
+							cell.setAttribute(
+								'aria-sort',
+								// The values' order: the best first, lowest or highest by the analyser.
+								(a.better === 'lower') !== state.sort.flip ? 'ascending' : 'descending'
+							);
+					}
 					sub.append(cell);
 				}
 			}
 			thead.append(top, sub);
 			return thead;
+		}
+
+		/**
+		 * Each layout's rank by each analyser and fingering (1: the analyser's
+		 * best), among the layouts scored so far; ties share a rank.
+		 * @returns {Map<string, number>} `${layout}|${analyser}|${fingering}` → rank.
+		 */
+		function ranks() {
+			const out = new Map();
+			const scored = state.results.filter((r) => state.scores.has(r.layout.id));
+			for (const a of analysers) {
+				if (a.better === 'none') continue;
+				for (const fingering of FINGERINGS) {
+					const value = (r) => state.scores.get(r.layout.id)[a.id][fingering].value;
+					const sorted = scored
+						.filter((r) => Number.isFinite(value(r)))
+						.sort((x, y) => (a.better === 'lower' ? value(x) - value(y) : value(y) - value(x)));
+					sorted.forEach((r, i) => {
+						const tied = i > 0 && value(sorted[i - 1]) === value(r);
+						const rank = tied ? out.get(`${sorted[i - 1].layout.id}|${a.id}|${fingering}`) : i + 1;
+						out.set(`${r.layout.id}|${a.id}|${fingering}`, rank);
+					});
+				}
+			}
+			return out;
 		}
 
 		function sortBy(a, fingering) {
@@ -158,17 +266,61 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		function render() {
 			title.textContent = t('layout_analysis.analysers.title');
 			intro.textContent = t('layout_analysis.analysers.intro');
+			if (state.total > state.results.length)
+				intro.textContent += ` ${t('layout_analysis.analysers.capped', {
+					count: state.results.length,
+					total: state.total
+				})}`;
+			viewName.textContent = t('layout_analysis.analysers.view');
+			view.replaceChildren(
+				...VIEWS.map((id) => {
+					const option = el('option', '', VIEW_LABEL[id]());
+					option.value = id;
+					return option;
+				})
+			);
+			view.value = state.view;
+			viewCaption.textContent =
+				state.view === 'ranks' ? t('layout_analysis.analysers.ranks_caption') : '';
+			const byRank = state.view === 'ranks' ? ranks() : null;
+			const last = byRank ? Math.max(...byRank.values(), 1) : 1;
 			const tbody = el('tbody');
 			for (const result of ordered()) {
 				const tr = el('tr');
-				tr.append(el('th', 'la-name', result.layout.name));
+				const name = el('th', 'la-name', result.layout.name);
+				name.scope = 'row';
+				tr.append(name);
 				const s = state.scores.get(result.layout.id);
 				for (const a of analysers)
-					for (const fingering of FINGERINGS)
-						tr.append(el('td', 'la-num', cellText(a, s && s[a.id][fingering])));
+					for (const fingering of FINGERINGS) {
+						const rank = byRank && byRank.get(`${result.layout.id}|${a.id}|${fingering}`);
+						const own = s && s[a.id][fingering];
+						const other = otherFidelity(a, own);
+						if (!rank) {
+							const cell = el('td', 'la-num', cellText(a, own));
+							if (other) cell.title = other;
+							tr.append(cell);
+							continue;
+						}
+						// One blue ramp, the first rank darkest; the rank is written in the cell.
+						const share = last > 1 ? (last - rank) / (last - 1) : 1;
+						const cell = el('td', 'la-num la-cell la-cell-rank', format(rank, 0));
+						cell.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+						if (share >= STRONG_SHARE) cell.classList.add('la-cell-strong');
+						cell.title = `${a.name} (${FINGERING_LABEL[fingering]()}): ${cellText(a, own)}${other ? ` · ${other}` : ''}`;
+						tr.append(cell);
+					}
 				tbody.append(tr);
 			}
-			table.replaceChildren(header(), tbody);
+			// The header stays while it says the same: the scoring draws the table
+			// again every RENDER_MS, and a new header took the focus from its « i »
+			// and sort buttons, so Enter on them opened nothing.
+			const thead = header();
+			const head = JSON.stringify([state.sort, thead.textContent]);
+			if (head !== state.head || !table.tHead) {
+				table.replaceChildren(thead, tbody);
+				state.head = head;
+			} else table.tBodies[0].replaceWith(tbody);
 			const done = state.results.filter((r) => state.scores.has(r.layout.id)).length;
 			status.textContent =
 				done < state.results.length
@@ -185,6 +337,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		function compute() {
 			const job = ++state.job;
 			const pending = state.results.filter((r) => !state.scores.has(r.layout.id));
+			let drawn = performance.now();
 			const next = () => {
 				if (job !== state.job || pending.length === 0) return;
 				const result = pending.shift();
@@ -193,12 +346,15 @@ var LAYOUT_ANALYSER_TAB = (function () {
 					throw new Error(`analyser_tab: no layout ${result.layout.id} from the Comparer`);
 				state.scores.set(
 					result.layout.id,
-					S.scoreAll(layout, state.tables, {
+					S.scoreAll(layout, state.tablesOf(result), {
 						keyboard: state.keyboard,
-						profile: FINGERING.current() || undefined
+						profile: FINGERING.current(state.keyboard) || undefined
 					})
 				);
-				render();
+				if (pending.length === 0 || performance.now() - drawn >= RENDER_MS) {
+					render();
+					drawn = performance.now();
+				}
 				idle(next);
 			};
 			render();
@@ -217,10 +373,20 @@ var LAYOUT_ANALYSER_TAB = (function () {
 			if (visible) compute();
 			else render();
 		};
-		comparer.onResults((results, tables, { keyboard, layouts }) => {
-			state.results = results;
+		comparer.onResults((results, tables, { keyboard, layouts, tablesOf }) => {
+			// Each result's own tables: the Comparer's « + » layouts type another text.
+			if (typeof tablesOf !== 'function')
+				throw new Error('analyser_tab: the Comparer names the tables of each result');
+			// The best ANALYSED_MAX of the ranking: every analyser costs some 370 ms a
+			// layout, a minute for the whole library.
+			state.total = results.length;
+			state.results = results
+				.slice()
+				.sort((a, b) => a.rank - b.rank)
+				.slice(0, ANALYSED_MAX);
 			state.layouts = layouts;
 			state.tables = tables;
+			state.tablesOf = tablesOf;
 			state.keyboard = keyboard;
 			restart();
 		});

@@ -37,6 +37,11 @@
 ---    blocking api.github.com), both checks read the public releases Atom feed
 ---    on github.com, the changelog window's alternate source: Sparkle installs
 ---    from the channel's appcast, so the feed's tags are all a check needs (#99).
+--- 9. The manual check goes through the launcher's native HTTP worker
+---    (core/network/adapters/managed_http_worker.lua), whose closed failure
+---    reasons give a native receipt: the window names a proxy, offline or
+---    certificate cause the managed-network contract classified from it, as on
+---    Windows and Linux (UPD-13). The background check only logs its failure.
 --- ==============================================================================
 
 local M = {}
@@ -60,7 +65,7 @@ local i18n      = require("core.i18n.engine.i18n")
 local LOG = "updater.auto_check"
 
 -- The flat preference key mapped to config.toml [updater] check_interval_seconds
--- by infra/preferences.lua.
+-- by settings/engine/preferences/preferences.lua.
 M.STATE_KEY = "update_check_interval_seconds"
 
 local USER_AGENT = "ErgoptiPlus-Updater-macOS/1.0"
@@ -116,6 +121,20 @@ function M.load_config()
 	end
 	return { timing = decoded.timing, state_key = state_key, list_key = list_key, releases_url = expand(template),
 		feed_url = expand(feed_template), timeout_sec = timeout_sec }
+end
+
+--- The managed-network failure contract over the canonical policy; it has no
+--- fallback: without it no failed check could name a cause.
+--- @return table contract core.network.engine.failure instance.
+function M.failure_contract()
+	local path = Paths.shared("core/network/data/managed_network.json")
+	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then error("the canonical managed network policy is unreadable", 0) end
+	local decoded, decode_err = JsonCodec.decode(raw)
+	if decode_err or type(decoded) ~= "table" then
+		error("the canonical managed network policy is not JSON: " .. tostring(decode_err), 0)
+	end
+	return require("core.network.engine.failure").new(decoded)
 end
 
 --- Reads a header case-insensitively (HTTP/2 lowercases names, Foundation
@@ -202,7 +221,10 @@ end
 ---   timer table { after(sec, fn) -> handle, committed; cancel(handle) -> boolean }
 ---   storage table { get(key, default), read_exact(key) -> ok, value, set(key, value) -> boolean }
 ---   http table Background transport { get(url, headers, callback(result)) -> boolean }.
----   manual_http table Distinct manual transport with the same contract.
+---   manual_http table Distinct manual transport with the same contract; a
+---     failed transfer's result carries failure_receipt, its native receipt.
+---   failure_contract table The managed-network contract
+---     (core.network.engine.failure) that classifies that receipt.
 ---   now function(): number Wall clock in epoch seconds.
 ---   current_version function(): string|nil, installed_channel function(): string|nil
 --- @return table owner
@@ -216,6 +238,9 @@ function M.new(opts)
 	end
 	if type(opts.storage.read_exact) ~= "function" then
 		error("the automatic update-check owner needs an exact storage read", 2)
+	end
+	if type(opts.failure_contract) ~= "table" or type(opts.failure_contract.classify) ~= "function" then
+		error("the automatic update-check owner needs the managed-network failure contract", 2)
 	end
 	local config = opts.config or M.load_config()
 	if type(config.feed_url) ~= "string" or config.feed_url == "" then
@@ -439,11 +464,14 @@ function M.new(opts)
 	end
 
 	--- Reads one list response: the usable body, or nil with the failure reason
-	--- (an updater.check_result reason name) and its English cause.
+	--- (an updater.check_result reason name), its English cause and the
+	--- evidence a failed check names (updater.check_result failure_key).
 	--- @param result table|nil The HTTP port's result.
 	--- @return string|nil body
 	--- @return string|nil reason
 	--- @return string|nil detail
+	--- @return table|nil evidence { rate_limited = true } for an exhausted limit,
+	---   { receipt } for a failed transfer whose transport gave its native receipt
 	local function read_response(result, request_copy, may_store)
 		local status = type(result) == "table" and tonumber(result.status) or 0
 		if status == 304 and request_copy then
@@ -467,9 +495,28 @@ function M.new(opts)
 		end
 		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
 			header_value(result.headers, "x-ratelimit-reset"))
-		if limited then return nil, "no_connection", limited end
+		if limited then return nil, "no_connection", limited, { rate_limited = true } end
+		local receipt = type(result) == "table" and type(result.failure_receipt) == "table"
+			and result.failure_receipt or nil
 		return nil, "no_connection",
-			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
+			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result"),
+			receipt and { receipt = receipt } or nil
+	end
+
+	--- The evidence a failed check names (updater.check_result failure_key):
+	--- the exhausted rate limit, and the cause the managed-network contract
+	--- classifies from the transfer's native receipt. No receipt, no cause.
+	--- @param evidence table|nil read_response()'s evidence.
+	--- @return table|nil { rate_limited, report }
+	local function check_evidence(evidence)
+		if type(evidence) ~= "table" then return nil end
+		local report = nil
+		if type(evidence.receipt) == "table" and next(evidence.receipt) ~= nil then
+			local classified, value = pcall(opts.failure_contract.classify, evidence.receipt, {})
+			if classified then report = value
+			else Logger.error(LOG, "The check's failure receipt could not be classified: %s.", tostring(value)) end
+		end
+		return { rate_limited = evidence.rate_limited == true, report = report }
 	end
 
 	--- Reads the public releases Atom feed after the API gave no list, and
@@ -617,7 +664,7 @@ function M.new(opts)
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
-		local function fail(reason, detail)
+		local function fail(reason, detail, evidence)
 			if answered or request_generation ~= manual_generation then return end
 			if request_sequence >= published_sequence then
 				published_sequence = request_sequence
@@ -625,7 +672,10 @@ function M.new(opts)
 				if previous then save_record(Schedule.record_check(previous, opts.now(), false)) end
 			end
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
-			answer(CheckResult.failure(base, reason, detail))
+			-- An exhausted rate limit (UPD-06) and a proxy, offline or certificate
+			-- cause the launcher's worker proved natively (UPD-13) are named in
+			-- the window; the API attempt's evidence stands when the feed fails too
+			answer(CheckResult.failure(base, reason, detail, check_evidence(evidence)))
 		end
 		Logger.start(LOG, "Manual update check (channel %s)…", tostring(channel))
 		if type(channel) ~= "string" or Updater.channels().channel(channel) == nil then
@@ -670,14 +720,14 @@ function M.new(opts)
 		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(request_copy), function(response)
 			if api_completed or answered or request_generation ~= manual_generation then return end
 			api_completed = true
-			local body, reason, detail = read_response(response, request_copy, request_sequence >= published_sequence)
+			local body, reason, detail, evidence = read_response(response, request_copy, request_sequence >= published_sequence)
 			if body then return answer_from(body) end
-			if reason ~= "no_connection" then return fail(reason, detail) end
+			if reason ~= "no_connection" then return fail(reason, detail, evidence) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
 				tostring(channel), detail)
 			read_feed(opts.manual_http, detail, function(feed_body, feed_detail)
 				if answered or request_generation ~= manual_generation then return end
-				if not feed_body then return fail("no_connection", feed_detail) end
+				if not feed_body then return fail("no_connection", feed_detail, evidence) end
 				answer_from(feed_body)
 			end)
 		end)
@@ -822,7 +872,8 @@ function M.start_session(opts)
 		timer = require("core.events.timer_scheduler"),
 		storage = require("core.fs.adapters.storage"),
 		http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
-		manual_http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("core.network.adapters.managed_http_worker").new({ timeout_sec = config.timeout_sec }),
+		failure_contract = M.failure_contract(),
 		now = os.time,
 	})
 	local watcher = require("core.events.wake_watcher").new(owner.on_wake)

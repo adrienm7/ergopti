@@ -9,9 +9,14 @@
 // buttons. The three drivers host this page and send it the same state:
 //   { platform, shortcut_menu_path, index, source, error, installed, provided,
 //     builtin, active, busy, result }
+// Windows adds `native`, the keyboard layouts Studio registered as DLLs,
+// each removed through its own uninstaller ({ action: 'uninstall', dll }).
 // The page decides the rows from that state (one source for every driver)
 // and only ever posts the allowlisted actions below; each host checks them
 // again before acting.
+// Keyboard and screen reader: the root names the interface language every
+// host seeds (window._i18n_locale), a redraw keeps the focus on the row the
+// user acted on, and Escape posts close, on the three hosts.
 // ===========================================================================
 
 // ========================================
@@ -40,8 +45,18 @@ const FAILURE_KEYS = Object.freeze({
 	provided_by_bundle: 'layout_manager.failure_provided_by_bundle',
 	foreign_file: 'layout_manager.failure_foreign_file',
 	download_failed: 'layout_manager.failure_download',
-	python_missing: 'layouts.linux_needs_python'
+	python_missing: 'layouts.linux_needs_python',
+	// Linux: what keeps a converted layout from reaching the user XKB tree.
+	helpers_missing: 'layout_manager.failure_helpers_missing',
+	conversion_failed: 'layout_manager.failure_conversion',
+	installer_failed: 'layout_manager.failure_installer',
+	xorg_session: 'layouts.linux_xorg_session',
+	// Linux: a compositor that selects its layout only in its own file (Sway, niri...).
+	session_unsupported: 'layout_manager.failure_session_unsupported'
 });
+
+// The DLL name of a Windows keyboard layout (KbdRegister_Constant("dll_name")).
+const NATIVE_DLL_NAME = /^[a-z][a-z0-9]{0,7}$/;
 
 // Catalogue error codes (_shared/layouts/engine/composer/catalogue.lua and its AHK twin).
 const CATALOGUE_ERROR_KEYS = Object.freeze({
@@ -55,6 +70,17 @@ let _strings = {};
 let _state = null;
 
 const _post = makeHostBridge('layout_manager_bridge');
+
+// The page speaks the interface language: a screen reader picks its voice from
+// the root lang (WCAG 3.1.1), which index.html declares as fr. Every host seeds
+// window._i18n_locale before this script runs (LTP-01, LTP-02).
+if (typeof window._i18n_locale === 'string' && window._i18n_locale !== '')
+	window.setPageLocale(window._i18n_locale);
+else console.error('layout manager: no window._i18n_locale seeded; the page language stays fr');
+
+// The elements of the last redraw that can take the focus back:
+// { row, action, el }, action '' for a row's heading.
+let _focusables = [];
 
 /**
  * Returns the translated string for key, or key itself when it is missing.
@@ -191,7 +217,37 @@ function layoutRows(state) {
 			rows.push(makeRow(null, installed[id], false, false, active, state.shortcut_menu_path));
 		}
 	}
+	const native = Array.isArray(state.native) ? state.native : [];
+	for (const layout of native) {
+		if (layout && typeof layout.dll === 'string' && NATIVE_DLL_NAME.test(layout.dll))
+			rows.push(nativeRow(layout));
+	}
 	return rows;
+}
+
+/**
+ * One keyboard layout Studio registered as a Windows DLL: it can only be
+ * removed, through its own uninstaller.
+ * @param {Object} layout - { dll, name, author, klid } from the host.
+ * @returns {Object}
+ */
+function nativeRow(layout) {
+	return {
+		id: 'native:' + layout.dll,
+		dll: layout.dll,
+		name: typeof layout.name === 'string' && layout.name !== '' ? layout.name : layout.dll,
+		author: typeof layout.author === 'string' ? layout.author : '',
+		licence: '',
+		homepage: '',
+		version: '',
+		installedVersion: '',
+		status: 'native',
+		active: false,
+		removed: false,
+		hotstrings: 0,
+		shortcuts: 0,
+		actions: ['uninstall']
+	};
 }
 
 /**
@@ -224,7 +280,8 @@ function catalogueStatus(state) {
 function resultMessage(result, rows) {
 	if (!result || typeof result !== 'object' || typeof result.id !== 'string') return null;
 	const row = rows.find((candidate) => candidate.id === result.id);
-	const name = row ? row.name : result.id;
+	// A removed DLL row is gone from the list: the host names it in the result.
+	const name = row ? row.name : typeof result.name === 'string' ? result.name : result.id;
 	const detail = typeof result.detail === 'string' ? result.detail : '';
 	if (!result.ok) {
 		const key = FAILURE_KEYS[result.code] || 'layout_manager.failure_other';
@@ -293,55 +350,73 @@ function element(tag, className, text) {
 function renderRow(row, busy) {
 	const item = element('li', 'layout layout-' + row.status);
 	item.dataset.id = row.id;
+	// Each card is a self-contained article: its name is the heading a screen
+	// reader jumps by, its header carries the badges and its footer the actions.
+	const card = element('article', 'layout-card');
+	item.appendChild(card);
 
-	const header = element('div', 'layout-header');
-	header.appendChild(element('span', 'layout-name', row.name));
-	const badges = element('span', 'layout-badges');
+	const header = element('header', 'layout-header');
+	const heading = element('h2', 'layout-name', row.name);
+	// Out of the Tab order: the focus comes back here when the button the user
+	// pressed is disabled or gone after the redraw.
+	heading.setAttribute('tabindex', '-1');
+	_focusables.push({ row: row.id, action: '', el: heading });
+	header.appendChild(heading);
+	const badges = element('ul', 'layout-badges');
 	badges.appendChild(
-		element('span', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
+		element('li', 'badge badge-' + row.status, _t('layout_manager.status_' + row.status))
 	);
 	if (row.active)
-		badges.appendChild(element('span', 'badge badge-active', _t('layout_manager.status_active')));
+		badges.appendChild(element('li', 'badge badge-active', _t('layout_manager.status_active')));
 	header.appendChild(badges);
-	item.appendChild(header);
+	card.appendChild(header);
 
-	const meta = element('div', 'layout-meta');
+	const meta = element('ul', 'layout-meta');
 	if (row.author)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_author', row.author)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_author', row.author)));
 	if (row.licence)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_licence', row.licence)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_licence', row.licence)));
 	if (row.version)
-		meta.appendChild(element('span', '', _fmt('layout_manager.meta_version', row.version)));
+		meta.appendChild(element('li', '', _fmt('layout_manager.meta_version', row.version)));
+	if (row.dll) meta.appendChild(element('li', '', _fmt('layout_manager.meta_dll', row.dll)));
 	if (row.installedVersion && row.installedVersion !== row.version) {
 		meta.appendChild(
-			element('span', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
+			element('li', '', _fmt('layout_manager.meta_installed_version', row.installedVersion))
 		);
 	}
-	item.appendChild(meta);
+	card.appendChild(meta);
 	if (row.hotstrings || row.shortcuts) {
-		const content = element('div', 'layout-content');
-		content.appendChild(
-			element('div', '', _fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts))
+		card.appendChild(
+			element(
+				'p',
+				'layout-content',
+				_fmt('layout_manager.extension_content', row.hotstrings, row.shortcuts)
+			)
 		);
-		content.appendChild(
-			element('div', 'layout-content-note', _t('layout_manager.extension_opt_in'))
+		card.appendChild(
+			element('p', 'layout-content layout-content-note', _t('layout_manager.extension_opt_in'))
 		);
-		item.appendChild(content);
 	}
 
-	const buttons = element('div', 'layout-actions');
+	const buttons = element('footer', 'layout-actions');
 	if (busy && busy.id === row.id && busy.action !== 'select') {
 		const key =
 			busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
-		buttons.appendChild(element('span', 'busy', _t(key)));
+		buttons.appendChild(element('p', 'busy', _t(key)));
 	}
 	if (row.homepage) buttons.appendChild(actionButton('open_homepage', row.id, false, 'link'));
 	for (const action of row.actions) {
 		buttons.appendChild(
-			actionButton(action, row.id, Boolean(busy), action === 'uninstall' ? 'danger' : '')
+			actionButton(
+				action,
+				row.id,
+				Boolean(busy),
+				action === 'uninstall' ? 'danger' : '',
+				row.dll ? { dll: row.dll } : undefined
+			)
 		);
 	}
-	item.appendChild(buttons);
+	card.appendChild(buttons);
 	return item;
 }
 
@@ -351,9 +426,10 @@ function renderRow(row, busy) {
  * @param {string} id
  * @param {boolean} disabled
  * @param {string} variant - Extra class.
+ * @param {Object} [target] - { dll } for a Windows DLL row, which has no registry id.
  * @returns {HTMLElement}
  */
-function actionButton(action, id, disabled, variant) {
+function actionButton(action, id, disabled, variant, target) {
 	const labels = {
 		install: 'layout_manager.btn_install',
 		update: 'layout_manager.btn_update',
@@ -365,8 +441,10 @@ function actionButton(action, id, disabled, variant) {
 	button.type = 'button';
 	button.disabled = disabled;
 	button.dataset.action = action;
+	_focusables.push({ row: id, action, el: button });
 	button.addEventListener('click', function () {
-		send(action, id);
+		if (target) send(action, undefined, target);
+		else send(action, id);
 	});
 	return button;
 }
@@ -396,9 +474,50 @@ function render() {
 	}
 
 	const list = document.getElementById('layout-list');
+	const focused = focusedTarget();
+	_focusables = [];
 	while (list.firstChild) list.removeChild(list.firstChild);
 	for (const row of rows) list.appendChild(renderRow(row, busy));
 	document.getElementById('empty').hidden = rows.length > 0;
+	if (focused) restoreFocus(focused);
+}
+
+/**
+ * The row and action of the list element that holds the focus, before a
+ * redraw replaces it.
+ * @returns {{row: string, action: string}|null}
+ */
+function focusedTarget() {
+	const active = document.activeElement;
+	const target = _focusables.find((candidate) => candidate.el === active);
+	return target ? { row: target.row, action: target.action } : null;
+}
+
+/**
+ * Gives the focus back after a redraw: to the same button when it can take
+ * it, else to its row's heading, else to the result line, which names a row
+ * that left the list. The redraw replaced every element, so without this the
+ * focus fell to the document and a keyboard or screen reader user started
+ * again from the top after each install (LTP-06).
+ * @param {{row: string, action: string}} focused
+ */
+function restoreFocus(focused) {
+	const same = _focusables.find(
+		(candidate) =>
+			candidate.row === focused.row && candidate.action === focused.action && !candidate.el.disabled
+	);
+	const heading = _focusables.find(
+		(candidate) => candidate.row === focused.row && candidate.action === ''
+	);
+	const result = document.getElementById('result');
+	const target = same
+		? same.el
+		: heading
+			? heading.el
+			: result.hidden
+				? document.getElementById('btn-refresh')
+				: result;
+	target.focus();
 }
 
 // ========================================
@@ -465,6 +584,16 @@ document.getElementById('btn-editor').addEventListener('click', function () {
 });
 
 document.getElementById('btn-close').addEventListener('click', function () {
+	send('close');
+});
+
+// Escape closes the window, as « Close » does and as Escape closes the Updates
+// window (UPD-03): the WebView holds the keyboard focus, so no host window
+// sees the key (LTP-07). The window keeps no unsaved work, and an operation
+// in flight goes on without it.
+document.addEventListener('keydown', function (event) {
+	if (event.key !== 'Escape' || event.defaultPrevented) return;
+	event.preventDefault();
 	send('close');
 });
 

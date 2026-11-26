@@ -25,7 +25,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Paths = require("core.fs.engine.paths")
-local TomlReader = require("core.text.engine.toml_codec.reader")
+local TomlReader = require("core.text.engine.toml.reader")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
 local KeyNames = require("platform.input.keycodes.key_names")
 
@@ -60,18 +60,10 @@ local function sections()
 	return _sections
 end
 
---- One required key, or an error naming exactly what is missing.
---- @param section string
---- @param key string
---- @return any
-local function require_key(section, key)
-	local s = sections()[section]
-	if type(s) ~= "table" or s[key] == nil then
-		error(string.format("[tooltip.config] missing key [%s].%s in the shared tooltip constants",
-			section, key))
-	end
-	return s[key]
-end
+--- One required key, or an error naming exactly what is missing, through the
+--- accessor macOS reads its copy of the constants with.
+--- @type fun(section: string, key: string): any
+local require_key = require("core.ui.engine.tooltip.constant_keys").reader(sections, "[tooltip.config]")
 
 --- A per-driver key, falling back to the shared one when the file declares only
 --- a single value for every driver.
@@ -135,6 +127,11 @@ function M.load()
 			line_spacing     = require_key("layout", "line_spacing"),
 			hint_spacing     = require_key("layout", "hint_spacing"),
 			label_gap        = require_key("layout", "label_gap"),
+			-- The framed badge of a preview row's category glyph
+			-- (CategoryGlyph.badge_geometry).
+			glyph_badge_pad_x  = require_key("layout", "glyph_badge_pad_x"),
+			glyph_badge_pad_y  = require_key("layout", "glyph_badge_pad_y"),
+			glyph_badge_gap    = require_key("layout", "glyph_badge_gap"),
 			llm_max_content_width = require_key("layout", "llm_max_content_width"),
 			corner_radius    = require_key("layout", "corner_radius"),
 			separator_height = require_key("layout", "separator_height"),
@@ -161,6 +158,8 @@ function M.load()
 			border_white = require_key("colors", "border_white"),
 			border_alpha = require_driver_key("colors", "border_alpha"),
 			sep_alpha    = require_driver_key("colors", "sep_alpha"),
+			-- The fill of the category glyph chip, 4.5:1 against every tint.
+			glyph_badge_white = require_key("colors", "glyph_badge_white"),
 		},
 		tint = {
 			lightness  = require_key("tint", "lightness"),
@@ -172,6 +171,14 @@ function M.load()
 		style.layout.pad_x, style.layout.pad_y, style.layout.corner_radius,
 		tostring(style.fonts.main), style.sizes.main)
 	return style
+end
+
+--- How long a preview with no trigger delay stays: the shared [timing]
+--- safety_timeout_sec, read on the three OS (TWD-1, decided by the maintainer on
+--- 2026-11-16), so a bubble never lingers after the typing stopped.
+--- @return number seconds
+function M.safety_timeout_seconds()
+	return require_key("timing", "safety_timeout_sec")
 end
 
 --- A preview's visible lifetime for its trigger delay: the shared decrement
@@ -186,11 +193,32 @@ function M.effective_delay(delay)
 	return math.max(floor, delay - decrement)
 end
 
---- An AI suggestion's lifetime: the shared [timing] llm_timeout_sec less the
---- shared decrement, never below the floor, as on Windows and macOS.
+--- The hotstring category whose delay override sets an AI suggestion's
+--- lifetime: the Delays submenu's AI row, the key Windows and macOS read too.
+--- @return string category
+function M.llm_delay_category()
+	return require_key("llm_ui", "delay_category")
+end
+
+--- The shared default lifetime of an AI suggestion before the decrement, the
+--- value the Delays submenu's AI row shows while the user has set none.
 --- @return number seconds
-function M.llm_timeout_seconds()
-	local timeout = require_key("timing", "llm_timeout_sec")
+function M.llm_timeout_default()
+	return require_key("timing", "llm_timeout_sec")
+end
+
+--- An AI suggestion's lifetime: the user's llm_prediction delay when one is set,
+--- else the shared [timing] llm_timeout_sec, less the shared decrement and never
+--- below the floor, as on Windows and macOS. A delay of 0 keeps the suggestion
+--- until the next activity, as on macOS.
+--- @param override number|nil The user's llm_prediction delay in seconds.
+--- @return number seconds 0 when the suggestion never expires.
+function M.llm_timeout_seconds(override)
+	if override ~= nil and (type(override) ~= "number" or override ~= override or override < 0) then
+		error("llm_timeout_seconds: the override must be a non-negative number of seconds, got " .. tostring(override), 2)
+	end
+	local timeout = override or M.llm_timeout_default()
+	if timeout == 0 then return 0 end
 	return math.max(require_key("timing", "timeout_floor_sec"),
 		timeout - require_key("timing", "timeout_decrement_sec"))
 end

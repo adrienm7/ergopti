@@ -82,7 +82,7 @@ class _TakeNoteNative {
 	static Launch(Path) {
 		if _TakeNoteNative._HasNativeNul(Path)
 			throw ValueError("note path cannot contain a NUL code unit")
-		Run('notepad.exe "' . Path . '"')
+		Run(ShellRunner_SystemProgramCommand("notepad.exe", '"' . Path . '"'))
 		return true
 	}
 
@@ -194,7 +194,7 @@ class _TakeNoteNative {
 
 	static ReportError(Message) {
 		LoggerError("TakeNote", "Deferred note-window transaction failed: {1}", Message)
-		try TrayTip(t("notify.take_note_failed"), "ErgoptiPlus", "Iconx Mute")
+		try NotifierSend(t("notify.take_note_failed"), Map("level", "error"))
 	}
 }
 

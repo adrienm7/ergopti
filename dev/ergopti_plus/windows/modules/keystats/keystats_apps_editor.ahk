@@ -9,6 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0+
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
 
 
 
@@ -221,10 +222,12 @@ _KLWAE_Confirm(Entry, Epoch, Request, App) {
 		t("metrics_apps.score_title"), "", String(Snapshot["current_score"]))
 	if !_KLWAE_Current(Entry, Epoch, Request) || ScoreChoice.Result != "OK"
 		return false
-	; The shared value schema owns the range and its localized refusal.
+	; The shared value schema owns the range and its localized refusal. A blank
+	; score goes back to the score of an application never edited (maintainer
+	; decision of 22 November 2026, PCK-13 for overrides).
 	Declared := ValueCheckEntryFor("metrics_apps.*.score")
 	Typed := (ScoreChoice.Value is String)
-		? ValueCheckParseEntry(Declared, ScoreChoice.Value)
+		? ValueCheckParseEntry(Declared, ScoreChoice.Value, KLAppCatConst.UNEDITED_SCORE)
 		: ValueCheckValue(Declared, ScoreChoice.Value)
 	if !Typed["ok"] {
 		LoggerWarn("KeystatsApps", "Typed score for '{1}' refused ({2}).", App, Typed["reason"])
@@ -364,7 +367,7 @@ _KLWAE_NativeDialog(Entry, Epoch, Request, Prompt, Title, Default := unset) {
 				return Result
 			Request["native_gui"] := NativeGui
 		} finally Critical(PreviousCritical)
-		NativeGui.SetFont("s10")
+		Gui_SetFont(NativeGui, "s10")
 		NativeGui.AddText("w420", Prompt)
 		InputEdit := IsSet(Default) ? NativeGui.AddEdit("w420", Default) : 0
 		Accept := NativeGui.AddButton("w90 Default", t("button.ok"))

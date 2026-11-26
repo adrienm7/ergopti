@@ -10,6 +10,9 @@
 # All values are in milliseconds unless the key name says otherwise.
 # Keys ending in _sec are in seconds (kept for readability where the
 # underlying API works in seconds, e.g. hs.timer.doAfter).
+# Every duration is an integer (maintainer decision, 2026-11-22): the three
+# readers refuse a fraction, and only *_mm distances and *_factor keys hold
+# one (tools/test/test-timings-registry-liveness.cjs).
 #
 # Editing this file is the single authoritative way to tune timings.
 # Driver-local constants that duplicate a value here should be removed
@@ -27,6 +30,13 @@
 # ──────────────────────────────────────────────────────────────────────
 
 [llm]
+# Windows: the managed Ollama session watch (cancellation, stale
+# configuration, pause, READY custody). AHK: ai/engine/ollama/managed_bootstrap.ahk.
+managed_session_poll_ms = 150
+
+# Windows: the API test progress pulse; slower and the probe looks frozen.
+# AHK: ai/ui/menu/api_entries.ahk.
+api_test_progress_tick_ms = 150
 
 # The keystroke debounce before an LLM prediction request is the user's
 # llm.trigger.debounce_ms, shipped as llm_debounce_ms in
@@ -39,15 +49,24 @@ chain_fallback_ms = 500
 # How long an automatic request that found its backend busy waits before it
 # asks again. The wait is at least the user's request interval; this keeps it
 # positive when that interval is 0 (llm.trigger.min_request_interval_ms).
-# LX: modules/llm/prediction_engine.lua send_when_free.
+# LX: ai/engine/prediction/engine.lua send_when_free.
 backend_busy_recheck_ms = 300
 
 # How often a just-installed owned Ollama re-reads its runtime metadata
 # before the daemon starts: the metadata is read off the UI thread, so the
 # first read after the install is still pending; the wait stops at the
 # metadata admission budget (_shared/core/network/data/bootstrap_retry.json).
-# HS: modules/llm/ollama_deps_checker.lua RUNTIME_METADATA_POLL_SEC.
+# HS: ai/engine/ollama/deps_checker.lua RUNTIME_METADATA_POLL_SEC.
 ollama_runtime_metadata_poll_ms = 250
+
+# How long config.toml must have been quiet before the AI preference reader
+# lets the file's change token (lstat: inode, size, mtime, ctime) stand for
+# the bytes it last read. A filesystem stamps from a coarse clock (a jiffy, up
+# to 10 ms; FAT's mtime 2 s), so an edit in the same tick as a read can keep
+# every field; past this, an edit always moves ctime. The managed archive
+# download re-admits its source about 30 times per 64 KiB chunk.
+# LX: ai/engine/preferences.lua.
+config_change_token_quiet_ms = 3000
 
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
@@ -63,7 +82,7 @@ ollama_request_timeout_ms = 180000
 # Period of the AI health watch that repaints the AI menu title's dot when
 # the active backend turns ready or fails after the menu was built (any
 # backend: local API, MLX, Ollama). It only reads in-memory state.
-# HS: ui/menu/menu_llm/init.lua HEALTH_WATCH_SEC.
+# HS: ai/ui/menu/init.lua HEALTH_WATCH_SEC.
 ai_health_watch_ms = 1000
 
 # Deadline of one models probe of a local OpenAI-compatible server
@@ -76,6 +95,14 @@ ai_health_watch_ms = 1000
 # HS: api_remote.lua detect_local_servers (each probe client). Linux:
 # enable_admission.lua. AHK: ollama_http.ahk LLM_OllamaIsRunning_Async.
 local_server_probe_timeout_ms = 1500
+
+# Linux: how long one admitted ancestor walk of the managed Ollama install
+# answers the per-download file owner's current(). A 64 KiB archive chunk
+# re-admits it about 14 times from separate callbacks, each walk one lstat per
+# ancestor; a refusal is never kept and every file mutation walks afresh.
+# LX: ai/engine/local_servers/runtime_composition.lua (ai/engine/ollama/install_admission.lua).
+# Linux only: no other driver walks the install ancestors per download chunk.
+install_ancestry_reuse_ms = 1
 
 # Deadline of each listening-socket or per-pid command of a local server sweep
 # (lsof, ss, ps -p; on Windows the one shell query of the processes and
@@ -112,26 +139,29 @@ keychain_operation_timeout_ms = 10000
 # answers). Retry: delay before the next attempt, doubled after each failure
 # other than a locked keyring up to retry_max (a locked keyring is probed again
 # after retry, since the probe never prompts).
-# LX: modules/llm/api_key_migration.lua.
+# LX: ai/engine/settings/api_key_migration.lua.
 api_key_migration_probe_timeout_ms = 5000
 api_key_migration_store_timeout_ms = 20000
 api_key_migration_retry_ms = 60000
 api_key_migration_retry_max_ms = 1800000
 
 # Hard ceiling for dependency bootstrap installation and daemon polling.
-# AHK: ollama_deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS.
-# HS: mlx_deps_checker.lua / ollama_deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.
+# AHK: ai/engine/ollama/deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS (the install
+# and start of the managed runtime; its model pull has
+# ollama_model_pull_timeout_ms). HS: ai/engine/local_servers/mlx_deps_checker.lua,
+# ai/engine/ollama/deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.
+# LX: ai/engine/local_servers/runtime_composition.lua.
 dependency_bootstrap_timeout_ms = 1800000
 
 # Longest wait for the desktop's proxy answer (a company PAC is downloaded and
 # evaluated) before the managed Ollama server is started with that proxy.
-# LX: modules/llm/runtime_factory.lua managed proxy lookup.
+# LX: ai/engine/local_servers/runtime_factory.lua managed proxy lookup.
 managed_proxy_lookup_timeout_ms = 30000
 
 # Longest TCP connect to a relay a PAC names before another entry ("PROXY a;
 # DIRECT"): an unreachable relay sends the managed Ollama server to the next
-# entry, as a browser does. LX: modules/llm/managed_ollama_proxy.lua.
-# AHK: modules/llm/ollama_managed_bootstrap.ahk (ProxyListProbeMs).
+# entry, as a browser does. LX: ai/engine/ollama/managed_ollama_proxy.lua.
+# AHK: ai/engine/ollama/managed_bootstrap.ahk (ProxyListProbeMs).
 managed_proxy_probe_timeout_ms = 1000
 
 # HTTP polling interval when the remote driver polls a streaming response.
@@ -139,8 +169,18 @@ managed_proxy_probe_timeout_ms = 1000
 poll_interval_ms = 50
 
 # How often a managed Ollama model pull's percentage is read for the model
-# selector page. AHK: ollama_managed_bootstrap.ahk (the pull's capture tail).
+# selector page. AHK: ai/engine/ollama/managed_bootstrap.ahk (the pull's
+# capture tail). macOS and Linux read the pull's streamed progress instead.
 pull_progress_poll_ms = 1000
+
+# Ceiling of one managed Ollama model pull, from its dispatch, apart from the
+# install's dependency_bootstrap_timeout_ms: a multi-gigabyte model on a slow
+# line outlasts that budget, and Ollama keeps its finished blobs anyway.
+# AHK: ai/engine/ollama/managed_bootstrap.ahk (the first-model pull and the
+# menu pull). LX: ai/engine/local_servers/model_download.lua. macOS sets no
+# absolute ceiling: its pull worker stops a stalled transfer after the network
+# retry's stall bound (ai/engine/network-retry.sh CURL_STALL_SEC).
+ollama_model_pull_timeout_ms = 86400000
 
 # MLX stream: fail fast if the server never sends the first TCP byte.
 stream_connect_timeout_ms = 5000
@@ -157,7 +197,7 @@ warmup_post_timeout_ms = 30000
 non_stream_timeout_ms = 8000
 
 # Initial delay before the first warmup attempt after startup.
-# HS: warmup_controller.lua. LX: modules/llm/warmup.lua (also its retry base and cap).
+# HS: warmup_controller.lua. LX: ai/engine/local_servers/warmup.lua (also its retry base and cap).
 warmup_initial_delay_ms = 2000
 
 # Base retry interval for the exponential-backoff warmup retry loop.
@@ -198,8 +238,10 @@ installed_cache_ttl_ms = 2000
 
 # Ceiling of one Ollama DELETE /api/delete round trip (the "Delete this model
 # from cache" row); Ollama answers in well under a second once it holds no lock.
+# macOS bounds its `ollama rm` task by the same ceiling, then stops it.
 # AHK: api_ollama/init.ahk LLM_OLLAMA_DELETE_TIMEOUT_MS.
-# LX: modules/llm/model_delete.lua.
+# HS: ai/ui/menu/models/manager_ollama.lua delete_model.
+# LX: ai/engine/local_servers/model_delete.lua.
 ollama_delete_timeout_ms = 10000
 
 # Validation chord (val_modifiers + digit N): the prediction is inserted only
@@ -218,6 +260,8 @@ val_chord_release_timeout_ms = 5000
 # ──────────────────────────────────────────────────────────────────────
 
 [tooltip]
+# Windows: the tooltip dequeue poll during a dequeue cycle. AHK: core/ui/ui/tooltip/core.ahk.
+dequeue_poll_ms = 100
 
 # The hotstring and LLM tooltip durations, their decrement and their floor are
 # declared once, in _shared/core/ui/data/tooltip/constants.toml [timing], which every
@@ -230,12 +274,22 @@ val_chord_release_timeout_ms = 5000
 # AHK: keymap/llm_bridge.ahk _LLM_INFINITE_TOOLTIP_SEC (pinned copy, seconds).
 infinite_ttl_ms = 86400000
 
+# The system accessibility settings the previews follow (contrast, screen
+# reader): how long one read stays valid, so a preview drawn per keystroke
+# never queries the system each time.
+# HS: core/ui/adapters/system_accessibility.lua SETTINGS_TTL_SECONDS.
+accessibility_settings_ttl_ms = 1000
+# LX: core/ui/adapters/system_accessibility.lua REFRESH_SECONDS, the
+# background gsettings refresh, and READ_TIMEOUT_MS, the bound of one read.
+accessibility_settings_refresh_ms = 5000
+accessibility_settings_read_timeout_ms = 2000
+
 # Minimum hotstring tooltip duration before the chained LLM call fires.
 # AHK: keymap/llm_bridge.ahk _LLM_MIN_TOOLTIP_DURATION_SEC (pinned copy, seconds).
 hotstring_min_ttl_ms = 50
 
 # Auto-hide delay for success banners in the deps-checker UI.
-# HS: modules/llm/ollama_deps_checker.lua and mlx_deps_checker.lua SUCCESS_AUTO_HIDE_SEC.
+# HS: ai/engine/ollama/deps_checker.lua and mlx_deps_checker.lua SUCCESS_AUTO_HIDE_SEC.
 success_banner_autohide_ms = 1500
 
 # Auto-dismiss delay for error dialogs in the download window.
@@ -243,7 +297,7 @@ success_banner_autohide_ms = 1500
 error_dialog_autodismiss_ms = 8000
 
 # Webview auto-close delay after a successful Ollama operation.
-# AHK: modules/llm/ollama_webview.ahk OllamaWV_Done.
+# AHK: ai/engine/ollama/webview.ahk OllamaWV_Done.
 ollama_webview_autoclose_ms = 1800
 
 
@@ -285,6 +339,15 @@ layout_tis_settle_ms = 500
 # state snapshot before the replacement text arrives.
 terminal_hotstring_key_delay_ms = 20
 
+# Windows Notepad: the immediate-Backspace undo of an expansion asks Notepad's
+# verified editor to erase the rest of the expansion, which it refuses before
+# any change while the physical Backspace has not reached the document yet. The
+# request is asked again every retry interval, within the settle window, while
+# the keyboard capture holds the keys typed after the Backspace.
+# AHK: hotstrings/engine/matcher/dispatch.ahk.
+notepad_undo_settle_ms = 600
+notepad_undo_retry_ms = 25
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Gestures
@@ -296,8 +359,8 @@ terminal_hotstring_key_delay_ms = 20
 # diagonal; the others' diagonal is gestures.direction's factor of theirs. One
 # value for every driver (maintainer decision GSD-3 of 2026-11-11); the swipe
 # step itself is each slot's own [gestures.sensitivities] setting.
-# HS: modules/gestures/geometry.lua. LX: modules/gestures/incremental_tracker.lua.
-# AHK: modules/gestures/raw_touchpad.ahk, from the raw HID digitizer reports.
+# HS: gestures/engine/geometry.lua. LX: gestures/engine/incremental_tracker.lua.
+# AHK: gestures/adapters/raw_touchpad.ahk, from the raw HID digitizer reports.
 swipe_minimum_mm = 1.5
 pair_swipe_minimum_mm = 3.0
 pair_diagonal_minimum_mm = 5.0
@@ -310,10 +373,17 @@ pair_diagonal_minimum_mm = 5.0
 # 4 mm on one of 30 (the value kept: decided by the coordinator on 2026-11-11,
 # to review by the maintainer). A pad that reports neither its resolution nor
 # its axes is read at the fallback resolution.
-# LX: modules/gestures/mt_decoder.lua.
+# LX: gestures/engine/mt_decoder.lua.
 decoder_swipe_minimum_mm = 10.0
 pair_scroll_travel_mm = 10.0
 touchpad_fallback_units_per_mm = 12
+
+# How often the Linux driver looks for a touchpad again after the one it read
+# was unplugged, while gestures are on: one read of /proc/bus/input/devices
+# (maintainer decision of 2026-11-17). macOS and Windows receive gestures from
+# the OS, which keeps them across a reconnect.
+# LX: gestures/engine/manager.lua.
+touchpad_rescan_ms = 2000
 
 # The incremental swipe step rule and the live direction lock, for a driver
 # that cannot require the shared Lua modules: travel before the first action
@@ -324,7 +394,7 @@ touchpad_fallback_units_per_mm = 12
 # shared corpora (_shared/tests/corpus/gestures/incremental_steps.json and
 # direction_vectors.json) pin these to the Lua constants on every driver.
 # HS, LX: _shared/gestures/engine/incremental.lua, direction.lua.
-# AHK: modules/gestures/incremental.ahk, direction.ahk.
+# AHK: gestures/engine/incremental.ahk, direction.ahk.
 incremental_first_step_mm = 4.0
 incremental_max_actions_per_frame = 100
 incremental_reverse_floor_mm = 1.0
@@ -335,7 +405,7 @@ swipe_diagonal_minimum_factor = 1.5
 # shortcut for that swipe still belongs to it. A touch that stepped while
 # moving swallows the shortcut within this window; a touch whose frames stop
 # for this long without a lift frame is over, so a deferred shortcut fires.
-# AHK: modules/gestures/raw_touchpad.ahk.
+# AHK: gestures/adapters/raw_touchpad.ahk.
 incremental_handoff_ms = 300
 
 # Windows: how long a gesture's synthetic keys stay marked, the settle after an
@@ -346,7 +416,7 @@ auto_configure_delay_ms = 250
 
 # Windows: how often a worker-authored result file is checked after a touchpad
 # restart or gesture registration.
-# AHK: modules/gestures/config.ahk, ui/onboarding/gesture_registration.ahk.
+# AHK: gestures/engine/config.ahk, ui/onboarding/gesture_registration.ahk.
 worker_result_poll_ms = 100
 
 # Touchdevice discovery: how often the startup phase checks for the first frame.
@@ -367,13 +437,13 @@ aux_shell_timeout_ms = 10000
 
 # Free names new_text_file_here tries in a folder ("New text file.txt", then
 # "New text file 2.txt"…) before it gives up on a folder that holds them all.
-# LX: modules/gestures/system_actions.lua. HS: modules/gestures/system_actions.lua
-# and AHK: modules/gestures/system_actions.ahk keep a copy of the same count.
+# LX: gestures/engine/system_actions.lua. HS: gestures/engine/system_actions.lua
+# and AHK: gestures/engine/system_actions.ahk keep a copy of the same count.
 new_text_file_name_attempts = 100
 
 # Longest a hidden run_command child may run before it is stopped and its
 # failure notified (a terminal window is the user's own and is not bounded).
-# HS: gestures/user_actions.lua. LX: modules/gestures/user_actions.lua.
+# HS: gestures/user_actions.lua. LX: gestures/engine/user_actions.lua.
 run_command_timeout_ms = 30000
 
 # Longest one `shortcuts run` of a run_apple_shortcut binding may take before it
@@ -461,7 +531,7 @@ gesture_auto_configure_delay_ms = 2000
 
 # macOS: delay before the emergency recycle of the gesture watchers runs, so the
 # frame that triggered it has been delivered.
-# HS: modules/gestures/init.lua schedule_emergency_recycle.
+# HS: gestures/engine/init.lua schedule_emergency_recycle.
 emergency_recycle_delay_ms = 20
 
 
@@ -470,18 +540,72 @@ emergency_recycle_delay_ms = 20
 # ──────────────────────────────────────────────────────────────────────
 
 [keep_awake]
-
 # Minimum interval between mouse-jitter ticks.
-# AHK: win.ahk AWAKE_TICK_MIN_MS. HS: system.lua AWAKE_TICK_MIN_SEC.
+# AHK: win.ahk AwakeNextTickMs. HS: system.lua AWAKE_TICK_MIN_SEC.
 tick_min_ms = 1000
 
 # Maximum interval between mouse-jitter ticks.
-# AHK: win.ahk AWAKE_TICK_MAX_MS. HS: system.lua AWAKE_TICK_MAX_SEC.
+# AHK: win.ahk AwakeNextTickMs. HS: system.lua AWAKE_TICK_MAX_SEC.
 tick_max_ms = 5000
 
 # Delay to hold the cursor offset before returning it to origin.
-# AHK: win.ahk AWAKE_RETURN_MS. HS: system.lua AWAKE_RETURN_DELAY_SEC.
+# AHK: win.ahk SimulateActivity. HS: system.lua AWAKE_RETURN_DELAY_SEC.
 return_delay_ms = 200
+
+# Not a duration: the largest pixel offset of a jitter tick around its origin,
+# on each axis, and the move beyond which the user's own mouse stops the
+# session. Linux inhibits idleness instead and moves nothing.
+# AHK: win.ahk AwakeJitterPx. HS: system.lua AWAKE_JITTER_PX.
+jitter_px = 80
+
+# Windows: how often keep-awake reads the cursor to stop when the user moves the
+# mouse. AHK: modules/shortcuts/win.ahk AwakeCheckMouseMoved.
+mouse_check_poll_ms = 150
+
+# Linux: how often the session idle inhibitor checks that systemd-inhibit still
+# runs, and how long it waits for the command's ready line before it reports
+# keep-awake as refused. LX: modules/keep_awake.lua.
+inhibitor_poll_ms = 1000
+inhibitor_ready_timeout_ms = 5000
+
+# The anti-sleep auto-clicker: how often it looks at the allowed foreground
+# window, and how long one library target waits before it may be clicked
+# again, so a button still drawn for a frame after its click is not pressed
+# twice (maintainer decision of 2026-11-25).
+# LX: modules/auto_click.lua. HS: modules/shortcuts/actions/auto_click.lua.
+# AHK: modules/shortcuts/auto_click.ahk.
+auto_click_tick_ms = 700
+auto_click_cooldown_ms = 3000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Screen vision (capture, image matching, text recognition)
+# ──────────────────────────────────────────────────────────────────────
+
+[screen_vision]
+# Longest one text recognition may take before its child is stopped and the
+# caller told "ocr_timeout". LX: platform/system/vision/tesseract_ocr.lua.
+# HS: platform/system/vision/screen_vision.lua (the launcher's vision worker).
+# AHK: platform/system/vision/screen_vision.ahk (the Windows.Media.Ocr bridge).
+ocr_timeout_ms = 10000
+
+# Windows: how often the driver looks for the screen vision worker's answers,
+# and how often the worker looks for new requests, in its queue folder; and how
+# long the worker may take to compile its C# and create its OCR engine before
+# the service is reported unavailable. AHK: platform/system/vision/screen_vision.ahk.
+worker_poll_ms = 25
+worker_start_timeout_ms = 20000
+
+# Longest the « Capture → texte » region selection (Ctrl+O) may stay open
+# before it is closed as cancelled: the user draws at their own pace, but an
+# abandoned selector must not hold the action for the whole session.
+# LX: modules/ocr_capture.lua. AHK: platform/system/vision/region_select.ahk.
+region_select_timeout_ms = 120000
+
+# How often the Windows region overlay redraws its frame while the user drags:
+# about 60 frames a second, smooth without loading the message loop.
+# AHK: platform/system/vision/region_select.ahk.
+region_select_track_ms = 15
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -493,6 +617,16 @@ return_delay_ms = 200
 stop_poll_ms = 50
 first_push_delay_ms = 1500
 
+# Windows: the pause before the one retry of a state file rename that a
+# transient antivirus or indexer lock refused. AHK: keystats.ahk
+# (the atomic state write).
+state_rename_retry_ms = 50
+
+# Windows: how often an Ergopti Studio « My typing » read looks for its worker's
+# finished stage, which it hands over before the worker saves the reader image.
+# AHK: keystats_prefetch.ahk _KLPF_WatchStudioStage.
+studio_stage_poll_ms = 250
+
 # Background ingest tick — how often buffered events are flushed to disk.
 # AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
 ingest_tick_ms = 5000
@@ -501,6 +635,13 @@ ingest_tick_ms = 5000
 # Linux: reservation, transactional flush and commit-receipt resolution are
 # separate owned phases; no new phase starts before physical cleanup ACK.
 sqlite_operation_timeout_ms = 1000
+
+# Linux: the longest wait for the persistent sqlite3 child's acknowledgement of
+# one synchronous statement (modules/keystats/sqlite_child.lua). Past it the
+# child is killed and reaped, and its batch rolls back. Generous, because the
+# schema bootstrap and the token-encoding backup (VACUUM INTO) run through it
+# on a year-long store; a hung child must still not hang the daemon's loop.
+sqlite_child_deadline_ms = 30000
 
 # How long a dashboard READ waits for the single writer's lock (a COMMIT holds
 # it for milliseconds) before the read is refused. The databases use a rollback
@@ -584,7 +725,8 @@ wpm_window_ms = 15000
 wpm_min_duration_ms = 2000
 
 # Silence after which the live WPM reads 0 rather than the speed of the last
-# burst. HS: keystats/init.lua get_live_stats(); Linux: keystats.lua.
+# burst. HS: keystats/init.lua get_live_stats(); Linux: keystats.lua;
+# AHK: ui/wpm/wpm_config.ahk (WPMWidgetConst.IDLE_RESET_MS).
 wpm_idle_reset_ms = 5000
 
 # System load poll interval (CPU / RAM sampling).
@@ -687,6 +829,14 @@ focus_barrier_timeout_ms = 20
 # Linux: platform/focus/atspi_focus_watch.lua.
 focus_pump_sleep_ms = 1
 
+# How long one text automation reason must hold before the tray names it.
+# Longer than focus_settle_ms plus a context join (about one second), short
+# enough that a user testing a hotstring sees the row at the next menu open.
+# macOS names an unreadable focused element after the same delay.
+# Linux: platform/focus/text_automation_status.lua.
+# HS: hotstrings/ui/menu/status.lua.
+text_automation_notice_after_ms = 5000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)
@@ -731,9 +881,15 @@ one_shot_shift_timeout_ms = 2000
 # application publishes its selection within the 200 ms the clipboard settle
 # delay already allows; this leaves it a little more before the copy is sent
 # again, and the wait is a timer, never a sleep on the input thread.
-# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: modules/keymap/init.lua
+# AHK: platform/remap/constants.ahk TAP_COPY_VERIFY_MS. HS: hotstrings/engine/expander/init.lua
 # build_tap_copy. LX: platform/remap/tap_hold_manager.lua.
 copy_verify_ms = 300
+
+# Period of the watch that repaints the Tap-Holds menu title's status dot when
+# the remap runtime turns ready, waits or fails after the menu was built. It
+# only reads in-memory state, like the AI title's watch (ai_health_watch_ms).
+# HS: ui/menu/menu_tap_holds.lua (menu/ui/title_status.lua).
+title_status_watch_ms = 1000
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -764,9 +920,20 @@ complex_key_carry_ms = 300
 # Windows: the emoji and symbol sections register after ready, at their boot
 # rank, in slices of this length; the keyboard waits at most one slice. A gap
 # between two slices lets the input queued meanwhile run.
-# AHK: infra/hotstrings/hotstring_engine_main.ahk HSE_DeferredRegistrationSlice.
+# AHK: hotstrings/engine/matcher/engine_main.ahk HSE_DeferredRegistrationSlice.
 deferred_registration_slice_ms = 25
 deferred_registration_gap_ms = 15
+
+# Windows: how often the programmable (user code) hotstring loader polls its
+# worker processes until each one ends.
+# AHK: hotstrings/engine/dynamic/user_code.ahk UserHotstringWorker.
+user_code_worker_poll_ms = 25
+
+# Period of the watch that repaints the Hotstrings menu title's red dot when a
+# typing event tap stays disabled, or recovers, after the menu was built. It
+# only reads in-memory state, like the Tap-Holds title's watch.
+# HS: menu/ui/builder/builder.lua (hotstrings/ui/menu/status.lua).
+title_status_watch_ms = 1000
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -801,6 +968,50 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+# Windows: the poll that awaits a pending suspend. AHK: core/lifecycle/engine/lifecycle.ahk.
+suspend_pending_poll_ms = 25
+
+# Windows: how long a reload waits for its successor to ask this instance to
+# close before stopping it and refusing the reload, so a successor held by a
+# hidden modal never keeps configuration writes blocked. A normal reload asks
+# within about two seconds.
+# AHK: core/lifecycle/engine/reload/terminal_handoff.ahk.
+reload_successor_deadline_ms = 30000
+
+# Windows: the quiet time a burst of many saved sources (a pull, a checkout, a
+# sync) needs before the developer source watcher reloads. Pinned to
+# BULK_SETTLE_SEC of _shared/core/lifecycle/engine/reload/gate.lua, the macOS
+# and Linux policy, by tools/test/test-reload-gate-single-source.cjs.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_bulk_settle_ms = 3000
+
+# Windows: more distinct saved sources than this in one burst is a bulk write,
+# which waits dev_source_bulk_settle_ms, not a hand edit. Pinned to
+# BULK_THRESHOLD of _shared/core/lifecycle/engine/reload/gate.lua by
+# tools/test/test-reload-gate-single-source.cjs.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_bulk_threshold = 3
+
+# Windows: a Git operation that holds the developer reload this long is
+# reported once as a possible stale lock; the hold itself never expires.
+# Pinned to GIT_HOLD_REPORT_SEC of _shared/core/lifecycle/engine/reload/gate.lua,
+# the macOS and Linux policy, by tools/test/test-reload-gate-single-source.cjs.
+# AHK: core/lifecycle/engine/dev_source.ahk.
+dev_source_git_hold_report_ms = 60000
+
+# Windows: how often a diagnostics collection polls its worker process until it ends.
+# AHK: diagnostics/ui/healthcheck/collection.ahk.
+diagnostic_collection_poll_ms = 100
+
+# Windows: a one-shot scheduled timer that comes due while the driver is
+# suspended waits this long, then checks again, instead of running paused.
+# AHK: core/events/timer_scheduler.ahk _TimerAdapterMakeOneShot.
+suspended_timer_requeue_ms = 500
+
+# Windows: how often the mouse spotlight checks for a pointer move or its timeout.
+# AHK: core/ui/ui/spotlight/ownership.ahk _SpotlightSessionTimerNative.
+spotlight_poll_ms = 100
+
 # Windows: how long TakeNote waits on a Notepad tab it has not bound before it
 # accepts it as the note it launched (Windows 11 tabbed Notepad, where a file
 # already open there stays selected instead of opening a new tab).
@@ -817,11 +1028,20 @@ x11_layout_reapply_settle_ms = 750
 x11_layout_reapply_window_ms = 60000
 x11_layout_reapply_read_timeout_ms = 5000
 
-# Windows: the model browser's filter debounce, the onboarding poll while a page
-# loads, and the wait before its gesture step reports done.
-model_browser_filter_debounce_ms = 120
+# Windows: the onboarding poll while a page loads, and the wait before its
+# gesture step reports done.
 onboarding_poll_ms = 100
 onboarding_gesture_done_ms = 100
+
+# Windows: the same action refused while paused is told once in this window, as
+# a page can send several refused messages for one click.
+# AHK: platform/system/notifier.ahk.
+paused_refusal_repeat_ms = 3000
+
+# Windows: while a screen reader runs, a tooltip's text is told to it once in
+# this window; a re-render of the same preview is not said again.
+# AHK: core/ui/ui/tooltip/helpers.ahk.
+tooltip_announce_repeat_ms = 3000
 
 # Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
 desktop_open_timeout_ms = 30000
@@ -850,12 +1070,12 @@ script_control_tap_watchdog_interval_ms = 2000
 # native dialog or WebView callback that triggered it has returned and released its
 # window first (the layout manager, the personal information editor, the shortcut
 # and gesture parameter prompts, the model selector).
-# HS: ui/menu/*.lua, ui/layout_manager/init.lua, ui/personal_info_editor/init.lua.
+# HS: ui/menu/*.lua, ui/layout_manager/init.lua, hotstrings/ui/personal_info_editor/init.lua.
 ui_handoff_ms = 50
 
 # Linux: the delay before a health-check probe starts its work off the click that
 # requested it, so the click returns first (one event-loop turn).
-# Linux: ui/healthcheck/probes.lua configuration probe.
+# Linux: diagnostics/ui/healthcheck/probes.lua configuration probe.
 healthcheck_probe_defer_ms = 1
 
 # Delay before the post-install keyboard-layout menu refresh fires.
@@ -928,38 +1148,37 @@ wpm_widget_idle_hide_ms = 3000
 # AHK: ui/wpm/wpm_config.ahk. HS and Linux: the shared wpm_widget model.
 wpm_color_hold_ms = 1000
 
-# Menu bar (macOS) / tray (Linux) readout update interval.
+# Menu bar (macOS) / tray (Windows, Linux) readout update interval.
 # HS: ui/wpm/wpm_menubar.lua. Linux: ui/wpm/tray_readout.lua.
+# AHK: ui/wpm/wpm_config.ahk (wpm_tray_readout.ahk).
 wpm_menubar_update_ms = 500
-
-# How long capturing the physical magic key by pressing it waits for a key
-# before it ends with nothing changed.
-# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture. HS: ui/menu/magic_key_source_menu.lua.
-# Linux: modules/hotstrings/magic_key_source.lua capture.
-magic_key_capture_timeout_ms = 10000
-
-# How often that capture reads the physical key state on Windows, for a key
-# whose remap hotkey sends nothing its InputHook sees (a dead key, a tap-hold).
-# Well under a key press, so a quick tap is still caught.
-# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture.
-magic_key_capture_poll_ms = 10
 
 # Windows: how often a developer driver looks for a field run request in its
 # clone (_shared/diagnostics/data/field_run_protocol.json); a request waits at most this long.
-# AHK: infra/field_run.ahk.
+# AHK: diagnostics/engine/field_run/field_run.ahk.
 field_run_poll_ms = 1000
+
+# Windows: how long an input probe step of the field run waits after its notice
+# asking the person not to type, so the notice can be read before keys are sent.
+# AHK: diagnostics/engine/field_run/field_run.ahk.
+field_run_input_notice_ms = 4000
 
 # Hammerspoon reload debounce after a config file change, and the settle poll
 # while Git holds the tree.
-# HS: ui/menu/menu_watchers.lua DEBOUNCE_SEC.
+# HS: menu/ui/builder/watchers.lua DEBOUNCE_SEC.
 hs_reload_debounce_ms = 500
 
 # Onboarding / first-run wizard startup delay.
 # HS: platform/remap/init.lua FIRST_RUN_WIZARD_DELAY_SEC.
 onboarding_startup_delay_ms = 2000
 
-# LLM deps checker: Ollama poll interval (readiness probe loop).
-# AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
+# Linux: the interval between two GET /api/version readiness probes of the
+# managed Ollama daemon it just started; each probe is a spawned HTTP client,
+# bounded by [llm] local_server_probe_timeout_ms, until the install budget.
+# LX: ai/engine/local_servers/runtime_composition.lua (_shared/ai/engine/local_servers/runtime_repair.lua).
+# Windows needs no HTTP poll: its launcher watches its own child's loopback
+# listener, then probes once (ai/engine/ollama/ollama-runtime-launch.ps1). macOS
+# waits for the listener event of its native worker (managed_ollama_serve.py).
 ollama_deps_poll_ms = 3000
 
 # Hard deadline for a user-requested quit (menubar Quit, script_quit gesture).
@@ -984,6 +1203,17 @@ notification_ttl_ms = 5000
 # acknowledges, so only a hung session bus reaches this deadline.
 notification_send_timeout_ms = 5000
 
+# Linux: how long after the tray icon appears the daemon checks that a panel
+# shows it (TRAY-03, tray/host_check.lua). A login starts the daemon and
+# the panel together, and GNOME's AppIndicator extension registers its
+# StatusNotifierWatcher only once the shell has loaded: checking at once would
+# tell a user whose tray works that it is missing.
+tray_host_check_delay_ms = 15000
+
+# Linux: bounds each session-bus call of the tray host check, NameHasOwner and
+# one property read (tray/adapters/status_notifier_host.lua).
+tray_host_bus_timeout_ms = 1000
+
 # Margin past user_quit_deadline_ms a launcher waits for the running instance's
 # controlled exit before it gives up: the macOS launcher answering a quit from
 # outside (Sparkle relaunch, logout, osascript; MLC-002), and a second launch
@@ -1002,11 +1232,11 @@ reload_deadline_ms = 12000
 
 # macOS: delay before the editor of a personal information file opens after its
 # menu row is clicked, so the menu has closed.
-# HS: ui/menu/menu_hotstrings.lua.
+# HS: hotstrings/ui/menu/hotstrings.lua.
 editor_open_after_click_ms = 100
 
 # macOS: delay before Hammerspoon reloads after the paths editor changed a path.
-# HS: ui/menu/init.lua.
+# HS: menu/ui/init.lua.
 config_editor_reload_delay_ms = 250
 
 # macOS: delay after a webview finished navigating before queued JavaScript is
@@ -1020,7 +1250,7 @@ webview_navigation_flush_delay_ms = 150
 webview_ready_safety_flush_ms = 1500
 
 # Windows: the same safety flush of the Ollama, changelog and model browser pages.
-# AHK: modules/llm/ollama_webview.ahk, ui/changelog/init.ahk, ui/model_browser/init.ahk.
+# AHK: ai/engine/ollama/webview.ahk, ui/changelog/init.ahk, ai/ui/model_browser/init.ahk.
 webview_page_safety_flush_ms = 2000
 
 # Windows: the same safety flush of the shared webview host and of onboarding.
@@ -1046,7 +1276,7 @@ webkit_warmup_hold_ms = 5000
 metrics_typing_poll_ms = 300
 
 # macOS: delay before the model manager retries a deferred delivery.
-# HS: ui/menu/menu_llm/models_manager.lua.
+# HS: ai/ui/menu/models/manager.lua.
 model_manager_retry_ms = 100
 
 # macOS: delay before the dialog focus is claimed after a modal opens.
@@ -1060,12 +1290,12 @@ slot_conflict_notice_delay_ms = 300
 
 # macOS and Linux: the health check yields once before it builds the configuration
 # context, so its probe never runs inside the caller's turn.
-# HS: ui/healthcheck/probes.lua. Linux: ui/healthcheck/probes.lua.
+# HS: diagnostics/ui/healthcheck/probes.lua. Linux: diagnostics/ui/healthcheck/probes.lua.
 healthcheck_probe_yield_ms = 1
 
 # macOS: the run-loop yield between two hotstring categories whose metadata is
 # read after the boot, so the first preview of a category reads memory rather
-# than its TOML on the keystroke. HS: modules/hotstrings/hotstrings_config.lua.
+# than its TOML on the keystroke. HS: hotstrings/engine/catalogue/config.lua.
 hotstring_meta_prewarm_step_ms = 1
 
 # Page scripts cannot read the registry; their copies are pinned to these keys by
@@ -1096,6 +1326,12 @@ token_prompt_focus_retry_second_ms = 150
 # reported its end, once the first check yielded without delivering it
 # (infra/suppressive_inputhook_ownership.ahk).
 custom_modifier_settle_poll_ms = 1
+
+# Web: the edits Ergopti Studio's undo history keeps per editor tab, Comparer and
+# Optimiser (a count, not a delay); the oldest step goes once a new one passes
+# it. Pinned to HISTORY_LIMIT of _shared/ui/edit_history.js, which a page script
+# cannot read from here, by tools/test/test-keystats-timings-single-source.cjs.
+studio_history_steps = 200
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1178,6 +1414,11 @@ native_slow_batch_ms = 500
 # AHK: infra/hotpath_profiler.ahk HotPath_LoadTimings.
 hotpath_slow_ms = 5
 
+# How often the latency statistics of the hot-path segments are summarised in
+# the log: one minute retains the distributions without turning normal typing
+# into log I/O. AHK: infra/hotpath_profiler.ahk HotPath_StartStatistics.
+hotpath_statistics_interval_ms = 60000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Performance budgets
@@ -1195,37 +1436,46 @@ hotpath_slow_ms = 5
 
 # Boot, process or VM start to "Boot complete". Measured p50 1667 ms, the
 # slowest healthy boot 2834 ms; the two 25 s and 32 s boots waited for the
-# Accessibility grant. 2500 ms is 1.5 times the median.
+# Accessibility grant. 2500 ms is 1.5 times the median. Windows and Linux count
+# from the process creation (Linux adds the load phase /proc gives to its
+# stages); macOS from its Lua VM's first lines, since Hammerspoon outlives a reload.
 # HS: core/logger/engine/boot_profiler.lua. LX: core/logger/engine/boot_profiler.lua. AHK: ErgoptiPlus.ahk.
 boot_total_ms = 2500
 
 # One driver reload, from its request to the next boot's completion. Measured
 # p50 2433 ms (teardown, VM re-exec and boot); 4000 ms leaves the boot budget
 # plus the teardown's 1.5 s.
+# Each driver starts the measure once the reload is admitted (maintainer
+# decision, 2026-11-22): macOS at hs.reload(), Linux at its stamp after the
+# cleanup checks, Windows at the successor's launch.
 # HS: init.lua (through core/lifecycle/engine/reload/guard.lua).
+# LX: core/timing/engine/reload_timing.lua. AHK: core/timing/engine/reload_timing.ahk.
 driver_reload_ms = 4000
 
 # One rebuild of the menu tree. It runs on the main thread, and from 250 ms key
 # events reach the taps late ([logger]'s main-thread hold count threshold,
 # core/logger/engine/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
 # budget names a defect the log already shows.
-# HS: ui/menu/init.lua.
+# HS: menu/ui/init.lua. LX: menu/ui/builder/timed_build.lua.
+# AHK: menu/ui/builder/rebuild.ahk.
 menu_rebuild_ms = 250
 
 # One request to a local AI server (Ollama, MLX, a local OpenAI-compatible
 # server), request to answer. Measured local time to first token p50 1573 ms.
-# HS: modules/llm/api_ollama.lua. AHK: modules/llm/llm_request_latency.ahk.
+# HS: ai/engine/api/ollama.lua. LX: ai/engine/api/api_ollama.lua.
+# AHK: ai/engine/prediction/request_latency.ahk.
 llm_local_request_ms = 2000
 
 # One request to a cloud AI provider, request to answer. Measured 706 to 1479 ms;
 # 3000 ms leaves room for a provider's own queue.
-# HS: modules/llm/api_remote.lua. LX: modules/llm/api_remote.lua.
-# AHK: modules/llm/llm_request_latency.ahk.
+# HS: ai/engine/api/remote.lua. LX: ai/engine/api/api_remote.lua.
+# AHK: ai/engine/prediction/request_latency.ahk.
 llm_remote_request_ms = 3000
 
 # A streamed prediction: chain start to the tooltip's first display (TTFT).
 # Measured p50 1573 ms, max 1582 ms.
-# HS: core/ui/ui/tooltip/llm.lua.
+# HS: core/ui/ui/tooltip/llm.lua. LX: ai/engine/prediction/display_budget.lua.
+# AHK: core/ui/ui/tooltip/llm.ahk.
 prediction_display_ms = 2000
 
 
@@ -1234,6 +1484,14 @@ prediction_display_ms = 2000
 # ──────────────────────────────────────────────────────────────────────
 
 [adapters]
+# Windows: how often the native navigation owner's receipts are drained when
+# its wake message is delayed or lost. AHK: ai/adapters/nav_event_owner.ahk.
+nav_event_owner_service_poll_ms = 100
+
+# Windows: the UIA selection poll a layout remap reads, armed only in the
+# apps that need it (a cross-process COM round trip). AHK: modules/keymap/layout.ahk.
+uia_selection_poll_ms = 500
+
 # Windows: the poll of a managed HTTP request an owner waits for.
 http_managed_wait_poll_ms = 10
 # Windows: the delay before a closed WebView profile folder is removed.
@@ -1247,6 +1505,10 @@ input_probe_step_ms = 10
 input_probe_settle_ms = 40
 # Windows: an updater completion run off the current thread.
 updater_callback_defer_ms = 50
+# Windows: how long the installed Ergopti layout's lookup is trusted before the
+# game keys read the registry again; installing the layout is rare. macOS and
+# Linux ask no registry. AHK: modules/keymap/keylayout/game_keys.ahk.
+game_keys_installed_layout_ttl_ms = 30000
 # Windows: the poll of the keyboard-layout registry watch's change events
 # (RegNotifyChangeKeyValue): a change of the installed layouts is captured
 # within this delay rather than at the next one-second layout poll.
@@ -1257,6 +1519,34 @@ layout_registry_watch_poll_ms = 100
 # which a seat without a keyboard never sends: unbounded, the start-up hung.
 # LX: adapters/keyboard_layout.lua.
 wayland_keymap_dump_timeout_ms = 3000
+# Linux: the pause before the first restart of a keyboard hook that stopped
+# while nobody asked it to; each later attempt waits twice the one before.
+# A restart that stays up for hook_restart_stable_ms earns the whole budget back.
+# LX: platform/input/hook_supervisor.lua.
+hook_restart_first_backoff_ms = 1000
+hook_restart_stable_ms = 60000
+# Linux: restart attempts the hook supervisor makes before it gives up and
+# keeps the run-time failure exit.
+hook_restart_attempts = 5
+# Linux: a click on the tray rebuilds its menu on a later turn, so the field
+# run's tray check reads the menu again this often, at most this many times,
+# and looks this many submenus deep under a group for a row.
+# LX: diagnostics/engine/field_check/tray_check.lua.
+field_tray_settle_ms = 250
+field_tray_settle_attempts = 12
+field_tray_search_depth = 2
+# Linux: the rows and separators one tray submenu may hold before its sections
+# fold into submenus of their own. KDE Plasma on Wayland draws a taller menu
+# from the panel up and offers no way back to its first rows, the submenu's
+# switch among them; thirty rows keep a submenu on a 1080-pixel screen.
+# LX: tray/adapters/menu.lua.
+tray_submenu_entries = 30
+# Linux: the field run's tray and session checks run their bus requests and
+# commands one after the other; each is bounded by its step's deadline divided
+# by this share, so together they never outlast the step.
+# LX: diagnostics/adapters/tray_check_ports.lua, diagnostics/adapters/session_check_ports.lua.
+field_tray_request_share = 12
+field_session_command_share = 8
 
 # Windows: minimum age of an abandoned atomic-write stage before it is reaped.
 # AHK: core/text/engine/toml/helpers.ahk StaleTempAgeMs (pinned copy).
@@ -1280,6 +1570,14 @@ unresponsive_ax_backoff_ms = 30000
 # LX: modules/keymap/layout_registry.lua (managed_python.lua).
 managed_python_download_timeout_ms = 600000
 
+# Linux: how long the GNOME focus worker waits, once it owns org.ergopti.Focus,
+# for the Shell extension's first report before it asks GNOME Shell again for the
+# extension's state. An enabled extension reports as soon as the name appears,
+# within one bus round trip; a silence this long means the Shell runs no copy
+# of it, or a stale one (an update needs a new login).
+# LX: platform/focus/compositor_focus.lua passes it to compositor_focus_worker.lua.
+desktop_focus_silence_ms = 10000
+
 # Linux: how long the window switch worker sleeps between two polls of its queue.
 # LX: platform/window_switch_worker.lua.
 window_switch_worker_sleep_ms = 10
@@ -1289,13 +1587,39 @@ window_switch_worker_sleep_ms = 10
 # selected proxy; handshake: a CONNECT with its NTLM/Negotiate legs, and a
 # client's request head; idle: an open tunnel with no byte in either direction;
 # probe: the whole probe child, from start to its JSON line.
-# LX: core/network/engine/proxy_auth_relay.lua. HS: adapters/field_check_ports.lua,
-# modules/llm/ollama_server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
+# LX: core/network/engine/proxy_auth_relay.lua. HS: diagnostics/adapters/field_check_ports.lua,
+# ai/engine/ollama/server_command.lua (network-retry.sh run_with_proxy_sign_in_relay).
 proxy_relay_dial_timeout_ms = 10000
 proxy_relay_handshake_timeout_ms = 15000
 proxy_relay_idle_timeout_ms = 300000
 proxy_relay_probe_timeout_ms = 30000
 
+
+# ──────────────────────────────────────────────────────────────────────
+# User workflows
+# ──────────────────────────────────────────────────────────────────────
+#
+# The deadlines of the steps of a user workflow, named by the `timeout` of each
+# kind in _shared/shortcuts/data/workflows/steps.json (a wait adds its own
+# duration, a wait-for its own timeout). A step past its deadline stops the
+# workflow with a notice naming it. Lua: shortcuts/engine/workflows/runner.lua.
+
+[workflows]
+# Keys, text, open, focus, clipboard, mouse, a notification or an Ergopti action.
+step_timeout_ms = 10000
+
+# A screen capture, an OCR pass, a click on a found image or text, an « if »
+# probe of the screen: one capture and one match on a 4K screen.
+screen_step_timeout_ms = 20000
+
+# A shell step, as long as a hidden run_command child ([gestures]).
+shell_timeout_ms = 30000
+
+# Longest wait or wait-for timeout a workflow may ask for (ten minutes).
+wait_max_ms = 600000
+
+# How often a wait-for step looks at the screen again.
+wait_for_poll_ms = 250
 
 # ──────────────────────────────────────────────────────────────────────
 # Byte limits
@@ -1311,16 +1635,27 @@ proxy_relay_probe_timeout_ms = 30000
 # What a child process may print before it is stopped: a version line, a df row,
 # a probe reply, never a stream. Lua canon: _shared/ai/engine/policy/process_limits.lua
 # (every Linux process owner takes it from there; pinned to this key).
-# AHK: adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
+# AHK: diagnostics/adapters/crash_report_worker.ahk and core/network/adapters/http_client.ahk, pinned copies.
 process_output_bytes = 65536
 
+# What one text recognition may print: the words and boxes of a whole window
+# (768 KiB, about 20,000 words). LX: platform/system/vision/tesseract_ocr.lua.
+ocr_output_bytes = 786432
+
 # Bytes of one /proc/<pid>/cmdline the Linux local-server scan reads: ports and
-# server names sit well inside it. LX: modules/llm/local_server_ports.lua.
+# server names sit well inside it. LX: ai/engine/local_servers/ports.lua.
 proc_cmdline_bytes = 65536
 
+# Longest line of `gdbus monitor` the KDE layout watch keeps waiting for its
+# newline: one layout signal with its arguments is under 200 bytes, so a line
+# past 1 KiB is no layout signal and is dropped up to its newline.
+# LX: modules/keymap/kde_layout_watch.lua.
+kde_layout_monitor_line_bytes = 1024
+
 # Largest managed-Ollama environment declaration file the Linux driver reads.
-# LX: modules/llm/managed_ollama_environment.lua.
+# LX: ai/engine/ollama/managed_ollama_environment.lua.
 declaration_file_bytes = 65536
+
 
 # Largest changelog feed the Linux changelog window downloads (ten releases'
 # rendered notes, about 0.5 MB today).
@@ -1349,13 +1684,43 @@ number_row_level_text_bytes = 1024
 # and some 40 assets), over the former 2 MiB, and the Linux update check failed;
 # 8 MiB leaves room for about 65 such releases.
 release_list_body_bytes = 8388608
+# Linux: the output one field check command may print before it is stopped:
+# the tray's whole dbusmenu layout as busctl JSON, every submenu filled, is a
+# few hundred kilobytes, and libinput list-devices a few dozen.
+# LX: diagnostics/adapters/bus_query.lua, diagnostics/adapters/session_check_ports.lua.
+field_check_output_bytes = 4194304
+
+# Free space the managed Ollama runtime needs beyond its pinned archive and its
+# pinned unpacked size (unpacked_bytes of _shared/ai/data/ollama_release.json,
+# of managed_ollama_release.json on macOS) before its download starts
+# (_shared/ai/data/ollama_install_errors.json): headroom for the user's volume
+# once the runtime is in place. Windows also checks the expanded size of the
+# downloaded archive before extracting it (ollama_managed_files.ps1).
+# AHK: ai/engine/ollama/managed_bootstrap.ahk. LX: ai/engine/local_servers/runtime_composition.lua.
+# HS: ai/engine/ollama/managed_ollama_runtime.py (reads this file).
+ollama_install_free_space_margin_bytes = 1073741824
+
+# Largest _shared/ai/data/ollama_install_errors.json the Windows driver reads: a
+# few dozen class rows. AHK: ai/engine/ollama/install_errors.ahk.
+ollama_install_errors_file_bytes = 65536
+
+# Largest release asset the Linux updater downloads (the AppImage or archive and
+# its signature) before it refuses the transfer. LX: modules/updater/manager.lua.
+update_asset_download_bytes = 268435456
+
+# Largest managed Ollama runtime seal the Linux driver reads (one SHA-256 per
+# runtime file, about 100 bytes each: a few hundred files fit in 128 KiB);
+# a larger file is not a seal.
+# LX: ai/engine/ollama/runtime_seal.lua.
+ollama_runtime_seal_bytes = 131072
+
 
 # What the digest tool may print for one file, beyond the file's own path: the
 # hexadecimal digest and its separators. LX: core/fs/adapters/file_digest.lua.
 file_digest_output_bytes = 1024
 
 # Head of one crash report the macOS field run reads for its closed tokens (the
-# header and the exception record). HS: adapters/field_probe_ports.lua.
+# header and the exception record). HS: diagnostics/adapters/field_probe_ports.lua.
 crash_report_head_bytes = 65536
 
 # Longest keyboard input-source identifier the macOS driver selects or probes.
@@ -1390,7 +1755,7 @@ shortcuts_reply_bytes = 65536
 # stopped and the run refused as too large, so a runaway command can neither
 # exhaust memory nor type for minutes.
 # HS: gestures/user_actions.lua, gestures/apple_shortcut_action.lua.
-# LX: modules/gestures/user_actions.lua.
+# LX: gestures/engine/user_actions.lua.
 user_action_output_bytes = 65536
 
 # Encoded log lines the macOS log transport prepares in one tick, also the
@@ -1403,10 +1768,28 @@ log_prepare_tick_bytes = 65536
 # HS: core/process/adapters/shell_runner.lua.
 shell_captured_output_bytes = 4194304
 
+# Largest typed payload the macOS migration registry cache admits; the
+# registry's is about 3 KB, so a larger cache file is forged or corrupt and is
+# refused. Windows keeps the same bound as its codec's MAX_BYTES.
+# HS: settings/engine/registry_cache.lua. AHK: settings/engine/publication/registry_cache.ahk.
+registry_cache_payload_bytes = 4194304
+
+# One read from the Linux persistent sqlite3 child's output or diagnostics
+# pipe; a larger row set takes as many reads as it needs.
+# LX: modules/keystats/sqlite_child.lua.
+sqlite_child_read_bytes = 65536
+
 # Read granularity of the macOS TOML cache when it collects a source's exact
 # bytes. Read through macos/_generated/registry_limits.lua.
 # HS: core/fs/adapters/toml_cache.lua.
 toml_source_chunk_bytes = 65536
+
+# Growth floor a metrics reader refresh may write into the copy-on-write overlay
+# of the shared reader image, before its per-tail-byte share; past it SQLite
+# reports SQLITE_FULL and the refresh fails without publishing. The detached
+# projection worker reads it before any registry load, through the generated
+# windows/_generated/registry_limits.ahk. AHK: modules/keystats/keystats_reader_db.ahk.
+metrics_overlay_slack_bytes = 268435456
 
 [launcher]
 
@@ -1474,6 +1857,12 @@ owned_runtime_console_poll_ms = 25
 vhid_report_query_poll_ms = 10
 vhid_report_main_poll_ms = 20
 vhid_report_request_poll_ms = 20
+
+# The managed Ollama daemon's sibling sign-in relay (docs/design/proxy-auth-relay.md,
+# "macOS managed daemon"): how long the suspended image guardian waits for the
+# relay to exit once its stdin is closed before it kills it.
+# Swift: SuspendedImageProxyRelay.swift.
+proxy_relay_stop_grace_ms = 5000
 
 # Test fixtures compiled into the launcher: the automation query fixture's
 # hold, the owned program fixture's poll, and the managed Ollama listener's

@@ -68,8 +68,6 @@ helpers.describe("LogTransport producer purity", function()
 			helpers.assert_not_nil(record, tostring(enqueue_err))
 			helpers.assert_eq(#context.state.sends, sends_before,
 				"enqueue must not call the UDP socket from an HID producer")
-			helpers.assert_eq(context.state.route_calls, 0,
-				"topical routing must execute in the timer pump, not enqueue")
 			helpers.assert_eq(#context.state.delivered, delivered_before,
 				"delivery hooks, including notifications, require a durable ACK")
 			helpers.assert_eq(print_calls, 0, "enqueue must not write to the HS console")
@@ -114,7 +112,6 @@ helpers.describe("LogTransport producer purity", function()
 			local enqueue_sub_calls = sub_calls
 			local enqueue_byte_calls = byte_calls
 			local enqueue_encode_calls = encode_calls
-			local enqueue_route_calls = context.state.route_calls
 			string.sub = original_sub
 			string.byte = original_byte
 			context.hs.json.encode = original_encode
@@ -128,8 +125,6 @@ helpers.describe("LogTransport producer purity", function()
 				"enqueue must not validate or sanitize user-derived bytes")
 			helpers.assert_eq(enqueue_encode_calls, 0,
 				"enqueue must not construct a native payload")
-			helpers.assert_eq(enqueue_route_calls, 0,
-				"enqueue must not derive topical routes")
 			helpers.assert_eq(context.transport.status().queued, 0,
 				"an oversized producer line must retain no queue slot or string reference")
 		end)

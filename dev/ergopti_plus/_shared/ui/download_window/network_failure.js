@@ -74,7 +74,8 @@
 		}
 		let panel = document.getElementById('managed-network-actions');
 		if (!panel) {
-			panel = document.createElement('div');
+			// A paragraph of the failure's actions, below the message.
+			panel = document.createElement('p');
 			panel.id = 'managed-network-actions';
 			panel.className = 'btn-row';
 			controls.appendChild(panel);

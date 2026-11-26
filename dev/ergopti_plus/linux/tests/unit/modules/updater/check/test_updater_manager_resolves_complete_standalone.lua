@@ -300,12 +300,12 @@ helpers.describe("modules.updater.manager", function()
 	-- ========================================
 
 	helpers.it("menu_builder renders updater section when updater context is present", function()
-		local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
-		-- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
+		local ok_mb, menu_builder = pcall(require, "menu.ui.builder.builder")
+		-- Asserted, not skipped. menu/ui/builder/builder.lua ships with this driver, so
 		-- "not available" can only mean it stopped loading — and the skip made that
 		-- indistinguishable from a pass in six cases across three files.
 		helpers.assert_true(ok_mb and menu_builder ~= nil,
-			"ui.menu.builder must load: " .. tostring(menu_builder))
+			"menu.ui.builder.builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",
@@ -326,12 +326,12 @@ helpers.describe("modules.updater.manager", function()
 	end)
 
 	helpers.it("menu_builder handles nil updater context gracefully", function()
-		local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
-		-- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
+		local ok_mb, menu_builder = pcall(require, "menu.ui.builder.builder")
+		-- Asserted, not skipped. menu/ui/builder/builder.lua ships with this driver, so
 		-- "not available" can only mean it stopped loading — and the skip made that
 		-- indistinguishable from a pass in six cases across three files.
 		helpers.assert_true(ok_mb and menu_builder ~= nil,
-			"ui.menu.builder must load: " .. tostring(menu_builder))
+			"menu.ui.builder.builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",
@@ -365,7 +365,7 @@ helpers.describe("updater bounded pagination", function()
 	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
 		local real_fs = require("core.fs.adapters.file_system")
 		local controlled_fs = setmetatable({ exists = function(path)
-			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
+			if path == require("settings.engine.paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return real_fs.exists(path)
 		end }, { __index = real_fs })
 		local M = helpers.load_module_with_dependency("modules.updater.manager", "core.fs.adapters.file_system", controlled_fs)

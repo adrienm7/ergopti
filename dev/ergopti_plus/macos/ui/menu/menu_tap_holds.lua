@@ -18,8 +18,10 @@
 --- 2. Key combinations: the modifier chords, grouped by key, are the
 ---    « Combinaisons de touches » group of the Shortcuts submenu, built here
 ---    (M.build_key_combinations) because this engine runs them. Their own
----    first-row switch is the persisted [mod_combos] enabled. Each pair's
----    three slots open the same shared action picker.
+---    first-row switch is the persisted [category_enabled] key_combinations,
+---    the master of every pair, as on Windows and Linux; [mod_combos] enabled
+---    covers only the chords and has no row. Each pair's three slots open the
+---    same shared action picker.
 --- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
 --- 4. Changes are saved immediately and applied by an exact regeneration.
 --- 5. Restore recommended / clear run the remap engine's tap_holds scope: a
@@ -30,13 +32,13 @@
 local M = {}
 
 local Logger      = require("core.logger.engine.logger")
-local MenuUtils   = require("ui.menu.menu_utils")
-local ManifestMenu = require("infra.manifest_menu")
+local LabelValue  = require("core.i18n.engine.label_value")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local Paths       = require("core.fs.engine.paths")
 local KeyCatalog  = require("tap_hold.engine.key_catalog")
 local CombinationLabels = require("tap_hold.engine.combination_labels")
 local LoneTap     = require("tap_hold.engine.lone_tap")
-local Manifest    = require("infra.manifest_reader")
+local Manifest    = require("menu.engine.manifest_reader")
 local LOG         = "menu.tap_holds"
 
 local i18n        = require("core.i18n.engine.i18n")
@@ -45,6 +47,16 @@ local WindowTitles = require("core.ui.engine.window_titles")
 local ConfigKeys = require("settings.engine.keys")
 
 local ValueCheck = require("settings.engine.value_check")
+local TitleStatus = require("menu.ui.title_status")
+local TapHoldsStatus = require("ui.menu.tap_holds_status")
+local Timings = require("core.timing.engine.timings")
+
+-- The title's status dot outlives the build that painted it: the runtime turns
+-- ready or fails later, so the shared watch repaints it (menu/ui/title_status.lua).
+-- It keeps watching a title without a dot: the runtime can fail after a build
+-- that drew none, and that failure is red even with the switch off.
+local _status_watch = TitleStatus.new_watch("Tap-Holds", Timings.sec("tap_hold", "title_status_watch_ms"),
+	{ keep_without_dot = true })
 
 -- The shared value schema declarations of the delays this menu asks for.
 local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
@@ -52,11 +64,15 @@ local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 
 --- Reads typed text through the shared value check. A refusal is logged and
 --- shown with the localized text naming the accepted range; nothing is written.
+--- A blank answer resets the setting to `default` (maintainer decision PCK-13);
+--- an override passes ValueCheck.INHERIT and gets it back for a blank answer.
 --- @param key string Declaration of the shared value schema.
 --- @param text any What the person typed.
+--- @param default any The setting's default, in the stored unit, or ValueCheck.INHERIT.
 --- @return any|nil value The value in the stored unit, nil when refused.
-local function read_typed(key, text)
-	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+local function read_typed(key, text, default)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text, default)
+	if result.ok and result.inherit then return ValueCheck.INHERIT end
 	if result.ok then return result.value end
 	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
 	require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
@@ -311,7 +327,7 @@ local _scope_generation = 0
 local function run_scope(karabiner, mode, update_menu, scope)
 	scope = scope or ConfigKeys.KEY.TAP_HOLDS
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("TapHoldConfigPath") .. "." .. scope .. "-"
+	local backup_path = require("settings.engine.paths").get("TapHoldConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
 	return run_bulk_menu_command(
 		karabiner,
@@ -375,14 +391,15 @@ local NONE_ACTION_ID = "none"
 --- Whether one catalogue action may fill a slot.
 ---   "tap"   — excludes actions with tappable == false (modifiers, combos, layer-hold).
 ---   "hold"  — only actions with holdable == true (modifiers, combos, layer-hold).
----   "combo" — every action.
+---   "combo" — every action but those no chord runs on any OS (the one-shot
+---             Shift, maintainer decision of 2026-11-06), as Windows and Linux.
 --- @param action table Catalogue entry.
 --- @param slot string "tap", "hold" or "combo".
 --- @return boolean
 local function slot_accepts(action, slot)
 	if slot == "hold" then return action.holdable == true end
 	if slot == "tap" then return action.tappable ~= false end
-	return true
+	return require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[action.id] ~= true
 end
 
 --- Builds the shared picker's items for one slot: the remap catalogue in its
@@ -532,8 +549,15 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			local call_ok, ok, result = pcall(hs.osascript.applescript, script)
 			if not call_ok or ok ~= true or type(result) ~= "table"
 				or type(result["text returned"]) ~= "string" then return false end
-			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"])
+			-- A blank answer removes the key's own delay, so the global delay the
+			-- hint names applies again (maintainer decision of 2026-11-22).
+			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"], ValueCheck.INHERIT)
 			if seconds == nil then return false end
+			if rawequal(seconds, ValueCheck.INHERIT) then
+				return commit_menu_setting(karabiner, "Per-key timeout reset", function()
+					return karabiner.set_tap_timeout(kid, nil)
+				end, update_menu)
+			end
 			return commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
 				return karabiner.set_tap_timeout(kid, whole_ms(seconds))
 			end, update_menu)
@@ -629,53 +653,81 @@ end
 -- ==========================================
 -- ==========================================
 
---- Builds a single combo menu item whose combo / tap / hold slots open the
---- shared action picker.
---- Shows "ComboLabel  /  TapLabel  /  HoldLabel" next to the combo label.
+--- The label of one slot of a pair, with the empty words Windows shows: a
+--- tap or a chord with nothing reads as the picker's « disabled », a hold
+--- with nothing as the native key.
+--- @param action_index table id → action def map.
+--- @param slot string "tap", "hold" or "chord".
+--- @param action_id string The slot's action id.
+--- @return string label
+--- @return boolean assigned
+local function pair_slot_label(action_index, slot, action_id)
+	if action_id == NONE_ACTION_ID then
+		return i18n.get(slot == "hold" and "tap_hold.hold.none" or "dialog.action_picker.disabled"), false
+	end
+	return short_action_label(action_index, action_id), true
+end
+
+--- Reads one slot of a pair through the remap facade; a refused read is empty.
+--- @param getter function Facade getter.
+--- @param combo_id string Combo id.
+--- @return string action_id
+local function read_pair_slot(getter, combo_id)
+	local ok, value = pcall(getter, combo_id)
+	if not ok or type(value) ~= "string" then return NONE_ACTION_ID end
+	return value
+end
+
+--- Builds one pair row: « First + Second : summary », the summary naming every
+--- assigned slot, chord included (CombinationLabels.summary), and its menu of
+--- tap, hold and chord slots, each opening the shared action picker — the
+--- Windows layout (maintainer decision KCD-8 of 2026-11-21).
+---
+--- Every ordered pair is listed, symmetry or not, since each order keeps its
+--- own tap and hold (KCD-5); only its chord row is shared: under symmetry a
+--- reverse-order pair reads and writes the chord of the order that owns it.
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
---- @param enabled     boolean  Whether the integration is active.
 --- @param combo_def   table    Entry from MOD_COMBOS.
---- @param pair_label  string   Canonical translated physical pair.
+--- @param pair_label  string   Translated physical pair.
+--- @param chord_id    string   The combo id whose chord this pair shows.
 --- @return table hs.menubar menu item.
-local function build_one_combo_item(karabiner, action_index, update_menu, enabled, combo_def, pair_label)
+local function build_one_combo_item(karabiner, action_index, update_menu, combo_def, pair_label, chord_id)
 	local cid = combo_def.id
-
-	local ok_tap,   current_tap   = pcall(karabiner.get_combo_tap_action,   cid)
-	local ok_hold,  current_hold  = pcall(karabiner.get_combo_hold_action,  cid)
-	local ok_combo, current_combo = pcall(karabiner.get_combo_combo_action, cid)
-	if not ok_tap   then current_tap   = "none" end
-	if not ok_hold  then current_hold  = "none" end
-	if not ok_combo then current_combo = "none" end
-
-	local tap_slbl   = short_action_label(action_index, current_tap)
-	local hold_slbl  = short_action_label(action_index, current_hold)
-	local combo_slbl = short_action_label(action_index, current_combo)
-	local is_empty   = (current_tap == "none" and current_hold == "none" and current_combo == "none")
-	local is_active  = not is_empty
-
-	local combo_label = is_empty and NONE_DISPLAY
-		or string.format("%s  /  %s  /  %s", combo_slbl, tap_slbl, hold_slbl)
+	local current = {
+		tap   = read_pair_slot(karabiner.get_combo_tap_action, cid),
+		hold  = read_pair_slot(karabiner.get_combo_hold_action, cid),
+		chord = read_pair_slot(karabiner.get_combo_combo_action, chord_id),
+	}
+	local labels, summary_labels, is_active = {}, {}, false
+	for _, slot in ipairs(CombinationLabels.SLOT_ORDER) do
+		local label, assigned = pair_slot_label(action_index, slot, current[slot])
+		labels[slot] = label
+		if assigned then summary_labels[slot], is_active = label, true end
+	end
+	local summary = CombinationLabels.summary(summary_labels, i18n.get("dialog.action_picker.disabled"))
 
 	-- Each slot opens the shared action picker, titled by the slot and the pair.
-	local function slot_row(caption_key, current_label, slot, presentation_id, getter, setter)
-		return {
-			label  = string.format(i18n.get(caption_key), current_label),
+	local slot_rows = {
+		tap = { caption = "menu.shortcuts.key_combinations_hold_tap", slot = "tap", id = cid,
+			presentation_id = "key_combination_tap_action", getter = "get_combo_tap_action", setter = "set_combo_tap_action" },
+		hold = { caption = "menu.shortcuts.key_combinations_hold_hold", slot = "hold", id = cid,
+			presentation_id = "key_combination_hold_action", getter = "get_combo_hold_action", setter = "set_combo_hold_action" },
+		chord = { caption = "menu.shortcuts.key_combinations_chord", slot = "combo", id = chord_id,
+			presentation_id = "key_combination_chord_action", getter = "get_combo_combo_action", setter = "set_combo_combo_action" },
+	}
+	local slots = {}
+	for _, slot in ipairs(CombinationLabels.SLOT_ORDER) do
+		local spec = slot_rows[slot]
+		slots[#slots + 1] = {
+			label  = string.format(i18n.get(spec.caption), labels[slot]),
 			action = function()
-				return open_slot_picker(karabiner, { slot = slot, id = cid, presentation_id = presentation_id,
-					suffix = pair_label, getter = getter, setter = setter }, update_menu)
+				return open_slot_picker(karabiner, { slot = spec.slot, id = spec.id, presentation_id = spec.presentation_id,
+					suffix = pair_label, getter = spec.getter, setter = spec.setter }, update_menu)
 			end,
 		}
 	end
-	local slots = {
-		slot_row("menu.shortcuts.key_combinations_chord", combo_slbl, "combo",
-			"key_combination_chord_action", "get_combo_combo_action", "set_combo_combo_action"),
-		slot_row("menu.shortcuts.key_combinations_hold_tap", tap_slbl, "tap",
-			"key_combination_tap_action", "get_combo_tap_action", "set_combo_tap_action"),
-		slot_row("menu.shortcuts.key_combinations_hold_hold", hold_slbl, "hold",
-			"key_combination_hold_action", "get_combo_hold_action", "set_combo_hold_action"),
-	}
 
 	local render_ctx = {
 		commands = {
@@ -690,11 +742,10 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		render_ctx, { ["key_combination_slots"] = function() return slots end })
 
 	return {
-		label    = string.format("%s  :  %s", pair_label, combo_label),
-		checked  = is_active or nil,
-		disabled = not enabled or nil,
+		label   = LabelValue.compose(i18n.get, pair_label, summary),
+		checked = is_active or nil,
 		-- This child has already passed through the shared renderer.
-		submenu   = enabled and combo_submenu or nil,
+		submenu = combo_submenu,
 	}
 end
 
@@ -724,8 +775,11 @@ local function report_unplaced_combos(karabiner)
 	end
 end
 
---- Builds one hand's modifier combos, grouped by the first physical key.
---- Items are grayed out when the integration is disabled.
+--- Builds one hand's pair rows the Windows way (maintainer decision KCD-8 of
+--- 2026-11-21): one submenu per key held first, in catalogue order, holding
+--- one row per key struck under it, in catalogue order, ticked while any of
+--- its pairs is assigned. Every ordered pair is listed (KCD-5). Rows are
+--- grayed out when the integration is disabled.
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
@@ -734,32 +788,47 @@ end
 --- @param hand        string   "left" or "right": the hand of the key held first.
 --- @return table List of hs.menubar menu item tables.
 local function build_raccourcis_items(karabiner, action_index, update_menu, enabled, hand)
-	local items         = {}
-	local current_group = nil
-	local is_symmetric  = karabiner.get_combo_symmetric()
+	local catalogue = key_catalog()
+	local is_symmetric = karabiner.get_combo_symmetric() == true
 	local non_canonical = karabiner.NON_CANONICAL_COMBOS or {}
-
-	for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
-		-- Skip combos handled elsewhere (e.g. script_control.lua shortcuts)
-		if combo_def.menu_hidden then goto continue end
-		-- In symmetric mode, non-canonical combos (reverse-order duplicates of a
-		-- canonical entry) are hidden: the canonical half configures the chord for
-		-- both press orders, so showing the reverse would confuse the user.
-		if is_symmetric and non_canonical[combo_def.id] then goto continue end
-		if combo_hand(combo_def) ~= hand then goto continue end
-
-		local keys = combo_def.from.simultaneous
-		local labels = CombinationLabels.resolve(key_catalog(), keys[1].key_code, keys[2].key_code, i18n.get)
-		if labels.group_id ~= current_group then
-			items[#items + 1] = MenuUtils.build_section_header(labels.group_label)
-			current_group = labels.group_id
+	-- Each listed pair by its two keys, so both orders find each other.
+	local by_keys = {}
+	for _, combo_def in ipairs(karabiner.MOD_COMBOS or {}) do
+		local keys = not combo_def.menu_hidden and type(combo_def.from) == "table" and combo_def.from.simultaneous
+		if type(keys) == "table" and keys[1] and keys[2] then
+			by_keys[tostring(keys[1].key_code) .. "\0" .. tostring(keys[2].key_code)] = combo_def
 		end
-		items[#items + 1] = build_one_combo_item(
-			karabiner, action_index, update_menu, enabled, combo_def, labels.label)
-
-		::continue::
 	end
 
+	local items = {}
+	for _, first in ipairs(KeyCatalog.of_hand(catalogue, hand)) do
+		local rows, any_assigned = {}, false
+		local group_label = nil
+		for _, second in ipairs(catalogue) do
+			local combo_def = second.id ~= first.id and by_keys[first.id .. "\0" .. second.id] or nil
+			if combo_def then
+				local labels = CombinationLabels.resolve(catalogue, first.id, second.id, i18n.get)
+				group_label = labels.group_label
+				-- Under symmetry the order that owns the chord runs it for both.
+				local chord_id = combo_def.id
+				if is_symmetric and non_canonical[combo_def.id] then
+					local owner = by_keys[second.id .. "\0" .. first.id]
+					if owner then chord_id = owner.id end
+				end
+				local row = build_one_combo_item(karabiner, action_index, update_menu, combo_def, labels.label, chord_id)
+				any_assigned = any_assigned or row.checked == true
+				rows[#rows + 1] = row
+			end
+		end
+		if #rows > 0 then
+			items[#items + 1] = {
+				label    = group_label,
+				checked  = any_assigned or nil,
+				disabled = not enabled or nil,
+				items    = enabled and rows or nil,
+			}
+		end
+	end
 	return items
 end
 
@@ -798,7 +867,8 @@ local function build_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"])
+			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"],
+				karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS / 1000)
 			if seconds == nil then return end
 			commit_menu_setting(karabiner, "Tap/hold timeout", function()
 				return karabiner.set_tap_hold_timeout(whole_ms(seconds))
@@ -830,7 +900,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
 			-- 0 is no time limit; a negative or fractional answer is refused.
-			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"])
+			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"],
+				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS))
 			if ms == nil then return end
 			commit_menu_setting(karabiner, "Sticky timeout", function()
 				return karabiner.set_sticky_timeout(ms)
@@ -898,7 +969,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"])
+			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"],
+				Manifest.default_for(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 			if ms == nil then return end
 			commit_menu_setting(karabiner, "Simultaneous threshold", function()
 				return karabiner.set_simultaneous_threshold(ms)
@@ -908,8 +980,8 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 end
 
 --- Toggles symmetric combinations: when on, "touche 1 + touche 2" and "touche 2
---- + touche 1" fire the same chord, and the reverse half of each pair is hidden
---- from the pair rows to avoid duplicates. The row is the manifest's `check`
+--- + touche 1" fire the same chord; both orders keep their rows and their own
+--- tap and hold, and share only the chord row. The row is the manifest's `check`
 --- combo_symmetric; this is only what a click does.
 --- @param karabiner   table    The karabiner module.
 --- @param update_menu function Callback to refresh the menu bar.
@@ -1172,19 +1244,23 @@ function M._explained_owned_reasons()
 	return reasons
 end
 
---- The disabled row that explains why the owned runtime does not run.
+--- The disabled row that explains why the owned runtime does not run, then
+--- the one row that fixes it when this menu holds that fix: the install, the
+--- service repair or the driver update.
 --- @param karabiner table Remap facade.
 --- @return table rows Empty unless the owner reports a block the user can act on.
+--- @return boolean offers_fix True when a fix row follows the explanation.
 local function owned_runtime_block_rows(karabiner)
-	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
+	if type(karabiner.owned_runtime_status) ~= "function" then return {}, false end
 	local ok, status = pcall(karabiner.owned_runtime_status)
 	-- A refused quit of the user's Karabiner settles as failed, the other blocks as unavailable.
 	if not ok or type(status) ~= "table" or (status.state ~= "unavailable" and status.state ~= "failed") then
-		return {}
+		return {}, false
 	end
 	local rows_fn = BLOCK_ROWS[status.reason]
-	if not rows_fn then return {} end
+	if not rows_fn then return {}, false end
 	local rows = rows_fn() or {}
+	local explanation_count = #rows
 	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
 		and type(karabiner.update_virtual_hid_driver) == "function" then
 		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
@@ -1208,7 +1284,7 @@ local function owned_runtime_block_rows(karabiner)
 			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_INSTALL] = function()
 				Logger.info(LOG, "Showing the owned runtime install from the Tap-Holds menu.")
 				local shown_ok, shown = xpcall(function()
-					return require("ui.owned_runtime_install").open(karabiner)
+					return require("ai.ui.owned_runtime_install").open(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The owned runtime install could not be shown: %s.", tostring(shown))
@@ -1224,7 +1300,7 @@ local function owned_runtime_block_rows(karabiner)
 			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_REPAIR] = function()
 				Logger.info(LOG, "Showing the owned runtime service repair from the Tap-Holds menu.")
 				local shown_ok, shown = xpcall(function()
-					return require("ui.owned_runtime_install").open_repair(karabiner)
+					return require("ai.ui.owned_runtime_install").open_repair(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The owned runtime service repair could not be shown: %s.", tostring(shown))
@@ -1233,6 +1309,31 @@ local function owned_runtime_block_rows(karabiner)
 				return shown == true
 			end,
 		}) or {}) do rows[#rows + 1] = row end
+	end
+	return rows, #rows > explanation_count
+end
+
+--- Greys every row of a finished Tap-Holds submenu but the block and its fix,
+--- without its tick, its click or its submenu: while the owned runtime waits
+--- for that fix no setting here can take effect, and a ticked switch or a live
+--- key row read as tap-holds that work (maintainer, 2026-11-23). The block
+--- explanation says why, as the karabiner_off_hint row leads the key rows
+--- greyed with « Ergopti uses Karabiner » off. The finished rows are only
+--- read: the shared renderer draws each greyed row from row data.
+--- @param block_rows table Row data of the block and its fix.
+--- @param children table Finished submenu rows, left untouched.
+--- @return table rows The gated submenu.
+local function grey_all_but_runtime_fix(block_rows, children)
+	local kept = {}
+	for _, row in ipairs(block_rows) do kept[row.label] = true end
+	local rows = {}
+	for _, child in ipairs(children) do
+		if child.title == "-" or kept[child.title] then
+			rows[#rows + 1] = child
+		elseif type(child.title) == "string" then
+			rows[#rows + 1] = ManifestMenu.render_rows({ { label = child.title, disabled = true } },
+				"tap_hold_owned_block")[1]
+		end
 	end
 	return rows
 end
@@ -1248,6 +1349,11 @@ end
 --- The manifest's `tapholds_toggle` row is the Tap-Holds feature switch. It
 --- never touches the remap engine itself, which the driver keeps running on
 --- its own: off only stops generating the per-key rules, like a pause.
+---
+--- While Ergopti's own runtime waits for a fix this menu offers (install it,
+--- repair its service, update its driver), that block and its fix row are the
+--- only live rows: every other row is greyed and unticked, the parent row
+--- included, since nothing else can work until then.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A provider row carrying the rendered submenu, or nil.
 function M.build(ctx)
@@ -1264,6 +1370,8 @@ function M.build(ctx)
 	local enabled = karabiner.get_enabled()
 	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
 		and karabiner.get_tap_holds_enabled() == true
+	-- Read once: the gate and the rows it keeps live must name the same block.
+	local block_rows, blocked_on_fix = owned_runtime_block_rows(karabiner)
 
 	-- The key lists build their trees on demand, inside the renderer's isolated
 	-- provider call: an unreadable key catalogue then costs the key rows and is
@@ -1275,7 +1383,7 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
-			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
+			for _, row in ipairs(block_rows) do rows[#rows + 1] = row end
 			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
 			for _, row in ipairs(user_karabiner_closed_rows(karabiner)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
@@ -1307,10 +1415,10 @@ function M.build(ctx)
 		end,
 		[ConfigKeys.COMMAND.SCOPE_RESTORE] = function() return run_scope(karabiner, "recommended", update_menu) end,
 		[ConfigKeys.COMMAND.SCOPE_CLEAR] = function() return run_scope(karabiner, "clear", update_menu) end,
-		-- Required on the click: the editor loads the layer data and its window
-		-- stack, which a menu build has no use for.
+		-- Required on the click: Ergopti Studio, on the source's navigation layer,
+		-- loads the layer data and its window stack, which a menu build has no use for.
 		[ConfigKeys.COMMAND.EDIT_NAV_LAYER] = function()
-			return require("ui.layer_editor").open({ karabiner = karabiner })
+			return require("ui.layout_manager").open_editor_on_nav({ karabiner = karabiner })
 		end,
 	}
 
@@ -1319,13 +1427,33 @@ function M.build(ctx)
 	render_ctx.commands = commands
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters["tapholds_enabled"] = function() return tap_holds_on end
+	-- Behind a block with its fix the switch reads on for the renderer: its
+	-- category-off rule would otherwise tell the user to tick the first row,
+	-- which the gate greys, and grey the fix row. The gate unticks it below.
+	render_ctx.state_getters["tapholds_enabled"] = function() return tap_holds_on or blocked_on_fix end
 
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
 	local children = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
-	return receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
+	if blocked_on_fix then children = grey_all_but_runtime_fix(block_rows, children) end
+	local row = receive(children, {
+		tapholds_enabled = function() return (tap_holds_on and not blocked_on_fix) or nil end,
+	})
+
+	-- The AI title's dot (maintainer, 2026-11-23), read again live by the watch:
+	-- a pause or the switch changing after this build repaints it too.
+	local function read_status()
+		local paused = ctx.paused == true
+		if type(ctx.is_paused) == "function" then paused = ctx.is_paused() == true end
+		local on = type(karabiner.get_tap_holds_enabled) == "function"
+			and karabiner.get_tap_holds_enabled() == true
+		return TapHoldsStatus.read(karabiner, on, paused)
+	end
+	local status = read_status()
+	if row then TitleStatus.decorate(row, status) end
+	if type(update_menu) == "function" then _status_watch.watch(status, read_status, update_menu) end
+	return row
 end
 
 --- Switches the Tap-Holds feature, persists it, then redeploys the rules.
@@ -1363,8 +1491,8 @@ end
 --- Builds the « Combinaisons de touches » group of the Shortcuts submenu: the
 --- rows `key_combinations_group` declares, answered by this engine's chords.
 ---
---- It opens with its own switch (persisted [mod_combos] enabled; on while the
---- user never set it, whatever the Tap-Holds switch says), then the symmetry
+--- It opens with its own switch (persisted [category_enabled] key_combinations;
+--- on while the user never set it, whatever the Tap-Holds switch says), then the symmetry
 --- check, the chord delay, the tap → chord copy, and
 --- one row per ordered pair of keys with its three slots, left hand then
 --- right hand.
@@ -1396,7 +1524,7 @@ function M.build_key_combinations(ctx)
 		end,
 	}
 
-	local combos_on = karabiner.get_mod_combos_enabled() == true
+	local combos_on = karabiner.get_key_combinations_enabled() == true
 	local commands = {
 		[ConfigKeys.COMMAND.KEY_COMBINATIONS_TOGGLE] = function()
 			return M.set_key_combinations_enabled(karabiner, not combos_on, update_menu)
@@ -1443,12 +1571,12 @@ end
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean committed
 function M.set_key_combinations_enabled(karabiner, enabled, update_menu)
-	if type(karabiner) ~= "table" or type(karabiner.set_mod_combos_enabled) ~= "function" then
+	if type(karabiner) ~= "table" or type(karabiner.set_key_combinations_enabled) ~= "function" then
 		Logger.error(LOG, "Key-combinations switch is unavailable.")
 		return false
 	end
 	Logger.start(LOG, "Switching the key combinations %s…", enabled and "on" or "off")
-	if karabiner.set_mod_combos_enabled(enabled == true) ~= true then
+	if karabiner.set_key_combinations_enabled(enabled == true) ~= true then
 		Logger.error(LOG, "Key-combinations switch did not persist.")
 		return false
 	end
@@ -1481,5 +1609,6 @@ end
 M._picker_fingerprint  = picker_fingerprint
 M._build_picker_trees  = build_picker_trees
 M._reset_picker_cache  = function() _picker_cache = nil end
+M._status_watch        = _status_watch
 
 return M

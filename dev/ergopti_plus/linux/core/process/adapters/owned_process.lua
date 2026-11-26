@@ -323,6 +323,14 @@ function M.start(executable, args, options, callback)
 		local admitted = authorized(request)
 		return admitted and held_running()
 	end
+	--- The pid of the running child, which leads its own process group (the
+	--- spawn is detached), so a descendant's socket can be told apart from a
+	--- foreign one. Nil once the child is no longer held running.
+	--- @return number|nil pid
+	function operation:pid()
+		if not held_running() then return nil end
+		return request.pid
+	end
 	function operation:on_settled(listener)
 		if type(listener) ~= "function" then return false end
 		if request.settled then

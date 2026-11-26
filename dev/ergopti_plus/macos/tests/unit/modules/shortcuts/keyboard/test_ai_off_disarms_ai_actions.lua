@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local ENGINE = "modules.llm.prediction_engine"
+local ENGINE = "ai.engine.prediction.engine"
 
 --- Runs a body with a stub prediction engine whose AI switch the body flips.
 --- @param body function(state: table) state.enabled is the AI switch.
@@ -100,7 +100,7 @@ local function load_keyboard()
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}

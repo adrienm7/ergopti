@@ -10,15 +10,18 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
-	helpers.with_fresh_modules({ "ui.menu.menu_paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
-		"core.fs.adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
-		"modules.keymap.number_row_live" }, function()
+	helpers.with_fresh_modules({ "settings.ui.menu.paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
+		"core.fs.adapters.file_system", "settings.engine.paths", "platform.remap", "core.text.engine.json",
+		"modules.keymap.number_row_live", "hotstrings.engine.magic_key_display" }, function()
+		-- The page proposes the layout's magic key default; this fixture's reads
+		-- are all intercepted, so the layout reads as one without a family.
+		package.loaded["hotstrings.engine.magic_key_display"] = { layout_default = function() return "★" end }
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {
 			available = function() return false, "no_source_layout" end,
 		}
 		-- Distinctive rule: a wizard that derived the path itself cannot match it.
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			get_config_dir = function() return "/virtual/current/" end,
 			metrics_dir = function(dir) return "<metrics of " .. dir .. ">" end,
 			get = function(key)
@@ -32,7 +35,7 @@ local function with_delivery(callback, native_timers)
 			recommended_key_report = function() return { enabled = false, keys = {} } end,
 		}
 		local picker = {}
-		package.loaded["ui.menu.menu_paths"] = {
+		package.loaded["settings.ui.menu.paths"] = {
 			get_config_dir = function() return "/virtual/current" end,
 			get_default_config_dir = function() return "/virtual/default" end,
 			pick_config_dir = function(current, prompt)

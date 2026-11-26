@@ -38,8 +38,8 @@
 #   - the daily unified log     <files.unified_prefix>YYYY-MM-DD<files.extension>
 #   - the daily errors mirror   <files.errors_prefix>YYYY-MM-DD<files.extension>
 #                               (WARNING and ERROR lines only)
-#   - the topical sub-files     <files.topical_prefix><name><files.extension>,
-#                               names from _shared/core/logger/data/sub_files.toml
+#   (the topical sub-files were retired on 2026-11-25: retired_topical_logs
+#   below names the files each retention sweep deletes)
 #   - crash reports             <logs>/<logs.crash_reports_dir>/
 #   - on macOS, the launcher's own launcher.log and fatal report
 # Metrics and keystroke data are user data, not logs: they stay in the
@@ -82,7 +82,6 @@ crash_reports_dir = "crash_reports"
 [logs.files]
 unified_prefix = "ErgoptiPlus_"
 errors_prefix = "ErgoptiPlus_errors_"
-topical_prefix = "ErgoptiPlus_"
 extension = ".log"
 # What happens before the configuration is read and the logger can start: a
 # yielding second instance, a refused configuration transition (Windows), a
@@ -92,6 +91,27 @@ extension = ".log"
 # loaded yet. macOS has the equivalent in the native launcher: launcher_log and
 # fatal_report below.
 bootstrap_log = "bootstrap.log"
+# The topical sub-files every driver used to fan lines out to beside the daily
+# log, until one daily log became the only log (maintainer decision,
+# 2026-11-25: testers had to send dozens of files). Every line they held is
+# also in the daily log, so each driver's retention sweep deletes these exact
+# names (a regular file directly in the logs folder, never anything else) the
+# first time it runs; nothing writes them any more.
+retired_topical_logs = [
+	"ErgoptiPlus_gestures.log",
+	"ErgoptiPlus_ollama.log",
+	"ErgoptiPlus_llm.log",
+	"ErgoptiPlus_hotstrings.log",
+	"ErgoptiPlus_keystats.log",
+	"ErgoptiPlus_menu.log",
+	"ErgoptiPlus_notify.log",
+	"ErgoptiPlus_boot.log",
+	"ErgoptiPlus_layout.log",
+	"ErgoptiPlus_dispatch.log",
+	"ErgoptiPlus_tray.log",
+	"ErgoptiPlus_mlx.log",
+	"ErgoptiPlus_karabiner.log",
+]
 
 # ===================================
 # ===================================
@@ -109,8 +129,14 @@ segments = ["Library", "Logs", "{app}"]
 # Written by the native launcher before any configuration is read, so they
 # always stay in this default folder, whatever LogsDirPath says.
 launcher_log = "launcher.log"
+# The boot journal (core/logger/adapters/boot_journal.lua): every boot stage
+# appended and closed synchronously, so a boot that dies before the native
+# logger commits (os.exit() discards its queue) still leaves its trail. It used
+# to share ErgoptiPlus_boot.log with the retired [init] topical sub-file, a name
+# the retention sweep now deletes.
+boot_journal = "boot_journal.log"
 fatal_report = "hammerspoon-fatal.txt"
-# The controlled reload's synchronous stage trail (adapters/reload_breadcrumb.lua),
+# The controlled reload's synchronous stage trail (diagnostics/adapters/reload_breadcrumb.lua),
 # beside launcher.log for the same reason: a reload that loses the app leaves
 # it for the next boot and the field report collector before any configuration
 # is read.

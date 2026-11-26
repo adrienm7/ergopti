@@ -51,16 +51,16 @@ and an equivalent that OS does not offer, then writes the table below.
 A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
 `shortcut`, `app`, `command`, `path`, `apple_shortcut`) is validated, prompted
 for and explained by each driver's gesture module: macOS
-`modules/gestures/actions.lua` (`validate_action_parameter`,
-`parameter_prompt`, `parameter_error`), Linux `modules/gestures/manager.lua`
+`gestures/engine/actions.lua` (`validate_action_parameter`,
+`parameter_prompt`, `parameter_error`), Linux `gestures/engine/manager.lua`
 (`validate_action_parameter`, `get_action_parameter_prompt`,
-`get_action_parameter_error`) and Windows `modules/gestures/config.ahk`
+`get_action_parameter_error`) and Windows `gestures/engine/config.ahk`
 (`GestureValidateActionParameter`, `GestureActionParameterPrompt`). A new kind
 is added to all three and to `PARAMETER_KINDS` in the generator in one change;
 the `wrap_pair` rule is pinned by
 `_shared/tests/corpus/action_parameters/wrap_pair_vectors.json`, and the
 `text`, `key` and `shortcut` rules (over `send_keys.json`, parsed by
-`_shared/platform/input` and `windows/infra/send_input_parameter.ahk`) by
+`_shared/platform/input` and `windows/settings/engine/send_input_parameter.ahk`) by
 `_shared/tests/corpus/action_parameters/send_input_vectors.json`.
 
 The shared action picker (`_shared/ui/action_picker/`) edits the `text`, `key`
@@ -75,10 +75,10 @@ replays the corpus against the page.
 
 `run_command`, `open_path` and `run_apple_shortcut` carry the `command`,
 `path` and `apple_shortcut` kinds, decoded by
-`_shared/shortcuts/engine/user_action_parameter.lua` and pinned by
+`_shared/shortcuts/engine/actions/user_action_parameter.lua` and pinned by
 `_shared/tests/corpus/action_parameters/user_action_vectors.json`. They run in
-`modules/gestures/user_actions.lua` on macOS and Linux and in
-`modules/gestures/apple_shortcut_action.lua` on macOS. On Windows the first two
+`gestures/engine/user_actions.lua` on macOS and Linux and in
+`gestures/engine/apple_shortcut_action.lua` on macOS. On Windows the first two
 run in `windows/infra/user_actions.ahk`, which owns the Windows path spelling
 (`windows_path_vectors` of the same corpus); `run_apple_shortcut` declares `hs`.
 
@@ -292,6 +292,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_path` | 📂 Open a file or folder [configurable] | yes | yes | yes |
 | `run_program` | ▶️ Run a program [configurable] | yes | yes | yes |
 | `run_command` | ⌨️ Run a shell command [configurable] | yes | yes | yes |
+| `run_workflow` | 🧩 Run a custom workflow [configurable] | yes | yes | yes |
 | `run_apple_shortcut` | 🧩 Run an Apple shortcut [configurable] | no, R15; use `run_program` | yes | no, R15; use `run_command`, `run_program` |
 | `quit_frontmost_app` | ✕ Quit the active app | yes | yes | yes (session:x11, tool:xdotool, tool:xprop) |
 | `force_quit_frontmost` | ⚠ Force quit the active app | yes | yes | yes (session:x11, tool:xdotool, tool:xprop) |
@@ -305,7 +306,7 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `new_text_file_here` | 📄 New text file here | yes | yes | yes (session:x11, tool:xdotool, tool:xprop, tool:gdbus, file_manager:folder) |
 | `screen_capture` | 📸 System screenshot tool | yes | yes | yes |
 | `screen_capture_instant` | 📸 Instant capture (window) | yes | yes | yes |
-| `ocr_screenshot` | 📷 OCR screenshot (Win+Shift+T) | yes | no, R19; use `screen_capture` | yes (tool:tesseract) |
+| `ocr_screenshot` | 📷 Capture → text | yes | yes | yes (tool:tesseract) |
 | `open_chatgpt` | Open ChatGPT (URL set in menu) | yes | yes | yes (tool:xdg-open) |
 | `open_url` | 🌐 Open a link [configurable] | yes | yes | yes (tool:xdg-open) |
 | `open_downloads` | 📥 Downloads folder | yes | yes | yes (tool:xdg-open, tool:xdg-user-dir) |
@@ -313,23 +314,22 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `open_system_settings` | ⚙ System settings | yes | yes | yes |
 | `pick_color` | 🎨 HEX colour under cursor | yes | yes | yes |
 | `open_emoji_picker` | 😀 Emoji picker | yes | yes | yes |
-| `take_note` | 📝 Take a note | yes | no, R20 | yes (tool:gtk-launch, tool:xdg-mime) |
+| `take_note` | 📝 Take a note | yes | no, R19 | yes (tool:gtk-launch, tool:xdg-mime) |
 | `activity_simulation` | 🖱 Simulate activity (anti-sleep) | yes | yes | yes (tool:systemd-inhibit) |
-| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | yes | yes | no, R21 |
+| `display_mirror_toggle` | 🖥 Mirror displays (on/off) | yes | yes | no, R20 |
 | `search_web` | 🔍 Web search [configurable] | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `copy_selected_path` | 📋 Copy the path, or open / search the selection | yes | yes | yes (tool:xclip, tool:xdg-open) |
 | `teleport_mouse` | 🖱 Teleport mouse | yes | yes | yes (session:x11, tool:xdotool, tool:xrandr) |
 | `spotlight_mouse` | 🔦 Mouse spotlight | yes | yes | yes (session:x11, tool:xdotool, tool:xrandr) |
 | `toggle_capslock` | ⇪ Toggle CapsLock | yes | yes | yes |
-| `microsoft_bold` | 𝐁 Ctrl+B Microsoft (→ Ctrl+G) | yes | no, R22 | no, R22 |
 | `one_shot_shift` | ⇧ OneShotShift | yes | no, R4; use `sticky_shift` | yes |
-| `caps_word` | ⇪★ CapsWord | yes | no, R4; use `capsword` | yes |
+| `caps_word` | ⇪★ CapsWord (capitals to the end of the word) | yes | no, R4; use `capsword` | yes |
 | `ctrl_backspace` | ⌫ Ctrl+BackSpace | yes | no, R6; use `opt_backspace` | yes |
 | `ctrl_delete` | ⌦ Ctrl+Delete | yes | no, R6; use `opt_delete_fwd` | yes |
 | `space` | ␣ Space | yes | yes | yes |
 | `caps_lock` | ⇪ CapsLock | yes | no, R4; use `toggle_capslock` | yes |
-| `layer_on` | 🗂 Nav layer ON | no, R23 | yes | no, R23 |
-| `layer_off` | 🗂 Nav layer OFF | no, R23 | yes | no, R23 |
+| `layer_on` | 🗂 Nav layer ON | no, R21 | yes | no, R21 |
+| `layer_off` | 🗂 Nav layer OFF | no, R21 | yes | no, R21 |
 | `capsword` | ⇪★ CapsWord | no, R4; use `caps_word` | yes | no, R4; use `caps_word` |
 | `sticky_shift` | 📌 Sticky Shift | no, R4; use `one_shot_shift` | yes | no, R4; use `one_shot_shift` |
 | `sticky_ctrl` | 📌 Sticky Ctrl | yes | yes | yes |
@@ -370,31 +370,31 @@ actions that do the same on that OS. The modifier + key shortcuts
 | `script_reload` | ↻ Reload | yes | yes | yes |
 | `script_save_reload` | ↻ Save and reload | yes | yes | yes |
 | `script_quit` | ✕ Quit | yes | yes | yes |
-| `open_console` | ▤ Console | no, R24 | yes | no, R24 |
-| `open_window_spy` | Window Spy | yes | no, R24 | no, R24 |
-| `open_list_vars` | Variable state | yes | no, R24 | no, R24 |
-| `open_key_history` | Key history | yes | no, R24 | no, R24 |
+| `open_console` | ▤ Console | no, R22 | yes | no, R22 |
+| `open_window_spy` | Window Spy | yes | no, R22 | no, R22 |
+| `open_list_vars` | Variable state | yes | no, R22 | no, R22 |
+| `open_key_history` | Key history | yes | no, R22 | no, R22 |
 
 ### Continuous swipes (axis actions)
 
 | Action | Label | Windows | macOS | Linux |
 | --- | --- | --- | --- | --- |
-| `tabs` | ⧉ Tabs | no, R25; use `tab_prev`, `tab_next` | yes | no, R25; use `tab_prev`, `tab_next` |
-| `char` | A Characters | no, R25; use `arrow_left`, `arrow_right` | yes | no, R25; use `arrow_left`, `arrow_right` |
-| `char_sel` | ✎ A Sel. Characters | no, R25; use `sel_left`, `sel_right` | yes | no, R25; use `sel_left`, `sel_right` |
-| `line_arrow` | ↕ Lines (Arrows) | no, R25; use `arrow_up`, `arrow_down` | yes | no, R25; use `arrow_up`, `arrow_down` |
-| `line_sel` | ✎ ↕ Sel. Lines | no, R25; use `sel_up`, `sel_down` | yes | no, R25; use `sel_up`, `sel_down` |
-| `words` | W Words | no, R25; use `word_prev`, `word_next` | yes | no, R25; use `word_prev`, `word_next` |
-| `words_sel` | ✎ W Sel. Words | no, R25; use `sel_word_prev`, `sel_word_next` | yes | no, R25; use `sel_word_prev`, `sel_word_next` |
-| `windows` | ◱ Windows | no, R25; use `win_prev`, `win_next` | yes | no, R25; use `win_prev`, `win_next` |
-| `spaces` | ▢ Spaces | no, R25; use `desktop_prev`, `desktop_next` | yes | no, R25; use `desktop_prev`, `desktop_next` |
-| `volume` | 🔊 Volume | no, R25; use `vol_down`, `vol_up` | yes | no, R25; use `vol_down`, `vol_up` |
-| `brightness` | ☀ Brightness | no, R25; use `brightness_down`, `brightness_up` | yes | no, R25; use `brightness_down`, `brightness_up` |
-| `tracks` | ♫ Tracks | no, R25; use `track_prev`, `track_next` | yes | no, R25; use `track_prev`, `track_next` |
-| `lines` | ↕ Lines (Alt) | no, R25; use `line_up`, `line_down` | yes | no, R25; use `line_up`, `line_down` |
-| `line_bounds` | ↔ Line (start/end) | no, R25; use `line_start`, `line_end` | yes | no, R25; use `line_start`, `line_end` |
-| `paragraphs` | ¶ Paragraphs | no, R25; use `para_prev`, `para_next` | yes | no, R25; use `para_prev`, `para_next` |
-| `document` | 📄 Document (start/end) | no, R25; use `doc_start`, `doc_end` | yes | no, R25; use `doc_start`, `doc_end` |
+| `tabs` | ⧉ Tabs | no, R23; use `tab_prev`, `tab_next` | yes | no, R23; use `tab_prev`, `tab_next` |
+| `char` | A Characters | no, R23; use `arrow_left`, `arrow_right` | yes | no, R23; use `arrow_left`, `arrow_right` |
+| `char_sel` | ✎ A Sel. Characters | no, R23; use `sel_left`, `sel_right` | yes | no, R23; use `sel_left`, `sel_right` |
+| `line_arrow` | ↕ Lines (Arrows) | no, R23; use `arrow_up`, `arrow_down` | yes | no, R23; use `arrow_up`, `arrow_down` |
+| `line_sel` | ✎ ↕ Sel. Lines | no, R23; use `sel_up`, `sel_down` | yes | no, R23; use `sel_up`, `sel_down` |
+| `words` | W Words | no, R23; use `word_prev`, `word_next` | yes | no, R23; use `word_prev`, `word_next` |
+| `words_sel` | ✎ W Sel. Words | no, R23; use `sel_word_prev`, `sel_word_next` | yes | no, R23; use `sel_word_prev`, `sel_word_next` |
+| `windows` | ◱ Windows | no, R23; use `win_prev`, `win_next` | yes | no, R23; use `win_prev`, `win_next` |
+| `spaces` | ▢ Spaces | no, R23; use `desktop_prev`, `desktop_next` | yes | no, R23; use `desktop_prev`, `desktop_next` |
+| `volume` | 🔊 Volume | no, R23; use `vol_down`, `vol_up` | yes | no, R23; use `vol_down`, `vol_up` |
+| `brightness` | ☀ Brightness | no, R23; use `brightness_down`, `brightness_up` | yes | no, R23; use `brightness_down`, `brightness_up` |
+| `tracks` | ♫ Tracks | no, R23; use `track_prev`, `track_next` | yes | no, R23; use `track_prev`, `track_next` |
+| `lines` | ↕ Lines (Alt) | no, R23; use `line_up`, `line_down` | yes | no, R23; use `line_up`, `line_down` |
+| `line_bounds` | ↔ Line (start/end) | no, R23; use `line_start`, `line_end` | yes | no, R23; use `line_start`, `line_end` |
+| `paragraphs` | ¶ Paragraphs | no, R23; use `para_prev`, `para_next` | yes | no, R23; use `para_prev`, `para_next` |
+| `document` | 📄 Document (start/end) | no, R23; use `doc_start`, `doc_end` | yes | no, R23; use `doc_start`, `doc_end` |
 
 ### Reasons
 
@@ -418,13 +418,11 @@ actions that do the same on that OS. The modifier + key shortcuts
 | R16 | `platform_reason.action_notifications_are_cleared_from_their_centre` | This system lets no application dismiss notifications: clear them in the notification centre, which the equivalent action opens. |
 | R17 | `platform_reason.action_download_mark_is_each_systems` | Each system marks downloaded files its own way (the quarantine attribute on macOS, the Mark of the Web on Windows) and offers the action that removes its own mark. Linux marks no downloaded file. |
 | R18 | `platform_reason.action_executable_permission_is_unix` | Not on Windows: a file runs there because of its extension, not because of an executable permission. |
-| R19 | `platform_reason.action_text_recognition_is_live_text_on_macos` | On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text. |
-| R20 | `platform_reason.action_take_note_uses_notepad` | macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file. |
-| R21 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
-| R22 | `platform_reason.action_office_bold_key_is_windows` | Windows only: French Microsoft Office makes text bold with Ctrl+G where other applications use Ctrl+B, so this action picks the key by application. On macOS (Cmd+B) and Linux (Ctrl+B) one combination works everywhere: bind it from “Shortcuts”. |
-| R23 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
-| R24 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
-| R25 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
+| R19 | `platform_reason.action_take_note_uses_notepad` | macOS provides Quick Note (Fn+Q) instead of opening a plain-text notes file. |
+| R20 | `platform_reason.action_mirroring_is_the_systems_projection_menu` | No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke. |
+| R21 | `platform_reason.action_navigation_layer_switch_is_karabiner` | macOS only: these switch the navigation layer kept inside Karabiner-Elements. On Windows and Linux the layer follows the key held down and has no switch to set. |
+| R22 | `platform_reason.debug_surface_is_each_drivers_own` | Each driver debugs through its own runtime: AutoHotkey provides Window Spy, a variable listing and a key history, and Hammerspoon provides a Lua console. The other runtimes have nothing equivalent to open. |
+| R23 | `platform_reason.action_continuous_swipe_is_macos` | macOS only: a continuous swipe follows the fingers while they move, which only the macOS driver reads. Windows gets finished gestures from its touchpad settings and Linux acts once a swipe ends: use the equivalent single-step actions. |
 
 <!-- END GENERATED availability -->
 

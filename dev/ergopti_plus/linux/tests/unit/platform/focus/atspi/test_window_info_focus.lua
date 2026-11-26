@@ -365,7 +365,7 @@ helpers.describe("window_info: Wayland", function()
 
 
 	helpers.it("(linux-focus-native-query-error) refuses unexpected compositor errors before accessible fallback", function()
-		local name = "adapters.user_hotstring_destination"
+		local name = "hotstrings.adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0
 		package.loaded[name] = {
 			capture_current = function()
@@ -389,7 +389,7 @@ helpers.describe("window_info: Wayland", function()
 	end)
 
 	helpers.it("(linux-focus-coherent-poll) reserves accessible focus lookup for fresh native targeting", function()
-		local name = "adapters.user_hotstring_destination"
+		local name = "hotstrings.adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0
 		local saved_lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		package.loaded[name] = {

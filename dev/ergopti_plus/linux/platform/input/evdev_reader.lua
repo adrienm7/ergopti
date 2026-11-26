@@ -53,6 +53,7 @@ local original_reconciliation_ports = {}
 
 local Logger = require("core.logger.engine.shim")
 local InputEvent = require("platform.input.event")
+local EvdevAbs = require("platform.input.keycodes.evdev_abs")
 
 local LOG = "platform.input.evdev_reader"
 
@@ -85,6 +86,11 @@ local EVIOCGKEY_NR = 0x18
 local EVIOCGLED_NR = 0x19
 local EVIOCGBIT_NR = 0x20
 local EVENT_TYPE_BYTES = 4 -- EV_MAX is 0x1f: one complete event-type bitmap.
+-- EVIOCGMTSLOTS(len): a __u32 axis code in, then one __s32 per slot out.
+local EVIOCGMTSLOTS_NR = 0x0a
+-- EVIOCGABS(abs) = _IOR('E', 0x40 + abs, struct input_absinfo): six __s32.
+-- The axis codes and the slot bound: _shared/platform/input/keycodes/evdev_abs.lua.
+local EVIOCGABS_BASE = 0x80184540
 
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
@@ -150,6 +156,11 @@ local _slots = {}
 local _wait_fds = {}
 -- Wait companions that failed once and are no longer polled.
 local _refused_companions = setmetatable({}, { __mode = "k" })
+-- The companions opened for the current wait and their record groups, reused
+-- like _wait_fds: group i is { records = …, count = … } for opened[i].
+local _wait_opened = {}
+local _wait_groups = {}
+local NO_COMPANIONS = {}
 
 --- The state for a slot, created on first use.
 --- @param slot string|nil Defaults to the keyboard.
@@ -170,6 +181,8 @@ end
 ---   open(path, flags)        → handle|nil, err
 ---   ioctl(handle, req, arg)  → boolean
 ---   read_event_bits(fd, req, count) → string|nil (full event-type bitmap)
+---   read_abs(fd, req)        → table|nil, reason (struct input_absinfo, 6 integers)
+---   read_mt_slots(fd, req, code, count) → table|nil, reason (count slot values)
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)            → true|nil on completion, false, reason on failure
@@ -272,6 +285,25 @@ local function build_ffi_backend()
 			if copied ~= count then return nil, "event-type ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
+		read_abs = function(fd, request)
+			local info = native_new("int32_t[6]")
+			if tonumber(native_ioctl(fd, request, info)) ~= 0 then
+				return nil, "EVIOCGABS failed (errno=" .. tostring(native_errno()) .. ")"
+			end
+			local values = {}
+			for index = 0, 5 do values[index + 1] = tonumber(info[index]) end
+			return values
+		end,
+		read_mt_slots = function(fd, request, code, count)
+			local values = native_new("int32_t[?]", count + 1)
+			values[0] = code
+			if tonumber(native_ioctl(fd, request, values)) ~= 0 then
+				return nil, "EVIOCGMTSLOTS failed (errno=" .. tostring(native_errno()) .. ")"
+			end
+			local slots = {}
+			for index = 1, count do slots[index] = tonumber(values[index]) end
+			return slots
+		end,
 		read = function(fd, count)
 			local got = tonumber(native_read(fd, buf, count))
 			if not got then return nil, "fatal", "read returned no result" end
@@ -298,12 +330,14 @@ local function build_ffi_backend()
 		-- Waits for any of several descriptors; the idle loop sleeps here instead
 		-- of waking to find nothing. One array, regrown on demand, so a wait
 		-- allocates nothing in steady state.
-		-- `extra` / `extra_count`: a companion's own pollfd-shaped records (the
-		-- tray's GLib descriptors), polled with their own events and handed back
-		-- their revents.
-		poll_many = function(fds, count, timeout_ms, extra, extra_count)
-			extra_count = extra and extra_count or 0
-			local total = count + extra_count
+		-- `groups` / `group_count`: the companions' own pollfd-shaped records
+		-- (the event loop's libuv descriptor, the tray's GLib descriptors), each
+		-- { records, count } with records indexed from 0, polled with their own
+		-- events and handed back their revents.
+		poll_many = function(fds, count, timeout_ms, groups, group_count)
+			group_count = groups and group_count or 0
+			local total = count
+			for group = 1, group_count do total = total + groups[group].count end
 			if total > many_capacity then
 				many_capacity = total * 2
 				many = native_new("struct pollfd[?]", many_capacity)
@@ -313,14 +347,26 @@ local function build_ffi_backend()
 				many[index - 1].events = POLLIN
 				many[index - 1].revents = 0
 			end
-			for index = 0, extra_count - 1 do
-				many[count + index].fd = extra[index].fd
-				many[count + index].events = extra[index].events
-				many[count + index].revents = 0
+			local slot = count
+			for group = 1, group_count do
+				local records = groups[group].records
+				for index = 0, groups[group].count - 1 do
+					many[slot].fd = records[index].fd
+					many[slot].events = records[index].events
+					many[slot].revents = 0
+					slot = slot + 1
+				end
 			end
 			local rc = tonumber(native_poll(many, total, timeout_ms))
 			if rc == nil or rc < 0 then return nil end
-			for index = 0, extra_count - 1 do extra[index].revents = many[count + index].revents end
+			slot = count
+			for group = 1, group_count do
+				local records = groups[group].records
+				for index = 0, groups[group].count - 1 do
+					records[index].revents = many[slot].revents
+					slot = slot + 1
+				end
+			end
 			return rc > 0
 		end,
 		close = function(fd)
@@ -351,7 +397,8 @@ function M.use_ffi_backend()
 	end
 	_backend, _native_backend = backend, backend
 	_native_ports = {}
-	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "poll", "close" }) do
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "read_abs",
+		"read_mt_slots", "poll", "close" }) do
 		_native_ports[name] = rawget(backend, name)
 	end
 	pcall(Logger.debug, LOG, "FFI backend bound.")
@@ -554,6 +601,18 @@ function M.is_grabbed(slot)
 	return state(slot).grabbed
 end
 
+--- The paths of every device this process holds under EVIOCGRAB, for the
+--- field run's session check: a touchpad must never be among them.
+--- @return table paths Sorted absolute paths; empty when nothing is grabbed.
+function M.grabbed_paths()
+	local paths = {}
+	for _, entry in pairs(_slots) do
+		if entry.grabbed and entry.fd ~= nil and type(entry.path) == "string" then paths[#paths + 1] = entry.path end
+	end
+	table.sort(paths)
+	return paths
+end
+
 --- @return string|nil The open device path.
 function M.device_path(slot)
 	return state(slot).path
@@ -643,6 +702,70 @@ function M.active_leds(slot, max_code)
 	return bit_snapshot(slot, EVIOCGLED_NR, max_code)
 end
 
+--- Calls one state-query port of the bound backend on an open source.
+--- @param slot string|nil Reader slot.
+--- @param port string Backend port name.
+--- @return boolean called, any answer, any detail
+local function state_query(slot, port, ...)
+	if _busy then return false, nil, "native operation is unavailable" end
+	local st = state(slot)
+	if not st.fd or st.close_error then return false, nil, "device is not open" end
+	local query = type(_backend) == "table" and rawget(_backend, port)
+	if type(query) ~= "function" then return false, nil, "backend cannot query " .. port end
+	_busy = true
+	local called, answer, detail = pcall(query, st.fd, ...)
+	_busy = false
+	if not called then return false, nil, tostring(answer) end
+	return true, answer, detail
+end
+
+--- Reads one absolute axis's struct input_absinfo (EVIOCGABS) on an open source.
+--- @param slot string|nil Reader slot.
+--- @param code integer ABS_* axis code.
+--- @return table|nil info { value, minimum, maximum, fuzz, flat, resolution }
+--- @return string|nil reason
+function M.abs_info(slot, code)
+	if not EvdevAbs.is_axis(code) then
+		return nil, "not an absolute axis code"
+	end
+	local called, values, detail = state_query(slot, "read_abs", EVIOCGABS_BASE + code)
+	if not called then return nil, detail end
+	if type(values) ~= "table" then return nil, tostring(detail or "EVIOCGABS gave no answer") end
+	for index = 1, 6 do
+		if type(values[index]) ~= "number" then return nil, "EVIOCGABS answer is incomplete" end
+	end
+	return { value = values[1], minimum = values[2], maximum = values[3], fuzz = values[4], flat = values[5],
+		resolution = values[6] }
+end
+
+--- Reads one multitouch axis in every slot (EVIOCGMTSLOTS) on an open source.
+--- The kernel answers the retained value of retired slots too, which is what
+--- a reader must know: it omits a later value equal to it.
+--- @param slot string|nil Reader slot.
+--- @param code integer ABS_MT_* axis code.
+--- @param count integer Slots to read (the ABS_MT_SLOT maximum plus one).
+--- @return table|nil values Indexed by slot number from 0.
+--- @return string|nil reason
+function M.mt_slot_values(slot, code, count)
+	if not EvdevAbs.is_slot_axis(code) then
+		return nil, "not a multitouch slot axis"
+	end
+	if not EvdevAbs.is_slot_count(count) then
+		return nil, "slot count out of range"
+	end
+	local bytes = 4 * (count + 1)
+	local called, values, detail = state_query(slot, "read_mt_slots",
+		ioctl_read_request(EVIOCGMTSLOTS_NR, bytes), code, count)
+	if not called then return nil, detail end
+	if type(values) ~= "table" then return nil, tostring(detail or "EVIOCGMTSLOTS gave no answer") end
+	local by_slot = {}
+	for index = 1, count do
+		if type(values[index]) ~= "number" then return nil, "EVIOCGMTSLOTS answer is incomplete" end
+		by_slot[index - 1] = values[index]
+	end
+	return by_slot
+end
+
 
 
 
@@ -677,14 +800,15 @@ end
 --- open, so an idle daemon wakes once per timeout instead of spinning, and a key
 --- wakes it at once. Nothing is read: the pump still owns every event.
 --- @param timeout_ms integer Milliseconds; 0 returns at once.
---- @param companion table|nil A second event source polled in the same wait (the
----   tray's GLib main context): { begin() -> pollfd-shaped records, count;
----   finish() }. A companion that raises once is retired for the process.
+--- @param companions table|nil Other event sources polled in the same wait (the
+---   event loop's libuv descriptor, the tray's GLib main context), an array of
+---   { begin() -> pollfd-shaped records, count; finish() }. A companion that
+---   raises once is retired for the process; the others stay polled.
 --- @return boolean|nil ready True when a source is readable (or in error, so the
 ---   pump sees and retires it); false on timeout; nil when no wait is possible
 ---   (busy reader, no open source, or a backend without a multi-descriptor wait),
 ---   so the caller yields another way instead of treating it as a quiet wait.
-function M.wait_any_readable(timeout_ms, companion)
+function M.wait_any_readable(timeout_ms, companions)
 	if _busy or _native_debt or not _backend then return nil end
 	local many = rawget(_backend, "poll_many")
 	if type(many) ~= "function" then return nil end
@@ -697,29 +821,41 @@ function M.wait_any_readable(timeout_ms, companion)
 	end
 	if count == 0 then return nil end
 	for index = count + 1, #_wait_fds do _wait_fds[index] = nil end
-	if companion ~= nil and (type(companion) ~= "table" or type(companion.begin) ~= "function"
-		or type(companion.finish) ~= "function") then
-		error("a wait companion needs begin() and finish()", 2)
-	end
-	if companion and _refused_companions[companion] then companion = nil end
-	local extra, extra_count = nil, 0
-	if companion then
-		local begun, records, records_count = pcall(companion.begin)
-		if begun then
-			extra, extra_count = records, records_count or 0
-		else
-			-- Retired after one report: the input wait alone stays correct. Its
-			-- finish still runs, so a half-opened begin releases what it took.
-			pcall(companion.finish)
-			_refused_companions[companion] = true
-			companion = nil
-			Logger.error(LOG, "The idle wait companion failed: %s; it is no longer polled.", tostring(records))
+	if companions ~= nil then
+		if type(companions) ~= "table" then error("wait companions must be an array", 2) end
+		for _, companion in ipairs(companions) do
+			if type(companion) ~= "table" or type(companion.begin) ~= "function"
+				or type(companion.finish) ~= "function" then
+				error("a wait companion needs begin() and finish()", 2)
+			end
 		end
 	end
+	local opened = 0
+	for _, companion in ipairs(companions or NO_COMPANIONS) do
+		if not _refused_companions[companion] then
+			local begun, records, records_count = pcall(companion.begin)
+			if begun then
+				opened = opened + 1
+				_wait_opened[opened] = companion
+				local group = _wait_groups[opened]
+				if not group then group = {}; _wait_groups[opened] = group end
+				group.records, group.count = records, records and records_count or 0
+			else
+				-- Retired after one report: the input wait alone stays correct. Its
+				-- finish still runs, so a half-opened begin releases what it took.
+				pcall(companion.finish)
+				_refused_companions[companion] = true
+				Logger.error(LOG, "The idle wait companion failed: %s; it is no longer polled.", tostring(records))
+			end
+		end
+	end
+	for index = opened + 1, #_wait_opened do _wait_opened[index] = nil end
 	_busy = true
-	local ok, ready = pcall(many, _wait_fds, count, timeout_ms, extra, extra_count)
+	local ok, ready = pcall(many, _wait_fds, count, timeout_ms, opened > 0 and _wait_groups or nil, opened)
 	_busy = false
-	if companion then
+	for index = 1, opened do
+		local companion = _wait_opened[index]
+		_wait_groups[index].records = nil
 		local finished, failure = pcall(companion.finish)
 		if not finished then
 			_refused_companions[companion] = true
@@ -1204,6 +1340,8 @@ M.O_NONBLOCK = O_NONBLOCK
 M.MAX_EVENTS_PER_DRAIN = MAX_EVENTS_PER_DRAIN
 M.EVIOCGKEY_NR = EVIOCGKEY_NR
 M.EVIOCGLED_NR = EVIOCGLED_NR
+M.EVIOCGMTSLOTS_NR = EVIOCGMTSLOTS_NR
+M.EVIOCGABS_BASE = EVIOCGABS_BASE
 
 original_source_owner_ports.capture = M.capture_source_owner
 original_source_owner_ports.current = M.source_owner_current

@@ -11,21 +11,21 @@
 local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 local RowDialect = require("menu.engine.row_dialect")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")
 local TextPrompt = require("core.ui.ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local _fill = require("ui.menu.menu_dialogs")._fill
-local prompt_text = require("ui.menu.menu_dialogs").prompt_text
-local show_error = require("ui.menu.menu_dialogs").show_error
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
-local open_action_picker = require("ui.menu.menu_dialogs").open_action_picker
-local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
+local _fill = require("menu.ui.builder.dialogs")._fill
+local prompt_text = require("menu.ui.builder.dialogs").prompt_text
+local show_error = require("menu.ui.builder.dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local assign_parameterized_action = require("menu.ui.builder.dialogs").assign_parameterized_action
+local open_action_picker = require("menu.ui.builder.dialogs").open_action_picker
+local slot_binding_rows = require("menu.ui.builder.dialogs").slot_binding_rows
 
 local LOG = "ui.menu.menu_shortcuts"
 
@@ -62,7 +62,7 @@ local function _extension_shortcut_rows()
 	local rows = {}
 
 	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
-	local ok_loader, Loader = pcall(require, "modules.hotstrings.loader")
+	local ok_loader, Loader = pcall(require, "hotstrings.engine.loader")
 	if not ok_paths or not ok_loader or type(Paths.extension_roots) ~= "function" then return rows end
 
 	-- The same io functions hotstrings_config.extension_packs() injects. The
@@ -316,7 +316,7 @@ local function _build_shortcuts(ctx)
 		[require("settings.engine.keys").COMMAND.SELECTION_CAPS_WORD] = function()
 			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
-			require("ui.menu.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,
@@ -397,7 +397,7 @@ local function _build_shortcuts(ctx)
 	local providers = {}
 	providers["keyboard_slots"] = function()
 		local ok_kbd, Keyboard = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_kbd or not ok_gestures then
 			Logger.error(LOG, "Keyboard slots unavailable — the shortcuts submenu loses its bindings.")
 			return {}
@@ -450,9 +450,9 @@ local function _build_shortcuts(ctx)
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
 				local reason
-				if slot == require("shortcuts.engine.magic_editor_core").SLOT_ID then
+				if slot == require("shortcuts.engine.star_slot_core").slot("linux").id then
 					local gate = ctx.input_capture_gate
-					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+					reason = Keyboard.star_slot_decision({ master = enabled == true,
 						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
 						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
 				end
@@ -489,16 +489,13 @@ local function _build_shortcuts(ctx)
 	-- under the loaded XKB keymap, then its action; the submenu opens the picker.
 	providers["tap_keys"] = function()
 		local ok_tap, TapKeys = pcall(require, "modules.shortcuts.tap_keys")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_tap or not ok_gestures then
 			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
 			return {}
 		end
 		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
 		local labels = { get = i18n_safe }
-		-- An action on the key chosen as the physical magic key takes its press;
-		-- the row says so, and so does the log when the assignment is made.
-		local Source = type(ctx.magic_key_source) == "table" and ctx.magic_key_source or nil
 		local rows = {}
 		for _, key in ipairs(TapKeys.keys()) do
 			local bound = TapKeys.get_action(key.id)
@@ -506,19 +503,13 @@ local function _build_shortcuts(ctx)
 			local function assign(option, picked)
 				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
 					option, function() return TapKeys.set_action(key.id, option) end, picked)
-				if assigned and Source and Source.tap_override_reason(key.linux, option) ~= nil then
-					Logger.warn(LOG, "Tap key '%s' → '%s' takes the physical magic key %s: that key no longer types "
-						.. "the magic key.", key.id, tostring(option), tostring(Source.get()))
-				end
 				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return assigned
 			end
-			local override = Source and Source.tap_override_reason(key.linux, bound) or nil
 			rows[#rows + 1] = {
 				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
-					or i18n_safe("menu.shortcuts.tap_keys.unassigned"))
-					.. (override and (" — " .. i18n_safe(override)) or ""),
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}
 		end
@@ -565,21 +556,21 @@ local function _build_shortcuts(ctx)
 				end
 				if spec == "program" then return nil end
 				if spec == "app" then
-					return require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+					return require("apps.ui.chooser").pick(require("core.process.adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
 				end
 				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
 				if require("ui.user_action_editor").KINDS[spec] then
 					return require("ui.user_action_editor").ask(spec, title, gestures.get_action_parameter_prompt(action), prior)
 				end
 				-- A backend is picked from a list, as on the action picker page.
-				if spec == "llm_vision" then return require("ui.vision_parameter_prompt").ask(title, prior) end
+				if spec == "llm_vision" then return require("ai.ui.vision_parameter_prompt").ask(title, prior) end
 				return prompt_text(title, plain_markup(gestures.get_action_parameter_prompt(action)), prior)
 			end,
 		})
 	end
 	group_builders[require("settings.engine.keys").LEAF.SCRIPT_CONTROL] = function()
 		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
-		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		local ok_gestures, Gestures = pcall(require, "gestures.engine.manager")
 		if not ok_chords or not ok_gestures then
 			Logger.error(LOG, "Script chords unavailable — the shortcuts submenu loses them.")
 			return nil
@@ -626,7 +617,7 @@ local function _build_shortcuts(ctx)
 				SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 				return false
 			end
-			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
+			require("menu.ui.builder.feature_notice").feature(i18n_safe("notify.script_control"), not current)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
@@ -766,7 +757,7 @@ local function _build_shortcuts(ctx)
 			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
-		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
+		require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
@@ -805,6 +796,10 @@ local function _build_shortcuts(ctx)
 	})
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	-- The user's workflows open in their shared window (ui/user_workflows_bridge).
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.USER_WORKFLOWS_EDITOR] = function()
+		return require("ui.user_workflows_bridge").open()
+	end
 	-- The editor's honest cause while physical delivery is unqualified.
 	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
 		local ok, host = pcall(require, "ui.physical_shortcuts.bridge")
@@ -839,7 +834,7 @@ local function _build_shortcuts(ctx)
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
 					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
-					require("ui.menu.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
+					require("menu.ui.builder.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,

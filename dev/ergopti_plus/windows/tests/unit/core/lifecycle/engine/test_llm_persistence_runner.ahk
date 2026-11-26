@@ -9,8 +9,8 @@ _LPR_RunCanonicalEntry() {
 	global TEST_REGISTRY, LLM_PERSISTENCE_RUNNER_TIMEOUT_MS
 	Expected := Map()
 	for Entry in TEST_REGISTRY {
-		SplitPath(Entry.file, &FileName)
-		if FileName == "test_llm_menu_persistence.ahk" || FileName == "test_llm_menu_regressions.ahk"
+		; Both sources sit in unit\ai\menu, whose generic file names other folders share.
+		if RegExMatch(Entry.file, "i)[\\/]ai[\\/]menu[\\/]test_(persistence|regressions)\.ahk$")
 			Expected[Entry.name] := true
 	}
 	AssertTrue(Expected.Count > 0, "the real isolated source registries must be registered")

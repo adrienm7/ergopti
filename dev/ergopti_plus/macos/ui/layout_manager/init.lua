@@ -4,7 +4,7 @@
 --- MODULE: Layout Manager Window (macOS host)
 --- DESCRIPTION:
 --- Hosts the shared layout manager page (_shared/ui/layout_manager) in a
---- WKWebView: the "Manage layouts…" row of the keyboard-layout submenu opens
+--- WKWebView: the « Install or remove layouts… » row of the layout submenu opens
 --- it, and it lists, installs, updates, uninstalls and selects the layouts of
 --- the registry through modules/keymap/layout_registry.lua.
 ---
@@ -115,7 +115,7 @@ local function pick_source(on_done)
 		return
 	end
 	local path = DialogUtil.choose_layout_source(i18n.get("layout_editor.pick_message"),
-		i18n.get("layout_editor.pick_title"))
+		i18n.get("layout_editor.pick_title"), settings.pick_extension_list)
 	if not path then
 		on_done({})
 		return
@@ -154,6 +154,11 @@ local function new_window(spec)
 	local _retiring_lease = nil
 	local _settling_retired_window = false
 	local _opening_window = false
+	-- The reader of the navigation layer a « Navigation layer » entry asked
+	-- this window to show, until its page takes it.
+	local _nav_reader = nil
+	-- The Studio tab an entry waits for this window's page to show.
+	local _tab_wanted = nil
 
 	--- Settles exact window and callback owners before admitting another window.
 	--- @return boolean settled Native cleanup committed or already consumed the window.
@@ -234,6 +239,20 @@ local function new_window(spec)
 			end or nil,
 			strings = function() return page_strings(spec.strings_file) end,
 			editor_window = spec.editor_window,
+			take_tab = spec.editor_window and function()
+				local tab = _tab_wanted
+				_tab_wanted = nil
+				return tab
+			end or nil,
+			take_nav = spec.editor_window and function()
+				local reader = _nav_reader
+				_nav_reader = nil
+				if reader == nil then return nil end
+				local read, nav = pcall(reader)
+				if read then return nav end
+				Logger.error(LOG, "The navigation layer could not be read for the Studio: %s.", tostring(nav))
+				return { error = tostring(nav) }
+			end or nil,
 			open_editor_window = not spec.editor_window and function() return M.open_editor() end or nil,
 			open_url = function(url)
 				local ok, ui_builder = pcall(require, "core.ui.ui.builder")
@@ -247,7 +266,7 @@ local function new_window(spec)
 			layout_changed = function(id)
 				if _layout_change_handler then _layout_change_handler(id) end
 			end,
-			reload_extensions = function(id) return _extension_reloader ~= nil and _extension_reloader(id) == true end,
+			reload_extensions = function(id) return M._reload_extensions(id) end,
 			apply_nav = _nav_applier and function(text, on_done)
 				local applier = _nav_applier
 				if not applier then
@@ -261,7 +280,7 @@ local function new_window(spec)
 			-- Deferred, so the page's message returns before the read.
 			read_keystats = spec.editor_window and function(on_done)
 				DeferredWork.after(0, function()
-					on_done(require("metrics.engine.view.studio_ngrams").read({
+					require("metrics.engine.view.studio_ngrams").read({
 						path = require("modules.keystats.log_manager").get_sqlite_path(),
 						exists = function(path) return FileSystem.path_status(path) ~= "absent" end,
 						read = require("modules.keystats.sqlite_reader").read_studio_ngrams,
@@ -270,7 +289,12 @@ local function new_window(spec)
 							local rev = require("modules.keystats.export").get_db_rev()
 							return rev > 0 and tostring(rev) or nil
 						end,
-					}))
+						-- The last complete read, saved beside db.sqlite (atomic write).
+						snapshot = require("modules.keystats.studio_snapshot").ports(),
+						log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+						-- The saved read reaches the page before the main thread reads the store.
+						defer = function(work) DeferredWork.after(0, work, "layout_manager.read_keystats_fresh") end,
+					}, on_done)
 				end, "layout_manager.read_keystats")
 			end or nil,
 			emulate = _emulation_applier and function(id, on_done)
@@ -299,6 +323,22 @@ local function new_window(spec)
 			return result
 		end
 		return controller
+	end
+
+	--- Asks this window's page to show the navigation layer that reader()
+	--- returns: at once when its page is ready, else when it says so.
+	--- @param reader function reader() -> { text, hold }
+	function W.want_nav(reader)
+		_nav_reader = reader
+		if _controller then _controller.show_nav() end
+	end
+
+	--- Asks this window's page to show one of its tabs: at once when its page
+	--- is ready, else when it says so.
+	--- @param tab string « edit », « compare » or « optimize ».
+	function W.want_tab(tab)
+		_tab_wanted = tab
+		if _controller then _controller.show_tab() end
 	end
 
 	--- Opens this window, or focuses it when it is already open.
@@ -348,7 +388,7 @@ local function new_window(spec)
 		local masks = hs.webview.windowMasks
 		local created, view = pcall(function() return ui_builder.show_webview({
 			delete_on_close = true,
-			frame = ui_builder.get_centered_frame(geo.width, geo.height),
+			frame = ui_builder.get_app_frame(geo),
 			title = i18n.get(spec.title_key),
 			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8),
 			usercontent = uc,
@@ -435,7 +475,7 @@ local Editor = new_window(EDITOR_SPEC)
 -- =============================
 
 --- Binds the layout editor's « Apply the navigation layer » to the navigation
---- layer editor's save (ui/layer_editor apply_text). A window opened before
+--- layer save (modules/keymap/nav_layer_save apply_text). A window opened before
 --- this offers no such button.
 --- @param applier function|nil applier(text) -> { saved, applied, errors }
 function M.set_nav_applier(applier)
@@ -474,18 +514,56 @@ function M.set_extension_reloader(reloader)
 	_extension_reloader = reloader
 end
 
+--- Loads or drops a changed layout's extension packs. The packs are discovered
+--- once per boot, so a changed catalogue still reloads the driver, which closes
+--- this window; an install that leaves the packs as they are (an Ergopti layout,
+--- whose pack ships with the app) only applies the layout change in place, and
+--- the window stays open (maintainer decision, 2026-11-25).
+--- @param id string The changed layout's registry id.
+--- @return boolean accepted
+function M._reload_extensions(id)
+	local checked, changed = pcall(require("hotstrings.engine.catalogue.extension_packs").changed_since_boot)
+	if not checked then
+		Logger.error(LOG, "The extension packs could not be compared after '%s' changed; reloading: %s.", id, tostring(changed))
+	elseif changed == false then
+		Logger.info(LOG, "The '%s' layout changed no extension pack: applied without a reload.", id)
+		if _layout_change_handler then _layout_change_handler(id) end
+		return true
+	end
+	return _extension_reloader ~= nil and _extension_reloader(id) == true
+end
+
 --- Opens the layout manager, or focuses it when it is already open. The factory's
 --- own function, not a wrapper: the native pool probe reads the window's owners
 --- as its upvalues (tools/diagnostics/macos_layout_manager_pool_observer.lua).
 --- @return boolean opened
 M.open = Manager.open
 
---- Opens the layout editor in its own window (the menu's « Create or edit a
---- layout… », the manager's « Layout editor »), or focuses it when it is
---- already open: an open editor keeps its unsaved work. A new window shows the
---- last saved source once its page is ready.
+--- Opens the layout editor in its own window (the manager's « Layout
+--- editor »), or focuses it when it is already open: an open editor keeps
+--- its unsaved work. A new window shows the
+--- last saved source once its page is ready; an open Studio comes back to its
+--- editor tab.
 --- @return boolean opened
-M.open_editor = Editor.open
+function M.open_editor()
+	Editor.want_tab("edit")
+	return Editor.open()
+end
+
+--- Opens Ergopti Studio, or focuses it on the tab it was left on (the top-level
+--- « Ergopti Studio… » row).
+--- @return boolean opened
+M.open_studio = Editor.open
+
+--- Opens Ergopti Studio on the source's navigation layer: the « Navigation
+--- layer » menu row, gesture and shortcut (open_layer_editor). The page imports
+--- the user's layers.toml as that layer when the source has none.
+--- @param opts table { karabiner = the remap facade }.
+--- @return boolean opened
+function M.open_editor_on_nav(opts)
+	Editor.want_nav(function() return require("modules.keymap.nav_layer_save").studio_nav(opts) end)
+	return Editor.open()
+end
 
 --- The open layout manager window, for ui/window_toggle (nil when closed).
 --- @return userdata|nil view
@@ -503,7 +581,7 @@ function M.editor_window() return Editor.window() end
 --- @return boolean committed
 function M.close_editor() return Editor.close() end
 
---- Builds the "Manage layouts…" menu command.
+--- Builds the « Install or remove layouts… » menu command.
 --- @return function
 function M.menu_command()
 	return function()
@@ -511,12 +589,13 @@ function M.menu_command()
 	end
 end
 
---- Builds the « Create or edit a layout… » menu command.
+--- Builds the top-level « Ergopti Studio… » command: the Studio on the tab it
+--- was left on (menu/ui/builder/builder.lua).
 --- @return function
 function M.editor_menu_command()
 	return function()
-		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_editor,
-			"layout_manager.open_editor")
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), M.open_studio,
+			"layout_manager.open_studio")
 	end
 end
 

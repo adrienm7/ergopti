@@ -26,7 +26,7 @@
 --- ==============================================================================
 
 local M = {}
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 
 local hs           = hs
 local i18n         = require("core.i18n.engine.i18n")
@@ -37,7 +37,7 @@ local ActionPicker = require("ui.action_picker")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
 local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local ShellRunner  = require("core.process.adapters.shell_runner")
 local dialog       = require("core.ui.engine.dialog_util")
 
@@ -249,12 +249,12 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	local gestures = ctx.gestures
 
 	local function add_for(prefix)
-		return function() return not group.fixed and group.prefix == prefix end
+		return function() return group.prefix == prefix end
 	end
 	local getters = {
-		keyboard_group_has_scope = function() return not group.fixed end,
+		keyboard_group_has_scope = function() return true end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
-		keyboard_group_ready = function() return not disabled and not group.fixed end,
+		keyboard_group_ready = function() return not disabled end,
 		keyboard_group_add_option = add_for("alt_"),
 		keyboard_group_add_ctrl = add_for("secondary_"),
 		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
@@ -289,9 +289,9 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		keyboard_group_assigned_rows = assigned_provider,
 	})
 	-- The scope group (restore, clear, separator) and the Add row belong to
-	-- every group the user can bind; a fixed group has neither.
-	local scope_count = not group.fixed and 3 or 0
-	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
+	-- every group.
+	local scope_count = 3
+	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + 1
 	if type(admission) ~= "table" or #admission ~= fixed_count then
 		Logger.error(LOG, "Declared keyboard group admission refused for '%s'.", tostring(group.prefix))
 		return nil
@@ -320,7 +320,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	})
 	-- A withdrawn Add, restore or clear declaration must not publish a group
 	-- missing one of its ports.
-	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
+	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + 1
 	if type(rows) ~= "table" or #rows ~= expected then
 		Logger.error(LOG, "Declared keyboard group frame refused for '%s'.", tostring(group.prefix))
 		return nil

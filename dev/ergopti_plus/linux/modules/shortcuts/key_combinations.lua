@@ -6,10 +6,10 @@ local Shared = require("tap_hold.engine.key_combinations")
 local TableUtil = require("core.text.engine.table_util")
 local Codec = require("core.text.engine.toml_codec")
 local Files = require("core.fs.adapters.file_system")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Logger = require("core.logger.engine.shim")
 local HoldOptions = require("tap_hold.engine.hold_options")
-local Features = require("infra.manifest_reader")
+local Features = require("menu.engine.manifest_reader")
 local ModuleSource = require("core.fs.engine.module_source_identity")
 local ModuleDirectory = require("core.fs.engine.module_source_directory")
 local ConfigKeys = require("settings.engine.keys")
@@ -48,6 +48,12 @@ local function declared_settings()
 	return settings
 end
 local M, instance = {}, nil
+-- Actions no chord runs: the shared list (the one-shot Shift, refused in a
+-- chord on every OS by the maintainer decision of 2026-11-06). A program launch
+-- and the monitor Alt-Tab run in a chord, through the chord's own owner guard
+-- (maintainer decision KCD-2 of 2026-11-22). Windows refuses the same list
+-- (KEY_COMBINATION_CHORD_REFUSED_ACTIONS). The read and the menu admit from it.
+local CHORD_REFUSED_ACTIONS = TableUtil.shallow_copy(Shared.CHORD_REFUSED_EVERYWHERE)
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
@@ -76,7 +82,7 @@ function M.new(options)
 	for _, hold in ipairs(HoldOptions.build(options.hold_picker)) do
 		if hold.kind ~= "none" then holds[hold.id] = true end
 	end
-	local catalogue = options.actions or require("modules.gestures.manager")
+	local catalogue = options.actions or require("gestures.engine.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
 	local delivery_fence
 	local function candidate(document, strict, shapes)
@@ -102,8 +108,25 @@ function M.new(options)
 			local action_ok = action == "none" or type(action) == "string" and catalogue.is_assignable(action)
 			local hold_ok = type(hold) == "string" and holds[hold] == true
 			assert(not strict or action_ok and hold_ok, "invalid known pair slot")
+			-- A slot read as none is said, never dropped in silence, as Windows does.
+			if not action_ok then
+				Logger.warn("modules.shortcuts.key_combinations",
+					"The %s pair's tap action '%s' is not available here; that tap does nothing.", pair, tostring(action))
+			end
+			if not hold_ok then
+				Logger.warn("modules.shortcuts.key_combinations",
+					"The %s pair's hold '%s' is not available here; that hold does nothing.", pair, tostring(hold))
+			end
 			result.taps[pair] = action_ok and action or "none"
 			result.holds[pair] = hold_ok and hold or "none"
+		end
+		for _, slots in ipairs(strict and {} or { taps, held }) do
+			for pair in pairs(slots) do
+				if not known[pair] then
+					Logger.warn("modules.shortcuts.key_combinations",
+						"The pair '%s' names a key this keyboard lacks; it is kept in the file and does nothing here.", tostring(pair))
+				end
+			end
 		end
 
 		-- Declared Linux absence values are read from Features, never hs_timeouts.
@@ -114,22 +137,33 @@ function M.new(options)
 			local defaults=declared_settings()
 			if defaults then combos=namespace(combos) else assert(type(combos)=="table") end
 			local delay,symmetric=combos.simultaneous_threshold_ms,combos.symmetric
-			-- A stored delay the shared value schema refuses is reported once, never
-			-- dropped silently; the chords stay off (fail closed, as before), since a
-			-- malformed setting must not become a delay on the original holds.
+			-- A stored delay the shared value schema refuses is reported, never
+			-- dropped silently, and the declared delay applies, as on Windows and
+			-- macOS (maintainer decision KCD-3 of 2026-11-21). A strict candidate,
+			-- a write being validated, still refuses it.
 			if delay~=nil then
 				local ValueCheck=require("settings.engine.value_check")
 				local checked=ValueCheck.check_value(ValueCheck.declaration(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS),delay)
-				if not checked.ok then
+				if not checked.ok and defaults and not strict then
 					require("settings.engine.migration.outdated").report(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,
-						string.format("%s is refused (%s, %s..%s ms); the key chords stay off until it is fixed", tostring(delay),
-							checked.reason, tostring(checked.min), tostring(checked.max)))
+						string.format("%s is refused (%s, %s..%s ms); the declared %s ms applies until it is fixed", tostring(delay),
+							checked.reason, tostring(checked.min), tostring(checked.max), tostring(defaults.simultaneous_threshold_ms)))
+					delay=nil
 				end
 			end
 			if delay==nil and defaults then delay=defaults.simultaneous_threshold_ms end
 			if symmetric==nil and defaults then symmetric=defaults.combo_symmetric end
 			local settings = Shared.chord_settings({ simultaneous_threshold_ms=delay,combo_symmetric=symmetric })
-			assert(combos.enabled==nil or type(combos.enabled)=="boolean")
+			-- The chords' own switch is on unless it says false, as on Windows
+			-- (_KeyCombinationChordBootEnabled) and macOS: a value that is not a
+			-- boolean is reported and the chords stay on (KCD-3).
+			local chords_on=combos.enabled
+			if chords_on~=nil and type(chords_on)~="boolean" then
+				assert(not strict,"chord switch must be an exact boolean")
+				Logger.warn("modules.shortcuts.key_combinations",
+					"[mod_combos] enabled = %s is not a boolean; the key chords stay on until it is fixed.", tostring(chords_on))
+				chords_on=nil
+			end
 			local configured=defaults and namespace(combos.config) or assert(combos.config)
 			assert(type(configured)=="table")
 			local chords,explicit={},false
@@ -137,7 +171,7 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				local valid=action=="none" or type(action)=="string" and action~="one_shot_shift"
+				local valid=action=="none" or type(action)=="string" and not CHORD_REFUSED_ACTIONS[action]
 					and catalogue.is_assignable(action)==true
 				assert(not strict or valid,"invalid known chord slot")
 				-- One action this driver lacks (another OS's, in the shared
@@ -145,13 +179,13 @@ function M.new(options)
 				-- every other chord stays (TCL-003).
 				if not valid then
 					Logger.warn("modules.shortcuts.key_combinations",
-						"The %s chord's action '%s' is not available here; that chord does nothing.", pair, tostring(action))
+						"The %s chord's action '%s' is not available to a chord here; that chord does nothing.", pair, tostring(action))
 					action="none"
 				end
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
 			assert(defaults or explicit)
-			return {chords=chords,settings=settings,enabled=combos.enabled~=false,defaults=defaults}
+			return {chords=chords,settings=settings,enabled=chords_on~=false,defaults=defaults}
 		end)
 		if strict and combos~=nil and (next(declarations)~=nil or type(combos)=="table" and combos.config~=nil) then
 			assert(normalized,"invalid known chord source")
@@ -376,11 +410,13 @@ function M.new(options)
 	function owner.owns_configuration(token) return type(token) == "table" and lease == token end
 	function owner.validate_slot(kind, pair, value)
 		if not known[pair] or type(value) ~= "string" then return false end
-		-- The one-shot Shift is pair-native state: a pair keeps refusing it, as a chord does.
-		if kind == "tap" then return value == "none" or value ~= "one_shot_shift" and catalogue.is_assignable(value) == true end
+		-- The one-shot Shift is a pair tap like any action, as the read and the
+		-- Windows and macOS menus admit it (maintainer decision KCD-4 of
+		-- 2026-11-21); only a chord refuses it.
+		if kind == "tap" then return value == "none" or catalogue.is_assignable(value) == true end
 		if kind == "combo" then
 			local declared=pcall(declared_settings)
-			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
+			return declared and next(declarations)~=nil and (value=="none" or not CHORD_REFUSED_ACTIONS[value] and catalogue.is_assignable(value)==true)
 		end
 		if kind == "hold" then return holds[value] == true end
 		return false

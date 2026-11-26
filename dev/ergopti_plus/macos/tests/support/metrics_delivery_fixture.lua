@@ -9,7 +9,15 @@
 local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
-local function with_delivery(cached, callback)
+--- Opens the apps dashboard over a virtual store and hands the observations over.
+--- @param cached boolean Whether a disk snapshot exists.
+--- @param callback function Receives dashboard, state, evaluations, errors, successes, pending.
+--- @param store table|nil { missing = boolean, complete = boolean, metrics_off = boolean }:
+---   no db.sqlite, an incomplete manifest read, or the real context tracker that keystats
+---   never started; a present, complete store with a started tracker by default.
+---   state.disk_writes counts the snapshot writes.
+local function with_delivery(cached, callback, store)
+	store = store or {}
 	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
 		"modules.keystats.context_tracker" }, function()
 		package.loaded["core.fs.adapters.file_system"] = {
@@ -21,20 +29,29 @@ local function with_delivery(cached, callback)
 				return "{}", "ok"
 			end,
 		}
-		package.loaded["modules.keystats.sqlite_reader"] = { read_manifest = function() return {}, true end }
-		package.loaded["modules.keystats.context_tracker"] = { get_active_app_snapshot = function() end }
+		package.loaded["modules.keystats.sqlite_reader"] = {
+			read_manifest = function() return {}, store.complete ~= false end,
+		}
+		if not store.metrics_off then
+			package.loaded["modules.keystats.context_tracker"] = {
+				is_initialized = function() return true end,
+				get_active_app_snapshot = function() end,
+			}
+		end
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}
+			state.disk_writes = 0
 			local original_open = io.open
 			local ok, err = xpcall(function()
 				io.open = function(_, mode)
 					if mode == "w" then
+						state.disk_writes = state.disk_writes + 1
 						return { write = function(self) return self end, close = function() return true end }
 					end
 					if cached then return { read = function() return "cache" end, close = function() end } end
 					return nil
 				end
-				package.loaded["hs.fs"].attributes = function() return true end
+				package.loaded["hs.fs"].attributes = function() return not store.missing end
 				package.loaded["hs.json"].encode = function() return "{}" end
 				package.loaded["hs.json"].decode = function(value)
 					return value == "cache" and { manifest = "{}" } or {}

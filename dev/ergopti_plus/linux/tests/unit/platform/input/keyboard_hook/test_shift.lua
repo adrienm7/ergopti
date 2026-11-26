@@ -31,14 +31,14 @@ local helpers = require("tests.helpers")
 
 -- Saved so the recording stub does not leak into other Linux tests that need
 -- the real input_reader (load_module only wipes the named module, not deps).
-local _saved_ir = package.loaded["modules.hotstrings.input_reader"]
+local _saved_ir = package.loaded["hotstrings.engine.input_reader"]
 
 --- Installs a fake input_reader whose resolve_char records the shift flag it
 --- receives per keycode. Must be called BEFORE load_module pumps a char.
 --- @return table shift_seen Ordered list of the shift flag per resolved letter.
 local function install_recording_input_reader()
 	local shift_seen = {}
-	package.loaded["modules.hotstrings.input_reader"] = {
+	package.loaded["hotstrings.engine.input_reader"] = {
 		resolve_char = function(_code, _layout, shift)
 			shift_seen[#shift_seen + 1] = shift and true or false
 			-- Distinguishable char so on_char still delivers something.
@@ -110,4 +110,4 @@ end)
 
 
 -- Restore the real input_reader entry so the recording stub does not leak.
-package.loaded["modules.hotstrings.input_reader"] = _saved_ir
+package.loaded["hotstrings.engine.input_reader"] = _saved_ir

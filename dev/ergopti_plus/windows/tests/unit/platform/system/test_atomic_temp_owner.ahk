@@ -57,7 +57,7 @@ _ATO_KeystatsReap(Path, MaxAgeMs) {
 	try {
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while ExitCode = -1 && TickElapsed(Started) < 5000 {
+		while ExitCode = -1 && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

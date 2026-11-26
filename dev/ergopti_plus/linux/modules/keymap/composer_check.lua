@@ -41,7 +41,7 @@ function M.env(overrides)
 	local deps = overrides.deps
 	local read = overrides.read or FileSystem.read
 	local exists = overrides.exists or FileSystem.exists
-	local config_dir = overrides.config_dir or (require("infra.config_paths").config("") .. "/")
+	local config_dir = overrides.config_dir or (require("settings.engine.paths").config("") .. "/")
 	local Logger = require("core.logger.engine.shim")
 	local env = {
 		composer_id = settings.id,

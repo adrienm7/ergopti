@@ -5,9 +5,11 @@
 # on first boot. After that, the user owns the copy.
 
 [script]
-locale = "fr"
+locale = ""
 log_level = "INFO"
 show_error_dialog = true
+reading_font = "default"
+reading_spacing = "default"
 alt_gr_is_kana_remap = "auto"
 
 
@@ -55,7 +57,6 @@ time_activation_seconds = 0.5
 
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
-pattern_max_length = 1
 
 
 
@@ -63,9 +64,9 @@ pattern_max_length = 1
 
 [hotstrings]
 trigger_char = "★"
-magic_key_source = "auto"
-magic_key_source_char = "j"
 repeat_key_enabled = false
+backspace_restore_enabled = true
+backspace_restore_window_ms = 500
 idle_reset_seconds = 3
 click_resets_word = true
 arrow_resets_word = true
@@ -76,6 +77,8 @@ expansion_delay = 0.75
 preview_ai_enabled = true
 preview_autocorrect_enabled = true
 preview_colored_tooltips = true
+preview_category_glyphs = true
+preview_announcements = true
 preview_star_enabled = true
 
 
@@ -223,16 +226,6 @@ enabled = false
 
 
 
-[hotstrings.rolls.chevron_greater]
-enabled = false
-
-
-
-[hotstrings.rolls.chevron_less]
-enabled = false
-
-
-
 [hotstrings.rolls.close_chevron_tag]
 enabled = false
 time_activation_seconds = 0.5
@@ -295,11 +288,6 @@ enabled = false
 
 
 [hotstrings.rolls.paren_quote]
-enabled = false
-
-
-
-[hotstrings.magic_key.replace]
 enabled = false
 
 
@@ -528,13 +516,19 @@ search_engine_url_query = "https://www.google.com/search?q="
 
 [shortcuts.take_note]
 dated_notes = false
-destination_folder = "D:\\Bureau"
+destination_folder = ""
 
 
 
 [shortcuts.a_grave]
 enabled = false
 letter = "v"
+
+
+
+[shortcuts.star]
+enabled = false
+letter = "s"
 
 
 
@@ -571,15 +565,6 @@ symmetric = false
 
 
 
-[shortcuts.personal]
-laptop_broken_key = false
-mouse_drag_window = false
-mouse_tab_switching = false
-professional_environment = false
-programmable_keyboard = false
-
-
-
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"
@@ -590,7 +575,7 @@ script_altgr_escape = "script_quit"
 
 
 [shortcuts.keyboard]
-magic_editor = "open_hotstrings_editor"
+meta_star = "open_hotstrings_editor"
 
 
 
@@ -660,20 +645,25 @@ swipe_4_down = 3.5
 
 
 [layout]
-ergopti_base = false
+ergopti_base = true
 direct_access_digits = "native"
 number_row_reorder_edges = false
-ergopti_alt_gr = false
+ergopti_alt_gr = true
 ergopti_variant = "none"
 emulate_number_row = true
 emulate_top_row = true
 emulate_home_row = true
 emulate_bottom_row = true
-ctrl_magic_save = false
 emulated_layout = ""
+emulated_layout_recents = []
+game_keys = "physical"
 pause_switch_enabled = false
 on_pause = ""
 on_resume = ""
+
+
+
+[layout.game_keys_apps]
 
 
 

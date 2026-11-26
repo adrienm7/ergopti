@@ -100,7 +100,7 @@ _HPLS_ProductionOwnershipIsWired() {
 		"logging starts only after releasing the snapshot transaction")
 	Start := _DriverFuncBody("HotPath_StartStatistics")
 	Assert(Start != "", "the summary scheduler must exist")
-	AssertContains(Start, "60000, -1")
+	AssertContains(Start, 'SetTimer(Owner.Timer, TimingsGet("logger", "hotpath_statistics_interval_ms"), -1)')
 }
 Test("hotpath: every measured callback contributes and exit publishes before logger flush (hotpath-latency-statistics)",
 	_HPLS_ProductionOwnershipIsWired)
@@ -118,7 +118,7 @@ _HPLS_DashboardStagesAreDistinct() {
 	Diagnostics := _DriverFuncBody("HealthCheck_ShowWindow")
 	DiagnosticsMark := _DriverFuncBody("_HC_OpenTimingMark")
 	Assert(Diagnostics != "" && DiagnosticsMark != "", "diagnostics timing owners must exist")
-	for Phase in ["snapshot", "host", "controller", "bindings", "navigate", "native_controls"]
+	for Phase in ["snapshot", "host", "controller", "bindings", "navigate"]
 		AssertContains(Diagnostics, '_HC_OpenTimingMark("' . Phase . '", Timing)')
 	AssertContains(DiagnosticsMark, "HotPath_RecordLatency(")
 	AssertContains(DiagnosticsMark, 'LoggerInfo("Healthcheck", Format(')

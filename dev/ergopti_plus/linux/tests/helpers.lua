@@ -35,6 +35,11 @@ require("tests.support.session_language").install()
 -- (tests/support/notify_send_guard.lua).
 local NotifySendGuard = require("tests.support.notify_send_guard")
 NotifySendGuard.install()
+-- No fixture may open a real dialog either: a dialog host started from a test
+-- records its case and exits without a window, which fails the run
+-- (tests/support/dialog_host_guard.lua).
+local DialogHostGuard = require("tests.support.dialog_host_guard")
+DialogHostGuard.install()
 local NoticeRecorder = require("tests.support.notice_recorder")
 NoticeRecorder.install()
 
@@ -179,27 +184,37 @@ function M.read_module_source(module_name)
 	return body
 end
 
+--- Finds a driver module's file by its module name, as require would.
+--- @param name string Module name.
+--- @return string|nil path nil when the driver holds no such module.
+function M.driver_module_path(name)
+	local root = M.driver_root()
+	return package.searchpath(name, root .. "/?.lua;" .. root .. "/?/init.lua")
+end
+
 --- Returns the tray root's source followed by every section module it binds.
---- ui/menu/builder.lua binds each section builder from its own
+--- menu/ui/builder/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.
 function M.read_menu_source()
-	local directory = M.driver_root() .. "/ui/menu/"
-	local function read(name)
-		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
+	local root = M.driver_root()
+	local search = root .. "/?.lua;" .. root .. "/?/init.lua"
+	local function read(path)
+		local handle = assert(io.open(path, "rb"))
 		local text = assert(handle:read("*a"))
 		assert(handle:close())
 		return text
 	end
 	-- A part may bind another part (the dialogs), which the root no longer names.
-	local texts, seen, index = { read("builder") }, {}, 1
+	-- The sections live in their features' folders: each is found by its module
+	-- name; a menu module outside the driver (a shared one) is not a section.
+	local texts, seen, index = { read(assert(package.searchpath("menu.ui.builder.builder", search))) }, {}, 1
 	while texts[index] do
-		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
-			if not seen[name] then
-				seen[name] = true
-				texts[#texts + 1] = read(name)
-			end
+		for name in texts[index]:gmatch('require%("([%w_%.]*menu[%w_%.]*)"%)') do
+			local path = not seen[name] and package.searchpath(name, search)
+			seen[name] = true
+			if path then texts[#texts + 1] = read(path) end
 		end
 		index = index + 1
 	end
@@ -418,6 +433,7 @@ function M.it(name, fn)
 	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
 	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	DialogHostGuard.enter_case(tostring(_current_module) .. " :: " .. name)
 	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
@@ -429,6 +445,7 @@ function M.it(name, fn)
 	end
 	NoticeRecorder.end_case()
 	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
+	DialogHostGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -544,6 +561,37 @@ local function fail_leaked_doubles(name, before)
 	end
 end
 
+-- The tray root and the manifest facade it captured when it loaded.
+local TRAY_ROOT, TRAY_FACADE = "menu.ui.builder.builder", "menu.engine.manifest_menu"
+
+--- Forgets a tray root left cached under a manifest facade that was replaced
+--- since. The root builds nothing for a facade other than its own
+--- (menu/ui/builder/builder.lua, separator_facade_current), so every later
+--- module that required it read an empty tray: test_matches_manifest did this,
+--- and the shortcuts tests failed whenever no other file reloaded the root in
+--- between, as under `--only menu`. The new facade stays, since the modules
+--- loaded meanwhile captured it; the next require binds a fresh root to it.
+--- @param before table Shallow copy of package.loaded taken earlier.
+--- @return boolean forgotten Whether the root had been left stale.
+function M.forget_stale_tray_root(before)
+	local root = package.loaded[TRAY_ROOT]
+	if root == nil or root ~= before[TRAY_ROOT] or package.loaded[TRAY_FACADE] == before[TRAY_FACADE] then return false end
+	package.loaded[TRAY_ROOT] = nil
+	return true
+end
+
+--- Forgets a tray root a test module left stale and records one failure for it.
+--- @param name string Test module identity.
+--- @param before table Shallow copy of package.loaded before the module ran.
+local function fail_stale_tray_root(name, before)
+	if not M.forget_stale_tray_root(before) then return end
+	local err = "replaced package.loaded['" .. TRAY_FACADE .. "'] under a cached '" .. TRAY_ROOT
+		.. "'; forget the root before the module ends so the next require binds the new facade"
+	_suite_results.failed = _suite_results.failed + 1
+	_suite_results.failures[#_suite_results.failures + 1] = { name = name, err = err, kind = "module", module = name }
+	print("  FAIL " .. name .. " — " .. err)
+end
+
 --- Records the current package.loaded entries a test module replaces, for the
 --- module to put back at its end (the runner fails a module that leaves a double).
 --- @param names string[] Module names the test module or its fixtures replace.
@@ -568,14 +616,115 @@ function M.measure_module(name, callback)
 	local previous = _current_module
 	_current_module = name
 	NotifySendGuard.enter_case(name .. " (outside a test case)")
+	DialogHostGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)
+	fail_stale_tray_root(name, before)
 	return ok, result
 end
 
 --- Reports timing admission failure without changing assertion counters.
 --- @return boolean failed True if clock or output diagnostics were incomplete.
 function M.timing_failed() return _timing ~= nil and _timing.has_errors() end
+
+--- The modules of a feature family a test forgets or stubs as one set: the
+--- names that once shared one prefix (modules.keymap, modules.llm). The
+--- structure plan moves them into several feature folders over several steps,
+--- so no prefix pattern follows them; each member is listed by its module name,
+--- which every step respells. A name under the family's original prefix (a
+--- module not moved yet, or a stub's made-up name) belongs to it too.
+local MODULE_FAMILIES = {
+	["modules.llm"] = {
+		"ai.engine.agent.connectors",
+		"ai.engine.agent.learning",
+		"ai.engine.settings.agent_settings",
+		"ai.engine.settings.api_entries",
+		"ai.engine.settings.api_key_migration",
+		"ai.engine.api.api_ollama",
+		"ai.engine.api.api_remote",
+		"ai.engine.settings.api_token_store",
+		"ai.engine.api.backend_brands",
+		"ai.engine.api.context",
+		"ai.engine.settings.display_settings",
+		"ai.engine.settings.enable_admission",
+		"ai.engine.settings.error_log",
+		"ai.engine.local_servers.inference",
+		"ai.engine.ollama.local_model_offer",
+		"ai.engine.ollama.local_model_probe",
+		"ai.engine.local_servers.catalogue",
+		"ai.engine.local_servers.ports",
+		"ai.engine.local_servers.local_servers",
+		"ai.engine.ollama.managed_ollama_environment",
+		"ai.engine.ollama.managed_ollama_proxy",
+		"ai.engine.local_servers.model_delete",
+		"ai.engine.local_servers.model_download",
+		"ai.engine.local_servers.model_inventory",
+		"ai.engine.local_servers.model_profile",
+		"ai.engine.settings.navigation_settings",
+		"ai.engine.ollama.install_admission",
+		"ai.engine.ollama.install_files",
+		"ai.engine.ollama.install_resolver",
+		"ai.engine.ollama.install_state",
+		"ai.engine.ollama.installed_runtime",
+		"ai.engine.local_servers.owned_timer",
+		"ai.engine.prediction.engine",
+		"ai.engine.settings.profile_settings",
+		"ai.engine.settings.profiles",
+		"ai.engine.local_servers.runtime_composition",
+		"ai.engine.local_servers.runtime_factory",
+		"ai.engine.local_servers.runtime_source",
+		"ai.engine.settings.settings",
+		"ai.engine.prediction.translation",
+		"ai.engine.settings.trigger_settings",
+		"ai.engine.prediction.vision_request",
+		"ai.engine.local_servers.warmup",
+	},
+	["infra.llm_"] = {
+		"ai.engine.bridge",
+		"ai.engine.preferences",
+		"ai.engine.scope",
+	},
+	["modules.hotstrings"] = {
+		"hotstrings.engine.device_finder",
+		"hotstrings.engine.engine",
+		"hotstrings.engine.expansion_delay",
+		"hotstrings.engine.catalogue.config",
+		"hotstrings.engine.injector",
+		"hotstrings.engine.input_reader",
+		"hotstrings.engine.loader",
+		"hotstrings.engine.magic_key",
+		"modules.shortcuts.star_key_source",
+		"hotstrings.engine.output_tokens",
+		"hotstrings.engine.output_transaction",
+		"hotstrings.engine.preview_settings",
+		"hotstrings.engine.repeat_key",
+		"hotstrings.engine.selected_output",
+		"hotstrings.engine.matcher.terminator_settings",
+		"hotstrings.engine.word_reset",
+	},
+}
+local _family_members = {}
+for family, members in pairs(MODULE_FAMILIES) do
+	local set = {}
+	for _, name in ipairs(members) do set[name] = true end
+	_family_members[family] = set
+end
+
+--- Whether a module name belongs to a feature family of MODULE_FAMILIES.
+--- @param name any A package.loaded key.
+--- @param family string The family's original prefix, as MODULE_FAMILIES keys it.
+--- @param members_only boolean|nil true excludes the family's own root module name.
+--- @return boolean
+function M.in_module_family(name, family, members_only)
+	local members = assert(_family_members[family], "unknown module family " .. tostring(family))
+	if type(name) ~= "string" then return false end
+	if name == family then return not members_only end
+	if members[name] then return true end
+	-- A prefix that ends a name segment (infra.llm_) continues it; any other is a parent.
+	local stem = family:sub(-1) == "_" and family or family .. "."
+	return name:sub(1, #stem) == stem
+end
+
 
 return M

@@ -134,7 +134,10 @@ enum OwnedRuntimeInstallerEntry {
 				if let stage = OwnedRuntimeBootstrapStageOwner.acquire(afterPublication: owner), stage.retire() {
 					result = .filesPublishedStagingRetired
 				}
-			} catch { result = owner.rollbackUnpublishedFiles() ? .refused : .cleanupPending }
+			} catch {
+				// A refusal before the journal wrote nothing to roll back (OwnedRuntimeIdleServiceEntry.unpublishedResult).
+				result = owner.snapshot() == .refused || owner.rollbackUnpublishedFiles() ? .refused : .cleanupPending
+			}
 		}
 		done.wait(); return result
 	}

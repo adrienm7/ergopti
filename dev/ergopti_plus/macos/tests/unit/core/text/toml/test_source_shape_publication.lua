@@ -119,7 +119,7 @@ helpers.describe("TOML source shape publication ownership", function()
 		helpers.it("keeps " .. kind .. " final dotted identity independent of actual Manifest sparse defaults", function()
 			local source = '[hotstrings]\n"autocorrection.names"={enabled=true,time_activation_seconds=0.5}\n[hotstrings.autocorrection]\nnames={enabled=true,time_activation_seconds=0.75}\n'
 			with_source(source, function(path, writer, files, rows)
-				local manifest = require("infra.manifest_reader")
+				local manifest = require("menu.engine.manifest_reader")
 				helpers.assert_true(manifest.has_default("hotstrings.autocorrection.names"), "actual declared default is the aliasing prerequisite")
 				writer.set_sparse_defaults(path, manifest)
 				local neutral = { enabled = false, time_activation_seconds = 0.5 }
@@ -136,7 +136,7 @@ helpers.describe("TOML source shape publication ownership", function()
 	helpers.it("retains ordinary nested direct-row Manifest neutral deletion", function()
 		local source = '[hotstrings]\n"autocorrection.names"={enabled=true,time_activation_seconds=0.75}\n[hotstrings.autocorrection]\nnames={enabled=true,time_activation_seconds=0.75}\n'
 		with_source(source, function(path, writer, files)
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			helpers.assert_true(manifest.has_default("hotstrings.autocorrection.names"))
 			writer.set_sparse_defaults(path, manifest)
 			helpers.assert_eq(writer.batch_write(path, { { section = "hotstrings.autocorrection", key = "names",

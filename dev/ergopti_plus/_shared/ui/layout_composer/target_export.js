@@ -123,6 +123,7 @@ var LayoutTargetExport = (function () {
 				limitations: [
 					'Only the character-key table is generated; listed system/keypad codes keep their installed behavior.',
 					'Option, right Alt and Kana map to AltGr; Linux Alt, Control and Super use the Command shortcut level.',
+					"A key's shortcut_key is written on that level, which the type keeps Control, Alt and Super on for the application's shortcut match. XKB has one such level per key: its Shift, Control, Alt and Super combinations all act as the named key, Ctrl+Alt included, which the emulation leaves to AltGr; an application matching shortcuts by key code ignores it.",
 					...(level5
 						? [
 								`${level5.modifier} holds the fifth level: ${level5.keys.map((key) => key.key).join(', ')} type ${level5.keys[0].keysym} and no longer act as their own modifier.`
@@ -130,6 +131,7 @@ var LayoutTargetExport = (function () {
 						: []),
 					'Listed empty cells emit NoSymbol and may inherit XKB symbols; source key disabling is not compiled.',
 					'Listed unbound character actions use the converter Unicode keysym fallback, without a physical source action binding.',
+					'Listed unreachable actions (typed by no projected key, named by no keysym) are left out with their dead-key transitions.',
 					'XCompose requires client support and the exported Compose file; native macOS dead-key fallback and cancellation are not certified.',
 					'Registry-specific keysym hints, driver features and installation are outside this source export.'
 				]
@@ -211,9 +213,11 @@ var LayoutTargetExport = (function () {
 		const metadata = klcMetadata(document);
 		const { locale, name, author, description } = metadata;
 		const modifierBits = (imported.plan && imported.plan.modifier_bits) || [];
+		const shortcutKeys = (imported.plan && imported.plan.shortcut_keys) || [];
 		const keycodes = tables.keycodes;
 		const physicalKeys = tables.physicalKeys;
-		const physical = keycodes.keys.map((key) => ({
+		// The JIS and ABNT keys (extra_keys) are placed too: the generator writes them when typed on.
+		const physical = keycodes.keys.concat(keycodes.extra_keys || []).map((key) => ({
 			code: key.code,
 			mac: typeof key.mac === 'object' ? key.mac[imported.convention] : key.mac
 		}));
@@ -281,7 +285,8 @@ var LayoutTargetExport = (function () {
 			keycodes,
 			physicalKeys,
 			sourceRel: `layout-source:${document.layout.id}`,
-			modifierBits
+			modifierBits,
+			shortcutKeys
 		};
 		let generated;
 		try {
@@ -342,13 +347,26 @@ var LayoutTargetExport = (function () {
 					.filter((cell) => cell.kind !== 'none')
 			});
 		}
+		// A shortcut key the generator could not carry, and a named key whose own
+		// shortcuts moved to the virtual key the exchange freed, are said.
+		const exchanged = generated.model.shortcutKeys;
+		const omitted = imported.omitted.concat(
+			exchanged.refused.map((entry) => ({
+				path: `keys.${entry.key}.shortcut_key`,
+				reason: `${entry.reason}_in_klc`
+			})),
+			exchanged.displaced.map((entry) => ({
+				path: `keys.${entry.by}.shortcut_key`,
+				reason: 'shortcut_key_displaces_virtual_key_in_klc'
+			}))
+		);
 		const report = {
 			target: 'windows',
 			status: 'partial',
 			artifact: 'klc',
 			reason: 'msklc_character_columns',
 			blockers: [],
-			omitted: imported.omitted,
+			omitted,
 			name: metadata.dll_name,
 			locale,
 			language_lcid: metadata.layout_id.toLowerCase(),
@@ -368,11 +386,31 @@ var LayoutTargetExport = (function () {
 				scan_code: key.scanCode,
 				virtual_key: key.vk
 			})),
+			shortcut_keys: {
+				carried: exchanged.carried.map((entry) => ({
+					key: entry.key,
+					shortcut_key: entry.shortcut_key,
+					virtual_key: entry.vk
+				})),
+				displaced: exchanged.displaced.map((entry) => ({
+					key: entry.key,
+					virtual_key: entry.vk,
+					by: entry.by
+				}))
+			},
 			dead_keys: generated.model.deadKeys.length,
 			ligatures: generated.model.ligatures.length,
 			limitations: [
 				'Ctrl and Shift+Ctrl cells are left empty for Windows control-key behavior; source Command mappings are not compiled. Listed combinations retain their source cells for review.',
 				'Virtual keys follow the existing generator allocation; source shortcuts are not inferred from the displayed character.',
+				...exchanged.carried.map(
+					(entry) =>
+						`${entry.key} sends VK_${entry.vk}, the virtual key of ${entry.shortcut_key}: its Ctrl, Alt and Win shortcuts act as that key.`
+				),
+				...exchanged.displaced.map(
+					(entry) =>
+						`${entry.key} gave its virtual key to ${entry.by} and sends VK_${entry.vk}: its own Ctrl, Alt and Win shortcuts act as that virtual key.`
+				),
 				...modifierBits.map(
 					(bit) =>
 						`${bit.modifier} holds the ${bit.bit} bit: ${bit.key} types VK_${bit.vk} and no longer acts as its own key.`

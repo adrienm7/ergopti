@@ -21,6 +21,28 @@ local LOG = "platform.focus.atspi_focus_watch"
 local MAX_FOCUS_OUTPUT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
 
+-- The command that turns the session's accessibility switch back off. The
+-- worker turns it on when it finds it off ("enabled_now"); every application
+-- then publishes its accessibility tree for the rest of the session, which
+-- costs memory and CPU for nothing once Ergopti has stopped.
+local A11Y_RESTORE_ARGS = { "call", "--session", "--timeout", "2", "--dest", "org.a11y.Bus",
+	"--object-path", "/org/a11y/bus", "--method", "org.freedesktop.DBus.Properties.Set",
+	"org.a11y.Status", "IsEnabled", "<false>" }
+
+--- Turns the session's accessibility switch back off through gdbus.
+--- @return boolean restored
+--- @return string|nil reason Why it could not be restored.
+local function restore_accessibility_switch()
+	local ShellRunner = require("core.process.adapters.shell_runner")
+	if not ShellRunner.has_command("gdbus", true) then return false, "gdbus is not installed" end
+	local words = { "gdbus" }
+	for _, argument in ipairs(A11Y_RESTORE_ARGS) do words[#words + 1] = ShellRunner.quote(argument) end
+	if ShellRunner.run(table.concat(words, " ") .. " >/dev/null 2>&1") ~= true then
+		return false, "the accessibility bus refused the change"
+	end
+	return true
+end
+
 --- Allocates only daemon-owned FIFO endpoints with close-on-exec descriptors.
 --- @return table transport
 local function native_transport()
@@ -107,13 +129,14 @@ end
 
 --- Creates one independently owned native focus watcher.
 --- Test transports model native ownership without requiring LuaJIT or libatspi.
---- @param options table|nil { now_ms?, create_transport?, start_process? }
+--- @param options table|nil { now_ms?, create_transport?, start_process?, restore_accessibility? }
 --- @return table watcher
 function M.new(options)
 	options = options or {}
 	local now_ms = options.now_ms or Monotonic.now_ms
 	local create_transport = options.create_transport or native_transport
 	local start_process = options.start_process or OwnedProcess.start
+	local restore_accessibility = options.restore_accessibility or restore_accessibility_switch
 	local lease_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local barrier_ms = Timings.ms("privacy", "focus_barrier_timeout_ms")
 	local pause = options.pause or function()
@@ -125,6 +148,17 @@ function M.new(options)
 	local receipt, last_at, sequence, request = nil, nil, 0, 0
 	local pending, received = "", false
 	local answered_request, answered_at = -1, nil
+	-- When the latest request was sent, so poll() renews one left unanswered.
+	local requested_at = nil
+	-- The kind of the answer to answered_request: "snapshot", "unknown" or
+	-- "absent" (the focused window is on no application of the bus).
+	local answered_kind = nil
+	-- The session's accessibility switch as the worker found it.
+	local accessibility = nil
+	-- Whether this watcher's worker turned the switch on, so stop() turns it
+	-- back off. start() does not clear it: a later worker would find the switch
+	-- on ("enabled") only because this one turned it on.
+	local switched_on = false
 	local cleanup_ok = true
 
 	local function publish(snapshot)
@@ -177,7 +211,7 @@ function M.new(options)
 		active, ready, failed = true, false, false
 		operation = nil
 		receipt, last_at, sequence, request, pending, received = nil, nil, 0, 0, "", false
-		answered_request, answered_at = -1, nil
+		answered_request, answered_at, answered_kind, requested_at = -1, nil, nil, nil
 		watcher.started_at = now_ms()
 		local ok, owned = pcall(create_transport)
 		if not ok or type(owned) ~= "table" then fail("transport unavailable"); return false end
@@ -215,13 +249,22 @@ function M.new(options)
 				and type(message.path) == "string" and message.path:match("^/[%w_/]+$") then
 				candidate = { role = message.role, bus = message.bus, path = message.path }
 			end
-		elseif kind ~= "ready" and kind ~= "heartbeat" and kind ~= "unknown" then return false end
+		elseif kind ~= "ready" and kind ~= "heartbeat" and kind ~= "unknown" and kind ~= "absent" then return false end
+		if kind == "ready" and message.accessibility ~= nil and message.accessibility ~= "enabled"
+			and message.accessibility ~= "enabled_now" and message.accessibility ~= "unavailable" then return false end
 		sequence, last_at = message.sequence, message.at_ms
 		if kind == "ready" then
 			-- Both ends are open now. Unlink the private names before admitting
 			-- input, so an unclean daemon death leaves no FIFO or directory.
 			if transport.cleanup() ~= true then return false end
 			ready = true
+			accessibility = message.accessibility
+			if accessibility == "enabled_now" then
+				switched_on = true
+				Logger.info(LOG, "Accessibility (AT-SPI) was off in this session: switched on, so applications report their focused field.")
+			elseif accessibility == "unavailable" then
+				Logger.warn(LOG, "The session's accessibility switch (org.a11y.Status) could not be read; applications that report fields only while it is on stay unchecked.")
+			end
 		end
 		if now - message.at_ms > lease_ms then
 			-- A busy daemon can accumulate honest old frames while its resident
@@ -231,7 +274,7 @@ function M.new(options)
 			return true
 		end
 		if kind == "ready" or message.request ~= request or kind == "heartbeat" then return true end
-		answered_request, answered_at = request, message.at_ms
+		answered_request, answered_at, answered_kind = request, message.at_ms, kind
 		publish(kind == "snapshot" and candidate or nil)
 		return true
 	end
@@ -284,20 +327,27 @@ function M.new(options)
 	function watcher.invalidate()
 		publish(nil)
 		if not active or failed or not transport then return false end
-		request = request + 1
+		request, requested_at = request + 1, now_ms()
 		if not transport.request(request) then fail("refresh request refused"); return false end
 		return true
 	end
 
 	--- Obtains a causally fresh resident answer before logical input collection.
 	--- Timeout withholds logical collection and never starts a second process.
+	--- An input callback keeps the short default budget, since a physical key
+	--- waits on it. An output boundary may pass a longer one, up to the lease of
+	--- a receipt: the application is then still busy with the keys just sent to
+	--- it, and a refusal there aborts the whole injection.
+	--- @param budget_ms number|nil Answer deadline; nil for the input budget.
 	--- @return table|nil receipt
-	function watcher.barrier()
+	function watcher.barrier(budget_ms)
+		assert(budget_ms == nil or (type(budget_ms) == "number" and budget_ms > 0
+			and budget_ms % 1 == 0 and budget_ms <= lease_ms), "focus barrier budget refused")
 		watcher.pump()
 		if not ready or failed or not transport then return nil end
-		request = request + 1
+		request, requested_at = request + 1, now_ms()
 		if not transport.request(request) then fail("admission request refused"); return nil end
-		local deadline = now_ms() + barrier_ms
+		local deadline = now_ms() + (budget_ms or barrier_ms)
 		while true do
 			-- The scheduler may resume a one-millisecond pause after the budget.
 			-- Drain once without waiting, accepting only a response the worker
@@ -315,12 +365,54 @@ function M.new(options)
 		return nil
 	end
 
+	--- Answers without waiting, for an input callback once the worker let a
+	--- barrier's budget pass: drains what it sent and returns the receipt of a
+	--- fresh answer to the latest request. With none, one request stays
+	--- outstanding, renewed after a lease, so a later key finds its answer.
+	--- @return table|nil receipt The fresh answer's receipt.
+	--- @return boolean answered Whether the latest request has a fresh answer.
+	function watcher.poll()
+		watcher.pump()
+		if not ready or failed or not transport then return nil, false end
+		if answered_request == request then
+			if answered_at ~= nil and now_ms() - answered_at <= lease_ms then return watcher.snapshot(), true end
+		elseif requested_at ~= nil and now_ms() - requested_at <= lease_ms then
+			return nil, false
+		end
+		request, requested_at = request + 1, now_ms()
+		if not transport.request(request) then fail("admission request refused") end
+		return nil, false
+	end
+
+	--- Whether the latest request has a fresh answer, from RAM only.
+	--- @return boolean answered
+	function watcher.answered()
+		return answered_request == request and answered_at ~= nil and now_ms() - answered_at <= lease_ms
+	end
+
 	--- Returns the last live, exact focused-control receipt without native work.
 	--- @return table|nil receipt
 	function watcher.snapshot()
 		if not ready or failed or not receipt or last_at == nil or now_ms() - last_at > lease_ms then return nil end
 		return { role = receipt.role, bus = receipt.bus, path = receipt.path }
 	end
+
+	--- Says, from RAM only, what authority the watcher holds over the focus.
+	--- @return string "field" (a fresh exact receipt), "absent" (the worker's
+	--- fresh answer to the latest request: the focused window is on no
+	--- application of the bus), "unanswered" (no fresh answer to the latest
+	--- request, or an inconclusive one) or "unavailable" (no running worker).
+	function watcher.authority()
+		if not active or failed or not transport or not ready then return "unavailable" end
+		if watcher.snapshot() then return "field" end
+		if answered_request == request and answered_kind == "absent" and answered_at ~= nil
+			and now_ms() - answered_at <= lease_ms then return "absent" end
+		return "unanswered"
+	end
+
+	--- The session's accessibility switch as the worker found it at startup.
+	--- @return string|nil "enabled", "enabled_now", "unavailable" or nil before readiness.
+	function watcher.accessibility() return accessibility end
 
 	--- Waits only during daemon startup, before entering the native event loop.
 	--- @return boolean ready
@@ -340,9 +432,24 @@ function M.new(options)
 
 	--- Fences publications and retains physical cleanup debt until acknowledged.
 	--- @return boolean settled
+	--- Turns the session's accessibility switch back off when one of this
+	--- watcher's workers turned it on: Ergopti leaves the session as it found it.
+	--- A refusal is logged, never retried, and does not hold the shutdown.
 	function watcher.stop()
 		active, ready = false, false
-		return retire()
+		local retired = retire()
+		if switched_on then
+			switched_on = false
+			Logger.info(LOG, "Turning the session's accessibility switch back off: Ergopti turned it on.")
+			local called, restored, reason = pcall(restore_accessibility)
+			if called and restored == true then
+				Logger.success(LOG, "The session's accessibility switch is off again, as Ergopti found it.")
+			else
+				Logger.warn(LOG, "The session's accessibility switch stays on: %s.",
+					called and tostring(reason or "not restored") or ErrorDescription.describe(restored))
+			end
+		end
+		return retired
 	end
 
 	--- Returns physical process, descriptor and private-directory settlement.

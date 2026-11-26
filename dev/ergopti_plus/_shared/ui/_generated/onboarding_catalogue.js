@@ -139,29 +139,6 @@
 				"uk": "Клавіша ★ та розширення тексту",
 				"zh": "★ 键与文本扩展"
 			},
-			"layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace": {
-				"ar": "تحويل مفتاح إلى مفتاح ★",
-				"cs": "Transformovat klávesu na klávesu ★",
-				"da": "Omdanne en tast til ★-tasten",
-				"de": "Eine Taste in die ★-Taste umwandeln",
-				"en": "Transform a key into the ★ key",
-				"es": "Transformar una tecla en la tecla ★",
-				"fr": "Transformer une touche en touche ★",
-				"he": "להפוך מקש למקש ★",
-				"hi": "किसी कुंजी को ★ में बदलें",
-				"it": "Trasformare un tasto nel tasto ★",
-				"ja": "キーを★キーに変換",
-				"ko": "키를 ★ 키로 변환",
-				"nl": "Een toets omzetten naar de ★-toets",
-				"no": "Gjøre en tast om til ★-tasten",
-				"pl": "Przekształć klawisz w klawisz ★",
-				"pt": "Transformar uma tecla na tecla ★",
-				"ru": "Превратить клавишу в клавишу ★",
-				"sv": "Omvandla en tangent till ★-tangenten",
-				"tr": "Bir tuşu ★ tuşuna dönüştür",
-				"uk": "Перетворити клавішу на клавішу ★",
-				"zh": "将一个键转换为 ★ 键"
-			},
 			"layouts/registry/ergopti/hotstrings/repeatcorrections.toml#repeat_corrections": {
 				"ar": "تصحيح الإيجابيات الكاذبة لمفتاح ★ التكرار (ê→u)",
 				"cs": "Opravy falešných pozitiv opakované klávesy ★ (ê→u)",
@@ -1253,7 +1230,7 @@
 									},
 									{
 										"path": "shortcuts.keyboard.primary_b",
-										"value": "microsoft_bold",
+										"value": "surround_parens",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -1269,7 +1246,29 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.microsoft_bold"
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_o",
+										"value": "ocr_screenshot",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ocr_screenshot"
 											}
 										]
 									},
@@ -1632,28 +1631,6 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.meta_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.win"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.tap_keys.number_row_left",
 										"value": "screenshot_fullscreen_save",
 										"default": "none",
@@ -1892,11 +1869,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -1913,11 +1885,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -1932,11 +1899,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -1959,7 +1921,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -1969,7 +1931,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}
@@ -2111,17 +2073,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.magic_key.replace.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.magic_key.repeat_corrections.enabled",
 												"value": true,
@@ -2386,28 +2337,6 @@
 												"label": [
 													{
 														"text": "<@ ➜ </"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.rolls.chevron_less.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.rolls.chevron_greater.enabled",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
 													}
 												]
 											},
@@ -3134,28 +3063,6 @@
 							{
 								"items": [
 									{
-										"path": "shortcuts.keyboard.secondary_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.ctrl"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
-											}
-										]
-									},
-									{
 										"path": "shortcuts.keyboard.secondary_a",
 										"value": "select_line",
 										"default": "none",
@@ -3310,8 +3217,30 @@
 										]
 									},
 									{
-										"path": "shortcuts.keyboard.secondary_o",
+										"path": "shortcuts.keyboard.secondary_b",
 										"value": "surround_parens",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.secondary_o",
+										"value": "ocr_screenshot",
 										"default": "none",
 										"recommended": true,
 										"label": [
@@ -3327,7 +3256,7 @@
 										],
 										"value_label": [
 											{
-												"key": "sg_actions.surround_parens"
+												"key": "sg_actions.ocr_screenshot"
 											}
 										]
 									},
@@ -3608,28 +3537,6 @@
 										"value_label": [
 											{
 												"key": "shortcuts.label_wrap_text"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keys.cmd_star",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.cmd"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"text": "★"
-											}
-										],
-										"value_label": [
-											{
-												"key": "shortcuts.label_cmd_star"
 											}
 										]
 									}
@@ -3924,11 +3831,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -3945,11 +3847,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -3964,11 +3861,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -3991,7 +3883,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -4001,7 +3893,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}
@@ -4145,17 +4037,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
@@ -4420,28 +4301,6 @@
 												"label": [
 													{
 														"text": "<@ ➜ </"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_less",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_greater",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
 													}
 												]
 											},
@@ -5215,6 +5074,50 @@
 										]
 									},
 									{
+										"path": "shortcuts.keyboard.primary_b",
+										"value": "surround_parens",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "B"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.surround_parens"
+											}
+										]
+									},
+									{
+										"path": "shortcuts.keyboard.primary_o",
+										"value": "ocr_screenshot",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "key_name.ctrl"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"text": "O"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.ocr_screenshot"
+											}
+										]
+									},
+									{
 										"path": "shortcuts.keyboard.primary_g",
 										"value": "open_chatgpt",
 										"default": "none",
@@ -5233,28 +5136,6 @@
 										"value_label": [
 											{
 												"key": "sg_actions.open_chatgpt"
-											}
-										]
-									},
-									{
-										"path": "shortcuts.keyboard.meta_space",
-										"value": "llm_generate_prediction",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "key_name.super"
-											},
-											{
-												"text": " + "
-											},
-											{
-												"key": "key_name.space"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.llm_generate_prediction"
 											}
 										]
 									},
@@ -5367,11 +5248,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": false,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "none",
 												"default": "none"
@@ -5388,11 +5264,6 @@
 												"default": ""
 											},
 											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
-											},
-											{
 												"path": "layout.ergopti_variant",
 												"value": "ergopti",
 												"default": "none"
@@ -5407,11 +5278,6 @@
 												"path": "layout.emulated_layout",
 												"value": "",
 												"default": ""
-											},
-											{
-												"path": "layout.ergopti_base",
-												"value": true,
-												"default": false
 											},
 											{
 												"path": "layout.ergopti_variant",
@@ -5434,7 +5300,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": true,
-												"default": false
+												"default": true
 											}
 										]
 									},
@@ -5444,7 +5310,7 @@
 											{
 												"path": "layout.ergopti_alt_gr",
 												"value": false,
-												"default": false
+												"default": true
 											}
 										]
 									}
@@ -5588,17 +5454,6 @@
 											}
 										],
 										"items": [
-											{
-												"path": "hotstrings.modules.magickey.replace",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text_ref": "layouts/registry/ergopti/hotstrings/magickeyreplace.toml#replace"
-													}
-												]
-											},
 											{
 												"path": "hotstrings.modules.magickey.repeat_corrections",
 												"value": true,
@@ -5863,28 +5718,6 @@
 												"label": [
 													{
 														"text": "<@ ➜ </"
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_less",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": "<% ➜ <="
-													}
-												]
-											},
-											{
-												"path": "hotstrings.modules.rolls.chevron_greater",
-												"value": true,
-												"default": false,
-												"recommended": true,
-												"label": [
-													{
-														"text": ">% ➜ >="
 													}
 												]
 											},
@@ -6237,11 +6070,19 @@
 							"hint_key": "onboarding.magic_key.choose_freely",
 							"custom_label_key": "onboarding.magic_key.option_custom",
 							"max_characters": 1,
-							"validation": "safe_magic_key",
+							"validation": "one_character",
 							"options": [
 								{
 									"value": "★",
 									"label_key": "onboarding.magic_key.option_blackstar"
+								},
+								{
+									"value": "ù",
+									"label_key": "onboarding.magic_key.option_ugrave"
+								},
+								{
+									"value": ";",
+									"label_key": "onboarding.magic_key.option_semicolon"
 								}
 							]
 						}

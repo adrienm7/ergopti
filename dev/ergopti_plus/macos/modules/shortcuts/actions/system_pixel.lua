@@ -28,7 +28,7 @@ local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local FileSystem    = require("core.fs.adapters.file_system")
 local TaskLifecycle = require("core.process.adapters.task_lifecycle")
-local PythonInterpreter = require("adapters.python_interpreter")
+local PythonInterpreter = require("ai.adapters.python_interpreter")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 
 local LOG = "shortcuts.actions.system"
@@ -469,7 +469,7 @@ local function pixel_hex_at(operation, x, y, on_hex)
 	if not python_bin then
 		operation.authorized = false
 		finish_operation(operation)
-		require("ui.python_runtime_offer").offer(python_state)
+		require("ai.ui.python_runtime_offer").offer(python_state)
 		return false
 	end
 	local tmpfile, allocation_detail, cancelled = allocate_temp_capture(operation)

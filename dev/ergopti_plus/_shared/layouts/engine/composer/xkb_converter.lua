@@ -352,10 +352,12 @@ end
 -- ====================================
 -- ====================================
 
---- Reads the shared keycode table for one keycode convention.
+--- Reads the shared keycode table for one keycode convention: its character
+--- keys, then its `extra_keys` (the JIS and ABNT keys), marked optional: the
+--- symbols file writes an optional key only when the layout types on it.
 --- @param table_data table Decoded mac_keycodes.json.
 --- @param convention string "iso" or "ansi".
---- @return table|nil pairs Array of { xkb_name, mac_code }.
+--- @return table|nil pairs Array of { xkb_name, mac_code, optional }.
 --- @return string|nil err
 function M.keycodes(table_data, convention)
 	local known = false
@@ -367,6 +369,9 @@ function M.keycodes(table_data, convention)
 	for _, key in ipairs(table_data.keys) do
 		local mac = key.mac
 		pairs_out[#pairs_out + 1] = { key.xkb, type(mac) == "table" and mac[convention] or mac }
+	end
+	for _, key in ipairs(table_data.extra_keys or {}) do
+		pairs_out[#pairs_out + 1] = { key.xkb, key.mac, true }
 	end
 	return pairs_out
 end
@@ -667,9 +672,15 @@ end
 function Converter:symbols(template, layout_id, display_name, level5_keys)
 	local text = template:gsub('xkb_symbols%s+"[^"]+"', function() return 'xkb_symbols "' .. layout_id .. '"' end)
 	text = text:gsub('name%[Group1%]%s*=%s*"[^"]+";', function() return 'name[Group1] = "' .. display_name .. '";' end)
+	-- Optional keys the template has no line for, written after its level3 include.
+	local added = {}
 	for _, key in ipairs(self.keycodes) do
 		local xkb = key[1]
 		local names, comments = {}, {}
+		local types_something = false
+		for _, cell in ipairs(self.grid[xkb]) do
+			if cell.kind ~= "none" then types_something = true end
+		end
 		for _, cell in ipairs(self.grid[xkb]) do
 			names[#names + 1] = self:cell_keysym(cell) or NO_SYMBOL
 			local shown = cell.kind ~= "none" and cell.text or ""
@@ -695,16 +706,22 @@ function Converter:symbols(template, layout_id, display_name, level5_keys)
 				from = e + 1
 			end
 		end
-		if #matches ~= 1 then fail("the symbols template has no single line for <" .. xkb .. ">") end
-		text = text:sub(1, matches[1][1] - 1) .. line .. text:sub(matches[1][2] + 1)
+		if key[3] and #matches == 0 then
+			-- A JIS or ABNT key: written only when the layout types on it.
+			if types_something then added[#added + 1] = "\n\t" .. line end
+		else
+			if #matches ~= 1 then fail("the symbols template has no single line for <" .. xkb .. ">") end
+			text = text:sub(1, matches[1][1] - 1) .. line .. text:sub(matches[1][2] + 1)
+		end
 	end
-	if level5_keys ~= nil then
+	if #added > 0 or level5_keys ~= nil then
 		-- After the template's level3 include, so a later include cannot take them back.
 		local close = nil
 		for position in text:gmatch("()\n};") do close = position end
 		if close == nil then fail("the symbols template has no closing };") end
 		local lines = {}
-		for _, key in ipairs(level5_keys) do
+		for _, line in ipairs(added) do lines[#lines + 1] = line end
+		for _, key in ipairs(level5_keys or {}) do
 			if self.grid[key.xkb] ~= nil then fail("<" .. key.xkb .. "> types characters and cannot hold the fifth level") end
 			-- No explicit type: XKB gives a one-keysym key ONE_LEVEL, and the installer
 			-- checks every type the symbols name against the shipped types file.

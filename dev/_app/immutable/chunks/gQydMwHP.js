@@ -1,0 +1,1 @@
+import{V as e,z as t}from"./CFanQ2AK.js";import"./DrgYvoPP.js";var n=e(`<span class="name-ergopti"><span class="namecolor">Ergopti</span></span>`);function r(e){var r=n();t(e,r)}export{r as t};

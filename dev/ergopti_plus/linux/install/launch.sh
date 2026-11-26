@@ -48,12 +48,31 @@ done
 
 # Only the desktop's bare tray request can be represented by the unit. Any
 # additional daemon arguments must reach the daemon itself in their original order.
-if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" \
+# The AppImage (ERGOPTI_PORTABLE_LAUNCH, set by its AppRun) installs no unit:
+# its desktop launch runs the daemon from here.
+PORTABLE_LAUNCH=false
+if [ "${ERGOPTI_PORTABLE_LAUNCH:-}" = 1 ]; then PORTABLE_LAUNCH=true; fi
+if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && ! "$PORTABLE_LAUNCH" \
 	&& [ "$#" -eq 1 ] && [ "$1" = --tray ] && command -v systemctl >/dev/null 2>&1 \
 	&& systemctl --user show-environment >/dev/null 2>&1; then
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
 	systemctl --user daemon-reload
+	# The unit runs in the user manager's environment, not this session's.
+	# GNOME and Plasma publish their display there; i3, Openbox and sway
+	# without a session manager may not, which started a daemon with no
+	# display at all. A manager that outlived an earlier Wayland login also
+	# keeps its WAYLAND_DISPLAY, which the daemon's display probe would trust
+	# in this X11 session. Publish what this graphical session has and retire
+	# the Wayland socket it lacks; a launch with no display changes nothing.
+	if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+		session_variables=()
+		for variable in DISPLAY WAYLAND_DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE; do
+			if [ -n "${!variable:-}" ]; then session_variables+=("$variable"); fi
+		done
+		systemctl --user import-environment "${session_variables[@]}"
+		if [ -z "${WAYLAND_DISPLAY:-}" ]; then systemctl --user unset-environment WAYLAND_DISPLAY; fi
+	fi
 	# A relaunch from the application menu restarts a running unit; systemd stops
 	# it with SIGTERM, the daemon's controlled exit (MLC-003).
 	if ! "$AUTOSTART" && systemctl --user is-active --quiet ergopti-hotstrings.service; then
@@ -76,7 +95,20 @@ for arg in "$@"; do
 				break
 			fi
 			status=0
-			diagnostic="$(pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
+			setup_root="$DRIVER_ROOT"
+			if "$PORTABLE_LAUNCH"; then
+				# root cannot read a user's FUSE mount, which is where the AppImage's
+				# files are: pkexec gets a private copy of the privileged part.
+				setup_root="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-permissions.XXXXXX")"
+				mkdir -p "$setup_root/install" "$setup_root/_generated"
+				cp -- "$DRIVER_ROOT/install/setup_permissions.sh" "$DRIVER_ROOT/install/messages.sh" \
+					"$DRIVER_ROOT/install/99-ergopti-uinput.rules" "$DRIVER_ROOT/install/ergopti-uinput.conf" \
+					"$setup_root/install/"
+				cp -R -- "$DRIVER_ROOT/_generated/shell_messages" "$setup_root/_generated/"
+				chmod -R a+rX "$setup_root"
+			fi
+			diagnostic="$(pkexec /bin/bash "$setup_root/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
+			if "$PORTABLE_LAUNCH"; then rm -rf -- "$setup_root"; fi
 			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi
 			if [ "$status" -ne 0 ]; then
 				# EX_UNAVAILABLE plus a `missing-program NAME` line: no window exists
@@ -88,6 +120,10 @@ for arg in "$@"; do
 					break
 				fi
 				ergopti_msg launch.authorization_failed >&2
+				# A desktop launch of the AppImage has no terminal: the daemon's
+				# tray then names the problem and the way to fix it, where an
+				# exit here left nothing on screen.
+				if "$PORTABLE_LAUNCH"; then break; fi
 				exit 78
 			fi
 		fi

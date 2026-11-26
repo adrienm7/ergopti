@@ -3,10 +3,11 @@
 --- Applies complete shortcut intent through the existing native and source owners.
 local M = {}
 local PhysicalAvailability = require("shortcuts.engine.physical_availability")
-local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
-local Scope = require("infra.preferences_scope")
+local Manifest = require("menu.engine.manifest_reader")
+local Preferences = require("settings.engine.preferences.preferences")
+local Scope = require("settings.engine.scope.preferences_scope")
 local MOD_COMBOS = require("settings.engine.keys").KEY.MOD_COMBOS
+local COMBINATIONS_MASTER = require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS
 
 local STATE_FIELDS = { "shortcuts", require("settings.engine.keys").LEAF.CHATGPT_URL, "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
 
@@ -122,13 +123,15 @@ function M.new(options)
 		-- cleanup. Physical edits retain their source-bound leaf validation;
 		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
-		-- [mod_combos] lives in tap_hold.toml: the remap engine applies
-		-- the Shortcuts scope's combination section itself (platform/remap
-		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves it.
+		-- [mod_combos] lives in tap_hold.toml and the key combinations' master
+		-- is a remap state row: the remap engine applies the Shortcuts scope's
+		-- combination section and master itself (platform/remap
+		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves both.
 		if not config.editing then
 			local narrowed = config.select
 			config.select = function(path)
 				if path == MOD_COMBOS or path:sub(1, #MOD_COMBOS + 1) == MOD_COMBOS .. "." then return false end
+				if path == COMBINATIONS_MASTER then return false end
 				return narrowed == nil or narrowed(path) == true
 			end
 		end
@@ -250,11 +253,11 @@ function M.new(options)
 			return true
 		end,
 	}
-	local owner = require("ui.menu.scoped_preferences").new(ports)
+	local owner = require("settings.ui.menu.scoped_preferences").new(ports)
 	local source_owner = options.preferences or Preferences
 	local inventory = require("shortcuts.engine.physical_editor_inventory").new({
-		path = options.path, current_path = options.current_path or function() return require("infra.config_paths").get("config.toml") end,
-		read = options.files.read_with_status, keyboard = keyboard, parameters = require("modules.gestures.actions"),
+		path = options.path, current_path = options.current_path or function() return require("settings.engine.paths").get("config.toml") end,
+		read = options.files.read_with_status, keyboard = keyboard, parameters = require("gestures.engine.actions"),
 		recognizes = function(binding)
 			return type(binding) == "string" and (binding:match("^keyboard__") ~= nil
 				or binding:match("^tap_key__") ~= nil or binding:match("^script__") ~= nil)

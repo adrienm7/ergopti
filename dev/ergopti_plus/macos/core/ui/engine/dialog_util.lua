@@ -348,14 +348,27 @@ function M.choose_path(message, title)
 	return type(path) == "string" and path ~= "" and path or nil
 end
 
---- Builds the native open panel of the layout editor: one Ergopti layout
---- source (.toml) or macOS layout (.keylayout), from the user's home. The
---- layout manager webview cannot rely on <input type="file"> (WKWebView needs
---- a UI delegate for it), so the host opens the file itself.
+--- Builds the native open panel of the layout editor: one layout file of the
+--- given types (an Ergopti source, a .keylayout or another tool's layout
+--- file), from the user's home. The layout manager webview cannot rely on
+--- <input type="file"> (WKWebView needs a UI delegate for it), so the host
+--- opens the file itself.
 --- @param message string The panel's unchanged message.
 --- @param title string|nil The translated, brandless parameter title.
+--- @param extensions table The file types, lowercase (source.pick_extensions of the layout defaults).
 --- @return string script The escaped native panel source.
-function M.layout_source_picker_script(message, title)
+function M.layout_source_picker_script(message, title, extensions)
+	if type(extensions) ~= "table" or #extensions == 0 then
+		error("dialog_util.layout_source_picker_script: no file type to offer", 2)
+	end
+	local types = {}
+	for _, extension in ipairs(extensions) do
+		-- Checked before it enters the script, so a type can never break out of its quotes.
+		if type(extension) ~= "string" or not extension:match("^[a-z_]+$") then
+			error("dialog_util.layout_source_picker_script: a file type is not a lowercase extension", 2)
+		end
+		types[#types + 1] = '"' .. extension .. '"'
+	end
 	return text_utils.applescript_format([[
 use framework "AppKit"
 use scripting additions
@@ -366,7 +379,7 @@ panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:"%s")
 panel's setCanChooseFiles:true
 panel's setCanChooseDirectories:false
 panel's setAllowsMultipleSelection:false
-panel's setAllowedFileTypes:{"toml", "keylayout"}
+panel's setAllowedFileTypes:{]] .. table.concat(types, ", ") .. [[}
 panel's setResolvesAliases:true
 set response to panel's runModal()
 if response is not (current application's NSModalResponseOK) then return missing value
@@ -381,10 +394,12 @@ end
 --- opened from a page button, never from the keyboard tap.
 --- @param message string The panel's message.
 --- @param title string|nil The translated, brandless parameter title.
+--- @param extensions table The file types the panel offers.
 --- @return string|nil path The chosen file, nil when cancelled.
-function M.choose_layout_source(message, title)
+function M.choose_layout_source(message, title, extensions)
+	local script = M.layout_source_picker_script(message, title, extensions)
 	focus_hammerspoon()
-	local ok, path = Logger.run_modal(hs.osascript.applescript, M.layout_source_picker_script(message, title))
+	local ok, path = Logger.run_modal(hs.osascript.applescript, script)
 	if ok ~= true then
 		error("dialog_util.choose_layout_source: the native open panel failed", 2)
 	end

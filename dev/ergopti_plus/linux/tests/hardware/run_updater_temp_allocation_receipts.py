@@ -67,8 +67,9 @@ if wants_callback then
 	if denied then assert(received_error == "temporary path unavailable") end
 end
 assert(not uv.loop_alive(), "refused operation left a native owner alive")
-local expected_state = denied and "available" or (api == "update" and "idle" or "available")
-assert(Manager.get_state() == expected_state, "refusal changed the pre-allocation state")
+-- A refused allocation and a failed download both keep the offer, so the menu
+-- still says « Update now » (UPD-08).
+assert(Manager.get_state() == "available", "refusal changed the pre-allocation state")
 assert(Manager.get_cached_release().tag == release.tag)
 assert(Manager.cancel_update() and Manager.get_state() == "idle")
 assert(type(prepared_artifact) == "table" and type(prepared_output) == "table"

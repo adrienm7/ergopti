@@ -469,8 +469,7 @@ _UpdaterTest_JsonStringZeroHasTypedTransportSemantics() {
 		"Updater_ParseBody",
 		"_Updater_HandleBackgroundResult",
 		"_Updater_ShowAvailableUpdateCallback",
-		"_Updater_OneClickUpdateCallback",
-		"_Updater_BuildChangelogGui"
+		"_Updater_OneClickUpdateCallback"
 	] {
 		Body := _DriverFuncBody(FunctionName)
 		Assert(InStr(Body, "_Updater_JsonPayloadIsFailure(Json)") > 0,

@@ -53,6 +53,12 @@ const REASONS = [
 
 const TYPES = ['integer', 'decimal', 'boolean', 'enum', 'string', 'path', 'url'];
 
+// The fallback an override passes to parseEntry(): a blank number then
+// answers `{ ok: true, inherit: true }`, and the caller removes the override
+// so the inherited value applies again (maintainer decision of 2026-11-22,
+// PCK-13 for overrides).
+const INHERIT = Object.freeze({ inherit: true });
+
 // A web address: a lowercase http or https scheme, then at least one
 // character and no ASCII space or control character anywhere, so a stored
 // link never reaches a browser or a shell carrying a line break or a space.
@@ -154,14 +160,28 @@ function checkValue(entry, value) {
  * is typed in another unit than it is stored (milliseconds typed, seconds
  * stored: scale 1000), and `entry_type` says whether the typed number may
  * carry decimals; the bounds of a refusal are then given in the typed unit.
+ * A blank numeric box resets the setting: given the setting's default, it
+ * answers that default with `reset: true` (maintainer decision PCK-13,
+ * 2026-11-21, on the three OS); without one it is refused as empty. Given
+ * INHERIT instead, an override's blank answers `inherit: true` and no value
+ * (maintainer decision of 2026-11-22).
  * @param {Object} entry - Declaration from entryFor().
  * @param {string} text - Raw text of the box.
- * @return {{ok: boolean, value?: *, reason?: string, min?: number, max?: number}}
+ * @param {*} [fallback] - The setting's default, or INHERIT for an override.
+ * @return {{ok: boolean, value?: *, reset?: boolean, inherit?: boolean, reason?: string, min?: number, max?: number}}
  */
-function parseEntry(entry, text) {
+function parseEntry(entry, text, fallback) {
 	if (typeof text !== 'string') return entryRefusal('wrong_type', entry);
 	if (entry.type === 'string' || entry.type === 'path') return checkValue(entry, text);
 	const trimmed = text.trim();
+	if (
+		trimmed === '' &&
+		fallback !== undefined &&
+		(entry.type === 'integer' || entry.type === 'decimal')
+	)
+		return fallback === INHERIT
+			? { ok: true, inherit: true }
+			: { ok: true, value: fallback, reset: true };
 	if (trimmed === '') return entryRefusal('empty', entry);
 	if (entry.type === 'integer' || entry.type === 'decimal') {
 		if (!DECIMAL_TEXT.test(trimmed)) return entryRefusal('wrong_type', entry);
@@ -367,6 +387,13 @@ function requireValue(schema, key, value) {
 						"label_key": "value_check.special.never"
 					}
 				]
+			},
+			"hotstrings.backspace_restore_window_ms": {
+				"file": "config.toml",
+				"type": "integer",
+				"unit": "ms",
+				"min": 50,
+				"max": 10000
 			},
 			"hotstrings.cascade_max_arrows": {
 				"file": "config.toml",
@@ -579,6 +606,7 @@ function requireValue(schema, key, value) {
 		"MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS": "mod_combos.simultaneous_threshold_ms",
 		"HOTSTRINGS_EXPANSION_DELAY": "hotstrings.expansion_delay",
 		"HOTSTRINGS_IDLE_RESET_SECONDS": "hotstrings.idle_reset_seconds",
+		"HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS": "hotstrings.backspace_restore_window_ms",
 		"HOTSTRINGS_CASCADE_MAX_ARROWS": "hotstrings.cascade_max_arrows",
 		"HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS": "hotstrings.dynamic.user_code.time_activation_seconds",
 		"HOTSTRINGS_CONFIG_ANY_DELAY": "hotstrings_config.*.delay",
@@ -607,5 +635,5 @@ function requireValue(schema, key, value) {
 		"TAP_HOLDS_STICKY_TIMEOUT_MS": "tap_holds.sticky_timeout_ms"
 	};
 
-	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
+	window.ErgoptiValueCheck = Object.freeze({ REASONS, TYPES, INHERIT, entryFor, checkValue, parseEntry, messageParts, formatNumber, renderMessage, requireValue, SCHEMA, KEY });
 })();

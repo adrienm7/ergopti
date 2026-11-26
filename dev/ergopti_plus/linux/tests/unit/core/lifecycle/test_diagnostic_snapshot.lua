@@ -128,7 +128,7 @@ end)
 -- =======================================
 
 describe("linux-diagnostic-read-admission", function()
-	local Collector = require("infra.diagnostic_snapshot")
+	local Collector = require("diagnostics.engine.reports.snapshot")
 	local FileSystem = require("core.fs.adapters.file_system")
 	local sha = "123456789" .. string.rep("0", 31)
 	local root = "/native-diagnostic-fixture"
@@ -176,7 +176,7 @@ describe("linux-diagnostic-read-admission", function()
 end)
 
 describe("Diagnostic snapshot: Linux collector", function()
-	local Collector = require("infra.diagnostic_snapshot")
+	local Collector = require("diagnostics.engine.reports.snapshot")
 	it("linux-system-locale-precedence: respects LC_MESSAGES between LC_ALL and LANG", function()
 		local original = os.getenv
 		local env = { LC_ALL = "", LC_MESSAGES = "fr_FR.UTF-8", LANG = "en_US.UTF-8" }
@@ -309,7 +309,7 @@ end)
 --- Captures only snapshot log output while preserving the real collector.
 --- @param body function Receives the collector and emitted formatted lines.
 local function with_prepared_snapshot(body)
-	local Collector, Logger = require("infra.diagnostic_snapshot"), require("core.logger.engine.shim")
+	local Collector, Logger = require("diagnostics.engine.reports.snapshot"), require("core.logger.engine.shim")
 	local original, lines = Logger.info, {}
 	Logger.info = function(tag, _, message)
 		if tag == Snapshot.MODULE then lines[#lines + 1] = message end
@@ -328,6 +328,8 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 				now_ms = function() return clock end,
 			})
 			package.loaded["core.logger.engine.boot_profiler"] = previous_profiler
+			-- A boot of 63 ms of loading before the 137 ms the clock measures.
+			Profiler._use_process_age(function() return 63 end)
 			Profiler.begin()
 			local env = { read = function(path)
 				assert_true(not frozen, "ready emission must not perform another discovery read")
@@ -347,7 +349,7 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 				log_level = "DEBUG", features_enabled = 3, features_total = 5,
 				driver = "forged driver", os = "forged OS", config_dir = "untrusted path" })
 			assert_eq(#lines, 1); assert_eq(message, lines[1])
-			assert_true(message:find("boot_ms=137", 1, true) ~= nil)
+			assert_true(message:find("boot_ms=200", 1, true) ~= nil, "the snapshot carries spawn to ready, the load phase included")
 			assert_true(message:find("features_enabled=3/5", 1, true) ~= nil)
 			assert_true(message:find("os=" .. Snapshot.render_value("Prepared Linux"), 1, true) ~= nil)
 			assert_true(not message:find("forged", 1, true) and not message:find("untrusted path", 1, true))

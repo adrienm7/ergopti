@@ -22,11 +22,11 @@ local helpers = require("tests.helpers")
 local function fresh(stored, characters)
 	local content = stored and require("core.text.engine.toml_codec").encode({ shortcuts = { tap_keys = stored } }) or nil
 	local owned = { "core.fs.adapters.storage", "platform.input.keycodes", "core.fs.adapters.file_system",
-		"core.fs.engine.paths", "infra.preferences", "infra.config_paths", "modules.shortcuts.tap_keys" }
+		"core.fs.engine.paths", "settings.engine.preferences.preferences", "settings.engine.paths", "modules.shortcuts.tap_keys" }
 	local saved = {}
 	for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
 	package.loaded["core.fs.adapters.storage"] = nil
-	package.loaded["infra.config_paths"] = { get = function() return "tap-key-test-config" end }
+	package.loaded["settings.engine.paths"] = { get = function() return "tap-key-test-config" end }
 	package.loaded["platform.input.keycodes"] = {
 		character_for = function(code) return characters and characters[code] or nil end,
 	}
@@ -45,7 +45,7 @@ local function fresh(stored, characters)
 			return body
 		end,
 	}
-	package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
+	package.loaded["settings.engine.preferences.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
 	local TapKeys = require("modules.shortcuts.tap_keys")
 	local function restore()
 		for _, name in ipairs(owned) do package.loaded[name] = saved[name] end

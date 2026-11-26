@@ -57,18 +57,17 @@ global I18N_LOCALES := LocaleTableData()
 ; selected locale triggers a script restart.
 global _I18nReloadDebounceMs := 150
 
-; Delay (ms) before warming the EN/FR fallback caches off the boot critical path.
-; Only the active locale is parsed eagerly at boot (the tray menu needs it); the
-; fallbacks — consulted solely when a key is missing from the active locale — are
-; warmed shortly after "ready" so they never cost the user boot latency. A miss
-; that arrives before this timer fires triggers a one-time lazy load inside t().
-global I18N_FALLBACK_WARM_DELAY_MS := 200
-
 ; Cached sorted locale list for the menu
 global _I18nSortedLocalesCache := false
 
 ; Map of locale code → boolean indicating if flag.png exists.
 global _I18nFlagExistsCache := Map()
+
+; The locale config.toml holds, "" when the row is absent (the system language,
+; else English). The active locale can be detected; only this one is a choice,
+; and a full save writes this one, never a detected language (maintainer
+; decision of 2026-11-21: a chosen locale is always written, French included).
+global _I18nConfiguredLocale := ""
 
 
 
@@ -127,8 +126,9 @@ _I18nDetectSystemLocale(LocaleProbe := 0) {
 ; is already available in Cache. Safe to call multiple times — subsequent calls
 ; are ignored if the locale has not changed.
 I18nInit(Cache, LocaleProbe := 0) {
-	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
-	
+	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache, _I18nConfiguredLocale
+	_I18nConfiguredLocale := ""
+
 	if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
 		_I18nFlagExistsCache := Map()
 
@@ -146,6 +146,7 @@ I18nInit(Cache, LocaleProbe := 0) {
 		}
 		if IsKnown {
 			_I18nLocale := NewLocale
+			_I18nConfiguredLocale := NewLocale
 		} else {
 			; Unknown code in config: pick the Windows UI language rather than
 			; silently defaulting to French — the user clearly wanted something
@@ -172,27 +173,15 @@ I18nInit(Cache, LocaleProbe := 0) {
 ; Pre-load the ACTIVE locale cache on the boot path so the first t() call during
 ; menu construction never blocks on disk I/O. The EN/FR fallback caches are NOT
 ; loaded here — they are consulted only on a missing key, so warming them at boot
-; cost the user a second JSON parse for nothing on a complete locale. They are
-; warmed instead by I18nWarmFallbacks() off the critical path (or lazily on the
-; first miss inside t()). Must be called after I18nInit().
+; cost the user a second JSON parse for nothing on a complete locale. They load
+; lazily on the first miss inside t(), which a complete catalogue never has (see
+; I18nProbe). Must be called after I18nInit().
 I18nPreload() {
 	global _I18nCache
 	try LoggerTrace("i18n", "Preloading active locale cache…")
 	_I18nEnsureActiveLoaded()
 	try LoggerDone("i18n", "Active locale warm ({1} key(s)); fallbacks deferred off the boot path.",
 		_I18nCache.Count)
-}
-
-; Warm the EN/FR fallback caches off the boot critical path. Armed as a deferred
-; SetTimer after "ready" so a later missing-key lookup is a cheap map hit rather
-; than a synchronous JSON parse mid-interaction. Idempotent.
-I18nWarmFallbacks() {
-	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
-	try LoggerTrace("i18n", "Warming fallback locale caches…")
-	_I18nEnsureFallbacksLoaded()
-	try LoggerDone("i18n", "Fallback caches warm ({1} EN, {2} FR).",
-		_I18nCacheEnLoaded ? _I18nCacheEn.Count : 0,
-		_I18nCacheFrLoaded ? _I18nCacheFr.Count : 0)
 }
 
 
@@ -203,14 +192,21 @@ I18nWarmFallbacks() {
 ; stale intermediate language from landing when the user switches quickly.
 I18nSetLocale(Code, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
 	global _I18nLocale, _I18nCacheLoaded, _I18nFallbacksWarmed, ConfigurationFile, _I18nReloadDebounceMs
-	if _I18nLocale == Code
+	global _I18nConfiguredLocale
+	; Only a choice already written is a no-op: the system language shown while
+	; the row is absent becomes an explicit, written choice.
+	if _I18nConfiguredLocale == Code
 		return true
 	Updates := [{ Section: "script", Key: "locale", Value: Code }]
 	if !ConfigCommitUpdates(ConfigurationFile, Updates,
 		"the locale switch to '" . Code . "'", WriterFn, NotifyFn)
 		return false
+	Unchanged := _I18nLocale == Code
 	PreviousCritical := Critical("On")
 	try {
+		_I18nConfiguredLocale := Code
+		if Unchanged
+			return true
 		_I18nLocale           := Code
 		_I18nCacheLoaded      := false
 		_I18nFallbacksWarmed  := false
@@ -258,6 +254,13 @@ _I18nReloadRefused(Locale, Reason) {
 I18nGetLocale() {
 	global _I18nLocale
 	return _I18nLocale
+}
+
+; Return the locale config.toml holds, "" when the row is absent: what a full
+; save writes, so a detected system language is never frozen into the file.
+I18nConfiguredLocale() {
+	global _I18nConfiguredLocale
+	return _I18nConfiguredLocale
 }
 
 ; Returns a menu callback bound to a specific locale code. Calling this helper

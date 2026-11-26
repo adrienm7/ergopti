@@ -394,7 +394,7 @@ _TooltipDequeuePollFn(ExpectedGeneration := unset, ExpectedSurface := 0) {
 ; to arm the poll timer. Code at file scope in #Include'd files does not execute
 ; in AHK v2 when the include appears after the auto-execute section has ended.
 TooltipDequeueInit() {
-    SetTimer(_TooltipDequeuePollFn, 100)
+    SetTimer(_TooltipDequeuePollFn, TimingsGet("tooltip", "dequeue_poll_ms"))
 }
 
 ; Style constants — sourced from core/ui/engine/style.ahk (included before this file
@@ -412,6 +412,7 @@ global _TOOLTIP_OFFSET_RIGHT := UI_OFFSET_RIGHT
 global _TOOLTIP_WINDOW_OFFSET_Y := UI_WINDOW_OFFSET_Y
 global _TOOLTIP_SCREEN_MARGIN := UI_SCREEN_MARGIN
 global _TOOLTIP_LOADING_TEXT_HEX := UI_LOADING_TEXT_HEX
+global _TOOLTIP_TEXT_HEX := UI_TEXT_HEX
 global _TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
 global _TOOLTIP_SEP_COLOR_HEX := UI_SEP_COLOR_HEX
 global _TOOLTIP_DIM_COLOR_HEX := UI_DIM_COLOR_HEX
@@ -422,6 +423,10 @@ global _TOOLTIP_CORNER_RADIUS := UI_CORNER_RADIUS
 global _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
 global _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
 global _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
+global _TOOLTIP_GLYPH_BADGE_HEX := UI_GLYPH_BADGE_HEX
+global _TOOLTIP_GLYPH_BADGE_PAD_X := UI_GLYPH_BADGE_PAD_X
+global _TOOLTIP_GLYPH_BADGE_PAD_Y := UI_GLYPH_BADGE_PAD_Y
+global _TOOLTIP_GLYPH_BADGE_GAP := UI_GLYPH_BADGE_GAP
 global _TOOLTIP_HINT_COLOR_HEX := UI_HINT_COLOR_HEX
 global _TOOLTIP_INFO_COLOR_HEX := UI_INFO_COLOR_HEX
 global _TOOLTIP_INFO_FONT_SIZE := UI_FONT_SIZE_INFO
@@ -448,6 +453,7 @@ Tooltip_UpdateStyles() {
     _TOOLTIP_WINDOW_OFFSET_Y := UI_WINDOW_OFFSET_Y
     _TOOLTIP_SCREEN_MARGIN := UI_SCREEN_MARGIN
     _TOOLTIP_LOADING_TEXT_HEX := UI_LOADING_TEXT_HEX
+    _TOOLTIP_TEXT_HEX := UI_TEXT_HEX
     _TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
     _TOOLTIP_SEP_COLOR_HEX := UI_SEP_COLOR_HEX
     _TOOLTIP_DIM_COLOR_HEX := UI_DIM_COLOR_HEX
@@ -458,6 +464,10 @@ Tooltip_UpdateStyles() {
     _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
     _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
     _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
+    _TOOLTIP_GLYPH_BADGE_HEX := UI_GLYPH_BADGE_HEX
+    _TOOLTIP_GLYPH_BADGE_PAD_X := UI_GLYPH_BADGE_PAD_X
+    _TOOLTIP_GLYPH_BADGE_PAD_Y := UI_GLYPH_BADGE_PAD_Y
+    _TOOLTIP_GLYPH_BADGE_GAP := UI_GLYPH_BADGE_GAP
     _TOOLTIP_HINT_COLOR_HEX := UI_HINT_COLOR_HEX
     _TOOLTIP_INFO_COLOR_HEX := UI_INFO_COLOR_HEX
     _TOOLTIP_INFO_FONT_SIZE := UI_FONT_SIZE_INFO
@@ -469,6 +479,7 @@ Tooltip_UpdateStyles() {
     _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
     _TOOLTIP_TIMEOUT_DECREMENT_SEC := UI_TIMEOUT_DECREMENT_SEC
     _TOOLTIP_TIMEOUT_FLOOR_SEC := UI_TIMEOUT_FLOOR_SEC
+    _TOOLTIP_SAFETY_SEC := UI_TOOLTIP_SAFETY_SEC
 }
 Tooltip_UpdateStyles()
 
@@ -488,11 +499,12 @@ Tooltip_UpdateStyles()
 global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0
 global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0
 
-; Safety deadline applied whenever the caller passes DurationSec = 0
-; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
-; linger when the normal hide path (buffer reset, expansion fire, etc.)
-; is skipped due to an unhandled exception or a missed timer callback.
-global _TOOLTIP_SAFETY_SEC := 3.0
+; Deadline applied whenever the caller passes DurationSec = 0 (a preview with
+; no delay): the shared [timing] safety_timeout_sec, read on the three OS
+; (TWD-1, decided by the maintainer on 2026-11-16). It also guards against
+; ghost tooltips when the normal hide path is skipped. Starts at the sentinel 0,
+; overwritten by Tooltip_UpdateStyles() from UI_TOOLTIP_SAFETY_SEC at boot.
+global _TOOLTIP_SAFETY_SEC := 0
 
 
 

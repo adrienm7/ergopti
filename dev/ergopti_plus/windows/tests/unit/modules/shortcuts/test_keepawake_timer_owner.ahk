@@ -57,19 +57,19 @@ _KATO_Bind(&Source, Name, Needle, Replacement, Expected) {
 }
 
 _KATO_Source(Receipt) {
-	global _DriverDir
+	global _DriverDir, _SharedDir
 	Owner := _KATO_Owner(), Original := FSReadStrict(Owner)
 	for Name in ["StartActivitySimulation", "StopActivitySimulation", "AwakeStopCancellationHook",
 		"AwakeCreateCancellationHook", "AwakeCheckMouseMoved", "SimulateActivity"]
 		AssertTrue(_DriverExtractFunctionBody(&Original, Name) != "", "the authentic subject must be nonempty: " . Name)
 	Start := _DriverFindFunctionDefinition(&Original, "StartActivitySimulation")
-	DeclarationsStart := InStr(Original, "global AWAKE_TICK_MIN_MS", true)
+	DeclarationsStart := InStr(Original, "global AwakeOriginX", true)
 	AssertTrue(DeclarationsStart > 0 && DeclarationsStart < Start.Idx)
 	Declarations := SubStr(Original, DeclarationsStart, Start.Idx - DeclarationsStart)
 	DeclarationsCode := _DriverMaskNonCode(&Declarations)
 	AssertFalse(InStr(DeclarationsCode, "(", true), "only the real inactive state declarations may be replayed")
 	RegExReplace(DeclarationsCode, "m)^\s*global\b", "", &DeclarationCount)
-	AssertTrue(DeclarationCount >= 6, "all original session defaults must be present")
+	AssertTrue(DeclarationCount >= 3, "all original session defaults must be present")
 	Bound := Original
 	MouseBindings := _KATO_Bind(&Bound, "StartActivitySimulation", "MCGetPos(", "_KATO_GetPos(", 1)
 	MouseBindings += _KATO_Bind(&Bound, "AwakeCheckMouseMoved", "MCGetPos(", "_KATO_GetPos(", 1)
@@ -112,7 +112,7 @@ _KATO_Source(Receipt) {
 		Source .= 'Features["shortcuts"]["' . Nested . '"] := Map("enabled", false)' . "`n"
 	Seen := Map()
 	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "KS_AltGrKeyName", "CryptoSha256Bytes",
-		"KL_JsonEncode", "JsonStringLiteral", "t"] {
+		"KL_JsonEncode", "JsonStringLiteral", "t", "NotifierSend", "ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the real child dependency must resolve: " . Symbol)
 		if !Seen.Has(Path) {
@@ -120,6 +120,11 @@ _KATO_Source(Receipt) {
 			Seen[Path] := true
 		}
 	}
+	; After the notifier's include, whose top level resets the seam: the
+	; keep-awake notices reach a recorder, never the desktop.
+	Source .= "NotifierSetDisplaySink((*) => 1)`n"
+	; The movement poll reads its period from the real shared timing registry.
+	Source .= "TimingsLoadShared(" . _KATO_Quote(_SharedDir) . ")`n"
 	BodyPath := _DriverDir . "\tests\fixtures\keepawake_timer_owner_body.ahk"
 	Body := FSReadStrict(BodyPath)
 	AssertTrue(Body != "")

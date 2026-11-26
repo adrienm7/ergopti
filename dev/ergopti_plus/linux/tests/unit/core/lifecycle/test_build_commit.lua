@@ -135,6 +135,18 @@ describe("Build commit: the shared stamp parser and resolver", function()
 		assert_eq(Snapshot.COMMIT_SOURCE_GIT, source)
 	end)
 
+	it("answers an install.sh copy of a checkout from its stamp, as a git commit", function()
+		-- The installed copy has no .git: without the stamp install.sh writes,
+		-- every start logged « Build commit unknown » (field report 2026-11-25).
+		local commit, source, detail = Snapshot.resolve_commit(fixture_fs({
+			["/home/u/.local/lib/ergopti/_shared/" .. Snapshot.BUILD_STAMP_FILE] = "commit=" .. SHA .. "\n"
+				.. Snapshot.BUILD_STAMP_SOURCE_KEY .. "=" .. Snapshot.BUILD_STAMP_SOURCE_CHECKOUT .. "\n",
+		}), "/home/u/.local/lib/ergopti/_shared", "/home/u/.local/lib/ergopti/linux")
+		assert_eq(SHORT, commit)
+		assert_eq(Snapshot.COMMIT_SOURCE_GIT, source, "the commit is the checkout's, not a release build's")
+		assert_eq(nil, detail)
+	end)
+
 	it("answers unknown with both places it looked when neither exists", function()
 		local commit, source, detail = Snapshot.resolve_commit(fixture_fs({}), "/opt/e/_shared", "/opt/e/linux")
 		assert_eq(Snapshot.UNKNOWN, commit)
@@ -162,7 +174,7 @@ end)
 -- =====================================
 
 describe("Build commit: the Linux snapshot resolves and logs", function()
-	local Collector = helpers.load_module("infra.diagnostic_snapshot")
+	local Collector = helpers.load_module("diagnostics.engine.reports.snapshot")
 
 	it("the snapshot's commit field is the package stamp", function()
 		local values = Collector.collect({
@@ -205,11 +217,11 @@ end)
 
 describe("Build commit: the healthcheck reports the commit and the real config dir", function()
 	it("sends the resolved commit, its source, the config dir and the script dir", function()
-		local ConfigPaths = require("infra.config_paths")
+		local ConfigPaths = require("settings.engine.paths")
 		local Paths = require("core.fs.engine.paths")
-		local handler = helpers.load_module("ui.healthcheck.bridge")
+		local handler = helpers.load_module("diagnostics.ui.healthcheck.bridge")
 		local result
-		with_module("infra.diagnostic_snapshot", {
+		with_module("diagnostics.engine.reports.snapshot", {
 			resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			system_facts = function() return {} end,
 		}, function()
@@ -229,9 +241,9 @@ end)
 describe("Build commit: the crash dump names the build and the config dir", function()
 	it("writes the resolved commit and the configuration directory", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
-			local ConfigPaths = require("infra.config_paths")
-			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			with_module("infra.diagnostic_snapshot", {
+			local ConfigPaths = require("settings.engine.paths")
+			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
+			with_module("diagnostics.engine.reports.snapshot", {
 				resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
 			}, function()
 				local ok, err = pcall(Reporter.dump, "engine", "boom")
@@ -248,8 +260,8 @@ describe("Build commit: the crash dump names the build and the config dir", func
 
 	it("a resolver failure is written as its reason and the dump survives", function()
 		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
-			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			with_module("infra.diagnostic_snapshot", {
+			local Reporter = helpers.load_module("diagnostics.engine.reports.crash_reporter")
+			with_module("diagnostics.engine.reports.snapshot", {
 				resolve_commit = function() error("stamp read exploded") end,
 			}, function()
 				local ok, err = pcall(Reporter.dump, "engine", "boom")

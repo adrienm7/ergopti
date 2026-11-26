@@ -24,7 +24,7 @@ local OWNERS = {
 	"core.text.engine.number_policy",
 	-- The real notifications owner focuses the clicked application through this adapter.
 	"platform.focus.running_application",
-	"settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
+	"settings.engine.program_parameter", "shortcuts.engine.actions.user_action_parameter",
 	"shortcuts.engine.actions.assignable",
 	-- The chord and sticky labels name their keys through the key name table,
 	-- which loads with its data.
@@ -49,17 +49,17 @@ local OWNERS = {
 	"core.text.engine.identifiers",
 	"_generated.gesture_emit_actions",
 	"core.fs.adapters.file_system",
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"platform.input.hotkey_registrar",
 	"core.fs.adapters.json_codec",
 	"platform.input.key_state",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"keyboard.engine.desktop_navigation",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"core.lifecycle.engine.startup_transaction",
@@ -78,20 +78,20 @@ local OWNERS = {
 	"ai.engine.prediction.vision",
 	-- The shared vision request reads the API dialects from this pure owner.
 	"ai.engine.api.remote_formats",
-	"modules.gestures",
-	"modules.gestures.actions",
-	"modules.gestures.native_app_switcher_action",
-	"modules.gestures.native_app_switcher",
+	"gestures.engine",
+	"gestures.engine.actions",
+	"gestures.adapters.native_app_switcher_action",
+	"gestures.adapters.native_app_switcher",
 	"adapters.system_switcher_input",
 	"adapters.system_switcher_sampler",
 	"adapters.system_switcher_runtime",
 
-	"modules.gestures.actions_aux_owner",
-	"modules.gestures.actions_click",
-	"modules.gestures.conflicts",
-	"modules.gestures.engine",
-	"infra.gesture_frame_evidence",
-	"modules.gestures.sticky_modifiers",
+	"gestures.engine.actions_aux_owner",
+	"gestures.engine.actions_click",
+	"gestures.engine.conflicts",
+	"gestures.engine.engine",
+	"gestures.engine.frame_evidence",
+	"gestures.engine.sticky_modifiers",
 	-- The engine bounds incremental tab steps through the sensitivity owner.
 	"gestures.engine.sensitivity",
 	-- The sensitivity owner checks a step against the shared value schema.
@@ -105,6 +105,8 @@ local OWNERS = {
 	"modules.shortcuts.actions.text",
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
+	-- The Shortcuts entry loads the layer wheel's own lifecycle owner at require time.
+	"modules.shortcuts.layer_wheel",
 	"modules.shortcuts.script_control",
 	"platform.input.send_input",
 	"core.text.engine.utils_core",
@@ -127,31 +129,31 @@ local OWNERS = {
 local function fresh_actions(options)
 	local controls = options or {}
 	for _, name in ipairs({
-		"modules.gestures.actions",
-	"modules.gestures.native_app_switcher_action",
-	"modules.gestures.native_app_switcher",
+		"gestures.engine.actions",
+	"gestures.adapters.native_app_switcher_action",
+	"gestures.adapters.native_app_switcher",
 	"adapters.system_switcher_input",
 	"adapters.system_switcher_sampler",
 	"adapters.system_switcher_runtime",
 
 		"core.ui.engine.notifications",
 		"core.events.timer_scheduler",
-		"modules.gestures.actions_aux_owner",
-		"modules.gestures.actions_click",
-		"modules.gestures.sticky_modifiers",
+		"gestures.engine.actions_aux_owner",
+		"gestures.engine.actions_click",
+		"gestures.engine.sticky_modifiers",
 		"modules.shortcuts.actions.screenshot_save",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.system_mouse",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system_pixel",
 		"core.fs.adapters.file_system",
-		"adapters.clipboard",
+		"clipboard.adapters.clipboard",
 		"platform.input.key_state",
 		"platform.input.synthetic_input",
 		"core.lifecycle.engine.shutdown.termination_coordinator",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
-		"infra.config_paths",
+		"settings.engine.paths",
 		"core.timing.engine.timings",
 		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
@@ -258,7 +260,7 @@ local function fresh_actions(options)
 		}
 		return true, token
 	end
-	package.loaded["modules.gestures.actions_aux_owner"] = {
+	package.loaded["gestures.engine.actions_aux_owner"] = {
 		after = function(delay, label, callback, parent)
 			local prepared, token = prepare_after(delay, label, callback, parent)
 			if prepared ~= true then return prepared end
@@ -576,7 +578,7 @@ local function fresh_actions(options)
 		{ "open_downloads", "open_finder", "open_settings", "copy_or_open_path" })
 	package.loaded["modules.shortcuts.actions.system_pixel"] = scoped_owner("pixel",
 		{ "copy_pixel_color" })
-	package.loaded["modules.gestures.actions_click"] = setmetatable({
+	package.loaded["gestures.engine.actions_click"] = setmetatable({
 		force_cleanup = function(parent)
 			calls.click_force_parents[#calls.click_force_parents + 1] = parent
 			return true
@@ -593,7 +595,7 @@ local function fresh_actions(options)
 			return accepted
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.sticky_modifiers"] = setmetatable({
+	package.loaded["gestures.engine.sticky_modifiers"] = setmetatable({
 		clear = function(parent)
 			calls.sticky_clear_parents[#calls.sticky_clear_parents + 1] = parent
 			return true
@@ -731,7 +733,7 @@ local function fresh_actions(options)
 		PersonalShortcutsLuaPath = "personal_shortcuts.lua",
 		PersonalTomlPath = "hotstrings/personal_hotstrings.toml",
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key) return config_files[key] and ("/fixture/config/" .. config_files[key]) or nil end,
 	}
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
@@ -757,7 +759,7 @@ local function fresh_actions(options)
 			return controlled_result(controls.window_action_mode, "window maximize exploded")
 		end,
 	}
-	actions = helpers.load_with_stubs("modules.gestures.actions", {
+	actions = helpers.load_with_stubs("gestures.engine.actions", {
 		configdir = "/tmp/ergopti",
 		reload = function() calls.reload = calls.reload + 1; return true end,
 		mouse = {
@@ -925,10 +927,10 @@ local function with_feature_lifecycles(actions, calls, body)
 		"modules.shortcuts.keyboard_shortcuts",
 		"platform.input.hotkey_registrar",
 		"core.lifecycle.engine.startup_transaction",
-		"modules.gestures",
-		"modules.gestures.engine",
-		"modules.gestures.conflicts",
-		"infra.manifest_reader",
+		"gestures.engine",
+		"gestures.engine.engine",
+		"gestures.engine.conflicts",
+		"menu.engine.manifest_reader",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -980,23 +982,23 @@ local function with_feature_lifecycles(actions, calls, body)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = setmetatable({
+	package.loaded["gestures.engine.engine"] = setmetatable({
 		init = function() return true end,
 		cancel_current_gesture = function()
 			feature.cancel_calls = feature.cancel_calls + 1
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
-	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
+	package.loaded["gestures.engine.conflicts"] = setmetatable({}, {
 		__index = function() return function() return true end end,
 	})
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return true end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["modules.gestures.actions"] = actions
+	package.loaded["gestures.engine.actions"] = actions
 	package.loaded["modules.shortcuts"] = nil
-	package.loaded["modules.gestures"] = nil
+	package.loaded["gestures.engine"] = nil
 
 	feature.keyboard_execute = function(action)
 		if feature.keyboard_started ~= true then return false end
@@ -1008,10 +1010,10 @@ local function with_feature_lifecycles(actions, calls, body)
 	end
 
 	local ok, err = xpcall(function()
-		body(require("modules.shortcuts"), require("modules.gestures"), feature)
+		body(require("modules.shortcuts"), require("gestures.engine"), feature)
 	end, debug.traceback)
 	for _, name in ipairs(module_names) do package.loaded[name] = saved[name] end
-	package.loaded["modules.gestures.actions"] = actions
+	package.loaded["gestures.engine.actions"] = actions
 	if not ok then error(err, 0) end
 end
 

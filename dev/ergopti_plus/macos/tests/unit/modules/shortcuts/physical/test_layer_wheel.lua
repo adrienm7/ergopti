@@ -42,7 +42,7 @@ local function make_ctx(slots)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local hs  = _G.hs
@@ -102,7 +102,7 @@ end
 --- @param name string "F20_LAYER_NAV_ENTERED" or "F19_LAYER_NAV_EXITED".
 local function sentinel(name)
 	local keycode = require("platform.input.keycodes")[name]
-	helpers.assert_true(require("modules.keymap.control_sentinels").claim_key(keycode, true, {}),
+	helpers.assert_true(require("hotstrings.engine.expander.control_sentinels").claim_key(keycode, true, {}),
 		name .. " must be a claimed control sentinel")
 end
 
@@ -221,7 +221,7 @@ helpers.describe("shortcuts.bind_layer_wheel: the layer's sentinels arm the whee
 
 	helpers.it("drops its layer listener when deleted", function()
 		local ctx = make_ctx()
-		local Sentinels = require("modules.keymap.control_sentinels")
+		local Sentinels = require("hotstrings.engine.expander.control_sentinels")
 		local real_set_listener = Sentinels.set_listener
 		local dropped = {}
 		Sentinels.set_listener = function(name, callback)

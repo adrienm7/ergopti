@@ -389,12 +389,13 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 		helpers.assert_eq(action, "none", "the neutral manifest default keeps native input")
 		helpers.assert_eq(consumed, false, "a neutral default must never consume the native Super+Space chord")
 		helpers.assert_eq(queued, 0, "no inert action may be queued behind the native key")
-		helpers.assert_eq(#super_slots, 0)
+		-- The ★ key's slot is the one Super slot with a default (2026-11-21).
+		helpers.assert_eq(super_slots, { "meta_star" })
 	end)
 
 	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
-		local previous_engine = package.loaded["modules.llm.prediction_engine"]
-		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return true end }
+		local previous_engine = package.loaded["ai.engine.prediction.engine"]
+		package.loaded["ai.engine.prediction.engine"] = { is_enabled = function() return true end }
 		local ok, detail = xpcall(function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
 			local action = shortcuts.get_action("meta_space")
@@ -402,12 +403,12 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 			local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
 			helpers.assert_eq(action, "llm_generate_prediction",
 				"an explicit saved action remains effective")
-			helpers.assert_eq(#super_slots, 1)
+			helpers.assert_eq(super_slots, { "meta_space", "meta_star" })
 			helpers.assert_eq(fired, true)
 			helpers.assert_eq(slot, "meta_space")
 		end, debug.traceback)
 		drop_config()
-		package.loaded["modules.llm.prediction_engine"] = previous_engine
+		package.loaded["ai.engine.prediction.engine"] = previous_engine
 		if not ok then error(detail, 0) end
 	end)
 
@@ -478,7 +479,7 @@ helpers.describe("Keyboard configuration admission", function()
 	for _, scenario in ipairs({ "ordinary rebind", "owned dispatch", "released generation", "new generation" }) do
 		helpers.it("keeps " .. scenario .. " bounded by the actual dispatcher", function()
 			local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures = require("modules.gestures.manager")
+			local gestures = require("gestures.engine.manager")
 			local execute = gestures.execute_action
 			local queue, fired = {}, {}
 			gestures.execute_action = function(action) fired[#fired + 1] = action end
@@ -533,21 +534,23 @@ end)
 
 
 
-helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", function()
+helpers.describe("keyboard shortcuts: the ★ key's ordinary slot", function()
 	local function with_editor(initial, body, writes_fail)
-		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
-		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
-		local saved_builder = package.loaded["ui.menu.builder"]
-		local gestures = require("modules.gestures.manager")
+		local saved_source = package.loaded["modules.shortcuts.star_key_source"]
+		local saved_magic = package.loaded["hotstrings.engine.magic_key"]
+		local saved_builder = package.loaded["menu.ui.builder.builder"]
+		local gestures = require("gestures.engine.manager")
 		local saved_execute = gestures.execute_action
 		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
 			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
 			queue = {}, fired = {} }
-		package.loaded["modules.hotstrings.magic_key_source"] = {
-			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
+		package.loaded["modules.shortcuts.star_key_source"] = {
+			source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
 			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
 		}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end,
+			default = function() return "★" end, marker = function() return "★" end,
+			display = function(char) return char or "★" end, display_text = function(text) return text end }
 		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
 		local ok, err = pcall(function()
 			local shortcuts, config = load_over_config(initial, writes_fail)
@@ -559,47 +562,52 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 			body(shortcuts, config, state)
 		end)
 		gestures.execute_action = saved_execute
-		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
-		package.loaded["modules.hotstrings.magic_key"] = saved_magic
-		package.loaded["ui.menu.builder"] = saved_builder
+		package.loaded["modules.shortcuts.star_key_source"] = saved_source
+		package.loaded["hotstrings.engine.magic_key"] = saved_magic
+		package.loaded["menu.ui.builder.builder"] = saved_builder
 		drop_config()
 		if not ok then error(err, 0) end
 	end
 
-	helpers.it("(magic-editor-broker) routes the manifest default through the ordinary executor and stable editable slot", function()
+	helpers.it("(star-slot-broker) routes the manifest default through the ordinary executor and stable editable slot", function()
 		with_editor(nil, function(shortcuts, config, state)
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "open_hotstrings_editor")
-			helpers.assert_eq(shortcuts.available_slots("contextual"), { "magic_editor" })
-			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" })
-			helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + ★")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "open_hotstrings_editor")
+			local offered = shortcuts.available_slots("meta_")
+			helpers.assert_eq(offered[#offered], "meta_star", "a row of the Super group, after its catalogue keys")
+			helpers.assert_eq(shortcuts.assigned_slots("meta_"), { "meta_star" })
+			helpers.assert_eq(shortcuts.available_slots("primary_")[1] ~= "meta_star", true)
+			helpers.assert_eq(shortcuts.get_slot_label("meta_star"), "Super + ★")
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			helpers.assert_eq(#state.fired, 0, "native capture queues ordinary actions outside the hook")
 			state.queue[1]()
-			helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__magic_editor" } })
+			helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__meta_star" } })
 			helpers.assert_eq(#config.keys(), 0, "a conditional default never seeds personal assignments")
-			helpers.assert_true(shortcuts.set_action("magic_editor", "none"))
-			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "none", "clearing a default remains explicit across restart")
+			helpers.assert_true(shortcuts.set_action("meta_star", "none"))
+			helpers.assert_eq(config.get("shortcuts.keyboard.meta_star"), "none", "clearing a default remains explicit across restart")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "none")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "none")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
-			helpers.assert_eq(shortcuts.assigned_slots("contextual"), { "magic_editor" }, "a cleared conditional slot remains editable")
-			helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+			helpers.assert_eq(shortcuts.available_slots("meta_")[#shortcuts.available_slots("meta_")], "meta_star",
+				"a cleared conditional slot remains editable")
+			helpers.assert_true(shortcuts.set_action("meta_star", "enter"))
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			state.queue[2]()
-			helpers.assert_eq(state.fired[2], { "enter", "keyboard__magic_editor" }, "reassignment uses the same ordinary action catalogue")
+			helpers.assert_eq(state.fired[2], { "enter", "keyboard__meta_star" }, "reassignment uses the same ordinary action catalogue")
 		end)
 	end)
 
 
-	helpers.it("(magic-editor-broker) exposes the ordinary contextual action and durable clearing in the tray", function()
+	helpers.it("(star-slot-broker) exposes the ordinary contextual action and durable clearing in the tray", function()
 		with_editor(nil, function(shortcuts, config, state)
 			local changed = 0
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local i18n = require("core.i18n.engine.i18n")
-			local function contextual(items)
+			local label = "Super + ★ → "
+			local function star_row(items)
 				for _, row in ipairs(items or {}) do
-					if row.title == i18n.get("menu.shortcuts.group_contextual") then return row end
-					local found = contextual(row.menu)
+					-- A cleared slot names its reason after « Super + ★ ».
+					if type(row.title) == "string" and row.title:sub(1, #"Super + ★") == "Super + ★" then return row end
+					local found = star_row(row.menu)
 					if found then return found end
 				end
 			end
@@ -610,44 +618,43 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 					{ __index = require("modules.shortcuts.manager") }), on_quit = function() end,
 					on_menu_changed = function() changed = changed + 1 end })
 			end
-			local group = contextual(build())
-			helpers.assert_type(group, "table", "the stable logical slot must be visible through the ordinary menu provider")
-			helpers.assert_eq(#group.menu, 1)
-			helpers.assert_eq(group.menu[1].title, "Super + ★ → " .. require("modules.gestures.manager").get_action_label("open_hotstrings_editor"))
-			helpers.assert_type(group.menu[1].menu[1].fn, "function", "the ordinary action picker offers reassignment")
-			helpers.assert_eq(group.menu[1].menu[2].title, i18n.get("dialog.action_picker.disabled"))
-			group.menu[1].menu[2].fn()
-			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "none")
+			local row = star_row(build())
+			helpers.assert_type(row, "table", "the slot is a row of the Super group through the ordinary menu provider")
+			helpers.assert_eq(row.title, label .. require("gestures.engine.manager").get_action_label("open_hotstrings_editor"))
+			helpers.assert_type(row.menu[1].fn, "function", "the ordinary action picker offers reassignment")
+			helpers.assert_eq(row.menu[2].title, i18n.get("dialog.action_picker.disabled"))
+			row.menu[2].fn()
+			helpers.assert_eq(config.get("shortcuts.keyboard.meta_star"), "none")
 			helpers.assert_eq(changed, 1, "a committed removal rebuilds the menu")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
-			local cleared = contextual(build())
-			helpers.assert_eq(#cleared.menu, 1, "clearing retains the editable stable slot")
-			helpers.assert_type(cleared.menu[1].menu[1].fn, "function")
+			local cleared = star_row(build())
+			helpers.assert_type(cleared, "table", "clearing retains the editable slot")
+			helpers.assert_type(cleared.menu[1].fn, "function")
 		end)
 	end)
 
-	helpers.it("(magic-editor-broker) follows ★ to ù and semicolon by physical proof on arbitrary layouts", function()
+	helpers.it("(star-slot-broker) follows the real ★ by physical proof, never the configured magic key", function()
 		with_editor(nil, function(shortcuts, config, state)
-			local scenarios = {
-				{ text = "★", code = "KeyJ", native = 36 },
-				{ text = "ù", code = "Quote", native = 40 },
-				{ text = ";", code = "Semicolon", native = 39 },
-			}
-			for index, scenario in ipairs(scenarios) do
+			-- A magic key configured as ù or ; moves nothing: only a key typing ★ is the slot's.
+			for index, scenario in ipairs({ { text = "ù", code = "Quote", native = 40 }, { text = ";", code = "Semicolon", native = 39 } }) do
 				state.trigger, state.generation = scenario.text, index
 				state.rows = { { code = scenario.code, native_code = scenario.native, identity = "evdev:" .. scenario.native,
 					text = scenario.text, native_text = scenario.text, direct = true, dead = false } }
 				local detail = { key = "deliberately unrelated", code = scenario.native, physical = true, mods = { meta = true } }
-				helpers.assert_true(shortcuts.consume(detail, state.options), "matching is physical and does not guess from a symbolic key")
-				state.queue[index]()
-				helpers.assert_eq(shortcuts.get_slot_label("magic_editor"), "Super + " .. scenario.text)
+				helpers.assert_eq(shortcuts.consume(detail, state.options), false, "no key types ★ on this layout")
 			end
-			helpers.assert_eq(#state.fired, 3)
+			state.generation = 3
+			state.rows = { { code = "Semicolon", native_code = 39, identity = "evdev:39", text = "★", native_text = "★", direct = true, dead = false } }
+			local detail = { key = "deliberately unrelated", code = 39, physical = true, mods = { meta = true } }
+			helpers.assert_true(shortcuts.consume(detail, state.options), "matching is physical and does not guess from a symbolic key")
+			state.queue[1]()
+			helpers.assert_eq(shortcuts.get_slot_label("meta_star"), "Super + ★")
+			helpers.assert_eq(#state.fired, 1)
 			helpers.assert_eq(#config.keys(), 0, "following the effective source does not overwrite personal settings")
 		end)
 	end)
 
-	helpers.it("(magic-editor-broker) leaves modified, remapped, dead, ambiguous and unproved input native", function()
+	helpers.it("(star-slot-broker) leaves modified, remapped, dead, ambiguous and unproved input native", function()
 		with_editor(nil, function(shortcuts, _, state)
 			for _, modifier in ipairs({ "ctrl", "shift", "alt", "altgr" }) do
 				local detail = { key = "j", code = 36, physical = true, mods = { meta = true, [modifier] = true } }
@@ -672,21 +679,21 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		end)
 	end)
 
-	helpers.it("(magic-editor-broker) preserves newly selected physical None across restart", function()
+	helpers.it("(star-slot-broker) preserves newly selected physical None across restart", function()
 		with_editor(nil, function(shortcuts, config, state)
 			helpers.assert_true(shortcuts.set_action("meta_j", "none"))
 			helpers.assert_eq(config.get("shortcuts.keyboard.meta_j"), "none")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+			helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
 			helpers.assert_eq(#state.queue, 0, "personal native intent never silently invokes the recommendation")
 		end)
 	end)
 
 	for _, action in ipairs({ "select_line", "none" }) do
-		helpers.it("(magic-editor-broker) preserves explicit personal physical claims including " .. action, function()
+		helpers.it("(star-slot-broker) preserves explicit personal physical claims including " .. action, function()
 			with_editor({ ["shortcuts.keyboard.meta_j"] = action }, function(shortcuts, config, state)
-				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
+				helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment")
 				local consumed = shortcuts.consume(state.detail, state.options)
 				helpers.assert_eq(consumed, action ~= "none")
 				if consumed then
@@ -701,21 +708,21 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 				helpers.assert_true(shortcuts.apply_configuration(token, shortcuts.configuration_candidate({}, true)))
 				helpers.assert_true(shortcuts.apply_configuration(token, snapshot))
 				helpers.assert_true(shortcuts.release_configuration(token))
-				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment",
+				helpers.assert_eq(shortcuts.star_slot_decision(state.options.admission()).reason, "explicit_assignment",
 					"compensation restores provenance, including a personal none absent from live assignments")
 			end)
 		end)
 	end
 
 	for _, gate in ipairs({ "master", "paused", "inhibited", "source", "rebind", "owner" }) do
-		helpers.it("(magic-editor-broker) cancels queued delivery when live " .. gate .. " changes", function()
+		helpers.it("(star-slot-broker) cancels queued delivery when live " .. gate .. " changes", function()
 			with_editor(nil, function(shortcuts, _, state)
 				helpers.assert_true(shortcuts.consume(state.detail, state.options))
 				if gate == "master" then state.master = false
 				elseif gate == "paused" then state.paused = true
 				elseif gate == "inhibited" then state.inhibited = true
 				elseif gate == "source" then state.generation = 2
-				elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+				elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("meta_star", "enter"))
 				else
 					local token = {}
 					helpers.assert_true(shortcuts.acquire_configuration(token))
@@ -730,15 +737,15 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		end)
 	end
 
-	helpers.it("(magic-editor-broker) retains the acknowledged action and provenance after persistence refusal", function()
-		with_editor({ ["shortcuts.keyboard.magic_editor"] = "enter" }, function(shortcuts, config, state)
-			helpers.assert_eq(shortcuts.set_action("magic_editor", "none"), false)
-			helpers.assert_eq(shortcuts.set_action("magic_editor", "select_line"), false)
-			helpers.assert_eq(config.get("shortcuts.keyboard.magic_editor"), "enter")
-			helpers.assert_eq(shortcuts.get_action("magic_editor"), "enter")
+	helpers.it("(star-slot-broker) retains the acknowledged action and provenance after persistence refusal", function()
+		with_editor({ ["shortcuts.keyboard.meta_star"] = "enter" }, function(shortcuts, config, state)
+			helpers.assert_eq(shortcuts.set_action("meta_star", "none"), false)
+			helpers.assert_eq(shortcuts.set_action("meta_star", "select_line"), false)
+			helpers.assert_eq(config.get("shortcuts.keyboard.meta_star"), "enter")
+			helpers.assert_eq(shortcuts.get_action("meta_star"), "enter")
 			helpers.assert_true(shortcuts.consume(state.detail, state.options))
 			state.queue[1]()
-			helpers.assert_eq(state.fired, { { "enter", "keyboard__magic_editor" } })
+			helpers.assert_eq(state.fired, { { "enter", "keyboard__meta_star" } })
 		end, true)
 	end)
 end)
@@ -758,7 +765,7 @@ for _, case in ipairs({
 		invoke = function(owner) return owner.available_slots("ctrl_") end, empty = true },
 	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "layouts/data/keycodes/physical_keys.json",
 		invoke = function(owner) return owner.physical_slot_descriptor("physical_ctrl_KeyA") end },
-	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "shortcuts/data/actions/send_keys.json",
+	{ name = "hotstring keys", module = "hotstrings.engine.output_tokens", path = "shortcuts/data/actions/send_keys.json",
 		invoke = function(owner) return owner.parse("{Enter}") end },
 }) do
 	helpers.it("shortcut catalogue refuses FIFO: " .. case.name, function()
@@ -792,7 +799,7 @@ helpers.describe('keyboard shortcut after a pause cycle', function()
   for _, action in ipairs({'select_line', 'script_reload'}) do
     helpers.it('respects pause generation for '..action, function()
       local shortcuts = load_over_config({['shortcuts.keyboard.primary_j']=action})
-      local gestures = require('modules.gestures.manager')
+      local gestures = require('gestures.engine.manager')
       local original = gestures.execute_action
       local queue, fired = {}, {}
       gestures.execute_action = function(value) fired[#fired+1]=value end

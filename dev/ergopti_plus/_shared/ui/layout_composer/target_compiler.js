@@ -219,7 +219,7 @@ var LayoutTargetCompiler = (function () {
 	 * the modifier and key that hold it.
 	 * @param {object} source - A validated structured source.
 	 * @param {object} tables - {macKeycodes, physicalKeys, hidUsages}.
-	 * @returns {{tokens: object, bits: object[], refused: Map<string, string>, omitted: object[]}}
+	 * @returns {{tokens: object, bits: object[], refused: Map<string, string>, omitted: object[], shortcutKeys: object[]}}
 	 */
 	function klcPlan(source, tables) {
 		const tokens = baseTokens(source);
@@ -281,7 +281,12 @@ var LayoutTargetCompiler = (function () {
 			}
 			take(id, bit, key);
 		}
-		return { tokens, bits, refused, omitted };
+		// Each key's shortcut_key: the KLC generator gives the key the virtual key of
+		// the key it names (tools/lib/kbd-dll/shortcut-keys.cjs).
+		const shortcutKeys = Object.entries(source.keys || {})
+			.filter(([, fields]) => own(fields, 'shortcut_key'))
+			.map(([key, fields]) => ({ key, shortcut_key: fields.shortcut_key }));
+		return { tokens, bits, refused, omitted, shortcutKeys };
 	}
 
 	// =============================
@@ -301,7 +306,10 @@ var LayoutTargetCompiler = (function () {
 			plan: (source, tables) => klcPlan(source, tables),
 			format: 'klc',
 			taken: 'klc_modifier_bits_taken',
-			report: (plan) => ({ modifier_bits: plan.bits.map((bit) => Object.assign({}, bit)) })
+			report: (plan) => ({
+				modifier_bits: plan.bits.map((bit) => Object.assign({}, bit)),
+				shortcut_keys: plan.shortcutKeys.map((pair) => Object.assign({}, pair))
+			})
 		}
 	});
 

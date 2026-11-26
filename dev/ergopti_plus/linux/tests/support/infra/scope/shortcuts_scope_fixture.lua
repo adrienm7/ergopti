@@ -31,7 +31,7 @@ local Writer = require("core.text.engine.toml_codec.writer")
 
 local Codec = require("core.text.engine.toml_codec")
 
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
 	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nprimary_p = "script_reload"\nforeign_slot = "keep"\n'
@@ -51,12 +51,12 @@ local function with_scope(body, source, options)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.builder" }) do
+				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "gestures.engine.manager",
+				"infra.shortcuts_scope", "menu.ui.builder.builder" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
@@ -65,13 +65,17 @@ local function with_scope(body, source, options)
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
 			}
-			local gestures = require("modules.gestures.manager")
+			-- The tap-hold owner starts the host's Wayland copy watcher (wl-paste)
+			-- in a Wayland session: the scope under test owns no host process.
+			package.loaded["clipboard.adapters.wayland_selection_counter"] = { start = function() return false end,
+				stop = function() end, read = function() return nil, "unsupported" end }
+			local gestures = require("gestures.engine.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
 			gestures.execute_action = function(action, binding)
 				controls.executed[#controls.executed + 1] = action .. "@" .. binding
@@ -157,7 +161,7 @@ local CHORD_PARAMETER = "script__script_altgr_enter__open_url"
 local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
-			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+			"modules.shortcuts.star_key_source", "hotstrings.engine.matcher.preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook, navigation_dir, navigation_made
 		local ok, why = pcall(function()
@@ -252,58 +256,9 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 	end, source)
 end
 
-local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmeta_star = "none"\n'
 
 local NO_TAP_HOLDS = '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
-
-local magic_collision_file_read = require("core.fs.adapters.file_system").read
-
---- Uses the real replacement owner and its actual cached preference document.
-local function with_magic_source(scope, owners, controls, path, state, body)
-	local names = { "modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
-	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	local Source, choices, typed = nil, {}, {}
-	local prior_read = controls.files.read
-	controls.files.read = magic_collision_file_read
-	local ok, why = pcall(function()
-		local Preferences = require("infra.hotstring_preferences")
-		helpers.assert_true(Preferences._set_file_for_test(path))
-		Source = require("modules.hotstrings.magic_key_source")
-		Source.init({
-			is_active = function() return state.active ~= false end,
-			replace_on = function() return state.replace ~= false end,
-			magic_key = function() return "★" end,
-			can_type = function() return state.typable ~= false end,
-			type_text = function(text) typed[#typed + 1] = text; return true end,
-			dispatch_char = function() error("preflight cannot dispatch a character") end,
-			end_selection = function() error("preflight cannot change a selection") end,
-			can_capture = function() return true end, key_text = function() return "j" end,
-			defer = function(callback, delay) choices[#choices + 1] = { callback = callback, delay = delay }; return true end,
-		})
-		body(scope, owners, controls, path, Source, Preferences, choices)
-		helpers.assert_eq(typed, {}, "claim capture and preflight never type output")
-	end)
-	if Source then Source._reset_for_test() end
-	controls.files.read = prior_read
-	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	if not ok then error(why, 0) end
-end
-
---- Refusal scenarios retain their exact no-native-ownership-change guard.
-local function with_magic_collision_scope(source, state, body)
-	with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
-		with_magic_source(scope, owners, controls, path, state, body)
-	end)
-end
-
---- None/removal use the original full publisher without readiness or map grants.
-local function with_magic_publication_scope(source, body)
-	with_scope(function(scope, owners, controls, path)
-		with_magic_source(scope, owners, controls, path, {}, body)
-	end, source)
-end
-
-local MAGIC_COLLISION_SOURCE = COLLISION_BASE .. '[hotstrings]\nmagic_key_source = "KeyJ"\n'
 
 --- Uses the same actual file/runtime intake, with no UI/provider/service actors.
 local function with_prediction_preflight(source, body)
@@ -311,9 +266,9 @@ local function with_prediction_preflight(source, body)
 		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 		local ok, failure = pcall(function()
 			for name in pairs(package.loaded) do
-				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+				if helpers.in_module_family(name, "modules.llm", true) or name == "ai.engine.preferences" then package.loaded[name] = nil end
 			end
-			local prediction = require("modules.llm.prediction_engine")
+			local prediction = require("ai.engine.prediction.engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler(), overlay = {
 				show = function() return true end,
 				move = function() return true end,
@@ -344,10 +299,5 @@ return {
 	with_collision_scope = with_collision_scope,
 	COLLISION_BASE = COLLISION_BASE,
 	NO_TAP_HOLDS = NO_TAP_HOLDS,
-	magic_collision_file_read = magic_collision_file_read,
-	with_magic_source = with_magic_source,
-	with_magic_collision_scope = with_magic_collision_scope,
-	with_magic_publication_scope = with_magic_publication_scope,
-	MAGIC_COLLISION_SOURCE = MAGIC_COLLISION_SOURCE,
 	with_prediction_preflight = with_prediction_preflight,
 }

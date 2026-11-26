@@ -8,9 +8,12 @@
 ; A separate native process observes the actual global clipboard lock. It only
 ; reads formats, never replaces clipboard data or runs any parent test source.
 
-; Clipboard history opens the lock right after every change, and this process
-; cannot use CB_OpenClipboardWithin; a leaked hold still outlasts this wait.
-global CALO_READER_WAIT_MS := 5000
+; This process does not load the test framework, so the parent passes its
+; TEST_NATIVE_SETTLE_TIMEOUT_MS as the fourth argument. It bounds the parent
+; handshakes and the reader wait: clipboard history opens the lock right after
+; every change and this process cannot use CB_OpenClipboardWithin, while a
+; leaked hold never ends and still fails the probe.
+global TEST_NATIVE_SETTLE_TIMEOUT_MS := 0
 
 _CALO_Require(Condition, Message) {
 	if !Condition
@@ -18,8 +21,9 @@ _CALO_Require(Condition, Message) {
 }
 
 _CALO_Wait(Path) {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Started := A_TickCount
-	while !FileExist(Path) && A_TickCount - Started < 15000
+	while !FileExist(Path) && A_TickCount - Started < TEST_NATIVE_SETTLE_TIMEOUT_MS
 		Sleep(10)
 	_CALO_Require(FileExist(Path) != "", "the parent did not publish its owned handshake")
 }
@@ -42,20 +46,24 @@ _CALO_HolderPid() {
 ; Opens the global lock past a passing reader, giving up at once when StopPid
 ; holds it. Returns 0 once open, else the holder's PID, or -1 for an unnamed one.
 _CALO_Open(StopPid := 0) {
-	global CALO_READER_WAIT_MS
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Started := A_TickCount
 	loop {
 		if DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int")
 			return 0
 		HolderPid := _CALO_HolderPid()
-		if (StopPid && HolderPid == StopPid) || A_TickCount - Started >= CALO_READER_WAIT_MS
+		if (StopPid && HolderPid == StopPid) || A_TickCount - Started >= TEST_NATIVE_SETTLE_TIMEOUT_MS
 			return HolderPid ? HolderPid : -1
 		Sleep(10)
 	}
 }
 
 _CALO_Main() {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
+	_CALO_Require(A_Args.Length == 4, "a root, a format, the parent PID and the settle bound are required")
 	Root := A_Args[1], CustomFormat := Integer(A_Args[2]), ParentPid := Integer(A_Args[3])
+	TEST_NATIVE_SETTLE_TIMEOUT_MS := Integer(A_Args[4])
+	_CALO_Require(TEST_NATIVE_SETTLE_TIMEOUT_MS > 0, "the parent must pass its positive settle bound")
 	_CALO_Publish(Root . "\ready", "ready")
 	_CALO_Wait(Root . "\before.request")
 	HolderPid := _CALO_Open(ParentPid)

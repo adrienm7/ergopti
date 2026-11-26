@@ -227,22 +227,48 @@ french_magickey = "FrenchMagicKey"
 # maintainer's order of 2026-10-01). A separator is drawn only between two
 # rows a platform shows.
 #
-# `greyed_when_paused` marks feature rows. Only the AHK tray still greys them
-# under Suspend: a pause stops typing, not configuration (EDD-1, maintainer
-# decision 2026-11-12), so the macOS and Linux trays keep them live, and the
-# Windows agent deletes the key together with its A_IsSuspended gates. The
-# Windows Layout row already stays live while paused, the rows that wait for
-# the resume greyed with why (menu_init.ahk _LAY_GreyPausedRows); the key still
-# keeps it out of the boot shell.
+# `boot_deferred` marks the feature rows the Windows boot shell leaves out: its
+# first root carries only the global rows, published before the features are
+# ready, and the full root adds the marked ones. No tray greys a row under a
+# pause (EDD-1, maintainer decision 2026-11-12): the rows that wait for the
+# resume are greyed inside their submenu, with why. It was named
+# `greyed_when_paused` until 2026-11-15.
+# The keyboard core's status row (maintainer, 2026-11-25), Windows only: drawn
+# first, with the health_dot "unreachable" glyph of the llm entry before its
+# label, only while the native owner of the press ledger (ergopti_nav_owner.dll)
+# could not start; a click explains what is degraded and what to do. A log
+# warning was the only trace before. Its builder stages nothing while the core
+# runs, and then the separator below is not drawn either. macOS shows the same
+# glyph on its Tap-Holds title (ui/menu/tap_holds_status.lua), and Linux draws
+# its problem rows in its tray adapter (core/ui/engine/component_status.lua).
+[[menu.top_level]]
+type = "command"
+id = "keyboard_core_status"
+i18n = "menu.keyboard_core.degraded"
+platforms = ["ahk"]
+unavailable = "hide"
+boot_deferred = true
+
+# The separator that closes the status row's group belongs to it, so it carries
+# the same restriction and the same reason.
+[[menu.top_level]]
+id = "---"
+platforms = ["ahk"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
+# On macOS the title carries the llm entry's health_dot glyphs for the state of
+# the Karabiner runtime the tap-holds depend on (maintainer, 2026-11-23).
+# Windows and Linux draw none: their tap-holds run inside the driver's own
+# process, which has no separate runtime that can wait, fail or be missing.
 [[menu.top_level]]
 type = "group"
 id = "tap_holds"
 i18n = "menu.tapholds.title"
 rows = []
 checked_when = ["tapholds_enabled"]
-greyed_when_paused = true
+boot_deferred = true
 
 [[menu.top_level]]
 type = "group"
@@ -250,7 +276,7 @@ id = "shortcuts"
 i18n = "menu.shortcuts.title"
 rows = []
 checked_when = ["shortcuts_enabled"]
-greyed_when_paused = true
+boot_deferred = true
 
 [[menu.top_level]]
 type = "group"
@@ -258,10 +284,21 @@ id = "gestures"
 i18n = "menu.gestures.title"
 rows = []
 checked_when = ["gestures_enabled"]
-greyed_when_paused = true
+boot_deferred = true
 
 [[menu.top_level]]
 id = "---"
+
+# Ergopti Studio, the layout editor, as a top-level entry beside the layout and
+# tap-hold groups (maintainer request, 2026-11-14), right before the layout
+# group since 2026-11-19 (maintainer request: « intervertir Studio et le menu
+# Disposition clavier »): it opens the layout editor window, where the user
+# creates or edits a layout, analyses it and installs it on the machine.
+[[menu.top_level]]
+type = "command"
+id = "ergopti_studio"
+i18n = "menu.studio.title"
+boot_deferred = true
 
 [[menu.top_level]]
 type = "group"
@@ -269,17 +306,7 @@ id = "keyboard_layout"
 i18n = "menu.layout.title"
 rows = []
 checked_when = ["layout_enabled"]
-greyed_when_paused = true
-
-# Ergopti Studio, the layout editor, as a top-level entry beside the layout and
-# tap-hold groups (maintainer request, 2026-11-14): it opens the same layout
-# editor window as the layout submenu's « Create or edit a layout… » row, where
-# the user edits a layout, analyses it and installs it on the machine.
-[[menu.top_level]]
-type = "command"
-id = "ergopti_studio"
-i18n = "menu.studio.title"
-greyed_when_paused = true
+boot_deferred = true
 
 [[menu.top_level]]
 type = "group"
@@ -287,7 +314,7 @@ id = "hotstrings"
 i18n = "menu.hotstrings.title"
 rows = []
 checked_when = ["hotstrings_enabled"]
-greyed_when_paused = true
+boot_deferred = true
 caption_count_policy = { value_getter = "hotstrings_parent_total", present_getter = "hotstrings_parent_count_present", visibility = { ahk = "always", hs = "available", linux = "positive" }, style = { ahk = "space", hs = "space", linux = "decimal" }, format = "%s (%s)", maximum = 9007199254740991 }
 
 [[menu.top_level]]
@@ -296,23 +323,36 @@ id = "metrics"
 i18n = "menu.metrics.title"
 rows = []
 checked_when = ["keystats_enabled"]
-greyed_when_paused = true
+boot_deferred = true
+
+# The anti-sleep mode's presets and options (maintainer, 2026-11-25). Ctrl+M
+# toggles the mode with the active preset; this submenu picks the preset and
+# switches its parts. Its rows are runtime data (the user's presets), so both
+# lists are filled by each driver from the shared presets store
+# (_shared/shortcuts/engine/keep_awake/presets.lua) and drawn by the renderer.
+[[menu.top_level]]
+type = "group"
+id = "keep_awake"
+i18n = "menu.keep_awake.title"
+rows = []
+boot_deferred = true
 
 [[menu.top_level]]
 id = "---"
 
 [[menu.top_level]]
 id = "llm"
-greyed_when_paused = true
+boot_deferred = true
 # The AI title carries the backend health dot on every driver (maintainer,
 # 2026-10-29): ready once the model answers, warming while the server answers
 # but the model loads, unreachable when the server is silent or the model was
 # given up on. No dot while the AI is off or paused, or before a first probe.
+# The macOS Tap-Holds title shows these same glyphs (menu/ui/title_status.lua).
 health_dot = { ready = "🟢", warming = "🟡", unreachable = "🔴" }
 
 [[menu.top_level]]
 id = "agent"
-greyed_when_paused = true
+boot_deferred = true
 disabled = true
 i18n = "menu.agent.title"
 reason_key = "menu.agent.not_ready"
@@ -329,7 +369,7 @@ type = "group"
 id = "apps"
 i18n = "menu.apps.title"
 rows = []
-greyed_when_paused = true
+boot_deferred = true
 platforms = ["ahk", "hs", "linux"]
 
 # The separator that closes the group of that row belongs to it.
@@ -366,6 +406,18 @@ id = "---"
 id = "suspend"
 platforms = ["ahk"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
+# The macOS and Linux twin of the Windows « Suspendre » row, right before
+# Reload (maintainer, 2026-11-24): ticked while Ergopti is paused, a click
+# pauses or resumes it. The macOS « Ergopti+ » title pill and the Linux paused
+# header row keep toggling too.
+[[menu.top_level]]
+type = "check"
+id = "suspend"
+i18n = "menu.global.suspend"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+checked_when = ["script_paused"]
 
 [[menu.top_level]]
 type = "command"
@@ -576,6 +628,21 @@ i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
 platforms = ["ahk", "hs", "linux"]
 
+# The lifecycle of the Ollama Ergopti installs and runs on its own port (OLL-11
+# of the 2026-11-20 managed Ollama campaign): one row per action, wired on each
+# driver to the owner that already ran it from the model page or a consent
+# dialog, so the parity table checks them. Its rows are in
+# llm_ollama_runtime_rows.
+[[menu.llm_menu]]
+type = "---"
+
+[[menu.llm_menu]]
+type = "group"
+id = "llm_ollama_runtime"
+i18n = "menu.llm.ollama_runtime.title"
+disabled_when_off = true
+platforms = ["ahk", "hs", "linux"]
+
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
 #
@@ -767,9 +834,6 @@ id = "llm_display_remaining"
 type = "check"
 id = "llm_token_streaming"
 i18n = "menu.llm.show_streaming"
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.token_streaming_unvalidated_on_windows"
 checked_when = ["llm_token_streaming_enabled"]
 disabled_when = ["llm_token_streaming_ready"]
 
@@ -917,6 +981,53 @@ type = "list"
 id = "apps_installed"
 platforms = ["ahk", "hs", "linux"]
 
+# The « Anti-veille » submenu: the presets as one single-choice group, then the
+# active preset's switches, its click counter and the reason anything cannot
+# run (row data from _shared/shortcuts/engine/keep_awake/menu.lua and its
+# Windows twin).
+[[menu.keep_awake_menu]]
+type = "section_header"
+i18n = "menu.keep_awake.header_presets"
+
+[[menu.keep_awake_menu]]
+type = "list"
+id = "keep_awake_presets"
+
+[[menu.keep_awake_menu]]
+type = "section_header"
+i18n = "menu.keep_awake.header_options"
+
+# The active preset's two switches. A Linux session that cannot click (Wayland,
+# no xdotool) greys the auto-click row; the exact reason is a red row of the
+# status list, with the click counter.
+[[menu.keep_awake_menu]]
+type = "check"
+id = "keep_awake_switch"
+i18n = "menu.keep_awake.keep_awake"
+checked_when = ["keep_awake_switch_on"]
+
+[[menu.keep_awake_menu]]
+type = "check"
+id = "keep_awake_auto_click"
+i18n = "menu.keep_awake.auto_click"
+checked_when = ["keep_awake_auto_click_on"]
+disabled_when = ["keep_awake_auto_click_available"]
+disabled_reason_key = "keepawake.auto_click_unavailable"
+
+[[menu.keep_awake_menu]]
+type = "list"
+id = "keep_awake_status"
+
+# « Bibliothèque… » opens the library window (_shared/ui/keep_awake_library):
+# the presets, their apps and their targets, « Ajouter un bouton… ».
+[[menu.keep_awake_menu]]
+type = "---"
+
+[[menu.keep_awake_menu]]
+type = "command"
+id = "keep_awake_library"
+i18n = "menu.keep_awake.library"
+
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing
 # described the menu they were listing them into.
@@ -942,6 +1053,13 @@ id = "locales"
 # owner writes its backup first, so neither row asks: the backup is the undo
 # (the maintainer retired the clear's question on 2026-09-30). AI and metrics
 # consent are never granted by the restore.
+#
+# Every group opens with a « — Title — » header like the Debug menu's
+# (maintainer, 2026-11-24): Reset, Files and wizard, Network, Accessibility.
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_reset"
+
 [[menu.configuration_menu]]
 type = "command"
 id = "scope_restore"
@@ -955,6 +1073,10 @@ i18n = "common.clear_to_system"
 [[menu.configuration_menu]]
 type = "---"
 
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_files"
+
 # Lists the config.toml keys the driver does not use and offers to remove them
 # after a backup. Each driver applies its own reader's rule: Windows the boot
 # loader's unknown-key check against the manifest, macOS and Linux the keys
@@ -963,11 +1085,6 @@ type = "---"
 type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
-
-# Set apart by a separator: the rows above rewrite the configuration, the rows
-# below open a window onto it.
-[[menu.configuration_menu]]
-type = "---"
 
 # The folders editor: where the configuration and the logs live.
 [[menu.configuration_menu]]
@@ -990,9 +1107,57 @@ i18n = "menu.global.setup_wizard"
 type = "---"
 
 [[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_network"
+
+[[menu.configuration_menu]]
 type = "command"
 id = "proxy_override"
 i18n = "menu.debug.proxy_override"
+
+# How the app's own windows show their text (the features' comment in
+# manifest.toml): each driver seeds the choice into every WebView window it
+# opens from then on.
+[[menu.configuration_menu]]
+type = "---"
+
+[[menu.configuration_menu]]
+type = "section_header"
+i18n = "menu.configuration.header_accessibility"
+
+# The reading font also draws the tray menus on Windows (owner-drawn items) and
+# macOS (styled titles); the label says so. A Linux tray menu crosses the
+# session bus as dbusmenu, whose items carry no font, and the desktop theme
+# draws it: the Linux row names the windows alone and says why (maintainer
+# decision 2026-11-24, docs/memory/maintainer-decisions.md).
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_font"
+i18n = "menu.configuration.reading_font"
+path = "script.reading_font"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+show_current_choice = true
+current_choice_label_value = true
+
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_font"
+i18n = "menu.configuration.reading_font_windows_only"
+path = "script.reading_font"
+platforms = ["linux"]
+unavailable = "hide"
+choice_label_prefix = "menu.configuration.reading_font."
+show_current_choice = true
+current_choice_label_value = true
+
+[[menu.configuration_menu]]
+type = "choice"
+id = "reading_spacing"
+i18n = "menu.configuration.reading_spacing"
+path = "script.reading_spacing"
+show_current_choice = true
+current_choice_label_value = true
 
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
@@ -1044,14 +1209,6 @@ type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
-# Right under the diagnostics window (the maintainer's request of 2026-10-02):
-# it decides whether an error shows itself, which that window then explains.
-[[menu.debug_menu]]
-type = "check"
-id = "show_error_dialog"
-i18n = "menu.debug.show_error_dialog"
-checked_when = ["error_dialog_enabled"]
-
 [[menu.debug_menu]]
 type = "command"
 id = "report_bug"
@@ -1070,18 +1227,30 @@ id = "---"
 type = "section_header"
 i18n = "menu.debug.header_logs"
 
+# The Logs section opens with its switches, then a separator, then the rows
+# that open a log (maintainer, 2026-11-24): the diagnostics group holds only
+# rows that open a window or a page, so the error-window switch left it.
+#
+# « Detailed log » replaced the eight-value log-level selector (maintainer,
+# 2026-11-24). It reads and writes the same `script.log_level`: ticked stores
+# DEBUG, unticked the declared default, and it reads ticked for any stored
+# level more detailed than the default (_shared/core/logger/engine/
+# level_setting.lua, the `detailed_log` logger parity vectors).
 [[menu.debug_menu]]
-type = "choice"
-id = "log_level"
-i18n = "menu.debug.log_level"
-path = "script.log_level"
-choice_values = ["DEBUG", "INFO", "WARNING", "ERROR"]
-# These are the logger's technical tokens, identical in every locale. Their
-# presentation is shared; the durable API still accepts all eight severities.
-choice_label_kind = "log_level_token"
-choice_icons = { DEBUG = "🐛", INFO = "ℹ️", WARNING = "⚠️", ERROR = "❌" }
-show_current_choice = true
-current_choice_label_value = true
+type = "check"
+id = "detailed_log"
+i18n = "menu.debug.detailed_log"
+checked_when = ["detailed_log_enabled"]
+
+[[menu.debug_menu]]
+type = "check"
+id = "show_error_dialog"
+i18n = "menu.debug.show_error_dialog"
+checked_when = ["error_dialog_enabled"]
+
+[[menu.debug_menu]]
+type = "---"
+id = "---"
 
 [[menu.debug_menu]]
 type = "command"
@@ -1098,9 +1267,26 @@ type = "command"
 id = "open_error_log"
 i18n = "menu.debug.open_error_log"
 
+# « Export the logs (zip) » (maintainer decision, 2026-11-25): the one archive
+# a tester sends, the daily logs of the last days scrubbed of typed text
+# (_shared/core/logger/data/log_export.toml).
+[[menu.debug_menu]]
+type = "command"
+id = "export_logs"
+i18n = "menu.debug.export_logs"
+
 [[menu.debug_menu]]
 type = "---"
 id = "---"
+
+# « Run the field report (every test) », just before « Tests » (maintainer
+# decision, 2026-11-24): one click hands the driver's own field run session its
+# field check steps in-app (diagnostics/engine/field_run/field_run.*), the
+# tests of the Tests submenu among them, and opens one report of its results.
+[[menu.debug_menu]]
+type = "command"
+id = "field_report"
+i18n = "menu.debug.field_report"
 
 # « Tests »: every one-click check and probe, in one submenu on every driver.
 # Each driver builds its rows from debug_tests_menu with the same command owners
@@ -1110,11 +1296,16 @@ type = "group"
 id = "debug_tests"
 i18n = "menu.debug.tests"
 
-# The rows of « Tests », grouped by topic: the network, then the typing chain
-# (the composed layout, the key accounting, the two Windows input probes), then
-# the macOS Karabiner runtime and the system around it. At most seven rows reach
-# one driver (macOS), so the topics need no separator between them.
-#
+# The rows of « Tests », in topic groups each headed by its title and set apart
+# by a separator, in the same order on every driver (maintainer request,
+# 2026-11-24): the network, the key remapping (the composed layout, the key
+# accounting, the two Windows input probes), then on macOS the Karabiner
+# runtime and the system and third-party tools around it. A group no row of a
+# driver fills draws neither its title nor its separator.
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_network"
+
 # One-click field checks of the macOS input and network chain (issue #101, item
 # 31). The network check runs on all three drivers (macOS and Linux share its
 # steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS
@@ -1124,6 +1315,13 @@ i18n = "menu.debug.tests"
 type = "command"
 id = "field_check_network"
 i18n = "menu.debug.field_check_network"
+
+[[menu.debug_tests_menu]]
+type = "---"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_remapping"
 
 # The composed-layout check installs the shipped check composition through the
 # composer's save path, verifies it and removes it again; every driver routes it.
@@ -1158,6 +1356,17 @@ platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
 
 [[menu.debug_tests_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_remap_runtime"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
 type = "command"
 id = "field_check_lease"
 i18n = "menu.debug.field_check_lease"
@@ -1170,6 +1379,17 @@ id = "field_check_owned_runtime"
 i18n = "menu.debug.field_check_owned_runtime"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_tests_menu]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.debug_tests_menu]]
+type = "section_header"
+i18n = "menu.debug.header_tests_system"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.debug_tests_menu]]
 type = "command"
@@ -1196,25 +1416,18 @@ submenu_off_reason_key = "menu.category_off_reason"
 # The Shortcuts scope's restore and clear, right after its switch like every
 # category's (the first group: switch, restore, clear, separator). Windows and
 # Linux register both on their scope owners, which back up config.toml and
-# publish the whole scope in one transaction. macOS keeps the key combinations
-# in the Karabiner settings, which only the Configuration rows compose with the
-# shortcut preferences so far: not yet ported there, so macOS draws both rows
-# greyed with that reason.
+# publish the whole scope in one transaction. macOS composes its shortcut
+# preferences with the key combinations its remap file keeps for Karabiner,
+# as the Configuration rows do (menu/ui/transactions/global_scope.lua).
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.shortcuts_restore_is_composed_on_macos"
 
 [[menu.shortcuts_menu]]
 type = "---"
@@ -1256,7 +1469,7 @@ path = "shortcuts.wrap_text_if_selected"
 
 # The wrap-symbol picker. Declared platforms = ["ahk"] until 2026-08-06, and all
 # three drivers had been building it the whole time: macOS in
-# build_wrap_symbols_submenu, Linux in ui/menu/builder.lua's wrap_items. The restriction
+# build_wrap_symbols_submenu, Linux in menu/ui/builder/builder.lua's wrap_items. The restriction
 # recorded who wrote it first rather than what the platforms can do — the third
 # time this exact shape has been found in this manifest.
 #
@@ -1271,7 +1484,7 @@ id = "wrap_symbols_menu"
 # The selection operations this driver performs on the current X11 selection —
 # CapsWord, the three case transforms, select word, select line, paste without
 # formatting. Declared 2026-08-07; they were built by hand in
-# linux/ui/menu/builder.lua and described nowhere, so no gate could see
+# linux/menu/ui/builder/builder.lua and described nowhere, so no gate could see
 # seven rows of a shared menu.
 #
 # A `list` rather than seven `command` rows because the set is one block with one
@@ -1321,6 +1534,14 @@ disabled_reason_key = "physical_shortcuts.window_unavailable"
 disabled_reasons = [
 	{ when = "physical_shortcuts_delivery_unqualified", reason_key = "physical_shortcuts.delivery_unqualified" },
 ]
+
+# The user's own workflows (_shared/shortcuts/data/workflows/), each an action
+# a slot, a gesture, a tap-hold key or a hotstring can run; the shared window
+# _shared/ui/user_workflows edits them on the three OS.
+[[menu.shortcuts_menu]]
+type = "command"
+id = "user_workflows_editor"
+i18n = "menu.shortcuts.user_workflows"
 
 [[menu.shortcuts_menu]]
 type = "---"
@@ -1428,7 +1649,7 @@ id = "extensions_shortcuts"
 # This carried platforms = ["ahk"] with the reason "neither Lua driver has that
 # concept", which was false for both: macOS has done it since
 # ui/menu/menu_shortcuts.lua:543 was written, and Linux since 2026-08-05
-# (ui/menu/builder.lua, _extension_shortcut_rows). The restriction survived
+# (menu/ui/builder/builder.lua, _extension_shortcut_rows). The restriction survived
 # a correction attempt because Linux's shortcuts menu was hand-rolled and could
 # not render any row BY ID, so widening it would have made the manifest promise
 # something the handler-bijection ratchet would flag. That menu now dispatches
@@ -2049,7 +2270,7 @@ disabled_when = ["keystats_enabled"]
 
 # The readouts this driver answers in its log rather than in a window. They are
 # Linux's own — macOS and Windows open a metrics WINDOW for the same figures —
-# and until 2026-08-06 they were built in ui/menu/builder.lua with nothing
+# and until 2026-08-06 they were built in menu/ui/builder/builder.lua with nothing
 # describing them. A driver-specific row is fine; a driver-specific row nobody
 # declared is a row no gate can compare, reason about or find.
 
@@ -2109,6 +2330,30 @@ type = "list"
 id = "metrics_migration"
 platforms = ["linux"]
 reason_key = "platform_reason.only_linux_migrates_in_the_background"
+
+# The layout menu, « Dispositions et émulation » since 2026-11-19 (maintainer:
+# « il faut pas de doublon et que tout soit clair »). One submenu, three headed
+# sections in this order on the three OS, decided by the maintainer on
+# 2026-11-19 (« inputs, émulation, puis tuning de dispo »):
+#   1. The input sources: the layouts installed in the OS, switched, switched
+#      at a pause, installed and removed.
+#   2. The emulation: the layout Ergopti+ types whatever OS layout is
+#      selected. It overrides that layout, nothing installed.
+#   3. The layout tuning: what adjusts the active layout, the OS one or the
+#      emulated one (layers, rows, digits in direct access, the shortcuts
+#      on the accented letters and on ★).
+# Then, after a separator and no header, the rows that tune no layout: the
+# physical keyboard Linux decodes and Karabiner presents, and the menu bar icon.
+# docs/memory/maintainer-decisions.md, « The layout menu: input sources,
+# emulation, tuning », says where each row goes and why.
+# Each action has one place. « Create or edit a layout… » left on 2026-11-19:
+# Ergopti Studio, the row right above this menu in the tray root, opens the
+# same window. So did the « Disposition personnalisée » list (`custom_layouts`):
+# on macOS and Linux it listed the registry layouts the input sources list
+# too, with the same switch; on Windows it repeated the emulated layout the
+# « Disposition à émuler » row already names. The layout manager still selects
+# an installed registry layout. tools/test/test-menu-no-duplicate-actions.cjs
+# refuses a second row for one action and holds the section order.
 [[menu.layout_menu]]
 type = "toggle"
 id = "layout_toggle"
@@ -2116,12 +2361,13 @@ i18n = "menu.layout.enable"
 checked_when = ["layout_enabled"]
 category = "Layout"
 submenu_off_reason_key = "menu.category_off_reason"
-# Only Windows emulates the Ergopti layout itself, so only Windows has an
-# emulation to switch off. macOS installs the layout as a system input source and
-# Linux remaps through kanata; declared for them, this row had no command and was
-# skipped in silence, which is the failure the renderer now reports.
+# The Windows category gate of the whole layout section (category_enabled.layout).
+# macOS and Linux emulate layouts too but keep no such gate: no layout to emulate
+# with both emulated layers off leaves the system layout alone. Declared for them,
+# this row had no command and was skipped in silence, which is the failure the
+# renderer now reports.
 platforms = ["ahk"]
-reason_key = "platform_reason.layout_emulation_is_windows_only"
+reason_key = "platform_reason.layout_master_switch_is_windows"
 
 # The keyboard-layout scope's restore and clear, right after the switch Windows
 # shows (the first group). Every driver registers both on its scope owner; on
@@ -2137,29 +2383,43 @@ type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
 
-# Two sections, so a user reads at a glance which rows are about the custom
-# layout (the registry layouts the layout manager installs, the one typing
-# uses, and each driver's own Ergopti rows) and which ones work whatever layout
-# they type on.
 [[menu.layout_menu]]
 type = "---"
 
+# 1. The system's keyboard layouts, under a header of their own (« Sources de
+# saisie »): without it the list read as more Ergopti settings. The active one
+# is ticked and choosing another switches the system layout, on every driver
+# (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
+# requests the user's installed layout (WM_INPUTLANGCHANGEREQUEST) and Linux
+# asks the desktop's own owner (the Ergopti GNOME Shell extension, the KDE
+# keyboard daemon or setxkbmap). Installing and removing them follows.
 [[menu.layout_menu]]
 type = "section_header"
-i18n = "menu.layout.header_custom"
+i18n = "menu.layout.active_layouts"
 
-# macOS and Linux list installed native input sources and select one through
-# the OS. Windows reports its enabled emulation as a disabled status row;
-# selection belongs to the shared layout manager immediately below it.
+# A Linux desktop with no way to change its layout says why, as the pause
+# switch does.
 [[menu.layout_menu]]
 type = "list"
-id = "custom_layouts"
-status_rows.none_installed = [{ type = "label", i18n = "menu.layout.none_installed" }]
+id = "active_layouts"
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.active_layouts_unsupported_desktop" }]
+
+# Which layout to switch to when the driver pauses and when it resumes: the
+# choices are the system's input sources (macOS), the desktop's layouts
+# (Linux) or the layouts installed for the user (Windows).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_switching"
+# A Linux desktop with no way to change its layout (a Wayland compositor other
+# than GNOME or KDE Plasma) shows why instead of a switch that could never act.
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
 
 # How far GTK 3 applications compose the installed layouts' Compose sequences
-# (ui/menu/compose_input_method_row.lua): GTK 3's built-in input method takes
+# (menu/ui/compose_input_method_row.lua): GTK 3's built-in input method takes
 # only the single-character rules, IBus takes them all. Linux only: macOS and
 # Windows type every character through their own layouts, with no Compose file.
+# It belongs to the input sources: it says how the installed XKB layouts reach
+# GTK 3, emulated or not.
 [[menu.layout_menu]]
 type = "list"
 id = "compose_input_method"
@@ -2167,32 +2427,37 @@ platforms = ["linux"]
 reason_key = "platform_reason.compose_input_method_is_linux"
 
 # Opens the shared layout manager window (_shared/ui/layout_manager): the
-# catalogue of the layout registry, to install, update or uninstall a layout.
+# catalogue of the layout registry, to install, update, use or uninstall a
+# layout. Creating one is Ergopti Studio's.
 [[menu.layout_menu]]
 type = "command"
 id = "layout_manager"
 i18n = "menu.layout.manage"
 
-# Opens the layout manager window straight on the unified layout editor: create
-# a layout from scratch or from another, export it for every OS, install it on
-# the system or emulate it without installing it (docs/design/layout-editor.md).
+# The layout manager is core, but its window needs lgi and WebKitGTK, which a
+# system can lack: Linux installs and activates Ergopti, and removes it, from the
+# tray itself as well (maintainer decision, 2026-11-25). The rows run the layout
+# manager's own registry operations (ui/layout_manager/tray_actions.lua) and say
+# each step's result in a notice; a failure also leaves a red tray row. macOS
+# and Windows install Ergopti from their own rows below.
 [[menu.layout_menu]]
-type = "command"
-id = "open_layout_editor"
-i18n = "menu.layout.edit"
+type = "list"
+id = "layout_user_install"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+status_rows.busy = [{ type = "label", i18n = "menu.layout.user_layout_busy" }]
+status_rows.installed = [{ type = "label", i18n = "menu.layout.user_layout_installed" }]
+status_rows.unreadable = [{ type = "label", i18n = "menu.layout.user_layout_unreadable" }]
 
-# The two blocks macOS alone has. It installs a .bundle keyboard layout through
-# TIS — the OS's own input-source mechanism, with a user scope and a system scope
-# — and it draws a menubar icon whose variant the user picks. Neither concept
-# exists on the other two drivers: Windows installs a .klc through its own
-# installer and Linux installs an XKB layout, and neither has a menubar.
+# The block macOS alone has. It installs a .bundle keyboard layout through TIS
+# — the OS's own input-source mechanism, with a user scope and a system scope.
+# Windows installs Ergopti from its own row below and Linux for the user from
+# the layout manager above (an Xorg session needs the system installer,
+# install.sh). The reason text tells the user where.
 #
-# Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
-# nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
-# and nothing to compare them against.
-# These .bundle rows are macOS's; Windows installs Ergopti from its own row
-# below and Linux for the user from the layout manager above (an Xorg session
-# needs the system installer, install.sh). The reason text tells the user where.
+# Built by hand in ui/menu/menu_keyboard_layout.lua and described nowhere until
+# 2026-08-07, so ten rows of a shared menu had no platforms field and nothing
+# to compare them against.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_bundle"
@@ -2207,7 +2472,7 @@ reason_key = "platform_reason.layout_install_is_the_macos_bundle"
 # whether the layout is installed and opens the package's download
 # (modules/keymap/system_layout_install.ahk). Once installed it is one of the
 # user's layouts, listed and switched by « Input sources » and the pause switch
-# below.
+# above.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_system_install"
@@ -2216,43 +2481,64 @@ reason_key = "platform_reason.layout_system_install_is_windows"
 status_rows.installed = [{ type = "label", i18n = "menu.layout.system_layout_installed" }]
 status_rows.unreadable = [{ type = "label", i18n = "menu.layout.system_layout_unreadable" }]
 
-# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
-# LAYERS it types, under this header, and which keyboard ROWS, in the submenu
-# below. Read as one flat block they looked like the same switches twice. The
-# three drivers emulate the layout (maintainer, 2026-11-06).
+[[menu.layout_menu]]
+type = "---"
+
+# 2. The emulation, under a header that says it overrides the OS layout
+# (maintainer, 2026-11-19: « l'émulation fonctionne quel que soit le layout
+# installé et sélectionné dans l'OS, cela override »).
 [[menu.layout_menu]]
 type = "section_header"
-i18n = "menu.layout.header_layers"
+i18n = "menu.layout.header_emulation"
 
-# The layout the emulation types over the system layout, as a submenu of
-# choices: none, the built-in Ergopti variants and the registry layouts the app
-# ships or the layout manager installed. It writes what the onboarding choice
-# writes. Windows picks it in the shared layout manager and reports it in the
-# custom_layouts status row above, where macOS and Linux list the system's own
-# input sources; the three drivers draw this row (Windows from its registry
-# catalogue, through the layout manager's acknowledged handoff).
+# The layout the emulation types over the system layout, as a submenu: one
+# single-choice group of « None » and the layouts chosen last
+# (layout.emulated_layout_recents, emulation.recent_count of
+# _shared/layouts/data/defaults.json), then layout_emulation_others_commands,
+# whose « Others… » opens the picker of every layout: the built-in Ergopti
+# variants and the registry layouts the app ships or the layout manager
+# installed (maintainer decision of 2026-11-25). It writes what the onboarding choice
+# writes, and its title names the emulated layout (and says when it cannot be
+# emulated), on the three drivers (Windows from its registry catalogue, through
+# the layout manager's acknowledged handoff).
 [[menu.layout_menu]]
 type = "list"
 id = "layout_emulation"
 
+[[menu.layout_menu]]
+type = "---"
+
+# 3. The layout tuning: settings that adjust the active layout, the OS one or
+# the emulated one (maintainer, 2026-11-19: « les shared settings c'est de
+# l'émulation en fait, ça agit soit sur la dispo dans Windows soit sur la dispo
+# émulée »). The header names both, so the former « Couches émulées »
+# sub-header left: the layer rows' own labels say « of the selected layout ».
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_tuning"
+
+# Two axes of the emulation, kept apart (maintainer, 2026-11-03): which Ergopti
+# LAYERS it types, these two rows, and which keyboard ROWS, in the submenu
+# below. Both rows are on by default and choose layers of the selected layout:
+# under « None » they do nothing (maintainer, 2026-11-23). The three drivers
+# emulate the layout (maintainer, 2026-11-06).
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.
+# The emulated layout's base and Shift layers (ergopti_base).
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_base"
 
-# The emulated layout's base and Shift layers (ergopti_base).
-
-# The Ergopti AltGr layer and its ➕ variant. Only these two: the digit row and
-# Ctrl+★ work on any layout and sit in the second section.
+# The Ergopti AltGr layer and its ➕ variant.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_features_altgr"
 
 # The rows the emulation types, one checkbox each (the layout.emulate_<row>
 # switches), in their own submenu: switching rows on one by one is how a user
-# learns the layout progressively. The same on the three drivers.
+# learns the layout progressively, the OS layout typing the others. The same
+# on the three drivers.
 [[menu.layout_menu]]
 type = "group"
 id = "layout_emulated_rows"
@@ -2278,58 +2564,50 @@ type = "feature"
 path = "layout.emulate_bottom_row"
 i18n = "menu.layout.emulate_bottom_row"
 
-# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
-[[menu.layout_menu]]
-type = "choice"
-id = "virtual_keyboard"
-path = "layout.virtual_keyboard"
-i18n = "menu.layout.virtual_keyboard"
-platforms = ["hs"]
-reason_key = "platform_reason.virtual_keyboard_is_karabiner"
-
-# The menubar icon, ONE row with its variants beneath it, last of the Ergopti
-# section. It was two sibling rows, one per variant, stored in hs.settings.
-[[menu.layout_menu]]
-type = "choice"
-id = "menubar_icon"
-path = "ui.menubar_icon"
-i18n = "menu.layout.menubar_icon"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
-
-[[menu.layout_menu]]
-type = "---"
-
-# The system's keyboard layouts, under a header of their own (« Sources de
-# saisie »): without it the list read as more Ergopti settings. The active one
-# is ticked and choosing another switches the system layout, on every driver
-# (maintainer, 2026-11-06): macOS selects the input source through TIS, Windows
-# requests the user's installed layout (WM_INPUTLANGCHANGEREQUEST) and Linux
-# asks the desktop's own owner (the Ergopti GNOME Shell extension, the KDE
-# keyboard daemon or setxkbmap).
-[[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.active_layouts"
-
-# A Linux desktop with no way to change its layout says why, as the pause
-# switch does.
+# One policy, with actual source-scoped availability supplied by native owners.
+# Lua drivers report native input only; Windows can also force digits and can
+# force symbols through a supported registry source's original action machine.
+# It orders the number row of the OS layout or of the emulated one.
 [[menu.layout_menu]]
 type = "list"
-id = "active_layouts"
-status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.active_layouts_unsupported_desktop" }]
+id = "number_row_policy"
+
+# « Touches de jeu » (maintainer decision of 2026-11-26): which key identity a
+# game reads while Ergopti types, over the system layout or the emulated one.
+# One submenu: the global choice (layout.game_keys) as a single-choice group,
+# then the front application's own choice (layout.game_keys_apps), which makes
+# it a game. A choice the OS cannot honour there is greyed with its reason
+# (_shared/layouts/engine/emulation/game_keys.lua route); the checked choice's
+# limit (Unreal games follow the letters on Windows, GameController games keep
+# the physical place on macOS) is a greyed row beneath. Same rows on the three
+# OS (layouts/engine/emulation/menu.lua game_keys_rows, Windows
+# ui/menu/menu_layout.ahk _LAY_GameKeysRows).
+[[menu.layout_menu]]
+type = "list"
+id = "layout_game_keys"
+
+# Works on every layout since 2026-09-21: the chords follow the key that types
+# the accented letter (or ★, since 2026-11-21) directly in the user's own
+# layout, not Ergopti's positions.
+# Linux follows Windows (modules/shortcuts/accented_shortcuts.lua); a macOS
+# layout file carries its own Command and Control layer.
+[[menu.layout_menu]]
+type = "group"
+id = "accented_letters"
+i18n = "menu.shortcuts.group_accented"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
 [[menu.layout_menu]]
 type = "---"
 
-[[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.header_any"
-
-# The base layout the Linux keyboard hook decodes keycodes with. Declared
-# 2026-08-07; the rows were two names written into ui/menu/builder.lua while the
-# driver already owned the list — input_reader.get_layouts() is the table the
-# decoder itself uses, and a menu that enumerates it by hand goes stale the day a
-# third table is added.
+# Last, without a header: rows that tune no layout. The base layout the Linux
+# keyboard hook decodes keycodes with names the PHYSICAL keyboard family
+# (qwerty or azerty) the finger map, the metrics and the heatmap describe; text
+# capture follows the active XKB keymap whatever it says
+# (platform/input/keyboard_hook.lua). Declared 2026-08-07; the rows were two
+# names written into menu/ui/builder/builder.lua while the driver already owned
+# the list — input_reader.get_layouts() is the table the decoder itself uses.
 #
 # linux only, because the concept is this driver's: it reads raw evdev keycodes
 # and needs to know which physical layout produced them. macOS asks the system
@@ -2341,48 +2619,29 @@ id = "base_layouts"
 platforms = ["linux"]
 reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
 
-# One policy, with actual source-scoped availability supplied by native owners.
-# Lua drivers report native input only; Windows can also force digits and can
-# force symbols through a supported registry source's original action machine.
+# The Karabiner virtual keyboard type: Automatic, ISO or ANSI. It is the
+# keyboard macOS sees for every key Karabiner remaps, emulated or not, so it
+# neither chooses nor tunes a layout: it decides which keycodes the two
+# ISO-only keys reach (modules/keymap/layout.lua).
 [[menu.layout_menu]]
-type = "list"
-id = "number_row_policy"
+type = "choice"
+id = "virtual_keyboard"
+path = "layout.virtual_keyboard"
+i18n = "menu.layout.virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
 
-# Works on every layout since 2026-09-21: the chords follow the key that types
-# the accented letter directly in the user's own layout, not Ergopti's positions.
-# Linux follows Windows (modules/shortcuts/accented_shortcuts.lua); a macOS
-# layout file carries its own Command and Control layer.
+# The menubar icon, ONE row with its variants beneath it, last of the menu: it
+# draws Ergopti on the menu bar whatever the layout. It was two sibling rows,
+# one per variant, stored in hs.settings.
 [[menu.layout_menu]]
-type = "group"
-id = "accented_letters"
-i18n = "menu.shortcuts.group_accented"
-platforms = ["ahk", "linux"]
-reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+type = "choice"
+id = "menubar_icon"
+path = "ui.menubar_icon"
+i18n = "menu.layout.menubar_icon"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-# Which layout to switch to when the driver pauses and when it resumes: the
-# choices are the system's input sources (macOS), the desktop's layouts
-# (Linux) or the layouts installed for the user (Windows).
-[[menu.layout_menu]]
-type = "list"
-id = "layout_switching"
-# A Linux desktop with no way to change its layout (a Wayland compositor other
-# than GNOME or KDE Plasma) shows why instead of a switch that could never act.
-status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
-
-# The physical key whose replacement choice lives in Hotstrings Ergopti
-# (hotstrings.magic_key_source), on every driver: one row naming the key in
-# effect, whose submenu captures the next key pressed, restores the automatic
-# key or lists every candidate. A `list`, because each candidate is labelled
-# with what the user's own layout types on it, which only the driver can ask.
-[[menu.layout_menu]]
-type = "list"
-id = "magic_key_source"
-
-[[menu.layout_menu]]
-type = "feature"
-path = "layout.ctrl_magic_save"
-platforms = ["ahk"]
-reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_grave"
@@ -2404,6 +2663,14 @@ reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "a_grave"
+platforms = ["ahk", "linux"]
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+# The key that types ★ at its base level, when the layout has one (maintainer's
+# decision of 2026-11-21): Ctrl+★ can act as Ctrl+S once the user picks « s ».
+[[menu.accented_letters_group]]
+type = "letter_picker"
+id = "star"
 platforms = ["ahk", "linux"]
 reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
 
@@ -2432,6 +2699,32 @@ i18n = "common.clear_to_system"
 
 [[menu.hotstrings_menu]]
 type = "---"
+
+# Why the macOS hotstrings expand nothing while their switch reads on: a typing
+# event tap of the keymap engine stays disabled after the watchdog's restart
+# (maintainer, 2026-11-25). Greyed under the switch's head while the title carries
+# the red dot; empty otherwise. Windows and Linux capture keys inside the
+# driver's own hook or daemon, which has no tap macOS can switch off.
+[[menu.hotstrings_menu]]
+type = "list"
+id = "hotstrings_taps_down"
+status_rows.taps_down = [{ type = "label", i18n = "menu.hotstrings.taps_down" }]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Why the macOS hotstrings expand without the password-field check: macOS
+# Accessibility has not said for a while which field of the front application
+# has focus, so only the window mode admits them there (hotstrings/engine/
+# expander/utils.lua window_mode_admits, maintainer 2026-11-25: « Oui, comme
+# Linux »). Greyed under the switch's head while the title carries the red dot;
+# empty otherwise. Linux names the same condition in its component_status rows
+# (linux_component_problems); Windows reads no field before a hotstring.
+[[menu.hotstrings_menu]]
+type = "list"
+id = "hotstrings_focus_unchecked"
+status_rows.focus_unchecked = [{ type = "label", i18n = "menu.hotstrings.focus_unchecked" }]
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.hotstrings_menu]]
 type = "group"
@@ -2602,7 +2895,7 @@ type = "---"
 # menu at all" was accurate — every Linux reader called
 # ManifestReader.default_for, which is the shipped DEFAULT and never a user's
 # choice — and a declared gap closes by writing the feature, not by widening the
-# declaration over an absence. modules/hotstrings/magic_key.lua now owns the
+# declaration over an absence. hotstrings/engine/magic_key.lua now owns the
 # value: one reader, one writer, validated (exactly one codepoint, and not a
 # character common in prose) and persisted.
 # `list` since 2026-08-07. The row shows the current magic key and opens a
@@ -2645,6 +2938,25 @@ i18n = "menu.hotstrings.tooltip_colored"
 checked_when = ["hotstrings.preview_colored_tooltips"]
 disabled_when = ["preview_colored_ready"]
 
+# The category symbol beside each row's trigger label (2026-11-19): a style
+# switch like the colours, so it sits with them under the same separator.
+[[menu.preview_glyphs_control]]
+type = "check"
+id = "preview_category_glyphs"
+i18n = "menu.hotstrings.tooltip_glyphs"
+checked_when = ["hotstrings.preview_category_glyphs"]
+disabled_when = ["preview_glyphs_ready"]
+
+# Whether a running screen reader is told the previews and the finished AI
+# predictions (2026-11-21): its own section, since it changes what is said,
+# not what is drawn.
+[[menu.preview_announcements_control]]
+type = "check"
+id = "preview_announcements"
+i18n = "menu.hotstrings.tooltip_announcements"
+checked_when = ["hotstrings.preview_announcements"]
+disabled_when = ["preview_announce_ready"]
+
 # Preview presence keeps its existing position; native ports supply only the
 # current flag and the acknowledged toggle owner.
 [[menu.preview_magic_control]]
@@ -2683,6 +2995,27 @@ type = "check"
 id = "repeat_key"
 i18n = "menu.hotstrings.repeat_key_toggle"
 checked_when = ["hotstrings_repeat_enabled"]
+
+# The Backspace undo (hotstrings.backspace_restore_enabled) and its window
+# (hotstrings.backspace_restore_window_ms): the feature's preset_values plus a
+# free entry each driver answers with its native prompt, as the idle reset.
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "backspace_restore"
+i18n = "menu.hotstrings.backspace_restore_enabled"
+checked_when = ["hotstrings_backspace_restore_enabled"]
+
+[[menu.hotstrings_params_group]]
+type = "choice"
+id = "backspace_restore_window"
+path = "hotstrings.backspace_restore_window_ms"
+i18n = "menu.hotstrings.backspace_restore_window"
+choice_registry = "hotstrings.backspace_restore_window"
+show_current_choice = true
+current_choice_label_value = true
+custom_command = "backspace_restore_window_custom"
+custom_i18n = "menu.hotstrings.backspace_restore_window_custom"
+custom_unit_i18n = "hs_config.unit_ms"
 
 # When the hotstring engine forgets the current word: after a pause without
 # typing (the feature's preset_values, plus a free entry each
@@ -2750,13 +3083,13 @@ current_choice_label_value = true
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while
-# _build_gestures in ui/menu/builder.lua has always built a master toggle, both bulk
+# _build_gestures in menu/ui/builder/builder.lua has always built a master toggle, both bulk
 # actions and every configurable slot. Same failure as kanata/updates/apps: the
 # manifest simply had no opinion about Linux, and an absent opinion reads as
 # "restricted elsewhere" rather than as the omission it was.
 [[menu.gestures_menu]]
 # Unrestricted, like the metrics toggle: Windows used to insert this row by hand
-# in ui/menu/menu_gestures.ahk and the declaration excluded it to avoid drawing a
+# in gestures/ui/menu/gestures.ahk and the declaration excluded it to avoid drawing a
 # second one. Every driver now draws it from here; Windows registers
 # ToggleGesturesEnabled as its command.
 type = "toggle"
@@ -2779,7 +3112,7 @@ i18n = "common.restore_recommended"
 # On Windows the clear also puts the Precision Touchpad registry back to its
 # system state: the values backed up before Ergopti's first gesture
 # configuration, or the Windows factory defaults without a backup
-# (windows/modules/gestures/touchpad_registry.ahk). It replaced the
+# (windows/gestures/adapters/touchpad_registry.ahk). It replaced the
 # Configuration menu's « Restaurer les gestes du pavé tactile Windows » row
 # (maintainer, 2026-11-03), and the global clear composes it too. macOS and
 # Linux read the touchpad themselves and change no system setting, so their
@@ -2930,7 +3263,7 @@ status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header
 # One list whose provider groups the slots by the finger count in their names
 # and frames each group with these status rows, as Windows does.
 # A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
-# inside the driver, so the manifest would name the slot while ui/menu/builder.lua
+# inside the driver, so the manifest would name the slot while menu/ui/builder/builder.lua
 # still built all thirty-odd rows and their nested action pickers. A list provider
 # returns row DATA and the shared renderer materialises it.
 [[menu.gestures_menu]]
@@ -3363,6 +3696,50 @@ type = "list"
 id = "llm_val_modifiers"
 i18n = "menu.llm.val_label"
 
+# Install reads « not installed yet »; every other row needs the installed
+# runtime. Start and repair run the same owner on each driver (it starts the
+# daemon and reinstalls a tree that fails its seal or signature check), named
+# by what the user wants. Uninstall asks first and removes the downloaded
+# models only when the user says so (shared sequence:
+# _shared/ai/engine/ollama/runtime_uninstall.lua).
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_install"
+i18n = "menu.llm.ollama_runtime.install"
+disabled_when = ["llm_ollama_absent"]
+disabled_reason_key = "menu.llm.ollama_runtime.installed_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_start"
+i18n = "menu.llm.ollama_runtime.start"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_repair"
+i18n = "menu.llm.ollama_runtime.repair"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_delete_model"
+i18n = "menu.llm.ollama_runtime.delete_model"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "---"
+
+[[menu.llm_ollama_runtime_rows]]
+type = "command"
+id = "llm_ollama_uninstall"
+i18n = "menu.llm.ollama_runtime.uninstall"
+disabled_when = ["llm_ollama_installed"]
+disabled_reason_key = "menu.llm.ollama_runtime.missing_reason"
+
 # The existing choice renderer supplies provider DATA; availability and writes
 # remain native-owned. This child declaration owns all labels and value order.
 [[menu.number_row_policy_rows]]
@@ -3398,7 +3775,7 @@ unavailable = "hide"
 
 # Fixed swipe child presentation only; native payloads remain actual child owners.
 # Windows renders it too since its raw touchpad reader follows the fingers
-# (modules/gestures/raw_touchpad.ahk); Linux draws its slot rows itself.
+# (gestures/adapters/raw_touchpad.ahk); Linux draws its slot rows itself.
 [[menu.gesture_swipe_slot_menu]]
 type = "include"
 section = "gesture_change_action"
@@ -3437,6 +3814,42 @@ type = "---"
 type = "command"
 id = "layout_open_preferences"
 i18n = "menu.layout.open_prefs"
+
+# The end of « Layout to emulate », below its single-choice group of « None »
+# and the layouts chosen last (maintainer decision of 2026-11-25): « Others… »
+# opens the picker window of every layout (_shared/ui/emulation_picker), whose
+# choice applies as a row of the group does. The three drivers append these
+# rows to the layout_emulation provider's choices.
+[[menu.layout_emulation_others_commands]]
+type = "---"
+
+[[menu.layout_emulation_others_commands]]
+type = "command"
+id = "layout_emulation_others"
+i18n = "menu.layout.emulation_others"
+
+# The commands of Layout's Ergopti rows (Linux): install and activate it when it
+# is not installed, activate or uninstall it once it is.
+[[menu.layout_user_install_commands]]
+type = "command"
+id = "user_layout_install"
+i18n = "menu.layout.user_layout_install"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+
+[[menu.layout_user_installed_commands]]
+type = "command"
+id = "user_layout_activate"
+i18n = "menu.layout.user_layout_activate"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
+
+[[menu.layout_user_installed_commands]]
+type = "command"
+id = "user_layout_uninstall"
+i18n = "menu.layout.user_layout_uninstall"
+platforms = ["linux"]
+reason_key = "platform_reason.layout_user_install_is_linux"
 
 # The commands of Layout > « Download the Ergopti system layout installer »
 # (Windows): the download when the layout is not installed, and the update shown
@@ -3679,35 +4092,6 @@ i18n = "menu.shortcuts.personal"
 platforms = ["ahk"]
 unavailable = "hide"
 
-# Complete physical magic-key presentation. Native ports supply only current
-# key text, candidate data and the existing capture/choice command callbacks.
-[[menu.magic_key_source_menu]]
-type = "group"
-id = "magic_key_source_heading"
-i18n = "menu.layout.magic_key_source"
-
-[[menu.magic_key_source_children]]
-type = "command"
-id = "magic_key_source_capture"
-i18n = "menu.layout.magic_key_source.capture"
-disabled_when = ["magic_key_source_capture_ready"]
-
-[[menu.magic_key_source_children]]
-type = "---"
-
-[[menu.magic_key_source_children]]
-type = "check"
-id = "magic_key_source_automatic"
-i18n = "menu.layout.magic_key_source.auto"
-checked_when = ["magic_key_source_is_automatic"]
-
-[[menu.magic_key_source_children]]
-type = "---"
-
-[[menu.magic_key_source_children]]
-type = "list"
-id = "magic_key_source_candidates"
-
 # Parameter providers retain their native state and mutation owners; these frames
 # own the fixed parent captions, child order and presentation boundaries.
 [menu.hotstrings_delay_captions]
@@ -3754,6 +4138,18 @@ type = "---"
 type = "list"
 id = "parameter_preview_colored"
 
+# Under the colours, its sibling style switch (2026-11-19).
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_glyphs"
+
+[[menu.hotstrings_preview_frame]]
+type = "---"
+
+[[menu.hotstrings_preview_frame]]
+type = "list"
+id = "parameter_preview_announcements"
+
 [[menu.hotstrings_delays_frame]]
 type = "list"
 id = "parameter_delay_config"
@@ -3791,7 +4187,7 @@ unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
 type = "---"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
@@ -3815,7 +4211,7 @@ unavailable = "hide"
 [[menu.hotstrings_delays_frame]]
 type = "list"
 id = "parameter_delay_ai_acceptance"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
@@ -4371,15 +4767,7 @@ present_when = "personal_controls_head_boundary"
 
 [[menu.hotstring_personal_controls_frame]]
 type = "list"
-id = "personal_legacy_before"
-
-[[menu.hotstring_personal_controls_frame]]
-type = "list"
 id = "personal_default_parent"
-
-[[menu.hotstring_personal_controls_frame]]
-type = "list"
-id = "personal_legacy_after"
 
 [[menu.hotstring_personal_controls_frame]]
 type = "include"
@@ -4501,17 +4889,6 @@ i18n = "menu.hotstrings.default_category_prefix"
 caption_getter = "personal_default_label"
 caption_layout = "prefix"
 caption_joiner = ""
-
-[[menu.hotstring_personal_legacy_shortcut]]
-type = "command"
-id = "personal_legacy_shortcut"
-i18n = "menu.hotstrings.shortcut_prefix"
-caption_getter = "personal_shortcut_label"
-caption_layout = "prefix"
-caption_joiner = ""
-disabled_when = ["personal_legacy_ready"]
-platforms = ["hs"]
-unavailable = "hide"
 
 # Complete Magic trigger provider: native snapshot and handlers, shared caption/order.
 [[menu.hotstrings_magic_trigger_frame]]
@@ -4995,6 +5372,16 @@ caption_getters = ["layout_install_scope", "layout_install_old", "layout_install
 platforms = ["hs"]
 unavailable = "hide"
 
+# Removing the user copy of the bundle: the system copy needs administrator
+# rights the driver cannot bind to its launcher yet (install_system_unlocked).
+[[menu.layout_bundle_remove]]
+type = "command"
+id = "layout_remove"
+i18n = "menu.layout.remove_version"
+caption_getters = ["layout_install_scope", "layout_install_old"]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.layout_bundle_install]]
 type = "command"
 id = "layout_install"
@@ -5309,6 +5696,184 @@ platforms = ["hs", "linux"]
 unavailable = "hide"
 
 # Linux keeps the version value and resume callback native; this frame owns both header kinds.
+# The problems a Linux part reported (core/ui/engine/component_status.lua) lead
+# the Linux tray, above its title, one row per code that still holds and then a
+# separator, none when nothing is wrong (menu/ui/builder/component_status_rows.lua):
+# a missing component the windows need, an unread keyboard layout, a failed
+# Ergopti layout step, a desktop that reports no focus, hotstrings withheld or
+# left without the password-field check (one row per text_automation_status
+# NOTICES reason, labelled by its mode). A transient notification was the only surface and KDE
+# Plasma 6 dropped it from its history (field report, Arch Linux, 2026-11-25).
+# The label names the problem after the llm entry's unreachable health dot; the
+# click shows the problem's title and explanation in the tray's status window.
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_windows_lgi"
+i18n = "startup.linux_gui_stack_windows_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_windows_webkit"
+i18n = "startup.linux_gui_stack_windows_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_layout_unresolved"
+i18n = "startup.linux_layout_unresolved_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+# The screen vision service (platform/system/vision/screen_vision.lua) names the part
+# a feature asked for that does not work (the auto-clicker's capture, OCR).
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_screen_vision_capture"
+i18n = "keepawake.reason.capture_unavailable"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+# The screen vision service (platform/system/vision/screen_vision.lua) names the part
+# a feature asked for that does not work (the auto-clicker's capture, OCR).
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_screen_vision_ocr"
+i18n = "keepawake.reason.ocr_engine_missing"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_kwin_focus_script"
+i18n = "startup.linux_kwin_script_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_gnome_focus_extension"
+i18n = "startup.linux_gnome_extension_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_atspi_unavailable"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_accessible_window"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_focus_answer"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_context_unavailable"
+i18n = "startup.linux_text_unchecked_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_no_detector"
+i18n = "startup.linux_text_closed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_text_automation_window_policy_failed"
+i18n = "startup.linux_text_closed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_install_failed"
+i18n = "layouts.linux_ergopti_install_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_activate_failed"
+i18n = "layouts.linux_ergopti_activate_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+[[menu.linux_component_problems]]
+type = "command"
+id = "component_problem_ergopti_layout_uninstall_failed"
+i18n = "layouts.linux_ergopti_uninstall_failed_label"
+caption_getter = "linux_component_health_dot"
+caption_layout = "suffix"
+caption_joiner = " "
+platforms = ["linux"]
+reason_key = "platform_reason.component_status_rows_are_linux"
+
+# The separator under the problem rows, drawn only when one is shown.
+[[menu.linux_component_problems_end]]
+type = "---"
+
 [[menu.linux_tray_active_header]]
 type = "label"
 id = "linux_tray_active_header"

@@ -42,10 +42,10 @@ end
 local function fixture(layout, form, source_override)
 	package.loaded["modules.keymap.layout_emulation"] = nil
 	local M = require("modules.keymap.layout_emulation")
-	local record = { paused = false, magic = nil, now = 0, posted = {} }
+	local record = { paused = false, now = 0, posted = {} }
 	M.init({
 		read_config = function() return { layout = layout } end,
-		default_for = require("infra.manifest_reader").default_for,
+		default_for = require("menu.engine.manifest_reader").default_for,
 		source = source_override or function(id)
 			for _, entry in ipairs(INDEX.layouts) do
 				if entry.id == id then
@@ -63,11 +63,14 @@ local function fixture(layout, form, source_override)
 			if form == "iso" then return iso end
 			return entry.hs
 		end,
-		keycode_for_char = function(char) return ({ z = 6, c = 8 })[char] end,
-		magic_code = function() return record.magic end,
+		keycode_for_char = function(char) return (record.keys or { z = 6, c = 8 })[char] end,
 		is_active = function() return not record.paused end,
 		autorepeat = function(e) return e.autorepeat == true end,
 		now_ms = function() return record.now end,
+		option_sides = function(e) return { left = e.left_option == true, right = e.right_option == true } end,
+		typed_text = function() return record.before or "" end,
+		frontmost_app = function() return record.front end,
+		ergopti_source_selected = function() return record.ergopti_source == true end,
 		post = function(outputs)
 			for _, output in ipairs(outputs) do
 				if output.type == "text" then record.posted[#record.posted + 1] = output.text
@@ -91,6 +94,66 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		local e = event()
 		helpers.assert_true(not M.key_down(e, KC_Q), "not deleted")
 		helpers.assert_nil(e.unicode, "not rewritten")
+	end)
+
+	-- The number-row menu counted any running emulation as typing the row, so
+	-- it offered an ordering nothing applied with the base layer or the number
+	-- row switched off (emulated-number-row-availability).
+	helpers.it("says it orders the number row only with its base layer and number row on (emulated-number-row-availability)", function()
+		for _, case in ipairs({
+			{ { ergopti_base = true, ergopti_variant = "ergopti" }, true },
+			{ { ergopti_base = true, ergopti_variant = "ergopti", emulate_number_row = false }, false },
+			{ { emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true }, false },
+		}) do
+			local M = fixture(case[1])
+			helpers.assert_true(M.reload(), "the layout loads")
+			helpers.assert_true(M.status().active, "the emulation runs")
+			helpers.assert_eq(M.status().number_row, case[2], "the number row typed by the emulation")
+		end
+		local M = fixture({})
+		M.reload()
+		helpers.assert_eq(M.status().number_row, false, "nothing emulated orders nothing")
+	end)
+
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): the key code is
+	-- what a keyCode-reading game binds; only the string was ever rewritten.
+	helpers.it("keeps the physical key code by default and moves it under « letters » (game-keys-letters)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		helpers.assert_true(M.reload(), "the shipped Ergopti layout loads")
+		record.keys = { ["è"] = 33 }
+		local e = event({}, "q")
+		M.key_down(e, KC_Q)
+		helpers.assert_eq(e.unicode, "è")
+		helpers.assert_nil(e.keycode, "physical: the key code stays the physical key's")
+		local L, letters = fixture({ ergopti_base = true, ergopti_variant = "ergopti", game_keys_apps = { ["com.example.Game"] = "letters" } })
+		L.reload()
+		letters.keys = { ["è"] = 33 }
+		letters.front = "com.example.Game"
+		local down = event({}, "q")
+		L.key_down(down, KC_Q)
+		helpers.assert_eq(down.keycode, 33, "letters: the input source's key that types è")
+		helpers.assert_eq(down.unicode, "è", "the character stays Ergopti's")
+		local up = event({}, "q")
+		helpers.assert_true(not L.key_up(up, KC_Q), "the release is kept")
+		helpers.assert_eq(up.keycode, 33, "the release goes out on the same key code")
+		letters.front = "com.apple.TextEdit"
+		local other = event({}, "q")
+		L.key_down(other, KC_Q)
+		helpers.assert_nil(other.keycode, "another application follows the global choice")
+	end)
+
+	helpers.it("moves the key code over the installed Ergopti layout under « letters » (game-keys-letters)", function()
+		local M, record = fixture({ game_keys = "letters" })
+		M.reload()
+		record.ergopti_source = true
+		local e = event({}, "e")
+		helpers.assert_true(not M.key_down(e, KC_D), "the event is kept")
+		helpers.assert_eq(e.keycode, 14, "the US key of e")
+		helpers.assert_nil(e.unicode, "the installed layout's string is untouched")
+		record.ergopti_source = false
+		local plain = event({}, "e")
+		M.key_down(plain, KC_D)
+		helpers.assert_nil(plain.keycode, "another input source is left alone")
 	end)
 
 	helpers.it("rewrites a key-down to the emulated Ergopti text", function()
@@ -211,6 +274,32 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_nil(e.flags.alt, "no application reads an Option chord")
 	end)
 
+	-- AltGr and Shift+AltGr were off by default, so choosing Ergopti+ typed the
+	-- system layout's Option characters (maintainer report of 2026-11-23). The
+	-- four layers are on by default and the selection is their one gate
+	-- (layout-selection-is-the-gate).
+	helpers.it("types the four layers of a selected layout by default (layout-selection-is-the-gate)", function()
+		local M = fixture({ ergopti_variant = "ergopti_plus" })
+		helpers.assert_true(M.reload(), "the selected layout loads")
+		local altgr = event({ alt = true }, "œ")
+		helpers.assert_true(not M.key_down(altgr, KC_Q), "kept")
+		helpers.assert_eq(altgr.unicode, "`", "Ergopti+'s AltGr level")
+		local shift_altgr = event({ alt = true, shift = true }, "Œ")
+		helpers.assert_true(not M.key_down(shift_altgr, KC_Q), "kept")
+		helpers.assert_eq(shift_altgr.unicode, "„", "Ergopti+'s Shift+AltGr level")
+		local unticked = fixture({ ergopti_variant = "ergopti_plus", ergopti_alt_gr = false })
+		unticked.reload()
+		local passed = event({ alt = true }, "œ")
+		helpers.assert_true(not unticked.key_down(passed, KC_Q), "kept")
+		helpers.assert_nil(passed.unicode, "an unticked AltGr layer is left to the system layout")
+		local base = event({}, "q")
+		unticked.key_down(base, KC_Q)
+		helpers.assert_eq(base.unicode, "è", "the base layer stays emulated")
+		local none = fixture({ ergopti_base = true, ergopti_alt_gr = true, ergopti_variant = "none" })
+		helpers.assert_true(none.reload(), "« None » reloads")
+		helpers.assert_true(not none.status().active, "« None » emulates nothing, whatever the layers")
+	end)
+
 	helpers.it("names the ISO key pair by the keyboard's geometry", function()
 		local ansi = fixture({ emulated_layout = "ergopti", ergopti_base = true }, "ansi")
 		ansi.reload()
@@ -224,13 +313,14 @@ helpers.describe("layout emulation (macOS keymap tap)", function()
 		helpers.assert_eq(on_iso.unicode, "$", "code 10 is the key left of 1 on an ISO keyboard")
 	end)
 
-	helpers.it("lets the physical magic key and a paused driver through", function()
+	-- The magic key is a configured character since 2026-11-21: no physical key
+	-- is handed over, so the emulated Ergopti+ layout types its own ★ there.
+	helpers.it("types the emulated layout's own ★ key and lets a paused driver through", function()
 		local M, record = fixture({ emulated_layout = "ergopti_plus", ergopti_base = true })
 		M.reload()
-		record.magic = "KeyC"
 		local magic = event({}, "c")
 		helpers.assert_true(not M.key_down(magic, KC_C), "kept")
-		helpers.assert_nil(magic.unicode, "the magic key owns its unshifted press")
+		helpers.assert_eq(magic.unicode, "★", "the layout types its ★ key itself")
 		record.paused = true
 		local paused = event({}, "q")
 		M.key_down(paused, KC_Q)
@@ -277,6 +367,25 @@ local function source_fixture(table_)
 end
 
 helpers.describe("layout emulation (macOS): a layout source's records", function()
+	-- layout-context-keys-emulation: a layout's own repeat and magic keys type
+	-- from the hotstrings' buffer, the text typed before the key-down.
+	helpers.it("types a layout's repeat and magic keys from the text typed before (layout-context-keys)", function()
+		local corpus = "tests/corpus/layouts/source/"
+		local M, record = source_fixture(Json.decode(read_all(helpers.shared(corpus .. "context_emulation.json"))).macos)
+		helpers.assert_true(M.reload(), "the composed layout and its table load")
+		local KC_QUOTE = 39
+		for _, case in ipairs({ { KC_INTL, "book", "k" }, { KC_QUOTE, "the", "d" }, { KC_QUOTE, "ace", "s" } }) do
+			record.before = case[2]
+			local e = event({}, "x")
+			M.key_down(e, case[1])
+			helpers.assert_eq(e.unicode, case[3], "after " .. case[2])
+		end
+		record.before = "x"
+		local nothing = event({}, "x")
+		helpers.assert_true(M.key_down(nothing, KC_QUOTE), "a magic key typing nothing is deleted")
+		helpers.assert_nil(nothing.unicode, "and types nothing")
+	end)
+
 	helpers.it("types a held custom modifier's layer until its key-up (source-emulation)", function()
 		local M = source_fixture()
 		helpers.assert_true(M.reload(), "the composed layout and its table load")
@@ -385,5 +494,86 @@ helpers.describe("layout emulation (macOS): a layout source's records", function
 		local e = event({}, "a")
 		M.key_down(e, KC_A)
 		helpers.assert_eq(e.unicode, "a", "the custom modifier no longer holds")
+	end)
+end)
+
+-- Neo 2's levels: its emulation table on top of the source fixture's keylayout.
+local KC_Y, KC_EQUAL, KC_RIGHT_OPTION = 16, 24, 61
+local function neo_table()
+	return Json.decode(read_all(helpers.shared("tests/corpus/layouts/source/neo2_emulation.json"))).macos
+end
+
+--- Right Option's flagsChanged edge, its device flag set while it is down.
+local function right_option(down)
+	local e = event(down and { alt = true } or {})
+	e.right_option = down
+	return e
+end
+
+helpers.describe("layout emulation (macOS): Neo 2's Mod4 on right Option", function()
+	helpers.it("holds Mod4 on right Option and clears its Option flag from the keys under it (layout-levels-emulation)",
+		function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload(), "the Neo table loads")
+		helpers.assert_true(M.holds_modifier_key("AltRight"), "AltGr holds Mod4")
+		helpers.assert_true(M.flags_changed(right_option(true), KC_RIGHT_OPTION), "its press edge is deleted")
+		local e = event({ alt = true }, "x")
+		e.right_option = true
+		helpers.assert_true(not M.key_down(e, KC_Y), "the Mod4 text rides the event")
+		helpers.assert_eq(e.unicode, "¡")
+		helpers.assert_eq(e.flags.alt, nil, "no application reads right Option as Option")
+		local chord = event({ alt = true, cmd = true }, "y")
+		chord.right_option = true
+		M.key_down(chord, KC_Y)
+		helpers.assert_eq(chord.flags.alt, nil, "a key Mod4 leaves to macOS goes out without Option")
+		helpers.assert_true(M.flags_changed(right_option(false), KC_RIGHT_OPTION), "its release edge is deleted")
+		local after = event({}, "k")
+		M.key_down(after, KC_Y)
+		helpers.assert_true(after.unicode ~= "¡", "the release returns to the base level")
+	end)
+
+	helpers.it("keeps the Option flag of a left Option held with Mod4 (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		M.flags_changed(right_option(true), KC_RIGHT_OPTION)
+		local e = event({ alt = true, cmd = true }, "y")
+		e.right_option, e.left_option = true, true
+		M.key_down(e, KC_Y)
+		helpers.assert_eq(e.flags.alt, true, "the user's own left Option is kept")
+	end)
+
+	helpers.it("types the Mod4 dead diaeresis on the next base key (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		M.flags_changed(right_option(true), KC_RIGHT_OPTION)
+		local dead = event({ alt = true })
+		dead.right_option = true
+		helpers.assert_true(M.key_down(dead, KC_EQUAL), "the dead key-down is deleted")
+		local repeated = event({ alt = true })
+		repeated.right_option, repeated.autorepeat = true, true
+		helpers.assert_true(M.key_down(repeated, KC_EQUAL), "its auto-repeat is deleted")
+		helpers.assert_true(M.key_up(event({ alt = true }), KC_EQUAL), "its key-up is deleted")
+		M.flags_changed(right_option(false), KC_RIGHT_OPTION)
+		local e = event({}, "a")
+		helpers.assert_true(not M.key_down(e, KC_D), "the composed text rides the event")
+		helpers.assert_eq(e.unicode, "ä")
+	end)
+
+	helpers.it("leaves Caps Lock to macOS's lock (layout-levels-emulation)", function()
+		local M = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		helpers.assert_true(not M.holds_modifier_key("CapsLock"), "macOS never reports Caps Lock held")
+	end)
+
+	helpers.it("leaves right Option to macOS for the Ergopti layouts (ergopti-emulation-unchanged)", function()
+		local pinned = Json.decode(read_all(helpers.shared("tests/corpus/layouts/source/ergopti_emulation.json")))
+		for file, tables in pairs(pinned) do
+			local M = source_fixture(tables.macos)
+			helpers.assert_true(M.reload(), file .. ": the table loads")
+			helpers.assert_true(not M.holds_modifier_key("AltRight") and not M.holds_modifier_key("CapsLock"),
+				file .. ": neither key holds a modifier")
+			helpers.assert_true(not M.flags_changed(right_option(true), KC_RIGHT_OPTION),
+				file .. ": right Option's edge reaches macOS")
+		end
 	end)
 end)

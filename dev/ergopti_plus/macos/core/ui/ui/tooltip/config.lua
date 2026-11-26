@@ -42,6 +42,7 @@
 ---   [timing]      llm_timeout_sec        → DEFAULT_LLM_TIMEOUT_SEC
 ---   [timing]      timeout_decrement_sec  → TIMEOUT_DECREMENT_SEC
 ---   [timing]      timeout_floor_sec      → TIMEOUT_FLOOR_SEC
+---   [timing]      safety_timeout_sec     → SAFETY_TIMEOUT_SEC
 --- ==============================================================================
 
 local M = {}
@@ -65,11 +66,19 @@ local DEFAULT_TIMEOUT_SEC     = nil
 local DEFAULT_LLM_TIMEOUT_SEC = nil
 local TIMEOUT_FLOOR_SEC       = nil
 local TIMEOUT_DECREMENT_SEC   = nil
+-- How long a tooltip asked for with no duration stays (TWD-1).
+local SAFETY_TIMEOUT_SEC      = nil
 
 M.settings = {
 	timeout_sec          = 0,
 	llm_timeout_sec      = 0,
-	colorization_enabled = true
+	colorization_enabled = true,
+	-- The category glyph beside each preview row's trigger label
+	-- (hotstrings.preview_category_glyphs); set by the menu's switch.
+	category_glyphs_enabled = true,
+	-- Whether VoiceOver is told the previews and the finished predictions
+	-- (hotstrings.preview_announcements); set by the menu's switch.
+	announcements_enabled = true,
 }
 
 -- Accent colors per display context — loaded from TOML [accent_colors].
@@ -86,12 +95,14 @@ M.accent_colors = {}
 -- ===================================
 
 --- Safely sets the general tooltip timeout.
---- @param seconds number The duration in seconds. Uses 0 for infinite.
+--- A duration of 0 (a hotstring preview with no delay) hides after the shared
+--- [timing] safety_timeout_sec, as on Windows and Linux (TWD-1, decided by the
+--- maintainer on 2026-11-16); it used to stay until the next key.
+--- @param seconds number The duration in seconds; 0 for the safety lifetime.
 function M.set_timeout(seconds)
 	local base_timeout = tonumber(seconds) or DEFAULT_TIMEOUT_SEC
 	if base_timeout <= 0 then
-		M.settings.timeout_sec = 0
-		Logger.info(LOG, "Standard timeout disabled (infinite).")
+		M.settings.timeout_sec = SAFETY_TIMEOUT_SEC
 	else
 		M.settings.timeout_sec = math.max(TIMEOUT_FLOOR_SEC, base_timeout - TIMEOUT_DECREMENT_SEC)
 	end
@@ -114,6 +125,20 @@ end
 function M.set_colorization_enabled(enabled)
 	M.settings.colorization_enabled = (enabled == true)
 	Logger.info(LOG, "Colorization explicitly set to: " .. tostring(M.settings.colorization_enabled) .. ".")
+end
+
+--- Shows or hides the category glyph of the hotstring previews.
+--- @param enabled boolean
+function M.set_category_glyphs_enabled(enabled)
+	M.settings.category_glyphs_enabled = (enabled == true)
+	Logger.info(LOG, "Category glyphs explicitly set to: " .. tostring(M.settings.category_glyphs_enabled) .. ".")
+end
+
+--- Lets or stops VoiceOver being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled)
+	M.settings.announcements_enabled = (enabled == true)
+	Logger.info(LOG, "Screen-reader announcements explicitly set to: " .. tostring(M.settings.announcements_enabled) .. ".")
 end
 
 --- Applies a table of configuration parameters.
@@ -173,7 +198,7 @@ function M.tint(key)
 
 	local category = TINT_KEY_TO_CATEGORY[key]
 	if category then
-		local ok, hs_cfg = pcall(require, "modules.hotstrings.hotstrings_config")
+		local ok, hs_cfg = pcall(require, "hotstrings.engine.catalogue.config")
 		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
 			local resolved = hs_cfg.resolve(category, nil)
 			local rgba = resolved and parse_hex_color(resolved.color)
@@ -182,6 +207,24 @@ function M.tint(key)
 	end
 
 	return M.accent_colors[key]
+end
+
+--- The category glyph of a display context and the i18n key that names it,
+--- resolved like the tint through the same category; nil when the glyph switch
+--- is off or the key has no category. resolve() is memoised, so this costs a
+--- table lookup on the preview path.
+--- @param key string The context key ("hotstring_star", …).
+--- @return string|nil glyph
+--- @return string|nil name_key
+function M.glyph(key)
+	if not M.settings.category_glyphs_enabled then return nil, nil end
+	local category = TINT_KEY_TO_CATEGORY[key]
+	if not category then return nil, nil end
+	local ok, hs_cfg = pcall(require, "hotstrings.engine.catalogue.config")
+	if not ok or type(hs_cfg) ~= "table" or type(hs_cfg.resolve) ~= "function" then return nil, nil end
+	local resolved = hs_cfg.resolve(category, nil)
+	if type(resolved) ~= "table" then return nil, nil end
+	return resolved.glyph, resolved.glyph_name_key
 end
 
 --- Overrides the accent color for a given tooltip display context.
@@ -232,17 +275,7 @@ local function load_from_shared()
 		error("[tooltip/config] cannot read constants.toml (missing or empty): " .. tostring(toml_path))
 	end
 
-	local function require_key(section, key)
-		local s = c.sections[section]
-		if type(s) ~= "table" then
-			error(string.format("[tooltip/config] missing section [%s] in constants.toml", section))
-		end
-		local v = s[key]
-		if v == nil then
-			error(string.format("[tooltip/config] missing key [%s].%s in constants.toml", section, key))
-		end
-		return v
-	end
+	local require_key = require("core.ui.engine.tooltip.constant_keys").reader(c.sections, "[tooltip/config]")
 
 	local function optional_key(section, key)
 		local s = c.sections[section]
@@ -284,6 +317,10 @@ local function load_from_shared()
 	M.layout.screen_margin = require_key("layout", "screen_margin")
 	M.layout.corner_radius = require_key("layout", "corner_radius")
 	M.layout.label_gap     = require_key("layout", "label_gap")
+	-- The framed badge of a preview row's category glyph (CategoryGlyph.badge_geometry).
+	M.layout.glyph_badge_pad_x  = require_key("layout", "glyph_badge_pad_x")
+	M.layout.glyph_badge_pad_y  = require_key("layout", "glyph_badge_pad_y")
+	M.layout.glyph_badge_gap    = require_key("layout", "glyph_badge_gap")
 	M.layout.llm_max_content_width = require_key("layout", "llm_max_content_width")
 
 	-- [positioning]
@@ -302,6 +339,8 @@ local function load_from_shared()
 	-- look. border_alpha_hs is the canvas-tuned alpha; never hardcode it.
 	M.colors.border   = { white = require_key("colors", "border_white"), alpha = require_key("colors", "border_alpha_hs") }
 	M.colors.hint     = { white = require_key("colors", "hint_white"), alpha = require_key("colors", "hint_alpha") }
+	-- The fill of the category glyph chip, 4.5:1 against every tint.
+	M.colors.glyph_badge = { white = require_key("colors", "glyph_badge_white"), alpha = 1 }
 	M.colors.info_bar = { white = require_key("colors", "info_white"), alpha = require_key("colors", "info_alpha") }
 	M.colors.invis    = { white = require_key("colors", "invis_white"), alpha = require_key("colors", "invis_alpha") }
 	M.colors.loading_text = { white = require_key("colors", "loading_text_white"), alpha = require_key("colors", "loading_text_alpha") }
@@ -355,9 +394,11 @@ local function load_from_shared()
 	DEFAULT_LLM_TIMEOUT_SEC = require_key("timing", "llm_timeout_sec")
 	TIMEOUT_DECREMENT_SEC   = require_key("timing", "timeout_decrement_sec")
 	TIMEOUT_FLOOR_SEC       = require_key("timing", "timeout_floor_sec")
+	SAFETY_TIMEOUT_SEC      = require_key("timing", "safety_timeout_sec")
 	M.timing = {
 		timeout_decrement_sec = TIMEOUT_DECREMENT_SEC,
 		timeout_floor_sec     = TIMEOUT_FLOOR_SEC,
+		safety_timeout_sec    = SAFETY_TIMEOUT_SEC,
 	}
 	M.settings.timeout_sec     = DEFAULT_TIMEOUT_SEC
 	M.settings.llm_timeout_sec = DEFAULT_LLM_TIMEOUT_SEC

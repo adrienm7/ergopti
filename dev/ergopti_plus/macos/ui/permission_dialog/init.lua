@@ -28,12 +28,20 @@
 ---    permission replaces it. Its owner hears of every close through on_closed.
 --- 5. Closed by its owner: the caller closes it as soon as its poll sees the
 ---    grant, so nobody has to dismiss a dialog about a permission already given.
---- 6. Names the entry macOS lists: the Accessibility grant belongs to the
----    running runtime, listed as "Hammerspoon", so its steps name it and give
----    its bundle path for the + button. The icon shown is that runtime's own
----    icon, the one beside the switch in the list. The Login Items steps name
----    "Allow in the Background", where macOS lists the remap guardian under the
----    app's name; that list has no + button, so they quote no path.
+--- 6. Names the app the user installed: a first install's grant to the
+---    "Hammerspoon" entry macOS's own prompt adds did not start the driver; it
+---    started once ErgoptiPlus.app itself was added with + and turned on
+---    (field report 2026-11-23). The embedded runtime is launched by the
+---    ErgoptiPlus launcher from inside its bundle, so the Accessibility steps
+---    name ErgoptiPlus and quote the path of ErgoptiPlus.app, the bundle the
+---    user selects after +, never the runtime nested in it. The Login Items
+---    steps name "Allow in the Background", where macOS lists the remap
+---    guardian under the app's name; that list has no + button, so they quote
+---    no path.
+--- 7. Steps a first-time user can follow: open the pane, click +, go to the
+---    path with Cmd+Shift+G, choose the app, turn the switch on. The body says
+---    the driver resumes by itself, so nobody looks for a reload in a runtime
+---    menu they do not know about.
 --- ==============================================================================
 
 local M = {}
@@ -52,21 +60,30 @@ local LOG = "permission_dialog"
 M.BRIDGE = "permission_dialog_bridge"
 
 -- Permissions this dialog explains. Each owns the locale keys under its prefix
--- and lists its steps in order; the first names the button that opens the
--- pane. `names_copies` formats its second step with the other copies of the
--- app, `names_bundle` adds the + step quoting the runtime path, and
--- `floating` marks the one kind shown before Accessibility is granted (see
+-- (ending in "." so the translation audit sees the family as used) and lists
+-- its steps in order; the first names the button that opens the
+-- pane. `names_copies` formats `step_other_copies` with the other copies of
+-- the app; `names_bundle` requires the app path, quoted by the shared
+-- `step_add` (the + step) and named with the app by `step_toggle`; and
+-- `floating` marks the kinds shown before Accessibility is granted (see
 -- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused instead.
 M.KINDS = {
+	accessibility = {
+		prefix       = "permission_dialog.accessibility.",
+		steps        = { "step_opened", "step_add", "step_toggle" },
+		names_copies = false,
+		names_bundle = true,
+		floating     = true,
+	},
 	accessibility_copies = {
-		prefix       = "permission_dialog.accessibility_copies",
-		steps        = { "step_opened", "step_other_copies", "step_toggle" },
+		prefix       = "permission_dialog.accessibility_copies.",
+		steps        = { "step_opened", "step_other_copies", "step_add", "step_toggle" },
 		names_copies = true,
 		names_bundle = true,
 		floating     = true,
 	},
 	login_items = {
-		prefix       = "permission_dialog.login_items",
+		prefix       = "permission_dialog.login_items.",
 		steps        = { "step_opened", "step_section", "step_toggle" },
 		names_bundle = false,
 		floating     = false,
@@ -88,6 +105,14 @@ local _session = nil
 -- ======= 1/ Internal helpers =========
 -- =====================================
 
+--- Returns the name Finder and System Settings show for an app bundle path.
+--- @param bundle_path any Absolute path ending in ".app".
+--- @return string|nil name Nil when the value names no app bundle.
+function M.app_name(bundle_path)
+	if type(bundle_path) ~= "string" then return nil end
+	return bundle_path:match("^/.-([^/]+)%.app$")
+end
+
 --- Checks a show request before any side effect.
 --- @param spec table Show request.
 local function validate(spec)
@@ -98,9 +123,8 @@ local function validate(spec)
 	if type(spec.open_settings) ~= "function" then
 		error("permission_dialog.show: open_settings must be a function", 3)
 	end
-	if M.KINDS[spec.kind].names_bundle
-		and (type(spec.bundle_path) ~= "string" or spec.bundle_path == "") then
-		error("permission_dialog.show: bundle_path must be a non-empty string", 3)
+	if M.KINDS[spec.kind].names_bundle and M.app_name(spec.bundle_path) == nil then
+		error("permission_dialog.show: bundle_path must be the absolute path of an .app bundle", 3)
 	end
 	if M.KINDS[spec.kind].names_copies and (type(spec.copies) ~= "table" or #spec.copies == 0) then
 		error("permission_dialog.show: copies must be a non-empty list", 3)
@@ -151,12 +175,14 @@ local function escape_html(text)
 	}))
 end
 
---- Returns the running app's icon as a data URL, the icon macOS shows beside
---- the switch to turn on.
+--- Returns the icon macOS shows beside the switch to turn on, as a data URL:
+--- the named app's own icon, or the running app's for a kind naming no app.
+--- @param bundle_path string|nil App the steps name.
 --- @return string|nil url Nil when the icon cannot be encoded.
-local function app_icon_url()
+local function app_icon_url(bundle_path)
 	local ok, url = pcall(function()
-		local image = hs.image.imageFromName("NSApplicationIcon")
+		local image = bundle_path ~= nil and require("adapters.accessibility_permission").app_icon(bundle_path)
+			or hs.image.imageFromName("NSApplicationIcon")
 		return image and image:encodeAsURLString() or nil
 	end)
 	if not ok or type(url) ~= "string" or url == "" then
@@ -168,35 +194,41 @@ end
 
 --- Resolves every translated string of one dialog.
 --- @param kind string Permission kind.
---- @param bundle_path string|nil Path of the runtime the grant belongs to, for
----        a kind that names it.
+--- @param bundle_path string|nil Path of the app the user adds with +, for a
+---        kind that names it.
 --- @param copies table|nil Paths of the other copies, for a kind that names them.
---- @return table content { locale, window_title, title, body, steps, open_label, later_label }
+--- @return table content { locale, window_title, title, body, steps,
+---         path_step (index of the step quoting bundle_path, or nil),
+---         open_label, later_label }
 function M.content(kind, bundle_path, copies)
 	local spec = M.KINDS[kind]
 	local prefix = spec.prefix
 	local open_label = i18n.get("permission_dialog.open_settings")
 	local steps = {}
+	local path_step = nil
 	for index, name in ipairs(spec.steps) do
+		if name == "step_add" and spec.names_bundle then path_step = index end
 		if index == 1 then
 			-- The dialog opens before the pane does, and the pane may not open
 			-- at all, so this step names the button that opens it again.
-			steps[index] = i18n.format(prefix .. "." .. name, open_label)
-		elseif index == 2 and spec.names_copies then
-			steps[index] = i18n.format(prefix .. "." .. name, table.concat(copies, ", "))
+			steps[index] = i18n.format(prefix .. name, open_label)
+		elseif name == "step_other_copies" and spec.names_copies then
+			steps[index] = i18n.format(prefix .. name, table.concat(copies, ", "))
+		elseif name == "step_add" and spec.names_bundle then
+			steps[index] = i18n.format("permission_dialog.step_add", M.app_name(bundle_path), bundle_path)
+		elseif name == "step_toggle" and spec.names_bundle then
+			steps[index] = i18n.format(prefix .. name, M.app_name(bundle_path))
 		else
-			steps[index] = i18n.get(prefix .. "." .. name)
+			steps[index] = i18n.get(prefix .. name)
 		end
-	end
-	if spec.names_bundle then
-		steps[#steps + 1] = i18n.format("permission_dialog.step_add", bundle_path)
 	end
 	return {
 		locale       = i18n.get_locale(),
 		window_title = i18n.get("permission_dialog.window_title"),
-		title        = i18n.get(prefix .. ".title"),
-		body         = i18n.get(prefix .. ".body"),
+		title        = i18n.get(prefix .. "title"),
+		body         = i18n.get(prefix .. "body"),
 		steps        = steps,
+		path_step    = path_step,
 		open_label   = open_label,
 		later_label  = i18n.get("common.later"),
 	}
@@ -237,8 +269,9 @@ function M.render(content, bundle_path, icon_url)
 	local steps = {}
 	for index, step in ipairs(content.steps) do
 		local text = escape_html(step)
-		-- The path is the one fragment the user copies; it is set apart as code.
-		if bundle_path ~= nil and index == #content.steps then
+		-- The path is the one fragment the user copies; it is set apart as code
+		-- in the + step only, where another copy's path cannot be mistaken for it.
+		if bundle_path ~= nil and index == content.path_step then
 			local quoted = escape_html(bundle_path)
 			local at = text:find(quoted, 1, true)
 			if at ~= nil then
@@ -255,15 +288,19 @@ function M.render(content, bundle_path, icon_url)
 		escape_html(content.body), "</p></div></div>",
 		"<ol>", table.concat(steps), "</ol>",
 		"<div class=\"buttons\"><button id=\"later\">", escape_html(content.later_label),
-		"</button><button id=\"open\" class=\"default\">", escape_html(content.open_label),
+		"</button><button id=\"open\" class=\"default\" autofocus>", escape_html(content.open_label),
 		"</button></div>",
 		"<script>",
 		"function send(a){try{window.webkit.messageHandlers.", M.BRIDGE,
 		".postMessage({action:a});}catch(e){}}",
 		"document.getElementById('open').onclick=function(){send('open_settings');};",
 		"document.getElementById('later').onclick=function(){send('later');};",
+		-- Enter on a focused button is that button's click: answering it here too
+		-- sent "open_settings" before the "later" the user chose (PRM-01).
 		"document.addEventListener('keydown',function(e){",
-		"if(e.key==='Enter'){send('open_settings');}else if(e.key==='Escape'){send('later');}});",
+		"if(e.key==='Enter'){if(e.target&&e.target.tagName==='BUTTON')return;",
+		"e.preventDefault();send('open_settings');}",
+		"else if(e.key==='Escape'){e.preventDefault();send('later');}});",
 		"</script></body></html>",
 	})
 end
@@ -334,7 +371,7 @@ end
 --- Never blocks: the call returns as soon as the window is on screen.
 --- @param spec table { kind = a key of M.KINDS,
 ---        open_settings = fn() -> boolean (reopens the exact pane),
----        bundle_path = string (runtime the grant belongs to; required by a
+---        bundle_path = string (the .app the user adds with +; required by a
 ---        kind that names it),
 ---        on_closed = fn()|nil (called once when this dialog closes, whoever
 ---        closes it; an open dialog keeps the one it was opened with) }.
@@ -390,7 +427,7 @@ function M.show(spec)
 			frame         = dialog_frame(geometry),
 			title         = content.window_title,
 			usercontent   = usercontent,
-			html_string   = M.render(content, spec.bundle_path, app_icon_url()),
+			html_string   = M.render(content, spec.bundle_path, app_icon_url(spec.bundle_path)),
 			inject_i18n   = false,
 			delete_on_close = true,
 			-- Accessibility is the factory's one floating exception (see
@@ -458,36 +495,39 @@ function M.close(kind)
 	return true
 end
 
---- Names the other copies of the app that can hold the Accessibility switch,
---- for the boot wait. Never raises and never blocks: the wait keeps polling
---- whatever happens here, with the Settings pane already open and macOS's
---- prompt shown, so a dialog failure costs the paths, not the boot.
+--- Shows the Accessibility steps for the boot wait: how to add and turn on
+--- the app, and, when other copies signed differently are registered, which
+--- ones to remove first. Never raises and never blocks: the wait keeps
+--- polling whatever happens here, with the Settings pane already open and
+--- macOS's prompt shown, so a dialog failure costs the steps, not the boot.
 --- @param permission table Accessibility permission adapter
----        { bundle_path(), open_settings() }.
---- @param copies table Paths of the other copies, at least one.
+---        { grant_app_path(), open_settings() }.
+--- @param copies table Paths of the other copies; empty for a lone copy.
 --- @return function close Closes the dialog; the wait calls it on the grant.
-function M.name_other_copies(permission, copies)
+function M.guide_accessibility(permission, copies)
+	if type(copies) ~= "table" then error("permission_dialog.guide_accessibility: copies must be a list", 2) end
+	local kind = #copies > 0 and "accessibility_copies" or "accessibility"
 	local function close_dialog()
-		local ok, err = xpcall(M.close, debug.traceback, "accessibility_copies")
-		if not ok then Logger.error(LOG, "The Accessibility copies dialog close raised: %s.", tostring(err)) end
+		local ok, err = xpcall(M.close, debug.traceback, kind)
+		if not ok then Logger.error(LOG, "The %s dialog close raised: %s.", kind, tostring(err)) end
 	end
 	local ok, shown = xpcall(function()
-		local bundle_path, path_err = permission.bundle_path()
-		if bundle_path == nil then
-			Logger.error(LOG, "The Accessibility copies dialog cannot name the app: %s.", tostring(path_err))
+		local app_path, path_err = permission.grant_app_path()
+		if app_path == nil then
+			Logger.error(LOG, "The %s dialog cannot name the app: %s.", kind, tostring(path_err))
 			return false
 		end
 		return M.show({
-			kind          = "accessibility_copies",
+			kind          = kind,
 			open_settings = permission.open_settings,
-			bundle_path   = bundle_path,
-			copies        = copies,
+			bundle_path   = app_path,
+			copies        = #copies > 0 and copies or nil,
 		})
 	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "The Accessibility copies dialog raised while opening: %s.", tostring(shown))
+		Logger.error(LOG, "The %s dialog raised while opening: %s.", kind, tostring(shown))
 	elseif shown ~= true then
-		Logger.warn(LOG, "The Accessibility copies dialog is not shown; the Settings pane and the macOS prompt remain.")
+		Logger.warn(LOG, "The %s dialog is not shown; the Settings pane and the macOS prompt remain.", kind)
 	end
 	return close_dialog
 end

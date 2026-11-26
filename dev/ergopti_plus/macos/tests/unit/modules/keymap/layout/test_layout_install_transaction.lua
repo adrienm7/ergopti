@@ -546,4 +546,48 @@ helpers.describe("layout_install: missing optional directories", function()
 	end)
 end)
 
+-- The menu installed the bundle in the user folder but offered no way to take
+-- it out again; Windows and Linux both remove what they install
+-- (layout-bundle-remove).
+helpers.describe("layout_install: removing the user bundle (layout-bundle-remove)", function()
+	helpers.it("moves the exact checked bundle out of the folder before deleting it (layout-bundle-remove)", function()
+		local install = helpers.load_with_stubs("modules.keymap.layout_install")
+		helpers.assert_eq(type(install.remove_user), "function", "the install owner removes what it installed")
+		local command = install.build_remove_transaction("/Users/me/Library/Keyboard Layouts/", "Ergopti_v2.2.1.bundle")
+		helpers.assert_true(type(command) == "string" and command ~= "")
+		local checked = command:find('Contents/Info.plist" ]', 1, true)
+		local moved = command:find('mv "$target/$name" "$work/$name"', 1, true)
+		local deleted = command:find('rm -rf "$work"', 1, true)
+		helpers.assert_true(checked and moved and deleted and checked < moved and moved < deleted,
+			"the bundle is checked, moved aside, then its private folder deleted")
+		for _, name in ipairs({ "../Ergopti_v2.2.1.bundle", "Other.bundle", "Ergopti_v2.2.1.bundle; rm -rf ~", "" }) do
+			helpers.assert_nil((install.build_remove_transaction("/tmp/layouts", name)), "refused: " .. name)
+		end
+	end)
+
+	helpers.it("removes only a bundle the user folder holds, under the install owner (layout-bundle-remove)", function()
+		with_fake_bundle_listing("Ergopti_v2.2.1.bundle", function()
+			local commands = {}
+			local install
+			install = helpers.load_with_stubs("modules.keymap.layout_install", {
+				execute = function(command)
+					commands[#commands + 1] = command
+					-- A removal never interleaves with an install.
+					helpers.assert_eq(install.install_user("/tmp/source", "Ergopti_v2.2.1.bundle"), false)
+					return "", true
+				end,
+				fs = { attributes = function() return { mode = "file" } end },
+			})
+			local removed, reason = install.remove_user("Ergopti_v9.9.9.bundle")
+			helpers.assert_eq(removed, false)
+			helpers.assert_eq(reason, "not_installed")
+			helpers.assert_eq(#commands, 0, "nothing runs for a bundle the folder does not hold")
+			helpers.assert_eq(install.remove_user("Ergopti_v2.2.1.bundle"), true)
+			helpers.assert_eq(#commands, 1)
+			helpers.assert_contains(commands[1], "Ergopti_v2.2.1.bundle")
+			helpers.assert_contains(commands[1], (install.USER_LAYOUTS_DIR:gsub("/+$", "")))
+		end)
+	end)
+end)
+
 package.loaded["platform.remap.lease_helper"] = original_resolver

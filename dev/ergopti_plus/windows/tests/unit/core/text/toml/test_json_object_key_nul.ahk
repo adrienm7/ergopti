@@ -92,6 +92,183 @@ _JOKN_MemberPathNulRefusals() {
 Test("JSON: public member paths refuse native NUL aliases before lookup (json-member-spans)",
 	_JOKN_MemberPathNulRefusals)
 
+; perf-json-member-spans-2026-11-17: the span owner decoded the whole document
+; to validate it, then decoded every member value of each walked object again
+; to find its end; three decodes of the AI catalogue made its boot load 440 ms.
+; Validation and the walks now build nothing: only the returned descriptors.
+_JOKN_MemberSpansBuildNoTree() {
+	Source := '{"providers":{"a":{"models":[{"id":"x","tags":["t"]}],"auth":{"k":{"v":1}}},'
+		. '"b":{"models":[[1,2],{"deep":{"deeper":{"deepest":[null]}}}]}},"order":["a","b"]}'
+	Before := JsonDecodeTally()["containers"]
+	Providers := JsonObjectMemberSpans(Source, ["providers"])
+	Root := JsonObjectMemberSpans(Source)
+	AssertEqual(Before, JsonDecodeTally()["containers"],
+		"member spans must validate and walk without building a decoded container")
+	AssertEqual(2, Providers.Count)
+	AssertEqual("object", Providers["b"]["kind"])
+	AssertEqual("array", Root["order"]["kind"])
+	AssertEqual('["a","b"]', Root["order"]["text"])
+	AssertEqual(JsonParse(Providers["b"]["text"])["models"][2]["deep"]["deeper"]["deepest"].Length, 1,
+		"a skipped value's span is still its exact decodable source")
+}
+Test("JSON: member spans validate and walk without decoding the document (json-member-spans)",
+	_JOKN_MemberSpansBuildNoTree)
+
+; Checks every object of a member span tree against JsonObjectMemberSpans of
+; that object's own text: same members, kinds and exact source, offsets in Source.
+_JOKN_AssertTreeMatchesSpans(Source, Tree, ObjectText, Where) {
+	Expected := JsonObjectMemberSpans(ObjectText)
+	AssertEqual(Expected.Count, Tree.Count, Where . ": the tree holds every decoded member")
+	for Key, Span in Expected {
+		AssertTrue(Tree.Has(Key), Where . ": the tree holds " . Key)
+		Node := Tree[Key]
+		AssertEqual(Span["text"], Node["text"], Where . "." . Key . " keeps its exact source")
+		AssertEqual(Span["kind"], Node["kind"], Where . "." . Key . " keeps its source kind")
+		AssertEqual(Node["text"], SubStr(Source, Node["start"], Node["length"]),
+			Where . "." . Key . " has its offsets in the whole text")
+		AssertEqual(Span["kind"] == "object", Node.Has("members"), Where . "." . Key . " nests only an object")
+		if Node.Has("members")
+			_JOKN_AssertTreeMatchesSpans(Source, Node["members"], Node["text"], Where . "." . Key)
+	}
+}
+
+; Two decoded values are the same, the JSON null sentinel included.
+_JOKN_SameDecoded(A, B) {
+	if (A is Map) {
+		if !(B is Map) || A.Count != B.Count
+			return false
+		for Key, Value in A
+			if !B.Has(Key) || !_JOKN_SameDecoded(Value, B[Key])
+				return false
+		return true
+	}
+	if (A is Array) {
+		if !(B is Array) || A.Length != B.Length
+			return false
+		for Index, Value in A
+			if !_JOKN_SameDecoded(Value, B[Index])
+				return false
+		return true
+	}
+	if IsObject(A) || IsObject(B)
+		return ObjPtr(A) == ObjPtr(B)
+	return Type(A) == Type(B) && A == B
+}
+
+; perf-ai-catalogue-walks-2026-11-18: the AI catalogue was decoded, walked whole
+; again for its provider spans, and each provider's slice walked once more. One
+; decode and one span walk now give the same spans, at every depth.
+_JOKN_MemberSpanTreeMatchesSpans() {
+	global _SharedDir
+	Sources := [
+		' { "layouts" : { "valid" : {"id":"valid"}, "retired" : [false, null, 1.25e+2, {"comma":"},:"}] }, "tail":true } ',
+		'{"x":1,"x":{"a":2},"x":{"b":{"c":false}}}',
+		'{"a\"b": {"value":"é😀"},"Case":{"k":1},"case":{"k":2},"":{}}',
+		'{"n":-0,"big":1234567890123456789,"f":1.5e-3,"s":"\\\"\/\b\f\n\r\té","t":true,"z":null}',
+		'{"deep":{"a":{"b":{"c":{"d":[{"e":{"f":1}}]}}}}}',
+		'{}'
+	]
+	for Name in ["api_providers.json", "local_servers.json", "thinking_off.json"]
+		Sources.Push(FileRead(_SharedDir . "\ai\data\" . Name, "UTF-8"))
+	for Index, Source in Sources {
+		Where := "source " . Index
+		_JOKN_AssertTreeMatchesSpans(Source, JsonObjectMemberSpanTree(Source), Source, Where)
+		Document := JsonParseWithMemberSpans(Source, [])
+		AssertTrue(_JOKN_SameDecoded(JsonParse(Source), Document["root"]), Where . ": the root is JsonParse's")
+		_JOKN_AssertTreeMatchesSpans(Source, Document["members"], Source, Where . " (decoded)")
+	}
+	Catalogue := Sources[Sources.Length - 2]
+	Providers := JsonParseWithMemberSpans(Catalogue, ["providers"])["members"]
+	_JOKN_AssertTreeMatchesSpans(Catalogue, Providers, JsonObjectMemberSpans(Catalogue)["providers"]["text"], "providers")
+	Paths := '{"Node":{"value":1},"node":{"value":2},"twice":{"v":1},"twice":{"v":2}}'
+	AssertEqual("2", JsonParseWithMemberSpans(Paths, ["node"])["members"]["value"]["text"],
+		"decoded path parts keep their case")
+	AssertEqual("2", JsonParseWithMemberSpans(Paths, ["twice"])["members"]["v"]["text"],
+		"the path follows the member the decoder kept, the last one")
+	AssertEqual(0, JsonParseWithMemberSpans('{"empty":{}}', ["empty"])["members"].Count)
+}
+Test("JSON: a member span tree holds the member spans of every nested object (json-member-span-tree)",
+	_JOKN_MemberSpanTreeMatchesSpans)
+
+_JOKN_MemberSpanTreeRefusals() {
+	for Source in ['{"layouts":{}} trailing', '{"layouts":{"safe":1},"later":[1,]}',
+		'{"layouts":{"safe":1},"\u0000":2}', '{"layouts":{"safe":1},"later":1e999}', '{"a":"\q"}'] {
+		AssertThrows(JsonObjectMemberSpanTree.Bind(Source), "the span tree validates the whole document")
+		AssertThrows(JsonParseWithMemberSpans.Bind(Source, ["layouts"]), "the decode refuses the whole document")
+	}
+	for Source in ['[]', 'null', 'false', '1', '"object"'] {
+		Message := ""
+		try JsonObjectMemberSpanTree(Source)
+		catch as Err
+			Message := Err.Message
+		AssertEqual("Selected JSON member is not an object.", Message, "a non-object root has no span tree")
+		Document := JsonParseWithMemberSpans(Source, [])
+		AssertFalse(Document["members"], "a decoded non-object root selects no members")
+		AssertTrue(_JOKN_SameDecoded(JsonParse(Source), Document["root"]), "and is still returned decoded")
+	}
+	for Path in [["missing"], ["array"], ["scalar"], ["nested", "array"], ["twice"]]
+		AssertFalse(JsonParseWithMemberSpans('{"array":[],"scalar":1,"nested":{"array":[]},"twice":{},"twice":2}',
+			Path)["members"], "a path that selects no object selects no members")
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', "x"))
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', [1]))
+	AssertThrows(() => JsonParseWithMemberSpans('{"x":{}}', ["x" . Chr(0) . "hidden"]))
+	Tree := JsonObjectMemberSpanTree('{"o":{"k":1},"s":"x"}')
+	AssertEqual(1, JsonSpanObjectMembers(Tree["o"]).Count, "an object span gives its members")
+	Message := ""
+	try JsonSpanObjectMembers(Tree["s"])
+	catch as Err
+		Message := Err.Message
+	AssertEqual("Selected JSON member is not an object.", Message,
+		"a scalar span is refused as JsonObjectMemberSpans refuses its text")
+}
+Test("JSON: a member span tree keeps the whole-document and non-object refusals (json-member-span-tree)",
+	_JOKN_MemberSpanTreeRefusals)
+
+; The decode is the one complete-document pass: the span walk that follows it,
+; at any depth, walks no text again.
+_JOKN_DecodeWithSpansWalksOnce() {
+	global _SharedDir
+	Source := FileRead(_SharedDir . "\ai\data\api_providers.json", "UTF-8")
+	Before := JsonDecodeTally()
+	JsonParseWithMemberSpans(Source, ["providers"])
+	After := JsonDecodeTally()
+	AssertEqual(1, After["document_passes"] - Before["document_passes"], "the decode is the only document pass")
+	AssertEqual(StrLen(Source), After["document_units"] - Before["document_units"], "over the text, once")
+	Before := JsonDecodeTally()
+	JsonObjectMemberSpanTree(Source)
+	After := JsonDecodeTally()
+	AssertEqual(1, After["document_passes"] - Before["document_passes"], "the span tree validates once")
+	AssertEqual(Before["containers"], After["containers"], "and decodes nothing")
+}
+Test("JSON: a decode with member spans walks its text once (json-member-span-tree)",
+	_JOKN_DecodeWithSpansWalksOnce)
+
+; perf-shared-json-roots-2026-11-17: four boot owners each decoded the 130 KB
+; physical-key registry (about 170 ms apiece). One decode is shared while the
+; text read is unchanged, and an edited text is decoded again.
+_JOKN_SharedRootFollowsItsText() {
+	Key := "shared-root-test-" . A_TickCount
+	First := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	Before := JsonDecodeTally()["containers"]
+	Again := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC01E"}}}')
+	AssertTrue(ObjPtr(First) == ObjPtr(Again), "an unchanged text must reuse the decoded root")
+	AssertEqual(Before, JsonDecodeTally()["containers"], "a reused root decodes nothing")
+	Edited := JsonParseShared(Key, '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertEqual("SC010", Edited["keys"]["KeyA"]["ahk"], "an edited text must be decoded again")
+	AssertEqual("SC01E", First["keys"]["KeyA"]["ahk"], "an earlier root is never rewritten")
+	Other := JsonParseShared(Key . "-other", '{"keys":{"KeyA":{"ahk":"SC010"}}}')
+	AssertFalse(ObjPtr(Other) == ObjPtr(Edited), "documents of different paths never share a root")
+	; Every owner of the registry decodes it through the shared root, the composed
+	; layout's source emulation too: it only reads the registry to name its scan
+	; codes, and its session is built from the layout's own model.
+	for Owner in ["WPMWidget_TypingBurstIndex", "StarSlotPhysicalCatalogue", "LayoutEmulationRows",
+			"KeymapLayers_LoadContext", "_KLE_SourceBoot"]
+		AssertTrue(InStr(_DriverFuncBody(Owner), "JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))"),
+			Owner . " must read the physical-key registry through its shared root")
+}
+Test("JSON: a shared root is reused for an unchanged text and decoded again for an edited one (json-shared-root)",
+	_JOKN_SharedRootFollowsItsText)
+
 
 _JsonArraySpans_PreserveExactOrderedTokenKinds() {
 	Source := ' [ true , 1, false, 0, "true", null, {"size":true,"\u0073ize":1}, ["é", {"x":"nested"}] ] '

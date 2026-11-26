@@ -3,6 +3,38 @@
 // =====================================================
 // =====================================================
 
+/**
+ * The text alternative of a drawn chart: its title and its largest entries,
+ * so a reader gets the values the marks' hover titles give a mouse
+ * (WCAG 1.1.1, 1.4.13).
+ * @param {string} titleKey - The locale key of the chart's heading.
+ * @param {{value: number, text: string}[]} entries - One per drawn mark.
+ * @returns {string} Escaped for an attribute.
+ */
+function chartSummary(titleKey, entries) {
+	const top = entries
+		.filter((entry) => entry.value > 0)
+		.sort((a, b) => b.value - a.value)
+		.slice(0, 5)
+		.map((entry) => entry.text);
+	return escapeHtml(top.length ? `${_t(titleKey)}: ${top.join('; ')}` : _t(titleKey));
+}
+
+/**
+ * Every value of a drawn chart for the keyboard and a screen reader: the
+ * summary above names five, the hover titles were the only way to the rest
+ * (MET-16). The drawing's tag takes `attribute`, `html` follows it.
+ * @param {string} id - Id of the values' disclosure, unique on the page.
+ * @param {{value: number, text: string}[]} entries - One per drawn mark.
+ * @returns {{attribute: string, html: string}}
+ */
+function chartValues(id, entries) {
+	return window.ErgoptiChartValues.markup(
+		id,
+		entries.map((entry) => entry.text)
+	);
+}
+
 // Active mode for the hour×weekday heatmap; flipped by setHourWeekdayMode().
 let _hourWeekdayMode = 'chars'; // "chars" | "time"
 
@@ -37,7 +69,7 @@ function renderHourWeekdayHeatmap(aggData) {
 	});
 
 	if (max_v === 0) {
-		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_activity')}</div>`;
+		container.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_activity')}</p>`;
 		return;
 	}
 
@@ -61,6 +93,7 @@ function renderHourWeekdayHeatmap(aggData) {
 	};
 
 	let cells = '';
+	const entries = [];
 	let labels_x = '';
 	for (let wd = 0; wd < W; wd++) {
 		const cx = LABEL_LEFT + wd * (CELL + GAP) + CELL / 2;
@@ -85,16 +118,19 @@ function renderHourWeekdayHeatmap(aggData) {
 						? `${v} ${_t('ui_apps.col_chars')}`
 						: '0';
 			const tip = `${weekdayLabels[wd]} ${hh}h — ${tip_v}`;
+			entries.push({ value: v, text: tip });
 			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${escapeHtml(tip)}</title></rect>`;
 		}
 	});
 
+	const values = chartValues('hour_weekday_values', entries);
 	container.innerHTML =
-		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_hour_weekday', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		labels_x +
 		labels_y +
 		cells +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 }
 
 /**
@@ -111,7 +147,7 @@ function renderRibbon(aggData) {
 	const ribbon = (aggData && aggData.rich && aggData.rich.ribbon) || {};
 	const days = Object.keys(ribbon).sort(); // ascending date
 	if (days.length === 0) {
-		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_activity')}</div>`;
+		container.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_activity')}</p>`;
 		if (legend) legend.innerHTML = '';
 		return;
 	}
@@ -136,6 +172,7 @@ function renderRibbon(aggData) {
 	}
 
 	let rows = '';
+	const entries = [];
 	days.forEach((dateStr, rowIdx) => {
 		const ribDay = ribbon[dateStr] || {};
 		const y = LABEL_TOP + rowIdx * (CELL_H + ROW_GAP);
@@ -167,22 +204,25 @@ function renderRibbon(aggData) {
 			const tip = topCat
 				? `${label} · ${hh}h — ${topCat} (${formatDuration(totalMs)})`
 				: `${label} · ${hh}h — 0`;
+			entries.push({ value: totalMs, text: tip });
 			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${escapeHtml(tip)}</title></rect>`;
 		});
 	});
 
+	const values = chartValues('ribbon_values', entries);
 	container.innerHTML =
-		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_day_strip', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		header +
 		rows +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 
 	if (legend) {
 		legend.innerHTML = [...cats_seen]
 			.sort()
 			.map((c) => {
 				const col = getCategoryColor(c, 0);
-				return `<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:${col};"></span>${escapeHtml(c)}</span>`;
+				return `<li style="--swatch:${col}">${escapeHtml(c)}</li>`;
 			})
 			.join('');
 	}
@@ -207,7 +247,7 @@ function renderSankey(aggData) {
 	edges.sort((a, b) => b.count - a.count);
 	const TOP_EDGES = edges.slice(0, 18);
 	if (TOP_EDGES.length === 0) {
-		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_switches')}</div>`;
+		container.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_switches')}</p>`;
 		return;
 	}
 
@@ -270,7 +310,12 @@ function renderSankey(aggData) {
 		svg += `<text x="${RIGHT_X + 6}" y="${y + 4}" text-anchor="start" fill="${ThemeTokens.color('grey-ddd')}" font-size="11" font-family="system-ui">${escapeHtml(n)}</text>`;
 	});
 
-	container.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+	const entries = TOP_EDGES.map((e) => ({
+		value: e.count,
+		text: `${e.src} → ${e.dst} (${e.count})`
+	}));
+	const values = chartValues('sankey_values', entries);
+	container.innerHTML = `<svg role="img" aria-label="${chartSummary('ui_apps.chart_app_switches', entries)}"${values.attribute} width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>${values.html}`;
 }
 
 let radialTop8Chart = null;
@@ -294,7 +339,7 @@ function renderDayTimeline(aggData) {
 	const day = projection.rich.timeline_day;
 	const targetDay = day.date;
 	if (!targetDay) {
-		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_day')}</div>`;
+		container.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_day')}</p>`;
 		return;
 	}
 	const byHour = {};
@@ -311,6 +356,7 @@ function renderDayTimeline(aggData) {
 	const SVG_H = 24 * (ROW_H + GAP) + 8;
 
 	let svg = '';
+	const entries = [];
 	for (let h = 0; h < 24; h++) {
 		const hh = String(h).padStart(2, '0');
 		const slots = byHour[hh] || [];
@@ -331,14 +377,17 @@ function renderDayTimeline(aggData) {
 			const w = (s.ms / scaleMs) * HOUR_W;
 			const col = getAppColor(s.app, 0);
 			const tip = `${s.app} · ${formatDuration(s.ms)} (${hh}h)`;
+			entries.push({ value: s.ms, text: tip });
 			svg += `<rect x="${LABEL_LEFT + cursor}" y="${y}" width="${w}" height="${ROW_H}" rx="2" fill="${col}" fill-opacity="0.9"><title>${escapeHtml(tip)}</title></rect>`;
 			cursor += w;
 		});
 	}
 
+	const values = chartValues('day_timeline_values', entries);
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(_t('ui_apps.col_day'))} : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+		`<p class="chart-caption">${escapeHtml(_t('ui_apps.col_day'))} : ${escapeHtml(formatDisplayDate(targetDay))}</p>` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_annotated_strip', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
+		values.html;
 }
 
 /**
@@ -389,7 +438,7 @@ function renderComparator(currentAgg) {
 	// by the period length. Restore state after.
 	const days = METRICS_PERIOD_DAYS[currentPeriod];
 	if (!days || !currentSelectedDate) {
-		panel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${_t('ui_apps.empty_comparator')}</div>`;
+		panel.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_comparator')}</p>`;
 		return;
 	}
 
@@ -423,14 +472,15 @@ function renderComparator(currentAgg) {
 				: d < 0
 					? ThemeTokens.color('red-dark')
 					: ThemeTokens.color('grey-888');
-		return `<div style="font-size:18px;color:${ThemeTokens.color('white')};font-weight:600;">${fmt(curV)}</div>
-			<div style="font-size:11px;color:${colour};">${sign}${fmt(Math.abs(d))} (${sign}${Math.abs(pct).toFixed(0)}%)</div>
-			<div style="font-size:10px;color:var(--text-muted);">avant : ${fmt(prevV)}</div>`;
+		// The sign tells the direction, the colour only repeats it (WCAG 1.4.1).
+		return `<p class="compare-value">${fmt(curV)}</p>
+			<p class="compare-delta" style="color:${colour};">${sign}${fmt(Math.abs(d))} (${sign}${Math.abs(pct).toFixed(0)}%)</p>
+			<p class="compare-before">${escapeHtml(_t('ui_apps.cmp_before').replace('{v}', fmt(prevV)))}</p>`;
 	};
 	const card = (label, html) =>
-		`<div style="background:rgba(0,0,0,0.25);border-radius:6px;padding:8px;">
-			<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${label}</div>${html}
-		</div>`;
+		`<li class="compare-card">
+			<p class="compare-label">${label}</p>${html}
+		</li>`;
 
 	rows.innerHTML =
 		card(
@@ -496,7 +546,7 @@ function renderSessionBoxplots(aggData) {
 	rows.sort((a, b) => b.time_ms - a.time_ms);
 	const top = rows.slice(0, 10);
 	if (top.length === 0) {
-		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_boxplot')}</div>`;
+		container.innerHTML = `<p class="chart-empty">${_t('ui_apps.empty_boxplot')}</p>`;
 		return;
 	}
 	const max_ms = Math.max(...top.map((r) => r.max));
@@ -508,6 +558,7 @@ function renderSessionBoxplots(aggData) {
 	const xFor = (ms) => LABEL_LEFT + (ms / max_ms) * TRACK_W;
 
 	let svg = '';
+	const entries = [];
 	top.forEach((r, idx) => {
 		const y = idx * ROW_H + ROW_H / 2 + 8;
 		// Label
@@ -526,11 +577,14 @@ function renderSessionBoxplots(aggData) {
 		svg += `<line x1="${xFor(r.med)}" x2="${xFor(r.med)}" y1="${y - 12}" y2="${y + 12}" stroke="${ThemeTokens.color('white')}" stroke-width="2"/>`;
 		// Tooltip rect (transparent overlay)
 		const tip = `${r.name} — ${_t('ui_apps.boxplot_tip').replace('{n}', r.count).replace('{med}', formatDuration(r.med)).replace('{q1}', formatDuration(r.q1)).replace('{q3}', formatDuration(r.q3))}`;
+		entries.push({ value: r.time_ms || r.med, text: tip });
 		svg += `<rect x="${LABEL_LEFT}" y="${y - 16}" width="${TRACK_W}" height="32" fill="transparent"><title>${escapeHtml(tip)}</title></rect>`;
 	});
+	const values = chartValues('session_boxplot_values', entries);
 	container.innerHTML =
-		`<svg width="${W}" height="${SVG_H}" viewBox="0 0 ${W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
-		`<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${_t('ui_apps.boxplot_scale').replace('{max}', formatDuration(max_ms))}</div>`;
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_session_durations', entries)}"${values.attribute} width="${W}" height="${SVG_H}" viewBox="0 0 ${W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
+		values.html +
+		`<p class="chart-caption below">${_t('ui_apps.boxplot_scale').replace('{max}', formatDuration(max_ms))}</p>`;
 }
 
 /**
@@ -557,8 +611,8 @@ function renderTopWindowsTable(aggData) {
 			(r) => `<tr>
 		<td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</td>
 		<td>${escapeHtml(r.app)}</td>
-		<td style="text-align:right;">${format_int(r.c)}</td>
-		<td style="text-align:right;">${formatDuration(r.ms)}</td>
+		<td style="text-align:end;">${format_int(r.c)}</td>
+		<td style="text-align:end;">${formatDuration(r.ms)}</td>
 	</tr>`
 		)
 		.join('');
@@ -585,8 +639,8 @@ function renderTopSessionsTable(aggData) {
 			(r) => `<tr>
 		<td>${escapeHtml(formatDisplayDate(r.date))}</td>
 		<td>${escapeHtml(r.app)}</td>
-		<td style="text-align:right;">${formatDuration(r.ms)}</td>
-		<td style="text-align:right;">${format_int(r.chars)}</td>
+		<td style="text-align:end;">${formatDuration(r.ms)}</td>
+		<td style="text-align:end;">${format_int(r.chars)}</td>
 	</tr>`
 		)
 		.join('');
@@ -611,10 +665,10 @@ function renderTopDaysTable(aggData) {
 		.map(
 			(d) => `<tr>
 		<td>${escapeHtml(formatDisplayDate(d.date))}</td>
-		<td style="text-align:right;">${format_int(d.chars || 0)}</td>
-		<td style="text-align:right;">${formatDuration(d.time_ms || 0)}</td>
-		<td style="text-align:right;">${escapeHtml(d.switches || 0)}</td>
-		<td style="text-align:right;">${d.sessions || 0}</td>
+		<td style="text-align:end;">${format_int(d.chars || 0)}</td>
+		<td style="text-align:end;">${formatDuration(d.time_ms || 0)}</td>
+		<td style="text-align:end;">${escapeHtml(d.switches || 0)}</td>
+		<td style="text-align:end;">${d.sessions || 0}</td>
 	</tr>`
 		)
 		.join('');
@@ -645,8 +699,8 @@ function renderAppPairsTable(aggData) {
 			return `<tr>
 			<td>${escapeHtml(e.src)}</td>
 			<td>${escapeHtml(e.dst)}</td>
-			<td style="text-align:right;">${e.count}</td>
-			<td style="text-align:right;color:var(--text-muted);">${pct.toFixed(1)} %</td>
+			<td style="text-align:end;">${e.count}</td>
+			<td style="text-align:end;color:var(--text-muted);">${pct.toFixed(1)} %</td>
 		</tr>`;
 		})
 		.join('');
@@ -892,6 +946,8 @@ function renderRadialTop8(appsArray) {
 			radialTop8Chart.destroy();
 			radialTop8Chart = null;
 		}
+		canvas.setAttribute('role', 'img');
+		canvas.setAttribute('aria-label', `${_t('ui_apps.chart_top8')}: ${_t('ui_apps.kpi_no_data')}`);
 		return;
 	}
 	const max_time = Math.max(...top.map((a) => a.timeMs || 0)) || 1;
@@ -965,6 +1021,12 @@ function renderBurstHistogram(aggData) {
 			burstHistogramChart.destroy();
 			burstHistogramChart = null;
 		}
+		// An empty canvas still says what it would show.
+		canvas.setAttribute('role', 'img');
+		canvas.setAttribute(
+			'aria-label',
+			`${_t('ui_apps.chart_burst_hist')}: ${_t('ui_apps.kpi_no_data')}`
+		);
 		return;
 	}
 	if (burstHistogramChart) burstHistogramChart.destroy();
@@ -1002,8 +1064,15 @@ window.setHourWeekdayMode = function (mode) {
 	_hourWeekdayMode = mode === 'time' ? 'time' : 'chars';
 	const btn_t = document.getElementById('hwk-mode-time');
 	const btn_c = document.getElementById('hwk-mode-chars');
-	if (btn_t) btn_t.classList.toggle('active', _hourWeekdayMode === 'time');
-	if (btn_c) btn_c.classList.toggle('active', _hourWeekdayMode === 'chars');
+	// The chosen mode reads as pressed, not by its colour alone (WCAG 1.4.1).
+	if (btn_t) {
+		btn_t.classList.toggle('active', _hourWeekdayMode === 'time');
+		btn_t.setAttribute('aria-pressed', String(_hourWeekdayMode === 'time'));
+	}
+	if (btn_c) {
+		btn_c.classList.toggle('active', _hourWeekdayMode === 'chars');
+		btn_c.setAttribute('aria-pressed', String(_hourWeekdayMode === 'chars'));
+	}
 	if (window._lastAggData) renderHourWeekdayHeatmap(window._lastAggData);
 };
 
@@ -1109,6 +1178,7 @@ function renderActivityCalendar() {
 	});
 
 	let rects = '';
+	const entries = [];
 	cells.forEach((c, i) => {
 		const col = Math.floor(i / 7);
 		const row = c.weekday;
@@ -1128,15 +1198,18 @@ function renderActivityCalendar() {
 				: c.value > 0
 					? `${c.value} ${_t('ui_apps.col_chars')}`
 					: '0';
+		entries.push({ value: c.value, text: `${dt} — ${v_txt}` });
 		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${escapeHtml(`${dt} — ${v_txt}`)}</title></rect>`;
 	});
 
+	const values = chartValues('activity_calendar_values', entries);
 	container.innerHTML =
-		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
+		`<svg role="img" aria-label="${chartSummary('ui_apps.chart_activity_cal', entries)}"${values.attribute} width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">` +
 		month_labels +
 		wd_labels +
 		rects +
-		`</svg>`;
+		`</svg>` +
+		values.html;
 }
 
 // =====================================================
@@ -1251,8 +1324,14 @@ window.setCalendarMode = function (mode) {
 	_calendarMode = mode === 'time' ? 'time' : 'chars';
 	const btn_t = document.getElementById('cal-mode-time');
 	const btn_c = document.getElementById('cal-mode-chars');
-	if (btn_t) btn_t.classList.toggle('active', _calendarMode === 'time');
-	if (btn_c) btn_c.classList.toggle('active', _calendarMode === 'chars');
+	if (btn_t) {
+		btn_t.classList.toggle('active', _calendarMode === 'time');
+		btn_t.setAttribute('aria-pressed', String(_calendarMode === 'time'));
+	}
+	if (btn_c) {
+		btn_c.classList.toggle('active', _calendarMode === 'chars');
+		btn_c.setAttribute('aria-pressed', String(_calendarMode === 'chars'));
+	}
 	renderActivityCalendar();
 };
 

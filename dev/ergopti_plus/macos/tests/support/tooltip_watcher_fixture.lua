@@ -112,8 +112,8 @@ local function with_fixture(callback)
 		"core.ui.ui.tooltip.llm",
 		"core.ui.ui.tooltip.hotstring",
 		"core.ui.ui.tooltip",
-		"modules.keymap.control_sentinels",
-		"adapters.event_provenance",
+		"hotstrings.engine.expander.control_sentinels",
+		"diagnostics.adapters.event_provenance",
 		"platform.input.key_state",
 		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
@@ -141,8 +141,8 @@ local function with_fixture(callback)
 				-- These adapters retain hs.timer/eventtap objects in module locals. Reload
 				-- them with the fresh hs stub so deferred-action assertions cannot inspect a
 				-- different timer table and pass without ever draining the real queue.
-				package.loaded["modules.keymap.control_sentinels"] = nil
-				package.loaded["adapters.event_provenance"] = nil
+				package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
+				package.loaded["diagnostics.adapters.event_provenance"] = nil
 				package.loaded["platform.input.key_state"] = nil
 				package.loaded["platform.input.synthetic_input"] = nil
 				package.loaded["core.events.timer_scheduler"] = nil

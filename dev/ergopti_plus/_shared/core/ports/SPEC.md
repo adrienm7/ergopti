@@ -87,10 +87,10 @@ Each `.spec.js` file exports:
 | HttpClient          | `core/network/adapters/http_client.ahk`    | `core/network/adapters/http_client.lua`    |
 | TimerScheduler      | `core/events/timer_scheduler.ahk`          | `core/events/timer_scheduler.lua`          |
 | Notifier            | `platform/system/notifier.ahk`             | `platform/system/notifier.lua`             |
-| TrayMenu            | `adapters/tray_menu.ahk`                   | `adapters/tray_menu.lua`                   |
+| TrayMenu            | `tray/adapters/menu.ahk`                   | `tray/adapters/menu.lua`                   |
 | FileSystem          | `core/fs/adapters/file_system.ahk`         | `core/fs/adapters/file_system.lua`         |
 | SecureFieldDetector | `platform/focus/secure_field_detector.ahk` | `platform/focus/secure_field_detector.lua` |
-| Clipboard           | `adapters/clipboard.ahk`                   | `adapters/clipboard.lua`                   |
+| Clipboard           | `clipboard/adapters/clipboard.ahk`         | `clipboard/adapters/clipboard.lua`         |
 | Storage             | `core/fs/adapters/storage.ahk`             | `core/fs/adapters/storage.lua`             |
 | ProcessLifecycle    | `core/process/adapters/lifecycle.ahk`      | `core/process/adapters/lifecycle.lua`      |
 | KeyState            | `platform/input/key_state.ahk`             | `platform/input/key_state.lua`             |
@@ -98,7 +98,7 @@ Each `.spec.js` file exports:
 | NetworkInfo         | `core/network/adapters/info.ahk`           | `core/network/adapters/info.lua`           |
 | WindowInfo          | `platform/focus/window_info.ahk`           | `platform/focus/window_info.lua`           |
 | WindowManager       | `platform/focus/window_manager.ahk`        | `platform/focus/window_manager.lua`        |
-| AppLauncher         | `adapters/app_launcher.ahk`                | `adapters/app_launcher.lua`                |
+| AppLauncher         | `apps/adapters/launcher.ahk`               | `apps/adapters/launcher.lua`               |
 | Crypto              | `adapters/crypto.ahk`                      | `adapters/crypto.lua`                      |
 | GraphicsRenderer    | `core/ui/adapters/graphics_renderer.ahk`   | `core/ui/adapters/graphics_renderer.lua`   |
 
@@ -137,7 +137,7 @@ adapters expose these methods under their own naming convention:
 | `http.post(url, body, cb)` | `LLM_RemoteGenerate(…)`   | `M.generate(…)`               |
 | `timer.after(delay, fn)`   | `SetTimer(fn, -ms)`       | `hs.timer.doAfter(s, fn)`     |
 | `notifier.send(msg)`       | `TrayTip(title, text)`    | `M.notify(title, body, kind)` |
-| `tray.update(state)`       | `UpdateTrayIcon()`        | `update_icon(custom_text)`    |
+| `tray.setIcon({ image })`  | `TrayMenuSetIcon(Opts)`   | `M.setIcon(opts)`             |
 
 ### 5.2 Error behavior vocabulary
 

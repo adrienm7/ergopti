@@ -313,7 +313,7 @@ enum ManagedPTYWorker {
 	/// - Returns: The standardized admitted paths; empty for a refusal.
 	static func admittedSources(for selection: LuaSourceSelection) -> Set<String> {
 		guard let configDir = selection.configDir else { return [] }
-		let directory = URL(fileURLWithPath: configDir).appendingPathComponent("modules/llm")
+		let directory = URL(fileURLWithPath: configDir).appendingPathComponent("ai/engine")
 		return Set(admittedSourceNames.map { directory.appendingPathComponent($0).standardizedFileURL.path })
 	}
 

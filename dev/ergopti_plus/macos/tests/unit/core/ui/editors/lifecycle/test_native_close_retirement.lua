@@ -19,13 +19,13 @@ local function with_window(module_name, scenario)
 	rawset(_G, "lfs", nil)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
-			"infra.config_paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
+			"ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "settings.ui.menu.paths",
+			"settings.engine.paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "platform.input.keycodes", "core.fs.adapters.file_system",
 			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",
-			"diagnostics.engine.runtime_log", "platform.remap.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.user_action_parameter",
+			"diagnostics.engine.runtime_log", "platform.remap.lease_helper", "settings.engine.program_parameter", "shortcuts.engine.actions.user_action_parameter",
 			"shortcuts.engine.brightness_actions", "shortcuts.engine.brightness_actions_data", "settings.engine.migration.migrate", "diagnostics.engine.operation_reporter",
 			"core.fs.engine.dir", "platform.input.keycodes.core", "lfs", "core.fs.engine.module_source_directory", "core.fs.engine.module_source_identity", "modules.keymap.layout",
 			"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.leaf_rows",
@@ -33,7 +33,7 @@ local function with_window(module_name, scenario)
 			"core.ui.adapters.webview_result", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.timing.engine.paced_job", "core.timing.engine.paced_json",
 			"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
-			"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+			"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "core.ui.engine.webview.i18n_seed",
 			"tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {}, bridges = {}, errors = {} }
@@ -52,7 +52,7 @@ local function with_window(module_name, scenario)
 			end
 			package.loaded["core.process.adapters.program_providers"] = {}
 			package.loaded["modules.keymap.layout_registry"] = { snapshot = function() return { platform = "macos", installed = {} } end }
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				is_initialized = function() return true end,
 				get_config_dir = function() return "/virtual/config/" end,
 				get_logs_dir = function() return "/virtual/logs/" end,
@@ -100,17 +100,15 @@ local function with_window(module_name, scenario)
 				if key == "menu.paths.window_title" then return "Folders" end
 				return translated(key, ...)
 			end
-			if module_name == "ui.menu.menu_paths" then assert(window.init("/virtual/app/", function() end)) end
+			if module_name == "settings.ui.menu.paths" then assert(window.init("/virtual/app/", function() end)) end
 			function h.show()
-				if module_name == "ui.layer_editor" then
-					return window.open({ karabiner = { regenerate = function() return true end } })
-				elseif module_name == "ui.action_picker" then
+				if module_name == "ui.action_picker" then
 					return window.open({ title = "Native close fixture", items = {} }, function() return true end)
-				elseif module_name == "ui.menu.menu_paths" then return window.open_editor()
+				elseif module_name == "settings.ui.menu.paths" then return window.open_editor()
 				else return window.open() end
 			end
 			function h.close()
-				if module_name == "ui.layer_editor" or module_name == "ui.action_picker" then return window.close() end
+				if module_name == "ui.action_picker" then return window.close() end
 				local bridge = h.bridges[#h.bridges]
 				bridge.callback({ name = bridge.name, webView = h.windows[#h.windows],
 					body = { action = module_name == "ui.layout_manager" and "close" or "cancel" } })
@@ -127,7 +125,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("editor close retires native references", function()
-	for _, module_name in ipairs({ "ui.layer_editor", "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		helpers.it("retires native user close and reopens " .. module_name, function()
 			with_window(module_name, function(_, h)
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
@@ -279,7 +277,7 @@ local function assert_prior_callback_retired(module_name, h, controller, before)
 end
 
 helpers.describe("editor native message callbacks retire independently of windows", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, mode in ipairs({ "native", "explicit" }) do
 			helpers.it(module_name .. " unrefs its script callback after " .. mode .. " close", function()
 				with_window(module_name, function(_, h)
@@ -341,7 +339,7 @@ helpers.describe("editor native message callbacks retire independently of window
 end)
 
 helpers.describe("editor bridge retirement without a native candidate", function()
-	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		for _, refusal in ipairs({ "nil", "false" }) do
 			helpers.it(module_name .. " retires a bound bridge when native creation returns " .. refusal, function()
 				with_window(module_name, function(_, h)

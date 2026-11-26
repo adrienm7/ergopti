@@ -58,7 +58,7 @@ local function with_action(route, mode, action, body)
 			.. 'tap_key__number_row_left__send_text = "ok"\nscript__script_altgr_enter__send_text = "ok"\n'
 			.. 'tap_3__send_text = "ok"\n')
 		assert(configuration:close())
-		local routes = require("infra.config_paths")
+		local routes = require("settings.engine.paths")
 		local config_route = routes.config
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
 		require("tests.support.text_owner_fixture").with(function(guard)
@@ -81,7 +81,7 @@ local function with_action(route, mode, action, body)
 			package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end }
 			package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
-			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
+			package.loaded["gestures.adapters.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
 				return { path = "controlled-touchpad", name = "controlled", max_fingers = 3 }
 			end }
 			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
@@ -89,7 +89,7 @@ local function with_action(route, mode, action, body)
 			local layout = require("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
 				O = { keycode = 24, mods = { "shift" } }, K = { keycode = 37, mods = { "shift" } } })
-			injector = require("modules.hotstrings.injector")
+			injector = require("hotstrings.engine.injector")
 			injector._set_nanosleep_for_test(function() end)
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				world.keys[#world.keys + 1] = { code, value }; world.held[code] = value == 1 or nil; return true
@@ -97,12 +97,12 @@ local function with_action(route, mode, action, body)
 			local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 			environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
-				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
-				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
+				gestures = "gestures.engine.manager", ActionHandlers = "modules.shortcuts.action_handlers",
+				prediction_engine = "ai.engine.prediction.engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
 				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
-				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
-				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
-				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
+				script_chords = "modules.shortcuts.script_chords",
+				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "hotstrings.engine.catalogue.config",
+				MagicKey = "hotstrings.engine.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
 			environment.input_capture_gate = require("platform.input.capture_gate").new()
 			environment.on_char = function() error("The bound chord must not become a text callback") end
@@ -112,7 +112,7 @@ local function with_action(route, mode, action, body)
 			first = assert(source:find("\tlocal wrap_on_type = ", 1, true))
 			last = assert(source:find("\n\tprivacy_owners.end_wrap_selection", first, true))
 			environment.wrap_on_type = evaluate(source:sub(first, last - 1) .. "\nreturn wrap_on_type", environment)
-			for _, name in ipairs({ "script_chords", "tap_keys", "MagicKeySource" }) do
+			for _, name in ipairs({ "script_chords", "tap_keys" }) do
 				evaluate(assert(source:match("\n\t(" .. name .. "%.init%b())")), environment)
 			end
 			first = assert(source:find("\tlocal function consume_bound_chord(detail)", 1, true))
@@ -120,7 +120,7 @@ local function with_action(route, mode, action, body)
 			local consume = evaluate(source:sub(first, last - 1) .. "\nreturn on_consume", environment)
 			local event = { code = 36, key = "j", char = "j", mods = { ctrl = true } }
 			if route == "tap" then event = { code = 41, mods = {} }
-			elseif route == "chord" then event = { code = 28, mods = { altgr = true } } end
+			elseif route == "chord" then event = { code = 28, mods = { altgr = true }, prior_role = "altgr" } end
 			if route == "gesture" then
 				world.consumed = environment.gestures.dispatch_gesture({ fingers = 3, tap = true })
 			elseif route == "observe" then

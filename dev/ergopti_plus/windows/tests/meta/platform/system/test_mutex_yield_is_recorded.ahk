@@ -21,8 +21,8 @@
 ;    sink is LoggerAppendBootstrapLine: a direct FileAppend to bootstrap.log in
 ;    the default logs folder, which it resolves from %LOCALAPPDATA% alone.
 ; 2. Forbids the two tempting non-fixes: routing it through the logger (which
-;    cannot work there) and calling LoggerInit (which would make a yielding
-;    instance DELETE the live owner's sub-logs via _LoggerInitSubFiles).
+;    cannot work there) and calling LoggerInit (whose retention purge would
+;    make a yielding instance DELETE files in the live owner's logs folder).
 ;
 ; SCOPE: source introspection of ErgoptiPlus.ahk's mutex gate and of the
 ; pre-logger sink it calls.
@@ -75,7 +75,7 @@ _MYIR_YieldDoesNotUseTheLogger() {
 		Assert(InStr(Code, "LoggerWarn") == 0 and InStr(Code, "LoggerError") == 0,
 			"the yield branch and its sink must not route through the logger: LOGGER_LOG_PATH is empty and the severity globals are unset this early, so the call raises UnsetError into a bare try and the line is lost")
 		Assert(InStr(Code, "LoggerInit") == 0,
-			"the yield branch and its sink must not call LoggerInit — it runs _LoggerInitSubFiles, which deletes any sub-file whose mtime is a previous day, so a yielding instance would destroy the LIVE owner's gestures/layout/tray sub-logs on its way out")
+			"the yield branch and its sink must not call LoggerInit — its retention purge deletes files in the logs folder, so a yielding instance would delete files the LIVE owner is writing beside on its way out")
 	}
 }
 

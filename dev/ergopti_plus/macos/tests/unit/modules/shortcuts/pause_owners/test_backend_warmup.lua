@@ -79,7 +79,7 @@ local function load_commit_staged_backend(kind, options)
 	local decrypt_callbacks = {}
 	local decrypt_calls = 0
 	if options.encrypted == true then
-		package.loaded["modules.llm.api_token_crypto"] = {
+		package.loaded["ai.engine.api.token_crypto"] = {
 			is_encrypted = function(value)
 				return type(value) == "string" and value:sub(1, 9) == "keychain:"
 			end,
@@ -91,7 +91,7 @@ local function load_commit_staged_backend(kind, options)
 		}
 	end
 	local module_name = kind == "remote"
-		and "modules.llm.api_remote" or "modules.llm.api_ollama"
+		and "ai.engine.api.remote" or "ai.engine.api.ollama"
 	reset_module(module_name)
 	local api = helpers.load_with_stubs(module_name)
 	if kind == "remote" then
@@ -534,7 +534,7 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 			local operations = {}
 			local cancelled_operations = {}
 			local cancel_mode = mode
-			package.loaded["modules.llm.api_token_crypto"] = {
+			package.loaded["ai.engine.api.token_crypto"] = {
 				is_encrypted = function() return true end,
 				decrypt_async = function(_, callback)
 					decrypt_calls = decrypt_calls + 1
@@ -556,8 +556,8 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 				is_paused = function() return false end,
 				get_pause_epoch = function() return 0 end,
 			}
-			reset_module("modules.llm.api_remote")
-			local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote")
+			reset_module("ai.engine.api.remote")
+			local ApiRemote = helpers.load_with_stubs("ai.engine.api.remote")
 			ApiRemote.PROVIDERS.fixture = {
 				label = "Fixture",
 				base_url = "https://fixture.invalid",
@@ -621,7 +621,7 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 			-- The preceding encrypted-owner matrix installs an always-encrypted
 			-- TokenCrypto double. Restore the real prefix contract so this plain-token
 			-- positive control cannot accidentally wait on a phantom Keychain task.
-			package.loaded["modules.llm.api_token_crypto"] = {
+			package.loaded["ai.engine.api.token_crypto"] = {
 				is_encrypted = function(value)
 					return type(value) == "string" and value:sub(1, 9) == "keychain:"
 				end,
@@ -633,8 +633,8 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 				is_paused = function() return false end,
 				get_pause_epoch = function() return 0 end,
 			}
-			reset_module("modules.llm.api_remote")
-			local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote")
+			reset_module("ai.engine.api.remote")
+			local ApiRemote = helpers.load_with_stubs("ai.engine.api.remote")
 			ApiRemote.PROVIDERS.fixture = {
 				label = "Fixture",
 				base_url = "https://fixture.invalid",
@@ -706,8 +706,8 @@ helpers.describe("HS-012 real Ollama warmup generation", function()
 				is_paused = function() return false end,
 				get_pause_epoch = function() return 0 end,
 			}
-			reset_module("modules.llm.api_ollama")
-			local ApiOllama = helpers.load_with_stubs("modules.llm.api_ollama")
+			reset_module("ai.engine.api.ollama")
+			local ApiOllama = helpers.load_with_stubs("ai.engine.api.ollama")
 			local client = get_upvalue(ApiOllama.warmup, "_warmup_client")
 			helpers.assert_not_nil(client)
 			local callback = nil

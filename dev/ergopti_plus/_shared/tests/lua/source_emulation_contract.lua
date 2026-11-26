@@ -47,7 +47,7 @@ local function replay(Engine, model, steps)
 	for index, step in ipairs(steps) do
 		local consumed, actions
 		if step.press ~= nil then
-			consumed, actions = Engine.press(session, step.press, held_set(step.held), step.at)
+			consumed, actions = Engine.press(session, step.press, held_set(step.held), step.at, step.before)
 		elseif step.release ~= nil then
 			consumed, actions = Engine.release(session, step.release, step.at)
 		elseif step.tick ~= nil then
@@ -89,6 +89,83 @@ function M.register(helpers, shared)
 			helpers.assert_true(replayed >= 2 * 18, "every vector is replayed on both platforms")
 		end)
 
+		-- layout-levels-emulation: Neo 2's Mod3 and Mod4 on Caps Lock and AltGr, ¡ ¿
+		-- and the dead keys of those levels, as the web and AutoHotkey engines type them.
+		helpers.it("types Neo 2's own levels and their dead keys as the web engine does", function()
+			local neo_vectors = Json.decode(read_all(shared(corpus .. "neo2_vectors.json")))
+			local neo = Json.decode(read_all(shared(corpus .. neo_vectors.table)))
+			local replayed = 0
+			for _, platform in ipairs(neo_vectors.platforms) do
+				local model = Engine.compile(neo[platform])
+				helpers.assert_true(Engine.holds_modifier_key(model, "AltRight"), platform .. ": AltGr holds Mod4")
+				helpers.assert_eq(Engine.holds_modifier_key(model, "CapsLock"), platform ~= "macos",
+					platform .. ": Caps Lock holds Mod3 where the hook sees it held")
+				for _, case in ipairs(neo_vectors.cases) do
+					local listed = case.platforms == nil
+					for _, name in ipairs(case.platforms or {}) do listed = listed or name == platform end
+					if listed then
+						helpers.assert_eq(replay(Engine, model, case.steps), nil, platform .. ": " .. case.name)
+						replayed = replayed + 1
+					end
+				end
+			end
+			helpers.assert_true(replayed >= 3 * 16, "every Neo vector is replayed on the three platforms")
+		end)
+
+		-- layout-context-keys-emulation: a layout's own repeat and magic keys type
+		-- from the text typed before, as the web and AutoHotkey engines type them.
+		helpers.it("types a layout's repeat and magic keys from the text typed before", function()
+			local context_vectors = Json.decode(read_all(shared(corpus .. "context_vectors.json")))
+			local context = Json.decode(read_all(shared(corpus .. context_vectors.table)))
+			local replayed = 0
+			for _, platform in ipairs(context_vectors.platforms) do
+				local model = Engine.compile(context[platform])
+				helpers.assert_true(Engine.has_records(model), platform .. ": the table has records")
+				for _, case in ipairs(context_vectors.cases) do
+					helpers.assert_eq(replay(Engine, model, case.steps), nil, platform .. ": " .. case.name)
+					replayed = replayed + 1
+				end
+				local ok, err = pcall(Engine.press, Engine.new_session(model), "Quote", {}, 0)
+				helpers.assert_true(not ok and tostring(err):find("needs the text typed before it", 1, true) ~= nil,
+					platform .. ": a magic key without the text before is refused")
+			end
+			helpers.assert_true(replayed >= 3 * 7, "every context vector is replayed on the three platforms")
+		end)
+
+		helpers.it("types what the shared magic vectors say", function()
+			local magic_vectors = Json.decode(read_all(shared("tests/corpus/layouts/magic_vectors.json")))
+			local checked = 0
+			for _, vector in ipairs(magic_vectors.vectors) do
+				local mapping = vector.action.magic ~= nil and { magic = vector.action.magic }
+					or { ["repeat"] = vector.action["repeat"] }
+				helpers.assert_eq(Engine.context_text(magic_vectors.magic, mapping, vector.before), vector.types,
+					canonical(vector.action) .. " after " .. vector.before)
+				checked = checked + 1
+			end
+			helpers.assert_true(checked >= 20, "every magic vector is checked")
+		end)
+
+		-- ergopti-emulation-unchanged: a layout holding no custom modifier on Caps
+		-- Lock or AltGr leaves both keys to the OS and emulates no dead key.
+		helpers.it("leaves Caps Lock and AltGr to the OS for the Ergopti layouts", function()
+			local pinned = Json.decode(read_all(shared(corpus .. "ergopti_emulation.json")))
+			local checked = 0
+			for file, tables in pairs(pinned) do
+				for platform, table_ in pairs(tables) do
+					local where = file .. " on " .. platform
+					helpers.assert_eq(table_.dead_keys, nil, where .. ": no dead key is emulated")
+					local model = Engine.compile(table_)
+					for _, key in ipairs({ "CapsLock", "AltRight" }) do
+						helpers.assert_true(not Engine.holds_modifier_key(model, key), where .. ": " .. key .. " keeps its role")
+						local consumed, actions = Engine.press(Engine.new_session(model), key, {}, 0)
+						helpers.assert_true(consumed == false and #actions == 0, where .. ": " .. key .. " goes to the OS")
+					end
+					checked = checked + 1
+				end
+			end
+			helpers.assert_true(checked >= 5 * 3, "every Ergopti table is checked on the three platforms")
+		end)
+
 		helpers.it("sees a changed expectation", function()
 			local model = Engine.compile(golden.linux)
 			local steps = {
@@ -116,7 +193,9 @@ function M.register(helpers, shared)
 				threshold_fraction = function(t) t.tap_holds[1].threshold_ms = 150.5 end,
 				threshold_string = function(t) t.tap_holds[1].threshold_ms = "150" end,
 				threshold_nan = function(t) t.tap_holds[1].threshold_ms = 0 / 0 end,
-				mapping = function(t) t.layers[1].keys.KeyX = { dead_key = "acute" } end,
+				mapping = function(t) t.layers[1].keys.KeyX = { dead_key = "undeclared" } end,
+				magic_unknown = function(t) t.layers[1].keys.KeyX = { magic = "undeclared" } end,
+				repeat_far = function(t) t.layers[1].keys.KeyX = { ["repeat"] = 3 } end,
 				shared_key = function(t) table.insert(t.modifiers[2].keys, "IntlBackslash") end,
 			}) do
 				helpers.assert_true(not pcall(Engine.compile, mutated(change)), label .. " is refused")

@@ -56,6 +56,7 @@ local function with_picker(scenario)
 		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 600, height = 400 } end,
 			get_centered_frame = function(width, height) return { x = 0, y = 0, w = width, h = height } end,
+			get_app_frame = function(geo) return { x = 0, y = 0, w = geo.width, h = geo.height } end,
 			show_webview = function(options)
 				if h.factory_refuses then return nil end
 				local view = { options = options, deleted = false, evaluations = {}, completions = {} }

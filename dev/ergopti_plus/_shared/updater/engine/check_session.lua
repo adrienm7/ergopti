@@ -148,7 +148,13 @@ function M.new(opts)
 			end
 		end
 		if answer.state == "error" then
-			page.reason_key = answer.reason_key
+			-- Only a reason or a classified network cause reaches the page (UPD-06)
+			if CheckResult.admits_reason_key(answer.reason_key) then
+				page.reason_key = answer.reason_key
+			else
+				opts.log("error", "Refused the update-check failure key '%s'.", tostring(answer.reason_key))
+				page.reason_key = CheckResult.REASONS.unexpected
+			end
 			local ok, path = pcall(opts.log_path)
 			if ok and type(path) == "string" then
 				page.log_path = path

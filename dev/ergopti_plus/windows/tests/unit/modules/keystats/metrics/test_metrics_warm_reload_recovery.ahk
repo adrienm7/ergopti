@@ -124,7 +124,6 @@ _MWRL_Case(Mode) {
 	global _SharedDir, KLPF_LAST_JSON, _RTP_Events, _ReloadTerminalHandoff, _ReloadTerminalRetirements
 	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
-	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	static Serial := 0
 	PreviousCritical := Critical("On")
 	try {
@@ -161,7 +160,6 @@ _MWRL_Case(Mode) {
 				AssertFalse(FSStrictExists(Path))
 			SidecarsReady := true
 			_ResetLogger()
-			LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 			_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
 			KLWV.windows := Map(), KLPFWorker.jobs := Map(), KLPF_LAST_JSON := Map(), _RTP_Events := [], Installed := true
 			KLPFWorker.spawn_fn := _MWA_Spawn.Bind(World), KLPFWorker.publish_fn := 0

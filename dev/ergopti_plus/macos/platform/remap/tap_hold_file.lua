@@ -202,7 +202,7 @@ function M.read(document, shapes, path)
 end
 
 --- The config.toml that holds the manifest's tap-hold rows: the file beside
---- tap_hold.toml (infra/config_paths.lua places ConfigTomlPath and
+--- tap_hold.toml (settings/engine/paths.lua places ConfigTomlPath and
 --- TapHoldConfigPath in the same driver folder; the macOS boot checks it).
 --- @param tap_hold_path string The tap_hold.toml path.
 --- @return string

@@ -7,7 +7,7 @@ require("core.logger.engine.logger")
 local M = {}
 function M.with_world(options, callback)
 	return helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner",
-		"core.fs.adapters.storage", "adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
+		"core.fs.adapters.storage", "diagnostics.adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
 		return Gesture.with_fixture(function(fresh)
 			fresh()
 			local f = Native.make({ absolute_time = 0, epoch = 1900000000 })
@@ -44,9 +44,9 @@ function M.with_world(options, callback)
 				native.stop = function(self) stop(self); return self end
 				return native
 			end
-			package.loaded["adapters.clipboard"] = nil
-			package.loaded["modules.gestures.actions"] = nil
-			local actions = require("modules.gestures.actions")
+			package.loaded["clipboard.adapters.clipboard"] = nil
+			package.loaded["gestures.engine.actions"] = nil
+			local actions = require("gestures.engine.actions")
 			actions.init({ action_params = {} })
 			assert(actions.set_action_parameter("keyboard__primary_1", "search_web", "https://example.test/?q=%s"))
 			if options.backlog then

@@ -55,7 +55,12 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 	Symbols := ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
 		"_WPMWidget_Collecting",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
-		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"]
+		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex",
+		"WPMWidget_BurstEnded", "WPMWidget_PointerEndsBurst", "WPMWidget_ShouldShow", "_WPMWidget_NameForReaders"]
+	; The tick names its surface for a running screen reader. Some programs set
+	; the system's screen-reader flag on a desktop without one: these vectors
+	; prove the hold, so the flag reads as off here, whatever the host says.
+	Code .= "A11ySystem_ScreenReaderOn() => false`n"
 	if Recovery {
 		for Symbol in ["_WPMWidget_DiscardSurface", "_WPMWidget_RebuildSurface", "_WPMWidget_ApplySurfaceGeometry",
 			"WPMWidget_ShowPos", "WPMWidget_ResolveGraphColor", "WPMWidget_BuildCompact", "WPMWidget_BuildGraph",
@@ -103,7 +108,7 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 _WPMZ_Canon() {
 	global _SharedDir, _TimingsCache, _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
-	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING, LOGGER_SUB_FILES
+	global _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN
 	global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError
 	AssertFalse(_LOGGER_FLUSH_ACTIVE, "An active foreign logger flush cannot be parked")
 	LoggerState := _TLOG_CaptureLoggerState()
@@ -120,7 +125,6 @@ _WPMZ_Canon() {
 	try {
 		_ResetLogger()
 		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
-		_LOGGER_SUB_PATHS := Map(), _LOGGER_SUB_PENDING := Map(), LOGGER_SUB_FILES := []
 		_ParseTomlCache := Map(), _TomlReadFailures := Map(), _TomlUnreadableFiles := Map()
 		TimingsLoadShared(_SharedDir)
 		WindowMs := TimingsGet("keystats", "wpm_window_ms")
@@ -132,6 +136,7 @@ _WPMZ_Canon() {
 		AssertTrue(Visual is Map && Visual.Has("colors") && Visual.Has("transparency") && Visual.Has("graph"))
 		Values := Map(
 			"WINDOW_MS", WindowMs, "WPM_MIN_DURATION_MS", MinimumMs,
+			"IDLE_RESET_MS", TimingsGet("keystats", "wpm_idle_reset_ms"),
 			"COLOR_HOLD_MS", TimingsGet("ui", "wpm_color_hold_ms"),
 			"IDLE_HIDE_MS", TimingsGet("ui", "wpm_widget_idle_hide_ms"),
 			"GRAPH_HISTORY", Integer(Visual["graph"]["history_samples"]),

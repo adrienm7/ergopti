@@ -79,7 +79,7 @@ helpers.describe("input capture gate: daemon wiring", function()
 		for _ in source:gmatch("input_capture_gate%.guard%(") do guard_count = guard_count + 1 end
 		helpers.assert_true(guard_count >= 5,
 			"every side-effecting input route needs the same owned gate")
-		local start_at = assert(source:find("keyboard_hook.start({", 1, true))
+		local start_at = assert(source:find("local hook_start_options = {", 1, true))
 		local end_at = assert(source:find("Logger.info(LOG, \"Keyboard hook started", start_at, true))
 		local wiring = source:sub(start_at, end_at)
 		for _, assignment in ipairs({

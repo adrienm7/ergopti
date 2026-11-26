@@ -1,0 +1,504 @@
+{
+	"_comment": "Maps every point of TODO-tests-linux.md « To confirm on Linux » to the Linux field report evidence that decides it. Each unchecked TODO line carries <!-- field-point: <id> --> on its first line. A check names a step of diagnostics/data/field_run_steps.json (the daemon's field run) or of diagnostics/data/field_guided_steps.json (the collector's probe and guided steps, tools/dev/field-guided.py), optionally the report steps that decide it. A point with no check states why a field report cannot test it (not_testable). tools/dev/field-todo-summary.py --os linux gives one verdict per point (docs/tooling/linux-field-report-coverage.md); tests/unit/diagnostics/engine/control/test_field_todo_coverage.lua fails when a TODO line has no entry or an entry names a missing step.",
+	"schema": 1,
+	"todo": {
+		"file": "TODO-tests-linux.md",
+		"section": "## To confirm on Linux",
+		"tag": "field-point"
+	},
+	"points": [
+		{
+			"id": "raw_telemetry",
+			"title": "Raw telemetry rows (window topology, network, WireGuard)",
+			"checks": [
+				{
+					"step": "linux_window_topology"
+				},
+				{
+					"step": "linux_network_toggle"
+				},
+				{
+					"step": "linux_wireguard"
+				}
+			],
+			"condition": "An X11 session with Metrics on; a second monitor and a WireGuard tunnel for the matching steps (each can be skipped by name)."
+		},
+		{
+			"id": "wayland_focus",
+			"title": "Wayland focus on GNOME and KDE",
+			"checks": [
+				{
+					"step": "field_setup",
+					"report": ["focus_listening"]
+				},
+				{
+					"step": "linux_focus_hands"
+				},
+				{
+					"step": "field_session",
+					"report": ["focus_script"]
+				}
+			],
+			"condition": "A GNOME Shell 45+ or Plasma Wayland session after install.sh (and a new login on GNOME).",
+			"not_testable": "GNOME, Plasma 6 and Plasma 5 are separate sessions: one report proves the session it runs in; run it once per desktop."
+		},
+		{
+			"id": "physical_acceptance",
+			"title": "Physical acceptance (grabs, polkit, autostart, wizard, magic key, hotplug)",
+			"checks": [
+				{
+					"step": "field_setup",
+					"report": ["uinput_writable", "evdev_readable", "unit_enabled", "polkit_agent"]
+				},
+				{
+					"step": "linux_physical_hands"
+				},
+				{
+					"step": "field_session",
+					"report": [
+						"input_groups",
+						"uinput_rule",
+						"virtual_keyboard_class",
+						"touchpad_not_grabbed",
+						"hook_restarts",
+						"emergency_stop"
+					]
+				}
+			],
+			"condition": "A real desktop on a kernel with uinput and evdev.",
+			"not_testable": "Wayland and X11 are separate sessions, and real kernel capture with ordered pairs (93) needs Xorg or a compositor reading the daemon's virtual keyboard: run the report once per session type."
+		},
+		{
+			"id": "item50_cascade",
+			"title": "Item 50 cascade and the composed layout on a physical keyboard",
+			"checks": [
+				{
+					"step": "linux_cascade_composed"
+				}
+			]
+		},
+		{
+			"id": "reading_windows",
+			"title": "Reading font and spacing reach the open windows at once, and the setup wizard offers them",
+			"checks": [
+				{
+					"step": "linux_reading_windows"
+				}
+			]
+		},
+		{
+			"id": "layout_emulation_w1_w4",
+			"title": "Layout emulation W1 to W4 on KDE",
+			"checks": [
+				{
+					"step": "linux_layout_emulation_kde"
+				},
+				{
+					"step": "field_tray",
+					"report": ["emulation_radio", "emulation_live"]
+				}
+			],
+			"condition": "A KDE Plasma Wayland session with the Bépo registry layout."
+		},
+		{
+			"id": "owned_gtk_host",
+			"title": "Owned GTK host dialogs",
+			"checks": [
+				{
+					"step": "linux_gtk_host"
+				}
+			]
+		},
+		{
+			"id": "physical_shortcut_delivery",
+			"title": "Physical shortcut delivery (LIN-004)",
+			"checks": [
+				{
+					"step": "linux_physical_shortcut"
+				},
+				{
+					"step": "linux_physical_shortcut_output"
+				}
+			],
+			"condition": "A real keyboard under the evdev grab (decided by the maintainer on 2026-11-11: the getter answers true)."
+		},
+		{
+			"id": "predictions_stop",
+			"title": "Predictions stop on activity",
+			"checks": [
+				{
+					"step": "linux_prediction_activity"
+				},
+				{
+					"step": "linux_prediction_window_switch"
+				},
+				{
+					"step": "linux_prediction_keep"
+				}
+			],
+			"condition": "A slow local model; a mouse, a wheel and a touchpad."
+		},
+		{
+			"id": "tray_reading_font",
+			"title": "Reading font: windows follow, the tray keeps the theme",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["reading_font_row"]
+				}
+			],
+			"not_testable": "The report reads the row in Configuration; that the open windows follow the font while the tray keeps the theme is seen on screen."
+		},
+		{
+			"id": "tray_suspend_row",
+			"title": "Tray « Suspendre » row before Reload",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["suspend_before_reload", "suspend_toggle"]
+				}
+			],
+			"not_testable": "That a hotstring stays unexpanded while paused is typed by a person: the report clicks the row over D-Bus and proves its place, its tick and the paused header, not the typing."
+		},
+		{
+			"id": "configuration_titles",
+			"title": "Configuration titles",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["configuration_titles"]
+				}
+			]
+		},
+		{
+			"id": "log_export_zip",
+			"title": "« Export the logs (zip) » writes one scrubbed archive",
+			"checks": [],
+			"not_testable": "The archive is written to the Downloads folder and shown in the file manager, which no run captures: click the row and inspect the zip; the selection, the scrub and the archive are unit-tested (test_log_export_vectors, test_log_export)."
+		},
+		{
+			"id": "debug_logs_rows",
+			"title": "Débogage logs rows and the detailed log switch",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["debug_logs_rows"]
+				}
+			],
+			"not_testable": "The report reads the rows and the « Journal détaillé » tick but never clicks it (it writes config.toml): ticking it and the « Signaler un bug » warning line stay a person's check."
+		},
+		{
+			"id": "tray_shortcut_hint",
+			"title": "Tray shortcut hints beside Suspend, Reload and Quit",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["shortcut_hints", "suspend_toggle"]
+				}
+			],
+			"not_testable": "The report reads the preset chords' labels and the paused tick; moving or clearing a chord and switching the chords off change the user's settings, and how GNOME, KDE and COSMIC draw the longer rows is seen on screen."
+		},
+		{
+			"id": "local_server_rows_paused",
+			"title": "The AI menu's local server rows commit while paused; only the rescan waits",
+			"checks": [],
+			"not_testable": "Needs a local server (LM Studio or oMLX) running and a person choosing a model, an address and a key while paused, then asking for a rescan: the field report does not drive the model selector page."
+		},
+		{
+			"id": "managed_ollama_cold_start",
+			"title": "Managed Ollama cold start to readiness on a quiet desktop (OLL-06)",
+			"checks": [],
+			"not_testable": "Needs a quiet desktop timed twice, after a new login and right after the runtime's first install: the field report runs inside a busy session and does not install the runtime."
+		},
+		{
+			"id": "ollama_archive_first_install",
+			"title": "Owned Ollama archive download timed on a first real install",
+			"checks": [],
+			"not_testable": "Needs a first install of the 1.4 GB managed Ollama runtime over the real network, timed by a person: the field report does not install the runtime."
+		},
+		{
+			"id": "clipboard_manager_hint",
+			"title": "Pasted text kept out of clipboard managers (x-kde-passwordManagerHint)",
+			"checks": [
+				{
+					"step": "field_session",
+					"report": ["clipboard_restore"]
+				}
+			],
+			"not_testable": "The report counts the clipboard restores lost since the start; reading Klipper's, GPaste's or CopyQ's history after a paste is a person's check."
+		},
+		{
+			"id": "tray_host_missing",
+			"title": "Tray without a tray host: the window and notification that say so, then its click and its accessible name (TRAY-03)",
+			"checks": [],
+			"not_testable": "Needs a GNOME session without the AppIndicator extension, then a panel with one, and a screen reader: the field report runs inside the user's own session and cannot remove or add a panel extension."
+		},
+		{
+			"id": "pickers_prompts",
+			"title": "Numeric prompt, action picker title-bar close and open_app refusal (PCK-03, PCK-04, PCK-06, PCK-09)",
+			"checks": [],
+			"not_testable": "Needs a person at the desktop with Orca, typing in the numeric prompt, closing the picker from its title bar and choosing a file in the open_app dialog: the field report opens no window."
+		},
+		{
+			"id": "update_windows",
+			"title": "Updates and download windows: Escape, Orca, a cancelled and a closed update download (UPD-02 to UPD-05)",
+			"checks": [],
+			"not_testable": "Needs a standalone install offered a newer release, a person who cancels and then closes the download window, and Orca: the field report never downloads or installs an update."
+		},
+		{
+			"id": "layout_tool_pages",
+			"title": "Layout manager and Studio: Orca language, focus after Install, Escape (LTP-02, LTP-06, LTP-07)",
+			"checks": [],
+			"not_testable": "Needs a person with Orca in the layout manager and Ergopti Studio, in a locale other than French: the field report neither listens to Orca nor installs a layout."
+		},
+		{
+			"id": "metrics_views",
+			"title": "Metrics dashboards: a failed range read, the range status read by Orca, numbers in the interface language and the apps incomplete notice (MET-04 to MET-07)",
+			"checks": [],
+			"not_testable": "Needs a person with Orca at the dashboards and a metrics store made unreadable then restored: the field report neither listens to a screen reader nor damages the metrics store."
+		},
+		{
+			"id": "preview_announcements",
+			"title": "Screen-reader switch of the previews: a preview and a finished prediction said by Orca, silent when unticked",
+			"checks": [],
+			"not_testable": "Needs a person listening to Orca while previews and predictions draw: the field report neither listens to a screen reader nor types hotstrings into a focused window."
+		},
+		{
+			"id": "tray_icon_missing",
+			"title": "Missing tray logo: the warning sign, its Orca name and one logged error (TRAY-05)",
+			"checks": [],
+			"not_testable": "Needs a copy of the install with a logo file moved away, a panel and a screen reader: the field report must not damage the installed daemon and reads no screen reader."
+		},
+		{
+			"id": "input_policies",
+			"title": "Branch wave3/input-policies: sticky delay, CapsWord menu, one-shot Shift device",
+			"checks": [
+				{
+					"step": "linux_input_policies"
+				}
+			],
+			"condition": "The Bépo registry layout installed."
+		},
+		{
+			"id": "layout_editor_window",
+			"title": "Layout editor in its own window",
+			"checks": [],
+			"not_testable": "Opening, refocusing and closing a WebKitGTK window needs a person at the desktop: open « Create or edit a layout… » and the manager's « Layout editor », check one window comes back to the front with its unsaved work, then « Close »."
+		},
+		{
+			"id": "direct_xkb_levels",
+			"title": "Direct XKB compiler: a sided-modifier layer on XKB's fifth level",
+			"checks": [
+				{
+					"step": "linux_direct_xkb_levels"
+				}
+			],
+			"condition": "A repository checkout with Node and Lua 5.4 on a real desktop (X11 or Wayland)."
+		},
+		{
+			"id": "one_shot_modifiers",
+			"title": "One-shot modifiers: no time limit, sticky actions, AltGr tap-hold pair",
+			"checks": [
+				{
+					"step": "linux_input_policies"
+				}
+			],
+			"condition": "A real keyboard; a GTK and a Qt application.",
+			"not_testable": "Which modifiers the application received after a `sticky_*` action is a person's reading of the typed result: the report proves only the sticky delay row."
+		},
+		{
+			"id": "shortcut_key_carriage",
+			"title": "Native carriage of `shortcut_key`: XKB omission and emulation",
+			"checks": [],
+			"not_testable": "Whether the emulated shortcut reaches a real application as the shortcut key is a person's reading of the focused application: no field run step drives an exported source."
+		},
+		{
+			"id": "incremental_swipes",
+			"title": "Incremental touchpad swipes on a real touchpad",
+			"checks": [],
+			"not_testable": "Whether one action fires per step of real finger travel is a person's reading of the swipe against the result: the container kernel has no evdev touchpad and no log line measures the travel felt."
+		},
+		{
+			"id": "typing_burst_widget",
+			"title": "Typing-speed widget bursts (TWD-2)",
+			"checks": [],
+			"not_testable": "The widget is read on screen: when it shows and hides as each key, modifier tap and pointer move arrives; the rule itself is unit-tested on the three drivers (twd2-typing-burst, twd2-level-modifiers, twd2-pointer-hides, twd2-keymap-role)."
+		},
+		{
+			"id": "eject_removable_disk",
+			"title": "Eject a real removable disk through udisks and polkit",
+			"checks": [],
+			"not_testable": "No field run or guided step drives eject_all_disks yet: a person plugs and mounts a USB stick, fires the bound gesture and checks the stick left lsblk and the file manager while the system disks stayed mounted."
+		},
+		{
+			"id": "x11_layout_install",
+			"title": "Install, use and remove a registry layout on an X11 session",
+			"checks": [],
+			"not_testable": "No field run or guided step installs a layout yet: a person on a GNOME or Plasma X11 session installs Ergo-L from the menu and from Studio, types with it, checks xkbcomp names ergol after a keyboard plug, then uninstalls it from the user XKB tree."
+		},
+		{
+			"id": "kde_input_sources_live",
+			"title": "Live layout switch on KDE Plasma through the keyboard daemon",
+			"checks": [
+				{
+					"step": "field_session",
+					"report": ["active_layout", "kde_layout_watch"]
+				}
+			],
+			"not_testable": "The report proves the active layout is resolved and named and that the KDE watch follows switches; picking the other layout in « Input sources » and typing after it is a person's check (the report never switches the user's layout)."
+		},
+		{
+			"id": "agent_desktop_connectors",
+			"title": "AI agent calendar, reminder and mail connectors in real desktop applications",
+			"checks": [],
+			"not_testable": "No field run or guided step accepts an agent action yet: a person with a configured AI accepts a calendar event, a reminder and a mail and checks the calendar import and the unsent draft in their own applications."
+		},
+		{
+			"id": "one_folder_name",
+			"title": "One folder name: the legacy folders migrated on the maintainer's Linux machine",
+			"checks": [],
+			"not_testable": "The migration runs once on the maintainer's own legacy folders, which a field run cannot recreate without touching the real profile: a person checks the folders listed in the handoff."
+		},
+		{
+			"id": "accessibility_orca",
+			"title": "Accessibility with Orca: the tray menu, the GTK dialogs, the WebKit windows and the overlays",
+			"checks": [],
+			"not_testable": "A field run reads no screen reader: a person runs Orca on GNOME and KDE and checks what it reads in the tray menu, the dialogs and the WebKit windows, and what it says when a preview appears."
+		},
+		{
+			"id": "backspace_restore",
+			"title": "Backspace restore: a Backspace right after an expansion gives the trigger back",
+			"checks": [],
+			"not_testable": "A field run types no hotstring and times no Backspace against the undo window: a person expands a magic-key trigger and a Space-terminated one in a real editor and checks the text each Backspace leaves."
+		},
+		{
+			"id": "small_native_units",
+			"title": "Daily note refusals logged and the Windows-only note settings’ reason (SNU-08, SNU-09)",
+			"checks": [],
+			"not_testable": "Needs a notes folder made read-only and a broken text/plain handler on the person’s desktop: the field report changes neither the data folder nor the desktop associations."
+		},
+		{
+			"id": "app_metadata",
+			"title": "Software centres and menus show the package metadata",
+			"checks": [],
+			"not_testable": "Needs a person to install the release packages and read the software centre's page: the field report runs from a checkout and installs no package; tools/test/test-app-metadata.cjs pins the fields every packager writes."
+		},
+		{
+			"id": "bug_report_link",
+			"title": "Report a bug and Suggest a feature open GitHub forms with readable, complete facts (2026-11-24)",
+			"checks": [],
+			"not_testable": "Needs a person signed in to GitHub in a browser to look at the opened forms and paste the clipboard: the field report opens no browser and reads no web page."
+		},
+		{
+			"id": "field_report_window",
+			"title": "Field report progress window (2026-11-24)",
+			"checks": [],
+			"not_testable": "The window is the person's: Debug > « Lancer le field report (tous les tests) » opened, then its Stop, its close box and its end buttons clicked, and the issue form looked at in a browser. The page, the observer's messages and each action are unit-tested (test_field_report, test_healthcheck_report_issue, field-report-window.playwright.cjs)."
+		},
+		{
+			"id": "gnome_50_focus_extension",
+			"title": "GNOME 50 and 51 focus extension (fixed 2026-11-25)",
+			"checks": [
+				{
+					"step": "field_setup",
+					"report": ["focus_listening"]
+				},
+				{
+					"step": "linux_focus_hands"
+				},
+				{
+					"step": "field_session",
+					"report": ["focus_script"]
+				}
+			],
+			"condition": "A GNOME 50 or 51 Wayland session after install.sh and a new login (Fedora 44 or Ubuntu 26.04).",
+			"not_testable": "The extension's ACTIVE state and GNOME's input source after a tray switch are read by the person in gnome-extensions and the shell; the report proves the focus reports the extension sends."
+		},
+		{
+			"id": "gnome_wayland_clipboard",
+			"title": "Clipboard on GNOME Wayland (2026-11-25)",
+			"checks": [],
+			"not_testable": "Needs a real GNOME 50 Wayland desktop with a focused text field, the desktop and a fullscreen video, and a person watching for a flashing window and checking the restored clipboard: no run types into another application's field."
+		},
+		{
+			"id": "wm_session_startup",
+			"title": "Startup without graphical-session.target (fixed 2026-11-25)",
+			"checks": [],
+			"not_testable": "Needs Xfce, Cinnamon, Openbox, i3 and sway sessions, each with install.sh run from it and a logout and login: one report runs in one already started session and installs nothing."
+		},
+		{
+			"id": "unit_start_limit",
+			"title": "Bounded restarts (fixed 2026-11-25)",
+			"checks": [],
+			"not_testable": "Needs the .deb installed, uinput unloaded and blacklisted with sudo, and a new login: the field report runs from a checkout with a working /dev/uinput and never changes kernel modules."
+		},
+		{
+			"id": "opensuse_rpm",
+			"title": "The .rpm on openSUSE (fixed 2026-11-25)",
+			"checks": [],
+			"not_testable": "Needs a person to install the release .rpm with zypper on Tumbleweed and Leap 15.6 and to install the GNOME AppIndicator extension: the field report runs from a checkout and installs no package."
+		},
+		{
+			"id": "tray_kde_hover_radio",
+			"title": "Tray ticks survive a KDE hover and single choices are radios (fixed 2026-11-25)",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["hover_keeps_checks", "emulation_radio", "emulation_live"]
+				}
+			]
+		},
+		{
+			"id": "tray_problem_rows",
+			"title": "Red component-problem rows in the tray (2026-11-25)",
+			"checks": [
+				{
+					"step": "field_tray",
+					"report": ["problem_rows"]
+				}
+			]
+		},
+		{
+			"id": "virtual_devices_touchpad",
+			"title": "The touchpad stays enabled: the virtual keyboard is no mouse (fixed 2026-11-25)",
+			"checks": [
+				{
+					"step": "field_session",
+					"report": [
+						"virtual_keyboard_class",
+						"virtual_pointer_class",
+						"libinput_keyboard",
+						"touchpad_not_grabbed"
+					]
+				}
+			],
+			"condition": "A laptop with a touchpad; the virtual pointer exists only while a wheel binding of the navigation layer is held."
+		},
+		{
+			"id": "session_health",
+			"title": "Session health after the fixes of 2026-11-25",
+			"checks": [
+				{
+					"step": "field_session",
+					"report": [
+						"reload_path",
+						"hook_restarts",
+						"emergency_stop",
+						"clipboard_restore",
+						"lgi_module",
+						"text_automation",
+						"dispatch_latency",
+						"notify_server",
+						"notify_persistence"
+					]
+				}
+			]
+		},
+		{
+			"id": "user_workflows",
+			"title": "User workflows window, assignment, hotstring and shell approval",
+			"checks": [],
+			"not_testable": "A person edits the window and triggers the workflow on a real desktop; the step model, validator, interpreter and shell approval replay `_shared/tests/corpus/workflows/` in the unit suites."
+		}
+	]
+}

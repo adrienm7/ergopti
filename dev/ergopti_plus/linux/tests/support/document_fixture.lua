@@ -106,7 +106,11 @@ function M.new(app_name, handler, state)
 				ucm.on_script_message_received[ucm.signal_details[id]]=nil
 			end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
 		package.loaded["core.logger.engine.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
+		-- A model pull reads its ceiling at dispatch (model_download.lua): that one
+		-- comes from the shared registry, every other key stays refused.
+		local RealTimings=saved["core.timing.engine.timings"].value or require("core.timing.engine.timings")
 		package.loaded["core.timing.engine.timings"]={ms=function(section,key)
+			if section=="llm" and key=="ollama_model_pull_timeout_ms" then return RealTimings.ms(section,key) end
 			assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
 		package.loaded["core.network.engine.managed_http_deadline"]={start=function(deadline,expired)
 			local t={started=true,settled=false,listeners={},deadline=deadline,expired=expired}

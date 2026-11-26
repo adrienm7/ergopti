@@ -51,8 +51,8 @@ function M.sha256(data)
 			Logger.warn(LOG, "Native OpenSSL binding unavailable; CLI hashing is subject to exec argument limits")
 		end
 		local output, native_error
-		-- The private runtime's openssl (infra/owned_programs.lua), never a host copy.
-		local openssl = Shell.quote(require("infra.owned_programs").path("openssl"))
+		-- The private runtime's openssl (settings/engine/preferences/owned_programs.lua), never a host copy.
+		local openssl = Shell.quote(require("settings.engine.preferences.owned_programs").path("openssl"))
 		if data:find("\0", 1, true) then
 			-- exec receives a C string: quoting cannot preserve embedded NUL.
 			-- The shared codec makes the shell input textual; OpenSSL restores

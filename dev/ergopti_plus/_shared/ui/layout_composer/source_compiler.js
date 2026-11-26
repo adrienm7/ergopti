@@ -88,11 +88,28 @@ var LayoutSourceCompiler = (function () {
 	// What each compilation target can carry. macOS reads the keylayout itself, with
 	// every sided token and an unused cell for a disabled key; Linux and Windows reach
 	// it through the XKB and KLC converters, which have neither and place no key at
-	// an unnamed macOS key code.
+	// an unnamed macOS key code. shortcutLevel: the target reads a key's shortcut_key
+	// from the Command keyMap (macOS, the XKB Control/Alt/Super level); the KLC
+	// carries it as a virtual key instead (tools/lib/kbd-dll/shortcut-keys.cjs).
 	const TARGETS = {
-		macos: { tokens: TOKENS, disabledCharacterCell: true, unnamedMacCodes: true },
-		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false },
-		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false }
+		macos: {
+			tokens: TOKENS,
+			disabledCharacterCell: true,
+			unnamedMacCodes: true,
+			shortcutLevel: true
+		},
+		linux: {
+			tokens: CONVERTER_TOKENS,
+			disabledCharacterCell: false,
+			unnamedMacCodes: false,
+			shortcutLevel: true
+		},
+		windows: {
+			tokens: CONVERTER_TOKENS,
+			disabledCharacterCell: false,
+			unnamedMacCodes: false,
+			shortcutLevel: false
+		}
 	};
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
@@ -355,14 +372,106 @@ var LayoutSourceCompiler = (function () {
 		])
 			(source[field] || []).forEach((entry) => note(`${field}.${entry.key}`, reason));
 		if (source.windows) note('windows', 'windows_only_flags');
+		// A key's shortcut_key is carried by compileModel's shortcut level (and by
+		// the Windows virtual key); what it cannot carry is reported there.
 		for (const [key, entry] of Object.entries(source.keys || {}))
 			for (const field of Object.keys(entry))
-				if (field === 'shortcut_key')
-					// The shortcut level of a native layout follows the typed character; the
-					// driver's emulation table performs a key's shortcut_key instead.
-					note(`keys.${key}.${field}`, `shortcut_output_not_in_${format}`);
-				else if (field !== 'name') note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
+				if (field !== 'name' && field !== 'shortcut_key')
+					note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
 		return omitted;
+	}
+
+	// The modifiers whose combinations select a native shortcut level.
+	const SHORTCUT_LEVEL_IDS = ['control', 'meta'];
+
+	/**
+	 * True when a selector holds for exactly the modifier ids `pressed` (Caps Lock
+	 * off). A combination names either side of a modifier: a sided id (Right Ctrl)
+	 * does not answer it.
+	 */
+	function selects(selector, pressed) {
+		const allowed = new Set([...selector.required, ...selector.optional]);
+		return (
+			selector.required.every((id) => pressed.includes(id)) &&
+			pressed.every((id) => allowed.has(id))
+		);
+	}
+
+	/**
+	 * Carries each key's shortcut_key on the native shortcut level: in every keyMap
+	 * a shortcut combination selects (LayoutSource.shortcutKeyCombinations), the key
+	 * types what the key it names types there, as the driver's emulation sends that
+	 * key. macOS matches Command and Control shortcuts on that keyMap's character, and
+	 * the XKB converter writes it on its Control/Alt/Super level. A combination no
+	 * layer selects falls to the default keyMap: one more keyMap, based on it, takes
+	 * those combinations. A combination a text layer answers cannot hold it, which
+	 * the omissions say.
+	 * @param {object} source - The validated source.
+	 * @param {object[]} layers - compileModel's compiled layers, in keyMap order.
+	 * @param {Map[]} keyMaps - compileModel's rows, one Map per layer (changed in place).
+	 * @param {object} context - { table, tokens, platform, format, omitted }.
+	 * @returns {object|null} The added layer { selectors, base } or null.
+	 */
+	function shortcutLevels(source, layers, keyMaps, context) {
+		const { table, tokens, platform, format, omitted } = context;
+		const pairs = Object.entries(source.keys || {}).filter(([, entry]) =>
+			own(entry, 'shortcut_key')
+		);
+		if (!pairs.length) return null;
+		const shortcutLayer = (layer) =>
+			[layer, ...(layer.alternatives || [])].every((selector) =>
+				selector.required.some((id) => SHORTCUT_LEVEL_IDS.includes(id))
+			);
+		const patched = new Set();
+		const free = [];
+		let shadowed = false;
+		for (const combination of LayoutSource.shortcutKeyCombinations()) {
+			const index = layers.findIndex(({ layer }) =>
+				[layer, ...(layer.alternatives || [])].some((selector) => selects(selector, combination))
+			);
+			if (index === -1) free.push(combination);
+			else if (shortcutLayer(layers[index].layer)) patched.add(index);
+			else shadowed = true;
+		}
+		const rows = new Map();
+		// Every key reads the rows as the layers wrote them: two keys naming each
+		// other exchange their rows.
+		const written = new Map([...patched].map((index) => [index, new Map(keyMaps[index])]));
+		const nativeCode = (name, path) => {
+			const mac = table.code(name);
+			if (mac === undefined || MODIFIER_KEYS.has(name)) {
+				omitted.push({ path, reason: `physical_key_not_in_${format}` });
+				return undefined;
+			}
+			if (!TARGETS[platform].unnamedMacCodes && !table.byName.has(name)) {
+				omitted.push({ path, reason: `mac_only_key_code_not_in_${platform}` });
+				return undefined;
+			}
+			return mac;
+		};
+		for (const [key, entry] of pairs) {
+			const path = `keys.${key}.shortcut_key`;
+			const from = nativeCode(key, path);
+			const to = from === undefined ? undefined : nativeCode(entry.shortcut_key, path);
+			if (to === undefined) continue;
+			if (shadowed) omitted.push({ path, reason: `shortcut_level_types_text_in_${format}` });
+			for (const index of patched) {
+				const original = written.get(index);
+				if (original.has(to)) keyMaps[index].set(from, original.get(to));
+				else keyMaps[index].delete(from);
+			}
+			if (!free.length) continue;
+			// The added keyMap inherits the default one: the named key's row there.
+			if (keyMaps[0].has(to)) rows.set(from, keyMaps[0].get(to));
+			else omitted.push({ path, reason: `shortcut_key_types_nothing_in_${format}` });
+		}
+		if (!free.length || !rows.size) return null;
+		const caps = tokens.caps_lock ? ['caps_lock'] : [];
+		const selectors = free.map((required) => selectorKeys({ required, optional: caps }, tokens));
+		if (selectors.includes(null)) fail('source_shortcut_level_tokens', 'keys');
+		layers.push({ layer: null, selectors, keys: {}, base: 0 });
+		keyMaps.push(rows);
+		return layers[layers.length - 1];
 	}
 
 	/**
@@ -458,14 +567,20 @@ var LayoutSourceCompiler = (function () {
 				} else
 					omitted.push({
 						path,
+						// A repeat or magic key types after the text typed before it: no
+						// native layout file holds that, the drivers' emulation does.
 						reason: own(mapping, 'action')
 							? `action_not_in_${format}`
-							: `key_chord_not_in_${format}`
+							: own(mapping, 'repeat') || own(mapping, 'magic')
+								? `context_key_not_in_${format}`
+								: `key_chord_not_in_${format}`
 					});
 			}
 			for (const [mac, output] of defaults) if (!rows.has(mac)) rows.set(mac, ['output', output]);
 			return rows;
 		});
+		if (TARGETS[platform].shortcutLevel)
+			shortcutLevels(source, layers, keyMaps, { table, tokens, platform, format, omitted });
 		// A rule input no key types keeps its action, as an imported file had it; a
 		// dead key only reached through a chain needs none.
 		for (const input of ruleInputs) if (!actions.has(input)) textAction(input, input, 'dead_keys');
@@ -530,7 +645,12 @@ var LayoutSourceCompiler = (function () {
 		});
 		lines.push('\t</modifierMap>', '\t<keyMapSet id="layout">');
 		keyMaps.forEach((rows, index) => {
-			lines.push(`\t\t<keyMap index="${index}">`);
+			const base = layers[index].base;
+			lines.push(
+				base === undefined
+					? `\t\t<keyMap index="${index}">`
+					: `\t\t<keyMap index="${index}" baseMapSet="layout" baseIndex="${base}">`
+			);
 			for (const mac of [...rows.keys()].sort((a, b) => a - b)) {
 				const [kind, value] = rows.get(mac);
 				lines.push(`\t\t\t<key code="${mac}" ${kind}="${esc(value)}"/>`);
@@ -638,6 +758,9 @@ var LayoutSourceCompiler = (function () {
 						id: 'layout',
 						key_maps: model.keyMaps.map((rows, index) => ({
 							index,
+							...(model.layers[index].base === undefined
+								? {}
+								: { base: { set: 'layout', index: model.layers[index].base } }),
 							keys: [...rows.keys()]
 								.sort((a, b) => a - b)
 								.map((code) => {
@@ -665,6 +788,19 @@ var LayoutSourceCompiler = (function () {
 	// alt_right (AltGr, macOS Option) is not reported by the Linux hook or the
 	// macOS tap flags, so a layer needing one cannot be selected by the engine.
 	const REPORTED = new Set(['shift', 'control', 'alt', 'alt_right', 'meta', 'caps_lock']);
+	// The modifier keys each driver's hook takes as plain keys when a custom
+	// modifier is held on them: its own Caps Lock toggle and AltGr level stay off
+	// while it does. macOS reports Caps Lock to an event tap only as the lock flag
+	// changing on a press, never its release, and toggles the lock before any
+	// tap sees it, so it cannot hold a modifier there (platform_parity.toml).
+	const HOLDABLE_MODIFIER_KEYS = {
+		macos: new Set(['AltRight']),
+		linux: new Set(['CapsLock', 'AltRight']),
+		windows: new Set(['CapsLock', 'AltRight'])
+	};
+	const HOLDABLE_SOMEWHERE = new Set(
+		Object.values(HOLDABLE_MODIFIER_KEYS).flatMap((keys) => [...keys])
+	);
 
 	/** A mapping the engine can perform, or the reason it cannot. */
 	function emulatedMapping(mapping, sendable) {
@@ -674,7 +810,50 @@ var LayoutSourceCompiler = (function () {
 			return { key: mapping.key, modifiers: (mapping.modifiers || []).slice() };
 		}
 		if (own(mapping, 'disabled')) return { disabled: true };
-		return own(mapping, 'dead_key') ? 'dead_key_not_emulated' : 'action_not_emulated';
+		if (own(mapping, 'dead_key')) return { dead_key: mapping.dead_key };
+		if (own(mapping, 'repeat')) return { repeat: mapping.repeat };
+		if (own(mapping, 'magic')) return { magic: mapping.magic };
+		return 'action_not_emulated';
+	}
+
+	/**
+	 * The text a key answers dead-key rules with when it differs from its text:
+	 * its compose_as, or empty for a key typing outside every dead key.
+	 */
+	function composeIdentity(mapping) {
+		if (mapping.compose === false) return '';
+		return own(mapping, 'compose_as') ? mapping.compose_as : mapping.text;
+	}
+
+	/**
+	 * The dead keys an emulated mapping can reach, with their rules keyed by what
+	 * answers them: `inputs` by the typed text, `dead_inputs` by the dead key
+	 * pressed. Every state a rule leads to is reached too, in source order.
+	 */
+	function emulatedDeadKeys(source, started) {
+		const byId = new Map((source.dead_keys || []).map((dead) => [dead.id, dead]));
+		const reached = new Set();
+		const queue = [...started];
+		while (queue.length) {
+			const id = queue.shift();
+			if (reached.has(id)) continue;
+			reached.add(id);
+			for (const rule of byId.get(id).rules) if (own(rule, 'next')) queue.push(rule.next);
+		}
+		const result = {};
+		for (const dead of source.dead_keys || []) {
+			if (!reached.has(dead.id)) continue;
+			const entry = { terminator: dead.terminator, inputs: {}, dead_inputs: {} };
+			for (const rule of dead.rules) {
+				const outcome = {};
+				if (own(rule, 'text')) outcome.text = rule.text;
+				if (own(rule, 'next')) outcome.next = rule.next;
+				if (own(rule, 'input')) entry.inputs[rule.input] = outcome;
+				else entry.dead_inputs[rule.input_dead_key] = outcome;
+			}
+			result[dead.id] = entry;
+		}
+		return result;
 	}
 
 	/**
@@ -711,13 +890,33 @@ var LayoutSourceCompiler = (function () {
 
 		// Every custom modifier is listed, keyless when none of its keys can be seen:
 		// a tap-hold can still hold it, and the engine refuses an undeclared id.
+		// Caps Lock and AltGr hold one where the platform's hook can take them.
+		const holdable = HOLDABLE_MODIFIER_KEYS[platform];
 		const modifiers = (source.modifiers || []).map((modifier) => ({
 			id: modifier.id,
 			mode: modifier.mode,
-			keys: modifier.keys.filter((key, index) =>
-				pressable(key, `modifiers.${modifier.id}.keys[${index}]`)
-			)
+			keys: modifier.keys.filter((key, index) => {
+				const path = `modifiers.${modifier.id}.keys[${index}]`;
+				if (holdable.has(key)) return true;
+				if (HOLDABLE_SOMEWHERE.has(key)) {
+					skip(path, `modifier_key_not_holdable_on_${platform}`);
+					return false;
+				}
+				return pressable(key, path);
+			})
 		}));
+		// The dead keys an emulated layer or a tap types, and the text mappings
+		// that answer them, whose compose identity is written once one is reached.
+		const startedDead = new Set();
+		const composing = [];
+		const emulate = (mapping) => {
+			const emulated = emulatedMapping(mapping, sendable);
+			if (typeof emulated === 'string') return emulated;
+			if (own(emulated, 'dead_key')) startedDead.add(emulated.dead_key);
+			if (own(emulated, 'text')) composing.push([emulated, composeIdentity(mapping)]);
+			return emulated;
+		};
+		const nativeLayers = [];
 
 		const layers = (source.layers || []).map((layer) => {
 			const selectors = [layer, ...(layer.alternatives || [])].map((selector) => ({
@@ -737,15 +936,23 @@ var LayoutSourceCompiler = (function () {
 				entry.selectable = false;
 				return entry;
 			}
-			for (const [name, mapping] of Object.entries(
-				layerKeys(source, layer, platform, 'iso', table)
-			)) {
+			const keys = layerKeys(source, layer, platform, 'iso', table);
+			if (native) nativeLayers.push([entry, keys]);
+			for (const [name, mapping] of Object.entries(keys)) {
 				const path = `layers.${layer.id}.keys.${name}`;
 				// The compiled .keylayout already types a native layer's text, dead keys and
-				// disabled keys; the emulation adds what it leaves out.
-				if (native && !own(mapping, 'key') && !own(mapping, 'action')) continue;
+				// disabled keys; the emulation adds what it leaves out (chords, actions,
+				// repeat and magic keys).
+				if (
+					native &&
+					!own(mapping, 'key') &&
+					!own(mapping, 'action') &&
+					!own(mapping, 'repeat') &&
+					!own(mapping, 'magic')
+				)
+					continue;
 				if (!pressable(name, path)) continue;
-				const emulated = emulatedMapping(mapping, sendable);
+				const emulated = emulate(mapping);
 				if (typeof emulated === 'string') skip(path, emulated);
 				else entry.keys[name] = emulated;
 			}
@@ -795,7 +1002,11 @@ var LayoutSourceCompiler = (function () {
 		for (const [index, entry] of (source.tap_holds || []).entries()) {
 			const path = `tap_holds[${index}]`;
 			if (!pressable(entry.key, path)) continue;
-			const tap = emulatedMapping(entry.tap, sendable);
+			// A tap's text is chosen at its release, with no text typed before it to read.
+			const tap =
+				own(entry.tap, 'repeat') || own(entry.tap, 'magic')
+					? 'context_key_tap_not_emulated'
+					: emulate(entry.tap);
 			if (typeof tap === 'string') {
 				skip(`${path}.tap`, tap);
 				continue;
@@ -820,7 +1031,7 @@ var LayoutSourceCompiler = (function () {
 			else remaps.push({ key: from, to });
 		}
 
-		return {
+		const emulation = {
 			format: EMULATION_FORMAT,
 			version: EMULATION_VERSION,
 			layout: source.layout.id,
@@ -832,6 +1043,44 @@ var LayoutSourceCompiler = (function () {
 			remaps,
 			not_emulated: notEmulated
 		};
+		// The magic keys' tables, by id, when an emulated mapping types one; a
+		// table without a magic key is written exactly as before.
+		const magicIds = new Set();
+		for (const entry of layers)
+			for (const mapping of Object.values(entry.keys))
+				if (own(mapping, 'magic')) magicIds.add(mapping.magic);
+		for (const entry of tapHolds) if (own(entry.tap, 'magic')) magicIds.add(entry.tap.magic);
+		if (magicIds.size > 0) {
+			emulation.magic = {};
+			for (const table of source.magic || [])
+				if (magicIds.has(table.id))
+					emulation.magic[table.id] = {
+						rules: table.rules.map((rule) => ({ after: rule.after, types: rule.types })),
+						fallback: own(table, 'fallback') ? table.fallback : ''
+					};
+		}
+		// A dead key the emulation types composes with the next key, which may be
+		// on a native layer the .keylayout types: the table then says what each key
+		// of those layers answers a rule with, and the text mappings their compose
+		// identity. A table without one is written exactly as before.
+		if (startedDead.size === 0) return emulation;
+		for (const [emulated, identity] of composing)
+			if (identity !== emulated.text) emulated.compose = identity;
+		for (const [entry, keys] of nativeLayers) {
+			const composeKeys = {};
+			for (const [name, mapping] of Object.entries(keys)) {
+				if (MODIFIER_KEYS.has(name) || !sendable(name)) continue;
+				if (own(mapping, 'dead_key')) composeKeys[name] = { dead_key: mapping.dead_key };
+				else if (own(mapping, 'text')) {
+					composeKeys[name] = { text: mapping.text };
+					const identity = composeIdentity(mapping);
+					if (identity !== mapping.text) composeKeys[name].compose = identity;
+				}
+			}
+			entry.compose_keys = composeKeys;
+		}
+		emulation.dead_keys = emulatedDeadKeys(source, startedDead);
+		return emulation;
 	}
 
 	// ========================

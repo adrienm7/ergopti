@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AHK v2 implementation of the TextSender port contract defined in
 ; static/ergopti_plus/_shared/core/ports/TextSender.spec.js. Wraps AHK's SendText,
-; SendInput, and the Clipboard port (adapters/clipboard.ahk) behind the three
+; SendInput, and the Clipboard port (clipboard/adapters/clipboard.ahk) behind the three
 ; canonical functions (TextSend, TextEraseChars, TextPressKey) so domain modules
 ; can inject text and keystrokes without coupling to AHK-specific send APIs.
 ;
@@ -23,7 +23,7 @@
 ;
 ; CLIPBOARD DEPENDENCY:
 ; The clipboard path uses CB_SaveAll / CB_Write / CB_RestoreAll from the Clipboard
-; port adapter (adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
+; port adapter (clipboard/adapters/clipboard.ahk) instead of accessing A_Clipboard directly.
 ; CB_SaveAll/CB_RestoreAll use ClipboardAll() so non-text content (images, files,
 ; RTF) is preserved across the paste cycle. CB_Write is text-only (sets A_Clipboard
 ; to a string) so the paste content itself is always text, which is correct.
@@ -33,7 +33,7 @@
 ; Mirrors TextSender.spec.js CLIPBOARD_THRESHOLD = 1000.
 global TEXT_CLIPBOARD_THRESHOLD := 1000
 
-#Include %A_LineFile%\..\..\..\adapters\editor_replace.ahk
+#Include %A_LineFile%\..\..\..\clipboard\adapters\editor_replace.ahk
 
 ; Metadata only: never retain document, prediction or clipboard text in a log.
 _TextSenderReadClipboardDiagnosticState() {
@@ -148,6 +148,8 @@ global TEXT_SENDER_SEND_LEVEL := 0
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
 global _AHK_SendText  := (Text) => SendText(Text)
 global _AHK_SendInput := (Keys) => SendInput(Keys)
+global _AHK_SendEvent := (Keys) => SendEvent(Keys)
+global _AHK_InputHookFactory := (Options) => InputHook(Options)
 
 
 
@@ -565,7 +567,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	; restore — the caller's Saved snapshot is simply never consumed.
 	;
 	; Every bail-out below calls Callback() before returning. Callers such as
-	; modules/keymap/llm_bridge.ahk's _InjectCallback own depth-counter guards
+	; ai/engine/bridge.ahk's _InjectCallback own depth-counter guards
 	; (PrefixWatcherSuppress/KL_MarkSynthetic) that are released exactly once,
 	; by the callback, on any path where TextSend itself did not throw --  a
 	; bail-out here that never invokes Callback leaked those guards forever,

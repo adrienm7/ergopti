@@ -23,6 +23,10 @@ Ui_MsgBox(Text := "", Title := "", Options := "") {
 
 /**
  * Opens the native input dialog without changing cancellation or entered text.
+ * One box is open at a time: InputBox waits on its own thread, so a second
+ * « Other value… » click ran a second box beside the first (PCK-17). A request
+ * made while a box is open brings that box forward and answers Cancel; macOS
+ * blocks in its text prompt and Linux replaces the open one.
  * @param {string} Prompt - Native prompt body.
  * @param {string} Title - Already-translated, brandless caption.
  * @param {string} Options - Native size, password and timeout options.
@@ -30,7 +34,16 @@ Ui_MsgBox(Text := "", Title := "", Options := "") {
  * @returns {object} The native Result and Value receipt.
  */
 Ui_InputBox(Prompt := "", Title := "", Options := "", Default := "") {
-	return InputBox(Prompt, WindowTitle(Title), Options, Default)
+	static Open := false, OpenCaption := ""
+	if Open {
+		if Hwnd := WinExist(OpenCaption . " ahk_pid " . DllCall("GetCurrentProcessId", "UInt"))
+			WinActivate(Hwnd)
+		return {Result: "Cancel", Value: ""}
+	}
+	Caption := WindowTitle(Title)
+	Open := true, OpenCaption := Caption
+	try return InputBox(Prompt, Caption, Options, Default)
+	finally Open := false, OpenCaption := ""
 }
 
 /**

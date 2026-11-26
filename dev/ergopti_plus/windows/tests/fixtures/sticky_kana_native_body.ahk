@@ -86,6 +86,12 @@ _SKN_Inject() {
 		for Token, Record in _SIHO_Owners
 			if Record["owner"] == "sticky-modifier"
 				_SKN.Hook := Record["hook"]
+		; The timer may interrupt StickyModifier before it has started its hook
+		; (its first call reads the shared value schema): wait for the admission.
+		if !(_SKN.Hook is InputHook && _SKN.Hook.InProgress) && _SKN.HasOwnProp("Admitting") && _SKN.Admitting {
+			SetTimer(_SKN_Inject, -10)
+			return
+		}
 		_SKN_Require(_SKN.Hook is InputHook && _SKN.Hook.InProgress,
 			"Original injection must reach the actual admitted sticky InputHook.")
 		; A newest, fully visible I1 observer independently receives native
@@ -175,7 +181,9 @@ _SKN_Main() {
 			_SKN_Require(_SKN.PreheldBeforeCapture, "The native receiver and independent observer must witness OEM held before Sticky is called")
 		}
 		SetTimer(_SKN_Inject, -1)
-		Accepted := StickyModifier("sticky_ctrl")
+		_SKN.Admitting := true
+		try Accepted := StickyModifier("sticky_ctrl")
+		finally _SKN.Admitting := false
 		if IsObject(_SKN.Failure)
 			throw _SKN.Failure
 		Started := A_TickCount

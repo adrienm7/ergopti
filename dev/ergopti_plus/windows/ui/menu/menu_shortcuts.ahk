@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Shortcuts category: personal shortcuts, script-control entries, extension shortcuts, the edit action and the surrounding-symbols (wrap) editor with its custom-pair CRUD.
 ;
-; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
+; Split out of menu/ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -517,6 +517,7 @@ _SC_ScopeCommands(Options := unset) {
 		MenuCommand.SHORTCUTS_TOGGLE, MenuRenderer_CategoryGateCommand("Shortcuts"),
 		MenuCommand.EDIT_SHORTCUTS, OpenPersonalShortcuts,
 		MenuCommand.PHYSICAL_SHORTCUTS_EDITOR, ObjBindMethod(PhysicalShortcutsMenuPort(), "Open"),
+		MenuCommand.USER_WORKFLOWS_EDITOR, WorkflowsEditorOpen,
 		MenuCommand.SCOPE_RESTORE, (*) => _SC_ApplyScope("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => _SC_ApplyScope("clear", OwnedOptions))
 }

@@ -496,8 +496,7 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 			if _llm_ov.HasOverride
 				llm_timeout_sec := _llm_ov.Delay
 		}
-		Meta["timeout_ms"] := Round(
-			Max(0.05, llm_timeout_sec - 0.2) * 1000)
+		Meta["timeout_ms"] := _LLM_TooltipLifetimeMs(llm_timeout_sec)
 	}
     ; Reserve render ownership and cancel the older hotstring dequeue cycle in
     ; one short transaction. Slots/Visible/ShownAt deliberately remain owned by
@@ -549,6 +548,23 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 		slots.Length, (is_final ? "true" : "false"),
 		Meta["timeout_ms"], RenderGeneration)
 	return RenderGeneration
+}
+
+; The auto-hide of a prediction in ms: its configured lifetime less the shared
+; [timing] decrement, never below the shared floor. A lifetime of 0, which the
+; Delays row shows as « infinite », keeps the prediction until the next activity
+; (0 arms no timeout), as on macOS and Linux; it used to hide it after the 50 ms
+; floor.
+; @param Sec {Number} The configured lifetime in seconds.
+; @returns {Integer} Milliseconds, 0 for no auto-hide.
+_LLM_TooltipLifetimeMs(Sec) {
+	global UI_TIMEOUT_DECREMENT_SEC, UI_TIMEOUT_FLOOR_SEC
+	if !IsNumber(Sec) || Number(Sec) < 0
+		throw ValueError("A prediction lifetime must be a non-negative number of seconds.", -1, Sec)
+	Sec := Number(Sec)
+	if Sec == 0
+		return 0
+	return Round(Max(UI_TIMEOUT_FLOOR_SEC, Sec - UI_TIMEOUT_DECREMENT_SEC) * 1000)
 }
 
 ; A caller that attaches state to a paint must compare the returned generation
@@ -1231,7 +1247,18 @@ LLM_TooltipRefreshChainTiming() {
 	if !_LLM_Tooltip_Chain.FirstShowTick {
 		_LLM_Tooltip_Chain.FirstShowTick := now
 		_LLM_Tooltip_Chain.TtftMs := now - _LLM_Tooltip_Chain.StartTick
+		_LLM_TooltipJudgeFirstDisplay(_LLM_Tooltip_Chain.TtftMs)
 	}
+}
+
+; Judges the chain's first display against [budgets] prediction_display_ms, as
+; the macOS and Linux tooltips do, once per chain. Diagnostics only: a budget
+; that cannot be read is logged and the display goes on.
+; @param TtftMs {Number} Chain start to the first display.
+_LLM_TooltipJudgeFirstDisplay(TtftMs) {
+	try PerfBudget_Report("LLM", "prediction.display", TtftMs, TimingsGet("budgets", "prediction_display_ms"))
+	catch as Err
+		try LoggerError("LLM", "The first display could not be judged against its budget: {1}.", Err.Message)
 }
 
 ; Freezes the chain timings WITHOUT repainting. Callers invoke it just before the
@@ -1263,8 +1290,10 @@ LLM_TooltipMarkChainTimingOnly(NowTick) {
 		; would then take the first-show branch in LLM_TooltipRefreshChainTiming and
 		; overwrite TtftMs with a later value — printing an info bar whose TTFT is
 		; greater than the TTLT frozen here.
-		if !_LLM_Tooltip_Chain.FirstShowTick
+		if !_LLM_Tooltip_Chain.FirstShowTick {
 			_LLM_Tooltip_Chain.FirstShowTick := final
+			_LLM_TooltipJudgeFirstDisplay(_LLM_Tooltip_Chain.TtftMs)
+		}
 	}
 }
 
@@ -1491,12 +1520,17 @@ _LLM_TooltipExpireSharedHeader(Surface) {
 
 ; Geometry of the hotstring rows heading a shared panel, drawn like the
 ; hotstring stack: a band per row, each followed by its 1 px rule (the last one
-; separates the predictions). Pure, layout units.
+; separates the predictions), the category glyph badge first in a row that
+; shows one. Pure, layout units.
 ; @param Sizes       Array of { W, H } — each row's text.
 ; @param LabelSizes  Array of { W, H } — each row's trigger label, W 0 when none.
 ; @param Style       { PadX, PadY, LabelGap }.
-; @returns { W, H, TextW, LabelW, RowY[], RowH[], Sizes, LabelSizes }
-_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
+; @param Badge       { W, H, Zone } from TooltipGlyphBadge, or 0 when no row shows a glyph.
+; @param Glyphs      Array of each row's glyph, "" when none; omitted with Badge.
+; @returns { W, H, TextX, TextW, LabelW, Badge, ContentH[], RowY[], RowH[], Sizes, LabelSizes }
+_LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style, Badge := 0, Glyphs := 0) {
+	if !IsObject(Badge)
+		Badge := { W: 0, H: 0, Zone: 0 }
 	TextW := 0
 	LabelW := 0
 	for , Size in Sizes
@@ -1504,10 +1538,14 @@ _LLM_TooltipHeaderLayout(Sizes, LabelSizes, Style) {
 	for , Size in LabelSizes
 		LabelW := Max(LabelW, Size.W)
 	LabelZone := LabelW > 0 ? Style.LabelGap + LabelW : 0
-	L := { W: Sizes.Length > 0 ? Style.PadX + TextW + LabelZone + Style.PadX : 0, H: 0,
-		TextW: TextW, LabelW: LabelW, RowY: [], RowH: [], Sizes: Sizes, LabelSizes: LabelSizes }
-	for , Size in Sizes {
-		RowH := Style.PadY + Size.H + Style.PadY
+	TextX := Style.PadX + Badge.Zone
+	L := { W: Sizes.Length > 0 ? TextX + TextW + LabelZone + Style.PadX : 0, H: 0, TextX: TextX,
+		TextW: TextW, LabelW: LabelW, Badge: Badge, ContentH: [], RowY: [], RowH: [], Sizes: Sizes,
+		LabelSizes: LabelSizes }
+	for Idx, Size in Sizes {
+		ContentH := _TooltipRowContentH(Size.H, IsObject(Glyphs) ? Glyphs[Idx] : "", Badge)
+		RowH := Style.PadY + ContentH + Style.PadY
+		L.ContentH.Push(ContentH)
 		L.RowY.Push(L.H)
 		L.RowH.Push(RowH)
 		L.H += RowH + 1
@@ -1533,14 +1571,17 @@ _LLM_TooltipMeasureHeader(Items) {
 	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
 	Sizes := []
 	LabelSizes := []
+	Glyphs := []
 	for , Item in Items {
 		Sizes.Push(_TooltipMeasureText(Item.Text))
-		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		Label := _TooltipItemLabel(Item)
 		Measured := _LLM_TooltipMeasureOptional(Label, _TOOLTIP_LABEL_FONT_SIZE)
 		LabelSizes.Push(IsObject(Measured) ? Measured : { W: 0, H: 0 })
+		Glyphs.Push(_TooltipItemGlyph(Item))
 	}
 	return _LLM_TooltipHeaderLayout(Sizes, LabelSizes,
-		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP })
+		{ PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y, LabelGap: _TOOLTIP_LABEL_GAP },
+		_TooltipMeasureGlyphBadge(Items), Glyphs)
 }
 
 ; Geometry of the prediction panel — the Windows port of the macOS layout in

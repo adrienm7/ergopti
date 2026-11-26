@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local previous_destination = package.loaded["modules.keymap.utils"]
+local previous_destination = package.loaded["hotstrings.engine.expander.utils"]
 local Destination = require("tests.support.text_destination_receipt")
 local json = require("core.text.engine.json")
 
@@ -102,7 +102,7 @@ local function transformed_by(action_name, selected)
 		end,
 	}
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.clipboard"] = nil
+	package.loaded["clipboard.adapters.clipboard"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	local Text = require("modules.shortcuts.actions.text")
 	helpers.assert_eq(type(Text[action_name]), "function",
@@ -147,4 +147,4 @@ helpers.describe("selection case actions replay the shared text-case corpus", fu
 	end
 end)
 
-package.loaded["modules.keymap.utils"] = previous_destination
+package.loaded["hotstrings.engine.expander.utils"] = previous_destination

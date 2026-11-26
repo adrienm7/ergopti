@@ -81,6 +81,55 @@ helpers.describe("layout catalogue (Linux): which index a refresh shows", functi
 	end)
 end)
 
+helpers.describe("layout catalogue: a 304 the refresh did not ask for (catalogue-not-modified)", function()
+	local settings = { url_template = "https://registry.test/{path}", owner = "o", repo = "r", branch = "b",
+		folder = "f", index_file = "index.json", timeout_ms = 1000, max_file_bytes = vectors.max_bytes }
+
+	--- Runs one refresh against scripted answers; returns the outcome and the headers sent.
+	local function refresh(cache, answers)
+		local sent, outcome = {}, nil
+		Catalogue.refresh(settings, {
+			read_cache = function() return cache end,
+			write_cache = function() return true end,
+			bundled_index = vectors.indexes.shipped,
+			decode_json = Json.decode,
+			transport = { get = function(_, headers, _, callback)
+				sent[#sent + 1] = headers
+				local answer = table.remove(answers, 1)
+				callback(answer.status, answer.body, nil, { etag = answer.etag })
+			end },
+		}, function(result) outcome = result end)
+		return outcome, sent
+	end
+
+	helpers.it("asks once more without a validator when no index is cached (catalogue-not-modified)", function()
+		local outcome, sent = refresh(nil, {
+			{ status = 304, body = "" },
+			{ status = 200, body = Json.encode(vectors.indexes.fresh), etag = "\"v2\"" },
+		})
+		helpers.assert_eq(#sent, 2, "the unrequested 304 is asked again once")
+		helpers.assert_eq(sent[2]["If-None-Match"], nil, "the second request carries no validator")
+		helpers.assert_eq(outcome.source, Catalogue.SOURCE_NETWORK, "the published index is shown")
+		helpers.assert_eq(index_name(outcome.index), "fresh")
+	end)
+
+	helpers.it("asks only once, then keeps the fallback, when the 304 repeats (catalogue-not-modified)", function()
+		local outcome, sent = refresh(nil, { { status = 304, body = "" }, { status = 304, body = "" } })
+		helpers.assert_eq(#sent, 2, "a second 304 is not asked again")
+		helpers.assert_eq(outcome.source, Catalogue.SOURCE_BUNDLED)
+		helpers.assert_eq(outcome.error and outcome.error.code, Catalogue.ERROR_NOT_MODIFIED_WITHOUT_CACHE)
+	end)
+
+	helpers.it("reuses the cached index on the 304 it asked for (catalogue-not-modified)", function()
+		local outcome, sent = refresh({ text = Json.encode(vectors.indexes.cached), etag = "\"v1\"" },
+			{ { status = 304, body = "" } })
+		helpers.assert_eq(#sent, 1)
+		helpers.assert_eq(sent[1]["If-None-Match"], "\"v1\"")
+		helpers.assert_eq(outcome.source, Catalogue.SOURCE_CACHE)
+		helpers.assert_eq(outcome.error, nil, "the cached copy is current: no error")
+	end)
+end)
+
 require("tests.lua.layouts.installed_record_contract")(helpers, Catalogue, Json)
 
 require("tests.lua.layouts.installed_update_contract")(helpers, Catalogue, Json)

@@ -34,7 +34,7 @@ helpers.describe("adapters-input-1: text_sender.send nil-text must not throw", f
 			return new_key_event(...)
 		end
 		package.loaded["platform.input.synthetic_input"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		local sender = helpers.load_with_stubs("platform.input.text_sender", { eventtap = eventtap })
 		return sender, function() return created end
 	end

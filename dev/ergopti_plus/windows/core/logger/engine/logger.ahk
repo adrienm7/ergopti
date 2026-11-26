@@ -69,6 +69,11 @@ global LOGGER_DEFAULT_LEVEL := "INFO"
 ; Resolved at boot from the ini (Script.LogLevel) or LOGGER_DEFAULT_LEVEL.
 global LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 
+; The level the Debug menu's « Detailed log » switch stores when ticked
+; (maintainer, 2026-11-24); unticked stores LOGGER_DEFAULT_LEVEL. The macOS and
+; Linux twin is DETAILED_LEVEL of _shared/core/logger/engine/level_setting.lua.
+global LOGGER_DETAILED_LEVEL := "DEBUG"
+
 ; Cached severity threshold (integer) and per-level fast-path flags, refreshed
 ; by LoggerInit whenever LOGGER_MIN_LEVEL changes. Hot-path callers (notably
 ; LoggerDebug / LoggerTrace / LoggerDone invoked from per-keystroke dispatch)
@@ -115,7 +120,7 @@ global _LOGGER_PATH_DATE := ""
 ; number macOS and Linux read too. The sentinel 0 means "not loaded yet": a purge
 ; is skipped rather than run with a guessed window, because _LoggerPurgeOldLogs
 ; with 0 days treats every dated file as expired. Only the fatal-path LoggerInit
-; of infra/error_net.ahk can run that early.
+; of diagnostics/engine/reports/error_net.ahk can run that early.
 global LOGGER_RETENTION_DAYS := 0
 
 ; Fixed-name diagnostic files used by detached helpers cannot participate in
@@ -185,32 +190,6 @@ global LOGGER_VOLUME_BUCKET := Map(
 global _LOGGER_VOLUME := Map("debug", 0, "info", 0, "warn", 0, "error", 0,
 		"dropped", 0, "suppressed", 0, "collapsed", 0)
 global _LOGGER_VOLUME_MARK := _LOGGER_VOLUME.Clone()
-
-; Sub-file fan-out: each entry maps a filename suffix to a list of tag substrings.
-; Lines whose [Tag] matches any pattern are appended to that sub-file in addition
-; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
-; previous days are deleted at init time. Paths are resolved relative to LogDir.
-;
-; Filled at LoggerInit from _generated/logger_sub_files.ahk, which is generated
-; from the canonical _shared/core/logger/data/sub_files.toml.
-;
-; This used to be populated by a 112-line hand-rolled [[array_of_tables]] parser
-; living right here, backed by a hardcoded fallback list. Both were liabilities.
-; The parser was one of TWO copies of the same grammar (the macOS driver had its
-; own), so the same bug had to be found and fixed twice — a "]" inside a quoted
-; pattern closed the array early and silently dropped every pattern after it,
-; and the shared file's own guidance is to prefer bracketed tag patterns like
-; "[gestures". The fallback was a second copy of the data, free to drift, and
-; the macOS one already had: it routed gestures on one pattern where the
-; canonical file declares two.
-global LOGGER_SUB_FILES := []
-
-; Resolved absolute paths for each sub-file (populated by LoggerInit).
-global _LOGGER_SUB_PATHS := Map()
-
-; Per-sub-file pending queues — keyed by sub-file name; drained by _LoggerFlush
-; alongside the main pending queue so fan-out lines are batched, not synchronous.
-global _LOGGER_SUB_PENDING := Map()
 
 ; Optional test sink — when set to a Callable, every emitted line is forwarded
 ; to it in addition to the ring buffer and pending-queue paths. Lets unit tests
@@ -433,8 +412,11 @@ _LoggerPrivacyAdmitted() {
 
 /** Preserves core metadata while applying canonical redaction to every body. */
 _LoggerPrivacyBlob(Blob, Config, Records := 0) {
+	; One preparation serves the whole batch: preparing per record cost about a
+	; millisecond a line, about 300 ms of the boot's first flush on the main thread.
+	Passes := Redact_Prepare(Config["rules"], Config["context"])
 	if !(Records is Array)
-		return Redact_Apply(Blob, Config["rules"], Config["context"])
+		return Redact_ApplyPrepared(Blob, Passes)
 	Original := "", Result := ""
 	for Record in Records {
 		if !(Record is String)
@@ -443,11 +425,11 @@ _LoggerPrivacyBlob(Blob, Config, Records := 0) {
 		; Only the first prefix belongs to this detached queue entry. A body may
 		; contain newlines and prefix-like text, which remain untrusted together.
 		if RegExMatch(Record, "s)^([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(?::[0-9]{3})? \[(?:DEBUG|TRACE|DONE|INFO|START|SUCCESS|WARNING|ERROR)\] \[[^\]\r\n]+\] )(.*)$", &Parts)
-			Result .= Parts[1] . Redact_Apply(Parts[2], Config["rules"], Config["context"]) . "`r`n"
+			Result .= Parts[1] . Redact_ApplyPrepared(Parts[2], Passes) . "`r`n"
 		else if RegExMatch(Record, "^===== [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3} " . Chr(0x2014) . " ErgoptiPlus session opened =====$")
 			Result .= Record . "`r`n"
 		else
-			Result .= Redact_Apply(Record, Config["rules"], Config["context"]) . "`r`n"
+			Result .= Redact_ApplyPrepared(Record, Passes) . "`r`n"
 	}
 	if !(Original == Blob)
 		throw Error("Logger batch differs from its source-owned entries.")
@@ -522,6 +504,42 @@ LoggerLoadTimings() {
 		LOGGER_RETENTION_DAYS := Days
 }
 
+; Resolves a stored script.log_level value to the level the logger applies: its
+; own name, matched without case, or LOGGER_DEFAULT_LEVEL (the manifest default,
+; pinned by test-logger-scalars-single-source.cjs). The macOS and Linux twin is
+; _shared/core/logger/engine/level_setting.lua; the level_setting cases of
+; _shared/tests/corpus/logger/parity_vectors.json hold the three to one answer.
+; @param Value {Any} The stored value; a non-string is never a level.
+; @returns {Map} "level" (an exact LOGGER_SEVERITY key) and "refused" (true when
+;   Value is no level name and the default was used).
+LoggerResolveLevel(Value) {
+		global LOGGER_SEVERITY, LOGGER_DEFAULT_LEVEL
+		; Enum admission accepts case variants; native severity keys are exact.
+		; Resolve with the same comparison and publish the owning native name.
+		if Value is String {
+				for Level in LOGGER_SEVERITY {
+						if Level = Value
+								return Map("level", Level, "refused", false)
+				}
+		}
+		return Map("level", LOGGER_DEFAULT_LEVEL, "refused", true)
+}
+
+; Whether a stored level reads as « Detailed log » ticked: its threshold lets
+; through more than the default's, so TRACE and DONE tick it too, and WARNING,
+; ERROR or a refused value do not (the detailed_log parity vectors).
+LoggerIsDetailed(Value) {
+		global LOGGER_SEVERITY, LOGGER_DEFAULT_LEVEL
+		return LOGGER_SEVERITY[LoggerResolveLevel(Value)["level"]] < LOGGER_SEVERITY[LOGGER_DEFAULT_LEVEL]
+}
+
+; The level a click on « Detailed log » stores: the default when it reads
+; ticked, else the detailed level.
+LoggerDetailedToggleTarget(Value) {
+		global LOGGER_DEFAULT_LEVEL, LOGGER_DETAILED_LEVEL
+		return LoggerIsDetailed(Value) ? LOGGER_DEFAULT_LEVEL : LOGGER_DETAILED_LEVEL
+}
+
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
@@ -537,19 +555,14 @@ LoggerInit() {
 				_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
 		else
 				LoggerDebug("Logger", "Log retention is not loaded yet; the purge waits for the next rollover.")
-		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
-		; _shared/core/logger/data/sub_files.toml — adding a topical log is a TOML edit
-		; plus a codegen run, never a parser change in two drivers.
-		global LOGGER_SUB_FILES
-		LOGGER_SUB_FILES := LoggerSubFilesData()
-		_LoggerInitSubFiles(LogDir)
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 		Value := LOGGER_DEFAULT_LEVEL
 		if IsSet(ConfigurationFile) {
 				if ConfigMigrateBoot(ConfigurationFile, "known") {
 						; Normal boot and menu updates retain the canonical source
-						; generation, including its original native presence.
-						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
+						; generation, including its original native presence. The boot
+						; read stretch serves the generation it already admitted.
+						Cache := ConfigTomlReadBootServedSnapshot(ConfigurationFile).Cache
 						Value := IniCacheGet(Cache, ConfigKey.SCRIPT, ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
 				} else if FileExist(ConfigurationFile) {
 						; Fatal startup recovery can initialize logging before the
@@ -561,18 +574,9 @@ LoggerInit() {
 						}
 				}
 		}
-		; Enum admission accepts case variants; native severity keys are exact.
-		; Resolve with the same comparison and publish the owning native name.
-		LevelKnown := false
-		if Value is String {
-				for Level in LOGGER_SEVERITY {
-						if Level = Value {
-								LOGGER_MIN_LEVEL := Level
-								LevelKnown := true
-								break
-						}
-				}
-		}
+		Resolved := LoggerResolveLevel(Value)
+		LOGGER_MIN_LEVEL := Resolved["level"]
+		LevelKnown := !Resolved["refused"]
 		_LoggerRefreshFastFlags()
 		; Now that the user's level is finally known, apply it retroactively to
 		; everything the permissive pre-init defaults let through. This is the half
@@ -597,7 +601,7 @@ LoggerInit() {
 				_LOGGER_FLUSH_TIMER_STARTED := True
 				; Session boundary marker (matches the macOS driver) so tailing the log
 				; reveals where the driver (re)started. Written once per session to the
-				; main unified log only — not the ring, errors, or sub-files. The blank
+				; main unified log only — not the ring or the errors file. The blank
 				; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
 				; source so a UTF-8/BOM regression cannot corrupt it.
 				SessionStamp := WallClockTimestamp()
@@ -807,20 +811,14 @@ _LoggerFlush(ForceFlush := false) {
 ; lifecycle can use it as a refusal-capable terminal preflight.
 _LoggerHasPendingDebt() {
 	global _LOGGER_APPEND_OWNERS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
 		if _LOGGER_APPEND_OWNERS.Count > 0
 			|| _LOGGER_APPEND_DEBTS.Count || _LOGGER_APPEND_DEBT_REPAIRS.Count
 			return true
-		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
-			return true
-		for _, Lines in _LOGGER_SUB_PENDING {
-			if Lines.Length > 0
-				return true
-		}
-		return false
+		return _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -931,12 +929,9 @@ _LoggerRefuseAppend(Stage) {
 _LoggerShutdownRefusalSnapshot(Phase) {
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_LAST_APPEND_FAILURE
 	global _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	PreviousCritical := Critical("On")
 	try {
-		TopicalLines := 0
-		for _, Lines in _LOGGER_SUB_PENDING
-			TopicalLines += Lines.Length
 		return Map(
 			"phase", Phase,
 			"flush_active", _LOGGER_FLUSH_ACTIVE,
@@ -946,8 +941,6 @@ _LoggerShutdownRefusalSnapshot(Phase) {
 			"append_repairs", _LOGGER_APPEND_DEBT_REPAIRS.Count,
 			"main_lines", _LOGGER_PENDING.Length,
 			"error_lines", _LOGGER_PENDING_ERRORS.Length,
-			"topical_queues", _LOGGER_SUB_PENDING.Count,
-			"topical_lines", TopicalLines,
 			"last_append_failure", _LOGGER_LAST_APPEND_FAILURE)
 	} finally {
 		Critical(PreviousCritical)
@@ -960,7 +953,6 @@ _LoggerShutdownRefusalSnapshot(Phase) {
 ; batch is acknowledged. Failure restores the pre-append boundary.
 _LoggerFlushOwned(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
-	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
 
 	; This is the periodic tick: close the repeat streaks that are due, so a
@@ -973,19 +965,11 @@ _LoggerFlushOwned(ForceFlush := false) {
 	; entry — misdating the log and making _LoggerPurgeOldLogs, which ages files
 	; by the date in their NAME, discard still-recent data. Cheap enough for the
 	; flush tick: one FormatTime and a string compare.
-	;
-	; The topical sub-files ride along. Their paths are undated and stay valid,
-	; but they are documented as "today only" and are truncated by the
-	; day-change check inside _LoggerInitSubFiles — which, like the dated paths,
-	; only ever ran at init. Re-running it here is what actually makes them
-	; daily; without it a driver up past midnight accumulates several days in a
-	; file the operator reads as today's.
 	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
 		RolledDir := _LoggerResolveDatedPaths()
 		; Same sentinel guard as LoggerInit: a window not loaded yet purges nothing.
 		if (LOGGER_RETENTION_DAYS > 0)
 			_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
-		_LoggerInitSubFiles(RolledDir)
 	}
 
 	; Prevent the timer from re-entering while we swap-and-drain the pending queues.
@@ -1013,39 +997,6 @@ _LoggerFlushOwned(ForceFlush := false) {
 	if ErrorsResult["failed"].Length > 0
 		_LoggerRequeue([], ErrorsResult["failed"])
 	WriteSucceeded := MainResult["wrote"]
-
-	; Drain per-sub-file queues with one verified append each, avoiding one write
-	; per matching log line.
-	local _crit2 := Critical("On")
-	try {
-		SubSnap := _LOGGER_SUB_PENDING.Clone()
-		_LOGGER_SUB_PENDING := Map()
-	} finally {
-		Critical(_crit2)
-		}
-		for Name, Lines in SubSnap {
-						DatedLines := _LoggerGroupLinesByDate(Lines, _LOGGER_PATH_DATE)
-						; Topical files are deliberately an ephemeral view of today. A delayed
-						; previous-day batch remains durable in the dated unified log above but
-						; must not repopulate the just-rotated topical files.
-						if !DatedLines.Has(_LOGGER_PATH_DATE)
-										continue
-						Lines := DatedLines[_LOGGER_PATH_DATE]
-						if !_LOGGER_SUB_PATHS.Has(Name) {
-										_LoggerRequeueSub(Name, Lines)
-										continue
-						}
-						SubBlob := ""
-						for _, SLine in Lines {
-										SubBlob .= SLine . "`r`n"
-						}
-						if SubBlob == ""
-										continue
-						SubWritten := _LoggerAppendComplete(
-								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush, 0, 0, 0, 0, Lines)
-						if !SubWritten
-										_LoggerRequeueSub(Name, Lines)
-	}
 
 	; Report the truncation only once the sink is proven writable again. Emitting
 	; while it is dead would push the report onto the very queue that is
@@ -1117,7 +1068,7 @@ _LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
 
 ; One-line report of the lines the cap sacrificed, modelled on
 ; _LoggerEmitDedupSummary: it bypasses _LoggerEmit, rebuilds the timestamp
-; itself, and pushes straight onto the ring, the queues and the fan-out. It must
+; itself, and pushes straight onto the ring and the queues. It must
 ; NOT call _LoggerFlush — this runs FROM _LoggerFlush, so a forced re-entry
 ; there would recurse.
 _LoggerEmitDroppedSummary() {
@@ -1135,7 +1086,6 @@ _LoggerEmitDroppedSummary() {
 	}
 	_LOGGER_PENDING.Push(Line)
 	_LOGGER_PENDING_ERRORS.Push(Line)
-	_LoggerFanOut("logger", Line)
 }
 
 ; Drops the OLDEST entries of Queue until it fits LOGGER_PENDING_CAP, counting
@@ -1560,7 +1510,7 @@ _LoggerFormatBody(Msg, Args) {
 }
 
 ; Writes one already formatted line through both suppression layers, the ring,
-; the sinks and the fan-out. Best-effort — never raises. Hot-path-safe.
+; and the sinks. Best-effort — never raises. Hot-path-safe.
 ; @param Level {String} Key of LOGGER_SEVERITY.
 ; @param Tag {String} Module tag.
 ; @param Msg {String} The unformatted template (the INFO/DEBUG repeat key).
@@ -1650,13 +1600,12 @@ _LoggerEmitBody(Level, Tag, Msg, Body, Exempt) {
 	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
 		_LoggerFlush(true)
 	}
-	_LoggerFanOut(Tag, Line)
 }
 
 ; Emits the "[LEVEL] [logger] (up-arrow) N identical lines suppressed" summary that
 ; closes a dedup streak, matching the macOS logger byte-for-byte. Chr(0x2191) keeps
 ; the up-arrow out of the source so a UTF-8/BOM encoding regression cannot corrupt it.
-; Takes the same ring / pending / errors / fan-out path as a normal line, but never
+; Takes the same ring / pending / errors path as a normal line, but never
 ; fires the healthcheck hooks (a suppressed warning/error storm is counted once, on
 ; its first occurrence, exactly like the deduped output).
 _LoggerEmitDedupSummary(Level, Count) {
@@ -1676,7 +1625,6 @@ _LoggerEmitDedupSummary(Level, Count) {
 	if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["ERROR"] {
 		_LoggerFlush(true)
 	}
-	_LoggerFanOut("logger", Line)
 }
 
 
@@ -1891,8 +1839,8 @@ _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now) {
 }
 
 ; Emits the summary that closes one repeat streak, at the streak's own level and
-; under its own tag, so a collapsed warning still reaches the errors-only file
-; and a topical file still receives its own module's summary. Matches the shared
+; under its own tag, so a collapsed warning still reaches the errors-only file.
+; Matches the shared
 ; core byte for byte; Chr(0x2191) keeps the up-arrow out of the source. An open
 ; dedup streak is closed first: its suppressed lines are the most recent ones.
 _LoggerEmitRepeatSummary(Streak, Stamp) {
@@ -1919,120 +1867,36 @@ _LoggerEmitRepeatSummary(Streak, Stamp) {
 	if LOGGER_SEVERITY[Streak.Level] >= LOGGER_SEVERITY["ERROR"] {
 		_LoggerFlush(true)
 	}
-	_LoggerFanOut(Streak.Tag, Line)
 }
 
 
 
 
-; ============================================
-; ===== 3.2) Fan-out, retention and ring =====
-; ============================================
+; ===================================
+; ===== 3.2) Retention and ring =====
+; ===================================
 
-; Resolves absolute paths for every sub-file and deletes any stale sub-file
-; whose date does not match today. Sub-files are ephemeral (today only) — they
-; are a filtered view of the main unified log, not an independent archive.
-_LoggerInitSubFiles(LogDir, InterleaveFn := 0, ExistsFn := FileExist,
-		GetTimeFn := FileGetTime, DeleteFn := FileDelete) {
-		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
-		Today := FormatTime(, "yyyy-MM-dd")
-		NewPaths := Map()
-		if HasMethod(InterleaveFn, "Call")
-				InterleaveFn.Call()
-		for _, Entry in LOGGER_SUB_FILES {
-				SubPath := LogDir . Entry["name"]
-				NewPaths[Entry["name"]] := SubPath
-				; Delete if the file exists but belongs to a previous day
-				if ExistsFn.Call(SubPath) {
-						FileStamp := ""
-						try FileStamp := GetTimeFn.Call(SubPath, "M")
-						catch
-								continue
-						; FileGetTime guarantees YYYYMMDDHH24MISS. A malformed receipt is
-						; not evidence that the operator-facing log belongs to another day.
-						if !RegExMatch(FileStamp, "^\d{14}$")
-								continue
-						FileDate := SubStr(FileStamp, 1, 4) . "-" . SubStr(FileStamp, 5, 2)
-								. "-" . SubStr(FileStamp, 7, 2)
-						if (FileDate != Today) {
-								try DeleteFn.Call(SubPath)
-						}
-				}
-		}
-		; Keep the previous complete route visible across metadata probes and stale
-		; file cleanup. One final assignment publishes every replacement path.
-		_LOGGER_SUB_PATHS := NewPaths
-}
-
-; Restore one failed sub-file snapshot ahead of entries emitted while its I/O
-; was in flight. A sub-file is an operator-facing diagnostic sink, not a
-; disposable view: losing it precisely when disk access fails hides recovery
-; evidence from the person investigating the incident.
-_LoggerRequeueSub(Name, Lines) {
-		global _LOGGER_SUB_PENDING
-		if (Lines.Length == 0)
-						return
-		local _crit := Critical("On")
-		try {
-						Current := _LOGGER_SUB_PENDING.Has(Name) ? _LOGGER_SUB_PENDING[Name] : []
-						Restored := []
-						for Index, Line in Lines
-										Restored.Push(Line)
-						for Index, Line in Current
-										Restored.Push(Line)
-						; _LOGGER_SUB_PENDING is a Map OF queues, one per sub-file, so the cap
-						; has to apply per queue — capping the Map would bound the number of
-						; sub-files, which is fixed anyway, and not their contents.
-						_LoggerTrimQueueToCap(Restored)
-						_LOGGER_SUB_PENDING[Name] := Restored
-		} finally {
-						Critical(_crit)
-		}
-}
-
-; Appends Line to every sub-file whose tag list contains a pattern that is a
-; substring of Line. Patterns in sub_files.toml are bracketed fragments like
-; "[LayoutShift]" matched against the full formatted log line — exact tag
-; equality would never match because the line already wraps the tag in brackets.
-_LoggerQueueSubLine(Name, Line, InterleaveFn := 0) {
-		global _LOGGER_SUB_PENDING
-		PreviousCritical := Critical("On")
-		try {
-				if !_LOGGER_SUB_PENDING.Has(Name)
-						_LOGGER_SUB_PENDING[Name] := []
-				if HasMethod(InterleaveFn, "Call")
-						InterleaveFn.Call()
-				_LOGGER_SUB_PENDING[Name].Push(Line)
-		} finally {
-				Critical(PreviousCritical)
-		}
-}
-
-_LoggerFanOut(Tag, Line, QueueFn := _LoggerQueueSubLine) {
-		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
-		if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
-				return
-		}
-		for _, Entry in LOGGER_SUB_FILES {
-				for _, Pat in Entry["tags"] {
-						if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
-								Name := Entry["name"]
-								QueueFn.Call(Name, Line)
-								break
-						}
-				}
-		}
+; Whether a dated archive is past retention: its date is older than Now minus
+; MaxAgeDays, compared as calendar days whatever the time of day. The rule of
+; the dated_retention cases of _shared/tests/corpus/logger/parity_vectors.json.
+; @param FileDate {String} YYYYMMDD from the file name.
+; @param Now {String} YYYYMMDDHH24MISS.
+; @param MaxAgeDays {Integer} Retention window in whole days.
+; @returns {Boolean}
+_LoggerDatedLogExpired(FileDate, Now, MaxAgeDays) {
+		return FileDate < SubStr(DateAdd(Now, -MaxAgeDays, "Days"), 1, 8)
 }
 
 ; Removes ErgoptiPlus_*.log (and ErgoptiPlus_errors_*.log) files in LogDir whose
-; date prefix is older than MaxAgeDays. Best-effort: errors are swallowed so a
-; permission issue cannot break logger init.
+; date prefix is older than MaxAgeDays, and the retired topical files. Best-effort:
+; a dated file that refuses deletion is left for the next sweep so a permission
+; issue cannot break logger init.
 _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		if !DirExist(LogDir) {
 				return
 		}
-		CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
-		CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+		_LoggerDeleteRetiredTopicalLogs(LogDir)
+		Now := A_Now
 		; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
 		; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log); \Q..\E keeps the
 		; generated names literal inside the pattern.
@@ -2041,13 +1905,47 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		try {
 				loop files, LogDir . AppDirsLogUnifiedPrefix() . "*" . AppDirsLogExtension() {
 						if RegExMatch(A_LoopFileName, Dated, &Match) {
-								FileDate := Match[1] . Match[2] . Match[3]
-								if (FileDate < CutoffDate) {
+								if _LoggerDatedLogExpired(Match[1] . Match[2] . Match[3], Now, MaxAgeDays) {
 										try FileDelete(A_LoopFileFullPath)
 								}
 						}
 				}
 		}
+}
+
+; Deletes the topical sub-files the logger used to fan lines out to beside the
+; daily log. Every line they held is also in the daily log (the fan-out only
+; ever copied a line after queueing it for the daily file), and one daily log
+; is now the only log (maintainer decision, 2026-11-25), so the first sweep
+; after an update removes them and nothing writes them again. Only the exact
+; generated names, and only a regular file directly in LogDir: a folder or a
+; reparse point that happens to carry one of the names is left alone.
+; @param LogDir {String} Logs folder with its trailing backslash.
+; @param ExistsFn {Func} FileExist seam: the attribute string, "" when absent.
+; @param DeleteFn {Func} FileDelete seam.
+; @returns {Integer} How many retired files were deleted.
+_LoggerDeleteRetiredTopicalLogs(LogDir, ExistsFn := FileExist, DeleteFn := FileDelete) {
+		Deleted := 0
+		for Name in AppDirsRetiredTopicalLogs() {
+				Path := LogDir . Name
+				Attributes := ExistsFn.Call(Path)
+				if (Attributes == "")
+						continue
+				if (InStr(Attributes, "D") || InStr(Attributes, "L")) {
+						LoggerWarn("Logger", "Retired topical log {1} is not a regular file — it is kept.", Name)
+						continue
+				}
+				try {
+						DeleteFn.Call(Path)
+						Deleted += 1
+				} catch as Err {
+						LoggerWarn("Logger", "Retired topical log {1} could not be deleted ({2}) — the next sweep retries.",
+								Name, Err.Message)
+				}
+		}
+		if (Deleted > 0)
+				LoggerInfo("Logger", "Deleted {1} retired topical log file(s): every line is in the daily log.", Deleted)
+		return Deleted
 }
 
 ; Append to the in-memory ring buffer with O(1) overwrite once full.

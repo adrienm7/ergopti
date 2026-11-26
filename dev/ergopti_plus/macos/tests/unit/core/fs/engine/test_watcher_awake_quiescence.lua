@@ -7,16 +7,18 @@
 --- TimerScheduler. Civil corrections occur after a source edit is admitted, so
 --- this exercises quiet-time decisions independently of either boot deadline.
 --- Native callback delivery is controlled; its physical cadence is not modeled.
+--- A Git marker holds the reload for as long as it exists, with one stale-lock
+--- warning after the shared report delay; its release restarts the quiet window.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"core.fs.engine.file_watchers", "ui.menu.menu_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.fs.engine.file_watchers", "menu.ui.builder.watchers", "menu.engine.ui_restore", "diagnostics.engine.reports.git_status", "core.fs.engine.dir",
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate", "core.fs.engine.native_path",
 	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.storage", "core.timing.engine.timings", "core.fs.adapters.file_system",
-	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "ui.hotstring_editor",
+	"ui.metrics_typing", "ui.metrics_apps", "ui.metrics_apps.init", "hotstrings.ui.hotstring_editor",
 }
 
 local BASE_ROOT = "/Users/test/Ergopti"
@@ -32,7 +34,7 @@ local function with_watchers(kind, callback)
 		helpers.with_stub_scope(OWNED_MODULES, function()
 			local world = {
 				awake = 10000, civil = 1700000000, ui_open = true, git_locked = false,
-				watchers = {}, timers = {}, reloads = 0, notices = 0, errors = {}, kind = kind,
+				watchers = {}, timers = {}, reloads = 0, notices = 0, errors = {}, warns = {}, kind = kind,
 			}
 			world.source_root = kind == "file watcher" and PERSONAL_ROOT or BASE_ROOT
 			local function make_timer(delay, fn, repeating)
@@ -66,6 +68,7 @@ local function with_watchers(kind, callback)
 			}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
+			logger.warn = function(_, format, ...) world.warns[#world.warns + 1] = string.format(format, ...) end
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.ui.engine.notifications"] = { notify = function()
@@ -92,8 +95,8 @@ local function with_watchers(kind, callback)
 				end,
 				read = function() return nil end,
 			}
-			package.loaded["ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
-			local Restore = require("infra.ui_restore")
+			package.loaded["hotstrings.ui.hotstring_editor"] = { is_open = function() return world.ui_open end }
+			local Restore = require("menu.engine.ui_restore")
 			local Scheduler = require("core.events.timer_scheduler")
 			_G.script_watchers = nil
 			local body_ok, body_failure = xpcall(function()
@@ -110,7 +113,7 @@ local function with_watchers(kind, callback)
 					world.owner = _G.script_watchers[1]
 				else
 					helpers.assert_eq(kind, "menu watcher")
-					local Watchers = require("ui.menu.menu_watchers")
+					local Watchers = require("menu.ui.builder.watchers")
 					world.owner = Watchers.start_config_watcher(BASE_ROOT, hs.reload,
 						function() return 0 end, Restore, {}, {})
 					helpers.assert_not_nil(world.owner, "the healthy native menu root must commit")
@@ -277,7 +280,34 @@ local CASES = {
 			helpers.assert_eq(world.reloads, 0)
 			world.git_locked = false
 			poll(world)
+			helpers.assert_nil(active_timer(world, 1),
+				"the released lock restarts the quiet window: Git may have just written the last files")
+			poll(world)
 			close_ui_and_accept(world)
+		end,
+	},
+	{
+		name = "a stale Git lock holds past the report delay with one warning, then reloads after the quiet period",
+		run = function(world)
+			local Gate = require("core.lifecycle.engine.reload.gate")
+			world.git_locked = true
+			edit(world, 1)
+			-- Twenty polls beyond the delay: a capped hold would have reloaded by now.
+			for _ = 1, Gate.GIT_HOLD_REPORT_SEC / 0.5 + 20 do
+				poll(world)
+				helpers.assert_nil(active_timer(world, 1), "a live lock never lets the burst reach the UI queue")
+				helpers.assert_eq(world.reloads, 0, "a live lock is never reloaded through")
+			end
+			helpers.assert_eq(#world.warns, 1, "the stale lock is reported exactly once:\n"
+				.. table.concat(world.warns, "\n"))
+			helpers.assert_contains(world.warns[1], "stale lock")
+			world.git_locked = false
+			poll(world)
+			helpers.assert_nil(active_timer(world, 1), "the lock release restarts the quiet window")
+			helpers.assert_eq(world.reloads, 0)
+			poll(world)
+			close_ui_and_accept(world)
+			helpers.assert_eq(#world.warns, 1, "the released hold adds no warning")
 		end,
 	},
 	{

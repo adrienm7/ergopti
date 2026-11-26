@@ -12,11 +12,13 @@ local TITLE_KEYS = {
 	["changelog"] = "changelog_window.window_title",
 	["config_cleanup"] = "dialog.unused_keys.title",
 	["download_window"] = "download_window.window_title",
+	["emulation_picker"] = "menu.layout.emulated_layout",
 	["error_dialog"] = "common.error_title",
+	["field_report"] = "field_report.title",
 	["healthcheck"] = "menu.debug.healthcheck",
 	["hotstring_editor"] = "editor.hotstrings.window_title",
 	["hotstrings_config_window"] = "hs_config.window_title",
-	["layer_editor"] = "layer_editor.window_title",
+	["keep_awake_library"] = "keepawake.library.window_title",
 	["layout_editor_window"] = "layout_editor.title",
 	["layout_manager"] = "layout_manager.window_title",
 	["metrics_apps"] = "metrics_apps.window_title",
@@ -31,6 +33,7 @@ local TITLE_KEYS = {
 	["prompt_editor"] = "prompt_editor.title_new",
 	["token_prompt"] = "token_prompt.window_title",
 	["update_check"] = "update_check.window_title",
+	["user_workflows"] = "workflows.editor.window_title",
 }
 local PRESENTATIONS = {
 	["action_picker"] = {
@@ -48,7 +51,6 @@ local PRESENTATIONS = {
 }
 
 local NATIVE_PRESENTATIONS = {
-	["magic_key_source_notice"] = { kind = "notification", title_key = "dialog.magic_key_source.title", platforms = {"linux"} },
 	["profile_shortcut_dialog"] = { kind = "dialog", title_key = "menu.profiles.shortcut_title", platforms = {"hs"} },
 }
 

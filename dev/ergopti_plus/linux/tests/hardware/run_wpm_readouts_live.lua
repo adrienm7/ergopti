@@ -35,7 +35,7 @@ local Gtk = lgi.require("Gtk", "3.0")
 local Gdk = lgi.require("Gdk", "3.0")
 
 local Surface = require("adapters.wpm_surface")
-local Indicator = require("platform.tray.appindicator")
+local Indicator = require("tray.adapters.appindicator")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK.") end
 if not Indicator.is_available() then abort("the tray library cannot bind.") end
 

@@ -7,7 +7,7 @@
 ; « Windows host »): the editor window's actions and initData flags, the
 ; composer's source form of composer_save (store, stage, elevate, switch) and
 ; composer_emulate, and the menu row. The elevated helper runs against the fake
-; machine of test_kbd_register.ahk, on the files the composer really staged: no
+; machine of ../../hotstrings/engine/expander/test_kbd_register.ahk, on the files the composer really staged: no
 ; UAC prompt, no registry write, no system file.
 ; ==============================================================================
 
@@ -63,8 +63,8 @@ _LCS_Deps(Dir, Log, Machine, Options := 0) {
 			return Options["elevate"].Call(Command)
 		Words := StrSplit(StrReplace(Command["arguments"], '"'), " ")
 		Words.RemoveAt(1, 2)
-		Staging := Dir . "stage\kbdsrcfx"
-		return KbdRegister_Run(Words[1] == "install" ? ["install", Staging] : ["uninstall", Words[2], Staging], Ports)
+		; install <staging> or uninstall <dll> <staging>, the folder of that DLL.
+		return KbdRegister_Run(Words, Ports)
 	}
 	Deps["registry"] := Machine.Ports
 	Deps["staging_root"] := Dir . "stage\"
@@ -78,6 +78,14 @@ _LCS_Deps(Dir, Log, Machine, Options := 0) {
 }
 
 _LCS_Composer(Dir, Field) => LayoutRegistry_ComposerDir(Dir) . LayoutRegistry_Composer()[Field]
+
+; The main fixture registered under another DLL name, as a re-saved source.
+_LCS_Renamed(Dll) {
+	Payload := _LCS_Payload()
+	Payload["source"] := StrReplace(_LCS_Source(), 'dll_name = "kbdsrcfx"', 'dll_name = "' . Dll . '"')
+	Payload["dll_name"] := Dll
+	return Payload
+}
 
 _LCS_Bool(Value) => (Value is LayMgrJsonBool) ? (Value.Value ? "true" : "false") : "not a JSON boolean"
 
@@ -268,16 +276,149 @@ _LCS_EmulateCase() {
 	} finally DirDelete(Dir, true)
 }
 
-Test("layout editor host: the emulation turns the base layer on with the composed layout (layout-editor-windows)",
+; The selection is the one gate of the layer switches (maintainer decision of
+; 2026-11-23): emulating the composed layout writes its identifier and leaves
+; the base and AltGr switches to the user (layout-selection-is-the-gate).
+Test("layout editor host: emulating the composed layout writes only its identifier (layout-selection-is-the-gate)",
 	_LCS_EmulateOperationsCase)
 
 _LCS_EmulateOperationsCase() {
 	Snapshot := Map("valid", true, "path", "C:\c.toml", "presence", true, "content", "", "values", Map())
 	Snap := (*) => Snapshot
-	Operations := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap, true)
-	AssertEqual(2, Operations.Length)
-	Plain := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
-	AssertEqual(1, Plain.Length, "a registry selection still writes only its identifier")
+	Operations := _LayMgrWeb_SelectionOperations("composed", "C:\c.toml", Snapshot, Snap)
+	AssertEqual(2, Operations.Length, "a registry selection writes its identifier and the recent layouts")
+	AssertEqual(ConfigLeaf.EMULATED_LAYOUT, Operations[1].Key, "the identifier is the selection")
+	; The layout selected leads the recent layouts (maintainer decision of 2026-11-25).
+	AssertEqual(ConfigLeaf.EMULATED_LAYOUT_RECENTS, Operations[2].Key, "the selection leads the recent layouts")
+	AssertEqual("composed", Operations[2].Value[1])
+}
+
+Test("layout editor host: a source re-saved under another DLL name uninstalls the previous DLL first (kbd-dll-replaced)",
+	_LCS_RenamedCase)
+
+; The stored source is the only record of the DLL it registered: overwriting
+; it left the previous DLL registered, found only by Windows Settings › Apps.
+_LCS_RenamedCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Deps := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Deps)
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		Log.Length := 0
+		AssertTrue(LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"), Deps))
+		Result := _LCH_Pushed(Log, "composerResult")
+		AssertEqual("true", _LCS_Bool(Result["ok"]), "installed: " . Result["detail"])
+		Calls := _LCH_Calls(Log)
+		Removed := InStr(Calls, "elevate /force C:\E\kbd_register.ahk uninstall kbdsrcfx")
+		AssertTrue(Removed, "the previous DLL is uninstalled: " . Calls)
+		AssertTrue(Removed < InStr(Calls, "install " . Dir . "stage\kbdsrcfy"), "before the new one is registered")
+		AssertEqual("new", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"], "nothing is left of kbdsrcfx")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfy", Machine.Ports)["state"])
+		AssertEqual("kbdsrcfy", _LayoutComposer_StoredDll(Dir))
+		; The same DLL name again upgrades in place: no uninstall.
+		Log.Length := 0
+		LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"), Deps)
+		AssertFalse(InStr(_LCH_Calls(Log), "uninstall"), "an upgrade keeps its DLL")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout editor host: a refused uninstall of the previous DLL keeps the stored source (kbd-dll-replaced)",
+	_LCS_RenamedRefusedCase)
+
+_LCS_RenamedRefusedCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), _LCS_Deps(Dir, Log, Machine))
+		Cancelled(Command) {
+			throw OSError(1223)
+		}
+		Log.Length := 0
+		LayoutComposer_Handle("composer_save", _LCS_Renamed("kbdsrcfy"),
+			_LCS_Deps(Dir, Log, Machine, Map("elevate", Cancelled)))
+		Result := _LCH_Pushed(Log, "composerResult")
+		AssertEqual("false", _LCS_Bool(Result["ok"]))
+		AssertEqual("elevation_refused", Result["code"])
+		AssertEqual("kbdsrcfx", _LayoutComposer_StoredDll(Dir), "the source of the registered DLL is kept")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout editor host: an emulation that replaces the source keeps the DLL, which the manager still lists (kbd-dll-replaced)",
+	_LCS_EmulationKeepsDllCase)
+
+; Emulating needs no administrator right, so it never asks to uninstall: the
+; DLL stays a Windows layout the user may keep using, and the layout manager
+; finds it from its uninstall entry rather than from the stored source.
+_LCS_EmulationKeepsDllCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Deps := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Deps)
+		Payload := _LCS_Renamed("kbdsrcfy")
+		Payload["action"] := "composer_emulate"
+		Log.Length := 0
+		LayoutComposer_Handle("composer_emulate", Payload, Deps)
+		AssertEqual("emulate composed", _LCH_Calls(Log), "no UAC prompt for an emulation")
+		AssertEqual("kbdsrcfy", _LayoutComposer_StoredDll(Dir))
+		Native := LayoutManager_PageState(Deps["local_dir"], Machine.Ports)["native"]
+		AssertEqual(1, Native.Length)
+		AssertEqual("kbdsrcfx", Native[1]["dll"], "the DLL the source no longer names is still found")
+	} finally DirDelete(Dir, true)
+}
+
+Test("layout manager: a DLL Studio registered is listed and removed after its own confirmation (kbd-dll-manager)",
+	_LCS_NativeManagerCase)
+
+; The layout manager listed no DLL Studio registered: removing one went through
+; Windows Settings › Apps. Each Ergopti_kbd_<dll> uninstall entry is now a row
+; whose « Uninstall » asks first, then runs the elevated uninstaller.
+_LCS_NativeManagerCase() {
+	Dir := _LCH_TempDir()
+	try {
+		Log := [], Machine := _KBR_Machine()
+		Composer := _LCS_Deps(Dir, Log, Machine)
+		LayoutComposer_Handle("composer_save", _LCS_Payload(), Composer)
+		Native := LayoutManager_PageState(Composer["local_dir"], Machine.Ports)["native"]
+		AssertEqual(1, Native.Length, "the registered DLL is listed")
+		AssertEqual("kbdsrcfx", Native[1]["dll"])
+		AssertEqual("Source Fixture", Native[1]["name"])
+		AssertEqual("a002040c", Native[1]["klid"])
+		AssertEqual(0, LayoutManager_PageState(Composer["local_dir"], _KBR_Machine().Ports)["native"].Length,
+			"a machine without an Ergopti_kbd_ entry lists none")
+		Manager := _LMH_Deps(Composer["local_dir"], Log)
+		Manager["registry"] := Machine.Ports
+		Asked := []
+		Answer := false
+		Manager["confirm"] := (Text) => (Asked.Push(Text), Answer)
+		Manager["uninstall_native"] := (Dll) => LayoutComposer_UninstallDll(Composer, Dll)
+		Message := Map("action", "uninstall", "dll", "kbdsrcfx")
+		; « No »: nothing runs.
+		Log.Length := 0
+		AssertTrue(LayoutManager_HandleMessage(Message, Manager))
+		AssertEqual(1, Asked.Length, "the removal asks first")
+		AssertContains(Asked[1], "kbdsrcfx")
+		AssertFalse(InStr(_LCH_Calls(Log), "elevate"), "no UAC prompt after « No »")
+		AssertEqual("installed", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		; « Yes »: the elevated uninstaller, then the page lists nothing.
+		Answer := true
+		Log.Length := 0
+		AssertTrue(LayoutManager_HandleMessage(Message, Manager))
+		AssertContains(_LCH_Calls(Log), "elevate /force C:\E\kbd_register.ahk uninstall kbdsrcfx")
+		AssertEqual("new", KbdRegister_Inspect("kbdsrcfx", Machine.Ports)["state"])
+		State := _LMH_LastPush(Log)["payload"]
+		AssertEqual(0, State["native"].Length, "the row is gone")
+		AssertEqual("native:kbdsrcfx", State["result"]["id"])
+		AssertEqual(true, State["result"]["ok"])
+		AssertEqual("Source Fixture", State["result"]["name"])
+		; A DLL Ergopti did not register is refused without a question.
+		Asked.Length := 0
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "uninstall", "dll", "kbdother"), Manager))
+		AssertFalse(LayoutManager_HandleMessage(Map("action", "uninstall", "dll", "../x"), Manager))
+		AssertEqual(0, Asked.Length)
+	} finally DirDelete(Dir, true)
 }
 
 Test("layout editor host: removing the composed layout uninstalls its Windows layout elevated (layout-editor-windows)",
@@ -359,11 +500,13 @@ _LCS_ManagerCase() {
 		Deps["editor_strings"] := () => Map("layout_editor.btn.install", "Install")
 		Deps["apply_nav"] := (Text) => (Log.Push(Map("call", "nav " . Text)),
 			Map("saved", true, "applied", false, "errors", []))
+		; A vendor folder without the export step host's identity: lua_export is not offered.
+		Deps["vendor_dir"] := Dir
 		; The editor window's ready answers with its flags, then with the last saved source.
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "ready"), Deps))
 		Init := _LayMgrWeb_Json(_LCH_Pushed(Log, "initData"))
 		for Flag in ['"source_editor":true', '"emulate":true', '"nav_apply":true', '"source_pick":false',
-				'"source_export":true', '"layout_editor.title":']
+				'"source_export":true', '"lua_export":false', '"layout_editor.title":']
 			AssertContains(Init, Flag)
 		Opened := _LayMgrWeb_Json(_LCH_Pushed(Log, "sourceData"))
 		AssertContains(Opened, '"text":null')
@@ -402,30 +545,56 @@ _LCS_ManagerCase() {
 	}
 }
 
-Test("layout editor host: the menu row opens the editor and is no longer greyed on Windows (layout-editor-windows)",
+Test("layout editor host: a change refused while a layout reload is pending answers the page (ltp-04-busy-answer)",
+	_LCS_BusyAnswerCase)
+
+; The page waits for one answer per change: a silent refusal left « Install »,
+; « Emulate » or « Apply » pending until the window closed (LTP-04).
+_LCS_BusyAnswerCase() {
+	global _LayMgrWeb_RuntimeRefresh, _LayoutCatalogueLast, LAYOUT_CATALOGUE_FAILURE_BUSY
+	SavedRefresh := _LayMgrWeb_RuntimeRefresh, SavedCatalogue := _LayoutCatalogueLast
+	Dir := _LCH_TempDir()
+	try {
+		_LayoutCatalogueLast := Map("index", _LMH_Index(), "source", "network", "error", 0)
+		_LayMgrWeb_RuntimeRefresh := Map("id", "ergol", "action", "install")
+		Log := []
+		Deps := _LMH_Deps(Dir, Log)
+		Deps["config_dir"] := Dir
+		Deps["apply_nav"] := (Text) => (Log.Push(Map("call", "nav")), Map("saved", true, "applied", true, "errors", []))
+		for Action in ["composer_save", "composer_emulate"] {
+			AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", Action, "source", "s", "keylayout", "k"), Deps),
+				Action . " is refused while the reload is pending")
+			Answer := _LayMgrWeb_Json(_LCH_Pushed(Log, "composerResult"))
+			AssertContains(Answer, '"action":"' . Action . '"', "the refusal answers " . Action)
+			AssertContains(Answer, '"ok":false')
+			AssertContains(Answer, '"code":"' . LAYOUT_CATALOGUE_FAILURE_BUSY . '"')
+			Log.Length := 0
+		}
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "nav_save", "text", "[_meta]`n"), Deps))
+		Nav := _LayMgrWeb_Json(_LCH_Pushed(Log, "navResult"))
+		AssertContains(Nav, '"saved":false', "the navigation layer refusal answers the page")
+		AssertContains(Nav, '"code":"' . LAYOUT_CATALOGUE_FAILURE_BUSY . '"')
+		AssertEqual(0, _LMH_Calls(Log).Length, "nothing was applied")
+	} finally {
+		_LayMgrWeb_RuntimeRefresh := SavedRefresh
+		_LayoutCatalogueLast := SavedCatalogue
+		DirDelete(Dir, true)
+	}
+}
+
+Test("layout editor host: the layout menu opens no Studio of its own (no-duplicate-studio)",
 	_LCS_MenuCase)
 
+; « Create or edit a layout… » opened the Studio the tray root's « Ergopti
+; Studio… » row opens too; it left the layout menu on 2026-11-19.
 _LCS_MenuCase() {
 	Commands := _LAY_ScopeCommands()
-	AssertTrue(Commands.Has(MenuCommand.OPEN_LAYOUT_EDITOR), "the command is bound")
-	AssertEqual(LayoutManager_OpenEditor, Commands[MenuCommand.OPEN_LAYOUT_EDITOR])
+	AssertFalse(Commands.Has("open_layout_editor"), "the layout menu binds no editor command")
+	AssertTrue(Commands.Has(MenuCommand.LAYOUT_MANAGER), "the layout manager row stays")
 	Manifest := JsonParse(FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8"))
-	Found := 0
-	Walk(Node) {
-		if Node is Map {
-			if Node.Get("id", "") == "open_layout_editor"
-				Found := Node
-			for , Child in Node
-				Walk(Child)
-		} else if Node is Array {
-			for Child in Node
-				Walk(Child)
-		}
-	}
-	Walk(Manifest)
-	AssertTrue(Found is Map, "the manifest lists the row")
-	AssertFalse(Found.Has("platforms"), "the row is on every platform")
-	AssertFalse(Found.Has("reason_key"), "no grey reason is left")
+	for Row in Manifest["layout_menu"]
+		AssertFalse(Row.Get("id", "") == "open_layout_editor" || Row.Get("id", "") == "ergopti_studio",
+			"Ergopti Studio is a row of the tray root only")
 }
 
 Test("layout editor host: the top-level Ergopti Studio row opens the editor and greys with a pause (ergopti-studio-menu-row)",
@@ -437,7 +606,8 @@ _LCS_StudioRowCase() {
 	AssertTrue(Builders.Has("ergopti_studio"), "the tray root has a builder for the row")
 	Body := _DriverFuncBody(Builders["ergopti_studio"].Name)
 	; The test source view reads generated constants as their values (test_framework.ahk).
-	AssertContains(Body, 'Map("ergopti_studio", LayoutManager_OpenEditor)')
+	; The row reopens the Studio on the tab it was left on (studio-edit-tab).
+	AssertContains(Body, 'Map("ergopti_studio", LayoutEditorWindow_Open)')
 	Stage := TrayMenuStage_Begin()
 	try {
 		Builders["ergopti_studio"].Call()
@@ -446,8 +616,7 @@ _LCS_StudioRowCase() {
 		AssertEqual("action", Entry["kind"], "the row is a command, registered with the startup admission")
 		AssertEqual(t("menu.studio.title"), Entry["label"])
 		AssertTrue(HasMethod(Entry["target"], "Call"), "the row runs a command")
-		AssertTrue(Entry.Get("feature", false), "a pause greys the row with the feature rows")
-		AssertEqual(1, _TrayStageFeatureLabels(Stage).Length)
+		AssertFalse(Entry.Has("feature"), "the row stays live while paused, as every top-level row (EDD-1)")
 	} finally {
 		TrayMenuStage_Abort()
 	}
@@ -461,7 +630,31 @@ _LCS_StudioTitleCase() {
 	AssertEqual("Ergopti Studio", WindowTitle(t("layout_editor.title")), "the whole title is the product name")
 	AssertEqual("ErgoptiPlus — Paths", WindowTitle("Paths"), "every other window keeps the brand")
 	AssertEqual("ErgoptiPlus — Ergopti Studio 2", WindowTitle("Ergopti Studio 2"))
-	Body := _DriverFuncBody("LayoutEditorWindow_Open")
-	Assert(Body != "", "the editor window opener must be readable")
+	; Both entry points (the plain opener and the navigation-layer one) open
+	; through the one host opener, which owns the caption.
+	for Opener in ["LayoutEditorWindow_Open", "LayoutEditorWindow_OpenOnNav", "LayoutEditorWindow_OpenOnEdit"] {
+		Body := _DriverFuncBody(Opener)
+		Assert(Body != "", "the editor window opener " . Opener . " must be readable")
+		AssertContains(Body, "_LayEdWin_TryOpen()", Opener . " opens through the shared host opener")
+	}
+	Body := _DriverFuncBody("_LayEdWin_TryOpen")
+	Assert(Body != "", "the editor window host opener must be readable")
 	AssertContains(Body, '"Title", t("layout_editor.title")', "the window passes its caption to the composing host")
+}
+
+Test("layout editor window: the manager's « Layout editor » shows the editor tab, the Studio row keeps its tab (studio-edit-tab)",
+	_LCS_StudioEditTabCase)
+
+; The maintainer, 2026-11-17: the row brought an open Studio left on
+; « Comparer » to the front without its editor.
+_LCS_StudioEditTabCase() {
+	AssertContains(_DriverFuncBody("LayoutManager_HandleMessage"),
+		'Deps.Get("open_editor", LayoutEditorWindow_OpenOnEdit).Call()',
+		"the manager's button asks for the editor tab, as on macOS and Linux")
+	AssertContains(_DriverFuncBody("_MI_StageErgoptiStudio"), "LayoutEditorWindow_Open))",
+		"the top-level Studio row keeps the tab the Studio was left on")
+	Body := _DriverFuncBody("_LayEdWin_PushTab")
+	AssertContains(Body, '_LayEdWin_Push(Host, "studioTab", Tab)')
+	AssertContains(Body, '_LayEdWin_TabWanted := ""', "the tab is pushed once")
+	AssertContains(_DriverFuncBody("_LayEdWin_OnReady"), "_LayEdWin_PushTab(Host)", "a new page takes it on its ready")
 }

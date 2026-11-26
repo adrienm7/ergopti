@@ -125,12 +125,17 @@ class RegistryConversionTests(unittest.TestCase):
             self.assertEqual(result.unplaced, [], entry["id"])
 
     def test_a_key_the_keycode_table_cannot_place_is_reported(self):
-        """A JIS key (macOS 93 Yen, 94 underscore) has no XKB name in the table."""
+        """The input-method keys (macOS 102 Eisu, 104 Kana) have no XKB name in the table.
+
+        The JIS Yen and Ro keys (93, 94) and the keypad comma (95) are the table's
+        extra_keys: they place, as in the Lua twin's contract.
+        """
         text = registry_keylayout("ergol")
         index0 = text.index('<keyMap index="0">') + len('<keyMap index="0">')
         extra = (
-            '<key code="93" output="&#x00A5;"/><key code="94" action="a"/>'
-            '<key code="82" output="0"/><key code="95" output="&#x0001;"/>'
+            '<key code="102" output="&#x00A5;"/><key code="104" action="a"/>'
+            '<key code="82" output="0"/><key code="96" output="&#x0001;"/>'
+            '<key code="93" output="&#x00A5;"/>'
         )
         result = keylayout_to_xkb.convert(
             text[:index0] + extra + text[index0:],
@@ -139,7 +144,32 @@ class RegistryConversionTests(unittest.TestCase):
             "Probe",
         )
         # The keypad key (82) is XKB's own, and a control output types nothing.
-        self.assertEqual(result.unplaced, [93, 94])
+        self.assertEqual(result.unplaced, [102, 104])
+
+    def test_the_jis_and_abnt_keys_are_written_only_when_the_layout_types_on_them(self):
+        """Yen (93), Ro (94) and the keypad comma (95) reach <AE13>, <AB11> and <KPPT>."""
+        text = registry_keylayout("ergol")
+        keycodes = keylayout_to_xkb.load_keycodes(KEYCODES_PATH, "ansi")
+        plain = keylayout_to_xkb.convert(text, keycodes, "probe", "Probe")
+        for name in ("AE13", "AB11", "KPPT"):
+            self.assertNotIn(
+                "<%s>" % name, plain.symbols_text, "a layout without the key keeps its bytes"
+            )
+        index0 = text.index('<keyMap index="0">') + len('<keyMap index="0">')
+        extra = (
+            '<key code="93" output="&#x00A5;"/><key code="94" output="_"/>'
+            '<key code="95" output=","/>'
+        )
+        result = keylayout_to_xkb.convert(
+            text[:index0] + extra + text[index0:], keycodes, "probe", "Probe"
+        )
+        self.assertEqual(result.unplaced, [])
+        self.assertEqual(result.key_symbols["AE13"][0], "yen")
+        self.assertEqual(result.key_symbols["AB11"][0], "underscore")
+        self.assertEqual(result.key_symbols["KPPT"][0], "comma")
+        tail = result.symbols_text[result.symbols_text.rindex("include") :]
+        for name in ("AE13", "AB11", "KPPT"):
+            self.assertIn("key <%s> {" % name, tail, "written after the template's last include")
 
     def test_every_dead_key_output_is_composed_from_the_keysym_its_key_sends(self):
         """Inside a dead state a key sends its own keysym, a dead key its trigger.
@@ -161,12 +191,12 @@ class RegistryConversionTests(unittest.TestCase):
             level_indices = [layout.key_map_index(mods) for mods in keylayout_to_xkb.XKB_LEVELS]
             keycodes = keylayout_to_xkb.load_keycodes(KEYCODES_PATH, entry["keycode_convention"])
             missing = []
-            for xkb, code in keycodes:
+            for xkb, code, _optional in keycodes:
                 for level, index in enumerate(level_indices):
                     key = layout.key_entry(index, code)
-                    keysym = result.key_symbols[xkb][level]
                     if key is None or key[0] != "action":
                         continue
+                    keysym = result.key_symbols[xkb][level]
                     if keysym == keylayout_to_xkb.NO_SYMBOL:
                         continue
                     for state, (output, _next) in layout.actions[key[1]].whens.items():

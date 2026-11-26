@@ -133,12 +133,12 @@ ShowUninstallErgopti(*) {
 		if !Owner["Parent"]
 			throw Error("Could not acquire the exact parent process")
 		PowerShell := _Updater_PowerShellPath()
-		Args := [PowerShell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		Args := ShellRunner_WinPsArgv([PowerShell, "-NoProfile", "-NonInteractive"],
 			"-File", Owner["Script"], "-ParentHandle", Owner["Parent"],
 			"-ReadyName", ReadyName, "-CommitName", CommitName,
 			"-ExpectedHash", ExecutableDigest,
 			"-Executable", A_ScriptFullPath, "-FailureTitle", t("dialog.uninstall.window_title"),
-			"-FailureText", t("dialog.uninstall.failed")]
+			"-FailureText", t("dialog.uninstall.failed"))
 		Command := ""
 		for Arg in Args
 			Command .= (Command == "" ? "" : " ") . _Updater_QuoteCreateProcessArg(Arg)

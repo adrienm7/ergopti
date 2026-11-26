@@ -80,8 +80,8 @@ local function preferences()
 			return content, "ok"
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences")
 end
 
 
@@ -214,7 +214,7 @@ helpers.describe("Preferences.load: corrupt is not absent", function()
 end)
 
 package.loaded["core.fs.adapters.file_system"] = nil
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 
 

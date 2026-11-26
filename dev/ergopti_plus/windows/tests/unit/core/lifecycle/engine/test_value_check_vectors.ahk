@@ -59,9 +59,21 @@ _ValueCheckTest_Entry() {
 	for Row in Corpus["entry"] {
 		if Row.Has("ahk_skip")
 			continue
-		Result := ValueCheckParseEntry(Corpus["declarations"][Row["declaration"]], Row["text"])
+		Declaration := Corpus["declarations"][Row["declaration"]]
+		Result := Row.Has("override") && Row["override"]
+			? ValueCheckParseEntry(Declaration, Row["text"], ValueCheckInherit())
+			: Row.Has("default")
+			? ValueCheckParseEntry(Declaration, Row["text"], Row["default"])
+			: ValueCheckParseEntry(Declaration, Row["text"])
 		AssertEqual(Row["ok"] ? true : false, Result["ok"] ? true : false, "entry " . Row["id"] . " ok")
-		if Row["ok"]
+		AssertEqual(Row.Has("reset") && Row["reset"] ? true : false, Result.Has("reset") && Result["reset"] ? true : false,
+			"entry " . Row["id"] . " reset (pck-13)")
+		Inherits := Row.Has("inherit") && Row["inherit"] ? true : false
+		AssertEqual(Inherits, Result.Has("inherit") && Result["inherit"] ? true : false,
+			"entry " . Row["id"] . " inherit (2026-11-22)")
+		if Inherits
+			AssertFalse(Result.Has("value"), "entry " . Row["id"] . " carries no value")
+		else if Row["ok"]
 			AssertEqual(Row["value"], Result["value"], "entry " . Row["id"] . " value")
 		else
 			AssertEqual(Row["reason"], Result["reason"], "entry " . Row["id"] . " reason")

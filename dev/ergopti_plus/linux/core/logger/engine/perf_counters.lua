@@ -61,7 +61,7 @@ M.FLUSH_INTERVAL_MS = 60000
 
 -- Every counter, by name. A name is "<area>.<what>".
 local COUNTER_NAMES = {
-	"loop.idle_ticks", "loop.idle_wakes_input", "loop.idle_timeouts",
+	"loop.idle_ticks", "loop.idle_wakes_input", "loop.idle_timeouts", "loop.idle_wakes_requested",
 	"loop.periodic_ticks", "loop.deferred_runs",
 	"input.pump_calls", "input.events", "input.key_events", "input.pointer_events",
 	"input.forwarded_events",
@@ -69,7 +69,7 @@ local COUNTER_NAMES = {
 	"output.uinput_writes", "output.uinput_events", "shell.spawns",
 	"hotstring.matches", "hotstring.expansions",
 	"keystats.ingests", "keystats.flushes",
-	"tray.builds", "tray.opens", "tray.rows", "tray.fills",
+	"tray.builds", "tray.opens", "tray.rows", "tray.fills", "tray.row_replacements",
 }
 
 -- Every span (a duration with its count, total and maximum), by name.

@@ -158,7 +158,7 @@ helpers.describe("The shared tap_hold.toml on Linux (tap-hold-shared-file)", fun
 		local ok, err = pcall(function()
 			write(path, '[_meta]\nschema_version = 1\n[tap_hold]\nenabled = true\nlone_modifier_tap_max_ms = 0\n')
 			local loaded = Loader.load(DEFAULTS, path)
-			helpers.assert_eq(loaded.enabled, require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED),
+			helpers.assert_eq(loaded.enabled, require("menu.engine.manifest_reader").default_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED),
 				"the switch comes from config.toml only")
 			helpers.assert_eq(loaded.lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS, "the window comes from config.toml only")
 			helpers.assert_eq(#warnings, 2, table.concat(warnings, "\n"))

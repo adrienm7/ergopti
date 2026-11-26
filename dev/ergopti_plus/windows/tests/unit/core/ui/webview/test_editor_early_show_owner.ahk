@@ -18,7 +18,8 @@ _ESOT_ChildSource(Owners) {
 	global _DriverDir, _SharedDir
 	Seen := Map(), Includes := ""
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "TickElapsed", "KL_JsonEncode",
-		"ProgramProviderCatalogue", "_ActPickWeb_TryOpen", "_PathsEdWeb_TryOpen", "ShowActionPicker", "WMPresentWindow"] {
+		"ProgramProviderCatalogue", "_ActPickWeb_TryOpen", "_PathsEdWeb_TryOpen", "ShowActionPicker", "WMPresentWindow",
+		"ReadingPrefs_SeedScript"] {
 		Root := Symbol == "ProgramProviderCatalogue" ? _SharedDir : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, Root)
 		AssertTrue(Owner != "", "The unique actual child path must resolve: " . Symbol)
@@ -31,7 +32,8 @@ _ESOT_ChildSource(Owners) {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(9, Seen.Count, "The public/lifecycle/clock/codec/policy owners must be genuine whole files")
+	; The page seed's owner too (LTP-09).
+	AssertEqual(10, Seen.Count, "The public/lifecycle/clock/codec/policy/page seed owners must be genuine whole files")
 	Fixture := _DriverDir . "\tests\fixtures\editor_early_show_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	Owners["fixture"] := Map("path", Fixture, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Fixture)))
@@ -134,7 +136,8 @@ _PINS_ChildSource(Owners) {
 	global _DriverDir
 	Seen := Map(), Includes := ""
 	for Symbol in ["JsonStringLiteral", "TickElapsed64", "PersonalInformationEditor",
-		"_PiEdWeb_TryOpen", "PersonalInfoTomlPath", "FSReadBytesStrict", "_ConfigWriteLeaseKey", "WMPresentWindow"] {
+		"_PiEdWeb_TryOpen", "PersonalInfoTomlPath", "FSReadBytesStrict", "_ConfigWriteLeaseKey", "WMPresentWindow",
+		"ReadingPrefs_SeedScript"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The native personal-info child needs its genuine whole owner: " . Symbol)
 		Source := FSReadStrict(Owner)

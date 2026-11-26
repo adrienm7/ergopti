@@ -20,13 +20,34 @@
  * 3. Same score as the Comparer: the weights and the ideal finger load set in
  *    « Comparer » (its saved settings) apply here.
  * 4. « Ma frappe »: the app's 'studio-ngrams' event adds the user's own
- *    typing as the default corpus, as in the Comparer.
+ *    typing as the default corpus, as in the Comparer: its first arrival
+ *    (even before the panel exists) selects it, a later one only replaces
+ *    its tables and keeps the user's corpus.
  * 5. The other analysers' scores (LAYOUT_ANALYSER_SCORES): each analyser's
  *    official score is drawn with the analysis, the score with the user's
  *    finger model on the next tick, so the panel paints first. Extra
  *    sections register with addSection and draw after each analysis.
  * 6. A layout the page cannot analyse says why; nothing is shown as a score
  *    that was not computed.
+ * 7. « Compare with other layouts »: on a page that gives it onCompare (the
+ *    app's Studio, whose « Comparer » tab ranks it against the chosen
+ *    layouts on any corpus, a pasted text or a file included), one click
+ *    hands over the edited layout in the library shape.
+ * 8. Live key heatmap: « Key colours » picks the global score or one metric;
+ *    after each analysis the panel tells its onHeat listeners what each key
+ *    costs (the engine's exact per-key parts, keyReport cost and keyScoreCost)
+ *    with a tooltip naming its worst pairs or trigrams, and the editor colours
+ *    its own keys from green to red.
+ * 10. Worst n-grams (worst_groups.js): the pairs and trigrams that cost the
+ *    layout the most; hovering or focusing one tells the onHighlight
+ *    listeners its keys, which the editor outlines on its board.
+ * 11. Best swaps (best_swaps.js): on a page that gives onSwap, the single
+ *    swaps that most improve the score under the panel's settings, searched
+ *    in slices on demand, each applied in one click.
+ * 9. Score chip: onResult listeners get each analysis's score, rank and
+ *    change since the last analysis of the same layout (null when nothing is
+ *    analysed), so the editor shows them beside the board; reveal() unfolds
+ *    the panel and brings it into view.
  * ==============================================================================
  */
 
@@ -41,6 +62,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const FILES = window.LAYOUT_ANALYSIS_FILES;
 	const SCORES = window.LAYOUT_ANALYSER_SCORES;
 	const t = INFO.t;
+	// How many corpus words the drill-down of a worst n-gram names.
+	const WORDS_SHOWN = 12;
 	// The metrics the panel lists; the Comparer shows them all.
 	const PANEL_METRICS = [
 		'sfb',
@@ -55,8 +78,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		'pinky_load',
 		'finger_imbalance',
 		'shortcut_left',
-		'unsupported'
+		'unsupported',
+		'distinct_chars',
+		'coverage_bonus',
+		'simplicity'
 	];
+	// How many characters the « typed via » line names.
+	const TYPING_ROWS = 3;
 	// Every keyboard of the model, in its order.
 	const KEYBOARDS = Object.keys(DATA.model.keyboards);
 	const UPDATE_DEBOUNCE_MS = 150;
@@ -68,10 +96,32 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const SCORE_DIGITS = 1;
 	// A change smaller than this is shown as none.
 	const DELTA_EPSILON = 0.005;
+	// The app's last keystats tables, kept when they arrive before a panel exists.
+	let lastNgrams = null;
+	document.addEventListener(NGRAMS_EVENT, (event) => {
+		lastNgrams = event.detail;
+	});
 	// Digits of the headline statistics of an analyser without a score.
 	const PART_DIGITS = 1;
 	// Shown in a score's cell until it is computed.
 	const PENDING_TEXT = '…';
+	// What « Key colours » can show: nothing, the global score, the presses, or
+	// one metric the keys share exactly (analysis_engine.js KEY_COST_METRICS).
+	const HEAT_OFF = 'off';
+	const HEAT_SCORE = 'score';
+	const HEAT_PRESSES = 'presses';
+	const HEAT_CHOICES = [HEAT_OFF, HEAT_SCORE, HEAT_PRESSES].concat(E.KEY_COST_METRICS);
+	// Digits of a key's share in its tooltip, and of the points it costs.
+	const HEAT_DIGITS = 2;
+	// How many metrics a key's global-score tooltip names, worst first.
+	const HEAT_SCORE_PARTS = 3;
+	// What the edited layout is ranked among: the whole library, or the
+	// layouts ticked in « Comparer ».
+	const RANK_LIBRARY = 'library';
+	const RANK_SELECTION = 'selection';
+	const RANK_CHOICES = [RANK_LIBRARY, RANK_SELECTION];
+	// A finger's share of the presses is drawn against this full-bar share.
+	const FINGER_SCALE_PERCENT = 25;
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -80,22 +130,47 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		return node;
 	}
 
-	const format = (value, digits) =>
-		Number(value).toLocaleString(window._i18n_locale || undefined, {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
-	const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
-	const unitText = (id) => (E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%');
+	// Every number in the language of the page's strings (info_popover.js).
+	const format = INFO.format;
+	// A number and its unit, tied by a no-break space (info_popover.js).
+	const measure = INFO.measure;
+	const metricDigits = E.metricDigits;
+	const unitText = INFO.metricUnit;
 
 	/**
-	 * The engine's layout for an editor document.
+	 * The engine's layout for an editor document: its compiled ISO .keylayout,
+	 * as macOS types it; a source with levels of its own (Neo's Mod3 and Mod4
+	 * on custom held modifiers, which no .keylayout holds) is read from its
+	 * layers instead, every level kept (LAYOUT_FORMATS.fromSource). Either way
+	 * its tap-holds are analysed as holds (LAYOUT_FORMATS.withTapHolds), and its
+	 * repeat and magic keys, which no .keylayout holds either, are added
+	 * (LAYOUT_FORMATS.contextFromSource).
 	 * @param {object} doc - A LayoutSourceIO document.
 	 * @returns {object} The layout in the library shape.
 	 * @throws {Error} When the document cannot be compiled to an ISO .keylayout
-	 *   (the compiler's refusal, with its code).
+	 *   (the compiler's refusal, with its code), or its levels are malformed.
 	 */
 	function layoutFromEditorDoc(doc) {
+		const formats = window.LAYOUT_FORMATS;
+		const fingering = DATA.model.fingerings.standard;
+		// Its tap-holds analysed as holds (formats.withTapHolds).
+		const held = (layout) => E.layoutFromRows(formats.withTapHolds(layout, doc, fingering));
+		// The source's repeat and magic keys, which no .keylayout holds, on the levels read.
+		const withContext = (layout) => {
+			const found = window.LayoutSourceIO.isPreserved(doc)
+				? null
+				: formats.contextFromSource(doc, layout);
+			if (!found) return layout;
+			// The emulation takes such a key before the .keylayout: its cell there is not typed.
+			const rows = Object.assign({}, layout.rows);
+			for (const [code, actions] of Object.entries(found.context))
+				if (rows[code]) rows[code] = rows[code].map((cell, i) => (actions[i] ? null : cell));
+			return E.layoutFromRows(Object.assign({}, layout, found, { rows }));
+		};
+		if (!window.LayoutSourceIO.isPreserved(doc) && formats.sourceHoldSets(doc)) {
+			const read = formats.fromSource(doc, fingering, E.typingCodes());
+			return withContext(held(E.layoutFromRows(Object.assign(read, { origin: 'user' }))));
+		}
 		const file = window.LayoutSourceIO.keylayoutFile(doc, SOURCE_BOARD);
 		const source = window.LayoutComposer.parseSource(
 			doc.layout.id,
@@ -107,7 +182,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const layout = E.layoutFromComposerSource(source, E.typingCodes());
 		layout.name = doc.layout.name || doc.layout.id;
 		layout.origin = 'user';
-		return layout;
+		return window.LayoutSourceIO.isPreserved(doc) ? layout : withContext(held(layout));
 	}
 
 	/** Reads a stored value; an unavailable storage gives none. */
@@ -120,49 +195,66 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		}
 	}
 
-	/** The Comparer's weights and ideal finger load, each checked by the engine. */
-	function comparerSettings() {
-		const saved = readStorage(FILES.SETTINGS_KEY);
-		const settings = {};
-		try {
-			// score() refuses an unknown metric or an invalid weight.
-			if (saved.weights) E.score({ metrics: {} }, saved.weights);
-			settings.weights = saved.weights;
-		} catch {
-			settings.weights = undefined;
-		}
-		try {
-			settings.idealLoad = saved.idealLoad ? E.idealLoad(saved.idealLoad) : undefined;
-		} catch {
-			settings.idealLoad = undefined;
-		}
-		// The user's fingering profile, shared with the Comparer.
-		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current() || undefined;
-		return settings;
+	/**
+	 * The Comparer's score settings and the user's fingering profile of one
+	 * keyboard, read once for every Studio score (score_settings.js).
+	 * @param {string} keyboardId The keyboard analysed.
+	 */
+	function comparerSettings(keyboardId) {
+		return window.LAYOUT_ANALYSIS_SCORE_SETTINGS.analysisOptions(keyboardId);
 	}
 
 	/**
 	 * Creates a panel. The page appends `node` where it wants it, every render
 	 * (the same node), and calls update(doc) after each render.
 	 * @returns {{node: HTMLElement, update: function(object): void,
+	 *   onHeat: function(function(object|null): void): void,
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
-	function create() {
+	/**
+	 * @param {{onCompare?: function(object): void, onOptimize?: function(object): void,
+	 *   format?: function(): string, onSwap?: function(string[]): void}} [options]
+	 *   - onCompare receives the edited layout in the library shape when the user
+	 *   asks to compare it, onOptimize when the user asks to optimise it; format gives the editor's keyboard format, which
+	 *   compact_fit measures on (the engine's default format when absent);
+	 *   onSwap receives the two keys of a best swap to apply.
+	 * @throws {Error} When onSwap is given without the optimiser on the page.
+	 */
+	function create(options) {
+		const onCompare = options && typeof options.onCompare === 'function' ? options.onCompare : null;
+		const keyboardFormat =
+			options && typeof options.format === 'function' ? options.format : E.defaultKeyboardFormat;
+		const onSwap = options && typeof options.onSwap === 'function' ? options.onSwap : null;
+		const onOptimize =
+			options && typeof options.onOptimize === 'function' ? options.onOptimize : null;
+		if (onSwap && typeof window.LAYOUT_OPTIMIZER !== 'object')
+			throw new Error('layout_analysis: best swaps need the optimiser (optimizer_core.js)');
 		const saved = readStorage(STORAGE_KEY);
 		const corpora = DATA.corpora.map((c) => ({ id: c.id, title: c.title, builtin: c }));
 		const state = {
 			corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
 			keyboard: KEYBOARDS.includes(saved.keyboard) ? saved.keyboard : SOURCE_BOARD,
+			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_SCORE,
+			rank: RANK_CHOICES.includes(saved.rank) ? saved.rank : RANK_LIBRARY,
 			doc: null,
+			// The layout the document belongs to (update's lineage): a change of
+			// metric is measured only against an earlier analysis of the same one.
+			lineage: null,
 			previous: null,
+			// drawnSignature() of the analysis shown, null when none is.
+			drawn: null,
 			library: null,
 			libraryKey: '',
 			timer: null,
 			generation: 0
 		};
 		const sections = [];
+		const heatListeners = [];
+		const resultListeners = [];
+		const highlightListeners = [];
 
 		const node = el('details', 'la-panel');
+		node.id = 'la-live-panel';
 		node.open = saved.open !== false;
 		const summary = el('summary', 'la-panel-title');
 		const corpusSelect = el('select');
@@ -173,35 +265,149 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		corpusLabel.htmlFor = corpusSelect.id;
 		const keyboardLabel = el('label');
 		keyboardLabel.htmlFor = keyboardSelect.id;
+		const heatSelect = el('select');
+		heatSelect.id = 'la-panel-heat';
+		const heatLabel = el('label');
+		heatLabel.htmlFor = heatSelect.id;
+		const rankSelect = el('select');
+		rankSelect.id = 'la-panel-rank';
+		const rankLabel = el('label');
+		rankLabel.htmlFor = rankSelect.id;
+		// The panel's settings: labelled selects and the hand-off buttons. A block,
+		// not a form: nothing is submitted, each control applies at once.
 		const controls = el('div', 'la-panel-controls');
-		controls.append(corpusLabel, corpusSelect, keyboardLabel, keyboardSelect);
+		controls.append(
+			corpusLabel,
+			corpusSelect,
+			keyboardLabel,
+			keyboardSelect,
+			heatLabel,
+			heatSelect,
+			rankLabel,
+			rankSelect
+		);
+		/**
+		 * A button that hands the edited layout (library shape) to another tab of
+		 * the Studio; a layout the page cannot read, or a tab storage that refuses
+		 * the hand-off, is said in the panel.
+		 */
+		const handOffButton = (id, hand) => {
+			const button = el('button', id);
+			button.type = 'button';
+			button.id = id;
+			button.addEventListener('click', () => {
+				if (!state.doc) return;
+				let layout;
+				try {
+					layout = layoutFromEditorDoc(state.doc);
+				} catch (error) {
+					showError(
+						t('layout_analysis.panel.unavailable', {
+							reason: (error && (error.code || error.message)) || 'error'
+						})
+					);
+					return;
+				}
+				try {
+					hand(layout);
+				} catch (error) {
+					// The site's hand-off to its other tabs needs this tab's storage.
+					if (!error || error.code !== 'studio_handoff_failed') throw error;
+					showError(t('layout_analysis.error.studio_handoff_failed'));
+				}
+			});
+			controls.append(button);
+			return button;
+		};
+		const compareButton = onCompare ? handOffButton('la-panel-compare', onCompare) : null;
+		// « Optimize this layout »: the optimiser starts from the edited layout.
+		const optimizeButton = onOptimize ? handOffButton('la-panel-optimize', onOptimize) : null;
 		const headline = el('p', 'la-panel-score');
 		headline.setAttribute('role', 'status');
+		const rankNote = el('p', 'la-panel-note');
+		rankNote.hidden = true;
+		// A layout that cannot type the space or a letter: what it lacks, and why it ranks last.
+		const incompleteNote = el('p', 'la-panel-note la-panel-incomplete');
+		incompleteNote.hidden = true;
 		const note = el('p', 'la-panel-note');
 		const metrics = el('table', 'la-panel-metrics');
+		// Where the layout offers a choice: how often and which characters.
+		const typing = el('p', 'la-panel-note');
+		// The worst n-grams, their keys outlined on the editor's board.
+		const ngramsTitle = el('h3');
+		ngramsTitle.id = 'la-panel-ngrams-title';
+		const ngramsNote = el('p', 'la-panel-note');
+		const ngrams = el('div', 'la-panel-ngrams');
+		ngrams.id = 'la-panel-ngrams';
 		const fingersTitle = el('h3');
-		const fingers = el('div', 'la-panel-fingers');
+		fingersTitle.id = 'la-panel-fingers-title';
+		const fingers = el('table', 'la-panel-fingers');
+		// The tap-hold keys (an idea seen in the Layouts Wiki playground, which
+		// models tap and hold keys): taps, holds and their risks, when the
+		// layout has any.
+		const tapTitle = el('h3');
+		tapTitle.id = 'la-panel-tap-holds-title';
+		const tapNote = el('p', 'la-panel-note');
+		const tapSummary = el('p', 'la-panel-note');
+		// Its own scroll in a narrow panel, reachable from the keyboard.
+		const tapWrap = el('section', 'la-panel-table-wrap');
+		tapWrap.tabIndex = 0;
+		tapWrap.setAttribute('aria-labelledby', 'la-panel-tap-holds-title');
+		const tapTable = el('table', 'la-panel-metrics la-panel-tap-holds');
+		tapTable.id = 'la-panel-tap-holds';
+		tapTable.setAttribute('aria-labelledby', tapTitle.id);
+		tapWrap.append(tapTable);
+		const tapBox = el('section', 'la-panel-tap-box');
+		tapBox.setAttribute('aria-labelledby', tapTitle.id);
+		tapBox.hidden = true;
+		tapBox.append(tapTitle, tapNote, tapSummary, tapWrap);
 		const analysersTitle = el('h3');
 		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
-		const extra = el('div', 'la-panel-extra');
-		node.append(
-			summary,
-			controls,
-			headline,
-			note,
-			metrics,
-			fingersTitle,
-			fingers,
-			analysersTitle,
-			analysers,
-			extra
-		);
+		// The sections other scripts add (addSection), under the analysers.
+		const extraBoxes = [];
+		// Who presses each key on the keyboard analysed, editable here as in the
+		// Comparer (one profile per keyboard, shared with it); its h2 names it.
+		const fingering = el('section', 'la-panel-fingering');
+		// Three columns that stack in a narrow panel and sit side by side when the
+		// panel spans the editor's width: the settings and score, the finger load
+		// and analysers, then the fingering board.
+		const scoreColumn = el('div', 'la-panel-column');
+		scoreColumn.append(controls, headline, incompleteNote, rankNote, note, metrics, typing);
+		const ngramsBox = el('section', 'la-panel-ngrams-box');
+		ngramsBox.setAttribute('aria-labelledby', ngramsTitle.id);
+		ngramsBox.append(ngramsTitle, ngramsNote, ngrams);
+		// The best swaps: what to rank (the last analysis), and the block itself.
+		let swapContext = null;
+		const swapsBox = el('section', 'la-panel-swaps');
+		const swaps = onSwap
+			? window.LAYOUT_ANALYSIS_SWAPS.mount(swapsBox, {
+					context: () => swapContext,
+					onApply: onSwap
+				})
+			: null;
+		if (swaps) scoreColumn.append(swapsBox);
+		const loadColumn = el('div', 'la-panel-column');
+		loadColumn.append(fingersTitle, fingers, tapBox, analysersTitle, analysers);
+		const fingeringColumn = el('div', 'la-panel-column');
+		fingeringColumn.append(fingering);
+		const body = el('div', 'la-panel-body');
+		body.append(scoreColumn, loadColumn, fingeringColumn, ngramsBox);
+		node.append(summary, body);
+		const fingeringView = window.LAYOUT_ANALYSIS_FINGERING.mount(fingering, {
+			keyboard: () => state.keyboard
+		});
 
 		function persist() {
 			try {
 				window.localStorage.setItem(
 					STORAGE_KEY,
-					JSON.stringify({ corpus: state.corpus, keyboard: state.keyboard, open: node.open })
+					JSON.stringify({
+						corpus: state.corpus,
+						keyboard: state.keyboard,
+						heat: state.heat,
+						rank: state.rank,
+						open: node.open
+					})
 				);
 			} catch {
 				// A private window or a full quota: the panel keeps working unsaved.
@@ -213,20 +419,23 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			corpusLabel.textContent = t('layout_analysis.corpus.label');
 			keyboardLabel.textContent = t('layout_analysis.keyboard.label');
 			fingersTitle.textContent = t('layout_analysis.details.fingers');
+			ngramsTitle.textContent = t('layout_analysis.ngrams.title');
+			ngramsNote.textContent = t('layout_analysis.ngrams.caption_editor');
+			if (swaps) swaps.label();
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
-			corpusSelect.replaceChildren(
-				...corpora.map((c) => {
-					const option = el(
-						'option',
-						'',
-						c.id === MY_TYPING_ID ? t('layout_analysis.corpus.my_typing') : c.title
-					);
-					option.value = c.id;
-					return option;
-				})
-			);
-			corpusSelect.value = state.corpus;
+			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
+			if (optimizeButton) optimizeButton.textContent = t('layout_analysis.panel.optimize');
+			// The Comparer's picker: « My typing » first, the texts by language.
+			FILES.fillCorpusPicker(corpusSelect, {
+				mine: corpora
+					.filter((c) => !c.builtin)
+					.map((c) => ({ id: c.id, label: t('layout_analysis.corpus.my_typing') })),
+				builtins: corpora.filter((c) => c.builtin).map((c) => c.builtin),
+				value: state.corpus,
+				t,
+				locale: INFO.locale()
+			});
 			keyboardSelect.replaceChildren(
 				...KEYBOARDS.map((id) => {
 					const option = el('option', '', t(`layout_analysis.keyboard.${id}`));
@@ -235,41 +444,178 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				})
 			);
 			keyboardSelect.value = state.keyboard;
+			heatLabel.textContent = t('layout_analysis.panel.heat.label');
+			heatSelect.replaceChildren(
+				...HEAT_CHOICES.map((id) => {
+					const option = el('option', '', heatName(id));
+					option.value = id;
+					return option;
+				})
+			);
+			heatSelect.value = state.heat;
+			rankLabel.textContent = t('layout_analysis.panel.rank.label');
+			rankNote.textContent = t('layout_analysis.panel.rank.none_ticked');
+			rankSelect.replaceChildren(
+				...[
+					[RANK_LIBRARY, t('layout_analysis.panel.rank.library')],
+					[RANK_SELECTION, t('layout_analysis.panel.rank.selection')]
+				].map(([id, label]) => {
+					const option = el('option', '', label);
+					option.value = id;
+					return option;
+				})
+			);
+			rankSelect.value = state.rank;
+		}
+
+		/**
+		 * The Comparer's text mode (FILES.TEXT_MODES), the keys typed until it is
+		 * chosen: « My typing » is analysed on the same text as the Comparer's
+		 * layouts not ticked « + » (those are the Comparer's alone).
+		 */
+		function textMode() {
+			const mode = readStorage(FILES.SETTINGS_KEY).textMode;
+			return Object.values(FILES.TEXT_MODES).includes(mode) ? mode : FILES.TEXT_MODES.typed;
+		}
+
+		/**
+		 * The chosen corpus's word table, once its tables are loaded: a built-in
+		 * corpus's, a host's when it sends one; null for a corpus of counts only.
+		 */
+		function corpusWords() {
+			const corpus = corpora.find((c) => c.id === state.corpus);
+			if (corpus.host) return corpus.host.words || null;
+			const raw = (window.LAYOUT_ANALYSIS_CORPORA || {})[corpus.id];
+			return (raw && raw.words) || null;
 		}
 
 		async function tables() {
 			const corpus = corpora.find((c) => c.id === state.corpus);
-			if (corpus.host) return E.prepareNgrams(corpus.host);
+			if (corpus.host) return E.prepareNgrams(FILES.plainTables(corpus.host, textMode()));
 			return E.prepareNgrams(await FILES.builtinTables(corpus.builtin));
 		}
 
-		/** The library's scores on these settings, computed once for them. */
+		/**
+		 * The layouts the edited one is ranked among: the whole library, or the
+		 * library and imported layouts ticked in « Comparer » (its saved selection;
+		 * the layouts open in « Éditer » are not among them).
+		 */
+		function rankPool() {
+			if (state.rank === RANK_LIBRARY) return E.libraryLayouts();
+			const saved = readStorage(FILES.SETTINGS_KEY);
+			const ticked = new Set(Array.isArray(saved.selected) ? saved.selected : []);
+			const imported = (Array.isArray(saved.imported) ? saved.imported : []).flatMap((value) => {
+				try {
+					return [E.layoutFromRows(value)];
+				} catch {
+					return [];
+				}
+			});
+			return E.libraryLayouts()
+				.concat(imported)
+				.filter((layout) => ticked.has(layout.id));
+		}
+
+		/** What a ranking depends on: corpus, keyboard, format, settings and the ranked layouts. */
+		function rankKey(settings, pool) {
+			return JSON.stringify([
+				state.corpus,
+				textMode(),
+				state.keyboard,
+				keyboardFormat(),
+				settings,
+				pool.map((layout) => layout.id)
+			]);
+		}
+
+		/**
+		 * The ranked layouts' standings on these settings (whether each is
+		 * complete, and its score: what E.rankOrder compares), computed once.
+		 */
 		function libraryScores(prepared, settings) {
-			const key = JSON.stringify([state.corpus, state.keyboard, settings]);
+			const pool = rankPool();
+			const libraryIds = new Set(E.libraryLayouts().map((layout) => layout.id));
+			const key = rankKey(settings, pool);
 			if (state.libraryKey !== key) {
-				state.library = E.compare(E.libraryLayouts(), prepared, {
+				state.library = E.compare(pool, prepared, {
 					keyboard: state.keyboard,
+					format: keyboardFormat(),
 					weights: settings.weights,
+					floors: settings.floors,
+					grades: settings.grades,
 					idealLoad: settings.idealLoad,
+					shortcuts: settings.shortcuts,
+					formWeights: settings.formWeights,
 					profile: settings.profile
-				}).map((r) => r.score.total);
+				}).map((r) => ({
+					incomplete: r.incomplete,
+					// A library layout (not the user's own): the percentiles' references.
+					library: libraryIds.has(r.layout.id),
+					score: { total: r.score.total },
+					// The listed metrics, for each one's percentile among the ranked layouts.
+					metrics: Object.fromEntries(PANEL_METRICS.map((id) => [id, r.metrics[id]]))
+				}));
 				state.libraryKey = key;
 			}
 			return state.library;
 		}
 
 		function showError(text) {
+			tellHeat(null);
+			tellResult(null);
 			headline.textContent = text;
 			headline.className = 'la-panel-score la-panel-error';
+			incompleteNote.hidden = true;
 			metrics.replaceChildren();
+			typing.textContent = '';
+			ngrams.replaceChildren();
+			swapContext = null;
+			if (swaps) swaps.stale();
+			tellHighlight(null);
 			fingers.replaceChildren();
 			analysers.replaceChildren();
-			extra.replaceChildren();
+			for (const box of extraBoxes.splice(0)) box.remove();
+			state.drawn = null;
+		}
+
+		/**
+		 * What the last full analysis drew from: the layout, the corpus, the
+		 * keyboard, every setting and the ranking pool. The editor calls update()
+		 * after each of its renders, a tab switch included: the same analysis
+		 * again would replace every « i » button and close the popover the reader
+		 * opened (and lose its focus), so a run that would draw the same keeps
+		 * the panel as it is. null when the document cannot be read.
+		 */
+		function drawnSignature() {
+			let layout;
+			try {
+				layout = layoutFromEditorDoc(state.doc);
+			} catch {
+				return null;
+			}
+			const settings = comparerSettings(state.keyboard);
+			return JSON.stringify([
+				state.lineage,
+				layout,
+				state.corpus,
+				state.keyboard,
+				keyboardFormat(),
+				state.heat,
+				state.rank,
+				settings,
+				rankKey(settings, rankPool())
+			]);
 		}
 
 		async function run() {
 			if (!state.doc || !node.open) return;
+			// Checked before a new generation starts: the shown analysis's pending
+			// analyser scores keep arriving.
+			const signature = drawnSignature();
+			if (signature !== null && signature === state.drawn) return;
 			const mine = ++state.generation;
+			// The layout this run analyses: an update during its pauses belongs to the next run.
+			const lineage = state.lineage;
 			let layout;
 			try {
 				layout = layoutFromEditorDoc(state.doc);
@@ -289,98 +635,299 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				return;
 			}
 			if (mine !== state.generation) return;
-			const settings = comparerSettings();
+			const settings = comparerSettings(state.keyboard);
 			const result = E.analyse(layout, prepared, {
 				keyboard: state.keyboard,
+				format: keyboardFormat(),
 				weights: settings.weights,
+				floors: settings.floors,
+				grades: settings.grades,
 				idealLoad: settings.idealLoad,
-				profile: settings.profile
+				shortcuts: settings.shortcuts,
+				formWeights: settings.formWeights,
+				profile: settings.profile,
+				// One layout: every key's worst pairs, for the heatmap's tooltips.
+				keyGroups: true
 			});
+			tellHeat(heatOf(result, layout, settings));
 			note.textContent = settings.profile
 				? `${t('layout_analysis.panel.weights_note')} ${t('layout_analysis.fingering.custom')}`
 				: t('layout_analysis.panel.weights_note');
-			if (state.libraryKey !== JSON.stringify([state.corpus, state.keyboard, settings]))
+			if (state.libraryKey !== rankKey(settings, rankPool()))
 				headline.textContent = t('layout_analysis.panel.ranking');
 			// The first ranking of a corpus takes a moment: let the page paint first.
 			await new Promise((resolve) => setTimeout(resolve, 0));
 			if (mine !== state.generation) return;
 			const scores = libraryScores(prepared, settings);
-			const rank = 1 + scores.filter((score) => score > result.score.total).length;
+			// A complete layout ranks before an incomplete one, then by score.
+			const rank = 1 + scores.filter((other) => E.rankOrder(other, result) < 0).length;
 			headline.className = 'la-panel-score';
 			headline.textContent = t('layout_analysis.panel.score', {
-				score: format(result.score.total, SCORE_DIGITS),
+				score: format(result.score.mark, SCORE_DIGITS),
 				rank,
 				count: scores.length + 1
 			});
-			const same =
-				state.previous &&
-				state.previous.corpus === state.corpus &&
-				state.previous.keyboard === state.keyboard;
-			drawMetrics(result, same ? state.previous.metrics : null);
+			incompleteNote.hidden = !result.incomplete;
+			incompleteNote.textContent = result.incomplete
+				? t('layout_analysis.incomplete.details', {
+						chars: result.coverage.missingRequired
+							.map((char) => (char === ' ' ? t('layout_analysis.incomplete.space') : char))
+							.join(' ')
+					})
+				: '';
+			// Ranked among the Comparer's ticks while none is ticked: say so.
+			rankNote.hidden = !(state.rank === RANK_SELECTION && scores.length === 0);
+			// What the change column compares with: the last analysis of another
+			// state of the same layout, on the same corpus, keyboard and settings.
+			// The same keys analysed again (a render, a rename, another key colour)
+			// keep the comparison they had instead of showing no change.
+			const context = JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings]);
+			const keys = JSON.stringify([layout.rows, layout.dead, layout.command]);
+			const previous =
+				state.previous && state.previous.lineage === lineage && state.previous.context === context
+					? state.previous
+					: null;
+			const before = previous ? (previous.keys === keys ? previous.before : previous.now) : null;
+			drawMetrics(result, before ? before.metrics : null, scores);
+			// Other keys, or another corpus or setting: the swaps found are stale.
+			if (swaps && !(previous && previous.keys === keys)) swaps.stale();
+			swapContext = {
+				layout,
+				tables: prepared,
+				analysis: {
+					keyboard: state.keyboard,
+					format: keyboardFormat(),
+					weights: settings.weights,
+					floors: settings.floors,
+					grades: settings.grades,
+					idealLoad: settings.idealLoad,
+					shortcuts: settings.shortcuts,
+					formWeights: settings.formWeights,
+					profile: settings.profile
+				}
+			};
+			tellResult({
+				score: result.score.mark,
+				rank,
+				count: scores.length + 1,
+				incomplete: result.incomplete,
+				change: before ? result.score.mark - before.score : null
+			});
+			drawTyping(result, layout);
+			tellHighlight(null);
+			const words = corpusWords();
+			window.LAYOUT_ANALYSIS_WORST.draw(ngrams, {
+				groups: result.topGroups,
+				layout,
+				highlight: tellHighlight,
+				// The drill-down to the corpus's words (an idea seen in the Layouts
+				// Wiki playground), when the corpus has a word table.
+				words: words
+					? (codes) =>
+							E.wordsWithKeys(layout, words, codes, {
+								keyboard: state.keyboard,
+								profile: settings.profile,
+								limit: WORDS_SHOWN
+							})
+					: undefined
+			});
 			drawFingers(result);
+			drawTapHolds(layout, prepared, settings);
 			drawAnalysers(layout, prepared, settings, mine);
-			extra.replaceChildren();
+			for (const box of extraBoxes.splice(0)) box.remove();
 			for (const draw of sections) {
-				const box = el('div', 'la-panel-section');
-				extra.append(box);
+				const box = el('section', 'la-panel-section');
+				loadColumn.append(box);
+				extraBoxes.push(box);
 				draw(box, { layout, tables: prepared, keyboard: state.keyboard, result });
 			}
-			state.previous = { corpus: state.corpus, keyboard: state.keyboard, metrics: result.metrics };
+			state.previous = {
+				lineage,
+				context,
+				keys,
+				now: { metrics: result.metrics, score: result.score.mark },
+				before
+			};
+			state.drawn = signature;
 		}
 
-		function drawMetrics(result, before) {
+		function drawMetrics(result, before, scores) {
 			metrics.replaceChildren();
+			// The complete layouts the edited one is ranked among: each metric's percentile.
+			const references = scores.filter((other) => !other.incomplete && other.library);
 			for (const id of PANEL_METRICS) {
 				const tr = el('tr');
+				tr.dataset.metric = id;
 				const th = el('th', '', t(`layout_analysis.metric.${id}`));
 				th.scope = 'row';
 				th.append(' ', INFO.button(id));
 				const value = result.metrics[id];
-				const td = el('td', '', `${format(value, metricDigits(id))} ${unitText(id)}`);
+				const td = el('td', '', measure(value, metricDigits(id), unitText(id)));
+				const standing = E.percentiles(
+					id,
+					references.map((other) => other.metrics[id])
+				)(value);
+				// Its own cell, so the value's cell keeps the value alone.
+				const pct = el('td', 'la-panel-pct');
+				if (standing) pct.append(INFO.percentile(t(`layout_analysis.metric.${id}`), standing));
 				const delta = el('td', 'la-panel-delta');
 				if (before && Math.abs(value - before[id]) >= DELTA_EPSILON) {
 					const change = value - before[id];
 					const better = E.METRICS[id].better;
 					const good = better === 'higher' ? change > 0 : better === 'lower' ? change < 0 : null;
-					delta.textContent = `${change > 0 ? '+' : '−'}${format(Math.abs(change), metricDigits(id))}`;
-					if (good !== null) delta.classList.add(good ? 'la-panel-good' : 'la-panel-bad');
+					delta.textContent = INFO.withUnit(
+						`${change > 0 ? '+' : '−'}${format(Math.abs(change), metricDigits(id))}`,
+						unitText(id)
+					);
+					if (good !== null) {
+						delta.classList.add(good ? 'la-panel-good' : 'la-panel-bad');
+						// Better or worse with a mark and in words, never by its colour alone.
+						const words = t(`layout_analysis.details.verdict_${good ? 'better' : 'worse'}`);
+						delta.title = words;
+						const mark = el('span', 'la-panel-verdict', good ? '▲' : '▼');
+						mark.setAttribute('aria-hidden', 'true');
+						delta.append(' ', mark, el('span', 'la-sr-only', ` ${words}`));
+					}
 				}
-				tr.append(th, td, delta);
+				tr.append(th, td, pct, delta);
 				metrics.append(tr);
 			}
 		}
 
+		/**
+		 * The share of the characters typed otherwise than their cheapest way out
+		 * of context, and the most frequent of them with their ways (the
+		 * Comparer's details list more).
+		 */
+		function drawTyping(result, layout) {
+			const rows = E.typingRows(result, layout, TYPING_ROWS);
+			if (rows.length === 0) {
+				typing.textContent = t('layout_analysis.details.typing_none');
+				return;
+			}
+			const chars = rows
+				.map(
+					(row) =>
+						`${row.char} ${row.ways.map((way) => `${way.keys} ${measure(way.share, 0, '%')}`).join(', ')}`
+				)
+				.join(' · ');
+			typing.textContent = `${t('layout_analysis.details.typing_caption', {
+				share: format(result.typing.changed, 2),
+				count: result.typing.alternatives
+			})} ${chars}`;
+		}
+
+		/**
+		 * Each finger's share of the non-thumb presses beside the ideal load the
+		 * score measures it against (the engine's fingerShares and idealLoad:
+		 * the two sides of finger_imbalance), the ideal drawn as a mark.
+		 */
 		function drawFingers(result) {
 			fingers.replaceChildren();
-			const ideal = comparerSettings().idealLoad || E.defaultIdealLoad();
-			for (const id of DATA.model.fingers) {
-				const row = el('div', 'la-panel-finger');
-				const share = result.fingers[id];
+			// A table: each finger a row, its share the cell, the ideal said with it.
+			// Its rows are laid out as grids (analysis_panel.css), so the native
+			// roles are also written: a reader that drops a restyled table's
+			// semantics (older WebKit) still reads it as one.
+			fingers.setAttribute('role', 'table');
+			fingers.setAttribute('aria-labelledby', fingersTitle.id);
+			const scale = Math.max(
+				FINGER_SCALE_PERCENT,
+				...Object.values(result.fingerShares),
+				...Object.values(result.idealLoad)
+			);
+			for (const [id, share] of Object.entries(result.fingerShares)) {
+				const row = el('tr', 'la-panel-finger');
 				const bar = el('span', 'la-panel-bar');
-				bar.style.width = `${Math.min(100, share * 2)}%`;
-				const target = ideal[id];
-				row.title =
-					target === undefined
-						? `${format(share, 1)} %`
-						: `${format(share, 1)} % / ${format(target, 1)} %`;
-				row.append(
-					el('span', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`)),
-					el('span', 'la-panel-track'),
-					el('span', 'la-panel-finger-value', `${format(share, 1)} %`)
-				);
-				row.children[1].append(bar);
+				bar.style.width = `${(share / scale) * 100}%`;
+				const target = result.idealLoad[id];
+				const mark = el('span', 'la-panel-target');
+				mark.style.left = `${(target / scale) * 100}%`;
+				const ideal = ` (${t('layout_analysis.details.ideal_mark')}: ${measure(target, 1, '%')})`;
+				row.title = `${measure(share, 1, '%')}${ideal}`;
+				row.setAttribute('role', 'row');
+				const name = el('th', 'la-panel-finger-name', t(`layout_analysis.finger.${id}`));
+				name.scope = 'row';
+				name.setAttribute('role', 'rowheader');
+				// The bar repeats the value's cell: hidden from readers, which hear the cell.
+				const track = el('td', 'la-panel-track');
+				track.setAttribute('aria-hidden', 'true');
+				track.append(bar, mark);
+				const value = el('td', 'la-panel-finger-value', measure(share, 1, '%'));
+				value.setAttribute('role', 'cell');
+				value.append(el('span', 'la-sr-only', ideal));
+				row.append(name, track, value);
 				fingers.append(row);
 			}
 		}
 
+		/**
+		 * The tap-hold keys of the edited layout (E.tapHoldReport): for each,
+		 * the level it holds, its taps and holds, and the shares of its taps
+		 * rolled into a key of the same hand and of its holds typed by that
+		 * hand, the two that make a tap-hold misfire or tire. Hidden for a
+		 * layout without tap-holds.
+		 */
+		function drawTapHolds(layout, prepared, settings) {
+			const report = E.tapHoldReport(layout, prepared, {
+				keyboard: state.keyboard,
+				weights: settings.weights,
+				profile: settings.profile
+			});
+			tapBox.hidden = report.keys.length === 0;
+			if (tapBox.hidden) {
+				tapTable.replaceChildren();
+				return;
+			}
+			tapTitle.textContent = t('layout_analysis.tap_hold.title');
+			tapNote.textContent = t('layout_analysis.tap_hold.note');
+			tapSummary.textContent = t('layout_analysis.tap_hold.summary', {
+				share: measure(report.holdShare, 2, '%')
+			});
+			const head = el('tr');
+			for (const id of ['key', 'level', 'taps', 'holds', 'hold_share', 'roll', 'same_hand']) {
+				const th = el('th', '', t(`layout_analysis.tap_hold.col_${id}`));
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			const pct = (value) => measure(value, 1, '%');
+			for (const key of report.keys) {
+				const tapped = (layout.rows[key.code] || [])[0];
+				const shown =
+					typeof tapped !== 'string'
+						? key.code
+						: tapped === ' '
+							? t('layout_analysis.incomplete.space')
+							: tapped;
+				const name = el('th', '', `${shown} (${key.code})`);
+				name.scope = 'row';
+				const tr = el('tr');
+				tr.dataset.code = key.code;
+				tr.append(
+					name,
+					el('td', '', key.holds.map((id) => layout.modifiers[id].label).join(', ')),
+					el('td', '', format(key.taps, 0)),
+					el('td', '', format(key.held, 0)),
+					el('td', '', pct(key.holdShare)),
+					el('td', '', pct(key.rollAfterTap)),
+					el('td', '', pct(key.sameHandHold))
+				);
+				tbody.append(tr);
+			}
+			tapTable.replaceChildren(thead, tbody);
+		}
+
 		/** One analyser's score, or the headline statistics of one without a score. */
 		function scoreText(analyser, score) {
-			// The value alone, as in the Comparer: the units are the analysers' own words.
-			if (analyser.better !== 'none') return format(score.value, analyser.digits);
+			// The value in the analyser's own unit, as in the Comparer.
+			if (analyser.better !== 'none')
+				return measure(score.value, analyser.digits, INFO.analyserUnit(analyser));
 			return analyser.headline
 				.map(
 					(part) =>
-						`${t(`layout_analysis.analysers.part.${part}`)} ${format(score.parts[part], PART_DIGITS)} %`
+						`${t(`layout_analysis.analysers.part.${part}`)} ${measure(score.parts[part], PART_DIGITS, '%')}`
 				)
 				.join(' · ');
 		}
@@ -390,12 +937,14 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		 * model on the next tick (an analysis that started since drops it).
 		 */
 		function drawAnalysers(layout, prepared, settings, mine) {
+			// The corner names nothing: a plain cell; the column headers say
+			// which cells they head (scope), as the row headers do (WCAG 1.3.1).
+			const officialHead = el('th', '', t('layout_analysis.analysers.official'));
+			const customHead = el('th', '', t('layout_analysis.analysers.custom'));
+			officialHead.scope = 'col';
+			customHead.scope = 'col';
 			const head = el('tr');
-			head.append(
-				el('th'),
-				el('th', '', t('layout_analysis.analysers.official')),
-				el('th', '', t('layout_analysis.analysers.custom'))
-			);
+			head.append(el('td'), officialHead, customHead);
 			const rows = SCORES.analysers().map((analyser) => {
 				const tr = el('tr');
 				const th = el('th', '', analyser.name);
@@ -429,6 +978,86 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			}, 0);
 		}
 
+		function tellHeat(heat) {
+			for (const listener of heatListeners) listener(heat);
+		}
+
+		function tellHighlight(codes) {
+			for (const listener of highlightListeners) listener(codes);
+		}
+
+		function tellResult(result) {
+			for (const listener of resultListeners) listener(result);
+		}
+
+		/**
+		 * What « Key colours » shows for an analysis: each key's value (points
+		 * lost, % of the presses, or its part of the metric), the largest, and
+		 * each key's tooltip line.
+		 * @returns {{metric: string, values: object, max: number, titles: object}|null}
+		 *   null when the colours are off.
+		 */
+		function heatOf(result, layout, settings) {
+			if (state.heat === HEAT_OFF) return null;
+			const points =
+				state.heat === HEAT_SCORE
+					? E.keyScoreCost(result, settings.weights, settings.floors, settings.grades)
+					: null;
+			const used = Object.assign(E.defaultWeights(), settings.weights || {});
+			const typed = (code) => {
+				const row = layout.rows[code];
+				const first = row && row.find((cell) => typeof cell === 'string' && cell !== '');
+				return first === undefined ? code : first;
+			};
+			const groups = (code, event) =>
+				result.keys[code].worst[event]
+					.map(
+						([others, share]) =>
+							`${[code].concat(others).map(typed).join(' ')} ${measure(share, HEAT_DIGITS, '%')}`
+					)
+					.join(', ');
+			const values = {};
+			const titles = {};
+			for (const [code, key] of Object.entries(result.keys)) {
+				let value;
+				let title;
+				if (points) {
+					value = points[code];
+					const parts = E.KEY_COST_METRICS.map((id) => [id, (used[id] || 0) * key.cost[id]])
+						.filter(([, part]) => part > 0)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, HEAT_SCORE_PARTS)
+						.map(
+							([id, part]) => `${t(`layout_analysis.metric.${id}`)} ${format(part, HEAT_DIGITS)}`
+						);
+					title = t('layout_analysis.panel.heat.points', { points: format(value, HEAT_DIGITS) });
+					if (parts.length) title += ` (${parts.join(' · ')})`;
+				} else if (state.heat === HEAT_PRESSES) {
+					value = key.presses;
+					title = `${heatName(HEAT_PRESSES)}: ${measure(value, HEAT_DIGITS, '%')}`;
+				} else {
+					value = key.cost[state.heat];
+					title = `${heatName(state.heat)}: ${measure(value, HEAT_DIGITS, unitText(state.heat))}`;
+					const worst = key.worst[state.heat] ? groups(code, state.heat) : '';
+					if (worst) title += ` — ${t('layout_analysis.panel.heat.worst', { groups: worst })}`;
+				}
+				values[code] = value;
+				titles[code] = title;
+			}
+			return {
+				metric: state.heat,
+				values,
+				max: Math.max(0, ...Object.values(values)),
+				titles
+			};
+		}
+
+		function heatName(id) {
+			if (id === HEAT_OFF || id === HEAT_SCORE) return t(`layout_analysis.panel.heat.${id}`);
+			if (id === HEAT_PRESSES) return t('layout_analysis.heat.presses');
+			return t(`layout_analysis.metric.${id}`);
+		}
+
 		function schedule() {
 			clearTimeout(state.timer);
 			state.timer = setTimeout(run, UPDATE_DEBOUNCE_MS);
@@ -437,47 +1066,137 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		corpusSelect.addEventListener('change', () => {
 			state.corpus = corpusSelect.value;
 			state.previous = null;
+			state.drawn = null;
 			persist();
 			schedule();
 		});
 		keyboardSelect.addEventListener('change', () => {
 			state.keyboard = keyboardSelect.value;
+			fingeringView.draw();
 			state.previous = null;
+			state.drawn = null;
 			persist();
+			schedule();
+		});
+		rankSelect.addEventListener('change', () => {
+			state.rank = rankSelect.value;
+			persist();
+			schedule();
+		});
+		heatSelect.addEventListener('change', () => {
+			state.heat = heatSelect.value;
+			persist();
+			if (state.heat === HEAT_OFF) tellHeat(null);
 			schedule();
 		});
 		node.addEventListener('toggle', () => {
 			persist();
+			// Folding cleared the board's colours and score: an unfolding draws again.
+			state.drawn = null;
 			if (node.open) schedule();
+			// A folded panel analyses nothing: its colours and score would go stale.
+			else {
+				tellHeat(null);
+				tellResult(null);
+			}
 		});
 		document.addEventListener('i18n:applied', () => {
 			fillControls();
+			state.drawn = null;
 			schedule();
 		});
 		// A new fingering profile changes every metric and the library's ranking.
 		window.LAYOUT_ANALYSIS_FINGERING.onChange(() => {
 			state.previous = null;
+			state.drawn = null;
 			schedule();
 		});
-		document.addEventListener(NGRAMS_EVENT, (event) => {
-			E.prepareNgrams(event.detail);
-			const entry = { id: MY_TYPING_ID, title: '', host: event.detail };
+		/**
+		 * Lists « Ma frappe » with the app's tables. Its first arrival makes it the
+		 * corpus; a later one (the fresh read after the saved one) replaces its
+		 * tables but keeps the user's choice, and analyses again only while
+		 * « Ma frappe » is the chosen corpus.
+		 * @param {object} ngrams The 'studio-ngrams' tables.
+		 */
+		function useMyTyping(ngrams) {
+			E.prepareNgrams(ngrams);
+			// The final text of « My typing » (schema 2) is read the same way.
+			if (ngrams.final !== undefined) E.prepareNgrams(ngrams.final);
+			const entry = { id: MY_TYPING_ID, title: '', host: ngrams };
 			const at = corpora.findIndex((c) => c.id === MY_TYPING_ID);
-			if (at >= 0) corpora.splice(at, 1, entry);
-			else corpora.unshift(entry);
-			state.corpus = MY_TYPING_ID;
+			if (at >= 0) {
+				corpora.splice(at, 1, entry);
+				if (state.corpus !== MY_TYPING_ID) return;
+			} else {
+				corpora.unshift(entry);
+				state.corpus = MY_TYPING_ID;
+				fillControls();
+			}
 			state.previous = null;
+			state.drawn = null;
 			state.libraryKey = '';
-			fillControls();
 			schedule();
-		});
+		}
+		document.addEventListener(NGRAMS_EVENT, (event) => useMyTyping(event.detail));
 		fillControls();
+		// Tables that arrived before the panel (the app sends its saved read as
+		// soon as the window opens).
+		if (lastNgrams) useMyTyping(lastNgrams);
 
 		return {
 			node,
-			update(doc) {
+			/**
+			 * Analyses a document after the pause.
+			 * @param {object} doc - The editor document.
+			 * @param {*} lineage - Which layout it is: the same value for every
+			 *   edit of one layout, another for a layout opened, started from or
+			 *   shown in another tab. The change column compares only two analyses
+			 *   of one lineage (the first render's empty board is another layout).
+			 * @throws {Error} Without a lineage.
+			 */
+			update(doc, lineage) {
+				if (lineage === undefined || lineage === null)
+					throw new Error('layout_analysis: update needs the layout lineage');
 				state.doc = doc;
+				state.lineage = lineage;
 				schedule();
+			},
+			/**
+			 * Listens to the key colours: listener(heat) after each analysis, with
+			 * heatOf()'s value, or null when they are off or nothing was analysed.
+			 */
+			onHeat(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a heat listener is a function');
+				heatListeners.push(listener);
+			},
+			/**
+			 * Listens to the scores: listener(result) after each analysis, with
+			 * {score, rank, count, incomplete, change} (change: the score's change
+			 * since the last analysis of the same layout on the same corpus and
+			 * keyboard, null for a first one), or null when nothing is analysed
+			 * (folded, or the layout cannot be analysed).
+			 */
+			onResult(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a result listener is a function');
+				resultListeners.push(listener);
+			},
+			/**
+			 * Listens to the worst n-gram shown: listener(codes) with the keys of
+			 * the row hovered or focused, in typing order, or null when none is.
+			 */
+			onHighlight(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a highlight listener is a function');
+				highlightListeners.push(listener);
+			},
+			/** Unfolds the panel, scrolls it into view and moves the focus to its title. */
+			reveal() {
+				if (!node.open) node.open = true;
+				const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				node.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+				summary.focus({ preventScroll: true });
 			},
 			addSection(draw) {
 				if (typeof draw !== 'function') throw new Error('layout_analysis: a section draws itself');
@@ -487,5 +1206,5 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		};
 	}
 
-	return { create, layoutFromEditorDoc, PANEL_METRICS };
+	return { create, layoutFromEditorDoc, PANEL_METRICS, DELTA_EPSILON };
 })();

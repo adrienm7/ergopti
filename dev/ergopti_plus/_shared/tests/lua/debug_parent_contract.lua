@@ -56,7 +56,7 @@ function M.register(helpers, fixture, corpus, platform)
 	helpers.describe("Debug parent structural source ownership (" .. platform .. ")", function()
 		for _, code in ipairs({ "en", "fr" }) do
 			local language = code
-			helpers.it("retains complete physical " .. language .. " order, choice callbacks and paused access", function()
+			helpers.it("retains complete physical " .. language .. " order, switch callbacks and paused access", function()
 				with_case(function(_, _, build, observed, locale)
 					locale.set_locale(language)
 					local expected = corpus[language]
@@ -69,26 +69,27 @@ function M.register(helpers, fixture, corpus, platform)
 					local labels = {}; for _, row in ipairs(parent.menu) do labels[#labels + 1] = row.title end
 					helpers.assert_eq(labels, expected[platform], "complete hand-authored native child image")
 					-- The developer rows (macOS's console and its separator) lead; the
-					-- « Diagnostics » and « Logs » headers open the two user groups.
+					-- « Diagnostics » and « Logs » headers open the two user groups, and
+					-- the Logs switches come first, then a separator (2026-11-24).
 					local base = platform == "hs" and 2 or 0
 					local checks = expected[platform .. "_tests"]
 					Layout.assert_layout(helpers, parent.menu, {
-						diagnostics = expected[platform][base + 2], report = expected[platform][base + 4],
-						suggest = expected[platform][base + 5], logs = expected[platform][base + 8],
-						tests = expected.tests, checks = checks,
+						diagnostics = expected[platform][base + 2], report = expected[platform][base + 3],
+						suggest = expected[platform][base + 4], logs = expected[platform][base + 7],
+						field_report = expected.field_report, tests = expected.tests, checks = checks,
 					}, platform .. " " .. language)
 					helpers.assert_eq(observed.effects, {}, "constructing Debug invokes no action")
-					for _, header in ipairs({ base + 1, base + 7 }) do
+					for _, header in ipairs({ base + 1, base + 6 }) do
 						helpers.assert_true(parent.menu[header].disabled == true, "the section header is inert: " .. header)
 						helpers.assert_nil(parent.menu[header].fn, "the section header has no action: " .. header)
 					end
-					local choice = parent.menu[base + 8]
-					helpers.assert_eq(#choice.menu, 4)
-					for index, value in ipairs({ "DEBUG", "INFO", "WARNING", "ERROR" }) do
-						helpers.assert_eq(choice.menu[index].checked == true, value == "INFO")
-						helpers.assert_eq(choice.menu[index].fn(), false, "actual native handler refusal propagates")
-					end
-					helpers.assert_eq(observed.effects, { "DEBUG", "INFO", "WARNING", "ERROR" })
+					helpers.assert_eq(parent.menu[base + 9].title, "-", "a separator closes the Logs switches")
+					-- « Detailed log » (2026-11-24): unticked at INFO, a click asks for DEBUG
+					local detailed = parent.menu[base + 7]
+					helpers.assert_eq(detailed.checked, false, "INFO reads as an unticked detailed log")
+					helpers.assert_nil(detailed.menu, "the detailed log is one switch, not a submenu")
+					helpers.assert_eq(detailed.fn(), false, "actual native handler refusal propagates")
+					helpers.assert_eq(observed.effects, { "DEBUG" })
 					if platform == "linux" then helpers.assert_eq(rows[#rows].title, expected.quit) end
 				end)
 			end)

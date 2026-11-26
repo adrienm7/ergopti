@@ -41,7 +41,7 @@ end
 --- @param catalogue table Decoded canonical ollama_release.json.
 --- @param platform string
 --- @param architecture string Actual native architecture, not an environment hint.
---- @return table|nil snapshot { key, version, name, sha256, bytes, url }.
+--- @return table|nil snapshot { key, version, name, sha256, bytes, unpacked_bytes, url }.
 --- @return string|nil reason
 function M.asset(catalogue, platform, architecture)
 	local supported = ASSETS[platform]
@@ -54,10 +54,12 @@ function M.asset(catalogue, platform, architecture)
 		return nil, "ollama_release_unreadable"
 	end
 	local name, digest, bytes = rawget(source, "filename"), rawget(source, "sha256"), rawget(source, "bytes")
+	local unpacked = rawget(source, "unpacked_bytes")
 	if not segment(name) or not name:match("^ollama%-[%w%-]+%.[%w%.]+$")
 		or type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$")
-		or type(bytes) ~= "number" or bytes <= 0 or bytes % 1 ~= 0 then return nil, "ollama_release_unreadable" end
-	return { key = key, version = version, name = name, sha256 = digest, bytes = bytes,
+		or type(bytes) ~= "number" or bytes <= 0 or bytes % 1 ~= 0
+		or type(unpacked) ~= "number" or unpacked <= 0 or unpacked % 1 ~= 0 then return nil, "ollama_release_unreadable" end
+	return { key = key, version = version, name = name, sha256 = digest, bytes = bytes, unpacked_bytes = unpacked,
 		url = "https://" .. Identifiers.hosts.github .. "/ollama/ollama/releases/download/v" .. version .. "/" .. name }
 end
 

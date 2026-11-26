@@ -56,7 +56,7 @@ _TSRT_CancelAndRequeueFailuresAreContained() {
 		"TimerCancel must attempt every native callback owner")
 	Assert(FailurePos > 0 && FiredPos > FailurePos && RegistryPos > FailurePos,
 		"TimerCancel must retain logical ownership when any native cancellation fails")
-	RequeuePos := InStr(OneShotBody, "SetTimer(requeued, -500)")
+	RequeuePos := InStr(OneShotBody, 'SetTimer(requeued, -TimingsGet("ui", "suspended_timer_requeue_ms"))')
 	RequeueFiredPos := InStr(OneShotBody, 'BoundHandle["Fired"] := true', false, RequeuePos)
 	RequeueRegistryPos := InStr(OneShotBody, "_TIMER_ADAPTER_REGISTRY.Delete(Id)", false, RequeuePos)
 	Assert(RequeuePos > 0 and RequeueFiredPos > RequeuePos and RequeueRegistryPos > RequeuePos,

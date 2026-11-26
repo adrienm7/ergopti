@@ -199,3 +199,215 @@ h.describe("owned dialog resolver (owned-dialog-host)", function()
 		h.assert_eq(NativeDialog.plain_markup("a < b & c > d"), "a &lt; b &amp; c &gt; d")
 	end)
 end)
+
+
+--- A GTK double recording every call, its handles distinct tables.
+--- @return table lib, table calls
+local function recording_lib()
+	local calls = {}
+	local gtk = setmetatable({
+		gtk_dialog_run = function() return -6 end,
+	}, { __index = function(_, name)
+		return function(...)
+			calls[#calls + 1] = { name = name, args = { ... } }
+			return { from = name }
+		end
+	end })
+	local ffi = {
+		new = function() return {} end,
+		cast = function(_, value) return value end,
+		string = function(value) return value end,
+	}
+	return { gtk = gtk, ffi = ffi, glib = {}, gobject = { g_signal_connect_data = function() return 0 end } }, calls
+end
+
+--- The arguments of the recorded calls to one GTK function.
+--- @param calls table
+--- @param name string
+--- @return table
+local function calls_to(calls, name)
+	local found = {}
+	for _, call in ipairs(calls) do
+		if call.name == name then found[#found + 1] = call.args end
+	end
+	return found
+end
+
+h.describe("owned dialog host names its windows and fields (a11y-dialog-host)", function()
+	h.it("(a11y-dialog-host) a window without a title is named after the product", function()
+		h.assert_eq(Host.window_title({ options = {} }), "Ergopti+")
+		h.assert_eq(Host.window_title({ options = { title = "" } }), "",
+			"an empty title the caller gives is the unbranded-titles choice, kept")
+		h.assert_eq(Host.window_title({ options = { title = "Clé" } }), "Clé")
+		local lib, calls = recording_lib()
+		Host.main({ "--question", "--no-markup", "--text=Q", "--ok-label=Y", "--cancel-label=N" }, sink(), sink(),
+			function() return lib end)
+		h.assert_eq(calls_to(calls, "gtk_window_set_title")[1][2], "Ergopti+")
+	end)
+
+	h.it("(a11y-dialog-host) an entry's caption names its text field", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--no-markup", "--text=Key", "--ok-label=OK", "--cancel-label=Cancel" }, sink(), sink(),
+			function() return lib end)
+		local bound = calls_to(calls, "gtk_label_set_mnemonic_widget")
+		h.assert_eq(#bound, 1, "the caption is bound to exactly one field")
+		h.assert_eq(bound[1][1].from, "gtk_label_new")
+		h.assert_eq(bound[1][2].from, "gtk_entry_new")
+	end)
+
+	h.it("(a11y-dialog-host) an entry with offered values binds the combo's own entry", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--no-markup", "--text=Key", "--ok-label=OK", "--cancel-label=Cancel", "a", "b" },
+			sink(), sink(), function() return lib end)
+		h.assert_eq(calls_to(calls, "gtk_label_set_mnemonic_widget")[1][2].from, "gtk_bin_get_child")
+	end)
+
+	h.it("(a11y-dialog-host) a list's caption names its table", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--list", "--no-markup", "--text=Pick", "--column=Value", "--ok-label=OK", "--cancel-label=Cancel",
+			"one" }, sink(), sink(), function() return lib end)
+		local bound = calls_to(calls, "gtk_label_set_mnemonic_widget")
+		h.assert_eq(#bound, 1)
+		h.assert_eq(bound[1][2].from, "gtk_tree_view_new_with_model")
+	end)
+
+	h.it("(a11y-dialog-host) no caption, no binding", function()
+		local lib, calls = recording_lib()
+		Host.main({ "--entry", "--ok-label=OK", "--cancel-label=Cancel" }, sink(), sink(), function() return lib end)
+		h.assert_eq(#calls_to(calls, "gtk_label_set_mnemonic_widget"), 0)
+	end)
+end)
+
+-- ==============================================================================
+-- The host reads its guard's names from the shared tree in every launch mode.
+-- ==============================================================================
+
+local quote = require("core.text.engine.utils_core").shell_quote
+
+--- The file a module loads from, and its path inside its tree.
+--- @param name string Dotted module name.
+--- @return string file Absolute source file.
+--- @return string relative Its path below the tree root.
+local function module_file(name)
+	local file = assert(package.searchpath(name, package.path), "module unresolved: " .. name)
+	return file, (name:gsub("%.", "/")) .. ".lua"
+end
+
+--- Copies one module into a tree at its own relative path.
+--- @param name string Dotted module name.
+--- @param tree string Destination root.
+local function copy_module(name, tree)
+	local file, relative = module_file(name)
+	local target = tree .. "/" .. relative
+	assert(os.execute("mkdir -p " .. quote(target:match("^(.*)/[^/]+$")) .. " && cp " .. quote(file) .. " "
+		.. quote(target)), "copy " .. name)
+end
+
+--- Copies the path owner a plain run loads to locate the shared tree.
+--- @param tree string Destination driver root.
+local function copy_resolver(tree)
+	copy_module("core.fs.engine.paths", tree)
+	copy_module("core.fs.engine.regular_file_reader", tree)
+end
+
+--- Copies the file the path owner probes to accept a shared tree.
+--- @param shared string Destination shared root.
+local function copy_shared_probe(shared)
+	local relative = "core/i18n/data/locales/en.json"
+	local target = shared .. "/" .. relative
+	assert(os.execute("mkdir -p " .. quote(target:match("^(.*)/[^/]+$")) .. " && cp "
+		.. quote(assert(require("core.fs.engine.paths").shared(relative))) .. " " .. quote(target)), "copy probe")
+end
+
+--- A fresh, empty directory.
+--- @return string path
+local function fresh_directory()
+	local path = os.tmpname()
+	os.remove(path)
+	assert(os.execute("mkdir -p " .. quote(path)), "temporary directory")
+	return path
+end
+
+--- Starts a host script under the guard as a child, in the given environment.
+--- @param prefix string Shell words before the interpreter (cd and env).
+--- @param host string The host script as the child names it.
+--- @return number|nil code The host's exit code.
+--- @return string|nil recorded What the guarded host recorded.
+local function run_guarded(prefix, host)
+	local record = os.tmpname()
+	os.remove(record)
+	local command = prefix .. " env -u LUA_INIT -u LUA_INIT_5_1 " .. Host.GUARD_VARIABLE .. "=" .. quote(record) .. " "
+		.. Host.GUARD_CASE_VARIABLE .. "=mode " .. quote(require("luv").exepath()) .. " " .. quote(host)
+		.. " --error --title=T 2>/dev/null"
+	local code = NativeDialog.exit_code(os.execute(command))
+	local file = io.open(record, "rb")
+	local recorded = file and file:read("*a")
+	if file then file:close() end
+	os.remove(record)
+	return code, recorded
+end
+
+-- What a guarded host records for the request run_guarded sends.
+local EXPECTED_RECORD = "mode\t--error T\n"
+
+-- No launcher variable reaches the child unless the mode exports it.
+local CLEAN = "env -u LUA_PATH -u ERGOPTI_LITERAL_DRIVER_ROOT -u ERGOPTI_LITERAL_SHARED_ROOT -u ERGOPTI_LITERAL_DIRECT"
+	.. " -u ERGOPTI_LITERAL_DAEMON -u ERGOPTI_LITERAL_NATIVE_MODULES"
+
+h.describe("owned dialog host launch modes (dialog-host-shared-names)", function()
+	local host_file, host_relative = module_file("core.ui.ui.dialog_host")
+	local root = host_file:sub(1, #host_file - #host_relative - 1)
+
+	h.it("(dialog-host-shared-names) a checkout run without LUA_PATH finds the sibling shared tree", function()
+		local code, recorded = run_guarded(CLEAN, host_file)
+		h.assert_eq(code, Host.EXIT_UNAVAILABLE)
+		h.assert_eq(recorded, EXPECTED_RECORD)
+	end)
+
+	h.it("(dialog-host-shared-names) a relative run from the driver directory finds it too", function()
+		local code, recorded = run_guarded("cd " .. quote(root) .. " && " .. CLEAN, host_relative)
+		h.assert_eq(code, Host.EXIT_UNAVAILABLE)
+		h.assert_eq(recorded, EXPECTED_RECORD)
+	end)
+
+	h.it("(dialog-host-shared-names) a system package nests the shared tree in the driver", function()
+		local base = fresh_directory()
+		local package_root = base .. "/ergopti"
+		copy_module("core.ui.ui.dialog_host", package_root)
+		copy_resolver(package_root)
+		copy_module("core.text.engine.identifiers", package_root .. "/_shared")
+		copy_shared_probe(package_root .. "/_shared")
+		local bare_code, bare = run_guarded(CLEAN .. " LUA_PATH=';;'", package_root .. "/" .. host_relative)
+		local exported = package_root .. "/?.lua;" .. package_root .. "/_shared/?.lua;;"
+		local wrapped_code, wrapped = run_guarded(CLEAN .. " LUA_PATH=" .. quote(exported),
+			package_root .. "/" .. host_relative)
+		os.execute("rm -rf " .. quote(base))
+		h.assert_eq(bare_code, Host.EXIT_UNAVAILABLE)
+		h.assert_eq(bare, EXPECTED_RECORD)
+		h.assert_eq(wrapped_code, Host.EXIT_UNAVAILABLE, "the AppImage and package wrappers export LUA_PATH")
+		h.assert_eq(wrapped, EXPECTED_RECORD)
+	end)
+
+	h.it("(dialog-host-shared-names) a root with template bytes resolves through the literal loader", function()
+		local base = fresh_directory()
+		local install = base .. "/a;b?c"
+		copy_module("core.ui.ui.dialog_host", install .. "/linux")
+		copy_module("core.lifecycle.engine.literal_module_loader", install .. "/linux")
+		copy_module("core.text.engine.identifiers", install .. "/_shared")
+		local code, recorded = run_guarded(CLEAN .. " LUA_PATH=';;' ERGOPTI_LITERAL_DRIVER_ROOT=" .. quote(install .. "/linux")
+			.. " ERGOPTI_LITERAL_SHARED_ROOT=" .. quote(install .. "/_shared"), install .. "/linux/" .. host_relative)
+		os.execute("rm -rf " .. quote(base))
+		h.assert_eq(code, Host.EXIT_UNAVAILABLE)
+		h.assert_eq(recorded, EXPECTED_RECORD)
+	end)
+
+	h.it("(dialog-host-shared-names) a tree without its shared names fails before any window", function()
+		local base = fresh_directory()
+		copy_module("core.ui.ui.dialog_host", base .. "/ergopti")
+		copy_resolver(base .. "/ergopti")
+		local code, recorded = run_guarded(CLEAN .. " LUA_PATH=';;'", base .. "/ergopti/" .. host_relative)
+		os.execute("rm -rf " .. quote(base))
+		h.assert_true(code ~= Host.EXIT_UNAVAILABLE and code ~= Host.EXIT_ACCEPTED, tostring(code))
+		h.assert_nil(recorded, "the host stopped before reading the guard")
+	end)
+end)

@@ -45,7 +45,7 @@ local Registrar   = require("platform.input.hotkey_registrar")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings     = require("core.timing.engine.timings")
 local FileSystem  = require("core.fs.adapters.file_system")
-local Manifest    = require("infra.manifest_reader")
+local Manifest    = require("menu.engine.manifest_reader")
 local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
 	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,
@@ -127,7 +127,7 @@ local KARABINER_OUT = nil
 --     <config_dir>/hammerspoon/tap_hold.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
-	local MenuPaths = require("infra.config_paths")
+	local MenuPaths = require("settings.engine.paths")
 	return MenuPaths.get("TapHoldConfigPath")
 end
 local ACTIONS_FILE    = _DATA_DIR .. "actions.json"
@@ -798,7 +798,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused, recove
 	end
 	local uncommitted_watcher = nil
 	if not _state.watcher then
-		local ok_ge, gestures_engine = pcall(require, "modules.gestures.engine")
+		local ok_ge, gestures_engine = pcall(require, "gestures.engine.engine")
 		if not ok_ge then gestures_engine = nil end
 		local watcher_ok, watcher_or_err = xpcall(function()
 			return Watchers.start_gesture_watcher(gestures_engine, expected_token)
@@ -3668,6 +3668,18 @@ function M.guardian_state()
 	return GUARDIAN_STATE_UNKNOWN
 end
 
+--- The lease controller's public phase, for the Tap-Holds title dot, read
+--- from memory without any native observation or side effect.
+--- @return string phase `active` once the rules are in force, `failed`, a
+---   transitional phase, `uninitialized`, or `unknown` when unreadable.
+function M.lease_phase()
+	if not _state then return GUARDIAN_STATE_UNKNOWN end
+	-- A watch reads it every second: a lease not yet started answers quietly
+	local ok, phase = pcall(LeaseController.status, { before_init = "uninitialized" })
+	if not ok or type(phase) ~= "string" then return GUARDIAN_STATE_UNKNOWN end
+	return phase
+end
+
 --- Enables or disables the Karabiner integration and persists the choice.
 --- When enabling: deploys inert token-gated rules, then activates the exact lease.
 --- When disabling: revokes only that lease; stock Karabiner remains user-managed.
@@ -4180,6 +4192,7 @@ end
 --- @param candidate table Persisted settings candidate.
 local function publish_settings_state(candidate)
 	_state.tap_holds_enabled = candidate.tap_holds_enabled ~= false
+	_state.key_combinations_enabled = candidate.key_combinations_enabled
 	_state.mod_combos_enabled = candidate.mod_combos_enabled
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
@@ -5058,6 +5071,11 @@ end
 --- @param action_id string Action id from actions.json.
 function M.set_combo_combo_action(combo_id, action_id)
 	if not require_state("set_combo_combo_action") then return false end
+	-- No chord runs the one-shot Shift on any OS (maintainer decision of 2026-11-06).
+	if require("tap_hold.engine.key_combinations").CHORD_REFUSED_EVERYWHERE[action_id] then
+		Logger.warn(LOG, "Combo '%s': the action '%s' cannot run as a chord — refused.", tostring(combo_id), tostring(action_id))
+		return false
+	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "combo", action_id)
@@ -5178,8 +5196,9 @@ end
 
 --- Sets combo symmetric mode and persists it.
 --- When true, key_down_order: "strict" is removed from chord rules so A+B and
---- B+A fire the same action. Non-canonical (reverse) combos are also suppressed
---- in the KE config and in the menu.
+--- B+A fire the same action. The chord of a non-canonical (reverse) combo is
+--- suppressed in the KE config; its tap and hold stay, and the menu lists it
+--- with the shared chord row (maintainer decision KCD-5 of 2026-11-21).
 --- @param value boolean
 function M.set_combo_symmetric(value)
 	if not require_state("set_combo_symmetric") then return false end
@@ -5202,7 +5221,7 @@ end
 --- per-key tap-hold rule except the right-Command one that carries AltGr and
 --- the script-control trigger; every per-key assignment is kept. The
 --- modifier-combo rules never follow it: only their own switch governs them
---- (M.set_mod_combos_enabled).
+--- (M.set_key_combinations_enabled).
 --- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
 --- @return boolean committed
@@ -5240,7 +5259,7 @@ end
 --- incompatible VirtualHIDDevice.
 --- @return string|nil version Nil when the manifest pins none.
 function M.owned_virtual_hid_version()
-	return require("adapters.runtime_owner_ports").virtual_hid_version()
+	return require("diagnostics.adapters.runtime_owner_ports").virtual_hid_version()
 end
 
 --- Replaces an incompatible VirtualHIDDevice with the pinned driver after the
@@ -5257,7 +5276,7 @@ function M.update_virtual_hid_driver(on_done)
 		Logger.error(LOG, "VirtualHIDDevice update refused: no incompatible driver blocks the owned runtime.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").update_virtual_hid(on_done)
 	return true
 end
 
@@ -5278,7 +5297,7 @@ M.OWNED_REPAIR_REASONS = {
 --- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
 --- caller reloads after telling the user, so the next owner admits it or names
 --- the System Settings approval macOS may still wait for
---- (ui/owned_runtime_install.lua).
+--- (ai/ui/owned_runtime_install.lua).
 --- @param on_done function fn(ok, reason|nil, detail|nil) called once.
 --- @return boolean started False when the owned runtime is not blocked by a missing install.
 function M.install_owned_runtime(on_done)
@@ -5288,14 +5307,14 @@ function M.install_owned_runtime(on_done)
 		Logger.error(LOG, "Owned runtime install refused: the runtime is not blocked by a missing install.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").install_runtime(on_done)
 	return true
 end
 
 --- Restarts the services of the installed owned runtime after the user
 --- confirmed it (« Réparer le service », MRT-004). The caller reloads after
 --- telling the user, so the next owner admits the runtime or names what still
---- blocks it (ui/owned_runtime_install.lua).
+--- blocks it (ai/ui/owned_runtime_install.lua).
 --- @param on_done function fn(ok, reason|nil, detail|nil) called once.
 --- @return boolean started False when the owned runtime is not blocked by a stopped service.
 function M.repair_owned_runtime(on_done)
@@ -5305,7 +5324,7 @@ function M.repair_owned_runtime(on_done)
 		Logger.error(LOG, "Owned runtime service repair refused: the runtime is not blocked by a stopped service.")
 		return false
 	end
-	require("adapters.runtime_owner_ports").repair_runtime(on_done)
+	require("diagnostics.adapters.runtime_owner_ports").repair_runtime(on_done)
 	return true
 end
 
@@ -5314,7 +5333,7 @@ end
 --- @return boolean closed
 function M.user_karabiner_closed()
 	if not M._owned.selected() then return false end
-	return require("adapters.runtime_owner_ports").marker().get() == true
+	return require("diagnostics.adapters.runtime_owner_ports").marker().get() == true
 end
 
 --- The user's consent to closing their own Karabiner while Ergopti runs.
@@ -5347,30 +5366,40 @@ function M.set_close_other_instances(value)
 end
 
 --- Returns whether the key combinations are switched on: the persisted
---- [mod_combos] enabled, on while it was never set.
+--- `[category_enabled] key_combinations`, on while it was never set.
 --- @return boolean enabled
-function M.get_mod_combos_enabled()
-	if not require_state("get_mod_combos_enabled") then return false end
+function M.get_key_combinations_enabled()
+	if not require_state("get_key_combinations_enabled") then return false end
 	return Generator.key_combinations_enabled(_state)
 end
 
 --- Switches the key combinations and persists the choice, independent of the
---- Tap-Holds switch. Off stops generating every
---- modifier-combo rule; every pair's assignment is kept. Does NOT regenerate —
---- call M.regenerate() explicitly when ready.
+--- Tap-Holds switch: the master of every pair's tap, hold and chord, as on
+--- Windows and Linux (maintainer decision KCD-6 of 2026-11-21). Off stops
+--- generating every modifier-combo rule; every pair's assignment is kept.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
 --- @param value boolean Desired switch state.
 --- @return boolean committed
-function M.set_mod_combos_enabled(value)
-	if not require_state("set_mod_combos_enabled") then return false end
+function M.set_key_combinations_enabled(value)
+	if not require_state("set_key_combinations_enabled") then return false end
 	if type(value) ~= "boolean" then
-		Logger.error(LOG, "set_mod_combos_enabled(): value must be a boolean.")
+		Logger.error(LOG, "set_key_combinations_enabled(): value must be a boolean.")
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
-		candidate.mod_combos_enabled = value
-	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_ENABLED)
+		candidate.key_combinations_enabled = value
+	end, nil, require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
+end
+
+--- Returns whether the chords are switched on: the persisted [mod_combos]
+--- enabled, which covers only the chord slots; on while it was never set.
+--- No menu row writes it, as on Windows and Linux.
+--- @return boolean enabled
+function M.get_mod_combos_enabled()
+	if not require_state("get_mod_combos_enabled") then return false end
+	return Generator.chords_enabled(_state)
 end
 
 --- Whether a live bridge can take a settings transaction now: M.init() built
@@ -5587,6 +5616,7 @@ local function clone_persisted_settings(source)
 		or (source.lone_modifier_tap_max_ms ~= nil and type(source.lone_modifier_tap_max_ms) ~= "number")
 		or type(source.simultaneous_threshold_ms) ~= "number"
 		or type(source.combo_symmetric) ~= "boolean"
+		or (source.key_combinations_enabled ~= nil and type(source.key_combinations_enabled) ~= "boolean")
 		or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean") then
 		return nil
 	end
@@ -5594,6 +5624,7 @@ local function clone_persisted_settings(source)
 	return {
 		enabled = detached.enabled == true,
 		tap_holds_enabled = detached.tap_holds_enabled ~= false,
+		key_combinations_enabled = detached.key_combinations_enabled,
 		mod_combos_enabled = detached.mod_combos_enabled,
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
@@ -5612,9 +5643,11 @@ end
 	local function snapshot(source)
 		if type(source) ~= "table" or getmetatable(source) ~= nil
 			or type(source.enabled) ~= "boolean" or (source.tap_holds_enabled ~= nil and type(source.tap_holds_enabled) ~= "boolean")
+			or (source.key_combinations_enabled ~= nil and type(source.key_combinations_enabled) ~= "boolean")
 			or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean")
 			or type(source.combo_symmetric) ~= "boolean" then return nil end
 		local result = { enabled = source.enabled, tap_holds_enabled = source.tap_holds_enabled ~= false,
+			key_combinations_enabled = source.key_combinations_enabled ~= false,
 			mod_combos_enabled = source.mod_combos_enabled ~= false, combo_symmetric = source.combo_symmetric }
 		for _, name in ipairs({ "tap_hold_config", "mod_combos_config" }) do
 			local entries = rawget(source, name)
@@ -5867,12 +5900,12 @@ end
 				if (baseline.tap_holds_enabled or definition.from and definition.from.key_code == "right_command")
 					and (metadata.activators[cfg.tap or "none"] == true or metadata.activators[cfg.hold or "none"] == true) then enters = true end
 			end
-			if baseline.mod_combos_enabled then
+			if baseline.key_combinations_enabled then
 				for _, definition in ipairs(metadata.combos) do
 					local cfg = baseline.mod_combos_config[definition.id] or {}
 					if not definition.menu_hidden and (metadata.activators[cfg.tap or "none"] == true
 						or metadata.activators[cfg.hold or "none"] == true
-						or metadata.activators[cfg.combo or "none"] == true
+						or metadata.activators[cfg.combo or "none"] == true and baseline.mod_combos_enabled
 							and not (baseline.combo_symmetric and metadata.symmetric_halves[definition.id])) then enters = true end
 				end
 			end
@@ -5940,6 +5973,7 @@ function M.restore_settings(snapshot, on_done, layer_receipt)
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
 		candidate.tap_holds_enabled = restored.tap_holds_enabled
+		candidate.key_combinations_enabled = restored.key_combinations_enabled
 		candidate.mod_combos_enabled = restored.mod_combos_enabled
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
@@ -6111,6 +6145,7 @@ function M.apply_scope(request, on_done)
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
+				candidate.key_combinations_enabled = target.key_combinations_enabled
 				candidate.mod_combos_enabled = target.mod_combos_enabled
 			end
 			candidate.mod_combos_config = target.mod_combos_config
@@ -6159,6 +6194,7 @@ function M.reset_to_defaults(on_done, scope)
 		candidate.lone_modifier_tap_max_ms  = defaults.lone_modifier_tap_max_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		if not includes_combos then return #M.TAP_HOLD_KEYS end
+		candidate.key_combinations_enabled  = defaults.key_combinations_enabled
 		candidate.mod_combos_enabled        = defaults.mod_combos_enabled
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
@@ -6995,7 +7031,7 @@ function M._owned.bind()
 	if M._owned.activation then return M._owned.activation end
 	local Owner = require("platform.remap.runtime_owner")
 	Logger.start(LOG, "Binding the owned Karabiner runtime…")
-	local OwnerPorts = require("adapters.runtime_owner_ports")
+	local OwnerPorts = require("diagnostics.adapters.runtime_owner_ports")
 	local ports_ok, ports = pcall(OwnerPorts.new)
 	if not ports_ok then
 		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))
@@ -7215,6 +7251,7 @@ function M.init(file_system)
 		runtime                   = runtime,
 		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
+		key_combinations_enabled  = user_cfg.key_combinations_enabled,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,

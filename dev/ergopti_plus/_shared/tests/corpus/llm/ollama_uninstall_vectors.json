@@ -1,0 +1,78 @@
+{
+	"schema_version": 1,
+	"_comment": "OLL-11 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). Each case is one uninstall of the Ollama Ergopti installed: the user's model choice, whether a download or an installation runs, the step whose port refuses (null for none), then the steps run in order and the message shown. Replayed through _shared/ai/engine/ollama/runtime_uninstall.lua by macos/tests/unit/ai/engine/vectors/test_ollama_uninstall_vectors.lua and linux/tests/unit/ai/engine/ollama/test_runtime_uninstall.lua, and through its port by windows/tests/unit/ai/servers/test_ollama_runtime_uninstall.ahk.",
+	"cases": [
+		{
+			"id": "keep_models",
+			"remove_models": false,
+			"busy": false,
+			"refuse": null,
+			"steps": ["stop", "files"],
+			"ok": true,
+			"message": "ollama.uninstall.done"
+		},
+		{
+			"id": "remove_models",
+			"remove_models": true,
+			"busy": false,
+			"refuse": null,
+			"steps": ["models", "stop", "files"],
+			"ok": true,
+			"message": "ollama.uninstall.done_models"
+		},
+		{
+			"id": "busy",
+			"remove_models": true,
+			"busy": true,
+			"refuse": null,
+			"steps": [],
+			"ok": false,
+			"message": "ollama.uninstall.reason_busy"
+		},
+		{
+			"id": "models_refused",
+			"remove_models": true,
+			"busy": false,
+			"refuse": "models",
+			"steps": ["models"],
+			"ok": false,
+			"message": "ollama.uninstall.reason_models"
+		},
+		{
+			"id": "stop_refused",
+			"remove_models": false,
+			"busy": false,
+			"refuse": "stop",
+			"steps": ["stop"],
+			"ok": false,
+			"message": "ollama.uninstall.reason_stop"
+		},
+		{
+			"id": "stop_refused_after_models",
+			"remove_models": true,
+			"busy": false,
+			"refuse": "stop",
+			"steps": ["models", "stop"],
+			"ok": false,
+			"message": "ollama.uninstall.reason_stop"
+		},
+		{
+			"id": "files_refused",
+			"remove_models": false,
+			"busy": false,
+			"refuse": "files",
+			"steps": ["stop", "files"],
+			"ok": false,
+			"message": "ollama.uninstall.reason_files"
+		},
+		{
+			"id": "files_refused_with_models",
+			"remove_models": true,
+			"busy": false,
+			"refuse": "files",
+			"steps": ["models", "stop", "files"],
+			"ok": false,
+			"message": "ollama.uninstall.reason_files"
+		}
+	]
+}

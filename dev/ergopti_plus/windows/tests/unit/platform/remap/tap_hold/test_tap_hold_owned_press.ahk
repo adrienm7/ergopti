@@ -89,6 +89,30 @@ _THOP_ClaimsEndWhenTheOwnerThrows() {
 Test("tap-hold owned press: claims end even when the owner throws (owned-press-repeat-2026-09-25)",
 	_THOP_ClaimsEndWhenTheOwnerThrows)
 
+; Space held as Shift: when the release wait throws, the modifier the owner
+; pressed must still be released, or Shift stays down in the system
+; (space-hold-exception-guard).
+_THOP_RecordKey(Keys, Key) {
+	Keys.Push(Key)
+	return true
+}
+
+_THOP_ThrowingWaitReleasesTheModifier() {
+	global LayerEnabled := false
+	_THOP_Reset()
+	Pressed := [], Released := []
+	AssertThrows(() => TapHoldOwnImmediateModifier("space", "SC039", "LShift", 0.2,
+		_THOP_WaitThrows, _THOP_KeyIsDown, _THOP_Tick,
+		_THOP_RecordKey.Bind(Pressed), _THOP_RecordKey.Bind(Released), _THOP_NoCancel, false, _THOP_NotSuspended),
+		"a release seam exception must propagate")
+	AssertEqual(1, Pressed.Length, "the owner pressed its modifier before waiting")
+	AssertEqual(1, Released.Length,
+		"a throwing release wait must still release the pressed modifier (space-hold-exception-guard)")
+	AssertTrue(Released.Length == 1 && Released[1] == Pressed[1], "the released key is the one the owner pressed")
+}
+Test("tap-hold owned press: a throwing wait still releases its modifier (space-hold-exception-guard)",
+	_THOP_ThrowingWaitReleasesTheModifier)
+
 ; A pass-through press (LShift held as LShift through ~) already reached the
 ; system, and so must its repeats and release: a swallowed repeat would make AHK
 ; suppress the physical release too and leave Shift down in the system

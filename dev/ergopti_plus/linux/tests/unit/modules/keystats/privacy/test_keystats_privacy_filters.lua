@@ -97,7 +97,7 @@ end
 
 helpers.describe("keystats privacy — the posture is read, not re-typed", function()
 	it("exposes every flag the shared manifest declares", function()
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		local kl = fresh_keystats(true)
 		local state = kl.get_privacy_state()
 

@@ -55,6 +55,8 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 		local kwin = json.decode(read("platform/desktop_focus/kwin/metadata.json"))
 		local installer = read("install/compositor_focus.sh")
 		helpers.assert_eq(installer:match('\nGNOME_FOCUS_UUID="([^"]+)"'), gnome.uuid)
+		helpers.assert_eq(helpers.load_module("platform.focus.compositor_focus").GNOME_EXTENSION_UUID, gnome.uuid,
+			"the worker asks GNOME Shell for the extension the installer ships")
 		helpers.assert_eq(installer:match('\nKWIN_FOCUS_ID="([^"]+)"'), kwin.KPlugin.Id)
 		helpers.assert_eq(helpers.load_module("platform.focus.compositor_focus_worker").KWIN_SCRIPT_ID, kwin.KPlugin.Id)
 		helpers.assert_eq(kwin["X-Plasma-MainScript"], "code/main.js")
@@ -62,5 +64,14 @@ helpers.describe("compositor_focus: shipped desktop files", function()
 		-- GNOME refuses to load an extension that does not list the running
 		-- version; the module syntax the extension uses needs 45 or later.
 		helpers.assert_eq(gnome["shell-version"][1], "45")
+		-- Every major version from there on, through 51: Fedora 44 and Ubuntu
+		-- 26.04 ship GNOME 50, rawhide 51, and a list that stopped at 49 left
+		-- the extension OUT_OF_DATE there, with per-application rules and the
+		-- layout switch silently off (proved loading on 50.6 and 51.1 in
+		-- headless Fedora sessions, 2026-11-25).
+		for index, version in ipairs(gnome["shell-version"]) do
+			helpers.assert_eq(version, tostring(44 + index), "contiguous shell versions")
+		end
+		helpers.assert_true(#gnome["shell-version"] >= 7, "GNOME 50 and 51 are listed")
 	end)
 end)

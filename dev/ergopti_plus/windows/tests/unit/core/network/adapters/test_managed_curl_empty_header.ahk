@@ -86,23 +86,28 @@ _MCEH_HeaderLines(Head) {
 
 ; The production worker and real WinHTTP: an empty field must still be sent.
 _MCEH_EmptyFieldsReachTheWire() {
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Listener := _MCEH_Listener()
 	Request := 0
 	try {
 		Request := CurlAsyncRequest()
 		Request.SetManagedRouting(_MCEH_DirectSettings)
-		Request.SetDeadline(A_TickCount, 30000)
+		Request.SetDeadline(A_TickCount, TEST_NATIVE_SETTLE_TIMEOUT_MS)
 		Request.Open("GET", "http://127.0.0.1:" . Listener.Port . "/empty-header", true)
 		Request.SetRequestHeader("X-Ergopti-Empty", "")
 		Request.SetRequestHeader("X-Ergopti-Spaces", "   ")
 		Request.SetRequestHeader("X-Ergopti-Plain", "kept value")
 		AssertTrue(Request.Send(), "the managed request must dispatch")
 		Begin := A_TickCount
-		while !Request.WaitForResponse(0) && TickElapsed(Begin) < 30000 {
+		while !Request.WaitForResponse(0) && TickElapsed(Begin) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			Listener.Pump()
 			Sleep(10)
 		}
-		AssertTrue(Listener.Answered, "the private listener must receive the complete request head")
+		; The facts separate a stalled host (elapsed reaches the bound) from an
+		; early transport failure (the request completes before any head arrives).
+		AssertTrue(Listener.Answered, "the private listener must receive the complete request head; elapsed_ms="
+			. TickElapsed(Begin) . ";completed=" . Request.WaitForResponse(0) . ";status=" . Request.Status
+			. ";head_chars=" . StrLen(Listener.Head))
 		AssertTrue(Request.WaitForResponse(0), "the managed request must complete")
 		AssertEqual(200, Request.Status, "the managed request must observe the loopback answer")
 		Fields := _MCEH_HeaderLines(Listener.Head)

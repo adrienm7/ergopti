@@ -1,16 +1,10 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #Include %A_LineFile%\..\_generated\config_keys.ahk
-; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
-; the interpreter): without it the exe carries only the runtime's defaults. The
-; version comes from BUNDLE_VERSION in core/lifecycle/engine/bundle.ahk.
-;@Ahk2Exe-SetProductName Ergopti+
-;@Ahk2Exe-SetCompanyName Ergopti
-;@Ahk2Exe-SetDescription Ergopti+: hotstrings and shortcuts to type faster and more ergonomically
-;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
-;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
-;@Ahk2Exe-SetInternalName ErgoptiPlus
-;@Ahk2Exe-Set Comments, Open-source keyboard companion.
+; The version resource of the compiled exe (its identity, copyright and
+; version) is the generated _generated/exe_version_info.ahk, included right
+; after core/lifecycle/engine/bundle.ahk: without it the exe carries only the
+; runtime's defaults.
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
@@ -100,6 +94,10 @@ if A_IsCompiled {
 	}
 	try EnvSet("ERGOPTI_UPDATER_SWAP_TERMINAL", "")
 }
+; The launch tick of the reload this process completes (core/timing/engine/reload_timing.ahk),
+; taken before any child can inherit it; judged once the boot completes.
+global _ReloadInheritedLaunchTick := ""
+try _ReloadInheritedLaunchTick := ReloadTimingTakeInherited()
 
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
@@ -158,10 +156,10 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 		; been invisible to three audits: the one event that proves it happened
 		; was unwritable by construction.
 		;
-		; Calling LoggerInit() here instead would be worse. It runs
-		; _LoggerInitSubFiles, which DELETES any sub-file whose mtime is a
-		; previous day — so a yielding instance would destroy the LIVE owner's
-		; gestures/layout/tray sub-logs on its way out.
+		; Calling LoggerInit() here instead would be worse. It runs the
+		; retention purge, which DELETES files in the logs folder the LIVE
+		; owner is writing to — a yielding instance must leave that folder to
+		; its owner on its way out.
 		;
 		; LoggerAppendBootstrapLine writes to bootstrap.log in the default logs
 		; folder, which needs nothing but %LOCALAPPDATA%: it is reachable before
@@ -242,7 +240,7 @@ global LayerEnabled := False
 global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
-; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
+; hotstrings/engine/matcher/engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
@@ -265,8 +263,8 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 ; this global. Assigned in the pre-pump block so it exists before the first
 ; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
-#Include infra/manifest_reader.ahk
-#Include infra/feature_io.ahk
+#Include menu/engine/manifest_reader.ahk
+#Include settings/engine/preferences/feature_io.ahk
 
 ; ===== Global error net — armed BEFORE the first message pump =====
 ; Without this, any uncaught error pops an AHK dialog mid-keystroke and can leave
@@ -277,7 +275,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; parse-time #HotIf and throw with no net at all. error_net.ahk has no dependency
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
-#Include infra/error_net.ahk
+#Include diagnostics/engine/reports/error_net.ahk
 if _DriverIsDetachedWorker
 	OnError(DetachedWorkerErrorHandler)
 else
@@ -289,6 +287,7 @@ else
 ; the driver can keep reading from _StaticDir without caring whether it runs
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
 #Include core/lifecycle/engine/bundle.ahk
+#Include _generated/exe_version_info.ahk
 Bundle_Init()
 ; First of the retroactive boot stamps (core/logger/engine/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
@@ -340,8 +339,8 @@ BootProfile_Stamp("UIA include initialised")
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
 ; message-pumping RunWait — see the "Global error net" block there.
-#Include infra/personal_features.ahk
-#Include infra/menu_helpers.ahk
+#Include settings/engine/preferences/personal_features.ahk
+#Include menu/engine/helpers.ahk
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
@@ -351,7 +350,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
 ; with the keystats's ~6 background timers + mouse/keyboard hooks. The
-; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
+; menu-dispatcher bypass in menu/engine/dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
 
@@ -364,31 +363,30 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
-; Generated sub-file routing table, included before the logger that calls it.
-; It defines a FUNCTION rather than a global, so this ordering is a convenience
-; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
-#Include _generated/logger_sub_files.ahk
 ; Application folder, logs folder and log file names, generated from
 ; _shared/core/fs/data/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
+; What « Export the logs (zip) » archives and its privacy rules, generated from
+; _shared/core/logger/data/log_export.toml; a function, read at click time.
+#Include _generated/log_export_data.ahk
 ; The Ergopti root and its purpose folders, and the one-time move of the folders
 ; of the builds before the single folder name (run by core/lifecycle/engine/boot.ahk).
-#Include infra/app_folders.ahk
-#Include infra/legacy_folder_migration.ahk
+#Include apps/engine/folders.ahk
+#Include settings/engine/migration/legacy_folder_migration.ahk
 #Include core/logger/engine/tick_count.ahk
 #Include core/logger/engine/wall_clock.ahk
 #Include core/logger/engine/logger.ahk
 #Include core/logger/engine/boot_profiler.ahk
-#Include infra/startup_smoke.ahk
-#Include infra/diagnostic_snapshot.ahk
-#Include infra/issue_link.ahk
-#Include infra/redact.ahk
-#Include infra/issue_report.ahk
-#Include infra/error_policy.ahk
-#Include infra/error_report.ahk
+#Include diagnostics/engine/field_run/startup_smoke.ahk
+#Include diagnostics/engine/reports/snapshot.ahk
+#Include diagnostics/engine/reports/issue_link.ahk
+#Include diagnostics/engine/reports/redact.ahk
+#Include diagnostics/engine/reports/issue_report.ahk
+#Include diagnostics/engine/reports/error_policy.ahk
+#Include diagnostics/engine/reports/error_report.ahk
 #Include infra/hotpath_profiler.ahk
 #Include core/logger/engine/perf_budget.ahk
-#Include infra/registry.ahk
+#Include settings/engine/registry.ahk
 #Include core/lifecycle/engine/app_state.ahk
 BootProfile_Stamp("Diagnostics and core state initialised")
 
@@ -400,20 +398,26 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
 #Include core/crypto/crypto.ahk
-#Include adapters/clipboard.ahk
+#Include clipboard/adapters/clipboard.ahk
 #Include core/events/timer_scheduler.ahk
 #Include core/fs/adapters/file_system.ahk
 ; Crash-safe multi-file config transitions bind strict Windows-only filesystem
 ; operations at this integration boundary; the portable core remains OS-free.
-#Include infra/config_transition.ahk
-#Include infra/config_transition_runtime.ahk
+#Include settings/engine/migration/transition.ahk
+#Include settings/engine/migration/transition_runtime.ahk
 #Include platform/focus/window_info.ahk
 #Include core/process/adapters/uia_worker.ahk
 #Include platform/input/hotkey_registrar.ahk
-#Include ../_shared/shortcuts/data/magic_editor.ahk
-#Include infra/magic_editor.ahk
+#Include ../_shared/shortcuts/data/star_slot.ahk
+#Include infra/star_slot.ahk
 #Include platform/system/notifier.ahk
-#Include adapters/tray_menu.ahk
+#Include platform/system/accessibility.ahk
+#Include modules/shortcuts/text_target.ahk
+#Include platform/system/vision/screen_vision.ahk
+#Include platform/system/vision/region_select.ahk
+#Include core/ui/engine/font_scale.ahk
+#Include tray/adapters/menu.ahk
+#Include tray/state_tip.ahk
 #Include platform/input/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
 #Include core/network/adapters/http_client.ahk
@@ -422,25 +426,25 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/process/adapters/lifecycle.ahk
 #Include platform/input/key_state.ahk
 #Include adapters/keyboard_layout_switch.ahk
-#Include adapters/app_launcher.ahk
+#Include apps/adapters/launcher.ahk
 #Include core/network/adapters/info.ahk
 #Include platform/input/keyboard_hook.ahk
-#Include adapters/llm_nav_event_owner.ahk
+#Include ai/adapters/nav_event_owner.ahk
 #Include core/ui/adapters/terminal_output_preview.ahk
 #Include core/ui/adapters/terminal_output_custody.ahk
 #Include core/ui/adapters/terminal_output_sendinput.ahk
-#Include adapters/llm_automation.ahk
+#Include ai/adapters/automation.ahk
 #Include adapters/mouse_control.ahk
 #Include platform/focus/window_manager.ahk
 #Include platform/system/control.ahk
 #Include core/ui/adapters/graphics_renderer.ahk
-#Include adapters/notify_icon.ahk
+#Include tray/adapters/notify_icon.ahk
 #Include core/ui/adapters/tooltip_renderer.ahk
 #Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
 #Include adapters/screen_brightness.ahk
-#Include adapters/crash_report_worker.ahk
-#Include modules/keymap/uia_selection_worker.ahk
+#Include diagnostics/adapters/crash_report_worker.ahk
+#Include hotstrings/engine/expander/uia_selection_worker.ahk
 BootProfile_Stamp("Adapters initialised")
 SFD_ConfigureUiaWorker(
 	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
@@ -457,6 +461,7 @@ if UIASW_IsWorkerInvocation()
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include core/timing/engine/config.ahk
+#Include core/timing/engine/reload_timing.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
 #Include modules/keymap/layout/accented_shortcuts.ahk
 
@@ -465,10 +470,10 @@ if UIASW_IsWorkerInvocation()
 #Include core/ui/engine/window_utils.ahk
 #Include core/network/engine/external_url_policy.ahk
 #Include core/text/engine/utils.ahk
-#Include infra/text_case.ahk
+#Include hotstrings/engine/text_case.ahk
 #Include infra/wrap_pair.ahk
 #Include infra/open_target.ahk
-#Include infra/send_input_parameter.ahk
+#Include settings/engine/send_input_parameter.ahk
 #Include core/ui/ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 #Include infra/capsword_state.ahk
@@ -477,30 +482,30 @@ if UIASW_IsWorkerInvocation()
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower) extracted into dedicated submodules so the main file
 ; stays focused on ErgoptiPlus-specific logic.
-#Include infra/hotstrings/hotstring_engine.ahk
+#Include hotstrings/engine/matcher/engine.ahk
 ; The AltGr family HotstringEngineInit decides at boot and that then follows
 ; the foreground window's layout (AltGrFamilyStartFollowing, below).
 #Include infra/altgr_family.ahk
-#Include infra/hotstrings/hotstring_engine_main.ahk
-#Include infra/hotstrings/hotstring_buffer_effects.ahk
-#Include infra/hotstrings/hotstring_live_toggle.ahk
-#Include infra/hotstrings/hotstring_count_policy.ahk
+#Include hotstrings/engine/matcher/engine_main.ahk
+#Include hotstrings/engine/matcher/buffer_effects.ahk
+#Include hotstrings/engine/matcher/live_toggle.ahk
+#Include hotstrings/engine/matcher/count_policy.ahk
 ; The programmable-hotstring owner's state must exist before the first tray
 ; render counts its rules and before a startup failure runs the shutdown
 ; preflight that invalidates it. Its globals initialise at this include
-; position; modules/hotstrings.ahk's later #Include of it is then a no-op.
-#Include modules/dynamic_hotstrings/user_code.ahk
+; position; hotstrings/hotstrings.ahk's later #Include of it is then a no-op.
+#Include hotstrings/engine/dynamic/user_code.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/text/data/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
 #Include core/text/engine/toml/loader.ahk
-#Include infra/hotstrings/extension_packs.ahk
+#Include hotstrings/engine/catalogue/extension_packs.ahk
 #Include core/text/engine/toml/config_loader.ahk
 BootProfile_Stamp("Hotstring and TOML state initialised")
 ; The config.toml schema migration the boot runs before any reader or writer.
-#Include infra/config_migrate.ahk
+#Include settings/engine/migration/migrate.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
@@ -518,24 +523,27 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
 #Include platform/remap/constants.ahk
 #Include core/lifecycle/engine/master_gates.ahk
-#Include infra/manifest_descriptions.ahk
-#Include infra/menu_dispatcher.ahk
+#Include menu/engine/manifest_descriptions.ahk
+#Include menu/engine/dispatcher.ahk
 #Include platform/input/hook_dispatcher.ahk
-#Include infra/menu_manifest.ahk
-#Include infra/manifest_menu.ahk
-#Include infra/llm_defaults.ahk
+#Include menu/engine/manifest.ahk
+#Include menu/engine/manifest_menu.ahk
+#Include ai/engine/defaults.ahk
 #Include modules/updater.ahk
 #Include core/lifecycle/engine/shutdown/uninstall.ahk
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
-#Include ui/healthcheck/init.ahk
-#Include infra/input_probe.ahk
+#Include diagnostics/ui/healthcheck/init.ahk
+#Include diagnostics/engine/field_run/input_probe.ahk
 #Include core/lifecycle/engine/driver_control.ahk
-#Include ui/error_dialog/init.ahk
+#Include diagnostics/ui/error_dialog.ahk
 #Include ui/update_check/init.ahk
-#Include modules/diagnostics/crash_reporter.ahk
+#Include diagnostics/engine/reports/crash_reporter.ahk
 #Include core/text/engine/json.ahk
-#Include infra/program_parameter.ahk
+; After the reading preferences (ui/changelog/init.ahk) and the JSON reader,
+; before the boot calls TrayMenuFont_Init.
+#Include tray/adapters/menu_font.ahk
+#Include settings/engine/program_parameter.ahk
 #Include core/process/adapters/program_providers.ahk
 #Include infra/program_actions.ahk
 #Include infra/user_actions.ahk
@@ -549,24 +557,24 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include core/i18n/engine/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
-#Include infra/hotstrings/hotstrings_config.ahk
-#Include ui/hotstrings_config_window/init.ahk
-#Include ui/hotstrings_config_window/webview.ahk
-#Include ui/prompt_editor/init.ahk
+#Include hotstrings/engine/catalogue/config.ahk
+#Include hotstrings/ui/hotstrings_config_window/init.ahk
+#Include hotstrings/ui/hotstrings_config_window/webview.ahk
+#Include ai/ui/prompt_editor/init.ahk
 #Include infra/wrap_symbols_config.ahk
 #Include _generated/window_titles.ahk
 #Include core/ui/engine/native_dialogs.ahk
 #Include core/ui/engine/style.ahk
 #Include core/ui/ui/tooltip/init.ahk
-#Include infra/hotstrings/hotstring_prefix_watcher.ahk
+#Include hotstrings/engine/matcher/prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
 ; with a gitignored flat .tsv read at registration — the same pattern as the i18n
 ; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
-#Include infra/hotstrings/hotstrings_cache.ahk
-#Include ui/personal_toml_editor.ahk
-#Include ui/personal_toml_editor_webview.ahk
+#Include hotstrings/engine/catalogue/cache.ahk
+#Include hotstrings/ui/personal_toml_editor.ahk
+#Include hotstrings/ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/settings/data/features/number_row_policy.ahk
 #Include ../_shared/settings/data/features/layout_rows_policy.ahk
@@ -585,8 +593,8 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/keylayout/layout_registry.ahk
 #Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include modules/keymap/keylayout/layout_extension.ahk
-#Include infra/app_picker.ahk
-#Include infra/config_shortcuts.ahk
+#Include apps/engine/picker.ahk
+#Include settings/engine/shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
 #Include infra/metrics/metrics_filters.ahk
 #Include ui/wpm/init.ahk
@@ -599,7 +607,7 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include core/network/adapters/failure_host.ahk
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
-#Include ui/console_window.ahk
+#Include diagnostics/ui/console_window.ahk
 #Include modules/keystats/keystats_app_categories.ahk
 #Include modules/keystats/keystats.ahk
 #Include modules/keystats/keystats_hotstring_log.ahk
@@ -641,10 +649,10 @@ if KLPF_IsWorkerInvocation()
 ; A bundled app (App Cloner, Encryptor, windows/apps/) reuses this executable in
 ; a compiled release, as the workers above do; a source run starts
 ; apps/bundled_app_entry.ahk instead. It never returns into the driver's boot.
-#Include adapters/bundled_apps_native.ahk
-#Include apps/app_strings.ahk
+#Include apps/adapters/bundled_apps_native.ahk
+#Include apps/strings.ahk
 #Include apps/encryptor_core.ahk
-#Include apps/app_cloner_core.ahk
+#Include apps/cloner_core.ahk
 #Include apps/bundled_apps.ahk
 if BundledApp_IsInvocation()
 	BundledApp_Main(_SharedDir)
@@ -656,12 +664,12 @@ if KbdRegister_IsInvocation()
 KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
-#Include modules/llm/api_common.ahk
-#Include modules/llm/api_token_crypto.ahk
-#Include modules/llm/api_ollama.ahk
-#Include modules/llm/rewrite.ahk
-#Include modules/llm/parser.ahk
-#Include modules/llm/remote_formats.ahk
+#Include ai/engine/api/common.ahk
+#Include ai/engine/api/token_crypto.ahk
+#Include ai/engine/api/ollama.ahk
+#Include ai/engine/prediction/rewrite.ahk
+#Include ai/engine/api/parser.ahk
+#Include ai/engine/api/remote_formats.ahk
 #Include ..\_shared\ai\data\local_server_auth.ahk
 #Include ..\_shared\ai\data\api_url_template.ahk
 #Include ..\_shared\ai\data\model_capabilities.ahk
@@ -670,36 +678,36 @@ KLPF_InitializeCleanup()
 #Include ..\_shared\ai\data\local_server_discovery.ahk
 #Include ..\_shared\ai\data\local_server_ports.ahk
 #Include ..\_shared\ai\data\local_server_menu.ahk
-#Include modules/llm/local_server_models.ahk
-#Include modules/llm/local_server_port_scan.ahk
-#Include modules/llm/local_servers.ahk
-#Include modules/llm/api_remote.ahk
-#Include modules/llm/models.ahk
+#Include ai/engine/local_servers/models.ahk
+#Include ai/engine/local_servers/port_scan.ahk
+#Include ai/engine/local_servers/local_servers.ahk
+#Include ai/engine/api/remote.ahk
+#Include ai/engine/settings/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
 ; prediction_engine.ahk and menu_llm.ahk initialise their state maps.
 LLM_Defaults_Load()
 BootProfile_Stamp("LLM defaults loaded")
 #Include _generated/llm_profiles_data.ahk
-#Include modules/llm/profiles.ahk
-#Include modules/llm/option_validation.ahk
-#Include modules/llm/prompt_action.ahk
-#Include modules/llm/tone.ahk
-#Include modules/llm/tone_action.ahk
-#Include modules/llm/vision.ahk
-#Include modules/llm/vision_action.ahk
-#Include modules/llm/translate.ahk
-#Include modules/llm/translate_action.ahk
-#Include modules/llm/agent.ahk
-#Include modules/llm/agent_connectors.ahk
-#Include modules/llm/agent_action.ahk
-#Include modules/llm/prediction_engine.ahk
-#Include modules/keymap/llm_bridge.ahk
-#Include modules/llm/ollama_webview.ahk
-#Include modules/llm/ollama_install_files_port.ahk
-#Include modules/llm/ollama_deps_checker.ahk
+#Include ai/engine/settings/profiles.ahk
+#Include ai/engine/api/option_validation.ahk
+#Include ai/engine/prediction/prompt_action.ahk
+#Include ai/engine/prediction/tone.ahk
+#Include ai/engine/prediction/tone_action.ahk
+#Include ai/engine/prediction/vision.ahk
+#Include ai/engine/prediction/vision_action.ahk
+#Include ai/engine/prediction/translate.ahk
+#Include ai/engine/prediction/translate_action.ahk
+#Include ai/engine/agent/agent.ahk
+#Include ai/engine/agent/connectors.ahk
+#Include ai/engine/agent/action.ahk
+#Include ai/engine/prediction/engine.ahk
+#Include ai/engine/bridge.ahk
+#Include ai/engine/ollama/webview.ahk
+#Include ai/engine/ollama/install_files_port.ahk
+#Include ai/engine/ollama/deps_checker.ahk
 #Include core/ui/ui/tooltip/tooltip_llm.ahk
-#Include ui/menu/menu_llm/_index.ahk
-#Include ui/model_browser/init.ahk
+#Include ai/ui/menu/_index.ahk
+#Include ai/ui/model_browser/init.ahk
 ; Closes the include graph: every module's top-level initialiser has now run.
 BootProfile_Stamp("Module includes initialised")
 
@@ -721,10 +729,10 @@ BootProfile_Stamp("Module includes initialised")
 #Include core/lifecycle/engine/reload/suspend_handoff.ahk
 ; Before boot.ahk: a developer run reads the installed build's paths.toml.
 #Include core/lifecycle/engine/dev_source.ahk
-#Include infra/field_run.ahk
+#Include diagnostics/engine/field_run/field_run.ahk
 #Include core/lifecycle/engine/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
-#Include infra/feature_state.ahk
+#Include settings/engine/preferences/feature_state.ahk
 ; Settle parse-time personal includes before any process reveals the tray icon.
 try {
 		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
@@ -737,9 +745,9 @@ try {
 		ExitApp(1)
 }
 BootProfile_Stamp("Personal shortcuts file ensured")
-#Include infra/tray_bootstrap.ahk
-#Include adapters/tray_startup_click.ahk
-#Include adapters/tray_startup_commands.ahk
+#Include tray/bootstrap.ahk
+#Include tray/adapters/startup_click.ahk
+#Include tray/adapters/startup_commands.ahk
 
 ; AHK-21: atomically replace the stock AHK tray items
 ; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so
@@ -750,8 +758,6 @@ BootProfile_Stamp("Personal shortcuts file ensured")
 _InstallSafeBootstrapTray()
 global _TrayStartupCommands := TrayStartupCommands(
 	() => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand)
-if FileExist(ConfigurationFile)
-	_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 global _TrayStartupClick := TrayStartupClick(
 	TrayStartupClickReadyNow,
 	_DriverStartupSmokeDir != "" ? (*) => 0 : 0, 0, 0, 0, 0,
@@ -760,10 +766,22 @@ global _TrayStartupClick := TrayStartupClick(
 ; Entering a native menu blocks auto-execute for the user's navigation interval.
 if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
-; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
-; the safe menu, never with AutoHotkey's default icon and stock items.
+; #NoTrayIcon keeps the icon hidden until the driver reveals it here: with the
+; custom icon, the safe menu and its name, never with AutoHotkey's default icon,
+; its stock items or the script's file name.
+_DriverRevealTrayIcon() {
+		A_IconHidden := false
+}
 BootProfile_Stamp("Safe tray and startup commands installed")
-A_IconHidden := false
+; Before I18nInit the active locale is the module default, French, so a normal
+; boot shows its icon only once the configured locale is read (below). A first
+; run never reaches I18nInit: its wizard reloads the driver. Its icon brings the
+; wizard forward, so it appears now, in the language the wizard opens in.
+if !FileExist(ConfigurationFile) {
+		_InstallSafeBootstrapTray(TrayBootstrapInertLabel(ONBOARDING_FIRST_RUN_LOCALE))
+		TrayRevealNamed(_Onboarding_Translate(ONBOARDING_FIRST_RUN_LOCALE, "accessibility.tray_tip"),
+				_DriverRevealTrayIcon)
+}
 ; Read-only construction precedes the wizard; the genuine migration stays below it.
 ConfigSchemaPrepareSource(ConfigurationFile)
 BootProfile_Stamp("Configuration schema source prepared")
@@ -787,7 +805,7 @@ BootProfile_Stamp("Tray reset + onboarding")
 ; ApplyBootConfigToml and the boot full save all see the migrated file. A file
 ; this build cannot version (a newer schema, a failed migration) stays
 ; untouched and every write to it is refused for the session
-; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
+; (settings/engine/migration/migrate.ahk, docs/adr/009-config-versioning.md).
 ConfigMigrateBoot(ConfigurationFile)
 ; From here to readiness the boot only reads config.toml: one registry comparison
 ; serves those reads, and the close below compares again.
@@ -815,6 +833,11 @@ BootProfile_Stamp("Script preferences applied")
 HotstringsSeedLanguageCategoryGates(CategoryEnabled)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
+; The native startup commands and the icon's name in the configured locale,
+; then the icon: never French rows or the file name for a user of another
+; language (the Linux daemon had the same order bug, test_i18n_is_ready_before_the_tray).
+_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
+TrayRevealNamed(TrayStateTipText(A_IsSuspended), _DriverRevealTrayIcon)
 BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
@@ -837,10 +860,16 @@ LoggerInit()
 ; Right after the logger: every later ERROR of the boot can open the error
 ; window, which waits for the driver to be ready before it shows
 ErrorDialog_Init(_IniCache)
+; The windows' font and spacing, read before any window can open
+ReadingPrefs_Init(_IniCache)
+; The tray menu draws in that font too, before the tray is first shown
+TrayMenuFont_Init()
 ManagedNetworkFailureWindows_Init()
 ProxyOverride_Init(_IniCache)
 Updater_ConfigureManagedFailurePresenter(ManagedNetworkFailureWindows_Contract(),
 	_Updater_ShowManagedDownloadFailure, _Updater_RetireManagedDownloadFailure)
+; An update download's progress and Cancel, in the shared download window
+Updater_ConfigureDownloadProgressPresenter(UpdateDownloadProgressWindow)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
 		bootScriptName := A_ScriptFullPath
@@ -869,9 +898,8 @@ catch as _EnvErr
 ; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
 ; call, which lands mid-config and buries its JSON parse inside a later, unrelated
 ; mark. The tray menu needs it within milliseconds anyway. Only the active locale
-; is parsed here; the EN/FR fallbacks (consulted solely on a missing key) are
-; warmed off the critical path by I18nWarmFallbacks() armed after "ready" — which
-; halves the boot i18n cost on a complete locale (one parse instead of two).
+; is parsed here; the EN/FR fallbacks are consulted solely on a missing key,
+; which a complete catalogue never has, so they load only on such a miss.
 BootProfile_StageBegin("i18n")
 I18nPreload()
 BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
@@ -882,6 +910,9 @@ ConfigNotifyOlderSchemaAtBoot()
 ; runtime values stay in sync with the TOML single source of truth.
 ; Must run after _SharedDir is set (line ~51) and ParseTomlFile is available.
 UiStyle_LoadSharedConst()
+; A contrast theme or a text size chosen while the driver runs restyles the
+; next tooltip without a restart.
+UiStyle_WatchSystemAccessibility()
 ; Now that UI_AI_LOADING_HEX is loaded, source the llm_prediction hotstring tint
 ; from it (single canonical AI loading colour) — must run after the line above
 ; and before the tray menu build / any HotstringsResolve.
@@ -1028,7 +1059,7 @@ _SpaceAroundSymbolsNode := (Features.Has("hotstrings")
 	: Map()
 global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
-#Include ui/tray_menu.ahk
+#Include menu/ui/tray_menu.ahk
 
 
 
@@ -1240,22 +1271,22 @@ BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled
 ; The touchpad registry table and its one owner (backup, write, restore).
 ; Functions only: the first-run wizard above already calls them.
 #Include _generated/touchpad_registry.ahk
-#Include modules/gestures/touchpad_registry.ahk
-#Include modules/gestures/init.ahk
-#Include modules/gestures/click.ahk
-#Include modules/gestures/screenshots.ahk
-#Include modules/gestures/window_cycle.ahk
-#Include modules/gestures/virtual_desktops.ahk
-#Include modules/gestures/config.ahk
+#Include gestures/adapters/touchpad_registry.ahk
+#Include gestures/engine/init.ahk
+#Include gestures/engine/click.ahk
+#Include gestures/adapters/screenshots.ahk
+#Include gestures/adapters/window_cycle.ahk
+#Include gestures/adapters/virtual_desktops.ahk
+#Include gestures/engine/config.ahk
 BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
-#Include infra/config_io.ahk
-#Include infra/config_scope.ahk
+#Include settings/engine/io.ahk
+#Include settings/engine/scope/scope.ahk
 #Include ../_shared/hotstrings/data/catalogue/scope_overrides.ahk
-#Include infra/hotstrings/hotstrings_scope.ahk
-#Include infra/config_global_scope.ahk
+#Include hotstrings/engine/catalogue/scope.ahk
+#Include settings/engine/scope/global_scope.ahk
 _BootMetricsCache := CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
@@ -1272,14 +1303,13 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; runtime owners genuinely exist.
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
-; Keep the real native commands throughout boot and refresh their locale before
-; feature initialization. No temporary loading surface replaces the tray root.
+; The real native commands, published in the configured locale right after
+; I18nInit, stay until then. No temporary loading surface replaces the tray root.
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; offer optional configuration maintenance after ready
-_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))
 #Include infra/tap_keys.ahk
 TapKeysReadConfig(_IniCache)
 #Include infra/key_combinations.ahk
@@ -1300,43 +1330,9 @@ global _DriverInputInitPending := true
 global _DriverBootTailPending := true
 global _DriverMenuReady := false
 ; Commands clicked while the previous instance's reload was pending are replayed
-; first, once input is ready (infra/menu_reload_replay.ahk).
+; first, once input is ready (menu/engine/reload_replay.ahk).
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
-BootProfile_StageBegin("magic key source")
-; The physical key typing the magic key (LayoutRegistry_MagicKeySource): the
-; key the user chose in [hotstrings] magic_key_source always wins; then the key
-; the active layout's extension declares — the emulated registry layout, or the
-; built-in Ergopti emulation; then, with no layout emulated, the key that types
-; MagicKeySourceChar ("j" by default) on the user's own OS layout — on bépo not
-; the SC02E Ergopti/QWERTY position; then the key the shipped Ergopti layout
-; declares. A layout is emulated only while the base layer is on
-; (_KLE_BaseCriterion): a layout left selected in the manager with the base
-; layer off types nothing, so the OS layout is still probed.
-;
-; The OS layout probed is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read
-; (through the KS_ResolveKeyboardLayout cascade: foreground, then the AHK
-; thread, then the system default), so the scan and the AltGr family describe
-; one layout and the layout poll, seeded with the same HKL, reloads when the
-; user switched — only when the key follows the OS layout at all.
-_MagicKeySource := LayoutRegistry_MagicKeySource(Map(
-	"chosen", ScriptInformation["MagicKeySourceChosen"],
-	"configured", ScriptInformation["MagicKeySource"],
-	"declared", LayoutRegistry_DeclaredMagicKey(
-		LayoutRegistry_ActiveLayoutExtension(KeylayoutEmulation_SelectedId(),
-			Features["layout"][ConfigLeaf.ERGOPTI_BASE], ERGOPTI_LAYOUT_ID,
-			() => LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))),
-		_HotstringExtensionPacks, LayoutRegistry_BundledDir()),
-	"emulated", Features["layout"][ConfigLeaf.ERGOPTI_BASE],
-	"keycodes", LayoutRegistry_Keycodes(),
-	"detect", LayoutRegistry_DetectMagicKeyScan.Bind(_LAYOUT_REMAP_HKL, ScriptInformation["MagicKeySourceChar"]),
-	"shipped", LayoutRegistry_ShippedMagicKey))
-ScriptInformation["MagicKeySourceScan"] := _MagicKeySource["scan"]
-ScriptInformation["MagicKeySourceFollowsOsLayout"] := _MagicKeySource["follows_os_layout"]
-ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overrides_emulation"]
-LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
-
-BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
 ; This canonicalizer is optional once a terminal transition owns the old boot.
 ; Recheck after refusal because schema admission and queue setup can yield.
 if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
@@ -1418,16 +1414,16 @@ BootProfile_Mark("Metrics/keystats started")
 
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
-#Include ui/paths_editor/init.ahk
+#Include settings/ui/paths_editor/init.ahk
 #Include ui/layout_manager/init.ahk
 #Include ui/layout_manager/editor_window.ahk
 #Include ui/layout_manager/composer.ahk
 #Include ui/layout_manager/composer_check.ahk
 #Include ui/layout_manager/source_store.ahk
-#Include ui/field_check/network_check.ahk
+#Include diagnostics/ui/field_check/network_check.ahk
+#Include diagnostics/ui/field_check/field_report.ahk
 #Include core/network/proxy_override.ahk
-#Include ui/personal_info_editor/init.ahk
-#Include ui/layer_editor/init.ahk
+#Include hotstrings/ui/personal_info_editor/init.ahk
 #Include ui/physical_shortcuts/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
@@ -1438,6 +1434,9 @@ _RegisterScriptAltGrHotkeys()
 ; Update the original static slots in place: creating runtime variants would
 ; move the direct digits behind the static typing tap-hold roll variants.
 DigitRow_RegisterBindings()
+; The release of every key the emulation holds (« Touches de jeu »), before any
+; other release hotkey of those keys: each held down gets its up.
+GameKeys_RegisterReleases()
 ; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
@@ -1463,7 +1462,7 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
 ; After the layout: a slot's letter is the key that types it under the emulation,
-; which RemappedList only knows from here. Before MagicEditorStart: a Win slot on
+; which RemappedList only knows from here. Before StarSlotStart: a Win slot on
 ; a remapped key joins the physical broker, which acquires its keys once.
 KeyboardShortcutsBindAll()
 ; [shortcuts.caps_word], read before the first activation arms its listeners.
@@ -1471,8 +1470,8 @@ CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
-#Include modules/hotstrings.ahk
-MagicEditorStart()
+#Include hotstrings/hotstrings.ahk
+StarSlotStart()
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
 ; in-process refactor. A_InputLevel is still 2 from the #InputLevel 2 above.
@@ -1568,10 +1567,10 @@ try {
 	if (DevSource_Root() != "") {
 		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
 			_DriverDir, DevSource_Resolution()["origin"])
-		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
-		; The collector's field run (infra/field_run.ahk) is optional too: the
+		DevSourceWatcher_Start(_DriverDir, DevSource_GitDir(DevSource_Root()), ReloadPreservingSuspend)
+		; The collector's field run (diagnostics/engine/field_run/field_run.ahk) is optional too: the
 		; driver keeps running without it.
-		try FieldRun_Start(DevSource_Root())
+		try FieldRun_Start(DevSource_Root(), () => ReloadPreservingSuspend())
 		catch as _FieldRunErr
 			LoggerError("FieldRun", "The developer field run could not start: {1}.", _FieldRunErr.Message)
 	}
@@ -1600,9 +1599,20 @@ _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+; The process CPU beside the wall total, the line macOS writes, so the field log
+; analyser reads boot.cpu on every driver (boot profiler parity BPF-05).
+_BootCpuMs := BootClockCpuMs()
+if (_BootCpuMs >= 0)
+	LoggerEvidence("BootProfile", "Boot CPU: {1} ms of process CPU over {2} ms of boot.", Round(_BootCpuMs), _BootTotalMs)
+else
+	LoggerWarn("BootProfile", "Boot CPU unreadable: GetProcessTimes refused, so the boot's process CPU is not measured.")
 try PerfBudget_Report("BootProfile", "boot", _BootTotalMs, TimingsGet("budgets", "boot_total_ms"))
 catch as _BootBudgetErr
 	LoggerError("BootProfile", "The boot could not be judged against its budget: {1}.", _BootBudgetErr.Message)
+; The reload this boot follows, from its launch in the previous instance.
+try ReloadTimingComplete(_ReloadInheritedLaunchTick)
+catch as _ReloadTimingErr
+	LoggerError("Lifecycle", "The reload could not be judged against its budget: {1}.", _ReloadTimingErr.Message)
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())
@@ -1669,8 +1679,6 @@ if (_DriverStartupSmokeDir != "") {
 						. " append_repairs=" . _StartupSmokeLoggerRefusal["append_repairs"]
 						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
 						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
-						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
-						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"]
 						. " last_append_failure=" . _StartupSmokeLoggerRefusal["last_append_failure"] . "`n",
 						"*", "UTF-8-RAW")
 				throw Error("The startup smoke could not make its diagnostic logs durable.")
@@ -1732,10 +1740,6 @@ if _LangMenuBuildPending
 ; request only after the initial root publishes, so the LLM timer cannot
 ; invalidate the boot generation and force a duplicate full submenu scan. The
 ; enabled path is still owned by asynchronous dependency readiness.
-; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
-; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
-; before this fires triggers a one-time lazy load inside t().
-SetTimer(I18nWarmFallbacks, -I18N_FALLBACK_WARM_DELAY_MS)
 ; Hotstrings and their preview index were completed before ready above. Do not arm a
 ; duplicate post-ready registration timer: even a no-op timer can contend with the
 ; first keystroke and must not define feature availability.

@@ -6,7 +6,7 @@
 --- Decides, for the macOS and Linux drivers, whether a logged ERROR opens the
 --- error window (_shared/ui/error_dialog/), joins the one already open, or is
 --- only logged. The thresholds are data: _shared/diagnostics/data/
---- error_policy.json. The AHK port (windows/infra/error_policy.ahk) replays the
+--- error_policy.json. The AHK port (windows/diagnostics/engine/reports/error_policy.ahk) replays the
 --- same vectors (_shared/tests/corpus/diagnostics/error_policy_vectors.json).
 ---
 --- FEATURES & RATIONALE:

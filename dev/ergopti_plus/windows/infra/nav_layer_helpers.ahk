@@ -79,6 +79,12 @@ DisableLayer(Owner := 0) {
 	return true
 }
 
+; The tray text the active layer replaced, held until the layer restores it
+; (Owner is 0 while no layer shows its name).
+class _NavLayerIndicator {
+	static Owner := 0
+}
+
 ; Publishes the layer's translated status through the tray presentation owner.
 ; Capture before the first publication and retain that exact text until its
 ; restoration is acknowledged. A refused write may already have taken effect,
@@ -87,7 +93,7 @@ DisableLayer(Owner := 0) {
 ; @param IsActive {Boolean} Whether the navigation layer is visibly active.
 ; @returns {Boolean} Whether the requested tray state was acknowledged.
 NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0) {
-	static Owner := 0
+	Owner := _NavLayerIndicator.Owner
 	if !IsObject(ReadFn)
 		ReadFn := TrayMenuGetTooltip
 	if !IsObject(WriteFn)
@@ -97,19 +103,30 @@ NavigationLayerUpdateIndicator(IsActive, ReadFn := 0, WriteFn := 0, LabelFn := 0
 	try {
 		if IsActive {
 			if !IsObject(Owner)
-				Owner := {PreviousText: ReadFn.Call()}
+				Owner := _NavLayerIndicator.Owner := {PreviousText: ReadFn.Call()}
 			if WriteFn.Call(LabelFn.Call()) != true
 				throw Error("The navigation layer indicator publication was not acknowledged")
 		} else if IsObject(Owner) {
 			if WriteFn.Call(Owner.PreviousText) != true
 				throw Error("The navigation layer indicator restoration was not acknowledged")
-			Owner := 0
+			_NavLayerIndicator.Owner := 0
 		}
 		return true
 	} catch as Err {
 		try LoggerWarn("NavLayer", "Navigation layer indicator failed: {1}.", Err.Message)
 		return false
 	}
+}
+
+; Retargets the text the active layer restores, so a state change while the
+; layer holds the tray (a pause) is not undone when the layer ends.
+; @param Text {String} The tray text to restore.
+; @returns {Boolean} Whether the layer holds the tray (the caller writes nothing).
+NavigationLayerIndicatorRebase(Text) {
+	if !IsObject(_NavLayerIndicator.Owner)
+		return false
+	_NavLayerIndicator.Owner.PreviousText := Text
+	return true
 }
 
 _TapHoldLayerWaitRelease(KeyName, TimeoutSec) {
@@ -135,9 +152,16 @@ _TapHoldLayerIsSuspended() {
 ; (TapHoldPressIsOwned) for the whole gesture, so its auto-repeat is swallowed.
 ; @param KeyId {String} Canonical tap-hold key id of the layer key.
 ; @param KeyName {String} Key name the release wait watches.
+; @param CancelTapFn {Func} When given (a key combination's own layer hold),
+;        takes (KeyId, GuardMs) and returns the reason another key's activity
+;        cancels the tap, "" for none, as TapHoldOwnImmediateModifier asks it:
+;        a layer key struck under the hold makes the press a hold, as the
+;        shared pair policy decides (maintainer decision THD-3 of 2026-11-21).
+;        The keys' own hotkeys leave it out: TapHoldDispatchTap asks the same
+;        tracker before their tap.
 TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0,
-	IsSuspendedFn := 0, Owner := 0) {
+	IsSuspendedFn := 0, Owner := 0, CancelTapFn := 0) {
 	if !IsObject(Owner)
 		Owner := TapHoldNewOwner()
 	if !TapHoldOwnerCurrent(Owner)
@@ -191,10 +215,17 @@ TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 
 		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
 		Suspended := IsSuspendedFn.Call()
+		Tap := Released and ReleaseProved and !Suspended and !A_IsSuspended
+			and TapHoldOwnerCurrent(Owner) and ElapsedMs <= TapThresholdSec * 1000
+		if (Tap && IsObject(CancelTapFn)) {
+			GuardMs := TapThresholdSec * 1100
+			if (GuardMs < 250)
+				GuardMs := 250
+			Tap := CancelTapFn.Call(KeyId, GuardMs) == ""
+		}
 		return Map(
 			"activated", true,
-			"tap", Released and ReleaseProved and !Suspended and !A_IsSuspended
-				and TapHoldOwnerCurrent(Owner) and ElapsedMs <= TapThresholdSec * 1000,
+			"tap", Tap,
 			"elapsed_ms", ElapsedMs)
 	} finally {
 		_TapHoldEndPressClaim(KeyId)

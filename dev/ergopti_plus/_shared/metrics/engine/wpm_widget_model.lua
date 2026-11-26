@@ -66,6 +66,14 @@ local REQUIRED_NAMES = {
 	position = { storage_x = true, storage_y = true, storage_pair = true },
 }
 
+-- Non-empty lists of names: the typing burst rule's KeyboardEvent.code names and
+-- registry groups. hs_level_codes is macOS's own extra list, which
+-- wpm/typing_keys.lua reads as "<field>_level_codes".
+local REQUIRED_LISTS = {
+	typing_burst = { ending_groups = true, modifier_codes = true, neutral_codes = true, level_codes = true,
+		hs_level_codes = true },
+}
+
 --- Checks a decoded canon.
 --- @param canon table|nil
 --- @return table|nil canon, string|nil error
@@ -90,6 +98,20 @@ function M.validate(canon)
 			local value = canon[section][key]
 			if type(value) ~= "string" or value == "" then
 				return nil, string.format("[%s].%s must be a non-empty string", section, key)
+			end
+		end
+	end
+	for section, keys in pairs(REQUIRED_LISTS) do
+		if type(canon[section]) ~= "table" then return nil, "missing [" .. section .. "]" end
+		for key in pairs(keys) do
+			local list = canon[section][key]
+			if type(list) ~= "table" or #list == 0 then
+				return nil, string.format("[%s].%s must be a non-empty list", section, key)
+			end
+			for _, value in ipairs(list) do
+				if type(value) ~= "string" or value == "" then
+					return nil, string.format("[%s].%s holds a value that is not a name", section, key)
+				end
 			end
 		end
 	end
@@ -336,9 +358,12 @@ function M.menubar_visible(stats, source, tooltip_visible)
 	return (tonumber(stats and stats.wpm) or 0) > 0 or tooltip_visible == true or source ~= "none"
 end
 
---- Whether the floating widget shows after real keyboard activity.
---- A preview is the only exception to pointer and keyboard-idle hiding.
---- @param ctx table { tooltip_visible, now_s, last_input_s, last_mouse_s, idle_hide_s }
+--- Whether the floating widget shows: only during a typing burst (TWD-2,
+--- decided by the maintainer on 2026-11-16). The last text key must be newer than
+--- the last burst end (shortcut, ending key, modifier tapped alone, focus change)
+--- and the last pointer use, and within the idle delay. A preview is the only
+--- exception.
+--- @param ctx table { tooltip_visible, now_s, last_input_s, last_break_s, last_mouse_s, idle_hide_s }
 --- @return boolean
 function M.widget_visible(ctx)
 	if ctx.tooltip_visible == true then return true end
@@ -346,6 +371,7 @@ function M.widget_visible(ctx)
 	if type(input) ~= "number" or input > ctx.now_s then return false end
 	return (ctx.now_s - input) < ctx.idle_hide_s
 		and (ctx.last_mouse_s == nil or ctx.last_mouse_s <= input)
+		and (ctx.last_break_s == nil or ctx.last_break_s < input)
 end
 
 --- The pill's default top-left corner: the screen's bottom-right, inset.

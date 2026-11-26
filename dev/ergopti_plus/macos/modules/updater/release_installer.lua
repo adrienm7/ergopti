@@ -39,6 +39,7 @@ local JsonCodec   = require("core.fs.adapters.json_codec")
 local ShellRunner = require("core.process.adapters.shell_runner")
 local Archives    = require("updater.engine.release_assets")
 local ProxyPolicy = require("core.network.engine.proxy_policy_core")
+local WorkerProtocol = require("core.network.engine.managed_http_protocol")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
@@ -66,14 +67,18 @@ M._getenv = os.getenv
 -- ================================
 -- ================================
 
--- Exit codes of the staging script: 10 is the download, 20 and up a check.
+-- Exit codes of the staging script: 10 is the download, 20 and up a check,
+-- 27 the code signature of the new app (codesign --verify, UPD-10).
 M.EXIT_DOWNLOAD = 10
 M.EXIT_VERIFY_FIRST = 20
+M.EXIT_SIGNATURE = 27
 
 --- The native extraction owner, captured once through the source-layout resolver.
 local stage_path = Paths.shared("../macos/adapters/release_stage.sh")
 M.STAGE_SCRIPT = type(stage_path) == "string" and FileSystem.read(stage_path) or nil
 assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native release staging script is unavailable")
+assert(M.STAGE_SCRIPT:find("codesign %-%-verify[^\n]*|| exit " .. M.EXIT_SIGNATURE .. "\n"),
+	"The native release staging script names no code-signature exit")
 
 --- Replaces the installed app once the launcher has quit, then keeps it only
 --- once its boot reports ready (the Windows swap's boot-ready and probation):
@@ -303,9 +308,33 @@ assert(M.SWAP_READY_TICKS, "The release swap script names no boot-ready wait")
 M.BOOT_READY_CAPABILITY = M.SWAP_SCRIPT:match('%[ ! %-f "%$app(/Contents/Resources/[^"]+)" %]')
 assert(M.BOOT_READY_CAPABILITY, "The release swap script names no boot-ready capability")
 
---- Downloads and verifies one release into a fresh staging folder.
+-- The curl exit codes whose stage is proven (proxy name resolution, peer
+-- certificate), as the Linux curl receipts read them.
+local CURL_STAGES = { [5] = "proxy_resolve", [60] = "tls" }
+
+--- The failure receipt of the staging script's output: the closed fact it
+--- printed, or an empty receipt (an unknown cause) when it printed none.
+--- @param stdout string|nil The script's standard output.
+--- @return table receipt Fields of _shared/core/network/data/managed_network.json.
+function M.failure_receipt(stdout)
+	local fact = type(stdout) == "string" and stdout:match("^FAILED ([%w_:]+)\n$") or nil
+	-- « FAILED native:<reason> » carries a ManagedBootstrapDownload reason; the
+	-- worker protocol owns what each one proves, and an unnamed one proves nothing
+	local reason = fact and fact:match("^native:([%w_]+)$")
+	if reason then return WorkerProtocol.failure_receipt(reason) end
+	local exit_code = fact and tonumber(fact:match("^curl:(%d+)$"))
+	if exit_code then
+		local stage = CURL_STAGES[exit_code]
+		return { backend = "curl", stage = stage or "connect", failure_provenance = stage and "verified" or "unknown",
+			curl_exit = exit_code, tls_verification = "enforced" }
+	end
+	return {}
+end
+
+--- Downloads and verifies one release into a fresh staging folder; the
+--- staging script removes that folder on any failure.
 --- @param asset table M.find_asset() result.
---- @param done function fn(staged_app|nil, stage "download"|"verify", detail).
+--- @param done function fn(staged_app|nil, stage "download"|"verify"|"signature", detail, failure_receipt|nil).
 --- @return boolean dispatched
 function M.stage(asset, done)
 	local app = M.app_bundle()
@@ -369,10 +398,13 @@ function M.stage(asset, done)
 			return
 		end
 		local code = tonumber(exit_code)
-		local stage = (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
+		local stage = code == M.EXIT_SIGNATURE and "signature"
+			or (code == 0 or (code and code >= M.EXIT_VERIFY_FIRST)) and "verify" or "download"
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
-		Logger.error(LOG, "Release %s refused at the %s; stage path: %s (%s).", asset.tag, stage, stage_dir, detail)
-		done(nil, stage, detail)
+		Logger.error(LOG, "Release %s refused at the %s; its stage %s is removed (%s).", asset.tag, stage, stage_dir, detail)
+		-- The failure's own receipt names its cause (proxy, offline, certificate)
+		-- in the Versions window, never an empty one (UPD-11)
+		done(nil, stage, detail, stage == "download" and M.failure_receipt(stdout) or nil)
 	end, nil, environment)
 	return type(handle) == "table" and handle.start() == true
 end

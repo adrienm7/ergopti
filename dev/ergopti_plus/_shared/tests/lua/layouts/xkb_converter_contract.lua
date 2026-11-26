@@ -58,13 +58,18 @@ function M.register(helpers, paths)
 			end
 		end)
 
+		-- The JIS Yen and Ro keys (93, 94) and the keypad comma (95) are the
+		-- table's extra_keys and place (Yen is probed), so the unplaced keys are
+		-- Eisu and Kana (102, 104), which it has no XKB key for. The keypad key
+		-- (82) is XKB's own, and a control output (96) types nothing.
 		helpers.it("reports the keys the keycode table cannot place, keypad and controls aside", function()
 			local vector = assert(Json.decode(read_all(paths.vectors))).vectors[1]
-			local extra = '<key code="93" output="&#x00A5;"/><key code="94" action="a"/>'
-				.. '<key code="82" output="0"/><key code="95" output="&#x0001;"/>'
+			local extra = '<key code="102" output="&#x00A5;"/><key code="104" action="a"/>'
+				.. '<key code="82" output="0"/><key code="96" output="&#x0001;"/>'
+				.. '<key code="93" output="&#x00A5;"/>'
 			local text = vector.keylayout:gsub('(<keyMap index="0">)', function(open) return open .. extra end, 1)
 			local result = assert(Converter.convert(assert(Keylayout.parse(text)), options_of(vector)))
-			helpers.assert_eq(table.concat(result.unplaced, ","), "93,94")
+			helpers.assert_eq(table.concat(result.unplaced, ","), "102,104")
 		end)
 
 		helpers.it("refuses a layout id the XKB section cannot carry", function()

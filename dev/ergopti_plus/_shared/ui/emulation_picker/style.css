@@ -1,0 +1,104 @@
+/* _shared/ui/emulation_picker/style.css */
+
+/* The HTML loads the error window palette before these layout overrides, as
+   the configuration clean-up window does: both are small lists over one
+   decision, and should read as the same application. */
+
+:root {
+	color-scheme: light dark;
+}
+
+html,
+body {
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+body {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+}
+header {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	gap: 6px;
+	padding: 18px 18px 0;
+}
+h1 {
+	color: var(--text);
+	font-size: 17px;
+	margin: 0 0 6px;
+}
+label {
+	color: var(--muted);
+	font-weight: 600;
+}
+#search {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text);
+	font: inherit;
+	padding: 8px 10px;
+}
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	padding: 12px 18px 0;
+}
+#choices {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	flex: 1;
+	list-style: none;
+	margin: 0;
+	min-height: 0;
+	overflow: auto;
+	padding: 0;
+	scrollbar-gutter: stable;
+}
+#choices li {
+	align-items: center;
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	/* 44 px: a row is a target of its own (WCAG 2.5.5). */
+	min-height: 44px;
+	padding: 8px 12px;
+}
+#choices:focus-visible li.active {
+	outline: 2px solid var(--text);
+	outline-offset: -4px;
+}
+#choices li:last-child {
+	border-bottom: 0;
+}
+#choices li.active {
+	background: var(--accent);
+	color: var(--accent-text);
+}
+.name {
+	overflow-wrap: anywhere;
+}
+.current {
+	flex: none;
+	font-size: 12px;
+	font-style: italic;
+}
+#status {
+	color: var(--muted);
+	margin: 8px 0 0;
+	min-height: 1.2em;
+}
+.buttons button {
+	min-height: 44px;
+	min-width: 44px;
+}

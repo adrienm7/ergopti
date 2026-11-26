@@ -54,4 +54,24 @@ helpers.describe("Tooltip: shared-style wiring", function()
 			"shared file must keep per-driver border alphas distinct")
 		helpers.assert_eq(Config.colors.border.alpha, shared.colors.border_alpha_hs)
 	end)
+
+	-- TWD-1, decided by the maintainer on 2026-11-16: a preview with no delay hid
+	-- only at the next key on macOS; it now hides after the shared safety lifetime,
+	-- as on Windows and Linux (twd1-zero-delay-safety).
+	helpers.it("(twd1-zero-delay-safety) a duration of 0 takes the shared [timing].safety_timeout_sec", function()
+		local saved = Config.settings.timeout_sec
+		local ok, err = pcall(function()
+			helpers.assert_true(type(shared.timing.safety_timeout_sec) == "number"
+				and shared.timing.safety_timeout_sec > 0, "the shared safety lifetime is declared")
+			Config.set_timeout(0)
+			helpers.assert_eq(Config.settings.timeout_sec, shared.timing.safety_timeout_sec)
+			helpers.assert_eq(Config.timing.safety_timeout_sec, shared.timing.safety_timeout_sec)
+			Config.set_timeout(2)
+			helpers.assert_eq(Config.settings.timeout_sec,
+				math.max(shared.timing.timeout_floor_sec, 2 - shared.timing.timeout_decrement_sec),
+				"a real delay keeps the shared decrement")
+		end)
+		Config.settings.timeout_sec = saved
+		if not ok then error(err, 0) end
+	end)
 end)

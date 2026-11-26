@@ -1198,8 +1198,8 @@ SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0, Strict := 
 		; quotes are PowerShell literals inside one native argv element.
 		Command := "& {" . Script . "} '" . StrReplace(PacRun.Capture["TmpFile"], "'", "''") . "'"
 		Args := Strict
-			? ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-				"-File", _VendorDir . "\ergopti_system_proxy_worker.ps1", "-InputPath", PacRun.Capture["TmpFile"]]
+			? ShellRunner_WinPsArgv(["-NoLogo", "-NoProfile", "-NonInteractive"],
+				"-File", _VendorDir . "\ergopti_system_proxy_worker.ps1", "-InputPath", PacRun.Capture["TmpFile"])
 			: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Command]
 		PacRun.Handle := IsObject(SpawnFn)
 			? SpawnFn.Call(Exe, Args, OnDone)

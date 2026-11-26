@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "core.fs.adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+local MODULES = { "core.fs.adapters.file_system", "ai.engine.api.network_env", "ai.engine.api.opaque_network_admission",
 	"platform.remap.network_download" }
 
 --- Loads the route over the real shared files.
@@ -59,7 +59,7 @@ helpers.describe("remap download network route (net-001-remap-route)", function(
 
 	helpers.it("names a refused route by its shared class and leaves curl's own failures alone", function()
 		with_route(function(Route)
-			local Admission = require("modules.llm.opaque_network_admission")
+			local Admission = require("ai.engine.api.opaque_network_admission")
 			local named = Route.describe_failure(Admission.refusal_exit_code, Admission.refusal_prefix .. "verified:unavailable\n")
 			helpers.assert_true(type(named) == "string" and named:find("proxy route could not be resolved", 1, true) ~= nil,
 				tostring(named))
@@ -68,7 +68,7 @@ helpers.describe("remap download network route (net-001-remap-route)", function(
 	end)
 
 	helpers.it("wires the artifact fetch and the VirtualHIDDevice update to the route", function()
-		local source = assert(helpers.read_module_source("adapters.runtime_owner_ports"))
+		local source = assert(helpers.read_module_source("diagnostics.adapters.runtime_owner_ports"))
 		for _, tag in ipairs({ "REMAP-RUNTIME", "VIRTUAL-HID" }) do
 			helpers.assert_contains(source, 'require("platform.remap.network_download").command("' .. tag .. '", curl_args)',
 				"the production port runs the " .. tag .. " download behind the network route")

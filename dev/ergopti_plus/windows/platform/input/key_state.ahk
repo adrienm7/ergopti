@@ -100,18 +100,54 @@ _KS_NativeKeyPress(KeyName) {
 	}
 }
 
+; Why the press ledger's native owner could not start, "" while it runs or was
+; never refused. The keyboard core's tray status row reads it
+; (_MI_StageKeyboardCoreStatus): a log warning alone left a degraded keyboard
+; invisible. KeyboardArbiterEnsureForLedger is its only writer.
+; @param Detail {String} Optional: the new failure, "" when the owner runs.
+; @return {String}
+KS_LedgerFailure(Detail := unset) {
+	static Failure := ""
+	if IsSet(Detail) {
+		if !(Detail is String)
+			throw TypeError("The press ledger failure must be a string.")
+		Failure := Detail
+	}
+	return Failure
+}
+
 ; Starts the owner of the press ledger, whatever the AI's state. A hook that cannot
-; install is no broken keyboard: first keys fall back to the catalogue order.
+; install is no broken keyboard: first keys fall back to the catalogue order, and
+; the tray shows the problem until a later start succeeds. A pause or a start
+; already in progress is no failure. The boot starts it before the configured
+; tray root is built, and a resume before the root is rebuilt for the pause
+; state, so the row follows without a rebuild of its own.
 ; @param StartFn {Func} Test seam, LLM_NavEventOwner_EnsureStarted by default.
+; @param FailureFn {Func} Test seam, LLM_NavEventOwner_LastStartFailure by default.
 ; @return {Boolean} Whether the owner runs.
-KeyboardArbiterEnsureForLedger(StartFn := 0) {
+KeyboardArbiterEnsureForLedger(StartFn := 0, FailureFn := 0) {
 	Started := false
+	Failure := ""
 	try Started := HasMethod(StartFn, "Call") ? StartFn.Call() : LLM_NavEventOwner_EnsureStarted()
-	catch as Err
+	catch as Err {
+		Failure := Err.Message
 		LoggerError("KeyboardArbiter", "stage=ledger_start outcome=raised detail={1}.", Err.Message)
-	if !Started
-		LoggerWarn("KeyboardArbiter", "stage=ledger_start outcome=not_started: first keys follow the catalogue order.")
-	return Started ? true : false
+	}
+	if Started {
+		if KS_LedgerFailure() != "" {
+			KS_LedgerFailure("")
+			LoggerSuccess("KeyboardArbiter", "stage=ledger_start outcome=recovered: the keyboard core problem leaves the tray.")
+		}
+		return true
+	}
+	LoggerWarn("KeyboardArbiter", "stage=ledger_start outcome=not_started: first keys follow the catalogue order.")
+	if Failure == ""
+		Failure := HasMethod(FailureFn, "Call") ? FailureFn.Call() : LLM_NavEventOwner_LastStartFailure()
+	if (Failure is String) && Failure != "" {
+		KS_LedgerFailure(Failure)
+		LoggerWarn("KeyboardArbiter", "[diagnosis] code=keyboard_core_degraded detail={1}: the tray shows the problem.", Failure)
+	}
+	return false
 }
 
 ; Returns 1 when the key is held for the user: physically down for AutoHotkey,
@@ -557,6 +593,15 @@ KS_ScanScancodeForChar(Hkl, TargetChar) {
 		try LoggerError("KeyState", "KS_ScanScancodeForChar failed: {1}.", e.Message)
 	}
 	return Map("scan", foundScan, "vk", foundVK)
+}
+
+; Returns VkKeyScanExW's answer for one character in Hkl: the virtual key in the
+; low byte, the shift state (1 Shift, 2 Ctrl, 4 Alt) in the high byte.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @param Char {String} One character of the Basic Multilingual Plane.
+; @return {Integer} The keystroke, or -1 when the layout has no key for it.
+KS_KeyScanForChar(Hkl, Char) {
+	return DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
 }
 
 ; Returns the scancode of the key that types Char with no Shift, Ctrl or Alt in

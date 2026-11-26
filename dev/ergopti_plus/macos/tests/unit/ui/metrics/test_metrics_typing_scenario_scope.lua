@@ -51,7 +51,8 @@ local function collect_scenarios()
 	end)
 end
 
--- Independent enrollment oracle: original families retain their 99 scenarios.
+-- Independent enrollment oracle: original families retain their 100 scenarios,
+-- the refused Studio saved-read retirement of the cache reset included.
 -- These eight additional native JSON regressions must join the same full scope.
 local SCALAR_SCENARIOS = {
 	"(hs-scalar-json-metrics) native table-only encoder accepts request 1",
@@ -68,14 +69,14 @@ helpers.describe("typing scenario lifetime (typing-scenario-scope)", function()
 	for _, failure in ipairs({ false, true }) do
 		helpers.it("restores every actual scenario after " .. (failure and "assertion failure" or "success"), function()
 			local scenarios = collect_scenarios()
-			helpers.assert_eq(#scenarios, 107, "all complete scenario families must be replayed")
+			helpers.assert_eq(#scenarios, 108, "all complete scenario families must be replayed")
 			local original_count, scalar_names = 0, {}
 			for _, scenario in ipairs(scenarios) do
 				if scenario.name:find("(hs-scalar-json-metrics)", 1, true) then
 					scalar_names[#scalar_names + 1] = scenario.name
 				else original_count = original_count + 1 end
 			end
-			helpers.assert_eq(original_count, 99, "all original scenario families must remain enrolled")
+			helpers.assert_eq(original_count, 100, "all original scenario families must remain enrolled")
 			helpers.assert_eq(scalar_names, SCALAR_SCENARIOS, "all eight native JSON cases must remain enrolled")
 			for _, scenario in ipairs(scenarios) do
 				local before, native, original_open = {}, _G.hs, io.open

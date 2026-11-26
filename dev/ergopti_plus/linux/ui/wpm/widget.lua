@@ -26,7 +26,7 @@ local TableUtil = require("core.text.engine.table_util")
 local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
 local Timings   = require("core.timing.engine.timings")
-local Manifest  = require("infra.manifest_reader")
+local Manifest  = require("menu.engine.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local Model     = require("metrics.engine.wpm_widget_model")
 local ConfigKeys = require("settings.engine.keys")
@@ -178,7 +178,7 @@ end
 --- @param group string
 --- @return string|nil
 local function group_colour(group)
-	local ok, Config = pcall(require, "modules.hotstrings.hotstrings_config")
+	local ok, Config = pcall(require, "hotstrings.engine.catalogue.config")
 	if not ok or type(Config) ~= "table" or type(Config.resolve) ~= "function" then return nil end
 	local resolved = Config.resolve(group, nil)
 	return type(resolved) == "table" and resolved.color or nil
@@ -445,7 +445,8 @@ function M.tick(stats, now_s, paused)
 
 	local show = Model.widget_visible({
 		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
-		last_input_s = stats and stats.last_input_time, last_mouse_s = _state.last_mouse_s,
+		last_input_s = stats and stats.last_input_time, last_break_s = stats and stats.last_break_time,
+		last_mouse_s = _state.last_mouse_s,
 		idle_hide_s = IDLE_HIDE_S,
 	})
 	-- A drag moves the pointer; the widget the user is holding must not vanish.

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Regression guard for the documented "bare try with no catch" anti-pattern
 ; (docs/memory's project-ahk-invariant-incomplete-application).
-; GestureGetCyclableWindows (modules/gestures/window_cycle.ahk) was correctly
+; GestureGetCyclableWindows (gestures/adapters/window_cycle.ahk) was correctly
 ; hardened (commit 7b701020d) with a per-window try/catch for the routine
 ; race where a window closes between WinGetList() and the next WinGet* call
 ; on its HWND. The two adapter siblings that enumerate the exact same window

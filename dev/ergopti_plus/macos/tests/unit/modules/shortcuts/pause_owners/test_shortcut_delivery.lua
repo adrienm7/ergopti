@@ -120,9 +120,13 @@ local function load_real_shortcut_delivery_owner()
 		target[names.is_paused] = function() return paused end
 		target[names.has_pending] = function() return false end
 	end
-	local function make_wrap_handle(getter)
+	-- The wrap tap is the delivery probe: the built-in hotkey whose native
+	-- callback consults the owner's delivery gate (Cmd+★ was until 2026-11-21).
+	-- An admitted press counts as the former lock-screen probe did.
+	local function make_wrap_handle(getter, delivery_admitted)
 		local delivering = true
 		local handle = make_handle(function()
+			if type(delivery_admitted) == "function" and delivery_admitted() then lock_calls = lock_calls + 1 end
 			if not delivering then return false end
 			wrap_ax_calls = wrap_ax_calls + 1
 			if type(getter) == "function" then getter() end
@@ -137,14 +141,6 @@ local function load_real_shortcut_delivery_owner()
 		bind_tap_keys = function() return make_handle(noop, "tap_keys") end,
 		bind_layer_wheel = function() return make_handle(noop, "layer_wheel") end,
 		bind_wrap_text_if_selected = make_wrap_handle,
-		-- Cmd+* is the delivery probe: the built-in hotkey whose native callback
-		-- consults the owner's delivery gate (Ctrl+G was until schema v20). It
-		-- counts as the former lock-screen probe did.
-		bind_cmd_star = function(_, delivery_admitted)
-			return make_handle(function()
-				if delivery_admitted() then lock_calls = lock_calls + 1 end
-			end, "cmd_star")
-		end,
 		pause_awake = noop,
 		resume_awake = noop,
 		stop_awake = noop,
@@ -207,8 +203,8 @@ local function load_real_shortcut_delivery_owner()
 	-- module may have been bound by an earlier file to a get-only i18n double,
 	-- which made the combined run fail in `i18n.format` while this file passed alone.
 	package.loaded["core.i18n.engine.i18n"] = nil
-	package.loaded["modules.gestures.actions"] = nil
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["gestures.engine.actions"] = nil
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,
 	}
 	package.loaded["modules.keystats"] = { log_shortcut = function() return true end }
@@ -267,7 +263,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 		helpers.it("keeps a retained native hotkey inert after rollback delete " .. mode, function()
 			local ctx = load_real_shortcut_delivery_owner()
 			helpers.assert_true(ctx.bindings.start())
-			local initial_callback = ctx.latest_callback("cmd_star")
+			local initial_callback = ctx.latest_callback("wrap")
 			helpers.assert_not_nil(initial_callback)
 			initial_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -291,7 +287,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			helpers.assert_eq(script_control.resume_all(), false,
 				"a later resume refusal must roll the real bindings owner back")
 			helpers.assert_true(script_control.is_paused())
-			local retained_callback = ctx.latest_callback("cmd_star")
+			local retained_callback = ctx.latest_callback("wrap")
 			helpers.assert_not_nil(retained_callback)
 			retained_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -300,7 +296,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			ctx.set_delete_mode("true")
 			helpers.assert_true(script_control.resume_all())
 			helpers.assert_eq(script_control.is_paused(), false)
-			local resumed_callback = ctx.latest_callback("cmd_star")
+			local resumed_callback = ctx.latest_callback("wrap")
 			helpers.assert_not_nil(resumed_callback)
 			resumed_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 2,

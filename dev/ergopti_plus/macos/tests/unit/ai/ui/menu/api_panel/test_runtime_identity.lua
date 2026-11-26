@@ -1,0 +1,218 @@
+--- tests/unit/ai/ui/menu/api_panel/test_runtime_identity.lua
+
+--- =============================================================================
+--- MODULE: Regression — remote menu identity is a full runtime transition
+--- DESCRIPTION:
+--- Selecting another remote entry, or No Model, used to mutate ApiRemote while
+--- leaving prediction_engine's visible pool and tooltip alive. ApiRemote could
+--- fence a later HTTP callback, but already-published pixels still described the
+--- previous paid/model identity. This drives the real menu actions and requires
+--- engine reset to commit before the remote identity is changed.
+--- =============================================================================
+
+local helpers = require("tests.helpers")
+
+
+
+
+helpers.describe("API panel runtime identity transaction", function()
+	helpers.it("(api-panel-runtime-identity) (no-model-runtime) (remote-identity-generation) resets visible predictions before changing entry identity", function()
+		local module_names = {
+			"ai.engine", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ai.ui.menu.panels.api_panel",
+		}
+		local saved_modules = {}
+		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
+		local events = {}
+		local entries = {
+			{ id = "entry-a", provider = "openai", model = "model-a", label = "Entry A" },
+			{ id = "entry-b", provider = "openai", model = "model-b", label = "Entry B" },
+		}
+		local active_id = "entry-a"
+		local reset_commits = true
+		local warmups = 0
+
+		local api_remote = {
+			PROVIDERS = { openai = { label = "OpenAI" } },
+			PROVIDER_ORDER = {},
+			entry_key_missing = function() return false end,
+			get_entries = function() return entries end,
+			get_active_entry_id = function() return active_id end,
+			get_active_entry = function()
+				for _, entry in ipairs(entries) do
+					if entry.id == active_id then return entry end
+				end
+				return nil
+			end,
+			set_active_entry_id = function(id)
+				active_id = id
+				events[#events + 1] = "set:" .. id
+			end,
+		}
+		package.loaded["ai.engine"] = {
+			api_remote = api_remote,
+			persist_api_entries = function(callback)
+				events[#events + 1] = "persist"
+				callback(true, nil, true)
+			end,
+		}
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = {
+			debug = function() end, info = function() end,
+			warn = function() end, error = function() end,
+		}
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = {}
+		local command_renderer = assert(require("menu.engine.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
+			i18n = {
+			get = package.loaded["core.i18n.engine.i18n"].get,
+			-- These command rows never request a translated section.
+			section = function() return {} end,
+		},
+			logger = helpers.make_logger_stub(),
+		}))
+		package.loaded["menu.engine.manifest_menu"] = {
+			command_row = command_renderer.command_row,
+			template_rows = command_renderer.template_rows,
+			get_array = command_renderer.get_array,
+			render_rows = function(rows) return rows end,
+		}
+		package.loaded["ai.ui.menu.panels.api_panel"] = nil
+
+		local ok, err = xpcall(function()
+			local ApiPanel = require("ai.ui.menu.panels.api_panel")
+			local state = { llm_backend = "api", llm_model = "model-a" }
+			local context = {
+				state = state,
+				paused = false,
+				is_paused = function() return false end,
+				keymap = {
+					reset_predictions_for_configuration = function()
+						events[#events + 1] = "reset"
+						return reset_commits
+					end,
+				},
+				WarmupCtrl = {
+					warmup = function()
+						warmups = warmups + 1
+						events[#events + 1] = "warmup"
+					end,
+				},
+				update_menu = function() events[#events + 1] = "update" end,
+			}
+
+			helpers.assert_eq(ApiPanel.clear_active_entry(context), true)
+			helpers.assert_eq(events, { "reset", "set:", "persist", "update" },
+				"No Model must revoke the old tooltip before clearing remote identity")
+			helpers.assert_eq(active_id, "")
+			helpers.assert_eq(state.llm_model, "")
+			helpers.assert_eq(warmups, 0,
+				"an explicit No Model identity has nothing to warm")
+
+			events = {}
+			-- The model selector page runs the entry selection the API panel builds.
+			local collected = {}
+			context.collect = collected
+			ApiPanel.build(context)
+			local entry_b_action = collected.select["entry-b"]
+			helpers.assert_type(entry_b_action, "function")
+			helpers.assert_eq(entry_b_action(), true)
+			helpers.assert_eq(events,
+				{ "reset", "set:entry-b", "persist", "warmup", "update" },
+				"entry B cannot publish until entry A's visible/request identity is revoked")
+			helpers.assert_eq(active_id, "entry-b")
+			helpers.assert_eq(state.llm_model, "model-b")
+
+			reset_commits = false
+			events = {}
+			collected = {}
+			context.collect = collected
+			ApiPanel.build(context)
+			local entry_a_action = collected.select["entry-a"]
+			helpers.assert_eq(entry_a_action(), false)
+			helpers.assert_eq(events, { "reset" },
+				"failed old-identity teardown must abort persistence, warmup and selection")
+			helpers.assert_eq(active_id, "entry-b")
+		end, debug.traceback)
+
+		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
+		if not ok then error(err) end
+	end)
+
+	-- api-entry-auto-name: the page names an entry <provider>/<model>; the
+	-- label an earlier build stored is not read.
+	helpers.it("lists entries by their automatic name only", function()
+		local module_names = {
+			"ai.engine", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ai.ui.menu.panels.api_panel",
+		}
+		local saved_modules = {}
+		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
+		local entries = {
+			{ id = "entry-a", provider = "openai", model = "model-a", label = "Entry A" },
+		}
+		package.loaded["ai.engine"] = {
+			api_remote = {
+				PROVIDERS = { openai = { label = "OpenAI" } },
+				PROVIDER_ORDER = {},
+				entry_key_missing = function() return false end,
+				get_entries = function() return entries end,
+				get_active_entry_id = function() return "entry-a" end,
+				get_active_entry = function() return entries[1] end,
+			},
+		}
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = {
+			debug = function() end, info = function() end,
+			warn = function() end, error = function() end,
+		}
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = {}
+		local command_renderer = assert(require("menu.engine.renderer").new({
+			platform = "hs",
+			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
+			i18n = { get = package.loaded["core.i18n.engine.i18n"].get,
+				section = package.loaded["core.i18n.engine.i18n"].get },
+			logger = helpers.make_logger_stub(),
+		}))
+		package.loaded["menu.engine.manifest_menu"] = {
+			template_rows = command_renderer.template_rows,
+			command_row = command_renderer.command_row,
+			get_array = command_renderer.get_array,
+			render_rows = function(rows) return rows end,
+		}
+		package.loaded["ai.ui.menu.panels.api_panel"] = nil
+		local ok, err = xpcall(function()
+			local ApiPanel = require("ai.ui.menu.panels.api_panel")
+			local collected = {}
+			ApiPanel.build({
+				state = { llm_backend = "api", llm_model = "model-a" },
+				paused = false,
+				is_paused = function() return false end,
+				keymap = { reset_predictions_for_configuration = function() return true end },
+				WarmupCtrl = { warmup = function() end },
+				update_menu = function() end,
+				collect = collected,
+			})
+			local found = false
+			for _, entry in ipairs(collected.entries) do
+				helpers.assert_true(entry.name ~= "Entry A", "the stored label is never shown")
+				if entry.name == "openai/model-a" then found = true end
+			end
+			helpers.assert_true(found, "the entry row must list provider/model")
+			-- model-button-emoji-first: the tray button names the provider by its
+			-- display name, never the stored label nor the provider id.
+			helpers.assert_eq(ApiPanel.active_entry_caption_text(), "OpenAI/model-a")
+			entries[1].model = ""
+			package.loaded["ai.engine"].api_remote.PROVIDERS.openai.default_model = "gpt-4o-mini"
+			helpers.assert_eq(ApiPanel.active_entry_caption_text(), "OpenAI/gpt-4o-mini",
+				"an entry without a model is named after the model its requests use")
+		end, debug.traceback)
+		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
+		if not ok then error(err) end
+	end)
+end)

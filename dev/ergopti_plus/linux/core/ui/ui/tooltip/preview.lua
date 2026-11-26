@@ -99,6 +99,8 @@ local _enabled = {
 	autocorrect = true,
 	ai = true,
 	colored = true,
+	glyphs = true,
+	announce = true,
 }
 
 --- Initialises the preview.
@@ -116,8 +118,9 @@ function M.init(opts)
 	end
 end
 
---- Sets one of the four preview toggles.
---- @param name string "star" | "autocorrect" | "ai" | "colored"
+--- Sets one of the six preview toggles. « announce » is the renderer's: the
+--- suggestions draw through it too, without this module.
+--- @param name string "star" | "autocorrect" | "ai" | "colored" | "glyphs" | "announce"
 --- @param value boolean
 function M.set_enabled(name, value)
 	if _enabled[name] == nil then
@@ -125,6 +128,7 @@ function M.set_enabled(name, value)
 		return
 	end
 	_enabled[name] = value and true or false
+	if name == "announce" then Renderer.set_announcements_enabled(_enabled[name]) end
 	Logger.debug(LOG, "Preview toggle %s: %s.", name, tostring(_enabled[name]))
 end
 
@@ -276,7 +280,7 @@ local function masked_for_preview(candidate)
 	local value = candidate.replacement
 	-- The row shows what the output types, as on macOS: a {Left} is not text.
 	if candidate.has_key_tokens and type(value) == "string" then
-		value = require("modules.hotstrings.output_tokens").parse(value).text
+		value = require("hotstrings.engine.output_tokens").parse(value).text
 	end
 	-- A multi-field row (an @-combo) carries parallel `parts` and `fields` arrays
 	-- instead of one value and one field name. Each part must be masked against
@@ -288,7 +292,7 @@ local function masked_for_preview(candidate)
 
 	if not is_multi and (type(value) ~= "string" or candidate.field == nil) then return value end
 
-	local ok, Fields = pcall(require, "infra.personal_info_fields")
+	local ok, Fields = pcall(require, "hotstrings.engine.catalogue.personal_info_fields")
 	if not ok or type(Fields.for_preview) ~= "function" then
 		-- Fail closed. A candidate that declared itself a personal-info value and
 		-- a classifier that cannot be reached is the one combination where showing
@@ -307,17 +311,31 @@ local function masked_for_preview(candidate)
 	return Fields.for_preview(value, candidate.field)
 end
 
+--- The accent and the category glyph for a row, from ONE resolve of the tint
+--- category: the glyph names the category whose colour the row wears, so the
+--- two can never disagree, and the keystroke pays for one cached lookup.
+--- @param kind string|nil
+--- @param group string|nil
+--- @return table|nil accent { red, green, blue }, nil when colouring is off.
+--- @return string|nil glyph nil when the glyph switch is off.
+--- @return string|nil glyph_name_key The i18n key naming the glyph.
+local function style_for(kind, group)
+	if not _enabled.colored and not _enabled.glyphs then return nil end
+	local category = tint_category(kind, group)
+	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
+	local ok, resolved = pcall(_config.resolve, category, nil)
+	if not ok or type(resolved) ~= "table" then return nil end
+	local accent = _enabled.colored and type(resolved.color) == "string" and HexColor.parse(resolved.color) or nil
+	if not _enabled.glyphs or type(resolved.glyph) ~= "string" then return accent end
+	return accent, resolved.glyph, resolved.glyph_name_key
+end
+
 --- The accent for a row, or nil when colouring is off.
 --- @param kind string|nil
 --- @param group string|nil
 --- @return table|nil { red, green, blue }
 local function accent_for(kind, group)
-	if not _enabled.colored then return nil end
-	local category = tint_category(kind, group)
-	if not _config or type(_config.resolve) ~= "function" or not category then return nil end
-	local ok, resolved = pcall(_config.resolve, category, nil)
-	if not ok or type(resolved) ~= "table" or type(resolved.color) ~= "string" then return nil end
-	return HexColor.parse(resolved.color)
+	return (style_for(kind, group))
 end
 
 --- Schedules the bubble's own disappearance.
@@ -348,9 +366,15 @@ local function arm_expiry(group, section, revision)
 	if revision ~= _revision then return false end
 	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
-	if not delay or delay <= 0 then return true end
-	-- Hidden just before the trigger window closes (shared decrement and floor).
-	delay = require("core.ui.ui.tooltip.config").effective_delay(delay)
+	if not delay then return true end
+	local TooltipConfig = require("core.ui.ui.tooltip.config")
+	if delay <= 0 then
+		-- No trigger delay: the shared safety lifetime, as on Windows and macOS (TWD-1).
+		delay = TooltipConfig.safety_timeout_seconds()
+	else
+		-- Hidden just before the trigger window closes (shared decrement and floor).
+		delay = TooltipConfig.effective_delay(delay)
+	end
 
 	local token = {}
 	_expiry_token = token
@@ -402,11 +426,13 @@ function M.build_rows(candidates, opts)
 	-- The key that fires a ★ row, read once per bubble rather than per row: it
 	-- cannot change while one is being built, and reading it is a storage lookup.
 	local magic_key = TERMINATOR_LABEL
-	local ok_magic, MagicKey = pcall(require, "modules.hotstrings.magic_key")
-	if ok_magic and type(MagicKey.get) == "function" then magic_key = MagicKey.get() end
+	local ok_magic, MagicKey = pcall(require, "hotstrings.engine.magic_key")
+	-- Shown as every UI shows it: « ★ », or « ★ (ù) » for another character.
+	if ok_magic and type(MagicKey.display) == "function" then magic_key = MagicKey.display() end
 
 	for _, candidate in ipairs(candidates or {}) do
 		if #rows >= limit then break end
+		local accent, glyph, glyph_name_key = style_for(kind, candidate.group)
 		rows[#rows + 1] = {
 			-- The replacement is what the user is about to get; the right-hand
 			-- column is the key that VALIDATES it — ★ for the magic-key family, ↵
@@ -430,7 +456,12 @@ function M.build_rows(candidates, opts)
 			-- from the first candidate, so with several categories pending at once
 			-- — the common case — every row after the first wore a colour belonging
 			-- to a different one.
-			accent = accent_for(kind, candidate.group),
+			accent = accent,
+			-- The category's symbol beside the label, so a reader who cannot tell
+			-- the tints apart still tells the categories apart (2026-11-19); the
+			-- renderer draws it and names it for the screen reader.
+			glyph = glyph,
+			glyph_name_key = glyph_name_key,
 		}
 	end
 

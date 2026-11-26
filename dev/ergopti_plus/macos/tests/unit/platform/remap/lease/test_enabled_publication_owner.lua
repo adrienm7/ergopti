@@ -69,7 +69,7 @@ helpers.describe("enabled preference conditional publication ownership", functio
 			require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, calls = fixture.load_enabled_remap({ initially_enabled = initially_enabled })
 				local configured = package.loaded["platform.remap.config"]
-				package.loaded["infra.config_paths"].get = function() return path end
+				package.loaded["settings.engine.paths"].get = function() return path end
 				local captured = require("core.fs.adapters.file_system")
 				for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 					captured[method] = fs[method]

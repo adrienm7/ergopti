@@ -24,6 +24,7 @@
 
 #Requires Autohotkey v2.0+
 #Include ../adapters/sqlite_native.ahk
+#Include ../adapters/sqlite_copy_on_write.ahk
 
 
 
@@ -255,12 +256,18 @@ SQLite_Open(path, flags := 0) {
 SQLite_CloseChecked(db) {
 		if !db
 				throw ValueError("A checked SQLite close requires its owned connection.")
+		if SQLite_IsCopyOnWrite(db)
+				return SQLite_CloseCopyOnWrite(db)
 		return DllCall(SQLiteConst.DLL . "\sqlite3_close", "Ptr", db, "Int")
 }
 
 SQLite_Close(db) {
 		if !db
 				return
+		; An overlay's pages are a mapping this wrapper owns; it is unmapped only
+		; once SQLite has let go of it.
+		if SQLite_IsCopyOnWrite(db)
+				return SQLite_AbandonCopyOnWrite(db)
 		DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", db)
 }
 

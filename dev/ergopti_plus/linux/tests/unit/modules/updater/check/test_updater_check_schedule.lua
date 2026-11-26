@@ -166,6 +166,23 @@ helpers.describe("updater (linux): the check schedule follows the persisted reco
 		end)
 	end)
 
+	-- An AppImage has no manager that announces a release: with no check at all,
+	-- a dev-channel AppImage user never learned of a new version. Its checks run
+	-- and announce (installing it stays refused; install_origin).
+	helpers.it("(appimage-update-announced) an AppImage arms its checks and announces a new release", function()
+		with_manager({ now = T0, install_kind = "appimage", record = { seed = SEED } }, function(ctx)
+			helpers.assert_true(#ctx.timers > 0, "an AppImage schedules its check")
+			ctx.clock.now = ctx.clock.now + ctx.M.TIMING.boot_check_delay_sec
+			fire(ctx)
+			helpers.assert_eq(#ctx.dispatches, 1, "the due check is dispatched")
+			ctx.dispatches[1](true, { tag = "v1.4.0" }, nil)
+			helpers.assert_eq(ctx.available, { "v1.4.0" }, "the new release is announced")
+		end)
+		with_manager({ now = T0, install_kind = "flatpak" }, function(ctx)
+			helpers.assert_eq(#ctx.timers, 0, "a Flatpak is still announced by its own manager")
+		end)
+	end)
+
 	helpers.it("notification refusal leaves the release retryable", function()
 		for _, refusal in ipairs({ "false", "throw" }) do
 			with_manager({ now = T0, record = { seed = SEED } }, function(ctx)

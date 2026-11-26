@@ -107,6 +107,7 @@ local function build(opts)
 			set = function(key, value) ctx.values[key] = value; return true end,
 		},
 		http = transport(), manual_http = transport(),
+		failure_contract = AutoCheck.failure_contract(),
 		now = function() return ctx.clock.now end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,
@@ -645,6 +646,84 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
 	end)
 
+	-- UPD-06: an exhausted rate limit read « Could not reach GitHub »
+	helpers.it("upd-06: names an exhausted rate limit once the feed failed too", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 500, error = "HTTP 500" })
+		helpers.assert_eq(#answers, 1)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+	end)
+
+	-- UPD-13: hs.http gave status -1 and a localized sentence, so a refusing
+	-- proxy, an offline Mac or a refused certificate read « Could not reach
+	-- GitHub ». The worker's closed reason now reaches the window through its
+	-- receipt, by the vectors Linux and the shared contract replay.
+	local Protocol = require("core.network.engine.managed_http_protocol")
+	local corpus_file = assert(io.open(helpers.shared("tests/corpus/updater/check_session_vectors.json"), "rb"))
+	local native_receipts = Json.decode(corpus_file:read("*a")).native_receipts
+	corpus_file:close()
+	for _, vector in ipairs(native_receipts) do
+		helpers.it("upd-13: " .. vector.id, function()
+			helpers.assert_eq(Protocol.failure_receipt(vector.terminal), vector.receipt,
+				"the worker protocol proves the corpus receipt")
+			local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+			local answers = check_now(ctx, "dev")
+			-- The worker's own stdout: one terminal frame naming the reason
+			local terminal = '{"version":1,"success":false,"reason":"' .. vector.terminal .. '"}'
+			ctx.pending[1](Protocol.result(74, string.pack(">I4", #terminal + 1)
+				.. string.char(Protocol.TAG_TERMINAL) .. terminal))
+			helpers.assert_eq(ctx.requests[2].url, FEED_URL, "the feed is still read")
+			ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native offline (exit 74)" })
+			helpers.assert_eq(#answers, 1)
+			helpers.assert_eq(answers[1].reason_key, vector.expect)
+		end)
+	end
+
+	helpers.it("upd-13: the rate limit still wins over a native cause of the feed", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
+		local answers = check_now(ctx, "dev")
+		ctx.pending[1]({ ok = false, status = 403, error = "HTTP 403",
+			headers = { ["X-RateLimit-Remaining"] = "0", ["X-RateLimit-Reset"] = "86400" } })
+		ctx.pending[2]({ ok = false, status = 0, headers = {}, error = "native proxy (exit 74)",
+			failure_receipt = Protocol.failure_receipt("proxy") })
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
+	end)
+
+	helpers.it("upd-13: the production session checks through the launcher worker", function()
+		local AutoCheck = load_module()
+		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
+		local worker, worker_opts, seen = { get = function() end }, nil, nil
+		local ok, err = pcall(function()
+			helpers.with_stub_scope({ "core.events.wake_watcher", "core.network.adapters.http_client",
+				"core.network.adapters.managed_http_worker", "core.fs.adapters.storage", "core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
+					start = function() return true end, stop = function() return true end,
+				} end }
+				package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+				package.loaded["core.network.adapters.managed_http_worker"] = {
+					new = function(opts) worker_opts = opts; return worker end,
+				}
+				package.loaded["core.fs.adapters.storage"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
+				AutoCheck.load_config = function() return { timeout_sec = 7 } end
+				AutoCheck.new = function(opts)
+					seen = opts
+					return { on_wake = function() end, start = function() return true end, stop = function() return true end }
+				end
+				helpers.assert_true(AutoCheck.start_session({}).stop())
+			end)
+		end)
+		AutoCheck.new, AutoCheck.load_config = old_new, old_config
+		if not ok then error(err, 0) end
+		helpers.assert_true(seen.manual_http == worker, "the manual check goes through the launcher worker")
+		helpers.assert_eq(worker_opts, { timeout_sec = 7 }, "the worker gets the configured timeout")
+		helpers.assert_eq(type(seen.failure_contract.classify), "function", "the managed-network contract is passed")
+	end)
+
 	helpers.it("offers a newer release of the checked channel without announcing it", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
@@ -792,7 +871,8 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		local ctx = build({ now = T0, record = { seed = SEED }, responses = { { ok = false, status = 403,
 			headers = { ["X-RateLimit-Remaining"] = "0", ["x-ratelimit-reset"] = "86400" } } } })
 		local answers = check_now(ctx, "dev")
-		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		-- The window names the limit, not a network failure (UPD-06)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
 		helpers.assert_contains(answers[1].detail, "1970-01-02 00:00:00 UTC")
 	end)
@@ -910,7 +990,8 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 			RATE_LIMITED, { ok = true, status = 200, body = "<html>proxy page</html>", headers = {} } } })
 		local answers = check_now(ctx, "dev")
 		helpers.assert_eq(answers[1].state, "error")
-		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		-- The API's exhausted limit names the failure; the detail keeps both causes (UPD-06)
+		helpers.assert_eq(answers[1].reason_key, "update_check.error_rate_limited")
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
 		helpers.assert_contains(answers[1].detail, "Atom feed: HTTP 200 without an Atom feed")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)

@@ -30,7 +30,7 @@ local function load_fixture(show_result)
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		is_initialized = function() return true end,
 		init = function()
 			calls.config_init = calls.config_init + 1
@@ -78,7 +78,7 @@ local function load_fixture(show_result)
 	}
 
 	_G._base_dir = nil
-	local module = helpers.load_with_stubs("ui.menu.menu_paths", {
+	local module = helpers.load_with_stubs("settings.ui.menu.paths", {
 		webview = {
 			usercontent = {
 				new = function()

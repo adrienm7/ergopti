@@ -1,0 +1,100 @@
+{
+	"description": "Clean text to the keys an Ergopti+ user types for it (LAYOUT_SHORTCUT_TYPING.toTyped, _shared/ui/layout_analysis/shortcut_typing.js), replayed by tools/test/test-shortcut-typing.cjs. Each vector enables the catalogue `sections` (ids of _generated/hotstring_catalogue.js, « group.section ») and the `personal` hotstrings (the host's fields), with the default end characters, then gives `text`; `typed` is the stream, `undos` the indexes of the stream's characters after which one Backspace undoes an expansion that text typed as written fired, `saved` the keystrokes saved (Backspaces counted), `used` the triggers used with their counts, and `absent` triggers that must not appear (a disabled section's). Every vector also checks that expanding `typed` with its undos gives `text` back.",
+	"vectors": [
+		{
+			"id": "accents_and_typographic_apostrophe",
+			"sections": ["french_magickey.text_expansion"],
+			"text": "C’était très cool, c’est vrai.",
+			"typed": "Ct★ t★ cool, c★ vrai.",
+			"undos": [],
+			"saved": 9,
+			"used": { "Ct★": 1, "t★": 1, "c★": 1 }
+		},
+		{
+			"id": "straight_apostrophe_typed_as_written_is_undone",
+			"sections": ["french_autocorrection.typographic_apostrophe"],
+			"text": "C'était l'été.",
+			"typed": "C'était l'été.",
+			"undos": [1, 9],
+			"saved": -2,
+			"used": {}
+		},
+		{
+			"id": "capitals_title_and_upper",
+			"sections": ["french_magickey.text_expansion"],
+			"text": "Mais MAIS mais C’ÉTAIT",
+			"typed": "M★ MAIS m★ CT★",
+			"undos": [],
+			"saved": 8,
+			"used": { "M★": 1, "m★": 1, "CT★": 1 }
+		},
+		{
+			"id": "end_character_kept_or_magic_key_typed",
+			"sections": ["french_magickey.text_expansion_auto"],
+			"text": "Il y’a, y’a. Y’a-t-il ?",
+			"typed": "Il ya, ya. Y’a-t-il ?",
+			"undos": [],
+			"saved": 2,
+			"used": { "ya": 2 }
+		},
+		{
+			"id": "word_boundary_inside_a_word",
+			"sections": ["french_magickey.text_expansion"],
+			"text": "mais désormais",
+			"typed": "m★ désormais",
+			"undos": [],
+			"saved": 2,
+			"used": { "m★": 1 }
+		},
+		{
+			"id": "not_a_word_trigger_inside_a_word",
+			"sections": ["distances_reduction.qu"],
+			"text": "quelque chose qui manque",
+			"typed": "qelqe chose qi manqe",
+			"undos": [],
+			"saved": 4,
+			"used": { "qe": 3, "qi": 1 }
+		},
+		{
+			"id": "disabled_section_never_used",
+			"sections": ["french_magickey.text_expansion"],
+			"text": "quelque chose qui manque",
+			"typed": "qqch★ qui manque",
+			"undos": [],
+			"saved": 8,
+			"used": { "qqch★": 1 },
+			"absent": ["qe", "qi"]
+		},
+		{
+			"id": "personal_hotstring_used",
+			"sections": [],
+			"personal": [
+				{ "trigger": "es★", "output": "Ergopti Studio", "is_word": true, "auto_expand": true }
+			],
+			"text": "Ouvrez Ergopti Studio.",
+			"typed": "Ouvrez es★.",
+			"undos": [],
+			"saved": 11,
+			"used": { "es★": 1 }
+		},
+		{
+			"id": "folded_case_typed_as_written_fires_harmlessly",
+			"sections": ["autocorrection.abbreviations"],
+			"text": "l’ADN et l’API.",
+			"typed": "l’ADN et l’API.",
+			"undos": [],
+			"saved": 0,
+			"used": {}
+		},
+		{
+			"id": "key_token_output_is_left_out",
+			"sections": [],
+			"personal": [{ "trigger": "sig★", "output": "Bien à vous{Enter}", "auto_expand": true }],
+			"text": "Bien à vous{Enter}",
+			"typed": "Bien à vous{Enter}",
+			"undos": [],
+			"saved": 0,
+			"used": {}
+		}
+	]
+}

@@ -108,7 +108,7 @@ _KATO_Observe(Phase) {
 }
 
 _KATO_Exercise() {
-	global _KATO, AwakeInputHook, ActivitySimulation, AWAKE_JITTER_PX
+	global _KATO, AwakeInputHook, ActivitySimulation
 	Started := A_TickCount
 	_KATO.A := _KATO_Start()
 	if _KATO.Mode == "retired-keyboard" {
@@ -125,7 +125,7 @@ _KATO_Exercise() {
 		return
 	}
 
-	_KATO.X += AWAKE_JITTER_PX + 1
+	_KATO.X += TimingsGet("keep_awake", "jitter_px") + 1
 	_KATO.Capturing := true
 	try AwakeCheckMouseMoved()
 	finally _KATO.Capturing := false
@@ -171,7 +171,7 @@ _KATO_Main() {
 	_KATO_Require(A_Args.Length == 4 && A_Args[2] == _KATO_ActualOwnerHash, "the child ABI and actual production owner must match")
 	_KATO_Require(CryptoSha256Bytes(FileRead(A_ScriptFullPath, "RAW")) == A_Args[3], "the child source must match the parent's physical bytes")
 	_KATO_Require(CryptoSha256Bytes(FileRead(A_AhkPath, "RAW")) == A_Args[4], "the actual native runtime must match")
-	_I18nCache := Map("keepawake.started", "Started", "keepawake.stopped", "Stopped", "keepawake.title", "Private test")
+	_I18nCache := Map("keepawake.started", "Started", "shortcuts.keep_awake_ended", "Stopped", "keepawake.title", "Private test")
 	_I18nCacheLoaded := true, _I18nFallbacksWarmed := true, _ALTGR_KANA_FIXUP := false
 	SavedCritical := Critical("On"), SavedSuspend := A_IsSuspended
 	Primary := 0, Cleanup := 0, DiagnosticFailure := 0

@@ -23,8 +23,12 @@ local _failure_serial = 0
 local _contract = nil
 
 -- The page's kinds (_shared/ui/download_window/script.js) a Linux producer
--- uses: its heading and layout
-local KINDS = { ollama_model = true, app_update = true }
+-- uses: its heading and layout, and the line a cancel leaves in the window
+-- (UPD-02: an app update cancelled read « Ollama download cancelled »)
+local KINDS = {
+	ollama_model = { cancelled = "ollama.download_cancelled" },
+	app_update   = { cancelled = "updater.download_cancelled" },
+}
 
 local function manager()
 	local ok, module = pcall(require, "core.ui.ui.webview_manager")
@@ -147,7 +151,7 @@ local function cancel_from_presentation(session, document_owner, state)
 	end
 	local completed, visible = pcall(function()
 		session.cancelled = true
-		M.complete(session.id, false, translated("ollama.download_cancelled"))
+		M.complete(session.id, false, translated(KINDS[session.kind].cancelled))
 		return presentation_current(session, document_owner)
 	end)
 	session.cancelling = false -- Finally, including presentation/translation refusal.
@@ -477,17 +481,6 @@ function M.on_message(payload, state, context)
 	if payload.action == "expand" then return { expanded = true } end
 	Logger.debug(LOG, "Unknown download action refused.")
 	return nil
-end
-
---- Fresh native admission for the same app-update operation document.
---- No document owner/descriptor is exported; a missing initialization ACK refuses.
-function M.install_admission_current(session_id)
-	local session = _session
-	if not session or session.id ~= session_id or session.kind ~= "app_update"
-		or session.terminal or session.retired or session.cancelled then return false end
-	local observed, admitted = pcall(owner_current, session)
-	return observed and admitted == true and _session == session and session.id == session_id
-		and not session.terminal and not session.retired and not session.cancelled
 end
 
 function M.session_id()

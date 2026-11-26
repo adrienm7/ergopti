@@ -2708,6 +2708,9 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
 			? _Updater_RateLimitDetail(Status, RateLimit["remaining"], RateLimit["reset"]) : ""
 		if (Detail != "") {
 			try LoggerWarn("Updater", "GitHub releases for '{1}': {2}.", Url, Detail)
+			; The check's window names the limit if the feed fails too (UPD-06)
+			if IsSet(Request) && IsObject(Request)
+				Request.RateLimited := true
 		} else {
 			try LoggerWarn("Updater", "GitHub refused the releases request (HTTP {1}) for '{2}'.", Status, Url)
 		}
@@ -3647,8 +3650,8 @@ _Updater_AbortStagingOnExit() {
 ; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
 ; GitHub releases-list request in a tree-owned curl child and returns
 ; at once; OnJson(Json) is invoked from a poll timer once the response completes
-; (Json == "" on any failure). Used by _Updater_OpenChangelogWindow so the
-; changelog GUI build never blocks the keyboard hook on a slow network.
+; (Json == "" on any failure). Its only caller, the native Versions window,
+; was removed on 2026-11-21; the transport tests still pin it.
 _Updater_FetchReleasesListJsonAsync(Channel, Request, OnJson) {
 	Url := Updater_ReleaseApiUrl()
 	Owner := _Updater_RegisterAsyncRequestOwner(
@@ -3945,9 +3948,9 @@ Updater_ParseTagName(Json) {
 
 ; Extracts the release object's own "body" (release notes markdown), decoded
 ; once by the shared parser. Returns "" when the field is absent, null, not a
-; string or empty — callers display t("updater.changelog_empty") in that case.
-; Carriage returns are kept: both note views normalize line endings when
-; rendering (_Updater_ReleaseNotesChangelog, the shared release-notes page).
+; string or empty.
+; Carriage returns are kept: the shared release-notes page normalizes line
+; endings when rendering.
 Updater_ParseBody(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""

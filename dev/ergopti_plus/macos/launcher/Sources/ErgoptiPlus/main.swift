@@ -86,7 +86,7 @@ func fieldRunRoot(_ candidate: String?) -> String? {
 	guard lstat(path, &info) == 0, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), info.st_uid == getuid(),
 		info.st_mode & 0o022 == 0 else { return nil }
 	var declaration = stat()
-	guard lstat(path + "/static/ergopti_plus/macos/data/field_run.json", &declaration) == 0,
+	guard lstat(path + "/static/ergopti_plus/macos/diagnostics/data/field_run.json", &declaration) == 0,
 		declaration.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), declaration.st_uid == getuid() else { return nil }
 	return path
 }
@@ -574,7 +574,7 @@ func seedEmbeddedHammerspoonConfig(initLuaPath: String) {
 	// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
 	// Ergopti provides its own menubar item via hs.menubar; the HS default
 	// icons are redundant and reveal the underlying dependency.
-	for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
+	for key in kHammerspoonHiddenIconKeys {
 		CFPreferencesSetValue(
 			key as CFString,
 			false as CFBoolean,
@@ -612,6 +612,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updater: SPUUpdater?
+	/// The menu reading-font faces this launch holds for the session.
+	private var menuFontFiles: [URL] = []
 	// Decided once: the signed payload, or the clone of a developer build.
 	private lazy var luaSource = LuaSourceSelection.resolve(
 		infoDictionary: Bundle.main.infoDictionary,
@@ -835,7 +837,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
+		// Before the runtime starts: its first menu build may already name a face.
+		registerMenuFonts()
 		startManagedHammerspoon(at: hsBinary)
+	}
+
+	/// Registers the tray menu's reading-font faces for the login session, so
+	/// the embedded runtime can draw its menu in them (MenuFontRegistration).
+	/// A failure is logged and the app still starts: the menu builder checks
+	/// the face itself and reports the system font it then keeps.
+	private func registerMenuFonts() {
+		let directory = MenuFontRegistration.fontsDirectory(configDir: bundledConfigDir())
+		LauncherLog.write("launcher stage: registering the menu reading fonts from \(directory.path)")
+		let urls: [URL]
+		do {
+			urls = try MenuFontRegistration.faceURLs(fontsDirectory: directory)
+		} catch {
+			LauncherLog.write("ERROR: menu reading fonts not registered: \(error); the tray menu keeps the system font")
+			return
+		}
+		let outcomes = MenuFontRegistration.register(urls)
+		for outcome in outcomes {
+			if case let .refused(url, code) = outcome {
+				LauncherLog.write("ERROR: Core Text refused the menu reading font \(url.path) (error \(code.map(String.init) ?? "none"))")
+			}
+		}
+		menuFontFiles = MenuFontRegistration.held(outcomes)
+		LauncherLog.write(
+			"launcher stage: \(menuFontFiles.count) of \(urls.count) menu reading font(s) registered for the session"
+		)
+	}
+
+	/// Releases the session's menu reading-font faces this launch holds.
+	private func unregisterMenuFonts() {
+		guard !menuFontFiles.isEmpty else { return }
+		LauncherLog.write("launcher stage: unregistering \(menuFontFiles.count) menu reading font(s)")
+		var released = 0
+		for url in menuFontFiles {
+			let result = MenuFontRegistration.sessionUnregistrar(url)
+			if result.succeeded {
+				released += 1
+			} else {
+				LauncherLog.write("ERROR: Core Text kept the menu reading font \(url.path) (error \(result.errorCode.map(String.init) ?? "none"))")
+			}
+		}
+		menuFontFiles = []
+		LauncherLog.write("launcher stage: \(released) menu reading font(s) unregistered")
 	}
 
 	/// Starts the retained Sparkle controller of a packaged app.
@@ -1009,6 +1056,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		loggerWorker?.stop()
 		loggerWorker = nil
 		childActivity.release()
+		unregisterMenuFonts()
 	}
 
 
@@ -1521,6 +1569,10 @@ if UninstallWorker.handles(arguments: CommandLine.arguments) {
 
 if KeychainTokenWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KeychainTokenWorker.run(arguments: CommandLine.arguments))
+}
+
+if ScreenVisionWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ScreenVisionWorker.run(arguments: CommandLine.arguments))
 }
 
 if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {

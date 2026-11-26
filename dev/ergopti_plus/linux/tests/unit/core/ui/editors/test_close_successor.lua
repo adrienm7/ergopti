@@ -25,6 +25,7 @@ local function with_picker(body)
 		end,
 		is_visible = function() return seen.visible end,
 		eval_js = function(app, script) seen.pushes[#seen.pushes + 1] = { app, script }; return true end,
+		current_epoch = function() return seen.visible and seen.shows or nil end,
 	}
 	package.loaded["core.ui.ui.webview_manager"] = host
 	package.loaded["core.process.adapters.program_providers"] = {}
@@ -45,6 +46,71 @@ local function with_picker(body)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not okay then error(detail, 0) end
 end
+
+helpers.describe("Action picker title-bar close (pck-06)", function()
+	helpers.it("pck-06: a window closed by the window manager retires its session as a cancel", function()
+		with_picker(function(f)
+			local Picker = require("apps.engine.program_provider_picker")
+			local closed_providers, cancelled = {}, 0
+			local close = Picker.close
+			Picker.close = function(providers) closed_providers[#closed_providers + 1] = providers; return close(providers) end
+			local ok, err = pcall(function()
+				helpers.assert_true(f.bridge.open({ title = "Picker", items = {} }, function() return true end,
+					function() cancelled = cancelled + 1 end))
+				helpers.assert_true(f.bridge.is_open())
+				f.seen.visible = false
+				f.bridge.on_window_closed(f.seen.shows)
+				helpers.assert_eq(f.bridge.is_open(), false, "the session ends with its window")
+				helpers.assert_nil(f.bridge.pending_opts, "the next ready cannot push the old binding")
+				helpers.assert_eq(cancelled, 1, "a title-bar close is a cancel")
+				helpers.assert_eq(#closed_providers, 1, "the program discovery of the session is closed")
+				f.message("confirm", "tab_new")
+				helpers.assert_eq(#f.seen.picks, 0, "a late confirm of the closed page reaches no binding")
+			end)
+			Picker.close = close
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("pck-06: a close notice of an older page leaves the open session alone", function()
+		with_picker(function(f)
+			f.open("First")
+			f.open("Second")
+			f.bridge.on_window_closed(1)
+			helpers.assert_true(f.bridge.is_open(), "the replacement keeps its session")
+			f.message("confirm", "tab_close")
+			helpers.assert_eq(f.seen.picks, { { "Second", "tab_close" } })
+		end)
+	end)
+
+	helpers.it("pck-06: the close notice its own hide raises is not a second cancel", function()
+		with_picker(function(f)
+			local cancelled = 0
+			helpers.assert_true(f.bridge.open({ title = "Picker", items = {} }, function() return true end,
+				function() cancelled = cancelled + 1 end))
+			local epoch = f.seen.shows
+			f.seen.on_close = function() f.bridge.on_window_closed(epoch) end
+			f.message("cancel")
+			helpers.assert_eq(cancelled, 1)
+			helpers.assert_eq(f.bridge.is_open(), false)
+		end)
+	end)
+end)
+
+helpers.describe("Action picker confirmation without an action (pck-07)", function()
+	helpers.it("pck-07: a confirmation that names no action is refused and the picker stays open", function()
+		with_picker(function(f)
+			f.open("Binding")
+			for _, id in ipairs({ false, "", 7 }) do
+				f.message("confirm", id ~= false and id or nil)
+				helpers.assert_eq(#f.seen.picks, 0, "it never means none: " .. tostring(id))
+				helpers.assert_true(f.bridge.is_open())
+			end
+			f.message("confirm", "none")
+			helpers.assert_eq(f.seen.picks, { { "Binding", "none" } }, "the page's own specials pass unchanged")
+		end)
+	end)
+end)
 
 helpers.describe("Action picker exact close successor", function()
 	helpers.it("(picker-private-exception) withholds callback data from the log", function()

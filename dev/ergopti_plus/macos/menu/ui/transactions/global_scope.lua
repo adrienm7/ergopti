@@ -1,0 +1,276 @@
+--- menu/ui/transactions/global_scope.lua
+
+--- ==============================================================================
+--- MODULE: Global Scope (macOS)
+--- DESCRIPTION:
+--- Restores Ergopti's recommended values, or clears every category to the
+--- system's own behaviour, by composing the per-scope owners through the shared
+--- composition in the manifest's `[scopes.global]` order. Both apply at once,
+--- without a question: each owner keeps its own backup, conflict detection and
+--- runtime acknowledgement, and a refusal reverts every committed one.
+---
+--- FEATURES & RATIONALE:
+--- 1. Existing Owners: the config.toml categories are the scoped owners the
+---    menus already use (each takes the global writer fence itself); the remap
+---    file joins through the remap engine's asynchronous scope request, the
+---    keys under tap_holds and the chords under shortcuts.
+--- 2. Live Owners Only: a category whose owner is unavailable on this Mac is
+---    skipped and reported, never guessed.
+--- 3. Consent: AI and metrics consent stay out of « recommended » through the
+---    manifest's scope exclusions, which each owner applies.
+--- ==============================================================================
+
+local M = {}
+local Manifest = require("menu.engine.manifest_reader")
+local Composition = require("settings.engine.scope.composition")
+local Participant = require("settings.engine.scope.participant")
+local Logger = require("core.logger.engine.logger")
+local EmulationReload = require("settings.engine.scope.layout_emulation_reload")
+local ConfigKeys = require("settings.engine.keys")
+local LOG = "menu.global_scope"
+
+--- The remap engine's part of one scope, as an asynchronous participant: its
+--- inverse includes its settings snapshot and exact navigation-layer import
+--- receipt, both restored through the same native cohort gate.
+--- The next category never runs on the Karabiner terminal's own stack: the
+--- continuation is deferred, so a second regeneration is not requested from
+--- inside the callback that settles the first. A `persisted-guardian-…`
+--- terminal commits too: the settings are saved and deploy once the remap
+--- guardian is ready. This flow shows no notice of its own for it; the
+--- guardian's notice already told the user why the rules wait, and the
+--- Tap-Hold submenu keeps saying so.
+--- @param remap table Remap facade (apply_scope, snapshot/restore_settings).
+--- @param scope string Manifest scope id served by the remap file.
+--- @param backup_path function scope -> unique backup path.
+--- @param defer function fn -> true once fn is scheduled off this stack.
+--- @return table participant See config_scope_composition.
+local function remap_participant(remap, scope, backup_path, defer)
+	local snapshot, committed, layer_receipt, missing_receipt = nil, false, nil, false
+	local participant = {}
+	local function settle(done, ok, reason)
+		if defer(function() return done(ok, reason) end) == true then return end
+		-- The terminal is already known, so settling here is exact, only earlier
+		-- than intended; an unscheduled continuation would orphan the rollback.
+		Logger.warn(LOG, "Remap %s continuation could not be deferred; settling in place.", scope)
+		return done(ok, reason)
+	end
+	function participant.apply(mode, done)
+		snapshot, committed, layer_receipt, missing_receipt = remap.snapshot_settings(), false, nil, false
+		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
+		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason, _, receipt)
+			committed = ok == true
+			if committed and scope == ConfigKeys.KEY.TAP_HOLDS and mode == "recommended" then
+				if type(receipt) ~= "table" then
+					missing_receipt = true
+					return settle(done, false, "missing-navigation-layer-receipt")
+				end
+				layer_receipt = receipt
+			end
+			return settle(done, committed, reason)
+		end)
+	end
+	function participant.revert(done)
+		if not committed then return done(false, "no committed remap scope to revert") end
+		if missing_receipt then return done(false, "missing-navigation-layer-receipt") end
+		remap.restore_settings(snapshot, function(ok, reason)
+			if ok == true then committed = false end
+			return settle(done, ok == true, reason)
+		end, layer_receipt)
+	end
+	function participant.release()
+		assert(committed and not missing_receipt and remap.settings_pending() == false,
+			"remap scope cannot release an unacknowledged cohort")
+		snapshot, committed, layer_receipt = nil, false, nil
+	end
+	function participant.pending() return missing_receipt or remap.settings_pending() == true end
+	function participant.retry_restore(done)
+		if missing_receipt then return done(false, "missing-navigation-layer-receipt") end
+		if remap.retry_settings_recovery() ~= true or remap.settings_pending() ~= false then
+			return done(false, "remap settings recovery remains pending")
+		end
+		-- A failed restore's own inverse recovers the pre-restore settings.
+		-- The parent's snapshot is still owed until its true terminal.
+		if committed then return participant.revert(done) end
+		return done(true)
+	end
+	return participant
+end
+
+--- The keyboard-layout part of one scope: the rows of config.toml through the
+--- synchronous owner, then the layout typing them, built and selected live
+--- (modules/keymap/number_row_live.lua). The request settles only once that
+--- layout was read back (docs/design/layout-option-emulation.md, section 5); a
+--- choice with no layout of ours to apply it to is stored and acknowledged with
+--- its reason. A layout the system did not take reverts the rows, so the file
+--- never claims options the keyboard does not type.
+---
+--- The scope also holds the layout emulation's rows (the emulated layout, its
+--- base, variant, AltGr and row switches): once config.toml moved, the running
+--- emulation reloads them, as the submenu's own restore does. A global restore
+--- or clear used to leave the emulation typing its old session until a reload.
+--- @param synchronous table Participant over the scoped preferences owner.
+--- @param layout table { rows() -> { order, edges }, live, emulation? } The stored
+---   rows, the live owner and the layout emulation owner (modules/keymap/
+---   layout_emulation by default).
+--- @param defer function fn -> true once fn is scheduled off this stack.
+--- @return table participant See config_scope_composition.
+function M.layout_participant(synchronous, layout, defer)
+	local applying, changed = false, false
+	local participant = {}
+	local function same(a, b) return a.order == b.order and a.edges == b.edges end
+	--- Has a started emulation type the rows config.toml now holds
+	--- (settings/engine/scope/layout_emulation_reload, shared with Linux).
+	local function reload_emulation() EmulationReload.reload(layout.emulation, Logger, LOG) end
+	--- Brings the typing layout to the stored rows; settle(ok, code).
+	local function load(settle)
+		local dispatched = layout.live.apply(layout.rows(), function(applied, code)
+			local function answer()
+				if applied then return settle(true, nil) end
+				if code == layout.live.REASON_NO_SOURCE then return settle(true, code) end
+				return settle(false, tostring(code))
+			end
+			if defer(answer) ~= true then answer() end
+		end)
+		return dispatched
+	end
+	function participant.pending() return applying or synchronous.pending() end
+	function participant.apply(mode, done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		applying = true
+		local before = layout.rows()
+		synchronous.apply(mode, function(committed, detail)
+			if not committed then
+				applying = false
+				return done(false, detail)
+			end
+			reload_emulation()
+			changed = not same(before, layout.rows())
+			if not changed then
+				applying = false
+				return done(true, "rows_unchanged")
+			end
+			load(function(loaded, code)
+				if loaded then
+					applying = false
+					Logger.info(LOG, "Keyboard layout scope settled on the typing layout (%s).", tostring(code or "built"))
+					return done(true, code)
+				end
+				synchronous.revert(function(reverted, revert_detail)
+					applying = false
+					if reverted == true then reload_emulation() end
+					Logger.error(LOG, "The layout rows were not loaded (%s); config.toml reverted: %s.", tostring(code),
+						tostring(reverted == true or revert_detail))
+					done(false, "the system did not take the layout: " .. tostring(code))
+				end)
+			end)
+		end)
+	end
+	function participant.revert(done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		synchronous.revert(function(reverted, detail)
+			if reverted == true then reload_emulation() end
+			if not reverted or not changed then return done(reverted == true, detail) end
+			changed = false
+			applying = true
+			load(function(loaded, code)
+				applying = false
+				done(loaded, code)
+			end)
+		end)
+	end
+	function participant.release()
+		if applying then return false end
+		return synchronous.release()
+	end
+	function participant.retry_restore(done)
+		if applying then return done(false, "the layout scope request is still settling") end
+		return synchronous.retry_restore(done)
+	end
+	return participant
+end
+
+--- Creates the owner of one composite scope from the menu's scope owners: the
+--- Configuration menu's « global », or a category whose rows live in two files,
+--- such as « shortcuts », whose chords the remap file keeps (tap_hold.toml,
+--- deployed into the Karabiner rules) beside its config.toml rows.
+--- @param options table owners (scope id -> function returning the scoped owner
+---   or nil when unavailable), remap (facade or nil), layout ({ rows, live } for
+---   the keyboard-layout participant, or nil), backup_path(scope),
+---   defer(fn) and refresh(committed, report), which also receives
+---   every refusal, with the typed failure point of its report; scope is the
+---   manifest's composite scope id, « global » when absent.
+--- @return table owner apply(mode), pending(), retry_restore(done).
+function M.new(options)
+	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
+	local scope_id = options.scope or "global"
+	local declaration = Manifest.scopes()[scope_id]
+	assert(type(declaration) == "table" and type(declaration.includes) == "table",
+		"a composed scope needs a composite manifest scope: " .. tostring(scope_id))
+	local included = {}
+	for _, id in ipairs(declaration.includes) do included[id] = true end
+	for _, name in ipairs({ "backup_path", "defer", "refresh" }) do
+		assert(type(options[name]) == "function", "the global scope needs " .. name)
+	end
+	-- Retired with the clear's question on 2026-09-30: a caller still wiring
+	-- one would expect it to be asked, so it is refused rather than ignored.
+	assert(options.confirm == nil, "the global scope asks no question: the confirm port is retired")
+	local function participants()
+		local registry = {}
+		for id, provider in pairs(options.owners) do
+			assert(type(provider) == "function", "scope owner provider must be a function: " .. tostring(id))
+			local owner = provider()
+			if owner ~= nil then
+				registry[id] = Participant.synchronous({
+					apply = function(mode) return owner.apply(mode) end,
+					owner = function() return owner end,
+				})
+				if id == "keyboard_layout" and type(options.layout) == "table" then
+					registry[id] = M.layout_participant(registry[id], options.layout, options.defer)
+				end
+			end
+		end
+		local remap = options.remap
+		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
+			if included[ConfigKeys.KEY.TAP_HOLDS] then
+				registry.tap_holds = remap_participant(remap, ConfigKeys.KEY.TAP_HOLDS, options.backup_path, options.defer)
+			end
+			if included.shortcuts then
+				local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
+				registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
+			elseif included.key_combinations then
+				-- The Shortcuts scope itself: its chords are the key-combination
+				-- part it includes, applied before its own config.toml rows.
+				registry.key_combinations = remap_participant(remap, "key_combinations", options.backup_path,
+					options.defer)
+			end
+		end
+		return registry
+	end
+	local composition = Composition.new({ manifest = Manifest, scope = scope_id, logger = Logger, log = LOG,
+		participants = participants })
+	local owner = { pending = composition.pending, retry_restore = composition.retry_restore }
+	--- Applies one mode to every available category, at once for both modes:
+	--- the maintainer retired the clear's question on 2026-09-30.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean accepted True once the composition started.
+	function owner.apply(mode)
+		if composition.pending() then
+			local settled = false
+			composition.retry_restore(function(ok) settled = ok == true end)
+			if not settled then
+				Logger.error(LOG, "Scope %s %s refused: an earlier rollback is still pending.", scope_id, tostring(mode))
+				-- Said like every other refusal: a click that changes nothing and
+				-- says nothing reads as a dead menu.
+				options.refresh(false, { scope = scope_id, mode = mode, point = "acquire",
+					kind = "rollback_pending", detail = "an earlier rollback is still pending" })
+				return false
+			end
+		end
+		return composition.apply(mode, function(committed, report)
+			options.refresh(committed == true, report)
+		end)
+	end
+	return owner
+end
+
+return M

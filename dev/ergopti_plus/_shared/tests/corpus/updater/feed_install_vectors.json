@@ -1,0 +1,18 @@
+{
+	"_comment": "A throwaway key and one signed record per update asset, served by the local fake feeds of the feed-only install tests (Windows test_asset_signature.ahk, Linux test_changelog_release_install.lua): with the API unavailable the newest feed release installs only once its downloaded asset's size and SHA-256 rebuild a record this key signed. content is the asset body the fake transport serves (Linux stubs its digest, so only its size counts there). The private key was discarded; tools/test/test-update-asset-signature.cjs replays both records with the reference verifier.",
+	"public_key_spki_base64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEk8ixVzAySoa5d1OxBD/nhywngb8mptdq23EX05zDlmJWvtjfL858JyX6aWYeLF5nBDc+yECEHdZIjZ7KHWwe7A==",
+	"windows": {
+		"name": "ErgoptiPlus.exe",
+		"content": "Ergopti+ feed-only install fixture: not an executable.\n",
+		"size": 55,
+		"sha256": "5e6dded6ab0d5c47bc90213d25b45ced7cab21a3d4be6ebf183db838886dab52",
+		"signature_base64": "vgIdDxrmG8ICEmpvd2Idv/mFQ2GV2ZHGszQtL/SRVDJJB/Hoz8HBZzsDhgz2RNOG2jANkxURDiF8SfLVIA2x+w=="
+	},
+	"linux": {
+		"name": "ergopti-plus-linux.tar.gz",
+		"content": "archive",
+		"size": 7,
+		"sha256": "abababababababababababababababababababababababababababababababab",
+		"signature_base64": "BY5utMH82ub+vOGvs91pJA7hF3E01+GxYWHCn+CTma1RlMohxDflXHRIKs90veHczsafM04byZtsGjuM92cxug=="
+	}
+}

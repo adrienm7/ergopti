@@ -2,7 +2,7 @@
 
 --- Plans carry dynamic ownership and separate-file requirements explicitly.
 return function(helpers)
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local Actions = require("_generated.action_catalogue").actions
 	-- This port stands in for each host's existing parameter-key validator. The
 	-- real generated catalogue supplies parameter capability; scopes never infer it.
@@ -175,11 +175,11 @@ return function(helpers)
 		end)
 		if Manifest.resolves_platform_defaults == true then
 			helpers.it("does not resolve an included native backend for direct planning", function()
-				local name = "modules.llm.backend_detector"
+				local name = "ai.engine.api.backend_detector"
 				local previous, calls = package.loaded[name], 0
 				package.loaded[name] = { auto_default = function() calls = calls + 1; return "llama_cpp" end }
 				local ok, err = pcall(function()
-					local reader = assert(loadfile(helpers.driver_root() .. "infra/manifest_reader.lua"))()
+					local reader = assert(loadfile(helpers.driver_root() .. "menu/engine/manifest_reader.lua"))()
 					reader.direct_scope_plan("global", "clear")
 					reader.direct_scope_operations("global", "recommended")
 					helpers.assert_eq(calls, 0, "direct script planning invoked the included AI owner")

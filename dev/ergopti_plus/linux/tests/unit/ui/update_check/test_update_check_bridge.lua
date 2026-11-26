@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local STUBBED = {
-	"core.ui.ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
+	"core.ui.ui.webview_manager", "ui.download_window.bridge", "diagnostics.ui.error_dialog", "ui.changelog.bridge",
 }
 
 --- Loads the real bridge with controlled collaborators.
@@ -66,7 +66,7 @@ local function load_bridge(answer)
 		show = function(opts) context.windows[#context.windows + 1] = opts; return 7 end,
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
-	package.loaded["ui.error_dialog.bridge"] = {
+	package.loaded["diagnostics.ui.error_dialog"] = {
 		report = function(record, complete)
 			context.reports[#context.reports + 1] = record
 			if context.on_report then return context.on_report() end
@@ -283,6 +283,82 @@ helpers.describe("update-check window bridge (Linux)", function()
 			helpers.assert_eq(context.finished[1], { true, "v0.0.0-dev.150", "install" },
 				"the daemon restarts on the installed release")
 			helpers.assert_eq(context.hidden, 1, "the update-check window closes")
+		end)
+	end)
+
+	-- UPD-09: the window said « installed, restarting » before the restart
+	-- was tried, and kept saying it when the restart was refused.
+	for _, armed in ipairs({ true, false }) do
+		helpers.it("upd-09: the window reports the restart only once it is armed (armed=" .. tostring(armed) .. ")", function()
+			scenario(available, function(bridge, context)
+				local order = {}
+				context.ctx.on_update_finished = function()
+					order[#order + 1] = "restart"
+					return armed
+				end
+				local complete = package.loaded["ui.download_window.bridge"].complete
+				package.loaded["ui.download_window.bridge"].complete = function(id, ok, message)
+					order[#order + 1] = "window"
+					return complete(id, ok, message)
+				end
+				bridge.open(context.ctx)
+				bridge.on_message({ action = "update" })
+				helpers.assert_eq(order, { "restart", "window" }, "the restart is tried before the window says it")
+				local I18n = require("core.i18n.engine.i18n")
+				local key = armed and "updater.installed_restarting" or "updater.installed_restart_refused"
+				helpers.assert_eq(context.completed[1][3], (I18n.get(key):gsub("{1}", "v0.0.0-dev.150")))
+				helpers.assert_true(I18n.get("updater.installed_restart_refused") ~= "updater.installed_restart_refused",
+					"the refused restart has its own localized line")
+			end)
+		end)
+	end
+
+	-- UPD-07: the download window stayed at 0 % « Starting… » until the end
+	helpers.it("upd-07: the update download's progress reaches its window", function()
+		scenario(available, function(bridge, context)
+			local updates = {}
+			package.loaded["ui.download_window.bridge"].update = function(id, percent, detail)
+				updates[#updates + 1] = { id, percent, detail }
+				return true
+			end
+			context.release.size = 1024
+			context.updater.download_update = function(_, callback, on_progress)
+				on_progress(256); on_progress(300); on_progress(512)
+				callback("/tmp/update.tar.gz", nil)
+				on_progress(1024)
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(updates, {
+				{ 7, 25, I18n.get("menu.about.update_downloading") },
+				{ 7, 29, I18n.get("menu.about.update_downloading") },
+				{ 7, 50, I18n.get("menu.about.update_downloading") },
+			}, "each new percentage, and nothing once the attempt ended")
+		end)
+	end)
+
+	-- UPD-10: a refused signature read as an integrity check
+	helpers.it("upd-10: the window names a refused signature, with no network receipt", function()
+		scenario(available, function(bridge, context)
+			local receipts = {}
+			package.loaded["ui.download_window.bridge"].complete = function(id, ok, message, receipt)
+				context.completed[#context.completed + 1] = { id, ok, message }
+				receipts[#receipts + 1] = receipt == nil and "none" or receipt
+			end
+			context.updater.download_update = function(_, callback)
+				callback(nil, "update signature refused: the signature does not match", "signature", { stage = "http" })
+				return true
+			end
+			bridge.open(context.ctx)
+			bridge.on_message({ action = "update" })
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(context.completed[1][2], false)
+			helpers.assert_eq(context.completed[1][3],
+				(I18n.get("changelog_window.install_error_signature"):gsub("{tag}", "v0.0.0-dev.150")))
+			helpers.assert_eq(receipts[1], "none", "a refused signature is no network failure")
+			helpers.assert_eq(context.finished[1][3], "signature", "the hook hears the stage")
 		end)
 	end)
 

@@ -1,0 +1,74 @@
+{
+	"schema_version": 1,
+	"_comment": "PCK-20 (docs/audits/platform-parity/2026-11-21-pickers-prompts/report.md). What the prompt editor's host saves from one page message, on the three drivers: the name is trimmed of Lua %s whitespace (space, tab, line feed, vertical tab, form feed, carriage return), the prompt is kept byte for byte, a name or a prompt that is blank once trimmed and a batch that is not a Boolean are refused. Windows replays it through _PromptEdWeb_ReadSavePayload, macOS through the prompt editor's bridge callback, Linux through ai/ui/prompt_editor/bridge on_message. A Windows JSON Boolean is the Integer 0 or 1, so no vector sends a number as batch.",
+	"save": [
+		{
+			"id": "plain",
+			"payload": { "name": "Résumé", "prompt": "Summarize the text.", "batch": false },
+			"accepted": true,
+			"name": "Résumé",
+			"prompt": "Summarize the text.",
+			"batch": false
+		},
+		{
+			"id": "name-trimmed",
+			"payload": { "name": " \t Notes \n", "prompt": "x", "batch": true },
+			"accepted": true,
+			"name": "Notes",
+			"prompt": "x",
+			"batch": true
+		},
+		{
+			"id": "prompt-verbatim",
+			"payload": { "name": "A", "prompt": "  Keep\n  the indent \n\n", "batch": false },
+			"accepted": true,
+			"name": "A",
+			"prompt": "  Keep\n  the indent \n\n",
+			"batch": false
+		},
+		{
+			"id": "prompt-with-carriage-returns",
+			"payload": { "name": "A", "prompt": "\r\nLine\r\n", "batch": true },
+			"accepted": true,
+			"name": "A",
+			"prompt": "\r\nLine\r\n",
+			"batch": true
+		},
+		{
+			"id": "blank-name",
+			"payload": { "name": " \t ", "prompt": "x", "batch": false },
+			"accepted": false
+		},
+		{
+			"id": "line-feed-name",
+			"payload": { "name": "\n", "prompt": "x", "batch": false },
+			"accepted": false
+		},
+		{
+			"id": "blank-prompt",
+			"payload": { "name": "A", "prompt": " \n\t\r ", "batch": false },
+			"accepted": false
+		},
+		{
+			"id": "empty-prompt",
+			"payload": { "name": "A", "prompt": "", "batch": false },
+			"accepted": false
+		},
+		{ "id": "missing-batch", "payload": { "name": "A", "prompt": "x" }, "accepted": false },
+		{
+			"id": "string-batch",
+			"payload": { "name": "A", "prompt": "x", "batch": "true" },
+			"accepted": false
+		},
+		{
+			"id": "number-name",
+			"payload": { "name": 7, "prompt": "x", "batch": false },
+			"accepted": false
+		},
+		{ "id": "missing-prompt", "payload": { "name": "A", "batch": false }, "accepted": false }
+	],
+	"unknown_actions": {
+		"_comment": "An action the page never sends is a page defect: each host logs one WARNING line naming it and saves nothing.",
+		"actions": ["rename", "delete", "submit"]
+	}
+}

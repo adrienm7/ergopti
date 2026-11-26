@@ -26,7 +26,11 @@ local function fixture(body)
 			publishFocus = function(_, epoch) return epoch == state.epoch end,
 			isSecureField = function() return state.secure end,
 		},
-		keystats = { set_secure_field = function(value) state.secure = value end,
+		keystats = { set_secure_field = function(value, read)
+				state.secure = value
+				state.verdicts = state.verdicts or {}
+				state.verdicts[#state.verdicts + 1] = { value, read }
+			end,
 			is_context_protected = function() return state.protected end },
 		now_ms = function() return state.now end,
 		capture_context_async = function(field, options, callback)
@@ -258,6 +262,32 @@ helpers.describe("asynchronous native privacy context", function()
 		for _ = 1, 100 do compiled() end
 		assert(calls == 1, "unknown/password/no-owner idle iterations cannot dispatch native queries")
 		assert(pumps == 201 and metrics_pumps == 201 and guarded_calls == 201, "each idle iteration retains one watch and one SQLite pump")
+	end)
+
+	-- A touch's clicks are counted in the field it began in while no verdict is
+	-- read since (keystats.record_pointer). The focus worker's answer to the
+	-- touch's own invalidation reads nothing; a password role is a read.
+	helpers.it("(tap-click-touch-context) marks each verdict read and only those", function()
+		fixture(function(guard, state)
+			guard.prime(); state.complete(1, true, true)
+			helpers.assert_true(guard.refresh(true))
+			helpers.assert_eq(state.verdicts[#state.verdicts], { false, true }, "an admission is a read")
+			state.verdicts = {}
+			guard.invalidate()
+			state.change("/field/A"); guard.refresh(false)
+			for _, verdict in ipairs(state.verdicts) do
+				helpers.assert_eq(verdict[1], true, "an invalidation only withdraws")
+				helpers.assert_true(verdict[2] ~= true, "the worker's answer to it reads nothing")
+			end
+			helpers.assert_true(#state.verdicts >= 2, "the invalidation and its answer both withdraw")
+			state.verdicts = {}
+			state.role = 40; state.change("/field/P"); guard.refresh(false)
+			local read = false
+			for _, verdict in ipairs(state.verdicts) do
+				if verdict[1] == true and verdict[2] == true then read = true end
+			end
+			helpers.assert_true(read, "a password role reaches keystats as a read")
+		end)
 	end)
 
 	helpers.it("(context-async) live policy and publication reentry remain closed", function()

@@ -223,11 +223,11 @@ do
 local h = require("tests.helpers")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local NAMES = {
-	"adapters.event_provenance", "adapters.input_source_broker", "platform.input.keyboard_hook",
+	"diagnostics.adapters.event_provenance", "adapters.input_source_broker", "platform.input.keyboard_hook",
 	"adapters.physical_observation_clock", "core.process.adapters.lifecycle", "platform.input.synthetic_input",
-	"infra.config_paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "infra.manifest_reader",
+	"settings.engine.paths", "core.ui.engine.dialog_util", "core.logger.engine.logger", "menu.engine.manifest_reader",
 	"metrics.engine.capture.physical_lifecycle_observation", "modules.keystats.context_tracker", "modules.keystats.init",
-	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "modules.keymap",
+	"modules.keystats.kc_bridge", "modules.keystats.log_manager", "modules.keystats.watchers", "hotstrings.engine.expander",
 }
 local function actual(body)
 	return h.with_stub_scope(NAMES, function()

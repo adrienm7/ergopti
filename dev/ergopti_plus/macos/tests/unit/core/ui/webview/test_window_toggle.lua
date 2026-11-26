@@ -97,19 +97,19 @@ helpers.describe("window toggle (macOS)", function()
 	end)
 
 	helpers.it("a context page opens only through its registered opener", function()
-		with_page("layer_editor", function(state)
-			helpers.assert_eq(WindowToggle.toggle("layer_editor"), false,
+		with_page("studio_nav", function(state)
+			helpers.assert_eq(WindowToggle.toggle("studio_nav"), false,
 				"without the session's opener nothing opens and the refusal is reported")
 			local calls = 0
-			WindowToggle.set_opener("layer_editor", function()
+			WindowToggle.set_opener("studio_nav", function()
 				calls = calls + 1
-				state.view = { page = "layer_editor" }
+				state.view = { page = "studio_nav" }
 				return true
 			end)
-			helpers.assert_true(WindowToggle.toggle("layer_editor"))
+			helpers.assert_true(WindowToggle.toggle("studio_nav"))
 			helpers.assert_eq(calls, 1, "the registered opener ran")
 			state.focused = true
-			helpers.assert_true(WindowToggle.toggle("layer_editor"))
+			helpers.assert_true(WindowToggle.toggle("studio_nav"))
 			helpers.assert_eq(state.closed, 1, "a focused context page closes through its module")
 		end)
 	end)
@@ -137,7 +137,7 @@ helpers.describe("window toggle (macOS)", function()
 		for page, spec in pairs(WindowToggle.PAGES) do
 			-- Resolved by module name, as require would, so a move keeps the check;
 			-- the health check defines its window hooks in its core submodule.
-			local name = spec.module == "ui.healthcheck" and "ui.healthcheck.core" or spec.module
+			local name = spec.module == "diagnostics.ui.healthcheck" and "diagnostics.ui.healthcheck.core" or spec.module
 			local path = package.searchpath(name, package.path)
 			helpers.assert_true(path ~= nil, page .. ": page module " .. name .. " resolves")
 			local handle = io.open(path)
@@ -173,8 +173,8 @@ end)
 
 helpers.describe("window actions reach the toggle (macOS)", function()
 	helpers.it("each catalogue window action toggles its own page", function()
-		package.loaded["modules.gestures.actions"] = nil
-		local Actions = helpers.load_with_stubs("modules.gestures.actions")
+		package.loaded["gestures.engine.actions"] = nil
+		local Actions = helpers.load_with_stubs("gestures.engine.actions")
 		local Catalogue = require("_generated.action_catalogue")
 		helpers.assert_eq(type(Actions.WINDOW_ACTIONS), "table")
 		local count = 0

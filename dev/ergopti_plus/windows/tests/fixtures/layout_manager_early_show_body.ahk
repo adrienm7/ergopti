@@ -88,7 +88,15 @@ class _LMSO_Core {
 		return _LMSO_Subscription(Callback, Controller)
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	Navigate(Url) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMSO_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMSO_Require(!HasProp(this, "Navigated"), "The seed precedes the navigation.")
+	}
+	Navigate(Url) {
+		this.Navigated := true
+	}
 }
 
 ; Passive subscription deletion observes the same unsubscribe-before-Close
@@ -141,6 +149,8 @@ class _LMSO_Controller {
 			throw Error("Explicit passive controller Close refusal before its effect")
 		}
 		this.Closed += 1
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -227,7 +237,7 @@ _LMSO_OpenGeneration(Mode) {
 		Environment: Environment, Failure: 0, Register: PreviousRegister.Call}
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present.")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine vendored SDK loader must be present.")
 		Gui.Prototype.DefineProp("OnEvent", {Call: _LMSO_RegisterEvent})
 		OnMessage(0x18, _LMSO_ShowMessage)
 		Thread("Interrupt", 0)
@@ -354,7 +364,7 @@ _LMSO_SettingsGeneration(Mode) {
 		if Mode == "subscription-destroy-throw"
 			Gui.Prototype.DefineProp("Destroy", {Call: _LMSO_DestroyAfterNative})
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		try Started := LayoutManager_Open()
 		catch Any as Failure
@@ -474,7 +484,7 @@ _LMSO_NavigationGeneration(Mode) {
 	Started := false, OpeningFailure := 0, Threw := false
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMSO_Require(_LayMgrWeb_Available(), "The genuine SDK loader must be available")
+		_LMSO_Require((WebView_UnavailableReason() == ""), "The genuine SDK loader must be available")
 		Thread("Interrupt", 0)
 		try Started := LayoutManager_Open()
 		catch Any as Failure {

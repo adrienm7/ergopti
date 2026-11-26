@@ -16,6 +16,7 @@ return {
 		ahk = "ErgoptiPlus.ahk",
 		exe = "ErgoptiPlus.exe",
 		bundle = "ErgoptiPlus.app",
+		display_name = "Ergopti+",
 	},
 	bundle_ids = {
 		launcher = "com.ergoptiplus.app",
@@ -63,7 +64,12 @@ return {
 	linux_stage = {
 		infix = "ergopti",
 	},
+	linux_launchers = {
+		package = "/usr/bin/ergopti",
+		flatpak = "/app/bin/ergopti",
+	},
 	linux_desktop = {
+		gnome_extension_uuid = "focus@ergopti.fr",
 		gnome_switch_path = "/org/ergopti/InputSource",
 		gnome_switch_interface = "org.ergopti.InputSource1",
 		gnome_extension_missing = "gnome_extension_missing",
@@ -71,6 +77,20 @@ return {
 		xkb_user_root_env = "ERGOPTI_XKB_USER_ROOT",
 		wayland_toplevel_list = "ext_foreign_toplevel_list_v1",
 		wayland_toplevel_handle = "ext_foreign_toplevel_handle_v1",
+		dialog_host_guard_env = "ERGOPTI_DIALOG_HOST_GUARD",
+		dialog_host_guard_case_env = "ERGOPTI_DIALOG_HOST_GUARD_CASE",
+		dbusmenu_interface = "com.canonical.dbusmenu",
+		notification_persistence = "persistence",
+		uinput_udev_rule_file = "99-ergopti-uinput.rules",
+	},
+	linux_host_environment = {
+		names_env = "ERGOPTI_HOST_ENV_NAMES",
+		value_prefix = "ERGOPTI_HOST_ENV_SET_",
+		driver_root_env = "ERGOPTI_HOST_ENV_DRIVER_ROOT",
+	},
+	linux_input = {
+		virtual_keyboard = "Ergopti Virtual Keyboard",
+		virtual_pointer = "Ergopti Virtual Pointer",
 	},
 	locales = {
 		system_fallback = "en",

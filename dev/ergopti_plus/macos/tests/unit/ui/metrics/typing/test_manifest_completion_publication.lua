@@ -4,7 +4,8 @@
 --- MODULE: Typing Manifest Completion Publication Regression
 --- DESCRIPTION:
 --- Incomplete manifests are shown flagged, never saved over the accepted
---- snapshot, and the next complete read is saved again.
+--- snapshot, and the next complete read is saved again. A missing store is
+--- an incomplete read too, not an empty fresh history (MET-11).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -36,6 +37,23 @@ helpers.describe("manifest-completion-publication", function()
 			end)
 		end)
 	end
+	helpers.it("(missing-store-incomplete, met-11) a missing store is shown incomplete and never saved", function()
+		Fixture.with_publication({ missing_store = true }, function(control)
+			local logs = ReadLogs.capture()
+			control.bootstrap()
+			helpers.assert_eq(#control.state.saves, 0, "an empty manifest with no store is not the next snapshot")
+			helpers.assert_eq(#control.publications, 1)
+			local full = control.publications[1]
+			helpers.assert_eq(next(full.payload.manifest), nil)
+			helpers.assert_eq(full.payload.manifest_incomplete, true, "the page says the history is incomplete")
+			control.live()
+			helpers.assert_eq(#control.publications, 2)
+			helpers.assert_eq(control.publications[2].payload.manifest_incomplete, true)
+			helpers.assert_eq(#control.state.saves, 0)
+			helpers.assert_eq(#logs.warnings, 1, "the incomplete read is logged once")
+			helpers.assert_eq(#control.errors, 0)
+		end)
+	end)
 	for _, failure in ipairs({ "rows", "after-row", "bounds", "open" }) do
 		helpers.it("(incomplete-history-partial) full shows a partial manifest after " .. failure .. " without saving it", function()
 			Fixture.with_publication({}, function(control)

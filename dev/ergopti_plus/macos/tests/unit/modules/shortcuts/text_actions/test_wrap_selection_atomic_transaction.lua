@@ -34,7 +34,7 @@ local function load_fixture(options)
 	options = options or {}
 	local saved = {
 		hs_global = _G.hs,
-		destination = package.loaded["modules.keymap.utils"],
+		destination = package.loaded["hotstrings.engine.expander.utils"],
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["core.logger.engine.logger"],
 		synthetic = package.loaded["platform.input.synthetic_input"],
@@ -224,7 +224,7 @@ local function load_fixture(options)
 			end
 		end,
 		restore = function()
-			package.loaded["modules.keymap.utils"] = saved.destination
+			package.loaded["hotstrings.engine.expander.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["core.logger.engine.logger"] = saved.logger
 			package.loaded["platform.input.synthetic_input"] = saved.synthetic

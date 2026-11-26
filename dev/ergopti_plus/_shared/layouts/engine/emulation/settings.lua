@@ -17,8 +17,12 @@
 ---    reported through the caller's sink and read as its default.
 --- 3. The layout emulated is `emulated_layout` when set, else the registry copy
 ---    of the built-in Ergopti layout (LayoutManager_ActiveId): Ergopti+ for the
----    ergopti_plus variant, Ergopti for "ergopti" and "none" (no helper overlay).
----    The .keylayout is the one description every driver types.
+---    ergopti_plus variant, Ergopti for "ergopti". The variant "none" selects no
+---    layout. The .keylayout is the one description every driver types.
+--- 5. The selection is the only gate (maintainer decision of 2026-11-23): the
+---    layer switches (base and Shift, AltGr and Shift+AltGr) are on by default
+---    and only choose layers, so with « None » selected they do nothing and a
+---    new installation emulates nothing.
 --- 4. An enum leaf written in another case (`ergopti_variant = "Ergopti_Plus"`)
 ---    takes its manifest spelling, as Windows' loader admits it (CFX-001).
 --- ==============================================================================
@@ -27,13 +31,14 @@ local ConfigKeys = require("settings.engine.keys")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local ManifestData = require("settings.engine.features.manifest_data")
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
+local Recents = require("layouts.engine.emulation.recents")
 local RowsPolicy = require("layouts.engine.layout.rows_policy")
 local TableUtil = require("core.text.engine.table_util")
 
 local M = {}
 
---- The registry layout each built-in Ergopti variant types.
-M.VARIANT_LAYOUTS = { none = "ergopti", ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
+--- The registry layout each built-in Ergopti variant types; "none" types none.
+M.VARIANT_LAYOUTS = { none = false, ergopti = "ergopti", ergopti_plus = "ergopti_plus" }
 
 local KEY = ConfigKeys.KEY
 
@@ -67,6 +72,7 @@ end
 -- Every leaf read, with its validator.
 M.LEAVES = {
 	{ name = "emulated_layout", path = KEY.LAYOUT_EMULATED_LAYOUT, valid = layout_id },
+	{ name = "recents", path = KEY.LAYOUT_EMULATED_LAYOUT_RECENTS, valid = Recents.valid },
 	{ name = "variant", path = KEY.LAYOUT_ERGOPTI_VARIANT, valid = variant },
 	{ name = "base", path = KEY.LAYOUT_ERGOPTI_BASE, valid = boolean },
 	{ name = "alt_gr", path = KEY.LAYOUT_ERGOPTI_ALT_GR, valid = boolean },
@@ -82,8 +88,8 @@ M.LEAVES = {
 --- @param config table Parsed config.toml.
 --- @param default_for function (path) -> the manifest default.
 --- @param report function|nil (segments, detail) Called for an outdated leaf.
---- @return table settings { id = registry id|nil, base, alt_gr, layout = { emulate_<row> },
----   number_row, edges }
+--- @return table settings { id = registry id, nil while « None » is selected, base, alt_gr,
+---   layout = { emulate_<row> }, number_row, edges, recents = the layouts chosen last }
 function M.resolve(config, default_for, report)
 	if type(config) ~= "table" then error("The emulation settings need a parsed configuration.") end
 	if type(default_for) ~= "function" then error("The emulation settings need the manifest defaults.") end
@@ -108,12 +114,15 @@ function M.resolve(config, default_for, report)
 	end
 	local layout = {}
 	for _, row in ipairs(RowsPolicy.IDS) do layout["emulate_" .. row] = values["emulate_" .. row] end
-	local id = values.emulated_layout ~= "" and values.emulated_layout or M.VARIANT_LAYOUTS[values.variant]
+	-- The selection alone decides whether a layout is emulated: the layer
+	-- switches never select one.
+	local id = values.emulated_layout ~= "" and values.emulated_layout or M.VARIANT_LAYOUTS[values.variant] or nil
 	return { id = id, base = values.base, alt_gr = values.alt_gr, layout = layout,
-		number_row = values.number_row, edges = values.edges }
+		number_row = values.number_row, edges = values.edges, recents = values.recents }
 end
 
---- Whether the settings emulate anything: a layout and at least one of its layers.
+--- Whether the settings emulate anything: a selected layout and at least one
+--- of its layers.
 --- @param settings table M.resolve's result.
 --- @return boolean
 function M.active(settings)
@@ -138,21 +147,34 @@ function M.switch_value(settings, path)
 	return settings.layout[name] == true
 end
 
---- The leaves a layout choice writes, as the onboarding choice and the Windows
---- layout manager (_LayMgrWeb_SelectionOperations) write them.
---- @param choice string "none", "ergopti", "ergopti_plus" or a registry id.
---- @return table|nil values path -> value; nil for an invalid choice.
-function M.choice_values(choice)
+--- The selection leaves of a choice alone.
+--- @param choice string
+--- @return table|nil values
+local function selection_values(choice)
 	if choice == "none" then
-		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_BASE] = false,
-			[KEY.LAYOUT_ERGOPTI_VARIANT] = "none" }
+		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_VARIANT] = "none" }
 	end
 	if choice == "ergopti" or choice == "ergopti_plus" then
-		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_BASE] = true,
-			[KEY.LAYOUT_ERGOPTI_VARIANT] = choice }
+		return { [KEY.LAYOUT_EMULATED_LAYOUT] = "", [KEY.LAYOUT_ERGOPTI_VARIANT] = choice }
 	end
 	if type(choice) ~= "string" or not choice:match("^[a-z][a-z0-9_]*$") then return nil end
-	return { [KEY.LAYOUT_EMULATED_LAYOUT] = choice, [KEY.LAYOUT_ERGOPTI_BASE] = true }
+	return { [KEY.LAYOUT_EMULATED_LAYOUT] = choice }
+end
+
+--- The leaves a layout choice writes, as the onboarding choice and the Windows
+--- layout manager (_LayMgrWeb_SelectionOperations) write them: the selection
+--- only, never a layer switch. A choice of a layout also moves it to the head
+--- of the recent layouts when the caller passes them
+--- (layouts/engine/emulation/recents.lua); « None » leaves them as they are.
+--- @param choice string "none", "ergopti", "ergopti_plus" or a registry id.
+--- @param recents table|nil The recent layouts in force (M.resolve's recents).
+--- @return table|nil values path -> value; nil for an invalid choice.
+function M.choice_values(choice, recents)
+	local values = selection_values(choice)
+	if values ~= nil and recents ~= nil and choice ~= "none" then
+		values[KEY.LAYOUT_EMULATED_LAYOUT_RECENTS] = Recents.after(recents, choice)
+	end
+	return values
 end
 
 --- Sparse write operations for path -> value, in a stable order.
@@ -175,7 +197,9 @@ end
 ---   read_emulation = function() -> decoded emulation table|nil, err (the composed layout's),
 ---   read_composed = function() -> { text, convention }|nil, err (the composed layout stored for
 ---   the emulation alone, read while it is not installed) }
---- @return table|nil source { id, text, convention, composer, emulation }
+--- @return table|nil source { id, text, convention, composer, emulation, family }
+---   family: the registry family of the installed or shipped entry (nil for a
+---   composed layout stored for the emulation alone).
 --- @return string|nil err Why it cannot be read.
 function M.source(id, ports)
 	if type(id) ~= "string" or id == "" then error("An emulation source needs a layout id.") end
@@ -184,7 +208,8 @@ function M.source(id, ports)
 	if entry ~= nil then
 		local text, err = ports.read_installed(id)
 		if type(text) ~= "string" then return nil, err or ("the installed copy of " .. id .. " is unreadable") end
-		local result = { id = id, text = text, convention = entry.keycode_convention, composer = composer }
+		local result = { id = id, text = text, convention = entry.keycode_convention, composer = composer,
+			family = entry.family }
 		-- The composed layout of a layout source carries the emulation table of the
 		-- records its .keylayout leaves out (layouts/engine/composer/source_emulation.lua).
 		if composer and type(ports.read_emulation) == "function" then
@@ -211,7 +236,8 @@ function M.source(id, ports)
 	end
 	local shipped, err = ports.shipped(id)
 	if type(shipped) ~= "table" then return nil, err or ("the layout " .. id .. " is neither installed nor shipped") end
-	return { id = id, text = shipped.text, convention = shipped.entry.keycode_convention, composer = composer }, nil
+	return { id = id, text = shipped.text, convention = shipped.entry.keycode_convention, composer = composer,
+		family = shipped.entry.family }, nil
 end
 
 return M

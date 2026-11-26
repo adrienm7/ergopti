@@ -18,6 +18,11 @@ _PWSO_Require(Condition, Message) {
 t(Key) => Key
 LoggerSuccess(*) => 0
 LoggerError(*) => 0
+; The production focus step (PCK-16) against the passive controller.
+WebView_TakeFocus(Controller) => (Controller.MoveFocus(0), true)
+; The shared WebView2 refusal, recorded instead of shown: there is no native form.
+global _PWSO_Refusals := []
+Ui_MsgBox(Text, *) => (_PWSO_Refusals.Push(Text), "")
 WebView_SharedEnvironment(Loader) => { Passive: true }
 
 Gui_Create(Options := "", Title := "") {
@@ -57,7 +62,12 @@ class _PWSO_View {
 		return { Callback: Callback }
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	AddScriptToExecuteOnDocumentCreated(*) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-09).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_PWSO_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The paths editor seeds its page's locale and reading choices before navigating.")
+		_PWSO_Require(this.Navigations == 0, "The seed precedes the navigation.")
+	}
 	Navigate(Url) {
 		this.Navigations += 1
 	}
@@ -79,6 +89,8 @@ class _PWSO_Controller {
 			_PWSO.ErrorReopen := true
 			FilePathsEditor()
 		}
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -327,14 +339,14 @@ _PWSO_CheckFactoryError() {
 		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
 			&& OldGone && _PWSO.FactoryResult is Integer && _PWSO.FactoryResult == 0
 			&& _PathsEdWeb_RetiredHosts.Length == 0,
-			"a Destroy exception after real effect must admit fallback without a phantom debt")
+			"a Destroy exception after real effect must refuse in words without a phantom debt")
 		return
 	}
 	if _PWSO.Mode == "factory-error-retry-current" || _PWSO.Mode == "factory-error-retry-reentry" {
 		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
 			&& !OldGone && _PWSO.FactoryResult is Integer && _PWSO.FactoryResult == 1
 			&& _PathsEdWeb_RetiredHosts.Length == 1 && _PathsEdWeb_RetiredHosts[1].gui == _PWSO.Windows[1],
-			"a refused native Destroy must retain the exact old GUI without admitting fallback")
+			"a refused native Destroy must retain the exact old GUI without refusing over it")
 		FilePathsEditor()
 		FileAppend("OBSERVATION paths-bare-retry mode=" . _PWSO.Mode . " reopened=" . _PWSO.FactoryReopen
 			. " successor_closed=" . _PWSO.RetrySuccessorClosed . " windows=" . _PWSO.Windows.Length
@@ -353,7 +365,7 @@ _PWSO_CheckFactoryError() {
 		FileAppend("OBSERVATION paths-factory-destroy-refusal refused=" . _PWSO.FactoryRefused . " alive=" . !OldGone . " result=" . _PWSO.FactoryResult . "`n", "*", "UTF-8")
 		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
 			&& !OldGone && _PWSO.FactoryResult is Integer && _PWSO.FactoryResult == 1,
-			"a refused native host destruction must not admit a second fallback over that live host")
+			"a refused native host destruction must not refuse over that live host")
 		return
 	}
 	_PWSO_Require(_PWSO.FactoryFailed && !IsObject(_PWSO.OpenError) && OldGone,

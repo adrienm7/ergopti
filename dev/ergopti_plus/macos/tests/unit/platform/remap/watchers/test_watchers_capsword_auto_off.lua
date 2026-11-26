@@ -35,7 +35,7 @@ local TYPES = {
 local function fresh_harness(overrides)
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
-	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
 	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
@@ -114,7 +114,7 @@ local function fresh_harness(overrides)
 	end
 	helpers.assert_true(h.settings.apply_state(state), "the test settings must compile")
 
-	h.sentinels = require("modules.keymap.control_sentinels")
+	h.sentinels = require("hotstrings.engine.expander.control_sentinels")
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		eventtap = {
 			new = function(types, callback)
@@ -501,7 +501,7 @@ helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed p
 		local h = fresh_harness({ shipped = true })
 		activate(h)
 		local delay = require("keyboard.engine.caps_word_auto_off").idle_delay_ms(h.settings.policy()) / 1000
-		helpers.assert_eq(delay, require("infra.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
+		helpers.assert_eq(delay, require("menu.engine.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
 			"the shipped delay is the manifest default")
 		helpers.assert_eq(delay, 10, "10 s (maintainer decision of 2026-10-20)")
 		helpers.assert_true(timers_at(h, delay)[1] ~= nil, "the delay counts from the activation")

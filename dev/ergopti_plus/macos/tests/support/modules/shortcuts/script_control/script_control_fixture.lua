@@ -28,13 +28,13 @@ package.loaded["platform.input.keycodes"] = {
 	FORWARD_DELETE = 0x75,
 }
 package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
-package.loaded["modules.gestures.engine"] = {
+package.loaded["gestures.engine.engine"] = {
   init = function() end
 }
-package.loaded["modules.gestures.conflicts"] = {
+package.loaded["gestures.engine.conflicts"] = {
   on_action_changed = function() end
 }
-package.loaded["modules.gestures.actions"] = {
+package.loaded["gestures.engine.actions"] = {
   init = function() end,
   get_label = function(n) return n end,
   SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" },
@@ -46,13 +46,13 @@ package.loaded["modules.gestures.actions"] = {
 package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 -- The fixed HS-012 inventory lazy-loads every owner. These broad ScriptControl
 -- API tests must not depend on a real owner cached by an earlier test module.
-package.loaded["modules.llm.api_mlx"] = {
+package.loaded["ai.engine.api.mlx"] = {
 	stop_warmup = function() return true end,
 	resume_warmup = function() return true end,
 }
-package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
-package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
-package.loaded["modules.llm.warmup_controller"] = {
+package.loaded["ai.engine.api.ollama"] = { stop_warmup = function() return true end }
+package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
+package.loaded["ai.engine.local_servers.warmup_controller"] = {
 	stop = function() return true end,
 	schedule_warmup_with_retry = function() return true end,
 }

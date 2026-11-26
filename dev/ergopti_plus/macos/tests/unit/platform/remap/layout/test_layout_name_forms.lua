@@ -120,7 +120,7 @@ end
 
 helpers.describe("karabiner.watchers: one layout, two names (layout-name-forms)", function()
 	helpers.it("(layout-name-forms) observing layouts never acquires the CapsWord control owner", function()
-		local module_name = "modules.keymap.control_sentinels"
+		local module_name = "hotstrings.engine.expander.control_sentinels"
 		local previous_loader = package.preload[module_name]
 		local acquisitions = 0
 		package.preload[module_name] = function()

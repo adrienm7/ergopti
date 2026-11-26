@@ -6,8 +6,9 @@
 --- Restarts the running daemon so every module starts again from config.toml,
 --- the Linux counterpart of hs.reload() and the Windows Reload. It reuses the
 --- updater's restarter: under the systemd user unit, systemd restarts the
---- daemon; otherwise a detached relay starts the standalone launcher, or the
---- developer launcher of a developer run, once this process has exited.
+--- daemon; otherwise a detached relay starts the installation's launcher (the
+--- standalone or package wrapper, the .AppImage file, the Flatpak command, or
+--- the developer launcher of a developer run) once this process has exited.
 --- ==============================================================================
 
 local M = {}
@@ -20,7 +21,7 @@ local LOG = "core.lifecycle.engine.reload.daemon_restart"
 local _pending = nil
 
 --- Requests a restart.
---- @param opts table `{ reason, args, paused?, restarter?, installation?, cgroup?, run? }`:
+--- @param opts table `{ reason, args, paused?, restarter?, installation?, cgroup?, run?, hold_gate? }`:
 ---   `installation()` resolves the updater's installation context,
 ---   `restarter` defaults to modules.updater.restarter.
 --- @return string|nil how "systemd" or "relay" (the caller must then exit).
@@ -41,22 +42,27 @@ function M.restart(opts)
 		Logger.error(LOG, "Restart for %s refused: the process cgroup is unavailable or invalid.", opts.reason)
 		return nil, "the process cgroup is unavailable or invalid"
 	end
-	local wrapper
+	local wrapper, sandbox
 	if not under_unit then
+		-- The installation's kind only decides whether it may replace itself; a
+		-- package, an AppImage or a Flatpak restarts through its own launcher.
 		local context = installation()
-		if type(context) ~= "table" or context.kind ~= "standalone" or type(context.wrapper) ~= "string" then
-			local detail = "no launcher can restart this daemon ("
-				.. tostring(type(context) == "table" and context.reason or "no installation context") .. ")"
+		if type(context) ~= "table" or type(context.launcher) ~= "string" or context.launcher == "" then
+			local why = type(context) == "table"
+				and (context.launcher_refusal or context.reason) or "no installation context"
+			local detail = "no launcher can restart this daemon (" .. tostring(why) .. ")"
 			Logger.error(LOG, "Restart for %s refused: %s.", opts.reason, detail)
 			return nil, detail
 		end
-		wrapper = context.wrapper
+		wrapper, sandbox = context.launcher, context.sandbox
 	end
 	Logger.start(LOG, "Restarting the daemon for %s…", opts.reason)
 	-- Under the unit systemd restarts the service itself and the relay launcher
 	-- is never used; the restarter still requires one, so the unit names it.
 	local how = Restarter.restart({
 		wrapper = wrapper or Restarter.UNIT,
+		sandbox = sandbox,
+		hold_gate = opts.hold_gate,
 		args = opts.args,
 		paused = opts.paused,
 		run = opts.run,

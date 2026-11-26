@@ -21,7 +21,7 @@ local LETTERS = { [K.q] = "q", [K.z] = "z", [K.x] = "x", [K.space] = " " }
 --- @param space_tap_hold boolean Whether Space is a tap-hold key.
 --- @return string screen
 local function type_events(events, space_tap_hold)
-	local engine = require("modules.hotstrings.engine").new()
+	local engine = require("hotstrings.engine.engine").new()
 	assert(engine:load_mappings({ { auto_expand = false, trigger = "qzx", replacement = "final" } }),
 		"the fixture mapping must publish")
 	local kh = helpers.load_module("platform.input.keyboard_hook")

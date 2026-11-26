@@ -13,7 +13,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 
 local function with_clipboard(read_ok, read_value, body)
 	local names = {
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		shell = "core.process.adapters.shell_runner",
 		display = "core.ui.engine.display_server",
 	}
@@ -101,7 +101,7 @@ helpers.describe("clipboard paste snapshot", function()
 		end)
 	end)
 
-	helpers.it("does not overwrite a copy when the ownership read fails", function()
+	helpers.it("does not overwrite a copy when the ownership read fails (clipboard-restore-count)", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
 			local original, reads = shell.exec_checked, 0
 			shell.exec_checked = function(command)
@@ -113,10 +113,12 @@ helpers.describe("clipboard paste snapshot", function()
 			local result, why = clipboard.paste_text("replacement", channel(), function(ms)
 				if ms == 120 then shell.value = "external copy" end
 			end)
-			helpers.assert_eq(result, false)
+			helpers.assert_eq(result, true, "the issued paste counts even though its restoration was given up")
 			helpers.assert_eq(why, "clipboard restoration failed")
 			helpers.assert_eq(shell.value, "external copy")
 			helpers.assert_eq(#shell.writes, 1)
+			-- The field run's session check reads the lost restores of the whole run.
+			helpers.assert_eq(clipboard.restore_failures(), 1, "the given-up restore is counted")
 		end)
 	end)
 
@@ -130,6 +132,7 @@ helpers.describe("clipboard paste snapshot", function()
 			helpers.assert_eq(result, true, "the paste itself succeeded")
 			helpers.assert_eq(#shell.writes, 1, "nothing is restored over the other application's copy")
 			helpers.assert_eq(shell.value, "copied elsewhere")
+			helpers.assert_eq(clipboard.restore_failures(), 0, "a kept foreign copy is no lost restore")
 		end)
 	end)
 
@@ -147,7 +150,7 @@ helpers.describe("clipboard paste snapshot", function()
 						return true
 					end,
 				}
-				local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+				local Transaction = helpers.load_module("hotstrings.engine.output_transaction")
 				local tx = Transaction.new(raw)
 				local pasted = clipboard.paste_text("replacement", tx.channel(), function() end)
 				if not pasted then tx.fail("paste chord failed", "clipboard") end
@@ -169,7 +172,7 @@ helpers.describe("clipboard paste snapshot", function()
 
 	helpers.it("treats an emitter exception like a failed chord and still restores", function()
 		with_clipboard(true, "saved", function(clipboard, shell)
-			local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+			local Transaction = helpers.load_module("hotstrings.engine.output_transaction")
 			local tx = Transaction.new({
 				is_open = function() return true end,
 				emit = function() error("wire exploded") end,

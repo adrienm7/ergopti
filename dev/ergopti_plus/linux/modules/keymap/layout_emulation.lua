@@ -12,18 +12,20 @@
 --- same text for the same physical keys.
 ---
 --- FEATURES & RATIONALE:
---- 1. Decided in the keyboard hook's consumption callback, after the physical
----    magic key: the grabbed press never reaches the application, its text is
----    typed in its place and then handed to the character path, so the buffer,
----    the metrics and the hotstrings see exactly what the application shows,
----    as for the magic key (modules/hotstrings/magic_key_source.lua).
+--- 1. Decided in the keyboard hook's consumption callback: the grabbed press
+---    never reaches the application, its text is typed in its place and then
+---    handed to the character path, so the buffer, the metrics and the
+---    hotstrings see exactly what the application shows.
 --- 2. Key presses first: a text the session's XKB layout types with keys goes
 ---    out as key presses; a character it cannot type goes through the
 ---    injector's clipboard route, the one the expansions use for such
 ---    characters, and says so in the log.
 --- 3. A shortcut chord keeps the modifiers the user holds and presses, instead
 ---    of the physical key, the key the session layout types the emulated
----    layout's Command-level character with (Ctrl+Z where Ergopti has z).
+---    layout's Command-level character with (Ctrl+Z where Ergopti has z). On a
+---    layout of the Ergopti family, the keys typing è, ê, é and à send the
+---    letters chosen for them ([shortcuts], modules/shortcuts/accented_shortcuts.lua),
+---    as the Windows built-in base does.
 --- 4. Off the key path: the settings, the .keylayout parse and the number-row
 ---    analysis run at start and on every [layout] change (M.reload). A layout
 ---    that cannot be read or compiled turns the emulation off with an ERROR,
@@ -38,9 +40,22 @@
 ---    is settled before the new press. A built-in modifier a tap-hold holds
 ---    applies to the keys pressed under it (typed shifted, or pressed with it),
 ---    not to a mouse click.
+--- 7. Caps Lock and AltGr holding a custom modifier (Neo's Mod3 and Mod4): the
+---    hook asks M.on_held_modifier_key before giving either its own role, so
+---    neither XKB, the Caps Lock lock nor the application sees the key while the
+---    emulation holds it; any other layout leaves both keys to the hook.
+--- 8. Held keys (« Touches de jeu », maintainer decision of 2026-11-26): a
+---    character the session layout types with exactly the modifiers the hand
+---    holds goes out as that layout's key, held on the wire from the press to
+---    the physical release with its repeats, so a game binds and holds it; the
+---    hook writes every edge (hold_code), the character path hears of the press
+---    once the down is written. Any other character keeps the typed route. A
+---    game whose keys stay at their physical place with the Ergopti layout
+---    installed is left to that layout (modules/keymap/game_keys_focus.lua).
 --- ==============================================================================
 
 local Emulation = require("layouts.engine.composer.keylayout_emulation")
+local GameKeys = require("layouts.engine.emulation.game_keys")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
 local Settings = require("layouts.engine.emulation.settings")
 local Logger = require("core.logger.engine.shim")
@@ -73,8 +88,13 @@ local CHORD_MODIFIERS = {
 -- The engine's built-in modifier ids as the hook names them in detail.mods.
 local HOOK_MODIFIERS = { shift = "shift", control = "ctrl", alt = "alt", alt_right = "altgr", meta = "meta" }
 
+-- The keys the hook gives a role of their own (the lock, the XKB level) unless
+-- the source emulation holds a custom modifier on them.
+local HOLDABLE_MODIFIER_KEYS = { [EvdevCodes.KEY_CAPSLOCK] = "CapsLock", [EvdevCodes.KEY_RIGHTALT] = "AltRight" }
+
 local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "registry", "type_text",
-	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "magic_evdev", "is_active" }
+	"dispatch_char", "emit_shortcut", "emit_key", "now_ms", "caps_locked", "is_active",
+	"ergopti_family", "typed_text", "resolve_key" }
 
 
 
@@ -89,7 +109,11 @@ local REQUIRED_DEPS = { "read_config", "default_for", "source", "keycodes", "reg
 --- Takes the collaborators. Called once, before the hook starts.
 --- @param deps table { read_config, default_for, report_outdated?, source, keycodes, registry,
 ---   type_text, dispatch_char, emit_shortcut(char, code, mods), emit_key(code, modifiers) where
----   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, magic_evdev, is_active }
+---   code is a KeyboardEvent.code and modifiers engine ids, now_ms, caps_locked, is_active,
+---   ergopti_family (the registry family whose layouts read the accented-letter choices),
+---   typed_text (the text typed so far, the hotstrings' buffer, which a layout's own
+---   repeat and magic keys read), resolve_key(char) -> { keycode, mods } the session
+---   layout's keystroke for a character, nil when it has none }
 function M.init(deps)
 	if _deps ~= nil then error("layout_emulation: already initialized", 2) end
 	if type(deps) ~= "table" then error("layout_emulation.init needs its collaborators", 2) end
@@ -113,7 +137,8 @@ end
 --- @return boolean ok False when the chosen layout cannot be emulated (logged).
 function M.reload()
 	if _deps == nil then error("layout_emulation.reload needs M.init first", 2) end
-	local settings = Settings.resolve(_deps.read_config(), _deps.default_for, _deps.report_outdated)
+	local config = _deps.read_config()
+	local settings = Settings.resolve(config, _deps.default_for, _deps.report_outdated)
 	if _extras ~= nil then M.reset() end
 	_extras = nil
 	if not Settings.active(settings) then
@@ -134,8 +159,14 @@ function M.reload()
 	local ok, built = pcall(function()
 		local model = Emulation.load(source.text, _deps.keycodes(), source.convention, { composer = source.composer })
 		local session = Emulation.new_session(model, Emulation.row_map(_deps.registry(), require("core.text.engine.json").is_null))
+		-- Ergopti's own layouts read the four accented-letter choices, as Windows.
+		local accented = nil
+		if source.family ~= nil and source.family == _deps.ergopti_family() then
+			local Accented = require("modules.shortcuts.accented_shortcuts")
+			accented = Emulation.accented_choices(Accented.resolve(config), Accented.LETTERS)
+		end
 		Emulation.configure(session, { base = settings.base, alt_gr = settings.alt_gr, layout = settings.layout,
-			number_row = settings.number_row, edges = settings.edges })
+			number_row = settings.number_row, edges = settings.edges, accented = accented })
 		if source.emulation ~= nil then extras = SourceEmulation.new_session(SourceEmulation.compile(source.emulation)) end
 		return session
 	end)
@@ -147,7 +178,14 @@ function M.reload()
 		return false
 	end
 	_session, _extras = built, extras
-	_status = { active = true, id = settings.id, error = nil }
+	-- Whether the installed Ergopti layout types what this emulation types
+	-- (modules/keymap/game_keys_focus.lua): a layout of the Ergopti family.
+	local family_ok, family = pcall(_deps.ergopti_family)
+	if not family_ok then
+		Logger.warn(LOG, "The Ergopti family is unreadable (%s): the installed layout is not offered to games.", tostring(family))
+	end
+	_status = { active = true, id = settings.id, error = nil,
+		ergopti = family_ok and source.family ~= nil and source.family == family }
 	Logger.info(LOG, "Layout emulation of '%s' on (base %s, AltGr %s, source records %s).", settings.id,
 		tostring(settings.base), tostring(settings.alt_gr), tostring(extras ~= nil))
 	return true
@@ -173,10 +211,35 @@ function M.legend(code)
 	return text ~= "" and text or nil
 end
 
---- What the emulation does now, for the menu.
---- @return table status { active, id, error }
+--- M.legend for a grabbed key's evdev code: what the running emulation types
+--- unshifted there.
+--- @param evdev number The key's evdev code.
+--- @return string|nil text nil when the emulation is off or leaves the key to
+---   the system layout.
+function M.legend_for_evdev(evdev)
+	if _evdev_to_code == nil then return nil end
+	local code = _evdev_to_code[evdev]
+	return code ~= nil and M.legend(code) or nil
+end
+
+--- Whether a configuration has the emulation type the base layer, without
+--- loading its layout: the magic key's layout default then falls back to the
+--- manifest default, since no emulated layout is an AZERTY or a QWERTY.
+--- @param config table Decoded config.toml.
+--- @param default_for function Manifest default reader.
+--- @return boolean
+function M.configured_base(config, default_for)
+	local settings = Settings.resolve(config, default_for, function() end)
+	return Settings.active(settings) and settings.base == true
+end
+
+--- What the emulation does now, for the menu: number_row says whether it types
+--- the number row itself (base layer and number-row switch on), the only case
+--- where the number-row ordering applies through it.
+--- @return table status { active, id, error, number_row, ergopti (a layout of the Ergopti family) }
 function M.status()
-	return { active = _status.active, id = _status.id, error = _status.error }
+	return { active = _status.active, id = _status.id, error = _status.error, ergopti = _status.ergopti == true,
+		number_row = _status.active == true and Emulation.orders_number_row(_session) }
 end
 
 --- Drops the running layout (a reload: a pending dead key does not survive, nor
@@ -229,6 +292,18 @@ local function type_in_place(text, code)
 	return true
 end
 
+--- The session layout's key a press's text is held on, nil for the typed route.
+--- @param text string The emulated text.
+--- @param hand table The modifiers the hand holds (the hook's detail.mods).
+--- @return integer|nil evdev code
+local function held_code(text, hand)
+	local step = _deps.resolve_key(text)
+	local held = { shift = hand.shift == true, altgr = hand.altgr == true,
+		caps_lock = _deps.caps_locked() == true, virtual = next(_virtual) ~= nil }
+	if not GameKeys.held_admissible(text, step, held) then return nil end
+	return step.keycode
+end
+
 --- The hook's modifiers with the ones a tap-hold holds for the user.
 local function merged_mods(mods)
 	if next(_virtual) == nil then return mods end
@@ -277,7 +352,7 @@ local function source_press(detail, code, mods)
 	local now = _deps.now_ms()
 	-- A real press of a key the engine holds: its release never arrived.
 	if extras.held_keys[code] ~= nil then perform(select(2, SourceEmulation.release(extras, code, now)), detail.code) end
-	local consumed, actions = SourceEmulation.press(extras, code, engine_held(mods), now)
+	local consumed, actions = SourceEmulation.press(extras, code, engine_held(mods), now, _deps.typed_text())
 	local performed = perform(actions, detail.code)
 	if not consumed then return nil end
 	local function release(release_detail)
@@ -293,7 +368,7 @@ local function source_press(detail, code, mods)
 	return true, function(repeat_detail)
 		if type(repeat_detail) ~= "table" or repeat_detail.code ~= held or _extras ~= extras then return false end
 		local _, repeated = SourceEmulation.press(extras, code, engine_held(merged_mods(
-			type(repeat_detail.mods) == "table" and repeat_detail.mods or {})), _deps.now_ms())
+			type(repeat_detail.mods) == "table" and repeat_detail.mods or {})), _deps.now_ms(), _deps.typed_text())
 		return perform(repeated, held)
 	end, release
 end
@@ -303,6 +378,8 @@ end
 --- @return boolean consumed True when the emulation typed in the key's place.
 --- @return function|nil repeat_callback Owner of the held press's repeats.
 --- @return function|nil release_callback Owner of the press's release (a source emulation key).
+--- @return table|nil hold { code, after }: the session layout's key the hook holds on the
+---   wire in the press's place, and what to run once its down is written.
 function M.on_key(detail)
 	local session = _session
 	if session == nil or type(detail) ~= "table" then return false end
@@ -315,8 +392,6 @@ function M.on_key(detail)
 	end
 	-- After the source emulation: this very press may have started a held modifier.
 	local mods = merged_mods(hand)
-	local magic = _deps.magic_evdev()
-	session.config.magic_code = magic and _evdev_to_code[magic] or nil
 	local decision, text = Emulation.decide(session, code, mods.shift == true, _deps.caps_locked() == true,
 		mods.altgr == true, mods.ctrl == true, mods.alt == true, mods.meta == true, detail.char)
 	if decision == Emulation.PASS then
@@ -347,6 +422,19 @@ function M.on_key(detail)
 		Logger.error(LOG, "The emulated shortcut key could not be pressed — the chord keeps its own key.")
 		return false
 	end
+	if decision == Emulation.TYPE then
+		local hold = held_code(text, hand)
+		if hold ~= nil then
+			-- Held from the press to the release: each repeat the wire takes
+			-- reaches the character path as the application shows it.
+			local pressed = detail.code
+			return true, function(repeat_detail)
+				if type(repeat_detail) ~= "table" or repeat_detail.code ~= pressed or _session ~= session then return false end
+				_deps.dispatch_char(text, pressed)
+				return true
+			end, nil, { code = hold, after = function() _deps.dispatch_char(text, pressed) end }
+		end
+	end
 	if not type_in_place(text, detail.code) then
 		Emulation.reset(session)
 		return false
@@ -359,6 +447,48 @@ function M.on_key(detail)
 	end
 end
 
+
+--- Decides a Caps Lock or AltGr press the hook would give its own role: while
+--- the composed layout's source emulation holds a custom modifier on the key,
+--- the press is that modifier's (consumed, its repeats ignored, its release
+--- owned), else nil and the key keeps its role.
+--- @param detail table { code, mods } as the hook reports a key-down.
+--- @return table|nil receipt { consume = true, repeat_callback, release_callback }.
+function M.on_held_modifier_key(detail)
+	if _session == nil or _extras == nil or type(detail) ~= "table" then return nil end
+	local code = HOLDABLE_MODIFIER_KEYS[detail.code]
+	if code == nil or not SourceEmulation.holds_modifier_key(_extras.model, code) then return nil end
+	if _deps.is_active() ~= true and _extras.held_keys[code] == nil then return nil end
+	local consumed, repeat_callback, release_callback = source_press(detail, code,
+		merged_mods(type(detail.mods) == "table" and detail.mods or {}))
+	if consumed ~= true or repeat_callback == nil then
+		error("layout_emulation: the source emulation did not hold its modifier key " .. code)
+	end
+	return { consume = true, repeat_callback = repeat_callback, release_callback = release_callback }
+end
+
+--- Whether the running source emulation holds a custom modifier on a key.
+--- @param code string KeyboardEvent.code.
+--- @return boolean
+function M.holds_modifier_key(code)
+	return _extras ~= nil and SourceEmulation.holds_modifier_key(_extras.model, code)
+end
+
+--- Whether the running emulation decides the Ctrl, Alt or Super chords of this
+--- key: the accented-letter shortcuts of the OS layout leave such a key to it,
+--- and keep the keys the emulation leaves to the OS layout (base layer or row
+--- off, AltGr alone).
+--- @param detail table Keyboard hook press detail.
+--- @return boolean
+function M.owns_chord(detail)
+	local session = _session
+	if session == nil or type(detail) ~= "table" or _deps.is_active() ~= true then return false end
+	local code = _evdev_to_code[detail.code]
+	if code == nil then return false end
+	local mods = merged_mods(type(detail.mods) == "table" and detail.mods or {})
+	local _, emulated = Emulation.chord_char(session, code, mods.ctrl == true, mods.alt == true, mods.meta == true)
+	return emulated == true
+end
 
 --- The character a Ctrl, Alt or Super chord on this key sends while the
 --- emulation runs, without typing anything: the keyboard shortcut slots match
@@ -398,7 +528,7 @@ local function shared_json(rel, lossless)
 end
 
 --- The daemon's collaborators for M.init, built from its ports.
---- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run, typed_text }
 --- @return table deps
 function M.production_deps(ports)
 	local Registry = require("modules.keymap.layout_registry")
@@ -406,11 +536,11 @@ function M.production_deps(ports)
 	return {
 		read_config = function()
 			local bytes, status, detail = require("core.text.engine.toml_codec.writer").read_classified(
-				require("infra.config_paths").config("config.toml"))
+				require("settings.engine.paths").config("config.toml"))
 			if status ~= "ok" and status ~= "absent" then error("config.toml is unreadable: " .. tostring(detail)) end
 			return require("core.text.engine.toml_codec").decode(bytes or "")
 		end,
-		default_for = require("infra.manifest_reader").default_for,
+		default_for = require("menu.engine.manifest_reader").default_for,
 		report_outdated = function(segments, detail) require("settings.engine.migration.outdated").report(segments, detail, Logger) end,
 		source = function(id)
 			local composer = Registry.composer_settings()
@@ -440,7 +570,7 @@ function M.production_deps(ports)
 			-- character's US key, as GTK and Qt resolve a shortcut there; the
 			-- physical key would be another shortcut (Ctrl+X for Ergopti's c).
 			-- A character with no US key keeps the physical one.
-			local Combo = require("modules.gestures.combo_emitter")
+			local Combo = require("gestures.engine.combo_emitter")
 			local us_name = char:match("^%w$") and char:lower() or ({ ["."] = "period", [","] = "comma" })[char]
 			local us_code = us_name and Combo.KEYSYM_TO_CODE[us_name] or code
 			local keycode, level_mods = require("adapters.keyboard_layout").shortcut_keycode(char, us_code)
@@ -454,7 +584,7 @@ function M.production_deps(ports)
 				if type(mods) == "table" and mods[held.name] == true then chord[#chord + 1] = held.code end
 			end
 			for _, mod in ipairs(level_mods) do chord[#chord + 1] = mod end
-			local pressed = require("modules.gestures.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
+			local pressed = require("gestures.engine.combo_emitter").press_codes(chord, { keycode }, "emulated shortcut")
 			return pressed == true
 		end,
 		emit_key = function(code, modifiers)
@@ -469,18 +599,30 @@ function M.production_deps(ports)
 				if evdev == nil then return false end
 				chord[#chord + 1] = evdev
 			end
-			return require("modules.gestures.combo_emitter").press_codes(chord, { key.evdev },
+			return require("gestures.engine.combo_emitter").press_codes(chord, { key.evdev },
 				"emulated layout source key") == true
 		end,
 		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 		caps_locked = function() return require("adapters.xkb_capture").caps_locked() == true end,
-		magic_evdev = ports.magic_evdev,
-		is_active = function() return not ports.is_paused() end,
+		-- A game whose keys stay at their place types through the installed
+		-- Ergopti layout while it has the focus (modules/keymap/game_keys_focus.lua).
+		is_active = function()
+			return not ports.is_paused() and not require("modules.keymap.game_keys_focus").passes_through()
+		end,
+		-- A layout's own repeat and magic keys type from the text typed before them.
+		typed_text = ports.typed_text,
+		-- The session layout's keystroke for one character, its held key's source.
+		resolve_key = function(char) return require("adapters.keyboard_layout").resolve(char) end,
+		ergopti_family = function()
+			local settings, settings_err = Registry.settings()
+			if not settings then error("the layout registry settings are unreadable: " .. tostring(settings_err)) end
+			return settings.ergopti_family
+		end,
 	}
 end
 
 --- Initializes the module with the daemon's collaborators and loads the layout.
---- @param ports table { injector, is_paused, dispatch_char, magic_evdev, dry_run }
+--- @param ports table { injector, is_paused, dispatch_char, dry_run, typed_text }
 --- @return boolean ok M.reload's answer.
 function M.start(ports)
 	M.init(M.production_deps(ports))

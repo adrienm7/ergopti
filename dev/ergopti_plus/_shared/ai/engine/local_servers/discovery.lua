@@ -7,6 +7,12 @@
 --- and superseding sweep generations. Native HTTP/credential/cleanup owners
 --- remain injected by the driver: a generation fence never acknowledges native
 --- process, task or timer retirement.
+---
+--- A pause stops the network work, not the configuration (EDD-1): pause()
+--- fences a running sweep and refuses new ones until resume(), and keeps the
+--- published verdicts, whose age stops while paused. A change of the view or a
+--- write while paused keeps them too, held: no longer current evidence for an
+--- action, so the menu shows them inert until the resume's sweep.
 --- ==============================================================================
 
 local M = {}
@@ -103,6 +109,8 @@ function M.new(options)
 	local order = {}
 	for index, id in ipairs(options.order) do order[index] = id end
 	local results, checked_at, generation, active, waiters = {}, nil, 0, false, {}
+	-- paused_age: the cache age frozen at the pause; held: the verdicts need a sweep
+	local paused, paused_age, held = false, nil, false
 	local controller = {}
 
 	--- Reports a contained producer/observer refusal through the native log port.
@@ -141,6 +149,14 @@ function M.new(options)
 		for index, id in ipairs(captured) do if order[index] ~= id then changed = true end end
 		if not changed then return false end
 		order = captured
+		if paused then
+			-- No sweep can answer for the new view before the resume: the last
+			-- verdicts of the rows it keeps stay shown, held.
+			local kept = {}
+			for _, id in ipairs(captured) do kept[id] = results[id] end
+			generation, active, checked_at, results, held, paused_age = generation + 1, false, nil, kept, true, nil
+			return true
+		end
 		generation, active, checked_at, results = generation + 1, false, nil, {}
 		return true
 	end
@@ -157,6 +173,8 @@ function M.new(options)
 		if on_done ~= nil and type(on_done) ~= "function" then
 			error("local_servers.sweep: on_done must be a function")
 		end
+		-- A sweep talks to the servers: a pause refuses it until the resume.
+		if paused then return false end
 		-- Copy before any producer runs. A native producer may annotate its input
 		-- or pump a callback that changes the caller's next target record.
 		local captured = {}
@@ -173,7 +191,7 @@ function M.new(options)
 
 		local function finish()
 			if own_generation ~= generation then return end
-			active = false
+			active, held = false, false
 			resolve_shared(order, fresh, identified, options.identities)
 			local changed = false
 			for _, id in ipairs(order) do
@@ -242,7 +260,7 @@ function M.new(options)
 	--- Returns whether a new logical sweep is due; native debt belongs to its port.
 	--- @return boolean
 	function controller.is_stale()
-		if active then return false end
+		if active or paused then return false end
 		if checked_at == nil then return true end
 		return options.clock() - checked_at >= options.max_age()
 	end
@@ -252,7 +270,45 @@ function M.new(options)
 	function controller.invalidate()
 		generation = generation + 1
 		active, checked_at, waiters = false, nil, {}
+		-- A write while paused leaves the verdicts without a sweep to renew them
+		if paused then held, paused_age = true, nil end
 	end
+
+	--- Stops the network work for a pause, keeping the verdicts and their age.
+	--- A running sweep is fenced and its callers dropped: its verdicts stay held.
+	--- Native callers separately cancel their own requests.
+	--- @param cut_short boolean|nil The driver's own pre-sweep work was running.
+	--- @return boolean changed False when already paused.
+	function controller.pause(cut_short)
+		assert(cut_short == nil or type(cut_short) == "boolean", "local discovery cut_short must be boolean")
+		if paused then return false end
+		paused = true
+		if active or cut_short == true then held = true end
+		generation, active, waiters = generation + 1, false, {}
+		paused_age = (not held and checked_at ~= nil) and options.clock() - checked_at or nil
+		if held then checked_at = nil end
+		return true
+	end
+
+	--- Readmits sweeps after a pause. Verdicts held while paused are stale at
+	--- once; the others resume the age they had at the pause.
+	--- @return boolean changed False when not paused.
+	function controller.resume()
+		if not paused then return false end
+		paused = false
+		checked_at = (not held and paused_age ~= nil) and options.clock() - paused_age or nil
+		paused_age, held = nil, false
+		return true
+	end
+
+	--- Returns whether a pause holds the network work.
+	--- @return boolean
+	function controller.is_paused() return paused end
+
+	--- Returns whether the verdicts shown are held by a pause without current
+	--- evidence (a write, a view change or a sweep cut short): no action.
+	--- @return boolean
+	function controller.is_held() return paused and held end
 
 	--- Returns logical discovery activity, never physical native retirement.
 	--- @return boolean

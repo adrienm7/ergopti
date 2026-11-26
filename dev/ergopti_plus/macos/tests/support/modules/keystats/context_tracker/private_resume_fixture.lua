@@ -15,8 +15,8 @@ local OWNERS = {
 	"core.text.engine.number_policy",
 	"core.text.engine.toml_codec.source_open",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
-	"infra.config_paths",
+	"menu.engine.manifest_reader",
+	"settings.engine.paths",
 	"core.ui.engine.dialog_util",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"modules.keystats.init",
@@ -27,7 +27,7 @@ local OWNERS = {
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"platform.input.synthetic_input",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook",
 	"adapters.input_source_broker",
@@ -48,15 +48,15 @@ local OWNERS = {
 	"metrics.engine.capture.physical_subscription_lifetime",
 	"modules.shortcuts.script_control",
 	"core.ui.engine.notifications",
-	"modules.gestures.engine",
-	"modules.gestures.actions",
+	"gestures.engine.engine",
+	"gestures.engine.actions",
 	"platform.input.key_state",
 	"infra.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
-	"modules.llm.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
+	"ai.engine.local_servers.warmup_controller",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
@@ -72,7 +72,7 @@ local OWNERS = {
 	"platform.input.keycodes",
 	"core.text.engine.json",
 	-- Optional keymap startup imports survive a rejected parent construction.
-	"adapters.clipboard",
+	"clipboard.adapters.clipboard",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
 	"platform.input.keyboard_geometry",
@@ -91,7 +91,7 @@ local OWNERS = {
 	"infra.capsword_output",
 	"core.timing.engine.deferred_work",
 	"core.fs.engine.dir",
-	"infra.hotstring_engine",
+	"hotstrings.engine.matcher.engine",
 	"core.lifecycle.engine.launcher_environment",
 	"layouts.engine.layers.control_signals",
 	"layouts.engine.layers.terminators",
@@ -107,25 +107,25 @@ local OWNERS = {
 	"ai.engine.prediction.rewrite",
 	"ai.engine.prediction.translate",
 	"core.logger.engine",
-	"modules.keymap.control_sentinels",
-	"modules.keymap.expander",
-	"modules.keymap.registry",
-	"modules.keymap.registry_groups",
-	"modules.keymap.registry_index",
-	"modules.keymap.state",
-	"modules.keymap.terminator_replay",
-	"modules.keymap.terminators",
-	"modules.keymap.utils",
-	"modules.llm",
-	"modules.llm.api_common",
-	"modules.llm.api_token_crypto",
-	"modules.llm.app_filter",
-	"modules.llm.local_servers",
-	"modules.llm.ollama_binary",
-	"modules.llm.parser",
-	"modules.llm.profiles",
-	"modules.llm.prompt_builder",
-	"modules.llm.streaming_handler",
+	"hotstrings.engine.expander.control_sentinels",
+	"hotstrings.engine.expander.expander",
+	"hotstrings.engine.expander.registry",
+	"hotstrings.engine.expander.registry_groups",
+	"hotstrings.engine.expander.registry_index",
+	"hotstrings.engine.expander.state",
+	"hotstrings.engine.expander.terminator_replay",
+	"hotstrings.engine.expander.terminators",
+	"hotstrings.engine.expander.utils",
+	"ai.engine",
+	"ai.engine.api.common",
+	"ai.engine.api.token_crypto",
+	"ai.engine.prediction.app_filter",
+	"ai.engine.local_servers.local_servers",
+	"ai.engine.ollama.binary",
+	"ai.engine.api.parser",
+	"ai.engine.settings.profiles",
+	"ai.engine.prediction.prompt_builder",
+	"ai.engine.api.streaming_handler",
 	"platform.remap.lease_helper",
 	"core.text.engine.utils_core",
 }
@@ -293,17 +293,17 @@ function M.with_runtime(callback)
 			end
 			local notices = {}
 			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
 			package.loaded["platform.input.key_state"] = {}
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end
-			for _, name in ipairs({ "modules.llm.api_mlx", "modules.llm.api_ollama", "modules.llm.api_remote", "modules.llm.warmup_controller" }) do
+			for _, name in ipairs({ "ai.engine.api.mlx", "ai.engine.api.ollama", "ai.engine.api.remote", "ai.engine.local_servers.warmup_controller" }) do
 				-- retry_deferred_warmup: a restored remote API entry replays the deferred warmup.
 				package.loaded[name] = { pause_warmup = yes, resume_warmup = yes, stop_warmup = yes, stop = yes,
 					retry_deferred_warmup = yes }
 			end
-			local remote = package.loaded["modules.llm.api_remote"]
+			local remote = package.loaded["ai.engine.api.remote"]
 			local remote_entries, remote_active = {}, nil
 			remote.set_entries = function(entries) remote_entries = entries end
 			remote.get_entries = function() return remote_entries end

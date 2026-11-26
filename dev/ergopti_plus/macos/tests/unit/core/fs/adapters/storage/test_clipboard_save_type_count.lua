@@ -19,7 +19,7 @@ helpers.describe("clipboard.save counts UTI types via pairs(), not #", function(
 			trace   = function() end, done = function() end, start = function() end, success = function() end,
 		}
 
-		local Clipboard = helpers.load_with_stubs("adapters.clipboard", {
+		local Clipboard = helpers.load_with_stubs("clipboard.adapters.clipboard", {
 			pasteboard = {
 				allContentTypes = function() return { {} } end,
 			changeCount = function() return 0 end,
@@ -33,6 +33,6 @@ helpers.describe("clipboard.save counts UTI types via pairs(), not #", function(
 			"save() must report 2 type(s) for a 2-UTI hash table, got: " .. tostring(logged))
 
 		package.loaded["core.logger.engine.logger"]         = nil
-		package.loaded["adapters.clipboard"] = nil
+		package.loaded["clipboard.adapters.clipboard"] = nil
 	end)
 end)

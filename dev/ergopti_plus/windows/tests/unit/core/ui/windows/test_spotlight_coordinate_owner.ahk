@@ -11,13 +11,22 @@
 #Requires AutoHotkey v2.0
 
 _SPCO_ChildSource() {
-	global _DriverDir
+	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["GR_CreateWindow", "MCGetPosStrict", "TickExpired"] {
+	; A published overlay is announced while a screen reader runs. Some programs
+	; set the system's screen-reader flag on a desktop without one: these vectors
+	; prove the timer, so the flag reads as off here, whatever the host says.
+	Source .= "A11ySystem_ScreenReaderOn() => false`n"
+	Seen := Map()
+	for Symbol in ["GR_CreateWindow", "MCGetPosStrict", "TickExpired", "ParseTomlFile", "IniCacheGet", "TimingsLoadShared"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The coordinate child needs the genuine whole owner of " . Symbol)
-		Source .= "#Include " . Owner . "`n"
+		if !Seen.Has(Owner)
+			Source .= "#Include " . Owner . "`n"
+		Seen[Owner] := true
 	}
+	; The real timer arms its period from the shared timing registry.
+	Source .= "TimingsLoadShared(" . JsonStringLiteral(_SharedDir) . ")`n"
 	Owner := _DriverProductionFileForSymbol("SpotlightMouseAt", _DriverDir)
 	Code := FileRead(Owner, "UTF-8")
 	SplitPath(Owner, , &OwnerDirectory)

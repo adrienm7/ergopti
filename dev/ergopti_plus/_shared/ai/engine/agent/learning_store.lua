@@ -4,7 +4,7 @@
 --- MODULE: AI Agent Learning Store (Shared)
 --- DESCRIPTION:
 --- The in-memory map behind the automatic mode of the AI agent on macOS and
---- Linux (modules/llm/agent_learning.lua): the threshold each (application,
+--- Linux (ai/engine/agent/learning.lua): the threshold each (application,
 --- intent) pair needs before System 2 wakes. Accepting a suggestion lowers it,
 --- dismissing one raises it, within agent.json's learning bounds (Agent.learn).
 --- The drivers own what differs: where and in which format the map persists,

@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Codec = require("core.text.engine.toml_codec")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local CHORD = { key = "g", mods = { ctrl = true } }
 local SOURCE = '[shortcuts]\nenabled = true\nchatgpt_url = "https://initial.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 
@@ -17,7 +17,7 @@ local function with_binding(body, options)
 	local ok, err = pcall(function()
 		Sandbox.with_config(SOURCE, function(path)
 			local seen = { commands = {}, other = 0, queue = {} }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end,
 				set = function() error("canonical bindings must not write legacy storage") end }
 			package.loaded["core.process.adapters.shell_runner"] = {
@@ -29,11 +29,11 @@ local function with_binding(body, options)
 				open = function() error("shortcut ownership must not acquire evdev") end,
 				close = function() error("shortcut ownership must not close evdev") end,
 			}
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			local function reload()
 				for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
-					"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "modules.gestures.manager", "infra.shortcuts_scope" }) do package.loaded[name] = nil end
-				local gestures = require("modules.gestures.manager")
+					"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.shortcuts.key_combinations", "gestures.engine.manager", "infra.shortcuts_scope" }) do package.loaded[name] = nil end
+				local gestures = require("gestures.engine.manager")
 				gestures.init({ persist = true, config_path = path, enabled = false,
 					action_handlers = { script_reload = function() seen.other = seen.other + 1 end } })
 				local manager = require("modules.shortcuts.manager")

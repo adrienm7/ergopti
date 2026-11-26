@@ -56,13 +56,12 @@ function M.register(helpers)
 				local receipt = receiver.prepare("profile_shortcut_dialog", "dialog")
 				helpers.assert_type(receipt, "table")
 				helpers.assert_eq(receiver.title(receipt), "Caption for menu.profiles.shortcut_title")
-				helpers.assert_nil(receiver.prepare("magic_key_source_notice", "notification"), "a Linux-only notice")
 				helpers.assert_nil(receiver.prepare("profile_shortcut_dialog", "notification"), "the wrong kind")
 				helpers.assert_nil(receiver.title({}), "a forged receipt")
 			end)
+			-- Linux declares no native presentation of its own since the physical
+			-- magic key's notice left (2026-11-21): it receives none of macOS's.
 			with_receiver("linux", function(receiver)
-				local receipt = receiver.prepare("magic_key_source_notice", "notification")
-				helpers.assert_eq(receiver.title(receipt), "Caption for dialog.magic_key_source.title")
 				helpers.assert_nil(receiver.prepare("profile_shortcut_dialog", "dialog"), "a macOS-only dialog")
 			end)
 		end)
@@ -84,9 +83,9 @@ end
 --- Checks that the driver's receiving owner is the shared receiver.
 --- @param helpers table Driver test API.
 function M.register_driver(helpers)
-	helpers.describe("infra.native_presentation is the shared receiver (native-presentation-receiver)", function()
+	helpers.describe("menu.engine.native_presentation is the shared receiver (native-presentation-receiver)", function()
 		helpers.it("prepare and title come from menu/engine/native_presentation_core.lua", function()
-			local receiver = require("infra.native_presentation")
+			local receiver = require("menu.engine.native_presentation")
 			for _, method in ipairs({ "prepare", "title" }) do
 				local source = debug.getinfo(receiver[method], "S").source
 				helpers.assert_true(source:find("_shared/menu/engine/native_presentation_core.lua", 1, true) ~= nil,

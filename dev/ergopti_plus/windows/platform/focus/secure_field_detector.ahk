@@ -92,6 +92,20 @@ global SFD_UIA_CONTEXT_MATCH_FN := 0
 ; ====================================
 ; ====================================
 
+; Whether the session's input desktop is locked or secure (lock screen, UAC):
+; no input desktop answers to this process. Fails closed.
+; @return {Boolean}
+SFD_IsInputDesktopLocked() {
+	static DESKTOP_SWITCHDESKTOP := 0x0100
+	try Desktop := DllCall("User32\OpenInputDesktop", "UInt", 0, "Int", 0, "UInt", DESKTOP_SWITCHDESKTOP, "Ptr")
+	catch
+		return true
+	if !Desktop
+		return true
+	DllCall("User32\CloseDesktop", "Ptr", Desktop)
+	return false
+}
+
 ; Returns true if the focused control is secure OR cannot yet be classified.
 ; The cheap native path is synchronous; an inconclusive browser/Electron/WPF
 ; control is denied once and confirmed with UIA on a deferred callback.

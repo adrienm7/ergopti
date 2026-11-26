@@ -94,11 +94,12 @@ end
 --- The installation context a Reload relays in a developer run, shaped as
 --- modules/updater/installer.resolve() answers for a standalone installation.
 --- @param root string|nil Clone root; the running one when nil.
---- @return table|nil context { kind = "standalone", wrapper = string }, nil outside a developer run.
+--- @return table|nil context { kind = "standalone", wrapper, launcher }, nil outside a developer run.
 function M.restart_context(root)
 	root = root or M.root()
 	if not root then return nil end
-	return { kind = "standalone", wrapper = root .. M.LAUNCHER_SUBPATH }
+	local launcher = root .. M.LAUNCHER_SUBPATH
+	return { kind = "standalone", wrapper = launcher, launcher = launcher }
 end
 
 --- The source trees whose saved .lua edits restart a developer run.

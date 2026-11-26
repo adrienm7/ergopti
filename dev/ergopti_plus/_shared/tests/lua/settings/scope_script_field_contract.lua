@@ -4,7 +4,7 @@
 return function(helpers, driver)
 	local function with_native(kind, callback)
 		local name = kind == "locale" and "core.i18n.engine.i18n"
-			or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
+			or (driver == "macos" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
 		local saved, names = {}, { name, "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.adapters.storage" }
 		for _, module in ipairs(names) do saved[module] = package.loaded[module]; package.loaded[module] = nil end
 		local writes = 0
@@ -104,7 +104,7 @@ return function(helpers, driver)
 			helpers.it("keeps exact live-parent admission through an equal-valued module replacement", function()
 				with_native(kind, function(native)
 					local name = kind == "locale" and "core.i18n.engine.i18n"
-						or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
+						or (driver == "macos" and "diagnostics.ui.error_dialog" or "diagnostics.ui.error_dialog")
 					local owner = token()
 					helpers.assert_eq(native.scope_acquire(owner), true)
 					local receipt = native.scope_capture(owner)
@@ -157,7 +157,11 @@ return function(helpers, driver)
 				end)
 			elseif driver == "macos" then
 				helpers.it("refuses the existing locale reload instead of cancelling or replaying it", function()
-					with_native(kind, function(native, backend)
+					-- A locale choice writes its config.toml row, which needs the
+					-- file (locale-neutral-2026-11-21).
+					local config_path = require("settings.engine.paths").get("ConfigTomlPath")
+					local config = assert(io.open(config_path, "wb")); assert(config:write("")); assert(config:close())
+					local ok, err = pcall(with_native, kind, function(native, backend)
 						local timers = hs.timer.__timers
 						local before = #timers
 						helpers.assert_eq(native.set_locale("en"), true)
@@ -170,6 +174,8 @@ return function(helpers, driver)
 						helpers.assert_eq(scheduled.running, true)
 						for index = #timers, before + 1, -1 do timers[index]:stop(); timers[index] = nil end
 					end)
+					os.remove(config_path)
+					if not ok then error(err, 0) end
 				end)
 			end
 			helpers.it("forgets only finalized native inverse data and acknowledges repeat cleanup", function()

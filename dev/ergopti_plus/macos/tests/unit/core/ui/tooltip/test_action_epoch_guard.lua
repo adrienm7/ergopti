@@ -102,7 +102,7 @@ local function load_fixture()
 	-- prior test would own different timer/property stubs and turn these callbacks
 	-- into fixture accidents instead of production behavior.
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["core.ui.ui.tooltip.llm"] = nil
 	local TooltipLLM = require("core.ui.ui.tooltip.llm")
 	local available = true
@@ -115,7 +115,7 @@ local function load_fixture()
 		hs.eventtap.new = previous_eventtap_new
 		hs.timer.doAfter = previous_do_after
 		package.loaded["core.ui.ui.tooltip.llm"] = nil
-		package.loaded["adapters.event_provenance"] = nil
+		package.loaded["diagnostics.adapters.event_provenance"] = nil
 		package.loaded["platform.input.synthetic_input"] = nil
 		restore_context()
 		restore_context = function() end

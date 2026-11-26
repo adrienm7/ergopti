@@ -45,6 +45,8 @@ local WINDOWS_PATH_PARSERS = {
 	["_shared/shortcuts/engine/open_target.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
 	["_shared/updater/engine/config_backup_core.lua"] = { 1,
 		"refuses a shipped backup name that would not be one component on Windows" },
+	["_shared/core/logger/engine/log_export.lua"] = { 1,
+		"refuses a crash report name that would not be one zip entry component where Windows extracts the archive" },
 }
 
 -- Unconverted sites, each owned by a concurrent change and converted next:

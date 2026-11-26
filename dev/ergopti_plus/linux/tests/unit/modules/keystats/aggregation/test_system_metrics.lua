@@ -45,7 +45,7 @@ end
 --- @param body function Receives the module.
 local function with_shell(answers, body)
 	local shell_name = "core.process.adapters.shell_runner"
-	local module_name = "modules.keystats.system_metrics"
+	local module_name = "modules.keystats.system.system_metrics"
 	local previous_shell = package.loaded[shell_name]
 	local previous_module = package.loaded[module_name]
 	local calendar = require("modules.keystats.calendar")

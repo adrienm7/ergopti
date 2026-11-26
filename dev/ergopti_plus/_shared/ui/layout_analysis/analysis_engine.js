@@ -18,14 +18,22 @@
  *    (prepareNgrams); a layout is scored by mapping those tables onto its
  *    keys, never by a pass over the text, so a hundred layouts take well under
  *    a second.
- * 2. Exact keystrokes: each character becomes the key sequence that types it
- *    (dead keys included, the cheapest when there are several), and the key
- *    bigrams and trigrams are those of the expanded stream, rebuilt exactly
- *    from the character uni-, bi- and trigrams.
+ * 2. Keystrokes as typed: each character is typed, where it stands, the way
+ *    that costs least among those the layout offers (keys on any level, dead
+ *    keys, multi-character outputs), and the key bigrams and trigrams are
+ *    those of the expanded stream, rebuilt from the character uni-, bi- and
+ *    trigrams (exactly where a character has one way).
  * 3. One source for data: fingers, keyboards, weights and the layout library
  *    come from LAYOUT_ANALYSIS_DATA (_generated/analysis_data.js), read on
  *    first use so the codegen can load this file to convert layouts.
  * 4. Fail fast: an unknown keyboard, metric or weight throws.
+ * 5. Incremental: scoreSession re-scores a changed layout by compiling again
+ *    only the ways its changed cells and dead-key rules reach
+ *    (compileCoreFrom, list for list a whole compile's) and walking only the
+ *    n-grams of the characters whose key sequence changed, through the same
+ *    visitor and metric code as analyse(), for the layout optimizer.
+ * 6. Bonuses apart from effort: the distinct characters a layout types
+ *    (coverage_bonus, over a fixed cap) and objective simplicity rules.
  * ==============================================================================
  */
 
@@ -34,20 +42,60 @@
 var LAYOUT_ANALYSIS = (function () {
 	'use strict';
 
+	// The built-ins as locals. The Node tests and the codegen run the engine in
+	// a vm context, where each read of a global goes through the context's
+	// interceptor, about a thousand times slower than a local one; the walks
+	// read Math, Map, the typed arrays and Infinity millions of times.
+	const {
+		Array,
+		Error,
+		Float64Array,
+		Int32Array,
+		JSON,
+		Map,
+		Math,
+		Number,
+		Object,
+		Set,
+		String,
+		Uint8Array,
+		Uint16Array,
+		Uint32Array,
+		WeakMap
+	} = globalThis;
+	const INFINITY = Number.POSITIVE_INFINITY;
+
 	// ============================
 	// ======= 1/ Constants =======
 	// ============================
 
 	const LAYER_IDS = ['base', 'shift', 'altgr', 'shift_altgr'];
-	// Modifier presses each layer adds: Shift, AltGr.
-	const LAYER_SHIFT = [0, 1, 0, 1];
-	const LAYER_ALTGR = [0, 0, 1, 1];
+	// The levels of a layout that declares none: each level's id, whether it
+	// holds Shift, and the other modifiers it holds (AltGr, the model's key).
+	const DEFAULT_LEVELS = Object.freeze(
+		LAYER_IDS.map((id, layer) =>
+			Object.freeze({
+				id,
+				shift: layer % 2 === 1,
+				hold: Object.freeze(layer >= 2 ? ['altgr'] : [])
+			})
+		)
+	);
+	// The modifier of the default levels; its keys come from the model.
+	const DEFAULT_MODIFIER = 'altgr';
+	const DEFAULT_MODIFIER_LABEL = 'AltGr';
+	// A level id, a modifier name: lower-case words joined by « _ ».
+	const LEVEL_NAME = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
+	// The held keys of a way that holds no modifier but Shift: shared, never written.
+	const NO_HELD = Object.freeze([]);
 	// A key press costs one; a held modifier half of one when choosing between
 	// two ways of typing a character.
 	const MODIFIER_COST = 0.5;
 	// Finger indexes: lp lr lm li lt rt ri rm rr rp.
 	const LEFT_THUMB = 4;
 	const RIGHT_THUMB = 5;
+	/** Whether a finger index is a thumb's. */
+	const isThumbFinger = (f) => f === LEFT_THUMB || f === RIGHT_THUMB;
 	// Order from the pinky (0) to the index (3), on either hand.
 	const INDEX_ORDER = 3;
 	// How far each finger reaches, by order (pinky, ring, middle, index), for half scissors.
@@ -55,14 +103,141 @@ var LAYOUT_ANALYSIS = (function () {
 	const DEFAULT_KEYBOARD = 'iso';
 	// An edited ideal finger load may miss 100 % by this much (rounding of inputs).
 	const LOAD_SUM_TOLERANCE = 0.05;
+	// A percentile needs this many reference layouts to mean something: fewer
+	// (a handful ticked) and each layout would move it by several points.
+	const PERCENTILE_MIN_REFERENCES = 20;
+	/**
+	 * A refusal with a stable code and the values its message names, so a page
+	 * shows it in the reader's language (layout_analysis.error.<code>).
+	 */
+	class AnalysisError extends Error {
+		constructor(code, values, message) {
+			super(`layout_analysis: ${message}`);
+			this.name = 'AnalysisError';
+			this.code = code;
+			this.values = values;
+		}
+	}
+
 	// A dead-key rule typed by another dead key: « dead:<state> » names the dead
 	// key that enters <state> (Ergo-L's 1dk pressed twice gives the diaeresis).
 	const DEAD_TYPED = 'dead:';
 	// A key is lateral from this far (in key units, on the column grid) beyond
 	// its finger's home column: the index's inner column, the pinky's outer keys.
 	const LATERAL_MIN_STEP = 0.75;
+	// The character layoutSimilarity leaves out: every layout types it on the
+	// space bar, which would add about a sixth of any text to every pair.
+	const SIMILARITY_SKIPPED = ' ';
+	// The share of a same-finger skipgram's travel sfb_distance counts beside a
+	// same-finger bigram's (genkey's and Oxeylyzer's skipgram discount).
+	const SFS_DISTANCE_SHARE = 0.5;
+	// Finger orders of the pinky and the ring finger (pinky_ring).
+	const PINKY_ORDER = 0;
+	const RING_ORDER = 1;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
+	// A row jump (the maintainer's « skipgram »): two fingers of one hand at
+	// least this many rows apart.
+	const ROW_JUMP_ROWS = 1;
+	/**
+	 * The graded costs (score_weights.json « grades », maintainer 2026-11-21):
+	 * each factor table scales its metric's weight by the kind of event. An
+	 * SFB by the rows its finger crosses (same row, one row, two or more); a
+	 * row jump (two fingers of one hand on different rows) by how far apart
+	 * the fingers are (adjacent, one finger between, index and pinky) times
+	 * the rows it crosses (one, two or more); the travel by the finger that
+	 * moves. Two tables are not factors (GRADE_KINDS): the alternation reward
+	 * on or off, and hand_run's progressive scale (the multiplier of a
+	 * keystroke by the length of the same-hand run it is in, one per length
+	 * up to the last, then a linear growth). The definitions are in
+	 * docs/design/layout-analysis.md, « Graded costs ».
+	 */
+	const GRADES = Object.freeze({
+		sfb: Object.freeze(['same_row', 'one_row', 'two_rows']),
+		row_jump: Object.freeze(['adjacent', 'one_apart', 'index_pinky', 'one_row', 'two_rows']),
+		distance: Object.freeze(['pinky', 'ring', 'middle', 'index', 'thumb']),
+		alternation: Object.freeze(['rewarded']),
+		hand_run: Object.freeze([
+			'length_1',
+			'length_2',
+			'length_3',
+			'length_4',
+			'length_5',
+			'length_6',
+			'growth'
+		])
+	});
+	// The tables that are not factors: a switch (a boolean: its metric counts
+	// or not) and a run scale (multipliers >= 1 by run length, the last one
+	// for its length, then a growth >= 0 per key beyond it).
+	const GRADE_SWITCH = 'switch';
+	const GRADE_RUN = 'run';
+	const GRADE_KINDS = Object.freeze({ alternation: GRADE_SWITCH, hand_run: GRADE_RUN });
+	// The run scale's growth beyond its last length (the other grades are lengths).
+	const RUN_GROWTH = 'growth';
+	const RUN_LENGTHS = GRADES.hand_run.filter((grade) => grade !== RUN_GROWTH);
+	// Each counted graded metric's axes: an event's cost is the product of its
+	// grade on each axis (an SFB has one, a row jump two: fingers, then rows).
+	const GRADE_AXES = Object.freeze({
+		sfb: [GRADES.sfb],
+		row_jump: [GRADES.row_jump.slice(0, 3), GRADES.row_jump.slice(3)]
+	});
+	// The graded metrics whose events the key stream counts per cell (the
+	// travel's grades are read from the presses of each finger).
+	const COUNTED_GRADES = Object.keys(GRADE_AXES);
+	// Each counted metric's cells, every combination of one grade per axis,
+	// the first axis outermost; a cell's name joins its grades with « _ ».
+	const GRADE_CELLS = Object.fromEntries(
+		COUNTED_GRADES.map((metric) => [
+			metric,
+			GRADE_AXES[metric].reduce(
+				(cells, axis) => cells.flatMap((cell) => axis.map((grade) => cell.concat([grade]))),
+				[[]]
+			)
+		])
+	);
+	// The stream counter of each cell: « <metric>_<cell name> ».
+	const GRADE_COUNTERS = Object.fromEntries(
+		COUNTED_GRADES.map((metric) => [
+			metric,
+			GRADE_CELLS[metric].map((cell) => `${metric}_${cell.join('_')}`)
+		])
+	);
+	// The finger grade of two fingers of one hand, by their distance in finger
+	// order (1: adjacent, 3: index and pinky).
+	const FINGER_GAP_GRADE = [null, 0, 1, 2];
+	// The finger types by finger order, pinky to index (the travel's grades).
+	const FINGER_TYPES = ['pinky', 'ring', 'middle', 'index'];
+	const THUMB_TYPE = 'thumb';
+	// The same-hand run counters (hand_run): every key bigram and trigram of
+	// the stream, the space's included (it ends a run), and those whose keys
+	// are fingers of one hand. Not events of any pair.
+	const RUN_COUNTS = new Set([
+		'run_pairs',
+		'run_same',
+		'run3',
+		'run3_lead',
+		'run3_tail',
+		'run3_all'
+	]);
+	// Ways to type one character kept for the context choice: a symbol on two
+	// keys, on AltGr and behind a dead key all stay; more never occur in the
+	// library and would multiply the cost of the choice.
+	const MAX_WAYS = 4;
+	// Sets of touched symbols whose closure a rule graph keeps (touchedClosure):
+	// every pair of a search's movable units (about 45 on a letter layout) fits,
+	// and a few megabytes bound what a longer stream of distinct changes holds.
+	const CLOSURE_CACHE_LIMIT = 1024;
+	// Separates two tokens in a map key (no layout types this control character).
+	const TOKEN_SEP = '\u0001';
+	// Separates a character from the repeat and magic keys that type it in a
+	// context token (contextTable; no layout types this control character).
+	const CONTEXT_SEP = '\u0002';
+	// The largest stamp a Uint32Array holds: a stamp counter starts over below it.
+	const UINT32_LAST = 0xffffffff;
+	// How many times over the key stream may count a table's whole total (a
+	// character's keys, both keys of a pair): its sums must stay exact.
+	const WHOLE_SUM_MARGIN = 64;
 
 	/**
 	 * Every metric: unit, direction and what it is a share of. The definitions
@@ -72,9 +247,14 @@ var LAYOUT_ANALYSIS = (function () {
 		sfb: { unit: '%', better: 'lower', of: 'bigrams' },
 		repeat: { unit: '%', better: 'none', of: 'bigrams' },
 		sfs: { unit: '%', better: 'lower', of: 'trigrams' },
+		// Per 100 key bigrams (the SFBs' travel) and trigrams (the skipgrams').
+		sfb_distance: { unit: 'mm', better: 'lower', of: 'ngrams' },
 		lsb: { unit: '%', better: 'lower', of: 'bigrams' },
 		scissors: { unit: '%', better: 'lower', of: 'bigrams' },
 		half_scissors: { unit: '%', better: 'lower', of: 'bigrams' },
+		pinky_ring: { unit: '%', better: 'lower', of: 'bigrams' },
+		row_jump: { unit: '%', better: 'lower', of: 'bigrams' },
+		hand_run: { unit: '%', better: 'lower', of: 'keystrokes' },
 		roll_in: { unit: '%', better: 'higher', of: 'bigrams' },
 		roll_out: { unit: '%', better: 'higher', of: 'bigrams' },
 		hand_change: { unit: '%', better: 'none', of: 'bigrams' },
@@ -92,18 +272,48 @@ var LAYOUT_ANALYSIS = (function () {
 		hand_imbalance: { unit: '%', better: 'lower', of: 'keystrokes' },
 		pinky_load: { unit: '%', better: 'lower', of: 'keystrokes' },
 		modifier_usage: { unit: '%', better: 'lower', of: 'characters' },
+		altgr_usage: { unit: '%', better: 'lower', of: 'characters' },
 		dead_key_usage: { unit: '%', better: 'lower', of: 'characters' },
+		// Typed by the layout's own repeat or magic key (contextWays): shown, not scored.
+		context_key_usage: { unit: '%', better: 'none', of: 'characters' },
 		outer_column: { unit: '%', better: 'lower', of: 'keystrokes' },
 		unsupported: { unit: '%', better: 'lower', of: 'characters' },
 		compact_fit: { unit: '%', better: 'higher', of: 'characters' },
 		char_coverage: { unit: '%', better: 'higher', of: 'layout' },
 		direct_digits: { unit: '%', better: 'higher', of: 'layout' },
-		shortcut_left: { unit: '%', better: 'higher', of: 'layout' }
+		shortcut_left: { unit: '%', better: 'higher', of: 'layout' },
+		distinct_chars: { unit: 'chars', better: 'none', of: 'layout' },
+		coverage_bonus: { unit: '%', better: 'higher', of: 'layout' },
+		simplicity: { unit: '%', better: 'higher', of: 'layout' }
 	};
+
+	/**
+	 * The access weights: the costs of the way a character is reached (a held
+	 * Shift or AltGr, the AltGr layer, a dead key's extra press). The choice
+	 * of ways reads the user's own (the other keystroke metrics choose by the
+	 * defaults), so an edit of one of them analyses again, and rescore()
+	 * refuses it (docs/design/layout-analysis.md, « Ways of typing »).
+	 */
+	const ACCESS_WEIGHTS = Object.freeze(['modifier_usage', 'altgr_usage', 'dead_key_usage']);
+
+	/**
+	 * How many decimals the pages show a metric with: a count none, a distance
+	 * one, a share two. The one source for the Comparer, the panel and the
+	 * optimizer.
+	 * @param {string} id - A METRICS id.
+	 * @returns {number} Fraction digits.
+	 */
+	function metricDigits(id) {
+		const unit = METRICS[id].unit;
+		if (unit === 'chars') return 0;
+		return unit === 'mm' ? 1 : 2;
+	}
 
 	// =======================
 	// ======= 2/ Data =======
 	// =======================
+
+	let loadedData = null;
 
 	/**
 	 * The generated data, read on first use.
@@ -111,13 +321,20 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @throws {Error} When _generated/analysis_data.js was not loaded first.
 	 */
 	function data() {
+		// Kept once found: a read of the global costs dearly in a vm context.
+		if (loadedData) return loadedData;
 		if (typeof LAYOUT_ANALYSIS_DATA === 'undefined' || !LAYOUT_ANALYSIS_DATA)
 			throw new Error('layout_analysis: load _generated/analysis_data.js before the engine');
-		return LAYOUT_ANALYSIS_DATA;
+		loadedData = LAYOUT_ANALYSIS_DATA;
+		return loadedData;
 	}
 
 	/** Splits a string into code points. */
 	const codePoints = (text) => Array.from(text);
+
+	/** Whether a string is one code point (codePoints(text).length === 1), without splitting it. */
+	const isOneCodePoint = (text) =>
+		text.length === 1 || (text.length === 2 && text.codePointAt(0) > 0xffff);
 
 	/**
 	 * FNV-1a 32-bit hash of a text, the cache key of its n-gram tables.
@@ -139,31 +356,46 @@ var LAYOUT_ANALYSIS = (function () {
 
 	const keyboardCache = new Map();
 
+	const unknownKey = (code) =>
+		new AnalysisError('fingering_unknown_key', { key: String(code) }, `unknown key ${code}`);
+	const unknownFinger = (finger) =>
+		new AnalysisError(
+			'fingering_unknown_finger',
+			{ finger: String(finger) },
+			`unknown finger ${finger}`
+		);
+
 	/**
 	 * Checks a fingering profile: the user's own model of which finger presses
 	 * each key and where each finger rests.
 	 * @param {object} profile - {id?, name?, base?: 'standard'|'angle',
 	 *   fingers?: {code: finger}, home?: {finger: code}}.
 	 * @returns {object} The profile, with empty maps filled in.
-	 * @throws {Error} On an unknown base, finger or key.
+	 * @throws {AnalysisError} On an unknown base, finger or key.
 	 */
 	function fingeringProfile(profile) {
 		const { model, geometry } = data();
+		// A board-only key (the ErgoDox's outer columns) has no row-staggered
+		// geometry; a profile may still finger it on its board.
+		const boardOnly = new Set(model.board_only_keys);
+		const known = (code) => Boolean(geometry[code]) || boardOnly.has(code);
 		if (!profile || typeof profile !== 'object')
-			throw new Error('layout_analysis: a fingering profile is an object');
+			throw new AnalysisError('fingering_not_object', {}, 'a fingering profile is an object');
 		if (profile.base !== undefined && !model.fingerings[profile.base])
-			throw new Error(`layout_analysis: unknown fingering ${profile.base}`);
+			throw new AnalysisError(
+				'fingering_unknown_base',
+				{ base: String(profile.base) },
+				`unknown fingering ${profile.base}`
+			);
 		const fingers = profile.fingers || {};
 		const home = profile.home || {};
 		for (const [code, finger] of Object.entries(fingers)) {
-			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
-			if (!model.fingers.includes(finger))
-				throw new Error(`layout_analysis: unknown finger ${finger}`);
+			if (!known(code)) throw unknownKey(code);
+			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
 		}
 		for (const [finger, code] of Object.entries(home)) {
-			if (!model.fingers.includes(finger))
-				throw new Error(`layout_analysis: unknown finger ${finger}`);
-			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
+			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
+			if (!known(code)) throw unknownKey(code);
 		}
 		return {
 			id: profile.id || 'custom',
@@ -180,16 +412,21 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} [profile] - A fingering profile (fingeringProfile): its
 	 *   base fingering, finger of each key and home key of each finger replace
 	 *   the keyboard's own; absent, the model's defaults.
+	 * @param {boolean} [withOptional] - Whether the board keeps the model's
+	 *   optional_keys (Tab, Enter, the right Control), which only a layout that
+	 *   types on one of them is measured with (boardFor); absent, without them.
 	 * @returns {object} {id, codes, index: Map code → i, finger, order, hand,
-	 *   row, relRow (row relative to the finger's home key), x, y, home,
+	 *   row, relRow (row relative to the finger's home key), x, y, width (in key units), home,
 	 *   lateral, outer, homeOf: finger → key index}.
 	 * @throws {Error} On an unknown keyboard, an invalid profile, or a home key
 	 *   that is not on the board or not pressed by its own finger (a shared
 	 *   home key, the space bar, rests both thumbs).
 	 */
-	function keyboard(keyboardId, profile) {
+	function keyboard(keyboardId, profile, withOptional) {
 		const checked = profile === undefined ? null : fingeringProfile(profile);
-		const cacheKey = checked ? `${keyboardId}|${JSON.stringify(checked)}` : keyboardId;
+		const cacheKey =
+			(checked ? `${keyboardId}|${JSON.stringify(checked)}` : keyboardId) +
+			(withOptional ? '|optional' : '');
 		if (keyboardCache.has(cacheKey)) return keyboardCache.get(cacheKey);
 		const { model, geometry } = data();
 		const spec = model.keyboards[keyboardId];
@@ -201,15 +438,29 @@ var LAYOUT_ANALYSIS = (function () {
 		const baseFingering = board3d
 			? board3d.fingers
 			: model.fingerings[checked && checked.base ? checked.base : spec.fingering];
-		const fingering = Object.assign({}, baseFingering, checked ? checked.fingers : {});
+		// A JIS or ABNT board adds its own keys (Yen, Ro) to the base fingering.
+		const fingering = Object.assign(
+			{},
+			baseFingering,
+			board3d ? {} : spec.extra_fingers || {},
+			checked ? checked.fingers : {}
+		);
 		const homeKeys = Object.assign(
 			{},
 			board3d ? board3d.home_keys : model.home_keys,
 			checked ? checked.home : {}
 		);
 		const form = spec.geometry === 'ortho' ? 'iso' : spec.geometry;
-		const outer = new Set(model.outer_keys);
-		const modifierCodes = new Set(Object.values(model.modifier_keys));
+		// A board names its own outer columns (the ErgoDox's two pinky columns).
+		const outer = new Set(board3d && board3d.outer_keys ? board3d.outer_keys : model.outer_keys);
+		const modifierCodes = new Set(heldCodes(model));
+		// The ErgoDox's left thumb keys beyond the one it types on (Alt, or Cmd on
+		// macOS, and keys further away: idle_thumb_keys) are no typing keys: a
+		// layout's characters there are on a key the board lacks.
+		const idle = new Set(model.idle_thumb_keys);
+		// Tab, Enter and the right Control are keys only for the layouts that
+		// type on them: the others keep the board they always had.
+		const optional = new Set(withOptional ? [] : model.optional_keys);
 		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
 			id: keyboardId,
@@ -225,11 +476,13 @@ var LAYOUT_ANALYSIS = (function () {
 			y: [],
 			// The column grid: x without the row stagger, for lateral keys.
 			grid: [],
+			width: [],
 			home: [],
 			lateral: [],
 			outer: []
 		};
 		for (const [code, fingerId] of Object.entries(fingering)) {
+			if (idle.has(code) || optional.has(code)) continue;
 			// A board key: its centre already, no row stagger to remove.
 			const g = board3d
 				? board3d.keys[code] && {
@@ -241,7 +494,7 @@ var LAYOUT_ANALYSIS = (function () {
 				: geometry[code] && geometry[code][form];
 			if (!g) continue;
 			const finger = model.fingers.indexOf(fingerId);
-			if (finger < 0) throw new Error(`layout_analysis: unknown finger ${fingerId}`);
+			if (finger < 0) throw unknownFinger(fingerId);
 			const grid = board3d
 				? g.col + g.width / 2
 				: g.col + g.width / 2 + model.ortho_row_offsets[String(g.row)];
@@ -257,27 +510,32 @@ var LAYOUT_ANALYSIS = (function () {
 			// A column-staggered board measures its real height; the others their rows.
 			board.y.push(board3d ? g.y : g.row);
 			board.grid.push(grid);
+			board.width.push(g.width);
 			board.home.push(homeCodes.has(code));
 			board.outer.push(outer.has(code));
-			// A wide modifier is pressed at its end nearest the home row.
+			// A wide modifier is pressed at its end nearest the home row: a
+			// left-hand one (left Shift, Caps Lock) at its right end.
 			if (modifierCodes.has(code) && !board3d) {
-				board.x[board.x.length - 1] =
-					code === model.modifier_keys.shift_for_right_hand ? g.col + g.width - 0.5 : g.col + 0.5;
+				board.x[board.x.length - 1] = finger < LEFT_THUMB ? g.col + g.width - 0.5 : g.col + 0.5;
 			}
 		}
 		board.homeOf = model.fingers.map((fingerId) => {
 			const k = board.index.get(homeKeys[fingerId]);
 			if (k === undefined)
-				throw new Error(
-					`layout_analysis: home key ${homeKeys[fingerId]} of ${fingerId} is not on ${keyboardId}`
+				throw new AnalysisError(
+					'home_key_not_on_keyboard',
+					{ key: String(homeKeys[fingerId]), finger: fingerId, keyboard: keyboardId },
+					`home key ${homeKeys[fingerId]} of ${fingerId} is not on ${keyboardId}`
 				);
 			// The space bar is wide: both thumbs rest on it, whichever presses it.
 			if (
 				model.fingers[board.finger[k]] !== fingerId &&
 				!model.shared_home_keys.includes(homeKeys[fingerId])
 			)
-				throw new Error(
-					`layout_analysis: home key ${homeKeys[fingerId]} is not pressed by ${fingerId}`
+				throw new AnalysisError(
+					'home_key_other_finger',
+					{ key: homeKeys[fingerId], finger: fingerId },
+					`home key ${homeKeys[fingerId]} is not pressed by ${fingerId}`
 				);
 			return k;
 		});
@@ -295,12 +553,38 @@ var LAYOUT_ANALYSIS = (function () {
 			);
 		});
 		// Distance in millimetres from each finger's home key to each key.
-		board.reach = board.codes.map((_, k) => {
+		const distance = (k, home) =>
+			Math.hypot(board.x[k] - board.x[home], board.y[k] - board.y[home]) * model.key_unit_mm;
+		// A thumb key (thumb_keys) is reached from the nearest place its thumb
+		// rests: its home key or one of its rest keys (thumb_rest_keys), so a
+		// thumb-letter layout's thumb costs no travel on the key it rests on.
+		const thumbCodes = new Set(model.thumb_keys);
+		const rests = model.thumb_rest_keys
+			.map((code) => board.index.get(code))
+			.filter((k) => k !== undefined);
+		board.reach = board.codes.map((code, k) => {
 			const home = board.homeOf[board.finger[k]];
-			const dx = board.x[k] - board.x[home];
-			const dy = board.y[k] - board.y[home];
-			return Math.hypot(dx, dy) * model.key_unit_mm;
+			if (!thumbCodes.has(code)) return distance(k, home);
+			const own = rests.filter((rest) => board.finger[rest] === board.finger[k]);
+			return Math.min(distance(k, home), ...own.map((rest) => distance(k, rest)));
 		});
+		// The thumb presses the pair and trigram metrics leave out: the space
+		// bar's and AltGr's, every thumb key but the thumbs' own (thumb_keys).
+		// boardFor adds the thumb key a layout types its space on.
+		board.outOfPairs = Uint8Array.from(board.codes, (code, k) =>
+			isThumbFinger(board.finger[k]) && !thumbCodes.has(code) ? 1 : 0
+		);
+		// The left thumb's typing keys (the space bar, NonConvert), of which a
+		// layout types on one (leftThumbKey), and the one it rests on first.
+		board.leftThumbCodes = board.codes.filter(
+			(code, k) => board.finger[k] === LEFT_THUMB && !modifierCodes.has(code)
+		);
+		board.leftThumbRest =
+			model.thumb_rest_keys.find((code) => board.leftThumbCodes.includes(code)) ||
+			board.codes[board.homeOf[LEFT_THUMB]];
+		// The left thumb keys a layout types on together (the ErgoDox's two
+		// 2-unit keys: left_thumb_typing_keys), where other boards keep one.
+		board.leftThumbTogether = (board3d && board3d.left_thumb_typing_keys) || [];
 		board.modifiers = {
 			shiftForLeft: board.index.get(model.modifier_keys.shift_for_left_hand),
 			shiftForRight: board.index.get(model.modifier_keys.shift_for_right_hand),
@@ -314,26 +598,243 @@ var LAYOUT_ANALYSIS = (function () {
 	// ======= 4/ Layouts ======
 	// =========================
 
+	const checkedLevels = new WeakMap();
+
+	/**
+	 * Checks the levels a layout declares beyond the default four (Neo's Mod3
+	 * and Mod4): the first four keep the default shape (none, Shift, one
+	 * modifier set, Shift with that set), so the readers, exports and other
+	 * analysers that know four levels read them as base, Shift, AltGr and
+	 * Shift+AltGr; the others follow. Each modifier names the keys that hold
+	 * it for a key of the left hand and for one of the right hand (a thumb
+	 * key's is the right hand's, as for Shift): the first the board has is
+	 * pressed, and a level whose modifier has none there types nothing on it.
+	 * @param {object} layout - The layout input, with levels and modifiers.
+	 * @returns {object[]|null} The levels, null for the default four.
+	 * @throws {Error} On malformed levels or modifiers, a modifier key the
+	 *   layout types on, or modifiers without levels.
+	 */
+	function checkLevels(layout) {
+		const { levels, modifiers } = layout;
+		if (levels === undefined && modifiers === undefined) return null;
+		const fail = (what) => {
+			throw new Error(`layout_analysis: ${layout.id} ${what}`);
+		};
+		// The rows change with every copy that shares its levels (the
+		// optimizer's trials): they are checked each time.
+		// A tap-hold key (tap_keys) types when tapped and holds when held.
+		const typesOnModifier = () => {
+			for (const [name, modifier] of Object.entries(modifiers))
+				for (const side of ['for_left_hand', 'for_right_hand'])
+					for (const code of modifier[side])
+						if (
+							!(modifier.tap_keys || []).includes(code) &&
+							(layout.rows[code] || []).some((cell) => cell !== null)
+						)
+							fail(`types on ${code}, which holds its modifier ${name}`);
+		};
+		if (checkedLevels.has(levels) && checkedLevels.get(levels) === modifiers) {
+			typesOnModifier();
+			return levels;
+		}
+		if (!Array.isArray(levels) || levels.length <= LAYER_IDS.length)
+			fail(`levels must list more than ${LAYER_IDS.length} levels`);
+		if (!modifiers || typeof modifiers !== 'object') fail('levels need their modifiers');
+		const names = Object.keys(modifiers);
+		for (const name of names) {
+			const modifier = modifiers[name];
+			if (!LEVEL_NAME.test(name) || name === 'shift')
+				fail(`modifier ${name} is not a modifier name`);
+			if (!modifier || typeof modifier.label !== 'string' || modifier.label === '')
+				fail(`modifier ${name} needs a label`);
+			for (const side of ['for_left_hand', 'for_right_hand']) {
+				const codes = modifier[side];
+				if (!Array.isArray(codes) || codes.length === 0 || codes.some((c) => typeof c !== 'string'))
+					fail(`modifier ${name} needs its ${side} keys`);
+			}
+			if (
+				modifier.tap_keys !== undefined &&
+				(!Array.isArray(modifier.tap_keys) ||
+					modifier.tap_keys.some(
+						(c) => !modifier.for_left_hand.includes(c) && !modifier.for_right_hand.includes(c)
+					))
+			)
+				fail(`modifier ${name}: its tap_keys must be among its keys`);
+		}
+		typesOnModifier();
+		const ids = new Set();
+		const used = new Set();
+		levels.forEach((level, i) => {
+			if (!level || !LEVEL_NAME.test(level.id) || ids.has(level.id))
+				fail(`level ${i} has no id of its own`);
+			ids.add(level.id);
+			if (level.shift !== undefined && typeof level.shift !== 'boolean')
+				fail(`level ${level.id}: shift is true or false`);
+			const hold = level.hold === undefined ? [] : level.hold;
+			if (
+				!Array.isArray(hold) ||
+				hold.some((name) => !names.includes(name)) ||
+				new Set(hold).size !== hold.length
+			)
+				fail(`level ${level.id} holds an unknown modifier`);
+			for (const name of hold) used.add(name);
+		});
+		const holdOf = (i) => (levels[i].hold || []).slice().sort().join('+');
+		if (
+			holdOf(0) !== '' ||
+			levels[0].shift ||
+			holdOf(1) !== '' ||
+			!levels[1].shift ||
+			holdOf(2) === '' ||
+			levels[2].shift ||
+			holdOf(3) !== holdOf(2) ||
+			!levels[3].shift
+		)
+			fail('levels must start with none, Shift, a modifier set and Shift with that set');
+		const shapes = new Set(levels.map((level, i) => `${level.shift ? 1 : 0}|${holdOf(i)}`));
+		if (shapes.size !== levels.length) fail('levels hold the same modifiers twice');
+		for (const name of names) if (!used.has(name)) fail(`modifier ${name} is held by no level`);
+		checkedLevels.set(levels, modifiers);
+		return levels;
+	}
+
+	/**
+	 * Checks a layout's own repeat and magic keys (docs/design/magic-and-repeat-keys.md):
+	 * `context` maps a key to one action per level (null where the key types
+	 * its row's cell), `magic` maps a table id to its rules. A repeat key types
+	 * the character typed `repeat` places back (1: the last one, 2: the one
+	 * before it); a magic key types what its table gives for the text typed
+	 * so far: the rule whose `after` is the longest end of that text, else
+	 * its fallback (nothing when empty). Each `after` holds one to
+	 * context_keys.context_max characters, each `types` and fallback one.
+	 * Kept beside the rows, so every reader of the rows reads characters only.
+	 * @param {object} layout - The layout input.
+	 * @param {number} width - Its levels per key.
+	 * @returns {boolean} Whether the layout has any repeat or magic key.
+	 * @throws {Error} On a malformed action, rule or table, an unknown or
+	 *   unused table, or a level that also types its row's cell.
+	 */
+	function checkContext(layout, width) {
+		const { context, magic } = layout;
+		if (context === undefined && magic === undefined) return false;
+		const fail = (what) => {
+			throw new Error(`layout_analysis: ${layout.id} ${what}`);
+		};
+		const isMap = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+		if (!isMap(context)) fail('context must map keys to their levels');
+		const tables = magic === undefined ? {} : magic;
+		if (!isMap(tables)) fail('magic must map table ids to their rules');
+		const { repeat_depths: depths, context_max: longest } = data().model.context_keys;
+		const oneChar = (text) => typeof text === 'string' && isOneCodePoint(text) && !isBreak(text);
+		const used = new Set();
+		let any = false;
+		for (const [code, row] of Object.entries(context)) {
+			if (!Array.isArray(row) || row.length !== width)
+				fail(`context.${code} is not ${width} cells`);
+			row.forEach((action, level) => {
+				if (action === null) return;
+				if (!isMap(action) || Object.keys(action).length !== 1)
+					fail(`context.${code} has an invalid action`);
+				if (action.repeat !== undefined) {
+					if (!depths.includes(action.repeat))
+						fail(`context.${code} repeats ${action.repeat} characters back`);
+				} else if (typeof action.magic === 'string') {
+					if (!Object.prototype.hasOwnProperty.call(tables, action.magic))
+						fail(`context.${code} names the unknown magic table ${action.magic}`);
+					used.add(action.magic);
+				} else fail(`context.${code} has an invalid action`);
+				const cell = layout.rows[code] ? layout.rows[code][level] : null;
+				if (cell !== null && cell !== undefined)
+					fail(`context.${code} level ${level} also types its cell`);
+				any = true;
+			});
+		}
+		for (const [id, table] of Object.entries(tables)) {
+			if (!used.has(id)) fail(`magic table ${id} is on no key`);
+			if (!isMap(table) || !Array.isArray(table.rules)) fail(`magic table ${id} needs its rules`);
+			const seen = new Set();
+			for (const rule of table.rules) {
+				if (!isMap(rule) || typeof rule.after !== 'string' || rule.after === '')
+					fail(`magic table ${id} has a rule without context`);
+				if (codeLength(rule.after) > longest || codePoints(rule.after).some(isBreak))
+					fail(`magic table ${id}: the context ${rule.after} is longer than ${longest} characters`);
+				if (seen.has(rule.after)) fail(`magic table ${id} has the context ${rule.after} twice`);
+				seen.add(rule.after);
+				if (!oneChar(rule.types))
+					fail(`magic table ${id}: after ${rule.after} types one character`);
+			}
+			if (table.fallback !== undefined && table.fallback !== '' && !oneChar(table.fallback))
+				fail(`magic table ${id}: its fallback is one character or nothing`);
+		}
+		if (!any) fail('context holds no repeat or magic key');
+		return true;
+	}
+
+	/**
+	 * What a repeat or magic key types after a text (checkContext): the one
+	 * definition the analysis and the drivers' vectors read.
+	 * @param {{repeat: number}|{magic: string}} action - A context action.
+	 * @param {object} magic - The layout's magic tables.
+	 * @param {string} before - The text typed so far (its end is read).
+	 * @returns {string} One character, or '' when the key types nothing.
+	 */
+	function contextOutput(action, magic, before) {
+		if (action.repeat !== undefined) {
+			const points = codePoints(before.slice(-2 * action.repeat));
+			const at = points.length - action.repeat;
+			return at >= 0 ? points[at] : '';
+		}
+		const table = magic[action.magic];
+		let best = null;
+		for (const rule of table.rules)
+			if (before.endsWith(rule.after) && (best === null || rule.after.length > best.after.length))
+				best = rule;
+		return best !== null ? best.types : table.fallback || '';
+	}
+
+	/**
+	 * What a layout's repeat or magic key shows on one level (its label in
+	 * context_keys.labels), '' when that level holds no such key.
+	 * @param {object} layout - Library shape, or any layout input with context.
+	 * @param {string} code - A key.
+	 * @param {number} level - The level's index in the rows.
+	 * @returns {string}
+	 */
+	function contextLabel(layout, code, level) {
+		const action = ((layout.context || {})[code] || [])[level];
+		if (!action) return '';
+		const labels = data().model.context_keys.labels;
+		return action.repeat !== undefined ? labels[`repeat_${action.repeat}`] : labels.magic;
+	}
+
 	/**
 	 * Checks and returns a layout in the library shape.
 	 * @param {object} layout - {id, name, rows: code → [base, shift, altgr,
-	 *   shift_altgr], dead?: state → {typed: output | {dead: state}} (typed is
-	 *   a character, or « dead:<state> » for the dead key entering <state>),
-	 *   command?: code → letter, fingering?: 'standard' | 'angle'}. A cell is a
-	 *   string, null, or {dead: state}.
+	 *   shift_altgr, ...its own levels], dead?: state → {typed: output |
+	 *   {dead: state}} (typed is a character, or « dead:<state> » for the dead
+	 *   key entering <state>), command?: code → letter, fingering?: 'standard'
+	 *   | 'angle', levels? and modifiers? (checkLevels): [{id, shift?, hold?:
+	 *   modifier names}] and name → {label, for_left_hand, for_right_hand,
+	 *   tap_keys?: those of its keys that also type when tapped (tap-holds)}},
+	 *   context? and magic? (checkContext): code → [null | {repeat: 1|2} |
+	 *   {magic: id} per level] and id → {rules: [{after, types}], fallback?}.
+	 *   A cell is a string, null, or {dead: state}.
 	 * @returns {object} The same layout, with empty dead/command maps filled in.
 	 * @throws {Error} On a malformed layout.
 	 */
 	function layoutFromRows(layout) {
 		if (!layout || typeof layout.id !== 'string' || typeof layout.rows !== 'object')
 			throw new Error('layout_analysis: a layout needs an id and rows');
+		const levels = checkLevels(layout);
+		const width = levels ? levels.length : LAYER_IDS.length;
 		for (const [code, row] of Object.entries(layout.rows)) {
-			if (!Array.isArray(row) || row.length !== LAYER_IDS.length)
-				throw new Error(`layout_analysis: ${layout.id}.${code} is not four cells`);
+			if (!Array.isArray(row) || row.length !== width)
+				throw new Error(`layout_analysis: ${layout.id}.${code} is not ${width} cells`);
 			for (const cell of row)
 				if (!(cell === null || typeof cell === 'string' || (cell && typeof cell.dead === 'string')))
 					throw new Error(`layout_analysis: ${layout.id}.${code} has an invalid cell`);
 		}
+		const contextual = checkContext(layout, width);
 		for (const [code, letter] of Object.entries(layout.command || {}))
 			if (typeof letter !== 'string')
 				throw new Error(`layout_analysis: ${layout.id} command.${code} is not text`);
@@ -350,7 +851,17 @@ var LAYOUT_ANALYSIS = (function () {
 			fingering: layout.fingering || 'standard',
 			rows: layout.rows,
 			command: layout.command || {},
-			dead: layout.dead || {}
+			dead: layout.dead || {},
+			// Absent for the default four levels (DEFAULT_LEVELS).
+			levels: levels || undefined,
+			modifiers: levels ? layout.modifiers : undefined,
+			// Absent without a repeat or magic key (checkContext).
+			context: contextual ? layout.context : undefined,
+			magic: contextual ? layout.magic || {} : undefined,
+			// A registry layout's family and board (iso or ansi), when its family
+			// ships one layout per board: the Comparer's default selection.
+			family: layout.family || '',
+			geometry: layout.geometry || ''
 		};
 	}
 
@@ -414,21 +925,1172 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The keys that are only held, never typed on: the modifiers every board
+	 * has (Shift, AltGr: modifier_keys), then those a layout may hold as one of
+	 * its own level modifiers (held_keys: Caps Lock).
+	 * @param {object} [model] - analysis_model.json; the loaded data's when absent.
+	 * @returns {string[]} KeyboardEvent codes.
+	 */
+	function heldCodes(model) {
+		const m = model || data().model;
+		return Object.values(m.modifier_keys).concat(m.held_keys);
+	}
+
+	/**
+	 * The keys a layout only holds: heldCodes but a held key it types on
+	 * (TypeMatrix's a on Caps Lock), which a drawing shows as a character key.
+	 * @param {object} layout - Library shape.
+	 * @returns {string[]} KeyboardEvent codes.
+	 */
+	function heldCodesOf(layout) {
+		return heldCodes().filter((code) => !(layout.rows[code] || []).some((cell) => cell !== null));
+	}
+
+	/**
 	 * The keys a layout types characters on: every finger-assigned key but the
-	 * held modifiers. The codes layoutFromComposerSource keeps.
+	 * modifiers every board has (Shift, AltGr; Caps Lock, a held key, is typed
+	 * on by a layout that holds no level there), the optional keys among them
+	 * (Tab, Enter, the right Control), the thumb keys, then the board-only keys
+	 * (board_only_keys: the ErgoDox's keys without a KeyboardEvent code,
+	 * measured on that board only). The codes layoutFromComposerSource keeps.
 	 * @param {object} [model] - analysis_model.json; the loaded data's when absent
 	 *   (the codegen passes it before the data exists).
-	 * @returns {string[]} KeyboardEvent codes.
+	 * @returns {string[]} KeyboardEvent codes, then the board-only codes.
 	 */
 	function typingCodes(model) {
 		const m = model || data().model;
 		const modifiers = new Set(Object.values(m.modifier_keys));
-		return Object.keys(m.fingerings.standard).filter((code) => !modifiers.has(code));
+		const thumbs = new Set(m.thumb_keys);
+		return Object.keys(m.fingerings.standard)
+			.filter((code) => !modifiers.has(code))
+			.concat(m.thumb_keys)
+			.concat(m.board_only_keys.filter((code) => !thumbs.has(code)));
+	}
+
+	/**
+	 * The thumbs' own keys beside the space bar (the model's thumb_keys), which
+	 * only the boards that have them physically measure.
+	 * @returns {string[]} A copy, in the model's order.
+	 */
+	function thumbKeyCodes() {
+		return data().model.thumb_keys.slice();
+	}
+
+	/**
+	 * The thumb keys at a modifier's place, read as QMK's mod-tap (the
+	 * ErgoDox's AltGr key): the optimizer offers them only to a layout that
+	 * types there.
+	 * @returns {string[]} Board-only codes.
+	 */
+	function modTapThumbKeyCodes() {
+		return data().model.mod_tap_thumb_keys.slice();
 	}
 
 	/** The layouts of the shared library, in the library shape. */
 	function libraryLayouts() {
 		return data().layouts.map(layoutFromRows);
+	}
+
+	/** The number of code points of a string, without splitting the usual one-unit case. */
+	function codeLength(text) {
+		return isOneCodePoint(text) ? 1 : textPoints(text).length;
+	}
+
+	const textPointCache = new Map();
+	// Short texts split once: the cells, rule outputs and substitutions of the
+	// layouts analysed, read again at every analysis.
+	const TEXT_CACHE_SIZE = 8192;
+
+	/** codePoints of a short text (a cell or a dead-key output), cached; the array is shared. */
+	function textPoints(text) {
+		let points = textPointCache.get(text);
+		if (points) return points;
+		points = codePoints(text);
+		if (textPointCache.size >= TEXT_CACHE_SIZE) textPointCache.clear();
+		textPointCache.set(text, points);
+		return points;
+	}
+
+	const deadRuleCache = new WeakMap();
+
+	/**
+	 * The dead-key rules of a layout as a flat list, read once per dead table:
+	 * what each rule needs (its state, then a typed character or another dead
+	 * key) and what it gives (a character, a text of several, or a next state).
+	 * @param {object} dead - layout.dead.
+	 * @returns {Array<object>} {state, typedDead, typedChar, outChar, outText, outDead}.
+	 */
+	function deadRules(dead) {
+		if (deadRuleCache.has(dead)) return deadRuleCache.get(dead);
+		const rules = [];
+		for (const [state, table] of Object.entries(dead)) {
+			for (const [typed, result] of Object.entries(table)) {
+				const rule = {
+					state,
+					typedDead: typed.startsWith(DEAD_TYPED) ? typed.slice(DEAD_TYPED.length) : null,
+					typedChar: typed.startsWith(DEAD_TYPED) ? null : typed,
+					outChar: null,
+					outText: null,
+					outDead: null
+				};
+				if (typeof result === 'string') {
+					const length = codeLength(result);
+					if (length === 0) continue;
+					if (length === 1) rule.outChar = result;
+					else rule.outText = result;
+				} else rule.outDead = result.dead;
+				rules.push(rule);
+			}
+		}
+		deadRuleCache.set(dead, rules);
+		return rules;
+	}
+
+	// Equal costs are settled the same way whatever order the file lists its
+	// keys in: fewer AltGr presses (the lower level, as Kalamine prefers), then
+	// fewer keys, then the lower key indexes, then fewer Shift presses.
+	function betterWay(a, b) {
+		if (a.cost !== b.cost) return a.cost < b.cost;
+		if (a.altgr !== b.altgr) return a.altgr < b.altgr;
+		if (a.keys.length !== b.keys.length) return a.keys.length < b.keys.length;
+		for (let i = 0; i < a.keys.length; i++)
+			if (a.keys[i] !== b.keys[i]) return a.keys[i] < b.keys[i];
+		if (a.shift !== b.shift) return a.shift < b.shift;
+		return false;
+	}
+
+	function sameWayKeys(a, b) {
+		if (a.keys.length !== b.keys.length) return false;
+		for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
+		return true;
+	}
+
+	/** Adds a way to a character's list (best first, at most MAX_WAYS); true when the list changed. */
+	function offerWay(map, key, candidate) {
+		const list = map.get(key);
+		if (!list) {
+			map.set(key, [candidate]);
+			return true;
+		}
+		for (let i = 0; i < list.length; i++) {
+			if (!sameWayKeys(list[i], candidate)) continue;
+			if (!betterWay(candidate, list[i])) return false;
+			list.splice(i, 1);
+			break;
+		}
+		let at = list.length;
+		while (at > 0 && betterWay(candidate, list[at - 1])) at--;
+		if (at >= MAX_WAYS) return false;
+		list.splice(at, 0, candidate);
+		if (list.length > MAX_WAYS) list.pop();
+		return true;
+	}
+
+	/** Array a then array b, in a new array: Array#concat without its generic, slower path. */
+	function joined(a, b) {
+		const out = a.slice();
+		for (let i = 0; i < b.length; i++) out.push(b[i]);
+		return out;
+	}
+
+	/** Way a then way b; state: the dead state a enters, or null for two characters in a row. */
+	function joinWays(a, b, state) {
+		return {
+			keys: joined(a.keys, b.keys),
+			layers: joined(a.layers, b.layers),
+			shift: a.shift + b.shift,
+			altgr: a.altgr + b.altgr,
+			held: joinHeld(a.held, b.held),
+			dead: state !== null || a.dead || b.dead,
+			cost: a.cost + b.cost,
+			level: state === null ? b.level : `${state}/${b.level}`,
+			state: state === null ? b.state : state
+		};
+	}
+
+	const levelCache = new WeakMap();
+
+	/**
+	 * A layout's levels as a page names them: each level's id, whether it
+	 * holds Shift, the modifiers it holds (their names) and their labels; the
+	 * default four hold AltGr. The drawings and their level choice read it.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @returns {Array<{id: string, shift: boolean, hold: string[], labels: string[]}>}
+	 */
+	function levelsOf(layout) {
+		const label = (name) => (layout.levels ? layout.modifiers[name].label : DEFAULT_MODIFIER_LABEL);
+		return (layout.levels || DEFAULT_LEVELS).map((level) => ({
+			id: level.id,
+			shift: level.shift === true,
+			hold: (level.hold || []).slice(),
+			labels: (level.hold || []).map(label)
+		}));
+	}
+
+	/**
+	 * A layout's levels on a board: each level's id, its Shift presses, the
+	 * keys that hold its other modifiers for a key of each hand (null when the
+	 * board has no key for one of them: that level types nothing there). The
+	 * default four hold AltGr on the model's key for both hands.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @param {object} board - From keyboard().
+	 * @returns {{ids: string[], shift: number[], held: Array<[number[]|null,
+	 *   number[]|null]>}} held[level][0] for the left hand, [1] for the right
+	 *   hand and the thumbs.
+	 */
+	function levelTable(layout, board) {
+		const levels = layout.levels || DEFAULT_LEVELS;
+		let byBoard = levelCache.get(levels);
+		if (!byBoard || byBoard.modifiers !== layout.modifiers) {
+			byBoard = { modifiers: layout.modifiers, boards: new WeakMap() };
+			levelCache.set(levels, byBoard);
+		}
+		const cached = byBoard.boards.get(board);
+		if (cached) return cached;
+		const altgr = data().model.modifier_keys.altgr;
+		const modifiers = layout.levels
+			? layout.modifiers
+			: { [DEFAULT_MODIFIER]: { for_left_hand: [altgr], for_right_hand: [altgr] } };
+		const keyFor = (name, side) => {
+			const code = modifiers[name][side].find((c) => board.index.has(c));
+			return code === undefined ? -1 : board.index.get(code);
+		};
+		const table = { ids: [], shift: [], held: [] };
+		for (const level of levels) {
+			const hold = level.hold || [];
+			const keysOn = (side) => {
+				const keys = hold.map((name) => keyFor(name, side));
+				if (keys.some((k) => k < 0)) return null;
+				return keys.length === 0 ? NO_HELD : keys;
+			};
+			table.ids.push(level.id);
+			table.shift.push(level.shift ? 1 : 0);
+			table.held.push([keysOn('for_left_hand'), keysOn('for_right_hand')]);
+		}
+		byBoard.boards.set(board, table);
+		return table;
+	}
+
+	/** Which side of a modifier holds it for key k: 0 for the left hand, 1 for the right hand and the thumbs. */
+	function heldSide(board, k) {
+		const f = board.finger[k];
+		return board.hand[k] === 0 && f !== LEFT_THUMB && f !== RIGHT_THUMB ? 0 : 1;
+	}
+
+	/** The held keys of way a then way b, sharing an array when one holds none. */
+	function joinHeld(a, b) {
+		if (b.length === 0) return a;
+		if (a.length === 0) return b;
+		return joined(a, b);
+	}
+
+	/**
+	 * Offers the way each cell of a layout gives: one key on one level. With
+	 * `only`, the cells of those characters, dead states and texts alone.
+	 * @param {object} core - {ways, deadWays, texts}, filled in place.
+	 * @param {{chars: Set<string>, dead: Set<string>, texts: Set<string>}|null} only
+	 */
+	function offerCells(core, layout, board, missing, only) {
+		const levels = levelTable(layout, board);
+		for (const code in layout.rows) {
+			const k = board.index.get(code);
+			if (k === undefined || (missing && missing.has(code))) continue;
+			const row = layout.rows[code];
+			const side = heldSide(board, k);
+			for (let layer = 0; layer < row.length; layer++) {
+				const cell = row[layer];
+				if (cell === null) continue;
+				// A level whose modifier the board has no key for types nothing, nor
+				// one a tap-hold key would hold for itself.
+				const held = levels.held[layer][side];
+				if (held === null || held.includes(k)) continue;
+				let map;
+				let key = cell;
+				let width = 1;
+				// Plain assignments: destructuring a fresh array costs more than the offer.
+				if (typeof cell !== 'string') {
+					map = core.deadWays;
+					key = cell.dead;
+				} else if (codeLength(cell) === 1) map = core.ways;
+				else if (cell.length > 0) {
+					map = core.texts;
+					width = codeLength(cell);
+				} else continue;
+				if (
+					only &&
+					!(map === core.ways ? only.chars : map === core.texts ? only.texts : only.dead).has(key)
+				)
+					continue;
+				const shift = levels.shift[layer];
+				const stroke = {
+					keys: [k],
+					layers: [layer],
+					shift,
+					// Every held modifier but Shift: AltGr, or a layout's own (Mod3, Mod4).
+					altgr: held.length,
+					held,
+					dead: false,
+					cost: 1 + MODIFIER_COST * (shift + held.length),
+					level: levels.ids[layer]
+				};
+				if (map === core.texts) stroke.width = width;
+				offerWay(map, key, stroke);
+			}
+		}
+	}
+
+	// When a joined way was first offered by a whole compile (followRules), on
+	// the way under this key: {d: pass, r: rule index, p: prefix, t: tail}. A
+	// cell's own way has none (it is there before the first pass). Kept for
+	// scoreSession only; a symbol, so a way reads (JSON, keys) as without it.
+	// A WeakMap cost more than the joins: a partial compile sets one time per
+	// way it keeps, into a table every young way's entry stays in until a full
+	// collection.
+	const WAY_TIME = Symbol('wayTime');
+	// Passes a partial compile may take before it gives up and compiles whole.
+	const PARTIAL_PASS_LIMIT = 4 * MAX_DEAD_DEPTH;
+	// No key changed (planTyping's from.changed when the compile is the same).
+	const NO_KEYS = new Set();
+
+	/**
+	 * Which of two offers of a way on the same keys a whole compile makes
+	 * first: the earlier pass, then the earlier rule, then (one rule's loop)
+	 * the better prefix, then the better tail.
+	 * @returns {number} Negative when a comes first, 0 when they tie.
+	 */
+	function compareTimes(a, b) {
+		if (a.d !== b.d) return a.d - b.d;
+		if (a.r !== b.r) return a.r - b.r;
+		if (!sameWayKeys(a.p, b.p)) return betterWay(a.p, b.p) ? -1 : 1;
+		if (!sameWayKeys(a.t, b.t)) return betterWay(a.t, b.t) ? -1 : 1;
+		return 0;
+	}
+
+	/** Whether two ways on the same keys read alike (labels, levels, flags). */
+	function sameLabels(a, b) {
+		if (a.level !== b.level || a.state !== b.state) return false;
+		if (a.terminated !== b.terminated || a.width !== b.width) return false;
+		for (let i = 0; i < a.layers.length; i++) if (a.layers[i] !== b.layers[i]) return false;
+		return true;
+	}
+
+	/**
+	 * offerWay for a partial compile, which makes its offers in another order
+	 * than a whole compile: of two offers on the same keys and of equal cost,
+	 * the one a whole compile makes first (compareTimes) stays, so the lists
+	 * read as a whole compile's. A joined candidate is filled in
+	 * (completeJoin, on the board) only once it may be kept: most are refused
+	 * on their keys and costs alone.
+	 */
+	function offerTimed(map, key, candidate, time, board) {
+		const list = map.get(key);
+		if (!list) {
+			completeJoin(candidate, time, board);
+			map.set(key, [candidate]);
+			candidate[WAY_TIME] = time;
+			return true;
+		}
+		for (let i = 0; i < list.length; i++) {
+			const held = list[i];
+			if (!sameWayKeys(held, candidate)) continue;
+			if (!betterWay(candidate, held)) {
+				if (betterWay(held, candidate)) return false;
+				const order = compareTimes(time, held[WAY_TIME]);
+				if (order > 0) return false;
+				completeJoin(candidate, time, board);
+				// An equal time is the same offer from inputs replaced since: the newer reads right.
+				if (order === 0 && sameLabels(held, candidate)) return false;
+				list[i] = candidate;
+				candidate[WAY_TIME] = time;
+				return true;
+			}
+			list.splice(i, 1);
+			break;
+		}
+		let at = list.length;
+		while (at > 0 && betterWay(candidate, list[at - 1])) at--;
+		if (at >= MAX_WAYS) return false;
+		completeJoin(candidate, time, board);
+		list.splice(at, 0, candidate);
+		if (list.length > MAX_WAYS) list.pop();
+		candidate[WAY_TIME] = time;
+		return true;
+	}
+
+	/**
+	 * Fills in a joined way of a partial compile (followRules) as joinWays
+	 * would, once offerTimed may keep it: its levels, its label, the thumb
+	 * that closes it (terminated) and the characters it types (width).
+	 * @param {object} way - keys, shift, altgr, dead, cost and state set.
+	 * @param {{p: object, t: object, width: number}} time - Its prefix and tail.
+	 * @param {object} board - From keyboard().
+	 */
+	function completeJoin(way, time, board) {
+		if (way.layers !== null) return;
+		way.layers = joined(time.p.layers, time.t.layers);
+		way.held = joinHeld(time.p.held, time.t.held);
+		way.level = `${way.state}/${time.t.level}`;
+		const closing = board.finger[way.keys[way.keys.length - 1]];
+		if (closing === LEFT_THUMB || closing === RIGHT_THUMB) way.terminated = true;
+		if (time.width > 0) way.width = time.width;
+	}
+
+	/** The first pass of a whole compile in which rule r can read a way. */
+	function readablePass(way, r) {
+		const time = way[WAY_TIME];
+		if (time === undefined) return 0;
+		return time.r < r ? time.d : time.d + 1;
+	}
+
+	/**
+	 * Follows the dead-key rules (those of `order`, in that order, or all) up
+	 * to MAX_DEAD_DEPTH passes: each joins the ways of its dead key with those
+	 * of the key typed after it, and offers them to its output.
+	 * @param {object} core - {ways, deadWays, texts}, filled in place.
+	 * @param {Array<object>} rules - From deadRules().
+	 * @param {number[]|null} order - Rule indexes, ascending; null for all.
+	 * @param {object} board - From keyboard().
+	 * @param {string} [timing] - 'record': note when each way is offered
+	 *   (WAY_TIME); 'partial': the rules of a partial compile, which reads the
+	 *   other lists as they end and gives each offer the time a whole compile
+	 *   would (an offer a whole compile makes after its last pass is left out).
+	 * @returns {boolean} Whether the rules were followed to their end (a pass
+	 *   changed nothing); a partial compile that is not must compile whole.
+	 */
+	function followRules(core, rules, order, board, timing) {
+		const partial = timing === 'partial';
+		const record = timing === 'record';
+		const { ways, deadWays, texts } = core;
+		// A list's version rises with each change. A rule whose prefixes and
+		// tails are the lists, at the versions, of its last pass would only
+		// offer again what it offered then: lists only get better, so every
+		// such offer is refused, and the rule is skipped (the same ways, in a
+		// fraction of the joins). A Map: it lives for this call alone, and a
+		// trial writes no weak table (WAY_TIME).
+		const versions = new Map();
+		const version = (list) => versions.get(list) || 0;
+		const count = order === null ? rules.length : order.length;
+		// By position in the order: each rule is in it once.
+		const lastPass = new Array(count);
+		const passes = partial ? PARTIAL_PASS_LIMIT : MAX_DEAD_DEPTH;
+		for (let depth = 0; depth < passes; depth++) {
+			let changed = false;
+			for (let i = 0; i < count; i++) {
+				const r = order === null ? i : order[i];
+				const rule = rules[r];
+				const prefixes = deadWays.get(rule.state);
+				if (!prefixes) continue;
+				const tails =
+					rule.typedDead !== null ? deadWays.get(rule.typedDead) : ways.get(rule.typedChar);
+				if (!tails) continue;
+				const seen = lastPass[i];
+				if (
+					seen &&
+					seen[0] === prefixes &&
+					seen[1] === version(prefixes) &&
+					seen[2] === tails &&
+					seen[3] === version(tails)
+				)
+					continue;
+				lastPass[i] = [prefixes, version(prefixes), tails, version(tails)];
+				let map = ways;
+				let target = rule.outChar;
+				if (rule.outDead !== null) {
+					map = deadWays;
+					target = rule.outDead;
+				} else if (rule.outText !== null) {
+					map = texts;
+					target = rule.outText;
+				}
+				for (const prefix of prefixes.slice())
+					for (const tail of tails.slice()) {
+						if (partial) {
+							// A partial compile settles a tie of keys on the labels too (offerTimed).
+							const d = Math.max(readablePass(prefix, r), readablePass(tail, r));
+							if (d >= MAX_DEAD_DEPTH) continue;
+							// Built in full only when offerTimed keeps it or compares labels.
+							const candidate = {
+								keys: joined(prefix.keys, tail.keys),
+								layers: null,
+								shift: prefix.shift + tail.shift,
+								altgr: prefix.altgr + tail.altgr,
+								held: null,
+								dead: true,
+								cost: prefix.cost + tail.cost,
+								level: null,
+								state: rule.state
+							};
+							const time = {
+								d,
+								r,
+								p: prefix,
+								t: tail,
+								width: map === texts ? codeLength(target) : 0
+							};
+							if (!offerTimed(map, target, candidate, time, board)) continue;
+							changed = true;
+							const list = map.get(target);
+							versions.set(list, version(list) + 1);
+							continue;
+						}
+						// join(prefix, tail, rule.state), with only what offer compares
+						// until it keeps the candidate: most chains are refused.
+						const candidate = {
+							keys: joined(prefix.keys, tail.keys),
+							layers: null,
+							shift: prefix.shift + tail.shift,
+							altgr: prefix.altgr + tail.altgr,
+							held: null,
+							dead: true,
+							cost: prefix.cost + tail.cost,
+							level: null,
+							state: rule.state
+						};
+						if (!offerWay(map, target, candidate)) continue;
+						changed = true;
+						const list = map.get(target);
+						versions.set(list, version(list) + 1);
+						candidate.layers = joined(prefix.layers, tail.layers);
+						candidate.held = joinHeld(prefix.held, tail.held);
+						candidate.level = `${rule.state}/${tail.level}`;
+						// A dead key closed by a thumb key (the space bar, on any level)
+						// types its own sign: the fallback, never an alternative to
+						// another way (planTyping).
+						const closing = board.finger[candidate.keys[candidate.keys.length - 1]];
+						if (closing === LEFT_THUMB || closing === RIGHT_THUMB) candidate.terminated = true;
+						if (map === texts) candidate.width = codeLength(target);
+						// Last, as a partial compile sets it: both build ways of one shape.
+						if (record) candidate[WAY_TIME] = { d: depth, r, p: prefix, t: tail };
+					}
+			}
+			if (!changed) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * The ways of a layout before the substitutes: its cells, then its
+	 * dead-key rules followed.
+	 * @returns {{layout: object, ways: Map, deadWays: Map, texts: Map}} Lists
+	 *   best first; deadWays maps a dead state to the ways of entering it.
+	 */
+	function compileCore(layout, board, missing, timing) {
+		const core = { layout, ways: new Map(), deadWays: new Map(), texts: new Map() };
+		offerCells(core, layout, board, missing, null);
+		followRules(core, deadRules(layout.dead), null, board, timing);
+		return core;
+	}
+
+	/**
+	 * The distinct characters, the substitutes and the cheapest way of each
+	 * character, from the ways before the substitutes.
+	 * @param {Map} ways - Character → ways; the substitutes are added to it.
+	 * @param {Map} texts - Multi-character output → ways.
+	 * @returns {{ways, texts, best, distinct}} As compileWays.
+	 */
+	function finishWays(ways, texts) {
+		let distinct = ways.size;
+		const extra = new Set();
+		for (const text of texts.keys())
+			for (const char of textPoints(text)) if (!ways.has(char)) extra.add(char);
+		distinct += extra.size;
+		// A typographic character the layout lacks is typed as its plain form; a
+		// copy, so the plain character's own way stays unmarked.
+		for (const [fancy, plain] of Object.entries(data().model.substitutions)) {
+			if (ways.has(fancy)) continue;
+			const parts = textPoints(plain).map((c) => ways.get(c));
+			if (parts.some((part) => !part)) continue;
+			const way = parts.map((list) => list[0]).reduce((a, b) => joinWays(a, b, null));
+			ways.set(fancy, [Object.assign({}, way, { substituted: true })]);
+		}
+		const best = new Map();
+		for (const [char, list] of ways) best.set(char, list[0]);
+		return { ways, texts, best, distinct };
+	}
+
+	/**
+	 * finishWays of a core compiled in part (compileCoreFrom) from the
+	 * finished ways of the core it was compiled from: the characters it
+	 * compiled again take their new lists, the substitutes are made again in
+	 * the same order, the other lists and best ways are shared. The same
+	 * lists as finishWays(new Map(core.ways), core.texts) (only the order of
+	 * the maps differs), and the accent rule's counts (simplicity) carried
+	 * over: only the characters compiled again, and the accented letters
+	 * whose base letter was, are counted again.
+	 * @param {object} previous - The finishWays() result of the core before.
+	 * @param {object} core - From compileCoreFrom(), with changedChars.
+	 * @param {{ways, best}} [spares] - spareMaps() a score session writes the
+	 *   finished maps into, instead of copies of the previous ones.
+	 * @returns {object} As finishWays, plus changed: the characters whose
+	 *   lists may differ from previous.ways.
+	 */
+	function finishWaysFrom(previous, core, spares) {
+		const ways = spares ? spares.ways.copyOf(previous.ways) : new Map(previous.ways);
+		const best = spares ? spares.best.copyOf(previous.best) : new Map(previous.best);
+		const changed = new Set(core.changedChars);
+		const substitutions = substitutionParts();
+		// The previous substitutes leave (a cell's own list is never a substitute).
+		for (const [fancy] of substitutions) {
+			const list = ways.get(fancy);
+			if (!list || !list[0].substituted) continue;
+			ways.delete(fancy);
+			best.delete(fancy);
+			changed.add(fancy);
+		}
+		for (const char of core.changedChars) {
+			const list = core.ways.get(char);
+			if (list) {
+				ways.set(char, list);
+				best.set(char, list[0]);
+			} else {
+				ways.delete(char);
+				best.delete(char);
+			}
+		}
+		let distinct = core.ways.size;
+		const extra = new Set();
+		for (const text of core.texts.keys())
+			for (const char of textPoints(text)) if (!core.ways.has(char)) extra.add(char);
+		distinct += extra.size;
+		for (const [fancy, plain] of substitutions) {
+			if (ways.has(fancy)) continue;
+			const parts = plain.map((c) => ways.get(c));
+			if (parts.some((part) => !part)) continue;
+			const way = parts.map((list) => list[0]).reduce((a, b) => joinWays(a, b, null));
+			const list = [Object.assign({}, way, { substituted: true })];
+			ways.set(fancy, list);
+			best.set(fancy, list[0]);
+			changed.add(fancy);
+		}
+		if (spares) {
+			spares.ways.mark(changed);
+			spares.best.mark(changed);
+		}
+		const out = { ways, texts: core.texts, best, distinct, changed };
+		if (!previous.accents) previous.accents = accentCounts(previous.ways);
+		let { accented, mnemonic } = previous.accents;
+		const recount = new Set(changed);
+		for (const char of changed) {
+			const users = accentUsers.get(lowerCase(char));
+			if (users && char.length === 1) for (const user of users) recount.add(user);
+		}
+		for (const char of recount) {
+			const was = accentState(previous.ways, char, previous.ways.get(char));
+			const now = accentState(ways, char, ways.get(char));
+			accented += (now > ACCENT_NONE ? 1 : 0) - (was > ACCENT_NONE ? 1 : 0);
+			mnemonic += (now === ACCENT_MNEMONIC ? 1 : 0) - (was === ACCENT_MNEMONIC ? 1 : 0);
+		}
+		out.accents = { accented, mnemonic };
+		return out;
+	}
+
+	/**
+	 * Every way a layout types each character, best first: a key on a level, a
+	 * dead key (itself on a level, possibly chained) followed by the key it
+	 * composes with, and the multi-character outputs (a cell or a dead-key rule
+	 * that types several characters at once). A way is {keys, layers (the level
+	 * of each key), shift, altgr, dead, cost, level (where the last key is
+	 * pressed: a level, or « state/level » behind a dead key), state? (the
+	 * dead state of the last key), substituted?, width? (characters typed)}.
+	 * Two ways on the same keys keep the cheaper one (it is never worse in any
+	 * context); at most MAX_WAYS are kept per character.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {Set<string>|null} missing - Codes absent from a compact board.
+	 * @returns {{ways: Map<string, object[]>, texts: Map<string, object[]>,
+	 *   best: Map<string, object>, distinct: number}} Character → ways,
+	 *   multi-character output → ways, character → its cheapest way, and the
+	 *   number of distinct characters typed (substitutes excluded, the
+	 *   characters of multi-character outputs included).
+	 */
+	function compileWays(layout, board, missing) {
+		const core = compileCore(layout, board, missing);
+		const out = finishWays(core.ways, core.texts);
+		out.context = contextWays(layout, board, missing);
+		return out;
+	}
+
+	/**
+	 * The ways of a layout's repeat and magic keys (checkContext): each key
+	 * on each level its board can press, as a one-key way marked with its
+	 * kind (context: 'repeat' or 'magic'). Such a way types a character only
+	 * after the text that makes the key type it, so it is no way of the
+	 * character in compileWays: planTyping offers it in that context alone.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {Set<string>|null} missing - Codes absent from a compact board.
+	 * @returns {object|null} {keys: [{code, layer, action, way}], magic,
+	 *   outputs: the characters a key can type (null: any, a repeat key),
+	 *   signature: the actions and tables as text}; null without such a key.
+	 */
+	function contextWays(layout, board, missing) {
+		if (!layout.context) return null;
+		const levels = levelTable(layout, board);
+		const keys = [];
+		for (const code of Object.keys(layout.context).sort()) {
+			const k = board.index.get(code);
+			if (k === undefined || (missing && missing.has(code))) continue;
+			const side = heldSide(board, k);
+			layout.context[code].forEach((action, layer) => {
+				if (action === null) return;
+				// A level whose modifier the board has no key for types nothing.
+				const held = levels.held[layer][side];
+				if (held === null) return;
+				const shift = levels.shift[layer];
+				keys.push({
+					code,
+					layer,
+					action,
+					way: {
+						keys: [k],
+						layers: [layer],
+						shift,
+						altgr: held.length,
+						held,
+						dead: false,
+						cost: 1 + MODIFIER_COST * (shift + held.length),
+						level: levels.ids[layer],
+						context: action.repeat !== undefined ? 'repeat' : 'magic'
+					}
+				});
+			});
+		}
+		if (keys.length === 0) return null;
+		let outputs = new Set();
+		for (const { action } of keys) {
+			if (action.repeat !== undefined) {
+				outputs = null;
+				break;
+			}
+			const table = layout.magic[action.magic];
+			for (const rule of table.rules) outputs.add(rule.types);
+			if (table.fallback) outputs.add(table.fallback);
+		}
+		const signature = JSON.stringify([keys.map((key) => key.action), layout.magic]);
+		return { keys, magic: layout.magic, outputs, signature };
+	}
+
+	const contextTableCache = new WeakMap();
+
+	/**
+	 * A token table whose characters a repeat or magic key can type carry
+	 * their context: a character after a text that makes some keys type it is
+	 * the token « char CONTEXT_SEP indexes of those keys », whose ways are the
+	 * character's own and those keys' (planTyping), so the plan chooses
+	 * between them with their neighbours. The context is the output text of
+	 * the tokens before (a chord's characters included), at most
+	 * context_max characters: a pair's first token and a triple's first two
+	 * are known; what precedes them is read from the triples (the share of
+	 * each character before), and a triple's first token takes the classes
+	 * of all its occurrences. Cached per table and keys.
+	 * @param {object} table - A prepared or token table.
+	 * @param {object} spec - contextWays().
+	 * @returns {{table: object, tokens: Map<string, {char: string, keys:
+	 *   number[]}>, classify: function(string, string): string}} The table,
+	 *   each context token's character and keys, and the token of a
+	 *   character after a text.
+	 */
+	function contextTable(table, spec) {
+		let byKeys = contextTableCache.get(table);
+		if (!byKeys) contextTableCache.set(table, (byKeys = new Map()));
+		let out = byKeys.get(spec.signature);
+		if (!out) {
+			out = buildContextTable(table, spec);
+			byKeys.set(spec.signature, out);
+		}
+		return out;
+	}
+
+	/** contextTable's work, uncached. */
+	function buildContextTable(table, spec) {
+		const longest = data().model.context_keys.context_max;
+		const tokens = new Map();
+		const capable = (t) => isOneCodePoint(t) && (spec.outputs === null || spec.outputs.has(t));
+		// The token t is after the text before: itself, or its context token.
+		const classify = (t, before) => {
+			if (!capable(t)) return { token: t, keys: null };
+			const tail = codePoints(before).slice(-longest).join('');
+			const keys = [];
+			spec.keys.forEach((key, i) => {
+				if (contextOutput(key.action, spec.magic, tail) === t) keys.push(i);
+			});
+			return keys.length === 0
+				? { token: t, keys: null }
+				: { token: t + CONTEXT_SEP + keys.join(','), keys };
+		};
+		const classMemo = new Map();
+		const tokenOf = (t, before) => {
+			const memoKey = t + TOKEN_SEP + before;
+			let token = classMemo.get(memoKey);
+			if (token !== undefined) return token;
+			const found = classify(t, before);
+			token = found.token;
+			if (found.keys !== null && !tokens.has(token))
+				tokens.set(token, { char: t, keys: found.keys });
+			classMemo.set(memoKey, token);
+			return token;
+		};
+		const pairKey = (a, b) => a + TOKEN_SEP + b;
+		const bi = new Map();
+		const biBefore = new Map();
+		const triBefore = new Map();
+		const push = (map, key, entry) => (map.get(key) || map.set(key, []).get(key)).push(entry);
+		for (const [a, b, n] of table.bi) {
+			bi.set(pairKey(a, b), n);
+			push(biBefore, b, [a, n]);
+		}
+		for (const [x, a, b, n] of table.tri) push(triBefore, pairKey(a, b), [x, n]);
+		// A distribution: token → share, one entry of share 1 when there is one.
+		const normal = (counts) => {
+			if (counts.size === 1) return [[counts.keys().next().value, 1]];
+			let total = 0;
+			for (const n of counts.values()) total += n;
+			return Array.from(counts, ([token, n]) => [token, n / total]);
+		};
+		const add = (counts, token, n) => counts.set(token, (counts.get(token) || 0) + n);
+		// The tokens t is after p (one token known before it), from the triples.
+		const givenMemo = new Map();
+		const given = (p, t) => {
+			if (!capable(t)) return [[t, 1]];
+			const key = pairKey(p, t);
+			let dist = givenMemo.get(key);
+			if (dist) return dist;
+			const counts = new Map();
+			let rest = bi.get(key) || 0;
+			for (const [y, m] of triBefore.get(key) || []) {
+				add(counts, tokenOf(t, y + p), m);
+				rest -= m;
+			}
+			// The pairs with nothing before p.
+			if (rest > 0 || counts.size === 0) add(counts, tokenOf(t, p), Math.max(rest, 1));
+			givenMemo.set(key, (dist = normal(counts)));
+			return dist;
+		};
+		// The tokens of all of t's occurrences.
+		const anyMemo = new Map();
+		const anywhere = (t, total) => {
+			if (!capable(t)) return [[t, 1]];
+			let dist = anyMemo.get(t);
+			if (dist) return dist;
+			const counts = new Map();
+			let rest = total;
+			for (const [p, m] of biBefore.get(t) || []) {
+				for (const [token, share] of given(p, t)) add(counts, token, m * share);
+				rest -= m;
+			}
+			if (rest > 0 || counts.size === 0) add(counts, tokenOf(t, ''), Math.max(rest, 1));
+			anyMemo.set(t, (dist = normal(counts)));
+			return dist;
+		};
+		const uniCount = new Map(table.uni.map(([t, n]) => [t, n]));
+		const uni = [];
+		for (const entry of table.uni) {
+			const [t, n] = entry;
+			const dist = anywhere(t, n);
+			if (dist.length === 1 && dist[0][0] === t) uni.push(entry);
+			else for (const [token, share] of dist) uni.push([token, n * share]);
+		}
+		// The tokens of a pair: its first token after each character before it
+		// (the triples), then the pairs with nothing before. A distribution of
+		// « ta TOKEN_SEP tb » over the pair's count; a triple's first two
+		// tokens share it, so the pairs a triple holds read as the pair's.
+		const pairMemo = new Map();
+		const pairTokens = (a, b) => {
+			const key = pairKey(a, b);
+			let dist = pairMemo.get(key);
+			if (dist) return dist;
+			const n = bi.get(key) || 0;
+			const before = triBefore.get(key) || [];
+			// Tables cut to their most frequent n-grams may hold more triples than their pair.
+			let known = 0;
+			for (const [, m] of before) known += m;
+			const scale = known > n ? n / known : 1;
+			const parts = new Map();
+			let rest = n;
+			for (const [x, m] of before) {
+				const tb = tokenOf(b, x + a);
+				for (const [ta, share] of given(x, a)) add(parts, pairKey(ta, tb), m * scale * share);
+				rest -= m * scale;
+			}
+			if (rest > 0 || parts.size === 0)
+				add(parts, pairKey(tokenOf(a, ''), tokenOf(b, a)), Math.max(rest, 1));
+			pairMemo.set(key, (dist = normal(parts)));
+			return dist;
+		};
+		const same = (dist, entry, size) =>
+			dist.length === 1 && dist[0][0] === entry.slice(0, size).join(TOKEN_SEP);
+		const biOut = [];
+		for (const entry of table.bi) {
+			const [a, b, n] = entry;
+			const dist = !capable(a) && !capable(b) ? null : pairTokens(a, b);
+			if (dist === null || same(dist, entry, 2)) biOut.push(entry);
+			else for (const [key, share] of dist) biOut.push(key.split(TOKEN_SEP).concat([n * share]));
+		}
+		const triOut = [];
+		for (const entry of table.tri) {
+			const [a, b, c, n] = entry;
+			if (!capable(a) && !capable(b) && !capable(c)) {
+				triOut.push(entry);
+				continue;
+			}
+			const tc = tokenOf(c, a + b);
+			const dist = pairTokens(a, b).map(([key, share]) => [key + TOKEN_SEP + tc, share]);
+			if (same(dist, entry, 3)) triOut.push(entry);
+			else for (const [key, share] of dist) triOut.push(key.split(TOKEN_SEP).concat([n * share]));
+		}
+		return {
+			table: { prepared: true, uni, bi: biOut, tri: triOut, totalChars: table.totalChars },
+			tokens,
+			classify: (t, before) => classify(t, before).token
+		};
+	}
+
+	const ruleGraphCache = new WeakMap();
+
+	/**
+	 * The dead-key rules as a graph of symbols (« c » a character, « d » a dead
+	 * state, « t » a text): what each rule gives, and the rules that read each.
+	 * @param {Array<object>} rules - From deadRules().
+	 * @returns {{outputs: string[], users: Map<string, number[]>, producers:
+	 *   Map<string, number[]>}} Rule index → its output's symbol; symbol → the
+	 *   indexes of the rules it is an input of, and of the rules that give it
+	 *   (ascending).
+	 */
+	function ruleGraph(rules) {
+		if (ruleGraphCache.has(rules)) return ruleGraphCache.get(rules);
+		const users = new Map();
+		const producers = new Map();
+		const add = (map, symbol, r) => (map.get(symbol) || map.set(symbol, []).get(symbol)).push(r);
+		const outputs = rules.map((rule, r) => {
+			add(users, `d${rule.state}`, r);
+			add(users, rule.typedDead !== null ? `d${rule.typedDead}` : `c${rule.typedChar}`, r);
+			const out =
+				rule.outDead !== null
+					? `d${rule.outDead}`
+					: rule.outText !== null
+						? `t${rule.outText}`
+						: `c${rule.outChar}`;
+			add(producers, out, r);
+			return out;
+		});
+		const graph = { outputs, users, producers, closures: new Map() };
+		ruleGraphCache.set(rules, graph);
+		return graph;
+	}
+
+	/**
+	 * What a partial compile does again for the symbols its changed cells and
+	 * rules touch: those symbols, every output of a rule that reads one of
+	 * them, and so on, by kind (the lists it compiles again), and the rules
+	 * that give one of them, ascending (those a whole compile follows first).
+	 * Both depend on the rule graph and the touched symbols alone, so they are
+	 * kept on the graph per set of touched symbols: a search swaps the same
+	 * few units again and again. The result is shared: never written.
+	 * @param {object} graph - From ruleGraph().
+	 * @param {Set<string>} touched - The symbols the changes touch.
+	 * @returns {{only: {chars: Set<string>, dead: Set<string>, texts: Set<string>},
+	 *   order: number[]}} The touched characters, dead states and texts, and the rule order.
+	 */
+	function touchedClosure(graph, touched) {
+		const key = [...touched].sort().join(TOKEN_SEP);
+		const cached = graph.closures.get(key);
+		if (cached !== undefined) return cached;
+		const { outputs, users, producers } = graph;
+		// What reads a touched symbol is touched in turn.
+		const all = new Set(touched);
+		const queue = [...all];
+		while (queue.length) {
+			for (const r of users.get(queue.pop()) || []) {
+				const out = outputs[r];
+				if (all.has(out)) continue;
+				all.add(out);
+				queue.push(out);
+			}
+		}
+		const only = { chars: new Set(), dead: new Set(), texts: new Set() };
+		const order = [];
+		for (const symbol of all) {
+			const name = symbol.slice(1);
+			if (symbol[0] === 'c') only.chars.add(name);
+			else if (symbol[0] === 'd') only.dead.add(name);
+			else only.texts.add(name);
+			const given = producers.get(symbol);
+			if (given) for (const r of given) order.push(r);
+		}
+		order.sort((x, y) => x - y);
+		if (graph.closures.size >= CLOSURE_CACHE_LIMIT) graph.closures.clear();
+		const closure = { only, order };
+		graph.closures.set(key, closure);
+		return closure;
+	}
+
+	/** Whether two cells (or dead-key rule results) are alike: null and undefined are no cell. */
+	function sameCell(a, b) {
+		if (a === b) return true;
+		if (a === undefined || b === undefined)
+			return (a === undefined ? null : a) === (b === undefined ? null : b);
+		return (
+			a !== null &&
+			b !== null &&
+			typeof a === 'object' &&
+			typeof b === 'object' &&
+			a.dead === b.dead
+		);
+	}
+
+	/**
+	 * The maps a score session writes one role of its trials into (a core's
+	 * ways, a compile's best ways, a plan's ways…), so that a trial starts
+	 * from a copy of the current map without copying it whole. The map handed
+	 * out last differs from the one it was made equal to only on the keys
+	 * the trial wrote (mark: each collection of keys, once its writes are
+	 * done; it must not change after), so asking again for that map writes
+	 * those keys back, and asking for the map handed out (the trial was
+	 * committed) writes them into the map before it, when that one is a
+	 * spare too. The map asked for is never written; any other map (a whole
+	 * compile's, which nothing writes after) is copied whole, and copyWhole
+	 * copies a map that may be written later (another role's spare). A map
+	 * handed out stays valid until the next copy.
+	 * @returns {{copyOf: function(Map): Map, copyWhole: function(Map): Map,
+	 *   mark: function(Iterable): void, owns: function(Map): boolean}}
+	 */
+	function spareMaps() {
+		// The map handed out last, the map it was made equal to, and whether that one is a spare.
+		let last = null;
+		let from = null;
+		let fromOwn = false;
+		// Collections of the keys where last and from may differ (a key may be in several).
+		let dirty = [];
+		const sync = (target, source) => {
+			for (const keys of dirty)
+				for (const key of keys) {
+					const value = source.get(key);
+					if (value === undefined) target.delete(key);
+					else target.set(key, value);
+				}
+			dirty = [];
+			return target;
+		};
+		return {
+			copyOf(map) {
+				if (map === from && last !== null) return sync(last, from);
+				if (map === last && fromOwn) {
+					[last, from] = [from, last];
+					return sync(last, from);
+				}
+				dirty = [];
+				fromOwn = map === last;
+				from = map;
+				return (last = new Map(map));
+			},
+			copyWhole(map) {
+				dirty = [];
+				fromOwn = false;
+				from = null;
+				return (last = new Map(map));
+			},
+			mark(keys) {
+				dirty.push(keys);
+			},
+			owns(map) {
+				return map === last || (fromOwn && map === from);
+			}
+		};
+	}
+
+	/**
+	 * compileCore of a layout a few cells or dead-key rules away from one
+	 * already compiled (scoreSession's swaps), equal to compiling it from
+	 * nothing: only the characters, dead states and texts whose ways can
+	 * change are compiled again — those of the changed cells and rules, then
+	 * every output of a rule that reads one of them, and so on — and the other
+	 * lists are shared with `previous`. A list is the best MAX_WAYS of its
+	 * candidates and each candidate is built from strictly cheaper ways, so a
+	 * list whose inputs are the same is the same; a chain left unfollowed
+	 * after MAX_DEAD_DEPTH passes compiles the layout whole.
+	 * @param {object} previous - From compileCore() or compileCoreFrom(), on the same board.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {{coreWays, deadWays, texts}} [spares] - spareMaps() a score session
+	 *   writes the new lists into, instead of copies of the previous maps.
+	 * @returns {object} As compileCore, plus whole: true when compiled from
+	 *   nothing, or changedChars: the characters compiled again.
+	 */
+	function compileCoreFrom(previous, layout, board, spares) {
+		const before = previous.layout;
+		const touched = new Set();
+		const touch = (cell) => {
+			if (cell === null || cell === undefined) return;
+			if (typeof cell !== 'string') touched.add(`d${cell.dead}`);
+			else if (codeLength(cell) === 1) touched.add(`c${cell}`);
+			else if (cell.length > 0) touched.add(`t${cell}`);
+		};
+		const compareRows = (a, b) => {
+			if (a === b) return;
+			const width = Math.max(a ? a.length : 0, b ? b.length : 0);
+			for (let layer = 0; layer < width; layer++) {
+				const ca = a ? a[layer] : null;
+				const cb = b ? b[layer] : null;
+				if (sameCell(ca, cb)) continue;
+				touch(ca);
+				touch(cb);
+			}
+		};
+		for (const code of Object.keys(layout.rows))
+			if (board.index.has(code)) compareRows(before.rows[code], layout.rows[code]);
+		for (const code of Object.keys(before.rows))
+			if (board.index.has(code) && !(code in layout.rows))
+				compareRows(before.rows[code], undefined);
+		const rules = deadRules(layout.dead);
+		const graph = ruleGraph(rules);
+		const { outputs } = graph;
+		if (before.dead !== layout.dead) {
+			const changedStates = new Set();
+			const compareStates = (ra, rb, state) => {
+				if (ra === rb) return;
+				const a = ra || {};
+				const b = rb || {};
+				for (const t of Object.keys(a)) if (!sameCell(a[t], b[t])) return changedStates.add(state);
+				for (const t of Object.keys(b))
+					if (!(t in a) && !sameCell(a[t], b[t])) return changedStates.add(state);
+			};
+			for (const state of Object.keys(layout.dead))
+				compareStates(before.dead[state], layout.dead[state], state);
+			for (const state of Object.keys(before.dead))
+				if (!(state in layout.dead)) compareStates(before.dead[state], undefined, state);
+			// Every output of a changed state's rules, before and after, is compiled again.
+			if (changedStates.size) {
+				const previousRules = deadRules(before.dead);
+				const previousOutputs = ruleGraph(previousRules).outputs;
+				previousRules.forEach((rule, r) => {
+					if (changedStates.has(rule.state)) touched.add(previousOutputs[r]);
+				});
+				rules.forEach((rule, r) => {
+					if (changedStates.has(rule.state)) touched.add(outputs[r]);
+				});
+			}
+		}
+		if (touched.size === 0) return previous;
+		const { only, order } = touchedClosure(graph, touched);
+		// The previous maps, less the lists compiled again: only those keys are written.
+		const without = (map, keys, spare) => {
+			const out = spare ? spare.copyOf(map) : new Map(map);
+			for (const key of keys) out.delete(key);
+			if (spare) spare.mark(keys);
+			return out;
+		};
+		const core = {
+			layout,
+			// The characters whose lists were compiled again (finishWaysFrom).
+			changedChars: only.chars,
+			ways: without(previous.ways, only.chars, spares && spares.coreWays),
+			deadWays: without(previous.deadWays, only.dead, spares && spares.deadWays),
+			texts: without(previous.texts, only.texts, spares && spares.texts)
+		};
+		offerCells(core, layout, board, null, only);
+		if (!followRules(core, rules, order, board, 'partial'))
+			return Object.assign(compileCore(layout, board, null, 'record'), { whole: true });
+		return core;
 	}
 
 	/**
@@ -440,85 +2102,140 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   dead: boolean, cost: number}>} Character → sequence.
 	 */
 	function compileLayout(layout, board, missing) {
-		const best = new Map();
-		const deadSeq = new Map();
-		// Equal costs are settled the same way whatever order the file lists its
-		// keys in: fewer AltGr presses (the lower level, as Kalamine prefers),
-		// then fewer keys, then the lower key indexes.
-		const better = (a, b) => {
-			if (a.cost !== b.cost) return a.cost < b.cost;
-			if (a.altgr !== b.altgr) return a.altgr < b.altgr;
-			if (a.keys.length !== b.keys.length) return a.keys.length < b.keys.length;
-			for (let i = 0; i < a.keys.length; i++)
-				if (a.keys[i] !== b.keys[i]) return a.keys[i] < b.keys[i];
-			return false;
-		};
-		const offer = (map, key, candidate) => {
-			const current = map.get(key);
-			if (!current || better(candidate, current)) map.set(key, candidate);
-		};
-		for (const [code, row] of Object.entries(layout.rows)) {
-			const k = board.index.get(code);
-			if (k === undefined || (missing && missing.has(code))) continue;
-			row.forEach((cell, layer) => {
-				if (cell === null) return;
-				const stroke = {
-					keys: [k],
-					shift: LAYER_SHIFT[layer],
-					altgr: LAYER_ALTGR[layer],
-					dead: false,
-					cost: 1 + MODIFIER_COST * (LAYER_SHIFT[layer] + LAYER_ALTGR[layer])
-				};
-				if (typeof cell === 'string') {
-					if (codePoints(cell).length === 1) offer(best, cell, stroke);
-				} else offer(deadSeq, cell.dead, stroke);
-			});
+		return compileWays(layout, board, missing).best;
+	}
+
+	/**
+	 * The characters a layout still types when some keys are missing (a
+	 * compact form factor): the same reach as compileWays, without the costs.
+	 * The rules' characters and states are followed on ids; only the cells'
+	 * own characters are kept by name, so no set of every character is built.
+	 * @param {object} layout - Library shape.
+	 * @param {object} board - From keyboard().
+	 * @param {Set<string>} missing - Codes absent from the form factor.
+	 * @returns {{has: function(string): boolean}} Whether a character is typed,
+	 *   substitutes included.
+	 */
+	function reachableChars(layout, board, missing) {
+		const graph = reachGraph(deadRules(layout.dead));
+		// The cells' characters the rules never name, and the rules' ones reached, by id.
+		const cellChars = new Set();
+		const hasChar = new Uint8Array(graph.chars.length);
+		const hasState = new Uint8Array(graph.states.length);
+		const levels = levelTable(layout, board);
+		for (const code in layout.rows) {
+			if (!board.index.has(code) || missing.has(code)) continue;
+			const side = heldSide(board, board.index.get(code));
+			const row = layout.rows[code];
+			for (let layer = 0; layer < row.length; layer++) {
+				const cell = row[layer];
+				// As offerCells: a level the board holds no modifier key for types nothing.
+				if (cell === null || levels.held[layer][side] === null) continue;
+				if (typeof cell !== 'string') {
+					const s = graph.stateId.get(cell.dead);
+					if (s !== undefined) hasState[s] = 1;
+				} else if (codeLength(cell) === 1) {
+					const c = graph.charId.get(cell);
+					if (c !== undefined) hasChar[c] = 1;
+					else cellChars.add(cell);
+				}
+			}
 		}
-		const join = (a, b, dead) => ({
-			keys: a.keys.concat(b.keys),
-			shift: a.shift + b.shift,
-			altgr: a.altgr + b.altgr,
-			dead: dead || a.dead || b.dead,
-			cost: a.cost + b.cost
-		});
+		const { state, typed, typedDead, out, outKind } = graph;
 		for (let depth = 0; depth < MAX_DEAD_DEPTH; depth++) {
 			let changed = false;
-			for (const [state, prefix] of Array.from(deadSeq.entries())) {
-				const rules = layout.dead[state];
-				if (!rules) continue;
-				for (const [typed, result] of Object.entries(rules)) {
-					const tail = typed.startsWith(DEAD_TYPED)
-						? deadSeq.get(typed.slice(DEAD_TYPED.length))
-						: best.get(typed);
-					if (!tail) continue;
-					const candidate = join(prefix, tail, true);
-					const map = typeof result === 'string' ? best : deadSeq;
-					const target = typeof result === 'string' ? result : result.dead;
-					if (typeof result === 'string' && codePoints(result).length !== 1) continue;
-					const before = map.get(target);
-					offer(map, target, candidate);
-					if (map.get(target) !== before) changed = true;
+			for (let r = 0; r < state.length; r++) {
+				if (!hasState[state[r]]) continue;
+				if (!(typedDead[r] ? hasState[typed[r]] : hasChar[typed[r]])) continue;
+				if (outKind[r] === REACH_CHAR) {
+					if (hasChar[out[r]]) continue;
+					hasChar[out[r]] = 1;
+					changed = true;
+				} else if (outKind[r] === REACH_STATE && !hasState[out[r]]) {
+					hasState[out[r]] = 1;
+					changed = true;
 				}
 			}
 			if (!changed) break;
 		}
-		// A typographic character the layout lacks is typed as its plain form; a
-		// copy, so the plain character's own sequence stays unmarked.
-		for (const [fancy, plain] of Object.entries(data().model.substitutions)) {
-			if (best.has(fancy)) continue;
-			const parts = codePoints(plain).map((c) => best.get(c));
-			if (parts.some((part) => !part)) continue;
-			offer(
-				best,
+		// The substitutes, in order: one may be a part of a later one.
+		const substitutes = new Set();
+		const typedChar = (char) => {
+			const c = graph.charId.get(char);
+			return (c !== undefined && hasChar[c] === 1) || cellChars.has(char) || substitutes.has(char);
+		};
+		for (const [fancy, plain] of substitutionParts())
+			if (!typedChar(fancy) && plain.every(typedChar)) substitutes.add(fancy);
+		return { has: typedChar };
+	}
+
+	// What a rule gives in reachGraph: a character, a dead state, or a text (nothing reached).
+	const REACH_TEXT = 0;
+	const REACH_CHAR = 1;
+	const REACH_STATE = 2;
+	const reachGraphCache = new WeakMap();
+
+	/**
+	 * The dead-key rules on ids, for reachableChars: the characters and
+	 * states they name, and per rule its state, what it reads (a state when
+	 * typedDead) and what it gives (outKind). Cached per rule list.
+	 */
+	function reachGraph(rules) {
+		let graph = reachGraphCache.get(rules);
+		if (graph) return graph;
+		const chars = [];
+		const states = [];
+		const charId = new Map();
+		const stateId = new Map();
+		const id = (map, list, name) => {
+			let i = map.get(name);
+			if (i === undefined) {
+				i = list.length;
+				map.set(name, i);
+				list.push(name);
+			}
+			return i;
+		};
+		const n = rules.length;
+		graph = {
+			chars,
+			states,
+			charId,
+			stateId,
+			state: new Int32Array(n),
+			typed: new Int32Array(n),
+			typedDead: new Uint8Array(n),
+			out: new Int32Array(n),
+			outKind: new Uint8Array(n)
+		};
+		rules.forEach((rule, r) => {
+			graph.state[r] = id(stateId, states, rule.state);
+			if (rule.typedDead !== null) {
+				graph.typedDead[r] = 1;
+				graph.typed[r] = id(stateId, states, rule.typedDead);
+			} else graph.typed[r] = id(charId, chars, rule.typedChar);
+			if (rule.outChar !== null) {
+				graph.outKind[r] = REACH_CHAR;
+				graph.out[r] = id(charId, chars, rule.outChar);
+			} else if (rule.outDead !== null) {
+				graph.outKind[r] = REACH_STATE;
+				graph.out[r] = id(stateId, states, rule.outDead);
+			} else graph.outKind[r] = REACH_TEXT;
+		});
+		reachGraphCache.set(rules, graph);
+		return graph;
+	}
+
+	let substitutionList = null;
+
+	/** The model's substitutions, each as [fancy, the characters of its plain form]. */
+	function substitutionParts() {
+		if (substitutionList === null)
+			substitutionList = Object.entries(data().model.substitutions).map(([fancy, plain]) => [
 				fancy,
-				Object.assign(
-					{},
-					parts.reduce((a, b) => join(a, b, false)),
-					{ substituted: true }
-				)
-			);
-		}
-		return best;
+				textPoints(plain)
+			]);
+		return substitutionList;
 	}
 
 	// ========================
@@ -527,9 +2244,14 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/**
 	 * Counts the characters, bigrams and trigrams of a text. Line breaks and
-	 * tabs cut the text: no n-gram spans them and they are not counted.
+	 * tabs cut the text: no n-gram of the main tables spans them and they are
+	 * not counted there. The analysers that type them (KLA's and KLAnext's
+	 * Enter and Tab) read them from `breaks`: the n-grams of the whole text that
+	 * hold a line break or a tab (CR LF and a lone CR read as one line break), so
+	 * that the main tables and `breaks` together count every n-gram of the text.
 	 * @param {string} text - The corpus.
-	 * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: {chars:
+	 *   object, bigrams: object, trigrams: object}}} Counts.
 	 */
 	function ngramsFromText(text) {
 		const chars = {};
@@ -548,6 +2270,39 @@ var LAYOUT_ANALYSIS = (function () {
 					trigrams[t] = (trigrams[t] || 0) + 1;
 				}
 			}
+		}
+		return { chars, bigrams, trigrams, breaks: breakNgrams(text) };
+	}
+
+	/** A line break or a tab: what cuts ngramsFromText's main tables. */
+	const isBreak = (char) => char === '\n' || char === '\t';
+
+	/**
+	 * The n-grams of a text that hold a line break or a tab, line breaks read as
+	 * one \n (CR LF, CR, LF).
+	 * @param {string} text - The corpus.
+	 * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+	 */
+	function breakNgrams(text) {
+		const chars = {};
+		const bigrams = {};
+		const trigrams = {};
+		const c = codePoints(text.replace(/\r\n?/g, '\n'));
+		const add = (table, key) => {
+			table[key] = (table[key] || 0) + 1;
+		};
+		for (let i = 0; i < c.length; i++) {
+			if (!isBreak(c[i])) continue;
+			add(chars, c[i]);
+			// Each n-gram once: where its first break is.
+			const earlier = (from) => {
+				for (let j = from; j < i; j++) if (isBreak(c[j])) return true;
+				return false;
+			};
+			for (let start = Math.max(0, i - 1); start <= i && start + 1 < c.length; start++)
+				if (!earlier(start)) add(bigrams, c[start] + c[start + 1]);
+			for (let start = Math.max(0, i - 2); start <= i && start + 2 < c.length; start++)
+				if (!earlier(start)) add(trigrams, c[start] + c[start + 1] + c[start + 2]);
 		}
 		return { chars, bigrams, trigrams };
 	}
@@ -580,11 +2335,185 @@ var LAYOUT_ANALYSIS = (function () {
 			prepared: true,
 			uni: split(ngrams.chars, 1),
 			bi: split(ngrams.bigrams, 2),
-			tri: split(ngrams.trigrams, 3)
+			tri: split(ngrams.trigrams, 3),
+			breaks: null,
+			analysers: null,
+			references: null
 		};
 		prepared.totalChars = prepared.uni.reduce((sum, entry) => sum + entry[1], 0);
+		// The counts some analysers read from the text itself
+		// (LAYOUT_ANALYSER_SCORES.textTables), when the table has them.
+		if (ngrams.analysers !== undefined) {
+			if (!ngrams.analysers || typeof ngrams.analysers !== 'object')
+				throw new Error('layout_analysis: analysers must be an object');
+			prepared.analysers = ngrams.analysers;
+		}
+		// The statistics some analysers take over their own reference layouts
+		// on this corpus (LAYOUT_ANALYSER_SCORES.referenceTables), when shipped.
+		if (ngrams.references !== undefined) {
+			if (!ngrams.references || typeof ngrams.references !== 'object')
+				throw new Error('layout_analysis: references must be an object');
+			prepared.references = ngrams.references;
+		}
+		// The n-grams with a line break or a tab (ngramsFromText), when the
+		// table has them; only the analysers that type Enter and Tab read them.
+		if (ngrams.breaks !== undefined) {
+			const b = ngrams.breaks;
+			if (!b || typeof b.chars !== 'object' || typeof b.bigrams !== 'object')
+				throw new Error('layout_analysis: breaks need chars and bigrams');
+			prepared.breaks = {
+				uni: split(b.chars, 1),
+				bi: split(b.bigrams, 2),
+				tri: split(b.trigrams, 3)
+			};
+			for (const [char] of prepared.breaks.uni)
+				if (char !== '\n' && char !== '\t')
+					throw new Error(`layout_analysis: breaks count ${JSON.stringify(char)}`);
+		}
 		preparedCache.set(ngrams, prepared);
 		return prepared;
+	}
+
+	/**
+	 * Whether a token typed by a key is text a layout produces: one code point
+	 * that is not a control character, a line break and a tab excepted (Escape
+	 * and Backspace also reach the store as U+001B and U+0008).
+	 * @param {string} token - One token of a stored key.
+	 * @returns {boolean}
+	 */
+	function isTypedText(token) {
+		const c = codePoints(token);
+		if (c.length !== 1) return false;
+		if (isBreak(c[0])) return true;
+		return !/^[\u0000-\u001f\u007f-\u009f]$/.test(c[0]);
+	}
+
+	/**
+	 * The n-gram tables of the keystats store's « My typing » payload
+	 * (_shared/metrics/data/studio_ngrams.json), in the shape ngramsFromText
+	 * returns. A stored key is a run of tokens (_shared/metrics/data/keystats_tokens.json):
+	 * a marker such as [BS] or [LEFT] for a key that types no text, the escape
+	 * [[ for a typed bracket, or one character. An n-gram with a marker or a
+	 * control character is no text a layout types, and a key whose tokens do not
+	 * make one n-gram of its family is not one either: both are left out and
+	 * counted in `skipped`. The n-grams with a line break or a tab go to `breaks`,
+	 * as ngramsFromText puts them, so the analysers read both corpora alike.
+	 * @param {{chars: object, bigrams: object, trigrams?: object, final?: object}} payload
+	 *   The host's tables; final, when present, is converted the same way.
+	 * @param {function(string): string[]} tokenize - The store's key reader (key_tokens).
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: object,
+	 *   total: number, skipped: number, final?: object}} Counts.
+	 * @throws {Error} On a payload without its tables or a count that is not a number.
+	 */
+	function ngramsFromKeystats(payload, tokenize) {
+		if (typeof tokenize !== 'function')
+			throw new Error('layout_analysis: keystats n-grams need the key reader');
+		const text = (tables, what) => {
+			if (!tables || typeof tables.chars !== 'object' || typeof tables.bigrams !== 'object')
+				throw new Error(`layout_analysis: the keystats ${what} need chars and bigrams`);
+			const main = { chars: {}, bigrams: {}, trigrams: {} };
+			const breaks = { chars: {}, bigrams: {}, trigrams: {} };
+			let skipped = 0;
+			let total = 0;
+			for (const [field, size] of [
+				['chars', 1],
+				['bigrams', 2],
+				['trigrams', 3]
+			]) {
+				for (const [key, n] of Object.entries(tables[field] || {})) {
+					if (typeof n !== 'number' || !Number.isFinite(n))
+						throw new Error(
+							`layout_analysis: the keystats count of ${JSON.stringify(key)} is no number`
+						);
+					if (!(n > 0)) continue;
+					const tokens = tokenize(key);
+					if (tokens.length !== size || !tokens.every(isTypedText)) {
+						if (size === 1) skipped += n;
+						continue;
+					}
+					const gram = tokens.join('');
+					const table = tokens.some(isBreak) ? breaks[field] : main[field];
+					table[gram] = (table[gram] || 0) + n;
+					if (size === 1) total += n;
+				}
+			}
+			return Object.assign(main, { breaks, total, skipped });
+		};
+		const out = text(payload, 'tables');
+		if (payload.final !== undefined) out.final = text(payload.final, 'final text');
+		return out;
+	}
+
+	const tableIdsCache = new WeakMap();
+
+	/**
+	 * A prepared table's tokens as ids and its n-grams as typed arrays, in the
+	 * table's order: a walk indexes arrays instead of looking each token up
+	 * by string. Cached per table.
+	 * @param {object} table - From prepareNgrams() or tokenTable().
+	 * @returns {{tokens: string[], idOf: Map<string, number>, uniId: Int32Array,
+	 *   uniN: Float64Array, biA: Int32Array, biB: Int32Array, biN: Float64Array,
+	 *   triA: Int32Array, triB: Int32Array, triC: Int32Array, triN: Float64Array,
+	 *   allBi: Int32Array, allTri: Int32Array, whole: boolean}} Ids (idOf: token
+	 *   → id); allBi, allTri: every entry's index; whole: every count an
+	 *   integer, small enough for exact sums.
+	 */
+	function tableIds(table) {
+		let out = tableIdsCache.get(table);
+		if (out) return out;
+		const tokens = [];
+		const idOf = new Map();
+		const id = (token) => {
+			let i = idOf.get(token);
+			if (i === undefined) {
+				i = tokens.length;
+				idOf.set(token, i);
+				tokens.push(token);
+			}
+			return i;
+		};
+		const ids = (entries, j) => {
+			const column = new Int32Array(entries.length);
+			for (let i = 0; i < entries.length; i++) column[i] = id(entries[i][j]);
+			return column;
+		};
+		let whole = true;
+		let total = 0;
+		const counts = (entries, j) => {
+			const column = new Float64Array(entries.length);
+			for (let i = 0; i < entries.length; i++) {
+				const n = entries[i][j];
+				column[i] = n;
+				total += n;
+				if (whole && !Number.isInteger(n)) whole = false;
+			}
+			return column;
+		};
+		out = {
+			tokens,
+			idOf,
+			uniId: ids(table.uni, 0),
+			uniN: counts(table.uni, 1),
+			biA: ids(table.bi, 0),
+			biB: ids(table.bi, 1),
+			biN: counts(table.bi, 2),
+			triA: ids(table.tri, 0),
+			triB: ids(table.tri, 1),
+			triC: ids(table.tri, 2),
+			triN: counts(table.tri, 3)
+		};
+		// Whole counts whose sums stay exact integers whatever their order (a
+		// character's own keys can count it a few times over).
+		out.whole = whole && total * WHOLE_SUM_MARGIN <= Number.MAX_SAFE_INTEGER;
+		const indexes = (length) => {
+			const all = new Int32Array(length);
+			for (let i = 0; i < length; i++) all[i] = i;
+			return all;
+		};
+		out.allBi = indexes(out.biN.length);
+		out.allTri = indexes(out.triN.length);
+		tableIdsCache.set(table, out);
+		return out;
 	}
 
 	// ==========================
@@ -592,52 +2521,628 @@ var LAYOUT_ANALYSIS = (function () {
 	// ==========================
 
 	/**
-	 * The keyboard a layout is measured on: an angle-mod layout uses the angle
-	 * fingering of an ISO board.
+	 * The keyboard a layout is measured on (layoutKeyboard: an angle-mod
+	 * layout uses the angle fingering of an ISO board, the optional keys only
+	 * for a layout typing on one, unless withOptional says), less its left
+	 * thumb's spare keys (layoutBoard).
 	 */
-	function boardFor(layout, keyboardId, profile) {
-		// A profile with its own base fingering decides; otherwise an angle-mod
-		// layout on an ISO board takes the angle fingering.
-		if (keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base))
-			return keyboard('iso_angle', profile);
-		return keyboard(keyboardId, profile);
+	function boardFor(layout, keyboardId, profile, withOptional) {
+		return layoutBoard(checkedLayoutKeyboard(layout, keyboardId, profile, withOptional), layout);
+	}
+
+	/**
+	 * Whether a layout types on one of the model's optional keys (Tab, Enter,
+	 * the right Control), which only its board then has.
+	 * @param {object} layout - Library shape.
+	 * @returns {boolean}
+	 */
+	function typesOnOptionalKeys(layout) {
+		return data().model.optional_keys.some((code) =>
+			(layout.rows[code] || []).some((cell) => cell !== null)
+		);
+	}
+
+	/**
+	 * The keyboard a layout is measured and drawn on, before its left thumb's
+	 * spare keys are taken off (layoutBoard): a profile with its own base
+	 * fingering decides, else an angle-mod layout on an ISO board takes the
+	 * angle fingering; the board has the optional keys (Tab, Enter, the right
+	 * Control) only when the layout types on one of them.
+	 * @param {object} layoutInput - Library shape.
+	 * @param {string} keyboardId - A key of model.keyboards.
+	 * @param {object} [profile] - A fingering profile.
+	 * @returns {object} From keyboard().
+	 */
+	function layoutKeyboard(layoutInput, keyboardId, profile) {
+		return checkedLayoutKeyboard(layoutFromRows(layoutInput), keyboardId, profile);
+	}
+
+	/**
+	 * layoutKeyboard for a layout layoutFromRows already checked (boardFor's);
+	 * withOptional, when given, decides instead of the layout whether the board
+	 * keeps the optional keys (a score session keeps its first layout's).
+	 */
+	function checkedLayoutKeyboard(layout, keyboardId, profile, withOptional) {
+		const optional = withOptional === undefined ? typesOnOptionalKeys(layout) : withOptional;
+		return keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base)
+			? keyboard('iso_angle', profile, optional)
+			: keyboard(keyboardId, profile, optional);
+	}
+
+	const layoutBoardCache = new WeakMap();
+
+	/**
+	 * The one key the left thumb types on for a layout (maintainer, 2026-11-21:
+	 * its second key is Alt, or Cmd on macOS, and the others are further away):
+	 * the left thumb key the layout types its space on, else the one it rests
+	 * on (NonConvert, then the space bar) when the layout uses it, else the
+	 * first left thumb key the layout puts a character on.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {string} A code of board.leftThumbCodes, or the rest key.
+	 */
+	function leftThumbKey(board, layout) {
+		const cells = (code) => layout.rows[code] || [];
+		const used = board.leftThumbCodes.filter((code) => cells(code).some((cell) => cell !== null));
+		return (
+			used.find((code) => cells(code).some((cell) => cell === ' ')) ||
+			(used.length === 0 || used.includes(board.leftThumbRest) ? board.leftThumbRest : used[0])
+		);
+	}
+
+	/**
+	 * The left thumb keys of a board a layout types nothing on: every one but
+	 * its leftThumbKey. The optimizer moves no character onto them.
+	 * @param {object} layoutInput - Library shape.
+	 * @param {string} keyboardId - A key of model.keyboards.
+	 * @param {object} [profile] - A fingering profile.
+	 * @returns {string[]} KeyboardEvent or board-only codes.
+	 */
+	function spareThumbKeys(layoutInput, keyboardId, profile) {
+		const layout = layoutFromRows(layoutInput);
+		const board = keyboard(keyboardId, profile);
+		const kept = leftThumbKeys(board, layout);
+		return board.leftThumbCodes.filter((code) => !kept.includes(code));
+	}
+
+	/**
+	 * The left thumb keys a layout types on: its leftThumbKey, and on a board
+	 * whose left thumb types on several keys together (the ErgoDox's 2-unit
+	 * keys, left_thumb_typing_keys; maintainer, 2026-11-24) every other one of
+	 * those it puts a character on.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {string[]} Codes of board.leftThumbCodes, the leftThumbKey first.
+	 */
+	function leftThumbKeys(board, layout) {
+		const first = leftThumbKey(board, layout);
+		if (!board.leftThumbTogether.includes(first)) return [first];
+		const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
+		return [first].concat(
+			board.leftThumbTogether.filter(
+				(code) => code !== first && board.leftThumbCodes.includes(code) && typed(code)
+			)
+		);
+	}
+
+	/**
+	 * The board a layout is measured on: without the left thumb keys beyond
+	 * its one (leftThumbKey) that it puts characters on, which become keys the
+	 * board lacks (their characters unsupported), and with the thumb keys it
+	 * types its space on out of the pair metrics, as the space bar is. The
+	 * board itself when neither applies (every ISO and ANSI layout), else one
+	 * copy per such set of keys, so a score session keeps one board.
+	 * @param {object} board - From keyboard().
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {object} The board, or its copy.
+	 */
+	function layoutBoard(board, layout) {
+		const typed = (code) => (layout.rows[code] || []).some((cell) => cell !== null);
+		const kept = leftThumbKeys(board, layout);
+		const dropped = board.leftThumbCodes.filter((code) => !kept.includes(code) && typed(code));
+		// A left thumb key typed together with the first (the ErgoDox's outer
+		// 2-unit key, board code Space) takes part in the pairs like a thumb key
+		// when it types no space.
+		const letterKeys = kept
+			.slice(1)
+			.filter((code) => !(layout.rows[code] || []).some((cell) => cell === ' '))
+			.map((code) => board.index.get(code))
+			.filter((k) => board.outOfPairs[k] === 1);
+		const spaceKeys = data()
+			.model.thumb_keys.filter(
+				(code) =>
+					board.index.has(code) &&
+					!dropped.includes(code) &&
+					(layout.rows[code] || []).some((cell) => cell === ' ')
+			)
+			.map((code) => board.index.get(code));
+		if (spaceKeys.length === 0 && dropped.length === 0 && letterKeys.length === 0) return board;
+		let copies = layoutBoardCache.get(board);
+		if (!copies) layoutBoardCache.set(board, (copies = new Map()));
+		const key = `${spaceKeys.join(',')}|${dropped.join(',')}|${letterKeys.join(',')}`;
+		if (!copies.has(key)) {
+			const outOfPairs = Uint8Array.from(board.outOfPairs);
+			for (const k of spaceKeys) outOfPairs[k] = 1;
+			for (const k of letterKeys) outOfPairs[k] = 0;
+			const index = new Map(board.index);
+			for (const code of dropped) index.delete(code);
+			copies.set(key, Object.assign({}, board, { outOfPairs, index }));
+		}
+		return copies.get(key);
 	}
 
 	/**
 	 * Measures one layout.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, weights?: object, idealLoad?: object}} [options]
-	 *   - Board, weights and the ideal finger load of finger_imbalance (finger →
-	 *   % of the non-thumb presses; the model's ideal_finger_load when absent).
-	 * @returns {object} {layout, keyboard, metrics, fingers, rows, coverage,
-	 *   trigramClasses, score}.
+	 * @param {{keyboard?: string, format?: string, weights?: object, floors?: object,
+	 *   grades?: object, idealLoad?: object, profile?: object, keyGroups?: boolean,
+	 *   shortcuts?: object, formWeights?: object}} [options]
+	 *   - The score's floors and graded costs (as score()); the user's shortcut table (shortcuts(): letter usefulness and key ease of
+	 *   shortcut_left) and compact form factor weights (formFactorWeights(): of
+	 *   compact_fit), the model's when absent; board, keyboard format
+	 *   (keyboard_formats id: compact_fit measures the per-format form factors on
+	 *   it alone), weights, the ideal finger load of finger_imbalance (finger → %
+	 *   of the non-thumb presses; the model's ideal_finger_load when absent), the
+	 *   fingering profile, and whether each key's worst groups are counted for
+	 *   every event (keys[code].worst; the SFB ones always are). typing:
+	 *   'best' (the default) types each character the way that costs least in
+	 *   its context and uses the multi-character outputs that save keystrokes
+	 *   (planTyping); 'fixed' types each its cheapest way out of context.
+	 * @returns {object} {layout, keyboard, metrics, parts, fingers, fingerShares,
+	 *   idealLoad, hands, rows, coverage, trigramClasses, keys, typing,
+	 *   simplicity, referenceBasis, score}: referenceBasis is QWERTY's
+	 *   measures on the same table and options, which the mark reads the
+	 *   score against (score()).
 	 */
 	function analyse(layoutInput, ngrams, options) {
 		const opts = options || {};
+		const table = prepareNgrams(ngrams);
+		const result = measure(layoutInput, table, opts);
+		// QWERTY's measures on the same table and options: the mark's reference.
+		result.referenceBasis = referenceBasis(table, opts);
+		result.score = score(result, opts.weights, opts.floors, opts.grades);
+		return result;
+	}
+
+	/**
+	 * Measures one layout as analyse() does, without its score and mark: the
+	 * metrics and every detail. For a caller that reads the measures only,
+	 * on any text: a toy text where QWERTY costs nothing has no mark
+	 * (markIndex), so analyse() refuses it.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {object} [options] - As analyse().
+	 * @returns {object} analyse()'s result without referenceBasis and score.
+	 */
+	function measure(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const table = prepareNgrams(ngrams);
 		const layout = layoutFromRows(layoutInput);
 		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
-		const table = prepareNgrams(ngrams);
-		const best = compileLayout(layout, board, null);
-		const thumb = board.finger.map((f) => f === LEFT_THUMB || f === RIGHT_THUMB);
+		const compiled = compileWays(layout, board, null);
+		const plan = planTyping(compiled, board, table, planMode(opts));
 		const keyCount = new Float64Array(board.codes.length);
-		const c = {
+		const c = streamCounts();
+		const unsupportedChars = {};
+		// Per key: how often it takes part in each bad event, and each event's
+		// key groups (a pair, or the trigram of a redirect), for the heatmap.
+		const perKey = {};
+		const groups = {};
+		for (const event of KEY_EVENTS) {
+			perKey[event] = new Float64Array(board.codes.length);
+			groups[event] = new Map();
+		}
+		// The good events each key takes part in (rolls, alternation), never grouped.
+		for (const gain of KEY_GAINS) perKey[gain] = new Float64Array(board.codes.length);
+		// Each graded event's keys, never grouped: the keys' part of each grade.
+		for (const metric of COUNTED_GRADES)
+			for (const name of GRADE_COUNTERS[metric])
+				perKey[name] = new Float64Array(board.codes.length);
+		// A pair's or a trigram's group id holds its keys in increasing order.
+		// Counting every event's groups costs about 40 % on a whole library, so
+		// only the SFB partners the ranking shows are counted unless asked.
+		const grouped = {};
+		for (const event of KEY_EVENTS) grouped[event] = opts.keyGroups === true || event === 'sfb';
+		const count = (event, id, n) => groups[event].set(id, (groups[event].get(id) || 0) + n);
+		const blame = {
+			pair(event, n, a, b) {
+				perKey[event][a] += n;
+				perKey[event][b] += n;
+				if (grouped[event]) count(event, a < b ? a * KEY_BASE + b : b * KEY_BASE + a, n);
+			},
+			triple(event, n, a, b, d) {
+				perKey[event][a] += n;
+				perKey[event][b] += n;
+				perKey[event][d] += n;
+				if (!grouped[event]) return;
+				const low = Math.min(a, b, d);
+				const high = Math.max(a, b, d);
+				count(event, (low * KEY_BASE + (a + b + d - low - high)) * KEY_BASE + high, n);
+			}
+		};
+
+		walkTyped(board, plan, streamVisitor(board, c, keyCount, unsupportedChars, blame));
+		const m = streamMetrics(
+			layout,
+			board,
+			compiled,
+			c,
+			keyCount,
+			opts,
+			compactFit(layout, board, table, opts.format, opts.formWeights)
+		);
+		const metrics = m.metrics;
+		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const report = typingReport(board, plan, layout);
+		const fingerIds = data().model.fingers;
+		const result = {
+			layout: {
+				id: layout.id,
+				name: layout.name,
+				origin: layout.origin,
+				source: layout.source,
+				authors: layout.authors,
+				url: layout.url,
+				language: layout.language
+			},
+			keyboard: board.id,
+			// The fingering profile measured with (null: the defaults), for the key map.
+			profile: board.profile,
+			metrics,
+			// The shares the graded costs weigh (gradeParts): score() reads them.
+			parts: m.parts,
+			fingers: m.fingers,
+			// Each non-thumb finger's share of the non-thumb presses, and the ideal
+			// load it is measured against: the two sides of finger_imbalance.
+			fingerShares: Object.fromEntries(
+				Object.keys(m.ideal).map((id) => [id, pct(m.fingerLoad[fingerIds.indexOf(id)], m.pressed)])
+			),
+			idealLoad: Object.assign({}, m.ideal),
+			fingerDistance: m.fingerDistance,
+			hands: { left: pct(m.left, m.left + m.right), right: pct(m.right, m.left + m.right) },
+			rows: {
+				number: metrics.number_row,
+				top: metrics.top_row,
+				home: metrics.home_row,
+				bottom: metrics.bottom_row
+			},
+			trigramClasses: {
+				roll3_in: metrics.roll3_in,
+				roll3_out: metrics.roll3_out,
+				alternation: metrics.alternation,
+				redirect: metrics.redirect,
+				roll_mixed: pct(c.roll_mixed, c.trigrams),
+				same_finger: pct(c.same_finger_trigram, c.trigrams)
+			},
+			keys: keyReport(board, {
+				keyCount,
+				allPresses: m.allPresses,
+				pressed: m.pressed,
+				fingerLoad: m.fingerLoad,
+				ideal: m.ideal,
+				perKey,
+				groups,
+				counts: c
+			}),
+			coverage: {
+				// Keys the layout puts characters on that this keyboard lacks (a
+				// 36-key board has no number row): their characters count as unsupported.
+				missingKeys: Object.keys(layout.rows)
+					.filter(
+						(code) => !board.index.has(code) && layout.rows[code].some((cell) => cell !== null)
+					)
+					.sort(),
+				typed: c.chars,
+				unsupported: c.unsupported,
+				unsupportedChars,
+				bigrams: c.bigrams,
+				trigrams: c.trigrams,
+				// The model's required characters (the space, a–z, A–Z) the layout
+				// cannot type on this keyboard: any of them makes it incomplete.
+				missingRequired: missingRequired(compiled.best)
+			},
+			typing: {
+				mode: typingMode(opts),
+				// The points the keystroke metrics take from the score along this
+				// path, by the default weights, the access weights of the choice and
+				// the corpus's own totals: what the choice of ways minimises
+				// (typingCosts, unitCost).
+				cost: typingCost(
+					table,
+					c,
+					{
+						pinky: m.fingerLoad[0] + m.fingerLoad[9],
+						outer: m.outer,
+						home: m.home,
+						// The travel weighted by the default finger grades.
+						travel:
+							gradedValue('distance', metrics.distance, m.parts.distance, data().grades.distance) *
+							c.chars
+					},
+					plan.access
+				),
+				// The access weights the ways were chosen by: rescore() refuses others.
+				access: Object.assign({}, plan.access),
+				alternatives: report.alternatives,
+				changed: pct(report.changed, c.chars),
+				paths: report.paths,
+				chords: report.chords
+			},
+			simplicity: m.simplicity
+		};
+		// One layout analysed in detail: each event's heaviest groups over the board.
+		if (opts.keyGroups === true) result.topGroups = topGroups(board, groups, c);
+		result.incomplete = result.coverage.missingRequired.length > 0;
+		return result;
+	}
+
+	/**
+	 * The required characters (model required_characters: the space and the 26
+	 * letters in each case, each checked on its own) a layout cannot type by
+	 * any way of its own; a typographic substitute does not count.
+	 * @param {Map<string, object>} best - compileWays().best.
+	 * @returns {string[]} The missing ones, in the model's order.
+	 */
+	function missingRequired(best) {
+		return codePoints(data().model.required_characters).filter(
+			(char) => !best.has(char) || best.get(char).substituted === true
+		);
+	}
+
+	/**
+	 * The access weights an analysis types with: each default, replaced by
+	 * the given weight of the same metric.
+	 * @param {object} [weights] - As score().
+	 * @returns {{modifier_usage: number, altgr_usage: number, dead_key_usage: number}}
+	 * @throws {Error} On a negative or non-finite access weight.
+	 */
+	function accessWeights(weights) {
+		const defaults = data().weights;
+		const out = {};
+		for (const id of ACCESS_WEIGHTS) {
+			const value = weights && weights[id] !== undefined ? weights[id] : defaults[id];
+			if (!(value >= 0) || !Number.isFinite(value))
+				throw new Error(`layout_analysis: weight of ${id} must be a finite number >= 0`);
+			out[id] = value;
+		}
+		return out;
+	}
+
+	/**
+	 * How analyse() options plan the typing (planTyping): the mode and the
+	 * access weights of the choice.
+	 * @returns {{fixed: boolean, access: object}}
+	 */
+	function planMode(opts) {
+		return { fixed: typingMode(opts) === 'fixed', access: accessWeights(opts.weights) };
+	}
+
+	/**
+	 * The typing mode of analyse() options: 'best' unless 'fixed' is asked.
+	 * @throws {Error} On another mode.
+	 */
+	function typingMode(opts) {
+		if (opts.typing === undefined) return 'best';
+		if (opts.typing !== 'best' && opts.typing !== 'fixed')
+			throw new Error(`layout_analysis: unknown typing ${opts.typing}`);
+		return opts.typing;
+	}
+
+	// What a key trigram is (tripleKind): one class, plus a flag when its first
+	// and last keys are another same-finger skipgram; 0 is « not yet known ».
+	const TRIPLE_CLASS = 7;
+	const TRIPLE_SAME_FINGER = 1;
+	const TRIPLE_ROLL_IN = 2;
+	const TRIPLE_ROLL_OUT = 3;
+	const TRIPLE_REDIRECT = 4;
+	const TRIPLE_REDIRECT_BAD = 5;
+	const TRIPLE_ALTERNATION = 6;
+	const TRIPLE_ROLL_MIXED = 7;
+	const TRIPLE_SFS = 8;
+	const TRIPLE_OUT = 16;
+	// Its first two keys, its last two keys, are fingers of one hand (hand_run).
+	const TRIPLE_RUN_LEAD = 32;
+	const TRIPLE_RUN_TAIL = 64;
+	const tripleKindCache = new WeakMap();
+
+	/**
+	 * The classification of streamVisitor's trigram rule for one key trigram:
+	 * a key out of the pair metrics (the space's: board.outOfPairs) leaves it
+	 * out (TRIPLE_OUT); otherwise TRIPLE_SFS when the
+	 * first and last keys are different keys of one finger, and its class: a
+	 * finger repeated in a row, then on one hand a roll in or out or a
+	 * redirect (bad without the index), else alternation or a mixed roll;
+	 * with the run bits of its two links (sameHandFingers).
+	 */
+	function tripleKind(board, k1, k2, k3) {
+		return (
+			tripleClass(board, k1, k2, k3) |
+			(sameHandFingers(board, k1, k2) ? TRIPLE_RUN_LEAD : 0) |
+			(sameHandFingers(board, k2, k3) ? TRIPLE_RUN_TAIL : 0)
+		);
+	}
+
+	/**
+	 * Whether two keys continue a same-hand run: fingers (no thumb, no space)
+	 * of one hand. The space or a thumb key ends a run.
+	 */
+	function sameHandFingers(board, k1, k2) {
+		const out = board.outOfPairs;
+		return !out[k1] && !out[k2] && fingerRows(board, k1, k2) && board.hand[k1] === board.hand[k2];
+	}
+
+	/** tripleKind's class and SFS flag, without the run bits. */
+	function tripleClass(board, k1, k2, k3) {
+		const out = board.outOfPairs;
+		if (out[k1] || out[k2] || out[k3]) return TRIPLE_OUT;
+		const f1 = board.finger[k1];
+		const f2 = board.finger[k2];
+		const f3 = board.finger[k3];
+		const sfs = f1 === f3 && k1 !== k3 ? TRIPLE_SFS : 0;
+		if (f1 === f2 || f2 === f3) return sfs | TRIPLE_SAME_FINGER;
+		const h1 = board.hand[k1];
+		const h2 = board.hand[k2];
+		const h3 = board.hand[k3];
+		if (h1 === h2 && h2 === h3) {
+			const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
+			if (d > 0)
+				return sfs | (board.order[k2] > board.order[k1] ? TRIPLE_ROLL_IN : TRIPLE_ROLL_OUT);
+			const index =
+				board.order[k1] === INDEX_ORDER ||
+				board.order[k2] === INDEX_ORDER ||
+				board.order[k3] === INDEX_ORDER;
+			return sfs | (index ? TRIPLE_REDIRECT : TRIPLE_REDIRECT_BAD);
+		}
+		return sfs | (h1 !== h2 && h2 !== h3 ? TRIPLE_ALTERNATION : TRIPLE_ROLL_MIXED);
+	}
+
+	/** The sfb cell of two keys of one finger: same row, one row, two rows or more. */
+	function sfbRowGrade(board, k1, k2) {
+		return Math.min(Math.abs(board.row[k1] - board.row[k2]), GRADE_CELLS.sfb.length - 1);
+	}
+
+	/**
+	 * The row_jump cell of two fingers of one hand on different rows: their
+	 * finger distance (adjacent, one apart, index and pinky), then their rows
+	 * (one, two or more).
+	 */
+	function rowJumpCell(board, k1, k2) {
+		const rows = GRADE_AXES.row_jump[1].length;
+		const gap = FINGER_GAP_GRADE[Math.abs(board.order[k1] - board.order[k2])];
+		return gap * rows + Math.min(Math.abs(board.row[k1] - board.row[k2]), rows) - 1;
+	}
+
+	/** A cell's factor: the product of its grades in a table (scoreGrades()[metric]). */
+	function cellFactor(metric, cell, table) {
+		return GRADE_CELLS[metric][cell].reduce((product, grade) => product * table[grade], 1);
+	}
+
+	/** A finger's type (GRADES.distance) by its index in the model's fingers. */
+	function fingerType(f) {
+		if (isThumbFinger(f)) return THUMB_TYPE;
+		return FINGER_TYPES[f < LEFT_THUMB ? f : data().model.fingers.length - 1 - f];
+	}
+
+	/** A board's tripleKind memo, (k1 * K + k2) * K + k3, filled as read. */
+	function tripleKinds(board) {
+		let out = tripleKindCache.get(board);
+		if (!out) {
+			const K = board.codes.length;
+			out = new Uint8Array(K * K * K);
+			tripleKindCache.set(board, out);
+		}
+		return out;
+	}
+
+	const sameFingerCache = new WeakMap();
+
+	/**
+	 * What a move between two keys of one finger costs sfb_distance: the
+	 * distance between the keys' centres in millimetres (the distance metric's
+	 * geometry) times the finger's same_finger_factor (a pinky's move costs
+	 * more than an index's), (k1 * K + k2); 0 between keys of two fingers.
+	 * @param {object} board - From keyboard().
+	 * @returns {Float64Array} K × K costs.
+	 * @throws {Error} When the model gives a finger no factor > 0.
+	 */
+	function sameFingerCosts(board) {
+		let out = sameFingerCache.get(board);
+		if (out) return out;
+		const { model } = data();
+		const factors = model.fingers.map((id) => {
+			const factor = model.same_finger_factor[id];
+			if (typeof factor !== 'number' || !Number.isFinite(factor) || factor <= 0)
+				throw new Error(`layout_analysis: same_finger_factor of ${id} must be a number > 0`);
+			return factor;
+		});
+		const K = board.codes.length;
+		out = new Float64Array(K * K);
+		for (let k1 = 0; k1 < K; k1++)
+			for (let k2 = 0; k2 < K; k2++) {
+				const f = board.finger[k1];
+				if (f !== board.finger[k2] || k1 === k2) continue;
+				const mm =
+					Math.hypot(board.x[k1] - board.x[k2], board.y[k1] - board.y[k2]) * model.key_unit_mm;
+				out[k1 * K + k2] = mm * factors[f];
+			}
+		sameFingerCache.set(board, out);
+		return out;
+	}
+
+	/**
+	 * sfb_distance from the stream counters: the same-finger travel of the
+	 * SFBs per 100 key bigrams plus SFS_DISTANCE_SHARE of the skipgrams' per
+	 * 100 key trigrams, each move weighted by its finger (sameFingerCosts).
+	 */
+	function sfbDistance(c) {
+		const per100 = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		return per100(c.sfb_cost, c.bigrams) + SFS_DISTANCE_SHARE * per100(c.sfs_cost, c.trigrams);
+	}
+
+	// The stream counters that add a weight per n-gram, not one (sfb_distance's
+	// travel): a key pair raises them by its cost, so they are no event of their own.
+	const WEIGHTED_COUNTS = new Set(['sfb_cost', 'sfs_cost']);
+
+	/**
+	 * Whether a key pair is a thumb SFB: two different keys of one thumb, such
+	 * as a thumb letter and the space on the same thumb. It is the only bigram
+	 * a key out of the pair metrics (board.outOfPairs) is in.
+	 */
+	function thumbSfb(board, k1, k2) {
+		const f = board.finger[k1];
+		return k1 !== k2 && f === board.finger[k2] && isThumbFinger(f);
+	}
+
+	/**
+	 * Whether a key pair is one of the fingers' rows: no thumb in it, so a row
+	 * jump, a scissor or a lateral stretch may be one.
+	 */
+	function fingerRows(board, k1, k2) {
+		return !isThumbFinger(board.finger[k1]) && !isThumbFinger(board.finger[k2]);
+	}
+
+	/**
+	 * The counters the key stream adds to: every one a sum over the n-grams,
+	 * the graded metrics' events also counted per grade (GRADE_COUNTERS).
+	 */
+	function streamCounts() {
+		const out = streamBaseCounts();
+		for (const metric of COUNTED_GRADES) for (const name of GRADE_COUNTERS[metric]) out[name] = 0;
+		return out;
+	}
+
+	/** streamCounts() without the per-grade counters. */
+	function streamBaseCounts() {
+		return {
+			run_pairs: 0,
+			run_same: 0,
+			run3: 0,
+			run3_lead: 0,
+			run3_tail: 0,
+			run3_all: 0,
 			chars: 0,
 			unsupported: 0,
 			modifiers: 0,
+			altgr: 0,
 			dead: 0,
+			context: 0,
 			distance: 0,
 			bigrams: 0,
 			sfb: 0,
+			sfb_cost: 0,
 			repeat: 0,
 			lsb: 0,
 			scissors: 0,
 			half_scissors: 0,
+			pinky_ring: 0,
+			row_jump: 0,
 			roll_in: 0,
 			roll_out: 0,
 			hand_change: 0,
 			trigrams: 0,
 			sfs: 0,
+			sfs_cost: 0,
 			roll3_in: 0,
 			roll3_out: 0,
 			alternation: 0,
@@ -646,95 +3151,47 @@ var LAYOUT_ANALYSIS = (function () {
 			roll_mixed: 0,
 			same_finger_trigram: 0
 		};
-		const unsupportedChars = {};
-		// Per key: how often it takes part in each bad event, for the heatmap.
-		const KEY_EVENTS = ['sfb', 'sfs', 'lsb', 'scissors', 'redirect'];
-		const perKey = {};
-		for (const event of KEY_EVENTS) perKey[event] = new Float64Array(board.codes.length);
-		const sfbPairs = new Map();
-		const blame = (event, n, keys) => {
-			for (const k of keys) perKey[event][k] += n;
-		};
+	}
 
-		const bigram = (k1, k2, n) => {
-			if (thumb[k1] || thumb[k2]) return;
-			c.bigrams += n;
-			const f1 = board.finger[k1];
-			const f2 = board.finger[k2];
-			if (k1 === k2) {
-				c.repeat += n;
-				return;
-			}
-			if (f1 === f2) {
-				c.sfb += n;
-				blame('sfb', n, [k1, k2]);
-				const pair = k1 < k2 ? k1 * 1000 + k2 : k2 * 1000 + k1;
-				sfbPairs.set(pair, (sfbPairs.get(pair) || 0) + n);
-				return;
-			}
-			if (board.hand[k1] !== board.hand[k2]) {
-				c.hand_change += n;
-				return;
-			}
-			const o1 = board.order[k1];
-			const o2 = board.order[k2];
-			if (Math.abs(o1 - o2) === 1) {
-				// A scissor: the longer finger bends down while the shorter one
-				// reaches up, one row apart (half) or two (full).
-				const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
-				const shorter = longer === k1 ? k2 : k1;
-				const down = board.row[longer] - board.row[shorter];
-				if (down >= 2) c.scissors += n;
-				else if (down === 1) c.half_scissors += n;
-				if (down >= 1) blame('scissors', n, [k1, k2]);
-				if (board.lateral[k1] || board.lateral[k2]) {
-					c.lsb += n;
-					blame('lsb', n, [k1, k2]);
-				}
-			}
-			if (o2 > o1) c.roll_in += n;
-			else c.roll_out += n;
+	/**
+	 * The visitor of walkKeyStream that classifies every press, key bigram and
+	 * key trigram into the counters: the one definition of the stream metrics.
+	 * Every count is a sum, so a negative n takes an n-gram back out (scoreSession).
+	 * @param {object} board - From keyboard().
+	 * @param {object} c - From streamCounts().
+	 * @param {Float64Array} keyCount - Presses per key, modifiers included.
+	 * @param {object} unsupportedChars - Character → count, filled.
+	 * @param {{pair: function, triple: function}|null} blame - Receives each bad
+	 *   event's keys (the heatmap), or null.
+	 * @returns {object} The visitor.
+	 */
+	function streamVisitor(board, c, keyCount, unsupportedChars, blame) {
+		const out = board.outOfPairs;
+		const K = board.codes.length;
+		const kinds = tripleKinds(board);
+		const sameFinger = sameFingerCosts(board);
+		const blame2 = blame ? blame.pair : () => {};
+		const blame3 = blame ? blame.triple : () => {};
+		const sfbGrades = GRADE_COUNTERS.sfb;
+		const rowJumpGrades = GRADE_COUNTERS.row_jump;
+		/** One SFB: its count, its grade's, its travel and its blame. */
+		const sfb = (k1, k2, n) => {
+			const grade = sfbGrades[sfbRowGrade(board, k1, k2)];
+			c.sfb += n;
+			c[grade] += n;
+			c.sfb_cost += n * sameFinger[k1 * K + k2];
+			blame2('sfb', n, k1, k2);
+			blame2(grade, n, k1, k2);
 		};
-
-		const trigram = (k1, k2, k3, n) => {
-			if (thumb[k1] || thumb[k2] || thumb[k3]) return;
-			c.trigrams += n;
-			const f1 = board.finger[k1];
-			const f2 = board.finger[k2];
-			const f3 = board.finger[k3];
-			if (f1 === f3 && k1 !== k3) {
-				c.sfs += n;
-				blame('sfs', n, [k1, k3]);
-			}
-			if (f1 === f2 || f2 === f3) {
-				c.same_finger_trigram += n;
-				return;
-			}
-			const h1 = board.hand[k1];
-			const h2 = board.hand[k2];
-			const h3 = board.hand[k3];
-			if (h1 === h2 && h2 === h3) {
-				const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
-				if (d > 0) {
-					if (board.order[k2] > board.order[k1]) c.roll3_in += n;
-					else c.roll3_out += n;
-				} else {
-					c.redirect += n;
-					blame('redirect', n, [k1, k2, k3]);
-					const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
-					if (!index) c.redirect_bad += n;
-				}
-				return;
-			}
-			if (h1 !== h2 && h2 !== h3) c.alternation += n;
-			else c.roll_mixed += n;
-		};
-
-		walkKeyStream(board, best, table, {
+		return {
 			char(char, seq, n) {
-				c.chars += n;
-				if (seq.dead) c.dead += n;
-				if (seq.shift + seq.altgr > 0) c.modifiers += n;
+				// A multi-character output counts each character it types.
+				const typed = n * (seq.width || 1);
+				c.chars += typed;
+				if (seq.dead) c.dead += typed;
+				if (seq.shift + seq.altgr > 0) c.modifiers += typed;
+				if (seq.altgr > 0) c.altgr += typed;
+				if (seq.context !== undefined) c.context += typed;
 			},
 			unsupported(char, n) {
 				c.unsupported += n;
@@ -744,10 +3201,234 @@ var LAYOUT_ANALYSIS = (function () {
 				keyCount[k] += n;
 				c.distance += board.reach[k] * n;
 			},
-			bigram,
-			trigram
-		});
+			bigram(k1, k2, n) {
+				c.run_pairs += n;
+				if (sameHandFingers(board, k1, k2)) c.run_same += n;
+				if (out[k1] || out[k2]) {
+					// The space and a thumb letter or another key of its thumb: an
+					// SFB, its travel included; any other pair with it is in no metric.
+					if (thumbSfb(board, k1, k2)) {
+						c.bigrams += n;
+						sfb(k1, k2, n);
+					}
+					return;
+				}
+				c.bigrams += n;
+				const f1 = board.finger[k1];
+				const f2 = board.finger[k2];
+				if (k1 === k2) {
+					c.repeat += n;
+					return;
+				}
+				if (f1 === f2) {
+					sfb(k1, k2, n);
+					return;
+				}
+				if (board.hand[k1] !== board.hand[k2]) {
+					c.hand_change += n;
+					return;
+				}
+				const o1 = board.order[k1];
+				const o2 = board.order[k2];
+				// A row jump: two fingers of one hand on different rows (one
+				// finger's jump is an SFB, counted there). A thumb's keys lie below
+				// every row. A scissor is one too.
+				const rows = fingerRows(board, k1, k2);
+				if (rows && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS) {
+					const grade = rowJumpGrades[rowJumpCell(board, k1, k2)];
+					c.row_jump += n;
+					c[grade] += n;
+					blame2('row_jump', n, k1, k2);
+					blame2(grade, n, k1, k2);
+				}
+				// A pinky and a ring finger of one hand, whatever their rows.
+				if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) {
+					c.pinky_ring += n;
+					blame2('pinky_ring', n, k1, k2);
+				}
+				if (rows && Math.abs(o1 - o2) === 1) {
+					// A scissor: the longer finger bends down while the shorter one
+					// reaches up, one row apart (half) or two (full).
+					const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
+					const shorter = longer === k1 ? k2 : k1;
+					const down = board.row[longer] - board.row[shorter];
+					if (down >= 2) {
+						c.scissors += n;
+						blame2('scissors', n, k1, k2);
+					} else if (down === 1) {
+						c.half_scissors += n;
+						blame2('half_scissors', n, k1, k2);
+					}
+					if (board.lateral[k1] || board.lateral[k2]) {
+						c.lsb += n;
+						blame2('lsb', n, k1, k2);
+					}
+				}
+				const roll = o2 > o1 ? 'roll_in' : 'roll_out';
+				c[roll] += n;
+				blame2(roll, n, k1, k2);
+			},
+			trigram(k1, k2, k3, n) {
+				const at = (k1 * K + k2) * K + k3;
+				let kind = kinds[at];
+				if (kind === 0) kind = kinds[at] = tripleKind(board, k1, k2, k3);
+				c.run3 += n;
+				if (kind & TRIPLE_RUN_LEAD) c.run3_lead += n;
+				if (kind & TRIPLE_RUN_TAIL) c.run3_tail += n;
+				if (kind & TRIPLE_RUN_LEAD && kind & TRIPLE_RUN_TAIL) c.run3_all += n;
+				if (kind & TRIPLE_OUT) return;
+				c.trigrams += n;
+				if (kind & TRIPLE_SFS) {
+					c.sfs += n;
+					c.sfs_cost += n * sameFinger[k1 * K + k3];
+					blame2('sfs', n, k1, k3);
+				}
+				switch (kind & TRIPLE_CLASS) {
+					case TRIPLE_SAME_FINGER:
+						c.same_finger_trigram += n;
+						break;
+					case TRIPLE_ROLL_IN:
+						c.roll3_in += n;
+						break;
+					case TRIPLE_ROLL_OUT:
+						c.roll3_out += n;
+						break;
+					case TRIPLE_REDIRECT:
+					case TRIPLE_REDIRECT_BAD:
+						c.redirect += n;
+						blame3('redirect', n, k1, k2, k3);
+						if ((kind & TRIPLE_CLASS) === TRIPLE_REDIRECT_BAD) {
+							c.redirect_bad += n;
+							blame3('redirect_bad', n, k1, k2, k3);
+						}
+						break;
+					case TRIPLE_ALTERNATION:
+						c.alternation += n;
+						blame3('alternation', n, k1, k2, k3);
+						break;
+					default:
+						c.roll_mixed += n;
+				}
+			}
+		};
+	}
 
+	/**
+	 * The shares the graded costs weigh (GRADES), from the stream counters:
+	 * each counted cell's events in its metric's unit (% of the key bigrams
+	 * or trigrams), each finger type's part of the travel (mm per typed
+	 * character, the parts adding up to the distance metric), and the two
+	 * links of a same-hand run (handRunLinks). score() turns them into the
+	 * graded values, so new grades re-score without analysing.
+	 * @param {object} board - From keyboard().
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @param {Float64Array} keyCount - Presses per key, modifiers included.
+	 * @returns {object} metric → grade → share.
+	 */
+	function gradeParts(board, c, keyCount) {
+		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const parts = {};
+		for (const metric of COUNTED_GRADES) {
+			const whole = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
+			parts[metric] = {};
+			GRADE_CELLS[metric].forEach((cell, i) => {
+				parts[metric][cell.join('_')] = pct(c[GRADE_COUNTERS[metric][i]], whole);
+			});
+		}
+		parts.hand_run = handRunLinks(c);
+		const travel = Object.fromEntries(GRADES.distance.map((type) => [type, 0]));
+		for (let k = 0; k < keyCount.length; k++)
+			travel[fingerType(board.finger[k])] += board.reach[k] * keyCount[k];
+		parts.distance = {};
+		for (const type of GRADES.distance)
+			parts.distance[type] = c.chars > 0 ? travel[type] / c.chars : 0;
+		return parts;
+	}
+
+	/**
+	 * The links of a same-hand run (hand_run), read from the key stream as a
+	 * second-order chain (the corpus tables hold no n-gram longer than three
+	 * characters): start, the chance a keystroke continues the hand of the one
+	 * before when that one began a run; carry, the chance it continues a run
+	 * already two keys long; keystrokes, the length of the whole stream (a
+	 * run that always carries on is that long). The space and the thumb keys
+	 * end a run. With no trigram to read a start from (a text of one word),
+	 * the bigrams give it.
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @returns {{start: number, carry: number, keystrokes: number}} start and
+	 *   carry in [0, 1].
+	 */
+	function handRunLinks(c) {
+		const opened = c.run3 - c.run3_lead;
+		const start =
+			opened > 0
+				? (c.run3_tail - c.run3_all) / opened
+				: c.run_pairs > 0
+					? c.run_same / c.run_pairs
+					: 0;
+		const carry = c.run3_lead > 0 ? c.run3_all / c.run3_lead : 0;
+		return { start, carry, keystrokes: c.run_pairs + 1 };
+	}
+
+	/** A run length's multiplier on a run scale (scoreGrades().hand_run). */
+	function runMultiplier(scale, length) {
+		const last = RUN_LENGTHS.length;
+		if (length <= last) return scale[RUN_LENGTHS[length - 1]];
+		return scale[RUN_LENGTHS[last - 1]] + scale[RUN_GROWTH] * (length - last);
+	}
+
+	/**
+	 * hand_run: how much more a keystroke weighs, on average, than one of a
+	 * perfect alternation (%): 100 × (the mean multiplier of the run each
+	 * keystroke is in − 1). A run has length 1 with chance 1 − start and
+	 * k >= 2 with chance start × carry^(k − 2) × (1 − carry); a keystroke is in
+	 * a run of length k with chance k P(k) / Σ k P(k), Σ k P(k) = 1 + start /
+	 * (1 − carry). The lengths up to the scale's last are summed, the linear
+	 * growth beyond it in closed form; a run that always carries on is the
+	 * whole stream.
+	 * @param {{start: number, carry: number, keystrokes: number}} links - From
+	 *   handRunLinks().
+	 * @param {object} scale - The run scale (scoreGrades().hand_run).
+	 * @returns {number} %, >= 0.
+	 */
+	function handRunValue(links, scale) {
+		const { start, carry, keystrokes } = links;
+		if (carry >= 1) return 100 * (runMultiplier(scale, keystrokes) - 1);
+		const last = RUN_LENGTHS.length;
+		let weighted = (1 - start) * runMultiplier(scale, 1);
+		for (let k = 2; k <= last; k++)
+			weighted += k * start * carry ** (k - 2) * (1 - carry) * runMultiplier(scale, k);
+		// Beyond the last length, k = last + t: Σ (last + t)(top + growth t) carry^t.
+		const top = runMultiplier(scale, last);
+		const growth = scale[RUN_GROWTH];
+		const q = 1 - carry;
+		const s0 = carry / q;
+		const s1 = carry / (q * q);
+		const s2 = (carry * (1 + carry)) / (q * q * q);
+		weighted +=
+			start *
+			carry ** (last - 2) *
+			q *
+			(last * top * s0 + (last * growth + top) * s1 + growth * s2);
+		return 100 * (weighted / (1 + start / q) - 1);
+	}
+
+	/**
+	 * Every metric of a layout from its stream counters, and the loads the
+	 * report shows: the one definition analyse() and scoreSession() share.
+	 * @param {object} layout - Library shape, checked.
+	 * @param {object} board - From keyboard().
+	 * @param {object} compiled - From compileWays().
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @param {Float64Array} keyCount - Presses per key.
+	 * @param {object} opts - The analyse() options.
+	 * @param {number} compact - compact_fit, measured by the caller.
+	 * @returns {object} {metrics, parts (gradeParts), fingers, fingerLoad, fingerDistance (each finger's
+	 *   part of the travel, mm per character), ideal, pressed, allPresses, left,
+	 *   right, outer, home (presses on the outer column, on the home row),
+	 *   simplicity (the rules)}.
+	 */
+	function streamMetrics(layout, board, compiled, c, keyCount, opts, compact) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
 		const allChars = c.chars + c.unsupported;
 		// Finger load over every press but the thumbs'.
@@ -757,15 +3438,16 @@ var LAYOUT_ANALYSIS = (function () {
 		let pressed = 0;
 		let outer = 0;
 		let typing = 0;
+		const isThumb = (k) => board.finger[k] === LEFT_THUMB || board.finger[k] === RIGHT_THUMB;
 		for (let k = 0; k < keyCount.length; k++) {
 			fingerLoad[board.finger[k]] += keyCount[k];
-			if (thumb[k]) continue;
+			if (isThumb(k)) continue;
 			pressed += keyCount[k];
 			if (board.outer[k]) outer += keyCount[k];
 		}
 		const modifierKeys = new Set(Object.values(board.modifiers));
 		for (let k = 0; k < keyCount.length; k++) {
-			if (thumb[k] || modifierKeys.has(k)) continue;
+			if (isThumb(k) || modifierKeys.has(k)) continue;
 			typing += keyCount[k];
 			// Rows relative to each finger's home key: a staggered home counts as home.
 			rowLoad[board.relRow[k]] = (rowLoad[board.relRow[k]] || 0) + keyCount[k];
@@ -775,20 +3457,32 @@ var LAYOUT_ANALYSIS = (function () {
 		fingerIds.forEach((id, f) => {
 			fingers[id] = pct(fingerLoad[f], allPresses);
 		});
+		// Each finger's part of the travel distance (mm per typed character):
+		// the parts add up to the distance metric.
+		const travel = new Float64Array(fingerIds.length);
+		for (let k = 0; k < keyCount.length; k++)
+			travel[board.finger[k]] += board.reach[k] * keyCount[k];
+		const fingerDistance = {};
+		fingerIds.forEach((id, f) => {
+			fingerDistance[id] = c.chars > 0 ? travel[f] / c.chars : 0;
+		});
 		const ideal = idealLoad(opts.idealLoad);
 		let imbalance = 0;
 		for (const [id, target] of Object.entries(ideal))
 			imbalance += Math.abs(pct(fingerLoad[fingerIds.indexOf(id)], pressed) - target);
 		const left = fingerLoad.slice(0, LEFT_THUMB).reduce((sum, v) => sum + v, 0);
 		const right = fingerLoad.slice(RIGHT_THUMB + 1).reduce((sum, v) => sum + v, 0);
-
 		const metrics = {
 			sfb: pct(c.sfb, c.bigrams),
 			repeat: pct(c.repeat, c.bigrams),
 			sfs: pct(c.sfs, c.trigrams),
+			sfb_distance: sfbDistance(c),
 			lsb: pct(c.lsb, c.bigrams),
 			scissors: pct(c.scissors, c.bigrams),
 			half_scissors: pct(c.half_scissors, c.bigrams),
+			pinky_ring: pct(c.pinky_ring, c.bigrams),
+			row_jump: pct(c.row_jump, c.bigrams),
+			hand_run: handRunValue(handRunLinks(c), scoreGrades(opts.grades).hand_run),
 			roll_in: pct(c.roll_in, c.bigrams),
 			roll_out: pct(c.roll_out, c.bigrams),
 			hand_change: pct(c.hand_change, c.bigrams),
@@ -806,62 +3500,68 @@ var LAYOUT_ANALYSIS = (function () {
 			hand_imbalance: pct(Math.abs(left - right), left + right),
 			pinky_load: pct(fingerLoad[0] + fingerLoad[9], pressed),
 			modifier_usage: pct(c.modifiers, c.chars),
+			altgr_usage: pct(c.altgr, c.chars),
 			dead_key_usage: pct(c.dead, c.chars),
+			context_key_usage: pct(c.context, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
-			compact_fit: compactFit(layout, board, table),
-			char_coverage: charCoverage(best),
+			compact_fit: compact,
+			char_coverage: charCoverage(compiled.best),
 			direct_digits: directDigits(layout, board),
-			shortcut_left: shortcutLeft(layout, board)
+			// The model's own table when none is given, read as is (no copy).
+			shortcut_left: shortcutLeft(
+				layout,
+				board,
+				opts.shortcuts === undefined
+					? { letters: data().model.shortcut_letters, ease: data().model.shortcut_key_ease }
+					: shortcuts(opts.shortcuts)
+			),
+			distinct_chars: compiled.distinct,
+			coverage_bonus: coverageBonus(compiled.distinct)
 		};
-		const result = {
-			layout: {
-				id: layout.id,
-				name: layout.name,
-				origin: layout.origin,
-				source: layout.source,
-				authors: layout.authors,
-				url: layout.url,
-				language: layout.language
-			},
-			keyboard: board.id,
-			// The fingering profile measured with (null: the defaults), for the key map.
-			profile: board.profile,
+		const rules = simplicity(board, compiled);
+		metrics.simplicity = rules.value;
+		return {
 			metrics,
+			parts: gradeParts(board, c, keyCount),
 			fingers,
-			hands: { left: pct(left, left + right), right: pct(right, left + right) },
-			rows: {
-				number: metrics.number_row,
-				top: metrics.top_row,
-				home: metrics.home_row,
-				bottom: metrics.bottom_row
-			},
-			trigramClasses: {
-				roll3_in: metrics.roll3_in,
-				roll3_out: metrics.roll3_out,
-				alternation: metrics.alternation,
-				redirect: metrics.redirect,
-				roll_mixed: pct(c.roll_mixed, c.trigrams),
-				same_finger: pct(c.same_finger_trigram, c.trigrams)
-			},
-			keys: keyReport(board, keyCount, allPresses, perKey, c, sfbPairs),
-			coverage: {
-				// Keys the layout puts characters on that this keyboard lacks (a
-				// 36-key board has no number row): their characters count as unsupported.
-				missingKeys: Object.keys(layout.rows)
-					.filter(
-						(code) => !board.index.has(code) && layout.rows[code].some((cell) => cell !== null)
-					)
-					.sort(),
-				typed: c.chars,
-				unsupported: c.unsupported,
-				unsupportedChars,
-				bigrams: c.bigrams,
-				trigrams: c.trigrams
-			}
+			fingerLoad,
+			fingerDistance,
+			ideal,
+			pressed,
+			allPresses,
+			left,
+			right,
+			outer,
+			home: rowLoad[0] || 0,
+			simplicity: rules.rules
 		};
-		result.score = score(result, opts.weights);
-		return result;
+	}
+
+	/**
+	 * Each bad event's TOP_GROUPS heaviest key groups over the whole board,
+	 * heaviest first: the keys (board order), how often the corpus has them,
+	 * and their share of the bigrams (or trigrams) the event is counted on.
+	 * @param {object} board - From keyboard().
+	 * @param {object} groups - event → Map group id → count (analyse()).
+	 * @param {object} c - analyse()'s counts (bigrams, trigrams).
+	 * @returns {object} event → [{keys: string[], count: number, share: number}].
+	 */
+	function topGroups(board, groups, c) {
+		const out = {};
+		for (const event of KEY_EVENTS) {
+			const whole = TRIGRAM_EVENTS.has(event) ? c.trigrams : c.bigrams;
+			out[event] = Array.from(groups[event])
+				.sort((x, y) => y[1] - x[1] || x[0] - y[0])
+				.slice(0, TOP_GROUPS)
+				.map(([id, n]) => {
+					const keys = [];
+					for (let i = 0, rest = id; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE))
+						keys.unshift(board.codes[rest % KEY_BASE]);
+					return { keys, count: n, share: whole > 0 ? (100 * n) / whole : 0 };
+				});
+		}
+		return out;
 	}
 
 	/**
@@ -889,46 +3589,248 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   (modifiers included), bigram(k1, k2, n), trigram(k1, k2, k3, n).
 	 */
 	function walkKeyStream(board, best, table, visit) {
-		for (const [char, n] of table.uni) {
-			const seq = best.get(char);
-			if (!seq) {
-				visit.unsupported(char, n);
-				continue;
+		const t = tableIds(table);
+		const seqs = t.tokens.map((token) => best.get(token));
+		for (let i = 0; i < t.uniId.length; i++)
+			walkChar(board, seqs[t.uniId[i]], t.tokens[t.uniId[i]], t.uniN[i], visit);
+		walkRest(board, t, seqs, t.allBi, t.allTri, visit);
+	}
+
+	/**
+	 * Walks the pairs then the triples of a table whose tokens each have one
+	 * sequence (seqs, by token id), the entries given by index. With whole
+	 * counts, each step sums its key bigrams and trigrams and passes each
+	 * distinct one on once, in the order it first came: every counter of the
+	 * stream is a sum of exact integers, so the visitor ends with the very
+	 * same values (and its maps with the same insertion order) for a
+	 * fraction of the calls. Other counts are passed on one by one.
+	 * @param {object} board - From keyboard().
+	 * @param {object} t - From tableIds().
+	 * @param {Array} seqs - Token id → sequence, undefined when unsupported.
+	 * @param {Int32Array} bi - Indexes of the pairs to walk.
+	 * @param {Int32Array} tri - Indexes of the triples to walk.
+	 * @param {object} visit - As walkKeyStream.
+	 */
+	function walkRest(board, t, seqs, bi, tri, visit) {
+		if (!t.whole) {
+			for (let j = 0; j < bi.length; j++) {
+				const i = bi[j];
+				walkPair(seqs[t.biA[i]], seqs[t.biB[i]], t.biN[i], visit);
 			}
-			visit.char(char, seq, n);
-			for (const k of seq.keys) visit.press(k, n);
-			// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
-			if (seq.shift > 0)
-				visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
-			if (seq.altgr > 0) visit.press(board.modifiers.altgr, n * seq.altgr);
+			for (let j = 0; j < tri.length; j++) {
+				const i = tri[j];
+				walkTriple(seqs[t.triA[i]], seqs[t.triB[i]], seqs[t.triC[i]], t.triN[i], visit);
+			}
+			return;
+		}
+		// Each token's keys that reach across its neighbours (-1: none): its
+		// first and last, its second and the one before its last.
+		const size = seqs.length;
+		const first = new Int32Array(size).fill(-1);
+		const last = new Int32Array(size).fill(-1);
+		const second = new Int32Array(size).fill(-1);
+		const penult = new Int32Array(size).fill(-1);
+		const single = new Uint8Array(size);
+		for (let id = 0; id < size; id++) {
+			const seq = seqs[id];
+			if (!seq) continue;
 			const keys = seq.keys;
-			for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
-			for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
+			first[id] = keys[0];
+			last[id] = keys[keys.length - 1];
+			if (keys.length >= 2) {
+				second[id] = keys[1];
+				penult[id] = keys[keys.length - 2];
+			} else single[id] = 1;
 		}
-		for (const [a, b, n] of table.bi) {
-			const sa = best.get(a);
-			const sb = best.get(b);
-			if (!sa || !sb) continue;
-			const ka = sa.keys;
-			const kb = sb.keys;
-			visit.bigram(ka[ka.length - 1], kb[0], n);
-			// Key trigrams that start in a and end in b.
-			const s = ka.concat(kb);
-			for (let i = Math.max(0, ka.length - 2); i < ka.length; i++)
-				if (i + 2 >= ka.length && i + 2 < s.length) visit.trigram(s[i], s[i + 1], s[i + 2], n);
+		const s = summingBuffers(board);
+		const { K, slot, ids, sums } = s;
+		const K2 = K * K;
+		let count = 0;
+		const add = (id, n) => {
+			let at = slot[id];
+			if (at === 0) {
+				if (count + 1 >= sums.length) flush();
+				at = slot[id] = ++count;
+				ids[at] = id;
+				sums[at] = 0;
+			}
+			sums[at] += n;
+		};
+		function flush() {
+			for (let at = 1; at <= count; at++) {
+				const id = ids[at];
+				const n = sums[at];
+				slot[id] = 0;
+				if (id < K2) visit.bigram((id / K) | 0, id % K, n);
+				else {
+					const rest = id - K2;
+					visit.trigram((rest / K2) | 0, ((rest / K) | 0) % K, rest % K, n);
+				}
+			}
+			count = 0;
 		}
-		for (const [a, b, d, n] of table.tri) {
-			const sb = best.get(b);
-			if (!sb || sb.keys.length !== 1) continue;
-			const sa = best.get(a);
-			const sd = best.get(d);
-			if (!sa || !sd) continue;
-			visit.trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
+		let clean = false;
+		try {
+			// walkPair: the pair across, then the triples across.
+			const { biA, biB, biN } = t;
+			for (let j = 0; j < bi.length; j++) {
+				const i = bi[j];
+				const a = biA[i];
+				const b = biB[i];
+				if (first[a] < 0 || first[b] < 0) continue;
+				const n = biN[i];
+				add(last[a] * K + first[b], n);
+				if (penult[a] >= 0) add(K2 + (penult[a] * K + last[a]) * K + first[b], n);
+				if (second[b] >= 0) add(K2 + (last[a] * K + first[b]) * K + second[b], n);
+			}
+			flush();
+			// walkTriple: the key trigram across a one-key middle.
+			const { triA, triB, triC, triN } = t;
+			for (let j = 0; j < tri.length; j++) {
+				const i = tri[j];
+				const b = triB[i];
+				if (single[b] === 0) continue;
+				const a = triA[i];
+				const d = triC[i];
+				if (first[a] < 0 || first[d] < 0) continue;
+				add(K2 + (last[a] * K + first[b]) * K + first[d], triN[i]);
+			}
+			flush();
+			clean = true;
+		} finally {
+			// A visitor that threw leaves sums behind: those buffers are dropped.
+			if (!clean && summingCache.get(board) === s) summingCache.delete(board);
+			s.busy = false;
 		}
+	}
+
+	const summingCache = new WeakMap();
+
+	// Distinct key n-grams walkRest sums before it passes them on: a slot
+	// index fits 16 bits, so the slot table of a board stays in cache.
+	const SUM_SLOTS = 65535;
+
+	/**
+	 * walkRest's sums on a board: key bigram k1 k2 has id k1 * K + k2,
+	 * trigram k1 k2 k3 id K² + (k1 * K + k2) * K + k3; slot[id] is its place
+	 * (1-based, 0: not seen) in ids and sums, filled in the order the ids
+	 * first come. Kept per board, released with every slot at 0.
+	 */
+	function summingBuffers(board) {
+		let s = summingCache.get(board);
+		if (!s || s.busy) {
+			const K = board.codes.length;
+			s = {
+				K,
+				slot: new Uint16Array(K * K + K * K * K),
+				ids: new Int32Array(SUM_SLOTS + 1),
+				sums: new Float64Array(SUM_SLOTS + 1)
+			};
+			if (!summingCache.has(board)) summingCache.set(board, s);
+		}
+		s.busy = true;
+		return s;
+	}
+
+	/**
+	 * The stream of one character typed n times: its presses and inner key
+	 * n-grams. seq is its sequence (compileLayout), undefined when unsupported.
+	 */
+	function walkChar(board, seq, char, n, visit) {
+		if (!seq) {
+			visit.unsupported(char, n);
+			return;
+		}
+		visit.char(char, seq, n);
+		for (const k of seq.keys) visit.press(k, n);
+		// The held modifiers: Shift by the other hand's pinky, the others on
+		// the keys of their level (AltGr by a thumb), a run of one key at once.
+		if (seq.shift > 0)
+			visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
+		const held = seq.held;
+		for (let i = 0; i < held.length; ) {
+			let j = i + 1;
+			while (j < held.length && held[j] === held[i]) j++;
+			visit.press(held[i], n * (j - i));
+			i = j;
+		}
+		const keys = seq.keys;
+		for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
+		for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
+	}
+
+	/**
+	 * The key n-grams across one character bigram (sequences sa, sb): the pair,
+	 * and the key triples that start in a and end in b.
+	 */
+	function walkPair(sa, sb, n, visit) {
+		if (!sa || !sb) return;
+		const ka = sa.keys;
+		const kb = sb.keys;
+		const la = ka.length;
+		visit.bigram(ka[la - 1], kb[0], n);
+		// The triples across: the last two keys of a with b's first, then a's
+		// last key with b's first two.
+		if (la >= 2) visit.trigram(ka[la - 2], ka[la - 1], kb[0], n);
+		if (kb.length >= 2) visit.trigram(ka[la - 1], kb[0], kb[1], n);
+	}
+
+	/** The key trigram across one character trigram whose middle is one key. */
+	function walkTriple(sa, sb, sd, n, visit) {
+		if (!sb || sb.keys.length !== 1 || !sa || !sd) return;
+		visit.trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
 	}
 
 	// Key n-gram codes: k1 * KEY_BASE + k2, and (k1 * KEY_BASE + k2) * KEY_BASE + k3.
 	const KEY_BASE = 1024;
+	// The bad events the heatmap blames on keys: how many keys each one
+	// involves, and those counted over trigrams.
+	const EVENT_KEYS = {
+		sfb: 2,
+		sfs: 2,
+		lsb: 2,
+		scissors: 2,
+		half_scissors: 2,
+		pinky_ring: 2,
+		redirect: 3,
+		redirect_bad: 3,
+		row_jump: 2
+	};
+	const KEY_EVENTS = Object.keys(EVENT_KEYS);
+	const TRIGRAM_EVENTS = new Set(['sfs', 'redirect', 'redirect_bad']);
+	// The scored events (an event shown but not scored would be shared over
+	// its keys the same way but stay out of the points a key costs; row_jump
+	// was one until it was weighed, 2026-11-21).
+	const SCORED_EVENTS = KEY_EVENTS.filter((event) => METRICS[event].better !== 'none');
+	const KEY_INFO_METRICS = KEY_EVENTS.filter((event) => METRICS[event].better === 'none');
+	// The metrics whose value the keys share exactly (keyReport cost) and the score weighs.
+	const KEY_COST_METRICS = SCORED_EVENTS.concat([
+		'distance',
+		'finger_imbalance',
+		'pinky_load',
+		'outer_column'
+	]);
+	// The good events the keys share the same way (keyReport gain): rolls over
+	// bigrams, alternation over trigrams; not part of the score's key costs.
+	const GAIN_KEYS = { roll_in: 2, roll_out: 2, alternation: 3 };
+	const KEY_GAINS = Object.keys(GAIN_KEYS);
+	// Every per-key value keyValues() reads: the presses, the costs, the gains,
+	// the events shown but not scored.
+	const KEY_METRICS = ['presses'].concat(KEY_COST_METRICS, KEY_GAINS, KEY_INFO_METRICS);
+	// How many of its worst pairs or trigrams each key names.
+	const WORST_GROUPS = 3;
+	// How many groups of each event topGroups() lists for the whole board: three
+	// times the worst n-grams' first rows (worst_groups.js), which « Show more » unfolds.
+	const TOP_GROUPS = 24;
+	// A word: a run of letters and combining marks (countWords).
+	const WORD_PATTERN = /[\p{L}\p{M}]+/gu;
+	// How many words a corpus's word table keeps, the most frequent ones: enough
+	// for the hardest frequent words, a few kilobytes per corpus.
+	const WORD_TABLE_SIZE = 1000;
+	// The penalty metrics a word's effort adds up (wordEfforts): the scored key
+	// events, the travel and the same-finger travel; the loads (finger, pinky,
+	// outer column) belong to a whole text, not to a word.
+	const WORD_EFFORT_METRICS = SCORED_EVENTS.concat(['distance', 'sfb_distance']);
 	const keyNgramCache = new WeakMap();
 
 	/**
@@ -955,11 +3857,13 @@ var LAYOUT_ANALYSIS = (function () {
 		if (!perLayout.has(layoutInput)) perLayout.set(layoutInput, new Map());
 		const perBoard = perLayout.get(layoutInput);
 		if (perBoard.has(board.id)) return perBoard.get(board.id);
-		const best = compileLayout(layout, board, null);
+		const compiled = compileWays(layout, board, null);
+		// The other analysers' scorers type by the default access weights.
+		const plan = planTyping(compiled, board, table, { fixed: false, access: accessWeights() });
 		const out = {
 			board,
 			layout,
-			best,
+			best: compiled.best,
 			presses: new Float64Array(board.codes.length),
 			stream: new Float64Array(board.codes.length),
 			bigrams: new Map(),
@@ -971,11 +3875,12 @@ var LAYOUT_ANALYSIS = (function () {
 			KEY_BASE
 		};
 		const add = (map, code, n) => map.set(code, (map.get(code) || 0) + n);
-		walkKeyStream(board, best, table, {
+		walkTyped(board, plan, {
 			char(char, seq, n) {
-				out.chars += n;
-				if (seq.dead) out.dead += n;
-				if (seq.shift + seq.altgr > 0) out.modifiers += n;
+				const typed = n * (seq.width || 1);
+				out.chars += typed;
+				if (seq.dead) out.dead += typed;
+				if (seq.shift + seq.altgr > 0) out.modifiers += typed;
 				for (const k of seq.keys) out.stream[k] += n;
 			},
 			unsupported(char, n) {
@@ -995,79 +3900,2787 @@ var LAYOUT_ANALYSIS = (function () {
 		return out;
 	}
 
+	/** Whether two key sequences put the same presses and modifiers in the stream. */
+	function sameSequence(a, b) {
+		if (a === b) return true;
+		if (!a || !b) return false;
+		if (a.shift !== b.shift || a.altgr !== b.altgr || a.dead !== b.dead) return false;
+		if (a.keys.length !== b.keys.length) return false;
+		for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
+		for (let i = 0; i < a.held.length; i++) if (a.held[i] !== b.held[i]) return false;
+		return true;
+	}
+
+	/** Whether two characters' lists of ways (planTyping) type alike in every context. */
+	function sameWays(a, b) {
+		if (a === b) return true;
+		if (!a || !b || a.length !== b.length) return false;
+		for (let i = 0; i < a.length; i++)
+			if (!sameSequence(a[i], b[i]) || (a[i].width || 1) !== (b[i].width || 1)) return false;
+		return true;
+	}
+
+	/** A cell as a token for a multiset comparison: null adds nothing. */
+	const cellToken = (cell) =>
+		cell === null ? null : typeof cell === 'string' ? `s${cell}` : `d${cell.dead}`;
+
+	/** Whether two layouts' dead-key rules are the same. */
+	function sameDead(a, b) {
+		if (a === b) return true;
+		const states = Object.keys(a);
+		if (states.length !== Object.keys(b).length) return false;
+		for (const state of states) {
+			const ra = a[state];
+			const rb = b[state];
+			if (!rb) return false;
+			const typed = Object.keys(ra);
+			if (typed.length !== Object.keys(rb).length) return false;
+			for (const t of typed)
+				if (cellToken(ra[t]) !== cellToken(rb[t] === undefined ? null : rb[t])) return false;
+		}
+		return true;
+	}
+
 	/**
-	 * The per-key data of the heatmap: each key's share of the presses and of
-	 * each bad event (the share of the bigrams or trigrams it takes part in),
-	 * and its three worst same-finger partners.
-	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
-	 *   sfbWith: [[code, %], ...]}.
+	 * An incremental scorer for a search that changes a layout a little at a
+	 * time (the optimizer's swaps). trial(layout).total is the global score
+	 * analyse(layout, ngrams, options).score.total gives, up to float
+	 * rounding, but a trial walks only the corpus n-grams that hold a
+	 * character whose key sequence changed: the layout is compiled from the
+	 * current one (compileCoreFrom: only the characters, dead states and
+	 * texts the changed cells and dead-key rules reach, through every chain,
+	 * to the same lists as a whole compile), each character's sequence is
+	 * compared with the current one, and those n-grams are taken out with the
+	 * old sequences and put back with the new ones through the same visitor
+	 * analyse() uses.
+	 * A compact form factor is measured again only when the trial changes the
+	 * cells on the keys that form keeps, or the dead-key rules.
+	 * A layout that offers a choice of ways (planTyping) is planned from the
+	 * current plan: only the choices whose context (the trigram around an
+	 * occurrence, and the tokens before and after it) holds a token whose
+	 * ways changed are made again, by the same code and in the same order as
+	 * from nothing, so the plan is the same to the last bit; the trial then
+	 * walks only the tokens, pairs and triples whose ways, choice or shares
+	 * of ways changed ('context'). A trial that changes the chords or the
+	 * multi-way tokens walks the whole stream again ('whole'), still through
+	 * the same visitor, so its total stays exact. The plan is made on ids
+	 * and typed arrays (planContext) into the buffers of the plan before the
+	 * current one, so a trial allocates almost nothing: only the last trial's
+	 * plan is whole, and committing an earlier trial scores its layout again.
+	 * @param {object} layoutInput - The current layout (library shape).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {object} [options] - As analyse() (keyGroups aside).
+	 * @returns {{total: number, trial: function(object): {total: number,
+	 *   changed: number, walk: string, compile: string, compiled: object,
+	 *   typing: function(): object, commit: function(): void}}} total is the
+	 *   current layout's score; trial scores another layout on the same board
+	 *   without changing the session (compile: 'incremental', 'whole' or
+	 *   'none'; compiled: its compileWays() result; typing: its plan's report,
+	 *   analyse()'s typing paths and chords, readable until the next trial),
+	 *   and its commit makes that layout the current one.
+	 * @throws {Error} When a trial's layout is measured on another board.
 	 */
-	function keyReport(board, keyCount, allPresses, perKey, c, sfbPairs) {
+	function scoreSession(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const table = prepareNgrams(ngrams);
+		const keyboardId = opts.keyboard || DEFAULT_KEYBOARD;
+		const firstLayout = layoutFromRows(layoutInput);
+		// A trial that empties the first layout's Tab or Enter keeps its board:
+		// an unpressed key changes no metric.
+		const optional = typesOnOptionalKeys(firstLayout);
+		const board = boardFor(firstLayout, keyboardId, opts.profile, optional);
+		const forms = compactForms(opts.format, opts.formWeights);
+		const formMissing = forms.map((form) => new Set(form.missing));
+		// The corpus's characters as ids, and its n-grams as id lists: an array
+		// lookup costs a fraction of a Map lookup by string.
+		const chars = [];
+		const idOf = new Map();
+		const id = (char) => {
+			if (!idOf.has(char)) {
+				idOf.set(char, chars.length);
+				chars.push(char);
+			}
+			return idOf.get(char);
+		};
+		const uniIds = Int32Array.from(table.uni, (entry) => id(entry[0]));
+		const uniN = Float64Array.from(table.uni, (entry) => entry[1]);
+		const biN = Float64Array.from(table.bi, (entry) => entry[2]);
+		const triN = Float64Array.from(table.tri, (entry) => entry[3]);
+		const biIds = new Int32Array(2 * table.bi.length);
+		table.bi.forEach((entry, i) => {
+			biIds[2 * i] = id(entry[0]);
+			biIds[2 * i + 1] = id(entry[1]);
+		});
+		const triIds = new Int32Array(3 * table.tri.length);
+		table.tri.forEach((entry, i) => {
+			for (let j = 0; j < 3; j++) triIds[3 * i + j] = id(entry[j]);
+		});
+		// Character id → the entries it appears in, each entry once.
+		const uniOf = chars.map(() => []);
+		const biOf = chars.map(() => []);
+		const triOf = chars.map(() => []);
+		uniIds.forEach((u, i) => uniOf[u].push(i));
+		for (let i = 0; i < table.bi.length; i++) {
+			biOf[biIds[2 * i]].push(i);
+			if (biIds[2 * i + 1] !== biIds[2 * i]) biOf[biIds[2 * i + 1]].push(i);
+		}
+		for (let i = 0; i < table.tri.length; i++) {
+			const [a, b, d] = [triIds[3 * i], triIds[3 * i + 1], triIds[3 * i + 2]];
+			triOf[a].push(i);
+			if (b !== a) triOf[b].push(i);
+			if (d !== a && d !== b) triOf[d].push(i);
+		}
+		// An entry already walked in this trial carries the trial's stamp.
+		const stamps = {
+			uni: new Uint32Array(table.uni.length),
+			bi: new Uint32Array(table.bi.length),
+			tri: new Uint32Array(table.tri.length)
+		};
+		let stamp = 0;
+		// The unsupported characters are not scored; the visitor needs a place for them.
+		const unsupportedChars = {};
+		const sequences = (best) => chars.map((char) => best.get(char));
+
+		// What one key bigram or trigram adds, probed once from the visitor with
+		// n = 1: the counters it raises, each by n (a weighted counter by n times
+		// its weight). The trial then adds those to the counters in a typed
+		// array, the same sums at a fraction of the cost.
+		const names = Object.keys(streamCounts());
+		const K = board.codes.length;
+		const patterns = [];
+		const patternOf = new Map();
+		const probe = (call) => {
+			const counts = streamCounts();
+			call(streamVisitor(board, counts, new Float64Array(K), {}, null));
+			const raised = [];
+			const by = [];
+			names.forEach((name, j) => {
+				if (counts[name] === 0) return;
+				if (counts[name] !== 1 && !WEIGHTED_COUNTS.has(name))
+					throw new Error(`layout_analysis: ${name} is not a plain count of the key stream`);
+				raised.push(j);
+				by.push(counts[name]);
+			});
+			const key = `${raised.join(',')}|${by.join(',')}`;
+			if (!patternOf.has(key)) {
+				patternOf.set(key, patterns.length);
+				patterns.push({ at: Int32Array.from(raised), by: Float64Array.from(by) });
+			}
+			return patternOf.get(key);
+		};
+		const pairPattern = new Int32Array(K * K).fill(-1);
+		const triplePattern = new Int32Array(K * K * K).fill(-1);
+		/** The session's visitor: the presses through analyse()'s own, the key n-grams memoized. */
+		const sessionVisitor = (c, keyCount, counts) => {
+			const plain = streamVisitor(board, c, keyCount, unsupportedChars, null);
+			return {
+				char: plain.char,
+				unsupported: plain.unsupported,
+				press: plain.press,
+				bigram(k1, k2, n) {
+					const at = k1 * K + k2;
+					if (pairPattern[at] < 0) pairPattern[at] = probe((v) => v.bigram(k1, k2, 1));
+					const raised = patterns[pairPattern[at]];
+					for (let j = 0; j < raised.at.length; j++) counts[raised.at[j]] += n * raised.by[j];
+				},
+				trigram(k1, k2, k3, n) {
+					const at = (k1 * K + k2) * K + k3;
+					if (triplePattern[at] < 0) triplePattern[at] = probe((v) => v.trigram(k1, k2, k3, 1));
+					const raised = patterns[triplePattern[at]];
+					for (let j = 0; j < raised.at.length; j++) counts[raised.at[j]] += n * raised.by[j];
+				}
+			};
+		};
+
+		const totalOf = (layout, compiled, c, counts, keyCount, formValues) => {
+			const all = streamCounts();
+			for (let j = 0; j < names.length; j++) all[names[j]] = c[names[j]] + counts[j];
+			return scoreTotals(
+				streamMetrics(layout, board, compiled, all, keyCount, opts, weightedFit(forms, formValues)),
+				opts.weights,
+				opts.floors,
+				opts.grades
+			).total;
+		};
+
+		const delta = {
+			c: streamCounts(),
+			counts: new Float64Array(names.length),
+			keyCount: new Float64Array(K)
+		};
+		const deltaVisitor = sessionVisitor(delta.c, delta.keyCount, delta.counts);
+		const mode = planMode(opts);
+		// Every character typed one way whatever its context: the incremental walk holds.
+		const simple = (plan) => plan.multi.size === 0 && plan.chords.length === 0;
+		// What decides a plan's stream: each character's ways and the chords.
+		const planState = (plan) => ({
+			ways: chars.map((char) => plan.ways.get(char)),
+			chords: plan.chords,
+			chordWays: plan.chords.map((chord) => plan.ways.get(chord))
+		});
+		// The whole stream of a plan, walked from nothing.
+		const walkAll = (plan) => {
+			const out = {
+				c: streamCounts(),
+				counts: new Float64Array(names.length),
+				keyCount: new Float64Array(K)
+			};
+			walkTyped(board, plan, sessionVisitor(out.c, out.keyCount, out.counts));
+			return out;
+		};
+		// The ways before the substitutes, which a trial compiles again only in part.
+		const core = compileCore(firstLayout, board, null, 'record');
+		const compiled = finishWays(new Map(core.ways), core.texts);
+		compiled.context = contextWays(firstLayout, board, null);
+		const plan = planTyping(compiled, board, table, mode);
+		const walked = walkAll(plan);
+		const formValues = forms.map((form) => formFit(firstLayout, board, table, form));
+		let state = {
+			layout: firstLayout,
+			core,
+			compiled,
+			plan,
+			simple: simple(plan),
+			...planState(plan),
+			seqs: sequences(compiled.best),
+			c: walked.c,
+			counts: walked.counts,
+			keyCount: walked.keyCount,
+			formValues,
+			total: totalOf(firstLayout, compiled, walked.c, walked.counts, walked.keyCount, formValues)
+		};
+
+		/** Whether a form keeps the same cells on its keys in both layouts. */
+		function sameForm(before, after, codes, missing) {
+			const tokens = (layout) => {
+				const out = [];
+				for (const code of codes) {
+					if (!board.index.has(code) || missing.has(code)) continue;
+					for (const cell of layout.rows[code] || []) {
+						const token = cellToken(cell);
+						if (token !== null) out.push(token);
+					}
+				}
+				return out.sort().join('\u0000');
+			};
+			return tokens(before) === tokens(after);
+		}
+
+		/** The keys whose cells differ between two layouts. */
+		function changedCodes(before, after) {
+			const out = [];
+			const cellAt = (layout, code, i) =>
+				layout.rows[code] && layout.rows[code][i] !== undefined ? layout.rows[code][i] : null;
+			const differs = (code) => {
+				if (before.rows[code] === after.rows[code]) return false;
+				const width = Math.max(
+					before.rows[code] ? before.rows[code].length : 0,
+					after.rows[code] ? after.rows[code].length : 0
+				);
+				for (let i = 0; i < width; i++)
+					if (!sameCell(cellAt(before, code, i), cellAt(after, code, i))) return true;
+				return false;
+			};
+			for (const code of Object.keys(after.rows)) if (differs(code)) out.push(code);
+			for (const code of Object.keys(before.rows))
+				if (!(code in after.rows) && differs(code)) out.push(code);
+			return out;
+		}
+
+		// The maps the trials write their compile and plan into (spareMaps): a
+		// trial's maps are its own until the next trial.
+		const spares = {
+			coreWays: spareMaps(),
+			ways: spareMaps(),
+			deadWays: spareMaps(),
+			texts: spareMaps(),
+			best: spareMaps(),
+			plan: spareMaps()
+		};
+		// Trials made so far: only the last one's plan is whole until the next trial.
+		let trials = 0;
+
+		function trial(layoutInput) {
+			const layout = layoutFromRows(layoutInput);
+			if (boardFor(layout, keyboardId, opts.profile, optional) !== board)
+				throw new Error('layout_analysis: a score session keeps the board it started on');
+			// The compiled ways hold each level's modifier keys (levelTable).
+			if (layout.levels !== firstLayout.levels || layout.modifiers !== firstLayout.modifiers)
+				throw new Error('layout_analysis: a score session keeps the levels it started on');
+			trials += 1;
+			const serial = trials;
+			// A layout with repeat or magic keys, before or after, is compiled,
+			// planned and walked whole: its context tokens are no characters of
+			// the incremental steps.
+			const contextual = layout.context !== undefined || state.layout.context !== undefined;
+			// Compiled from the current layout: only the ways the changed cells and rules reach.
+			const nextCore = contextual
+				? compileCore(layout, board, null, 'record')
+				: compileCoreFrom(state.core, layout, board, spares);
+			let nextCompiled;
+			if (contextual) {
+				nextCompiled = finishWays(new Map(nextCore.ways), nextCore.texts);
+				nextCompiled.context = contextWays(layout, board, null);
+			} else
+				nextCompiled =
+					nextCore === state.core
+						? state.compiled
+						: nextCore.whole
+							? finishWays(new Map(nextCore.ways), nextCore.texts)
+							: finishWaysFrom(state.compiled, nextCore, spares);
+			// Planned from the current plan: only the choices a changed token can reach are made again.
+			const nextPlan = planTyping(nextCompiled, board, table, mode, state.plan, {
+				spare: spares.plan,
+				changed:
+					nextCompiled === state.compiled ? NO_KEYS : nextCore.whole ? null : nextCompiled.changed
+			});
+			const seqs = sequences(nextCompiled.best);
+			let next;
+			// How the trial was walked: the changed characters' n-grams ('stream'),
+			// the changed contexts ('context'), or nothing to walk or all ('whole').
+			let walk = 'whole';
+			if (contextual) next = Object.assign(walkAll(nextPlan), { changed: chars.length });
+			else if (state.simple && simple(nextPlan)) {
+				next = walkChanged(state.seqs, seqs);
+				walk = 'stream';
+			} else if (nextPlan.changed) {
+				next = walkContext(state.plan, nextPlan);
+				walk = 'context';
+			} else {
+				// A context choice: the stream changes only if some character's ways
+				// (or the chords) do; then it is walked whole.
+				const ways = chars.map((char) => nextPlan.ways.get(char));
+				let moved = 0;
+				for (let ch = 0; ch < chars.length; ch++)
+					if (!sameWays(state.ways[ch], ways[ch])) moved += 1;
+				const sameChords =
+					state.chords.length === nextPlan.chords.length &&
+					nextPlan.chords.every(
+						(chord, i) =>
+							chord === state.chords[i] && sameWays(state.chordWays[i], nextPlan.ways.get(chord))
+					);
+				next =
+					moved === 0 && sameChords
+						? { c: state.c, counts: state.counts, keyCount: state.keyCount }
+						: walkAll(nextPlan);
+				next.changed = moved + (sameChords ? 0 : 1);
+			}
+			const changed = next.changed;
+			// A compact form is measured again only when its kept cells changed.
+			const before = state.layout;
+			const deadSame = sameDead(before.dead, layout.dead);
+			const codes = changedCodes(before, layout);
+			// Forms that keep the same changed keys share one comparison.
+			const kept = new Map();
+			const nextForms = forms.map((form, i) => {
+				if (!deadSame) return formFit(layout, board, table, form);
+				let key = '';
+				for (const code of codes) key += formMissing[i].has(code) ? '0' : '1';
+				let same = kept.get(key);
+				if (same === undefined)
+					kept.set(key, (same = sameForm(before, layout, codes, formMissing[i])));
+				return same ? state.formValues[i] : formFit(layout, board, table, form);
+			});
+			const total = totalOf(layout, nextCompiled, next.c, next.counts, next.keyCount, nextForms);
+			return {
+				total,
+				walk,
+				changed,
+				// How the layout was compiled: not at all (the same ways), in part, or whole.
+				compile:
+					nextCore === state.core ? 'none' : contextual || nextCore.whole ? 'whole' : 'incremental',
+				compiled: nextCompiled,
+				/** The plan's report (analyse()'s typing paths and chords), before the next trial. */
+				typing() {
+					if (serial !== trials)
+						throw new Error("layout_analysis: a later trial replaced this trial's plan");
+					return typingReport(board, nextPlan, layout);
+				},
+				commit() {
+					// A later trial wrote its plan over this one's (planContext's
+					// spare buffers): this layout is scored again, then kept.
+					if (serial !== trials) {
+						trial(layoutInput).commit();
+						return;
+					}
+					state = {
+						layout,
+						core: nextCore,
+						compiled: nextCompiled,
+						plan: nextPlan,
+						simple: simple(nextPlan),
+						...planState(nextPlan),
+						seqs,
+						c: next.c,
+						counts: next.counts,
+						keyCount: next.keyCount,
+						formValues: nextForms,
+						total
+					};
+				}
+			};
+		}
+
+		/**
+		 * The counters of a trial whose characters each have one way: the
+		 * current ones, less the n-grams holding a changed character walked with
+		 * the old sequences, plus the same walked with the new ones.
+		 * @returns {{c, counts, keyCount, changed}} changed: characters whose sequence changed.
+		 */
+		function walkChanged(old, seqs) {
+			// The trial's changes go to the delta buffers, then onto a copy of the state.
+			for (const name of names) delta.c[name] = 0;
+			delta.counts.fill(0);
+			delta.keyCount.fill(0);
+			const visit = deltaVisitor;
+			stamp += 1;
+			let changed = 0;
+			for (let ch = 0; ch < chars.length; ch++) {
+				if (sameSequence(old[ch], seqs[ch])) continue;
+				changed += 1;
+				for (const i of uniOf[ch]) {
+					if (stamps.uni[i] === stamp) continue;
+					stamps.uni[i] = stamp;
+					const u = uniIds[i];
+					const n = uniN[i];
+					walkChar(board, old[u], chars[u], -n, visit);
+					walkChar(board, seqs[u], chars[u], n, visit);
+				}
+				for (const i of biOf[ch]) {
+					if (stamps.bi[i] === stamp) continue;
+					stamps.bi[i] = stamp;
+					const a = biIds[2 * i];
+					const b = biIds[2 * i + 1];
+					const n = biN[i];
+					walkPair(old[a], old[b], -n, visit);
+					walkPair(seqs[a], seqs[b], n, visit);
+				}
+				for (const i of triOf[ch]) {
+					if (stamps.tri[i] === stamp) continue;
+					stamps.tri[i] = stamp;
+					const a = triIds[3 * i];
+					const b = triIds[3 * i + 1];
+					const d = triIds[3 * i + 2];
+					const n = triN[i];
+					walkTriple(old[a], old[b], old[d], -n, visit);
+					walkTriple(seqs[a], seqs[b], seqs[d], n, visit);
+				}
+			}
+			const nextC = streamCounts();
+			for (const name of names) nextC[name] = state.c[name] + delta.c[name];
+			const nextCounts = state.counts.slice();
+			for (let j = 0; j < nextCounts.length; j++) nextCounts[j] += delta.counts[j];
+			const nextKeys = state.keyCount.slice();
+			for (let k = 0; k < K; k++) nextKeys[k] += delta.keyCount[k];
+			return { c: nextC, counts: nextCounts, keyCount: nextKeys, changed };
+		}
+
+		/**
+		 * The counters of a trial planned from the current plan (planTyping's
+		 * previous): the current ones, less the token, pair and triple entries
+		 * whose ways, choice or shares of ways may have changed walked with the
+		 * current plan, plus the same walked with the trial's.
+		 * @param {object} old - The current plan.
+		 * @param {object} plan - The trial's, with plan.changed.
+		 * @returns {{c, counts, keyCount, changed}} changed: tokens whose ways changed.
+		 */
+		function walkContext(old, plan) {
+			for (const name of names) delta.c[name] = 0;
+			delta.counts.fill(0);
+			delta.keyCount.fill(0);
+			const visit = deltaVisitor;
+			const { dirty, picks, leftKeys, rightKeys, tokens } = plan.changed;
+			const was = old.ctx;
+			const now = plan.ctx;
+			const m = now.model;
+			const t = m.t;
+			// One stamp per entry of the partition: each entry is walked once.
+			m.walkStamp = m.walkStamp === UINT32_LAST ? 1 : m.walkStamp + 1;
+			if (m.walkStamp === 1)
+				for (const list of [m.walkUni, m.walkRestBi, m.walkRestTri, m.walkBi, m.walkTri])
+					list.fill(0);
+			const mark = m.walkStamp;
+			const { uniAt, restBiOf, restTriOf, biOf, byFirst, byLast, pairBi } = m;
+			const token = (u) => {
+				for (let k = uniAt.start[u]; k < uniAt.start[u + 1]; k++) {
+					const i = uniAt.items[k];
+					if (m.walkUni[i] === mark) continue;
+					m.walkUni[i] = mark;
+					walkTypedToken(board, was, u, t.uniN[i], -1, visit);
+					walkTypedToken(board, now, u, t.uniN[i], 1, visit);
+				}
+			};
+			for (let j = 0; j < dirty.size; j++) token(dirty.list[j]);
+			for (let j = 0; j < tokens.size; j++) token(tokens.list[j]);
+			const best = (st, u) => (st.wl[u] ? st.wl[u][0] : undefined);
+			for (let j = 0; j < dirty.size; j++) {
+				const u = dirty.list[j];
+				for (let k = restBiOf.start[u]; k < restBiOf.start[u + 1]; k++) {
+					const r = restBiOf.items[k];
+					if (m.walkRestBi[r] === mark) continue;
+					m.walkRestBi[r] = mark;
+					const i = m.restBiAt[r];
+					// Plain reads: destructuring a fresh array costs more than the walk.
+					const a = t.biA[i];
+					const b = t.biB[i];
+					const n = t.biN[i];
+					walkPair(best(was, a), best(was, b), -n, visit);
+					walkPair(best(now, a), best(now, b), n, visit);
+				}
+				for (let k = restTriOf.start[u]; k < restTriOf.start[u + 1]; k++) {
+					const r = restTriOf.items[k];
+					if (m.walkRestTri[r] === mark) continue;
+					m.walkRestTri[r] = mark;
+					const i = m.restTriAt[r];
+					const a = t.triA[i];
+					const b = t.triB[i];
+					const d = t.triC[i];
+					const n = t.triN[i];
+					walkTriple(best(was, a), best(was, b), best(was, d), -n, visit);
+					walkTriple(best(now, a), best(now, b), best(now, d), n, visit);
+				}
+			}
+			const pair = (i) => {
+				if (i < 0 || m.walkBi[i] === mark) return;
+				m.walkBi[i] = mark;
+				walkTypedPair(was, i, -1, visit);
+				walkTypedPair(now, i, 1, visit);
+			};
+			const triple = (i) => {
+				if (m.walkTri[i] === mark) return;
+				m.walkTri[i] = mark;
+				walkTypedTriple(was, i, -1, visit);
+				walkTypedTriple(now, i, 1, visit);
+			};
+			for (let j = 0; j < dirty.size; j++) {
+				const u = dirty.list[j];
+				for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) pair(biOf.items[k]);
+			}
+			for (let j = 0; j < leftKeys.size; j++) pair(pairBi[leftKeys.list[j]]);
+			for (let j = 0; j < rightKeys.size; j++) pair(pairBi[rightKeys.list[j]]);
+			for (let j = 0; j < picks.size; j++) triple(picks.list[j]);
+			// A triple reads the shares of its first pair (its first token's ways)
+			// and of its last pair (its last token's).
+			for (let j = 0; j < leftKeys.size; j++) {
+				const p = leftKeys.list[j];
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++) triple(byFirst.items[k]);
+			}
+			for (let j = 0; j < rightKeys.size; j++) {
+				const p = rightKeys.list[j];
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++) triple(byLast.items[k]);
+			}
+			const nextC = streamCounts();
+			for (const name of names) nextC[name] = state.c[name] + delta.c[name];
+			const nextCounts = state.counts.slice();
+			for (let j = 0; j < nextCounts.length; j++) nextCounts[j] += delta.counts[j];
+			const nextKeys = state.keyCount.slice();
+			for (let k = 0; k < K; k++) nextKeys[k] += delta.keyCount[k];
+			return { c: nextC, counts: nextCounts, keyCount: nextKeys, changed: dirty.size };
+		}
+
+		return {
+			get total() {
+				return state.total;
+			},
+			trial
+		};
+	}
+
+	/**
+	 * The typing plan of a layout on a corpus (planTyping): the chords it
+	 * uses, each token's ways, and the way it types a token between two
+	 * others, so a text can be typed exactly as the tables are (the tests'
+	 * reference stream).
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, typing?: string}} [options] - As analyse().
+	 * @returns {{board: object, chords: string[], ways: Map, choose: function}}
+	 *   choose(before, token, after) → index in ways.get(token); before and
+	 *   after are tokens the layout types, or null at an edge.
+	 */
+	function typingPlan(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngrams),
+			planMode(opts)
+		);
+		return {
+			board,
+			chords: plan.chords.slice(),
+			ways: plan.ways,
+			choose: (before, token, after) =>
+				plan.multi.has(token) ? plan.choose(before, token, after) : 0
+		};
+	}
+
+	/**
+	 * The held modifiers of each level of a layout, as the pages write them
+	 * before a key (« Shift+AltGr+ », « Mod3+Mod4+ »).
+	 * @param {object} layout - Library shape, or its input.
+	 * @returns {Map<string, string>} Level id → prefix.
+	 */
+	function levelPrefixes(layout) {
+		const levels = checkLevels(layout) || DEFAULT_LEVELS;
+		const label = (name) =>
+			levels === DEFAULT_LEVELS ? DEFAULT_MODIFIER_LABEL : layout.modifiers[name].label;
+		return new Map(
+			levels.map((level) => [
+				level.id,
+				(level.shift ? 'Shift+' : '') + (level.hold || []).map((name) => `${label(name)}+`).join('')
+			])
+		);
+	}
+
+	/**
+	 * The « typed via » rows of an analysis, for the pages: each character a
+	 * choice concerned (several ways used, or a chord), most frequent first,
+	 * with each way's keys written with the layout's own characters as its
+	 * boards show them (« AltGr+o », the space as « ␣ », a dead key as its bare
+	 * accent « ^ »: the shared key legend, never the state's id) and its share.
+	 * @param {object} result - analyse() output.
+	 * @param {object} layoutInput - The layout analysed (library shape).
+	 * @param {number} [limit] - At most this many rows; all when absent.
+	 * @returns {Array<{char: string, count: number, ways: Array<{kind: string,
+	 *   keys: string, share: number}>}>} share in % of the character's count.
+	 * @throws {Error} When the page did not load the shared key legend
+	 *   (_shared/ui/_generated/key_legend.js) before the engine.
+	 */
+	function typingRows(result, layoutInput, limit) {
+		// A top-level var of key_legend.js: a page global the pages load first.
+		if (typeof KEY_LEGEND === 'undefined')
+			throw new Error('layout_analysis: typingRows needs the shared key legend (key_legend.js)');
+		const legend = KEY_LEGEND;
+		const rows = layoutInput.rows || {};
+		const dead = layoutInput.dead || {};
+		const prefixes = levelPrefixes(layoutInput);
+		const levelIds = (checkLevels(layoutInput) || DEFAULT_LEVELS).map((level) => level.id);
+		const label = (code, level) => {
+			const base = rows[code] ? rows[code][0] : null;
+			let name = code;
+			// The level of the step: a repeat or magic key shows its own label there.
+			const own = contextLabel(layoutInput, code, levelIds.indexOf(level));
+			if (own !== '') name = own;
+			else if (typeof base === 'string' && base !== '') name = legend.visibleText(base);
+			else if (base && base.dead) {
+				// What the dead key types alone (its terminator), as its key shows it.
+				const accent = legend.deadKeyText((dead[base.dead] || {})[' '] || '');
+				if (accent !== '') name = accent;
+			}
+			return prefixes.get(level) + name;
+		};
+		const out = [];
+		for (const [char, ways] of Object.entries(result.typing.paths)) {
+			const count = ways.reduce((sum, way) => sum + way.count, 0);
+			if (!(count > 0) || (ways.length < 2 && !(char in result.typing.chords))) continue;
+			out.push({
+				char,
+				count,
+				ways: ways.map((way) => ({
+					kind: way.kind,
+					keys: way.steps.map(([code, level]) => label(code, level)).join(' '),
+					share: (100 * way.count) / count
+				}))
+			});
+		}
+		out.sort((a, b) => b.count - a.count || (a.char < b.char ? -1 : 1));
+		return limit === undefined ? out : out.slice(0, limit);
+	}
+
+	/**
+	 * The per-key data of the heatmap.
+	 * - presses, sfb, sfs, lsb, scissors (full and half), redirect: the key's
+	 *   share of the presses, or of the bigrams or trigrams it takes part in;
+	 * - cost: for each metric of KEY_COST_METRICS, the part of that metric's
+	 *   value the key causes; each event is shared equally between the keys it
+	 *   involves, so the keys' parts add up to the metric (finger_imbalance
+	 *   goes to the keys of the fingers above their ideal load, in proportion
+	 *   to their presses);
+	 * - gain: the same for the good events of KEY_GAINS (rolls in and out over
+	 *   the bigrams, alternation over the trigrams): the keys' parts add up to
+	 *   the metric;
+	 * - worst: for each event metric, the key's WORST_GROUPS heaviest groups
+	 *   with it (the other key of a pair, the two others of a redirect), each
+	 *   [codes, % of the bigrams or trigrams];
+	 * - grades: for each counted graded metric (COUNTED_GRADES), the key's
+	 *   part of each cell's share, shared the same way (the keys' parts add
+	 *   up to result.parts); finger: the type of its finger (GRADES.distance).
+	 * @param {object} board - From keyboard().
+	 * @param {object} m - What analyse() measured: keyCount, allPresses, pressed
+	 *   (every press but the thumbs'), fingerLoad, ideal, perKey, groups, counts.
+	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
+	 *   cost, gain, worst, grades, finger}.
+	 */
+	function keyReport(board, m) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const c = m.counts;
+		const fingerIds = data().model.fingers;
+		const thumb = (k) => board.finger[k] === LEFT_THUMB || board.finger[k] === RIGHT_THUMB;
+		const whole = (event) => (TRIGRAM_EVENTS.has(event) ? c.trigrams : c.bigrams);
+		// Each finger's load above its ideal, in points of the non-thumb presses.
+		const over = fingerIds.map((id, f) =>
+			m.ideal[id] === undefined ? 0 : Math.max(0, pct(m.fingerLoad[f], m.pressed) - m.ideal[id])
+		);
 		const keys = {};
 		board.codes.forEach((code, k) => {
+			const share = (event) => pct(m.perKey[event][k], whole(event));
+			const f = board.finger[k];
+			const cost = {
+				distance: c.chars > 0 ? (board.reach[k] * m.keyCount[k]) / c.chars : 0,
+				finger_imbalance: m.fingerLoad[f] > 0 ? (over[f] * m.keyCount[k]) / m.fingerLoad[f] : 0,
+				pinky_load: !thumb(k) && (f === 0 || f === 9) ? pct(m.keyCount[k], m.pressed) : 0,
+				outer_column: !thumb(k) && board.outer[k] ? pct(m.keyCount[k], m.pressed) : 0
+			};
+			const worst = {};
+			for (const event of KEY_EVENTS) {
+				cost[event] = share(event) / EVENT_KEYS[event];
+				worst[event] = [];
+			}
+			const gain = {};
+			for (const id of KEY_GAINS) {
+				const whole = id === 'alternation' ? c.trigrams : c.bigrams;
+				gain[id] = pct(m.perKey[id][k], whole) / GAIN_KEYS[id];
+			}
+			// Every graded event is a pair of keys, shared between both.
+			const grades = {};
+			for (const metric of COUNTED_GRADES) {
+				const of = METRICS[metric].of === 'trigrams' ? c.trigrams : c.bigrams;
+				grades[metric] = {};
+				GRADE_CELLS[metric].forEach((cell, i) => {
+					grades[metric][cell.join('_')] = pct(m.perKey[GRADE_COUNTERS[metric][i]][k], of) / 2;
+				});
+			}
 			keys[code] = {
-				presses: pct(keyCount[k], allPresses),
-				sfb: pct(perKey.sfb[k], c.bigrams),
-				sfs: pct(perKey.sfs[k], c.trigrams),
-				lsb: pct(perKey.lsb[k], c.bigrams),
-				scissors: pct(perKey.scissors[k], c.bigrams),
-				redirect: pct(perKey.redirect[k], c.trigrams),
-				sfbWith: []
+				presses: pct(m.keyCount[k], m.allPresses),
+				sfb: share('sfb'),
+				sfs: share('sfs'),
+				lsb: share('lsb'),
+				scissors: share('scissors') + share('half_scissors'),
+				redirect: share('redirect'),
+				cost,
+				gain,
+				worst,
+				grades,
+				finger: fingerType(f)
 			};
 		});
-		const pairs = Array.from(sfbPairs.entries()).sort((a, b) => b[1] - a[1]);
-		for (const [pair, n] of pairs) {
-			const a = Math.floor(pair / 1000);
-			const b = pair % 1000;
-			for (const [self, other] of [
-				[a, b],
-				[b, a]
-			]) {
-				const list = keys[board.codes[self]].sfbWith;
-				if (list.length < 3) list.push([board.codes[other], pct(n, c.bigrams)]);
+		// One pass per event: each key keeps its WORST_GROUPS heaviest groups (id, n).
+		for (const event of KEY_EVENTS) {
+			const top = new Map();
+			for (const [id, n] of m.groups[event]) {
+				let rest = id;
+				for (let i = 0; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE)) {
+					const k = rest % KEY_BASE;
+					if (!top.has(k)) top.set(k, []);
+					const list = top.get(k);
+					if (list.length && list[list.length - 1][0] === id) continue;
+					if (list.length === WORST_GROUPS && list[WORST_GROUPS - 1][1] >= n) continue;
+					list.push([id, n]);
+					list.sort((x, y) => y[1] - x[1] || x[0] - y[0]);
+					if (list.length > WORST_GROUPS) list.pop();
+				}
 			}
+			for (const [k, list] of top)
+				keys[board.codes[k]].worst[event] = list.map(([id, n]) => {
+					const others = [];
+					for (let i = 0, rest = id; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE))
+						if (rest % KEY_BASE !== k) others.unshift(board.codes[rest % KEY_BASE]);
+					return [others, pct(n, whole(event))];
+				});
 		}
 		return keys;
+	}
+
+	/**
+	 * What each key costs the global score: the points of the score's penalty
+	 * metrics (KEY_COST_METRICS) it causes, with these weights and graded
+	 * costs. The keys' costs add up to those metrics' part of the score: a
+	 * graded metric shares its graded value by each key's part of each grade
+	 * (its travel by its finger's grade), and a metric with a floor shares
+	 * only its part above the floor, in proportion to each key's part.
+	 * @param {object} result - analyse() output.
+	 * @param {object} [weights] - As score(); the defaults when absent.
+	 * @param {object} [floors] - As score(); the defaults when absent.
+	 * @param {object} [grades] - As score(); the defaults when absent.
+	 * @returns {object} code → points lost.
+	 */
+	function keyScoreCost(result, weights, floors, grades) {
+		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		const floorOf = scoreFloors(floors);
+		const gradeOf = scoreGrades(grades);
+		// Each metric's weight times the share of its value above its floor.
+		const factor = {};
+		for (const id of KEY_COST_METRICS) {
+			const value = weighedValue(result, id, gradeOf);
+			const floor = floorOf[id] || 0;
+			factor[id] =
+				(used[id] || 0) * (floor > 0 && value > 0 ? aboveFloor(value, floor) / value : 1);
+		}
+		const out = {};
+		for (const [code, key] of Object.entries(result.keys)) {
+			let points = 0;
+			for (const id of KEY_COST_METRICS) {
+				let part = key.cost[id];
+				if (id === 'distance') part *= gradeOf.distance[key.finger];
+				else if (id in GRADES) part = gradedValue(id, part, key.grades[id], gradeOf[id]);
+				points += factor[id] * part;
+			}
+			out[code] = points;
+		}
+		return out;
+	}
+
+	/**
+	 * One per-key value of every key: its share of the presses, its part of a
+	 * cost metric (KEY_COST_METRICS) or of a good event (KEY_GAINS).
+	 * @param {object} result - analyse() output.
+	 * @param {string} metric - One of KEY_METRICS.
+	 * @returns {object} code → value (% of the presses, or the metric's unit).
+	 * @throws {Error} On a metric that is not per key.
+	 */
+	function keyValues(result, metric) {
+		if (!KEY_METRICS.includes(metric))
+			throw new Error(`layout_analysis: ${metric} is not a per-key value`);
+		const out = {};
+		for (const [code, key] of Object.entries(result.keys))
+			out[code] =
+				metric === 'presses'
+					? key.presses
+					: KEY_GAINS.includes(metric)
+						? key.gain[metric]
+						: key.cost[metric];
+		return out;
+	}
+
+	/**
+	 * Key by key, how much more of a per-key value one layout puts on each
+	 * physical key than another, both measured on the same keyboard.
+	 * @param {object} a - analyse() output, the layout read.
+	 * @param {object} b - analyse() output, the layout it is compared with.
+	 * @param {string} metric - One of KEY_METRICS.
+	 * @returns {object} code → a's value − b's value.
+	 * @throws {Error} On results measured on different keyboards, or a metric
+	 *   that is not per key.
+	 */
+	function keyDiff(a, b, metric) {
+		if (a.keyboard !== b.keyboard)
+			throw new Error(`layout_analysis: keyDiff needs one keyboard (${a.keyboard}, ${b.keyboard})`);
+		const x = keyValues(a, metric);
+		const y = keyValues(b, metric);
+		const out = {};
+		for (const code of Object.keys(x)) out[code] = x[code] - y[code];
+		return out;
+	}
+
+	/**
+	 * Where one layout stands among compared ones, metric by metric: how many
+	 * of the others it beats, ties and loses to on each scored metric (one
+	 * whose `better` is higher or lower).
+	 * @param {object[]} results - analyse() or compare() outputs.
+	 * @param {string} id - The layout id read.
+	 * @returns {object} metric → {beats, ties, loses, others}.
+	 * @throws {Error} When the layout is not among the results.
+	 */
+	function standing(results, id) {
+		const own = results.find((r) => r.layout.id === id);
+		if (!own) throw new Error(`layout_analysis: standing needs the layout ${id} among the results`);
+		const out = {};
+		for (const [metric, definition] of Object.entries(METRICS)) {
+			if (definition.better === 'none') continue;
+			const entry = { beats: 0, ties: 0, loses: 0, others: results.length - 1 };
+			for (const other of results) {
+				if (other === own) continue;
+				const delta = own.metrics[metric] - other.metrics[metric];
+				if (delta === 0) entry.ties++;
+				else if ((definition.better === 'higher') === delta > 0) entry.beats++;
+				else entry.loses++;
+			}
+			out[metric] = entry;
+		}
+		return out;
+	}
+
+	/**
+	 * A value's percentile among reference values for a direction: the share
+	 * of the references it does better than, a tie counting half ('higher' or
+	 * 'lower' is better), or, with 'none', the share it is higher than. Sorted
+	 * once, each value is placed by two binary searches.
+	 * @param {'higher'|'lower'|'none'} better - Which way is better.
+	 * @param {number[]} references - The references' values.
+	 * @returns {function(number): ({percent: number, count: number}|null)} Null
+	 *   for every value when there are fewer than PERCENTILE_MIN_REFERENCES
+	 *   references, and for a value that is not a number.
+	 * @throws {Error} On an unknown direction or a reference that is not a number.
+	 */
+	function rankAmong(better, references) {
+		if (!['higher', 'lower', 'none'].includes(better))
+			throw new Error(`layout_analysis: rankAmong of an unknown direction ${better}`);
+		if (!references.every(Number.isFinite))
+			throw new Error('layout_analysis: rankAmong needs numbers');
+		if (references.length < PERCENTILE_MIN_REFERENCES) return () => null;
+		const sorted = references.slice().sort((a, b) => a - b);
+		// The number of references below (strictly) a value, and at or below it.
+		const below = (value, orEqual) => {
+			let low = 0;
+			let high = sorted.length;
+			while (low < high) {
+				const middle = (low + high) >> 1;
+				if (orEqual ? sorted[middle] <= value : sorted[middle] < value) low = middle + 1;
+				else high = middle;
+			}
+			return low;
+		};
+		return (value) => {
+			if (!Number.isFinite(value)) return null;
+			const less = below(value, false);
+			const ties = below(value, true) - less;
+			const worse = better === 'lower' ? sorted.length - less - ties : less;
+			return {
+				percent: Math.round((100 * (worse + ties / 2)) / sorted.length),
+				count: sorted.length
+			};
+		};
+	}
+
+	/**
+	 * A metric's percentile against reference layouts (the library's complete
+	 * ones, ux-study item 9): for a value, the share of the references it does
+	 * better than, a tie counting half, so P100 is better than all of them and
+	 * P0 worse than all (rankAmong in the metric's direction).
+	 * @param {string} metric - A metric whose `better` is higher or lower.
+	 * @param {number[]} references - The references' values of that metric.
+	 * @returns {function(number): ({percent: number, count: number}|null)} Null
+	 *   for every value when there are fewer than PERCENTILE_MIN_REFERENCES
+	 *   references, or for a metric that is not scored.
+	 * @throws {Error} On an unknown metric or a reference that is not a number.
+	 */
+	function percentiles(metric, references) {
+		const definition = METRICS[metric];
+		if (!definition) throw new Error(`layout_analysis: percentiles of an unknown metric ${metric}`);
+		if (!references.every(Number.isFinite))
+			throw new Error(`layout_analysis: percentiles of ${metric} need numbers`);
+		if (definition.better === 'none') return () => null;
+		return rankAmong(definition.better, references);
+	}
+
+	/**
+	 * The scored metrics a key pair or a word can raise, with their weight and
+	 * direction: one place for the points of a pair (bigramMatrix) and of a
+	 * word (wordEfforts).
+	 * @param {object} [weights] - As score(); the defaults when absent.
+	 * @returns {function(string): number} metric → signed points per unit (0
+	 *   for a metric shown but not scored, or a counter that is no metric).
+	 */
+	function signedWeights(weights) {
+		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		return (id) => {
+			const metric = METRICS[id];
+			if (!metric || metric.better === 'none') return 0;
+			return (metric.better === 'higher' ? 1 : -1) * (used[id] || 0);
+		};
+	}
+
+	/**
+	 * Every key pair a layout makes on a corpus, key × key, with how often it
+	 * occurs and what it is: the bigrams of the key stream analyse() measures
+	 * (the ways of typing it chose, typing option included) without the space
+	 * (board.outOfPairs) but for the thumb SFBs, the ones every bigram metric is a share of, each classified by the
+	 * one visitor analyse() uses. The pairs' counts and points add up to
+	 * analyse()'s bigram metrics and their part of the score.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, grades?: object,
+	 *   typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keyboard: string, bigrams: number, keys: string[], pairs:
+	 *   Array<{keys: string[], count: number, share: number, events: string[],
+	 *   points: number}>}} bigrams: the key bigrams counted; keys: every key of
+	 *   a pair, the busiest first; pairs: the most frequent first, each with its
+	 *   share of the bigrams (%), the counters it raises (metric ids such as
+	 *   sfb, roll_in, row_jump, hand_change, repeat) and the score points it
+	 *   gains (> 0) or costs (< 0): Σ sign × weight × share over those metrics.
+	 */
+	function bigramMatrix(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const table = prepareNgrams(ngrams);
+		const compiled = compileWays(layout, board, null);
+		const plan = planTyping(compiled, board, table, planMode(opts));
+		const K = board.codes.length;
+		const names = Object.keys(streamBaseCounts()).filter(
+			(name) => name !== 'bigrams' && !WEIGHTED_COUNTS.has(name) && !RUN_COUNTS.has(name)
+		);
+		const gradeOf = scoreGrades(opts.grades);
+		// A pair's class, probed once from the visitor: the counters it raises,
+		// its same-finger travel (sfb_distance's part of it) and the grade each
+		// graded event of it is weighed by.
+		const classes = new Map();
+		const travels = new Map();
+		const pairGrades = new Map();
+		const classOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!classes.has(at)) {
+				const counts = streamCounts();
+				streamVisitor(board, counts, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				classes.set(at, counts.bigrams === 0 ? null : names.filter((name) => counts[name] !== 0));
+				travels.set(at, counts.sfb_cost);
+				const factor = {};
+				for (const metric of COUNTED_GRADES)
+					GRADE_COUNTERS[metric].forEach((name, i) => {
+						if (counts[name] !== 0) factor[metric] = cellFactor(metric, i, gradeOf[metric]);
+					});
+				pairGrades.set(at, factor);
+			}
+			return classes.get(at);
+		};
+		const pairs = new Map();
+		let total = 0;
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				// A pair with the space is in no bigram metric, a thumb SFB aside.
+				if (classOf(k1, k2) === null) return;
+				total += n;
+				const at = k1 * K + k2;
+				pairs.set(at, (pairs.get(at) || 0) + n);
+			},
+			trigram() {}
+		});
+		const signed = signedWeights(opts.weights);
+		const busy = new Float64Array(K);
+		const out = Array.from(pairs, ([at, n]) => {
+			const k1 = Math.floor(at / K);
+			const k2 = at % K;
+			busy[k1] += n;
+			busy[k2] += n;
+			const events = classOf(k1, k2);
+			const share = total > 0 ? (100 * n) / total : 0;
+			const grade = pairGrades.get(at);
+			const points =
+				events.reduce((sum, id) => sum + signed(id) * share * (id in grade ? grade[id] : 1), 0) +
+				signed('sfb_distance') * share * travels.get(at);
+			return { keys: [board.codes[k1], board.codes[k2]], count: n, share, events, points, at };
+		})
+			.filter((pair) => pair.count !== 0)
+			.sort((x, y) => y.count - x.count || x.at - y.at)
+			.map(({ at, ...pair }) => pair);
+		const keys = board.codes
+			.map((code, k) => [code, k])
+			.filter(([, k]) => busy[k] > 0)
+			.sort((x, y) => busy[y[1]] - busy[x[1]] || x[1] - y[1])
+			.map(([code]) => code);
+		return { keyboard: board.id, bigrams: total, keys, pairs: out };
+	}
+
+	/**
+	 * Adds every word of a text to a word count. A word is a run of letters and
+	 * combining marks (Unicode L and M), folded to lower case: an apostrophe, a
+	 * hyphen, a digit or a space ends it (« l'homme » is « l » and « homme »).
+	 * A word of one character is not kept: it has no key pair to measure.
+	 * @param {string} text - The text.
+	 * @param {number} [n] - How many times the text counts (a word list's count); 1.
+	 * @param {object} [into] - The count to add to; a new one when absent.
+	 * @returns {object} word → count.
+	 * @throws {Error} On a text that is not a string or a count that is not positive.
+	 */
+	function countWords(text, n, into) {
+		if (typeof text !== 'string') throw new Error('layout_analysis: countWords needs a text');
+		const times = n === undefined ? 1 : n;
+		if (!(times > 0) || !Number.isFinite(times))
+			throw new Error('layout_analysis: countWords needs a positive count');
+		const counts = into || {};
+		for (const match of text.matchAll(WORD_PATTERN)) {
+			const word = match[0].toLowerCase();
+			if (isOneCodePoint(word)) continue;
+			// An own count only: « constructor » is a word, not Object.prototype's.
+			counts[word] =
+				(Object.prototype.hasOwnProperty.call(counts, word) ? counts[word] : 0) + times;
+		}
+		return counts;
+	}
+
+	/**
+	 * The WORD_TABLE_SIZE most frequent words of a count, the most frequent
+	 * first (ties in code point order): the bounded word table a corpus ships.
+	 * @param {object} counts - word → count (countWords).
+	 * @returns {object} word → count, in that order.
+	 */
+	function wordTable(counts) {
+		return Object.fromEntries(
+			Object.entries(counts)
+				.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+				.slice(0, WORD_TABLE_SIZE)
+		);
+	}
+
+	/** The bounded word table of a text: wordTable(countWords(text)). */
+	function wordsFromText(text) {
+		return wordTable(countWords(text));
+	}
+
+	/**
+	 * How hard each word is to type on a layout: the points the global score
+	 * would take off a text made of that word alone, from the score's penalty
+	 * metrics measured on the word's own key stream (WORD_EFFORT_METRICS: its
+	 * SFBs, skipgrams, lateral stretches, scissors and redirects as shares of
+	 * its key bigrams or trigrams, and its travel in mm per character), each
+	 * times its weight. The word is typed alone as analyse() types a text, the
+	 * ways of typing chosen the same way (typing option included). A word with
+	 * a character the layout cannot type is listed apart.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object|Array} words - word → count, or [[word, count], ...].
+	 * @param {{keyboard?: string, profile?: object, weights?: object, grades?: object,
+	 *   typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{words: Array<{word: string, count: number, effort: number,
+	 *   parts: object}>, unsupported: Array<{word: string, count: number}>,
+	 *   mean: number}} words: the hardest first (then the most frequent);
+	 *   effort in points ≥ 0, parts: metric → its points; mean: the effort
+	 *   averaged over the words' occurrences.
+	 * @throws {Error} On a word that is not a non-empty string without line
+	 *   breaks or tabs, or a count that is not positive.
+	 */
+	function wordEfforts(layoutInput, words, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const compiled = compileWays(layout, board, null);
+		const mode = planMode(opts);
+		const signed = signedWeights(opts.weights);
+		const gradeOf = scoreGrades(opts.grades);
+		const entries = Array.isArray(words) ? words : Object.entries(words || {});
+		const out = [];
+		const unsupported = [];
+		let occurrences = 0;
+		let sum = 0;
+		for (const [word, count] of entries) {
+			if (typeof word !== 'string' || word === '' || /[\r\n\t]/.test(word))
+				throw new Error(`layout_analysis: ${JSON.stringify(word)} is not a word`);
+			if (!(count > 0) || !Number.isFinite(count))
+				throw new Error(`layout_analysis: the word ${word} needs a positive count`);
+			const c = streamCounts();
+			const keyCount = new Float64Array(board.codes.length);
+			const plan = planTyping(compiled, board, prepareNgrams(ngramsFromText(word)), mode);
+			walkTyped(board, plan, streamVisitor(board, c, keyCount, {}, null));
+			if (c.unsupported > 0) {
+				unsupported.push({ word, count });
+				continue;
+			}
+			const graded = gradeParts(board, c, keyCount);
+			const parts = {};
+			let effort = 0;
+			for (const id of WORD_EFFORT_METRICS) {
+				const whole = id === 'distance' ? c.chars : TRIGRAM_EVENTS.has(id) ? c.trigrams : c.bigrams;
+				// sfb_distance is no count: its travel has its own two totals.
+				const raw =
+					id === 'sfb_distance'
+						? sfbDistance(c)
+						: whole > 0
+							? ((id === 'distance' ? 1 : 100) * c[id]) / whole
+							: 0;
+				const value = id in GRADES ? gradedValue(id, raw, graded[id], gradeOf[id]) : raw;
+				// A penalty metric's signed weight is negative: the points it takes off.
+				parts[id] = -signed(id) * value;
+				effort += parts[id];
+			}
+			out.push({ word, count, effort, parts });
+			occurrences += count;
+			sum += count * effort;
+		}
+		out.sort(
+			(x, y) =>
+				y.effort - x.effort || y.count - x.count || (x.word < y.word ? -1 : x.word > y.word ? 1 : 0)
+		);
+		return { words: out, unsupported, mean: occurrences > 0 ? sum / occurrences : 0 };
+	}
+
+	/**
+	 * How the occurrences of measured words spread over equal ranges of effort,
+	 * from 0 to the hardest word's: the distribution the Comparer draws.
+	 * @param {Array<{effort: number, count: number}>} words - wordEfforts().words.
+	 * @param {number} bins - How many ranges (an integer ≥ 1).
+	 * @returns {Array<{from: number, to: number, count: number, words: number,
+	 *   share: number}>} Each range [from, to) (the last one closed): the
+	 *   occurrences it holds, the distinct words, and its share of all the
+	 *   occurrences (%).
+	 * @throws {Error} On a bin count that is not a positive integer.
+	 */
+	function effortDistribution(words, bins) {
+		if (!Number.isInteger(bins) || bins < 1)
+			throw new Error('layout_analysis: effortDistribution needs a positive integer of bins');
+		const max = words.reduce((m, w) => Math.max(m, w.effort), 0);
+		const width = max / bins;
+		const out = Array.from({ length: bins }, (_, i) => ({
+			from: i * width,
+			to: i === bins - 1 ? max : (i + 1) * width,
+			count: 0,
+			words: 0,
+			share: 0
+		}));
+		let all = 0;
+		for (const w of words) {
+			const i = width > 0 ? Math.min(bins - 1, Math.floor(w.effort / width)) : 0;
+			out[i].count += w.count;
+			out[i].words += 1;
+			all += w.count;
+		}
+		for (const bin of out) bin.share = all > 0 ? (100 * bin.count) / all : 0;
+		return out;
+	}
+
+	// The events a trace names on a key pair and on a key triple: the bigram and
+	// trigram counters of the stream visitor that are a metric of their own.
+	const TRACE_PAIR_EVENTS = [
+		'sfb',
+		'repeat',
+		'lsb',
+		'scissors',
+		'half_scissors',
+		'pinky_ring',
+		'row_jump',
+		'roll_in',
+		'roll_out',
+		'hand_change'
+	];
+	const TRACE_TRIPLE_EVENTS = [
+		'sfs',
+		'roll3_in',
+		'roll3_out',
+		'alternation',
+		'redirect',
+		'redirect_bad'
+	];
+	// The characters that cut a traced text, as they cut the n-gram tables.
+	const TRACE_BREAK = /[\r\n\t]/;
+	// The longest text a trace types: a few sentences, drawn key by key.
+	const TRACE_MAX_CHARS = 2000;
+
+	/**
+	 * How a text is typed on a layout, keystroke by keystroke (an idea seen in
+	 * the Layouts Wiki playground's « Trace »): each character's way of typing
+	 * (its keys, their levels, a dead key) chosen as analyse() chooses it on
+	 * that text, then every key pair and key triple of the stream with the
+	 * events the stream visitor raises for it. The keys and events are the
+	 * metrics' own: the counts of a trace are the key n-grams analyse()
+	 * measures on that text alone. A line break, a tab or a character the
+	 * layout cannot type cuts the stream (no pair spans it), as in the tables.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {string} text - At most TRACE_MAX_CHARS code points.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keyboard: string, chars: Array<{char: string, kind: string|null,
+	 *   steps: Array<[string, string, number]>, held: string[], keys: number[]}>,
+	 *   keys: Array<{code: string, finger: string, char: number}>,
+	 *   pairs: Array<{keys: [number, number], events: string[]}>,
+	 *   triples: Array<{keys: [number, number, number], events: string[]}>,
+	 *   counts: object, bigrams: number, trigrams: number, unsupported: number}}
+	 *   chars: each character, kind null when the layout cannot type it (or a
+	 *   break; « repeat » or « magic » when the layout's own repeat or magic
+	 *   key types it after the characters before it), steps its [code, level id, level index in the rows] presses, held the modifiers held for
+	 *   it by name (« Shift », « AltGr », a layout's own: « Mod3 »), keys its indexes in `keys`; keys: the stream, each press with
+	 *   its finger (a model.fingers id) and the character it types; pairs and
+	 *   triples: index n-grams of `keys` with their events
+	 *   (TRACE_PAIR_EVENTS, TRACE_TRIPLE_EVENTS); counts: event → how many;
+	 *   bigrams and trigrams: the pairs and triples the metrics count (a pair
+	 *   with the space is in none, a thumb SFB aside).
+	 * @throws {Error} On a text that is not a string or is too long.
+	 */
+	function traceText(layoutInput, text, options) {
+		if (typeof text !== 'string') throw new Error('layout_analysis: traceText needs a text');
+		const chars = Array.from(text);
+		if (chars.length > TRACE_MAX_CHARS)
+			throw new Error(`layout_analysis: traceText types at most ${TRACE_MAX_CHARS} characters`);
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngramsFromText(text)),
+			planMode(opts)
+		);
+		const levels = levelTable(layout, board).ids;
+		const prefixes = levelPrefixes(layout);
+		const fingerIds = data().model.fingers;
+		const kindOf = (way) => {
+			if (way.context !== undefined) return way.context;
+			if (way.substituted) return 'substitution';
+			if (way.dead) return 'dead';
+			if (way.altgr > 0) return 'altgr';
+			return way.shift > 0 ? 'shift' : 'direct';
+		};
+		// Each character's token: a context token where a repeat or magic key
+		// types it after the characters typed before it in its stretch.
+		const contextual = plan.context ? plan.context.tokens : null;
+		const longest = data().model.context_keys.context_max;
+		const tokens = [];
+		let stretch = '';
+		for (const char of chars) {
+			let token = char;
+			if (contextual && !TRACE_BREAK.test(char)) token = plan.context.classify(char, stretch);
+			tokens.push(token);
+			stretch = TRACE_BREAK.test(char)
+				? ''
+				: codePoints(stretch + char)
+						.slice(-longest)
+						.join('');
+		}
+		const typed = (i) => !TRACE_BREAK.test(chars[i]) && plan.best.has(tokens[i]);
+		const outChars = [];
+		const keys = [];
+		const segments = [];
+		let segment = [];
+		let unsupported = 0;
+		chars.forEach((char, i) => {
+			if (!typed(i)) {
+				if (!TRACE_BREAK.test(char)) unsupported++;
+				outChars.push({ char, kind: null, steps: [], held: [], keys: [] });
+				if (segment.length > 0) segments.push(segment);
+				segment = [];
+				return;
+			}
+			const before = i > 0 && typed(i - 1) ? tokens[i - 1] : null;
+			const after = i + 1 < chars.length && typed(i + 1) ? tokens[i + 1] : null;
+			const token = tokens[i];
+			const way = plan.multi.has(token)
+				? plan.ways.get(token)[plan.choose(before, token, after)]
+				: plan.best.get(token);
+			// The modifiers held for the character: its last key's level's, by name.
+			const last = way.layers[way.layers.length - 1];
+			const held = prefixes
+				.get(levels[last])
+				.split('+')
+				.filter((name) => name !== '');
+			const at = [];
+			for (const k of way.keys) {
+				at.push(keys.length);
+				segment.push(keys.length);
+				keys.push({ code: board.codes[k], finger: fingerIds[board.finger[k]], char: i, k });
+			}
+			outChars.push({
+				char,
+				kind: kindOf(way),
+				steps: way.keys.map((k, j) => [board.codes[k], levels[way.layers[j]], way.layers[j]]),
+				held,
+				keys: at
+			});
+		});
+		if (segment.length > 0) segments.push(segment);
+		const counts = {};
+		for (const event of TRACE_PAIR_EVENTS.concat(TRACE_TRIPLE_EVENTS)) counts[event] = 0;
+		const raised = (names, visit) => {
+			const c = streamCounts();
+			visit(streamVisitor(board, c, new Float64Array(board.codes.length), {}, null));
+			return { c, events: names.filter((name) => c[name] !== 0) };
+		};
+		const pairs = [];
+		const triples = [];
+		let bigrams = 0;
+		let trigrams = 0;
+		for (const seg of segments) {
+			for (let j = 0; j + 1 < seg.length; j++) {
+				const [a, b] = [seg[j], seg[j + 1]];
+				const { c, events } = raised(TRACE_PAIR_EVENTS, (v) => v.bigram(keys[a].k, keys[b].k, 1));
+				bigrams += c.bigrams;
+				for (const event of events) counts[event]++;
+				pairs.push({ keys: [a, b], events });
+			}
+			for (let j = 0; j + 2 < seg.length; j++) {
+				const [a, b, d] = [seg[j], seg[j + 1], seg[j + 2]];
+				const { c, events } = raised(TRACE_TRIPLE_EVENTS, (v) =>
+					v.trigram(keys[a].k, keys[b].k, keys[d].k, 1)
+				);
+				trigrams += c.trigrams;
+				for (const event of events) counts[event]++;
+				triples.push({ keys: [a, b, d], events });
+			}
+		}
+		return {
+			keyboard: board.id,
+			chars: outChars,
+			keys: keys.map(({ k, ...key }) => key),
+			pairs,
+			triples,
+			counts,
+			bigrams,
+			trigrams,
+			unsupported
+		};
+	}
+
+	// The pair classes the movement table shows, over adjacent key pairs and over
+	// skipgrams (the first and last keys of each key trigram): the pair events of
+	// the stream visitor (TRACE_PAIR_EVENTS).
+	const MOVEMENT_CLASSES = TRACE_PAIR_EVENTS;
+	// The movement table's own classes, shown only, no metric of the score: a
+	// row change (two fingers of one hand, thumbs aside, on different rows),
+	// concordant when the longer finger takes the upper row (the hand's natural
+	// shape) and discordant when it takes the lower one (the scissor's way).
+	const MOVEMENT_EXTRA = ['row_change', 'row_change_concordant', 'row_change_discordant'];
+	// The trigram rhythm of the movement table (an idea seen in the Layouts Wiki
+	// playground's « Trigram rhythm » view), shown only: the trigram classes of
+	// the stream visitor, and those whose two ends are the same finger (an SFS).
+	const RHYTHM_CLASSES = [
+		'alternation',
+		'alternation_sfs',
+		'roll3_in',
+		'roll3_out',
+		'redirect',
+		'redirect_sfs',
+		'redirect_bad',
+		'redirect_bad_sfs'
+	];
+	// Which way is better for the movement table's own classes, for their
+	// percentiles against the library (the scored classes take their metric's):
+	// a discordant row change and a same-finger end are costs; a row change as
+	// such and a concordant one are neither.
+	const MOVEMENT_BETTER = {
+		row_change: 'none',
+		row_change_concordant: 'none',
+		row_change_discordant: 'lower',
+		alternation_sfs: 'lower',
+		redirect_sfs: 'lower',
+		redirect_bad_sfs: 'lower'
+	};
+
+	/**
+	 * Which way is better for a class of the movement table or of its trigram
+	 * rhythm: its metric's direction, else the table's own (MOVEMENT_BETTER).
+	 * @param {string} id - A class of MOVEMENT_CLASSES, MOVEMENT_EXTRA or RHYTHM_CLASSES.
+	 * @returns {'higher'|'lower'|'none'}
+	 * @throws {Error} On another id.
+	 */
+	function movementBetter(id) {
+		if (Object.prototype.hasOwnProperty.call(MOVEMENT_BETTER, id)) return MOVEMENT_BETTER[id];
+		if (
+			!MOVEMENT_CLASSES.includes(id) &&
+			!MOVEMENT_EXTRA.includes(id) &&
+			!RHYTHM_CLASSES.includes(id)
+		)
+			throw new Error(`layout_analysis: ${id} is not a movement class`);
+		return METRICS[id].better;
+	}
+
+	/**
+	 * The movement table of a layout on a corpus (an idea seen in the Layouts
+	 * Wiki playground's « Movement » view): each pair class (SFB, same key,
+	 * lateral stretch, scissors, row jump, rolls, hand change…) as a share of the
+	 * adjacent key pairs, and the same class as a share of the skipgrams, the
+	 * first and last keys of every key trigram classified as if they were
+	 * adjacent. The stream is the one analyse() measures (its ways of typing),
+	 * so the bigram column is analyse()'s metric for each scored class. Shown,
+	 * never scored: the score keeps its own metrics and weights.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{bigram: object, skipgram: object, bigrams: number, skipgrams: number}}
+	 *   bigram and skipgram: class (MOVEMENT_CLASSES, then MOVEMENT_EXTRA) → share (%); bigrams and skipgrams: the pairs
+	 *   counted (a pair with the space is in none, a thumb SFB aside).
+	 */
+	function movementTable(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngrams),
+			planMode(opts)
+		);
+		const K = board.codes.length;
+		const classes = new Map();
+		// A pair's classes, probed once from the visitor; null when no metric counts it.
+		const classOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!classes.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				classes.set(at, c.bigrams === 0 ? null : MOVEMENT_CLASSES.filter((name) => c[name] !== 0));
+			}
+			return classes.get(at);
+		};
+		// A pair's row change: null when none, else concordant or discordant.
+		const rowChange = (k1, k2) => {
+			const f1 = board.finger[k1];
+			const f2 = board.finger[k2];
+			if (f1 === f2 || board.hand[k1] !== board.hand[k2] || !fingerRows(board, k1, k2)) return null;
+			if (board.row[k1] === board.row[k2]) return null;
+			const longer = FINGER_LENGTH[board.order[k1]] > FINGER_LENGTH[board.order[k2]] ? k1 : k2;
+			const shorter = longer === k1 ? k2 : k1;
+			return board.row[longer] < board.row[shorter]
+				? 'row_change_concordant'
+				: 'row_change_discordant';
+		};
+		const extraOf = (k1, k2) => {
+			const kind = rowChange(k1, k2);
+			return kind === null ? [] : ['row_change', kind];
+		};
+		const zero = () =>
+			Object.fromEntries(MOVEMENT_CLASSES.concat(MOVEMENT_EXTRA).map((name) => [name, 0]));
+		// A key triple's rhythm classes, probed once; null when no metric counts it.
+		const rhythms = new Map();
+		const rhythmOf = (k1, k2, k3) => {
+			const at = (k1 * K + k2) * K + k3;
+			if (!rhythms.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).trigram(k1, k2, k3, 1);
+				const sfs = c.sfs !== 0;
+				const found = [];
+				for (const name of ['alternation', 'roll3_in', 'roll3_out', 'redirect', 'redirect_bad'])
+					if (c[name] !== 0) {
+						found.push(name);
+						if (sfs && name !== 'roll3_in' && name !== 'roll3_out') found.push(`${name}_sfs`);
+					}
+				rhythms.set(at, c.trigrams === 0 ? null : found);
+			}
+			return rhythms.get(at);
+		};
+		const thumb = (k) => isThumbFinger(board.finger[k]);
+		const rhythmZero = () => Object.fromEntries(RHYTHM_CLASSES.map((name) => [name, 0]));
+		const rhythm = { all: rhythmZero(), noThumbs: rhythmZero() };
+		let trigramsAll = 0;
+		let trigramsNoThumbs = 0;
+		const bigram = zero();
+		const skipgram = zero();
+		let bigrams = 0;
+		let skipgrams = 0;
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				const found = classOf(k1, k2);
+				if (found === null) return;
+				bigrams += n;
+				for (const name of found.concat(extraOf(k1, k2))) bigram[name] += n;
+			},
+			trigram(k1, k2, k3, n) {
+				const kinds = rhythmOf(k1, k2, k3);
+				if (kinds !== null) {
+					trigramsAll += n;
+					for (const name of kinds) rhythm.all[name] += n;
+					if (!thumb(k1) && !thumb(k2) && !thumb(k3)) {
+						trigramsNoThumbs += n;
+						for (const name of kinds) rhythm.noThumbs[name] += n;
+					}
+				}
+				const found = classOf(k1, k3);
+				if (found === null) return;
+				skipgrams += n;
+				for (const name of found.concat(extraOf(k1, k3))) skipgram[name] += n;
+			}
+		});
+		const share = (counts, whole) => {
+			for (const name of MOVEMENT_CLASSES.concat(MOVEMENT_EXTRA))
+				counts[name] = whole > 0 ? (100 * counts[name]) / whole : 0;
+			return counts;
+		};
+		const rhythmShare = (counts, whole) =>
+			Object.fromEntries(
+				RHYTHM_CLASSES.map((name) => [name, whole > 0 ? (100 * counts[name]) / whole : 0])
+			);
+		return {
+			bigram: share(bigram, bigrams),
+			skipgram: share(skipgram, skipgrams),
+			bigrams,
+			skipgrams,
+			rhythm: {
+				all: rhythmShare(rhythm.all, trigramsAll),
+				noThumbs: rhythmShare(rhythm.noThumbs, trigramsNoThumbs)
+			},
+			trigrams: trigramsAll,
+			trigramsNoThumbs
+		};
+	}
+
+	// ==========================================
+	// ======= Tap-hold keys ====================
+	// ==========================================
+
+	/**
+	 * A layout's tap-hold keys: those of its modifiers' keys that also type
+	 * when tapped (tap_keys), each with the modifiers it holds.
+	 * @param {object} layout - Library shape.
+	 * @returns {Map<string, string[]>} code → modifier names, in the modifiers' order.
+	 */
+	function tapHoldKeys(layout) {
+		const out = new Map();
+		for (const [name, modifier] of Object.entries(layout.modifiers || {}))
+			for (const code of modifier.tap_keys || []) {
+				if (!out.has(code)) out.set(code, []);
+				out.get(code).push(name);
+			}
+		return out;
+	}
+
+	/**
+	 * How a layout's tap-hold keys are used on a corpus (an idea seen in the
+	 * Layouts Wiki playground, which models tap and hold keys): each key's taps
+	 * (it types its own character) and holds (it holds a level for another
+	 * key), and the two patterns that make a tap-hold misfire or tire: a tap
+	 * rolled into another key of the same hand (a fast roll reads as a hold),
+	 * and a hold whose key typed is on the hold's own hand (one hand holds and
+	 * types). The stream is the one analyse() measures.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{keys: Array<{code: string, holds: string[], taps: number,
+	 *   held: number, holdShare: number, rollAfterTap: number, sameHandHold: number}>,
+	 *   presses: number, holdShare: number}} keys in the board's order (those
+	 *   the board has): taps and held counted, holdShare the held share of the
+	 *   key's uses (%), rollAfterTap the share of its taps followed by another
+	 *   key of the same hand (%), sameHandHold the share of its holds typing a
+	 *   key of the same hand (%); presses the stream's key presses and
+	 *   holdShare the tap-holds' holds among them (%).
+	 */
+	function tapHoldReport(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const byCode = tapHoldKeys(layout);
+		const tapKeys = new Map();
+		for (const [code, holds] of byCode)
+			if (board.index.has(code)) tapKeys.set(board.index.get(code), holds);
+		const zero = () => new Float64Array(board.codes.length);
+		const [taps, held, rolled, sameHand] = [zero(), zero(), zero(), zero()];
+		let presses = 0;
+		let holds = 0;
+		if (tapKeys.size > 0) {
+			const plan = planTyping(
+				compileWays(layout, board, null),
+				board,
+				prepareNgrams(ngrams),
+				planMode(opts)
+			);
+			walkTyped(board, plan, {
+				char(char, seq, n) {
+					for (const k of seq.keys) if (tapKeys.has(k)) taps[k] += n;
+					// A run of one held key is one hold.
+					for (let i = 0; i < seq.held.length; i++) {
+						const k = seq.held[i];
+						if (!tapKeys.has(k) || (i > 0 && seq.held[i - 1] === k)) continue;
+						held[k] += n;
+						holds += n;
+						if (seq.keys.some((typed) => board.hand[typed] === board.hand[k])) sameHand[k] += n;
+					}
+				},
+				unsupported() {},
+				press(k, n) {
+					presses += n;
+				},
+				bigram(k1, k2, n) {
+					if (tapKeys.has(k1) && k1 !== k2 && board.hand[k1] === board.hand[k2]) rolled[k1] += n;
+				},
+				trigram() {}
+			});
+		}
+		const share = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const keys = Array.from(tapKeys.keys())
+			.sort((a, b) => a - b)
+			.map((k) => ({
+				code: board.codes[k],
+				holds: tapKeys.get(k).slice(),
+				taps: taps[k],
+				held: held[k],
+				holdShare: share(held[k], taps[k] + held[k]),
+				rollAfterTap: share(rolled[k], taps[k]),
+				sameHandHold: share(sameHand[k], held[k])
+			}));
+		return { keys, presses, holdShare: share(holds, presses) };
+	}
+
+	// ==========================================
+	// ======= User metrics over key windows =====
+	// ==========================================
+
+	// The key windows a user metric counts (an idea seen in the Layouts Wiki
+	// playground's metric queries): adjacent key pairs, skipgrams (the first
+	// and last keys of each key trigram) and key trigrams, each among the
+	// windows the metrics count (a pair with the space in none, as analyse()).
+	const WINDOW_KINDS = ['bigram', 'skipgram', 'trigram'];
+	// The values of each key of a window, suffixed by its place (finger1…):
+	// finger 1 index to 4 pinky, 0 a thumb; hand 0 left, 1 right; row against
+	// its finger's home row (−1 above, 1 below); reach the millimetres from
+	// its finger's home key; thumb and home (on its finger's home key) yes or no.
+	const WINDOW_KEY_NUMBERS = ['finger', 'hand', 'row', 'reach'];
+	const WINDOW_KEY_FLAGS = ['thumb', 'home'];
+	// The values of a pair (adjacent or skipgram): the rows and grid columns
+	// between its keys, their distance in millimetres, and yes-or-no values.
+	const WINDOW_PAIR_NUMBERS = ['rows_apart', 'columns_apart', 'distance'];
+	const WINDOW_PAIR_FLAGS = ['same_finger', 'same_hand', 'same_key'];
+	// A trigram's own yes-or-no value: its three keys on one hand.
+	const WINDOW_TRIPLE_FLAGS = ['same_hand'];
+	// The most user metrics measured at once.
+	const WINDOW_MAX_METRICS = 12;
+
+	/**
+	 * The names a user metric's query may use on a kind of window: each key's
+	 * values by place, then the window's own, then the events the stream
+	 * visitor raises on it (TRACE_PAIR_EVENTS on a pair, TRACE_TRIPLE_EVENTS
+	 * on a trigram) as yes-or-no values.
+	 * @param {string} kind - A WINDOW_KINDS id.
+	 * @returns {{numbers: string[], flags: string[]}} For compileQuery.
+	 * @throws {Error} On another kind.
+	 */
+	function windowNames(kind) {
+		if (!WINDOW_KINDS.includes(kind))
+			throw new Error(`layout_analysis: ${JSON.stringify(kind)} is not a key window`);
+		const triple = kind === 'trigram';
+		const places = triple ? [1, 2, 3] : [1, 2];
+		const each = (names) => places.flatMap((place) => names.map((name) => `${name}${place}`));
+		return {
+			numbers: each(WINDOW_KEY_NUMBERS).concat(triple ? [] : WINDOW_PAIR_NUMBERS),
+			flags: each(WINDOW_KEY_FLAGS).concat(
+				triple
+					? WINDOW_TRIPLE_FLAGS.concat(TRACE_TRIPLE_EVENTS)
+					: WINDOW_PAIR_FLAGS.concat(TRACE_PAIR_EVENTS)
+			)
+		};
+	}
+
+	/**
+	 * User metrics of a layout on a corpus (an idea seen in the Layouts Wiki
+	 * playground's metric queries): each the share of its windows (adjacent
+	 * pairs, skipgrams or trigrams of the key stream analyse() measures) for
+	 * which its query holds, a values query (compileQuery) over the names of
+	 * windowNames: « same_finger & finger1 = 4 » is the SFB of the pinkies.
+	 * Shown, never scored.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {Array<{id: string, window: string, query: string}>} metrics - At
+	 *   most WINDOW_MAX_METRICS, distinct ids.
+	 * @param {{keyboard?: string, profile?: object, weights?: object, typing?: string}} [options]
+	 *   - As analyse().
+	 * @returns {{values: object, windows: {bigram: number, skipgram: number, trigram: number}}}
+	 *   values: id → share (%), 0 on a corpus without such windows; windows:
+	 *   how many of each the shares are over.
+	 * @throws {QueryError} On a query that does not read; Error on too many
+	 *   metrics, a duplicate id or an unknown window.
+	 */
+	function windowMetrics(layoutInput, ngrams, metrics, options) {
+		if (!Array.isArray(metrics) || metrics.length > WINDOW_MAX_METRICS)
+			throw new Error(`layout_analysis: windowMetrics takes at most ${WINDOW_MAX_METRICS} metrics`);
+		const ids = new Set();
+		const compiled = metrics.map((metric) => {
+			if (!metric || typeof metric.id !== 'string' || ids.has(metric.id))
+				throw new Error('layout_analysis: each user metric needs an id of its own');
+			ids.add(metric.id);
+			return {
+				id: metric.id,
+				window: metric.window,
+				test: compileQuery(String(metric.query), windowNames(metric.window))
+			};
+		});
+		const opts = options || {};
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const plan = planTyping(
+			compileWays(layout, board, null),
+			board,
+			prepareNgrams(ngrams),
+			planMode(opts)
+		);
+		const K = board.codes.length;
+		const unit = data().model.key_unit_mm;
+		const keyValues = (k, place, into) => {
+			const order = board.order[k];
+			const thumb = isThumbFinger(board.finger[k]);
+			into[`finger${place}`] = thumb ? 0 : INDEX_ORDER + 1 - order;
+			into[`hand${place}`] = board.hand[k];
+			into[`row${place}`] = board.relRow[k];
+			into[`reach${place}`] = board.reach[k];
+			into[`thumb${place}`] = thumb;
+			into[`home${place}`] = board.homeOf[board.finger[k]] === k;
+		};
+		// A pair's values, probed once; null when no metric counts it.
+		const pairs = new Map();
+		const pairOf = (k1, k2) => {
+			const at = k1 * K + k2;
+			if (!pairs.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).bigram(k1, k2, 1);
+				if (c.bigrams === 0) pairs.set(at, null);
+				else {
+					const values = {
+						rows_apart: Math.abs(board.row[k1] - board.row[k2]),
+						columns_apart: Math.abs(board.grid[k1] - board.grid[k2]),
+						distance: Math.hypot(board.x[k1] - board.x[k2], board.y[k1] - board.y[k2]) * unit,
+						same_finger: board.finger[k1] === board.finger[k2],
+						same_hand: board.hand[k1] === board.hand[k2],
+						same_key: k1 === k2
+					};
+					keyValues(k1, 1, values);
+					keyValues(k2, 2, values);
+					for (const name of TRACE_PAIR_EVENTS) values[name] = c[name] !== 0;
+					pairs.set(at, values);
+				}
+			}
+			return pairs.get(at);
+		};
+		const triples = new Map();
+		const tripleOf = (k1, k2, k3) => {
+			const at = (k1 * K + k2) * K + k3;
+			if (!triples.has(at)) {
+				const c = streamCounts();
+				streamVisitor(board, c, new Float64Array(K), {}, null).trigram(k1, k2, k3, 1);
+				if (c.trigrams === 0) triples.set(at, null);
+				else {
+					const values = {
+						same_hand: board.hand[k1] === board.hand[k2] && board.hand[k2] === board.hand[k3]
+					};
+					keyValues(k1, 1, values);
+					keyValues(k2, 2, values);
+					keyValues(k3, 3, values);
+					for (const name of TRACE_TRIPLE_EVENTS) values[name] = c[name] !== 0;
+					triples.set(at, values);
+				}
+			}
+			return triples.get(at);
+		};
+		const byWindow = Object.fromEntries(
+			WINDOW_KINDS.map((kind) => [kind, compiled.filter((m) => m.window === kind)])
+		);
+		const sums = Object.fromEntries(compiled.map((m) => [m.id, 0]));
+		const windows = { bigram: 0, skipgram: 0, trigram: 0 };
+		const count = (kind, values, n) => {
+			if (values === null) return;
+			windows[kind] += n;
+			for (const metric of byWindow[kind]) if (metric.test(values)) sums[metric.id] += n;
+		};
+		walkTyped(board, plan, {
+			char() {},
+			unsupported() {},
+			press() {},
+			bigram(k1, k2, n) {
+				count('bigram', pairOf(k1, k2), n);
+			},
+			trigram(k1, k2, k3, n) {
+				count('trigram', tripleOf(k1, k2, k3), n);
+				count('skipgram', pairOf(k1, k3), n);
+			}
+		});
+		const values = {};
+		for (const metric of compiled) {
+			const whole = windows[metric.window];
+			values[metric.id] = whole > 0 ? (100 * sums[metric.id]) / whole : 0;
+		}
+		return { values, windows };
+	}
+
+	/**
+	 * The words of a word table whose key stream holds a key sequence (the
+	 * drill-down from an n-gram to its words, an idea seen in the Layouts Wiki
+	 * playground's Keystrokes and Words views): each word typed alone, each
+	 * character its cheapest way out of context (the ways compiled once), and
+	 * kept when the given codes follow each other in its keys.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object|Array} words - word → count, or [[word, count], ...].
+	 * @param {string[]} codes - Two or three KeyboardEvent codes, in order.
+	 * @param {{keyboard?: string, profile?: object, limit?: number}} [options] - limit: at most
+	 *   this many words (all when absent).
+	 * @returns {{words: Array<{word: string, count: number}>, occurrences: number}}
+	 *   The most frequent first (ties by code point); occurrences: their counts summed.
+	 * @throws {Error} On fewer than two codes or a code the board lacks.
+	 */
+	function wordsWithKeys(layoutInput, words, codes, options) {
+		const opts = options || {};
+		if (!Array.isArray(codes) || codes.length < 2)
+			throw new Error('layout_analysis: wordsWithKeys needs at least two key codes');
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
+		const wanted = codes.map((code) => {
+			if (!board.index.has(code)) throw new Error(`layout_analysis: the board has no key ${code}`);
+			return board.index.get(code);
+		});
+		const best = compileWays(layout, board, null).best;
+		const entries = Array.isArray(words) ? words : Object.entries(words || {});
+		const out = [];
+		let occurrences = 0;
+		for (const [word, count] of entries) {
+			const keys = [];
+			let typed = true;
+			for (const char of word) {
+				const way = best.get(char);
+				if (!way) {
+					typed = false;
+					break;
+				}
+				keys.push(...way.keys);
+			}
+			if (!typed) continue;
+			const holds = keys.some((_, i) => wanted.every((k, j) => keys[i + j] === k));
+			if (!holds) continue;
+			out.push({ word, count });
+			occurrences += count;
+		}
+		out.sort((x, y) => y.count - x.count || (x.word < y.word ? -1 : x.word > y.word ? 1 : 0));
+		return {
+			words: opts.limit === undefined ? out : out.slice(0, opts.limit),
+			occurrences
+		};
+	}
+
+	// How many characters a corpus blend counts: each part scaled to its share of it.
+	const BLEND_CHARS = 1000000;
+	// The tables a blend mixes, each part scaled by the same factor (also those
+	// of `breaks`, the n-grams across a line break, itself such a set).
+	const BLEND_TABLES = ['chars', 'bigrams', 'trigrams'];
+
+	/**
+	 * A weighted blend of corpora (an idea seen in the Layouts Wiki playground's
+	 * corpus blends): each part's tables scaled so its characters make its
+	 * weight's share of BLEND_CHARS, then summed; the word tables mixed the
+	 * same way on their own totals and cut to the WORD_TABLE_SIZE most frequent.
+	 * The other analysers' text counts cannot be mixed and are left out (their
+	 * scorers then read the tables, as for a corpus of counts).
+	 * @param {Array<{ngrams: object, weight: number}>} parts - Raw tables
+	 *   ({chars, bigrams, trigrams, breaks?, words?}) and weights ≥ 0, one at least
+	 *   above 0; a part of weight 0 is skipped.
+	 * @returns {{chars: object, bigrams: object, trigrams: object, breaks: object,
+	 *   words: object|null}} words: null when no weighted part has a word table.
+	 * @throws {Error} On no part, a weight that is negative or not finite, all
+	 *   weights 0, or a weighted part without characters.
+	 */
+	function blendNgrams(parts) {
+		if (!Array.isArray(parts) || parts.length === 0)
+			throw new Error('layout_analysis: blendNgrams needs at least one part');
+		for (const part of parts)
+			if (!part || !Number.isFinite(part.weight) || part.weight < 0)
+				throw new Error('layout_analysis: a blend weight must be a number ≥ 0');
+		const used = parts.filter((part) => part.weight > 0);
+		if (used.length === 0) throw new Error('layout_analysis: a blend needs a weight above 0');
+		const all = used.reduce((sum, part) => sum + part.weight, 0);
+		const out = {
+			chars: {},
+			bigrams: {},
+			trigrams: {},
+			breaks: { chars: {}, bigrams: {}, trigrams: {} }
+		};
+		const add = (into, table, factor) => {
+			for (const [token, n] of Object.entries(table || {}))
+				if (n > 0) into[token] = (into[token] || 0) + n * factor;
+		};
+		const words = {};
+		let anyWords = false;
+		for (const part of used) {
+			const total = Object.values(part.ngrams.chars || {}).reduce(
+				(sum, n) => sum + (n > 0 ? n : 0),
+				0
+			);
+			if (!(total > 0)) throw new Error('layout_analysis: a blended corpus has no characters');
+			const factor = (BLEND_CHARS * part.weight) / all / total;
+			for (const name of BLEND_TABLES) {
+				add(out[name], part.ngrams[name], factor);
+				add(out.breaks[name], (part.ngrams.breaks || {})[name], factor);
+			}
+			if (part.ngrams.words) {
+				const count = Object.values(part.ngrams.words).reduce((sum, n) => sum + n, 0);
+				if (count > 0) {
+					anyWords = true;
+					add(words, part.ngrams.words, (BLEND_CHARS * part.weight) / all / count);
+				}
+			}
+		}
+		out.words = anyWords ? wordTable(words) : null;
+		return out;
+	}
+
+	// ==========================================
+	// ======= Values query (library filter) ====
+	// ==========================================
+
+	/** A values query that does not read: a stable code and where, for the page's words. */
+	class QueryError extends Error {
+		constructor(code, at, token) {
+			super(`${code} at ${at}${token ? `: ${token}` : ''}`);
+			this.name = 'QueryError';
+			this.code = code;
+			this.at = at;
+			this.token = token || '';
+		}
+	}
+
+	// The comparisons a values query reads, each a test of a value against a number.
+	const QUERY_COMPARISONS = {
+		'<': (a, b) => a < b,
+		'<=': (a, b) => a <= b,
+		'>': (a, b) => a > b,
+		'>=': (a, b) => a >= b,
+		'=': (a, b) => a === b,
+		'!=': (a, b) => a !== b
+	};
+	// The words that join or negate, besides & | !.
+	const QUERY_WORDS = { and: '&', or: '|', not: '!' };
+
+	/** The tokens of a values query, each {kind, text, at}. */
+	function queryTokens(text) {
+		const tokens = [];
+		const pattern =
+			/\s*(?:([-−]?(?:\d+(?:[.,]\d+)?|[.,]\d+))|([a-z_][a-z0-9_]*)|(<=|>=|!=|==|<|>|=|&&?|\|\|?|!|\(|\)))/iy;
+		let at = 0;
+		while (at < text.length) {
+			if (/^\s*$/.test(text.slice(at))) break;
+			pattern.lastIndex = at;
+			const found = pattern.exec(text);
+			if (!found) {
+				// Where the unread text starts, past the spaces before it.
+				const from = at + (text.slice(at).length - text.slice(at).trimStart().length);
+				throw new QueryError('query_unexpected', from, text.slice(from).split(/\s/)[0]);
+			}
+			const start = found.index + found[0].length - found[0].trimStart().length;
+			if (found[1] !== undefined)
+				tokens.push({
+					kind: 'number',
+					text: found[1].replace(',', '.').replace('−', '-'),
+					at: start
+				});
+			else if (found[2] !== undefined) {
+				const word = found[2].toLowerCase();
+				if (QUERY_WORDS[word]) tokens.push({ kind: 'op', text: QUERY_WORDS[word], at: start });
+				else tokens.push({ kind: 'name', text: word, at: start });
+			} else {
+				// && and || read as & and |, == as =.
+				const op = { '&&': '&', '||': '|', '==': '=' }[found[3]] || found[3];
+				tokens.push({ kind: 'op', text: op, at: start });
+			}
+			at = pattern.lastIndex;
+		}
+		return tokens;
+	}
+
+	/**
+	 * Compiles a values query over a layout's values (an idea seen in the
+	 * Layouts Wiki playground's Boolean filter on its library): comparisons
+	 * of a value with a number (« sfb < 1.2 », « roll_in >= 30 »), a yes-or-no
+	 * value alone (« complete »), joined by & (and), | (or), negated by !
+	 * (not), grouped by parentheses; & binds before |. A decimal comma reads
+	 * as a point, and a number may be negative (« row1 = -1 », a minus sign
+	 * too). An empty query keeps every layout.
+	 * @param {string} text - The query.
+	 * @param {{numbers: string[], flags: string[]}} names - The value names it may use.
+	 * @returns {function(object): boolean} A test over {name: value}: a number
+	 *   for each of numbers, a boolean for each of flags; a value that is not a
+	 *   finite number fails its comparison.
+	 * @throws {QueryError} query_unexpected, query_unknown_name, query_number,
+	 *   query_comparison, query_flag, query_parenthesis or query_end, with
+	 *   where it happens.
+	 */
+	function compileQuery(text, names) {
+		const numbers = new Set(names.numbers);
+		const flags = new Set(names.flags);
+		const tokens = queryTokens(text);
+		if (tokens.length === 0) return () => true;
+		let index = 0;
+		const peek = () => tokens[index];
+		const end = () => text.length;
+		const isOp = (token, op) => token && token.kind === 'op' && token.text === op;
+		const expression = () => {
+			let left = conjunction();
+			while (isOp(peek(), '|')) {
+				index += 1;
+				const right = conjunction();
+				const a = left;
+				left = (values) => a(values) || right(values);
+			}
+			return left;
+		};
+		const conjunction = () => {
+			let left = negation();
+			while (isOp(peek(), '&')) {
+				index += 1;
+				const right = negation();
+				const a = left;
+				left = (values) => a(values) && right(values);
+			}
+			return left;
+		};
+		const negation = () => {
+			if (isOp(peek(), '!')) {
+				index += 1;
+				const inner = negation();
+				return (values) => !inner(values);
+			}
+			return primary();
+		};
+		const primary = () => {
+			const token = peek();
+			if (!token) throw new QueryError('query_end', end());
+			if (isOp(token, '(')) {
+				index += 1;
+				const inner = expression();
+				if (!isOp(peek(), ')'))
+					throw new QueryError('query_parenthesis', peek() ? peek().at : end());
+				index += 1;
+				return inner;
+			}
+			if (token.kind !== 'name') throw new QueryError('query_unexpected', token.at, token.text);
+			index += 1;
+			if (flags.has(token.text)) {
+				if (peek() && peek().kind === 'op' && QUERY_COMPARISONS[peek().text])
+					throw new QueryError('query_flag', peek().at, token.text);
+				return (values) => values[token.text] === true;
+			}
+			if (!numbers.has(token.text))
+				throw new QueryError('query_unknown_name', token.at, token.text);
+			const op = peek();
+			if (!op || op.kind !== 'op' || !QUERY_COMPARISONS[op.text])
+				throw new QueryError('query_comparison', op ? op.at : end(), token.text);
+			index += 1;
+			const number = peek();
+			if (!number || number.kind !== 'number')
+				throw new QueryError('query_number', number ? number.at : end(), token.text);
+			index += 1;
+			const test = QUERY_COMPARISONS[op.text];
+			const bound = Number(number.text);
+			return (values) => Number.isFinite(values[token.text]) && test(values[token.text], bound);
+		};
+		const compiled = expression();
+		if (index < tokens.length)
+			throw new QueryError('query_unexpected', tokens[index].at, tokens[index].text);
+		return compiled;
+	}
+
+	const PARETO_DIRECTIONS = ['lower', 'higher'];
+
+	/**
+	 * The Pareto layers of points over several values (an idea seen in the
+	 * Layouts Wiki playground): a point is dominated when another is at least
+	 * as good on every value and better on one; the frontier (layer 1) holds
+	 * the points no other dominates, layer 2 those only the frontier
+	 * dominates, and so on. Points equal on every value share their layer and
+	 * do not dominate each other. No weight is involved: the frontier is every
+	 * best trade-off between the values.
+	 * @param {Array<{id: string, values: number[]}>} points - Distinct ids,
+	 *   one finite value per direction.
+	 * @param {string[]} directions - 'lower' or 'higher' (which is better), one
+	 *   per value, at least one.
+	 * @returns {Array<{id: string, layer: number, front: boolean,
+	 *   dominatedBy: string[]}>} In the points' order: layer ≥ 1, front when
+	 *   layer is 1, dominatedBy the ids of the points dominating it, in the
+	 *   points' order.
+	 * @throws {Error} On an unknown direction, a duplicate id or a value that
+	 *   is missing or not finite.
+	 */
+	function pareto(points, directions) {
+		if (!Array.isArray(directions) || directions.length === 0)
+			throw new Error('layout_analysis: pareto needs at least one direction');
+		for (const direction of directions)
+			if (!PARETO_DIRECTIONS.includes(direction))
+				throw new Error(
+					`layout_analysis: pareto direction ${JSON.stringify(direction)} is unknown`
+				);
+		if (!Array.isArray(points)) throw new Error('layout_analysis: pareto needs a list of points');
+		const ids = new Set();
+		for (const point of points) {
+			if (!point || typeof point.id !== 'string' || ids.has(point.id))
+				throw new Error(
+					`layout_analysis: pareto point ${JSON.stringify(point && point.id)} is not a distinct id`
+				);
+			ids.add(point.id);
+			if (
+				!Array.isArray(point.values) ||
+				point.values.length !== directions.length ||
+				!point.values.every(Number.isFinite)
+			)
+				throw new Error(
+					`layout_analysis: pareto point ${point.id} needs ${directions.length} finite values`
+				);
+		}
+		// Every value made « lower is better ».
+		const signs = directions.map((direction) => (direction === 'lower' ? 1 : -1));
+		const cost = points.map((point) => point.values.map((v, i) => signs[i] * v));
+		const dominates = (a, b) => {
+			let better = false;
+			for (let i = 0; i < signs.length; i++) {
+				if (cost[a][i] > cost[b][i]) return false;
+				if (cost[a][i] < cost[b][i]) better = true;
+			}
+			return better;
+		};
+		const n = points.length;
+		const dominatedBy = Array.from({ length: n }, () => []);
+		for (let a = 0; a < n; a++)
+			for (let b = 0; b < n; b++) if (a !== b && dominates(b, a)) dominatedBy[a].push(b);
+		// The layers: peel the points no remaining point dominates.
+		const layer = new Array(n).fill(0);
+		let remaining = Array.from({ length: n }, (_, i) => i);
+		for (let current = 1; remaining.length > 0; current++) {
+			// Dominance is a strict order: some remaining point is always free.
+			const peel = remaining.filter((i) => dominatedBy[i].every((j) => layer[j] !== 0));
+			if (peel.length === 0) throw new Error('layout_analysis: pareto found a dominance cycle');
+			for (const i of peel) layer[i] = current;
+			remaining = remaining.filter((i) => layer[i] === 0);
+		}
+		return points.map((point, i) => ({
+			id: point.id,
+			layer: layer[i],
+			front: layer[i] === 1,
+			dominatedBy: dominatedBy[i].map((j) => points[j].id)
+		}));
+	}
+
+	// How many points a density curve samples between its ends.
+	const DENSITY_POINTS = 64;
+	// Silverman's rule of thumb: bandwidth = 0.9 · min(σ, IQR / 1.34) · n^(-1/5).
+	const SILVERMAN = { factor: 0.9, iqr: 1.34, power: -0.2 };
+	// The curve runs this many bandwidths past the extreme values, so its tails close.
+	const DENSITY_TAIL = 3;
+	// Values with no spread are smoothed over this share of their range (or of their size).
+	const DENSITY_FLAT_SHARE = 0.05;
+
+	/**
+	 * A smoothed distribution of values (an idea seen in the Layouts Wiki
+	 * playground's Ranking view): a Gaussian kernel density estimate, its
+	 * bandwidth by Silverman's rule of thumb (the spread, or DENSITY_FLAT_SHARE
+	 * of the range when the values are nearly all equal), sampled from DENSITY_TAIL
+	 * bandwidths under the lowest value to as many above the highest. The
+	 * density integrates to 1 over the values' axis.
+	 * @param {number[]} values - At least one finite value.
+	 * @param {{points?: number, bandwidth?: number}} [options] - points: samples
+	 *   (2 at least, DENSITY_POINTS when absent); bandwidth: a fixed one (> 0).
+	 * @returns {{bandwidth: number, points: Array<{x: number, density: number}>}}
+	 *   points in increasing x.
+	 * @throws {Error} On no value, a value that is not finite, fewer than two
+	 *   points or a bandwidth that is not above 0.
+	 */
+	function densityCurve(values, options) {
+		const opts = options || {};
+		if (!Array.isArray(values) || values.length === 0 || !values.every(Number.isFinite))
+			throw new Error('layout_analysis: densityCurve needs finite values');
+		const count = opts.points === undefined ? DENSITY_POINTS : opts.points;
+		if (!Number.isInteger(count) || count < 2)
+			throw new Error('layout_analysis: densityCurve needs at least two points');
+		const sorted = values.slice().sort((a, b) => a - b);
+		const n = sorted.length;
+		const quantile = (p) => {
+			const at = p * (n - 1);
+			const low = Math.floor(at);
+			return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low);
+		};
+		let bandwidth = opts.bandwidth;
+		if (bandwidth === undefined) {
+			const mean = sorted.reduce((sum, v) => sum + v, 0) / n;
+			const sd = Math.sqrt(sorted.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n);
+			const iqr = (quantile(0.75) - quantile(0.25)) / SILVERMAN.iqr;
+			const spread = iqr > 0 ? Math.min(sd, iqr) : sd;
+			const range = sorted[n - 1] - sorted[0];
+			// Equal values have no spread: a width that still draws a bump.
+			const base =
+				spread > 0
+					? spread
+					: (range > 0 ? range : Math.abs(mean)) * DENSITY_FLAT_SHARE || DENSITY_FLAT_SHARE;
+			bandwidth = SILVERMAN.factor * base * n ** SILVERMAN.power;
+		}
+		if (!(bandwidth > 0) || !Number.isFinite(bandwidth))
+			throw new Error('layout_analysis: densityCurve needs a bandwidth above 0');
+		const from = sorted[0] - DENSITY_TAIL * bandwidth;
+		const to = sorted[n - 1] + DENSITY_TAIL * bandwidth;
+		const norm = 1 / (n * bandwidth * Math.sqrt(2 * Math.PI));
+		const points = [];
+		for (let i = 0; i < count; i++) {
+			const x = from + ((to - from) * i) / (count - 1);
+			let sum = 0;
+			for (const v of sorted) sum += Math.exp(-0.5 * ((x - v) / bandwidth) ** 2);
+			points.push({ x, density: sum * norm });
+		}
+		return { bandwidth, points };
+	}
+
+	/**
+	 * The keyboard formats (100 %, TKL, 75 %, 65 %, 60 %), each with the keys
+	 * it lacks: the one table the editor's « Format », the Comparer's and the
+	 * compact form factors read (analysis_model.json).
+	 * @returns {Array<{id: string, hidden: Set<string>}>} In the model's order.
+	 */
+	function keyboardFormats() {
+		const model = data().model;
+		return model.keyboard_formats.map((format) => ({
+			id: format.id,
+			hidden: new Set(format.hides.flatMap((block) => model.keyboard_blocks[block]))
+		}));
+	}
+
+	/** The format a keyboard has when nothing chose one. */
+	function defaultKeyboardFormat() {
+		return data().model.default_keyboard_format;
+	}
+
+	/**
+	 * The keys one keyboard format lacks.
+	 * @param {string} id A keyboard_formats id.
+	 * @returns {Set<string>} The hidden key codes.
+	 * @throws {Error} On an unknown format.
+	 */
+	function formatHiddenKeys(id) {
+		const format = keyboardFormats().find((entry) => entry.id === id);
+		if (!format) throw new Error(`unknown keyboard format ${id}`);
+		return format.hidden;
+	}
+
+	/**
+	 * The compact form factors measured: the model's, a form factor marked
+	 * per_keyboard_format split over the keyboard formats (its weight shared
+	 * equally) or, when one format is chosen, measured on that one alone.
+	 * @param {string|undefined} format The chosen keyboard format, if any.
+	 * @returns {Array<{weight: number, missing: string[]}>} The form factors.
+	 */
+	function compactForms(format, weights) {
+		// The model's weights give the same forms every time: built once per format.
+		const cacheKey = weights === undefined ? String(format) : null;
+		if (cacheKey !== null && defaultFormsCache.has(cacheKey))
+			return defaultFormsCache.get(cacheKey);
+		const formats =
+			format === undefined ? keyboardFormats() : [{ hidden: formatHiddenKeys(format) }];
+		const chosen = formFactorWeights(weights);
+		const forms = [];
+		for (const [id, form] of Object.entries(data().model.form_factors)) {
+			if (!form.per_keyboard_format) {
+				forms.push({ weight: chosen[id], missing: form.missing });
+				continue;
+			}
+			for (const entry of formats)
+				forms.push({
+					weight: chosen[id] / formats.length,
+					missing: form.missing.concat([...entry.hidden])
+				});
+		}
+		if (cacheKey !== null) defaultFormsCache.set(cacheKey, forms);
+		return forms;
+	}
+
+	const defaultFormsCache = new Map();
+	const formSetsCache = new WeakMap();
+
+	/** Each form's missing keys as a Set, once per forms list (compactForms). */
+	function formSets(forms) {
+		let out = formSetsCache.get(forms);
+		if (!out) {
+			out = forms.map((form) => new Set(form.missing));
+			formSetsCache.set(forms, out);
+		}
+		return out;
 	}
 
 	/**
 	 * Frequency-weighted share of the characters still typed on each compact
 	 * form factor, averaged with the form factors' weights.
 	 */
-	function compactFit(layout, board, table) {
-		const forms = data().model.form_factors;
+	function compactFit(layout, board, table, format, formWeights) {
+		const forms = compactForms(format, formWeights);
+		// Forms that take away the same keys of this layout (most differ only by
+		// keys it leaves empty, a numpad or arrows) keep the same characters.
+		const used = Object.keys(layout.rows).filter((code) => board.index.has(code));
+		const fits = new Map();
+		const sets = formSets(forms);
+		return weightedFit(
+			forms,
+			forms.map((form, i) => {
+				const key = used.filter((code) => sets[i].has(code)).join(' ');
+				if (!fits.has(key)) fits.set(key, formFit(layout, board, table, form));
+				return fits.get(key);
+			})
+		);
+	}
+
+	/** The share of the characters still typed on one compact form factor. */
+	function formFit(layout, board, table, form) {
+		const reachable = reachableChars(layout, board, new Set(form.missing));
+		let kept = 0;
+		let all = 0;
+		for (const [char, n] of table.uni) {
+			all += n;
+			if (reachable.has(char)) kept += n;
+		}
+		return all > 0 ? (100 * kept) / all : 0;
+	}
+
+	/** The form factors' shares averaged with their weights: compact_fit. */
+	function weightedFit(forms, values) {
 		let sum = 0;
 		let weights = 0;
-		for (const form of Object.values(forms)) {
-			const reachable = compileLayout(layout, board, new Set(form.missing));
-			let kept = 0;
-			let all = 0;
-			for (const [char, n] of table.uni) {
-				all += n;
-				if (reachable.has(char)) kept += n;
-			}
-			sum += form.weight * (all > 0 ? (100 * kept) / all : 0);
+		forms.forEach((form, i) => {
+			sum += form.weight * values[i];
 			weights += form.weight;
-		}
+		});
 		return weights > 0 ? sum / weights : 0;
 	}
 
+	// The reference character set, split once (charCoverage).
+	let referenceChars = null;
+
 	/** Share of the reference character set the layout can type. */
 	function charCoverage(best) {
-		const reference = codePoints(data().model.reference_characters);
-		const typed = reference.filter((char) => best.has(char) && !best.get(char).substituted).length;
-		return (100 * typed) / reference.length;
+		if (referenceChars === null) referenceChars = codePoints(data().model.reference_characters);
+		let typed = 0;
+		for (const char of referenceChars) {
+			const way = best.get(char);
+			if (way !== undefined && !way.substituted) typed++;
+		}
+		return (100 * typed) / referenceChars.length;
+	}
+
+	/**
+	 * The coverage bonus: the distinct characters a layout types (any way),
+	 * over the model's fixed cap (coverage_cap), at most 100 %. A fixed cap,
+	 * not the best of the layouts compared, so one layout's value never
+	 * depends on the others and the optimizer's objective stays stable.
+	 * @param {number} distinct - compileWays().distinct.
+	 * @returns {number} 0 to 100.
+	 */
+	function coverageBonus(distinct) {
+		const cap = data().model.coverage_cap;
+		return (100 * Math.min(distinct, cap)) / cap;
+	}
+
+	/**
+	 * The simplicity rules, each an objective share from 0 to 100 % (null when
+	 * the layout gives the rule nothing to measure); simplicity is their mean.
+	 * - accents: of the accented letters typed through AltGr or a dead key (not
+	 *   on a key of their own), the share whose last key is their base letter's
+	 *   key (dead key then e for ê, AltGr+e for é);
+	 * - pairs: each pair of simplicity_pairs typed, 1 when the closing
+	 *   character is the key right of the opening one on the same level, ½
+	 *   when it is left of it or both share one key (opening on the lower
+	 *   level), 0 otherwise;
+	 * - digits: of the nine steps 1→2 … 8→9, 9→0, the share where the next
+	 *   digit is the key right of the previous one on the same level.
+	 * « The key right of » is the next key of the same row (a split board's
+	 * other half included). Every way of each character is tried.
+	 * @param {object} board - From keyboard().
+	 * @param {object} compiled - From compileWays(); the accent rule's counts are kept
+	 *   on it (accents), or carried over by finishWaysFrom.
+	 * @returns {{value: number, rules: {accents, pairs, digits}}} Each rule
+	 *   {value, measured} or null.
+	 */
+	function simplicity(board, compiled) {
+		const { ways } = compiled;
+		const right = rightNeighbours(board);
+		const real = (char) => (ways.get(char) || []).filter((way) => !way.substituted);
+		// Each way's last key, level and level index (-1 behind a dead key).
+		const placed = (char) =>
+			real(char).map((way) => [
+				way.keys[way.keys.length - 1],
+				way.level,
+				way.dead ? -1 : way.layers[way.layers.length - 1]
+			]);
+		const share = (got, measured) =>
+			measured > 0 ? { value: (100 * got) / measured, measured } : null;
+
+		if (!compiled.accents) compiled.accents = accentCounts(ways);
+		const { accented, mnemonic } = compiled.accents;
+
+		let pairScore = 0;
+		let pairs = 0;
+		for (const [open, close] of simplicityPairs()) {
+			const o = placed(open);
+			const c = placed(close);
+			if (o.length === 0 || c.length === 0) continue;
+			pairs++;
+			let best = 0;
+			for (const [ko, lo, io] of o)
+				for (const [kc, lc, ic] of c) {
+					if (lo === lc && right[ko] === kc) best = Math.max(best, 1);
+					else if (lo === lc && right[kc] === ko) best = Math.max(best, 0.5);
+					else if (ko === kc && io >= 0 && io < ic) best = Math.max(best, 0.5);
+				}
+			pairScore += best;
+		}
+
+		const DIGITS = '1234567890';
+		let steps = 0;
+		let ordered = 0;
+		for (let i = 0; i + 1 < DIGITS.length; i++) {
+			const a = placed(DIGITS[i]);
+			const b = placed(DIGITS[i + 1]);
+			if (a.length === 0 || b.length === 0) continue;
+			steps++;
+			if (a.some(([ka, la]) => b.some(([kb, lb]) => la === lb && right[ka] === kb))) ordered++;
+		}
+
+		const rules = {
+			accents: share(mnemonic, accented),
+			pairs: share(pairScore, pairs),
+			digits: share(ordered, steps)
+		};
+		const values = Object.values(rules).filter((rule) => rule !== null);
+		const value = values.length ? values.reduce((s, rule) => s + rule.value, 0) / values.length : 0;
+		return { value, rules };
+	}
+
+	const accentCache = new Map();
+	// Lower-case base letter → every accented character seen with it (accentBase).
+	const accentUsers = new Map();
+
+	/** The accent rule's counts over every character of a compile (simplicity). */
+	function accentCounts(ways) {
+		let accented = 0;
+		let mnemonic = 0;
+		for (const [char, list] of ways) {
+			const state = accentState(ways, char, list);
+			if (state > ACCENT_NONE) accented++;
+			if (state === ACCENT_MNEMONIC) mnemonic++;
+		}
+		return { accented, mnemonic };
+	}
+
+	// What one character adds to the accent rule (accentState).
+	const ACCENT_NONE = 0;
+	const ACCENT_ONLY = 1;
+	const ACCENT_MNEMONIC = 2;
+
+	/**
+	 * One character's part of the accent rule: none (not an accented letter,
+	 * not typed, or typed on a key of its own), measured, or measured and
+	 * mnemonic (a way ends on a base key of its base letter).
+	 * @param {Map} ways - The compile's ways.
+	 * @param {string} char - The character.
+	 * @param {object[]|undefined} list - Its ways.
+	 * @returns {number} ACCENT_NONE, ACCENT_ONLY or ACCENT_MNEMONIC.
+	 */
+	function accentState(ways, char, list) {
+		if (!list) return ACCENT_NONE;
+		const letter = accentBase(char);
+		if (letter === null) return ACCENT_NONE;
+		// Its own ways (not substitutes), none of them direct.
+		let own = 0;
+		for (const way of list) {
+			if (way.substituted) continue;
+			own++;
+			if (way.altgr === 0 && !way.dead) return ACCENT_NONE;
+		}
+		if (own === 0) return ACCENT_NONE;
+		// Whether a letter has a way of one key k, without AltGr (its base keys).
+		const baseKey = (base, k) => {
+			const ofBase = ways.get(base);
+			if (ofBase)
+				for (const way of ofBase)
+					if (!way.substituted && way.keys.length === 1 && way.altgr === 0 && way.keys[0] === k)
+						return true;
+			return false;
+		};
+		const [lower, upper] = letter;
+		for (const way of list) {
+			if (way.substituted) continue;
+			const k = way.keys[way.keys.length - 1];
+			if (baseKey(lower, k) || baseKey(upper, k)) return ACCENT_MNEMONIC;
+		}
+		return ACCENT_ONLY;
+	}
+	let pairList = null;
+
+	/** The model's simplicity pairs, each as [opening, closing] character. */
+	function simplicityPairs() {
+		if (pairList === null) pairList = data().model.simplicity_pairs.map((pair) => codePoints(pair));
+		return pairList;
+	}
+
+	/**
+	 * The base letter of an accented Latin letter (a letter A–Z followed by
+	 * combining marks once decomposed: ê → e, Ǘ → U), in lower and upper
+	 * case, null for anything else.
+	 * @param {string} char - One character.
+	 * @returns {string[]|null} [lower, upper] of the base letter.
+	 */
+	function accentBase(char) {
+		let base = accentCache.get(char);
+		if (base !== undefined) return base;
+		const parts = codePoints(char.normalize('NFD'));
+		base =
+			parts.length >= 2 &&
+			/^[A-Za-z]$/.test(parts[0]) &&
+			parts.slice(1).every((mark) => /^\p{M}$/u.test(mark))
+				? [parts[0].toLowerCase(), parts[0].toUpperCase()]
+				: null;
+		accentCache.set(char, base);
+		if (base !== null)
+			(accentUsers.get(base[0]) || accentUsers.set(base[0], new Set()).get(base[0])).add(char);
+		return base;
+	}
+
+	const neighbourCache = new WeakMap();
+
+	/**
+	 * The key right of each key: the next key of the same row by position.
+	 * @param {object} board - From keyboard().
+	 * @returns {Int32Array} key index → the next key's index, or -1.
+	 */
+	function rightNeighbours(board) {
+		if (neighbourCache.has(board)) return neighbourCache.get(board);
+		const out = new Int32Array(board.codes.length).fill(-1);
+		const rows = new Map();
+		board.codes.forEach((_, k) => {
+			const row = board.row[k];
+			(rows.get(row) || rows.set(row, []).get(row)).push(k);
+		});
+		for (const keys of rows.values()) {
+			keys.sort((a, b) => board.x[a] - board.x[b] || a - b);
+			for (let i = 0; i + 1 < keys.length; i++) out[keys[i]] = keys[i + 1];
+		}
+		neighbourCache.set(board, out);
+		return out;
+	}
+
+	/**
+	 * The points the keystroke metrics take from the score along the path an
+	 * analysis typed, by the default weights and the access weights of its
+	 * choice (ACCESS_WEIGHTS), each share over the corpus's
+	 * own totals (characters, bigrams, trigrams): the sum the choice of ways
+	 * minimises (typingCosts), so a best path never costs more than the fixed
+	 * one where the choices do not interact.
+	 * @param {object} table - From prepareNgrams().
+	 * @param {object} c - analyse()'s counts.
+	 * @param {{pinky: number, outer: number, home: number, travel: number}} presses -
+	 *   Presses on the pinkies, on the outer column and on the home row, and
+	 *   the travel in mm weighted by the default finger grades.
+	 * @param {object} access - From accessWeights().
+	 * @returns {number} Points (positive: lost).
+	 */
+	function typingCost(table, c, presses, access) {
+		const w = data().weights;
+		const grades = data().grades;
+		const maps = ngramMaps(table);
+		const nc = table.totalChars;
+		const per = (n, total) => (total > 0 ? (100 * n) / total : 0);
+		// A graded metric's events, each count times its cell's default factor.
+		const graded = (metric) =>
+			GRADE_COUNTERS[metric].reduce(
+				(sum, name, i) => sum + cellFactor(metric, i, grades[metric]) * c[name],
+				0
+			);
+		const alternation = grades.alternation.rewarded ? w.alternation : 0;
+		const bigrams =
+			w.sfb * graded('sfb') +
+			w.row_jump * graded('row_jump') +
+			w.sfb_distance * c.sfb_cost +
+			w.lsb * c.lsb +
+			w.scissors * c.scissors +
+			w.half_scissors * c.half_scissors +
+			w.pinky_ring * c.pinky_ring -
+			w.roll_in * c.roll_in -
+			w.roll_out * c.roll_out;
+		const trigrams =
+			w.sfs * c.sfs +
+			SFS_DISTANCE_SHARE * w.sfb_distance * c.sfs_cost +
+			w.redirect * c.redirect +
+			w.redirect_bad * c.redirect_bad -
+			w.roll3_in * c.roll3_in -
+			w.roll3_out * c.roll3_out -
+			alternation * c.alternation;
+		const chars =
+			w.pinky_load * presses.pinky +
+			w.outer_column * presses.outer -
+			w.home_row * presses.home +
+			access.modifier_usage * c.modifiers +
+			access.altgr_usage * c.altgr +
+			access.dead_key_usage * c.dead;
+		return (
+			per(bigrams, maps.bigrams) +
+			per(trigrams, maps.trigrams) +
+			per(chars, nc) +
+			(nc > 0 ? (w.distance * presses.travel) / nc : 0)
+		);
 	}
 
 	/** Share of the ten digits typed on the base layer. */
 	function directDigits(layout, board) {
 		const digits = new Set();
-		for (const [code, row] of Object.entries(layout.rows)) {
+		for (const code in layout.rows) {
 			if (!board.index.has(code)) continue;
-			if (typeof row[0] === 'string' && /^[0-9]$/.test(row[0])) digits.add(row[0]);
+			const cell = layout.rows[code][0];
+			if (typeof cell === 'string' && cell.length === 1 && cell >= '0' && cell <= '9')
+				digits.add(cell);
 		}
 		return digits.size * 10;
+	}
+
+	/** A copy of the model's shortcut table: each letter's usefulness, each key's ease. */
+	function defaultShortcuts() {
+		const { model } = data();
+		return {
+			letters: Object.assign({}, model.shortcut_letters),
+			ease: Object.assign({}, model.shortcut_key_ease)
+		};
+	}
+
+	/**
+	 * The shortcut table shortcut_left measures with (maintainer, 2026-11-14:
+	 * editable in the Studio like the weights).
+	 * @param {object} [table] - {letters: letter → usefulness 0–10, ease: key →
+	 *   ease 0–1}, the same letters and keys as the model's; the model's when absent.
+	 * @returns {object} The table, checked.
+	 * @throws {AnalysisError} On another shape, a letter or key the model lacks
+	 *   or misses, or a value out of its range.
+	 */
+	function shortcuts(table) {
+		const defaults = defaultShortcuts();
+		if (table === undefined) return defaults;
+		if (!table || typeof table !== 'object' || !table.letters || !table.ease)
+			throw new AnalysisError('shortcuts_not_object', {}, 'a shortcut table has letters and ease');
+		const checkPart = (part, max, unknownCode, valueCode, field) => {
+			for (const id of Object.keys(table[part]))
+				if (!(id in defaults[part]))
+					throw new AnalysisError(unknownCode, { [field]: id }, `unknown shortcut ${field} ${id}`);
+			for (const id of Object.keys(defaults[part])) {
+				const value = table[part][id];
+				if (!Number.isFinite(value) || value < 0 || value > max)
+					throw new AnalysisError(
+						valueCode,
+						{ [field]: id, max },
+						`shortcut ${field} ${id} must be a number from 0 to ${max}`
+					);
+			}
+		};
+		checkPart('letters', 10, 'shortcut_letter_unknown', 'shortcut_letter_value', 'letter');
+		checkPart('ease', 1, 'shortcut_key_unknown', 'shortcut_key_value', 'key');
+		return { letters: Object.assign({}, table.letters), ease: Object.assign({}, table.ease) };
+	}
+
+	/** A copy of the compact form factors' weights (analysis_model.json form_factors). */
+	function defaultFormFactorWeights() {
+		return Object.fromEntries(
+			Object.entries(data().model.form_factors).map(([id, form]) => [id, form.weight])
+		);
+	}
+
+	/**
+	 * The weights compact_fit gives each compact form factor (maintainer,
+	 * 2026-11-14: editable).
+	 * @param {object} [weights] - form factor id → weight ≥ 0, every model form
+	 *   factor and no other, not all zero; the model's when absent.
+	 * @returns {object} The weights, checked.
+	 * @throws {AnalysisError} On an unknown or missing form factor, a negative or
+	 *   non-finite weight, or weights that are all zero.
+	 */
+	function formFactorWeights(weights) {
+		const defaults = defaultFormFactorWeights();
+		if (weights === undefined) return defaults;
+		if (!weights || typeof weights !== 'object')
+			throw new AnalysisError('form_weights_not_object', {}, 'form factor weights are an object');
+		for (const id of Object.keys(weights))
+			if (!(id in defaults))
+				throw new AnalysisError('form_factor_unknown', { form: id }, `unknown form factor ${id}`);
+		let sum = 0;
+		for (const id of Object.keys(defaults)) {
+			const value = weights[id];
+			if (!Number.isFinite(value) || value < 0)
+				throw new AnalysisError(
+					'form_factor_weight',
+					{ form: id },
+					`form factor ${id} needs a weight >= 0`
+				);
+			sum += value;
+		}
+		if (sum <= 0)
+			throw new AnalysisError('form_weights_zero', {}, 'at least one form factor needs a weight');
+		return Object.assign({}, weights);
 	}
 
 	/** A copy of the default ideal finger load (analysis_model.json). */
@@ -1079,56 +6692,1772 @@ var LAYOUT_ANALYSIS = (function () {
 	 * The ideal finger load an analysis measures finger_imbalance against.
 	 * @param {object} [load] - finger → %; the default when absent.
 	 * @returns {object} The load, checked.
-	 * @throws {Error} On a finger the default lacks or misses, a negative or
-	 *   non-finite share, or shares that do not sum to 100.
+	 * @throws {AnalysisError} On a finger the default lacks or misses, a negative
+	 *   or non-finite share, shares that do not sum to 100, or a hand whose
+	 *   shares break index ≥ middle ≥ ring ≥ pinky (the maintainer's order, which
+	 *   the default keeps: model.ideal_finger_load_hands).
 	 */
 	function idealLoad(load) {
-		if (load === undefined) return data().model.ideal_finger_load;
-		const fingers = Object.keys(data().model.ideal_finger_load);
+		const { model } = data();
+		if (load === undefined) return model.ideal_finger_load;
+		const fingers = Object.keys(model.ideal_finger_load);
 		const given = Object.keys(load);
 		if (given.length !== fingers.length || !fingers.every((f) => given.includes(f)))
-			throw new Error(`layout_analysis: idealLoad needs exactly ${fingers.join(', ')}`);
+			throw new AnalysisError(
+				'ideal_load_fingers',
+				{},
+				`idealLoad needs exactly ${fingers.join(', ')}`
+			);
 		let sum = 0;
 		for (const f of fingers) {
 			if (!Number.isFinite(load[f]) || load[f] < 0)
-				throw new Error(`layout_analysis: idealLoad.${f} must be a finite number >= 0`);
+				throw new AnalysisError(
+					'ideal_load_share',
+					{ finger: f },
+					`idealLoad.${f} must be a finite number >= 0`
+				);
 			sum += load[f];
 		}
 		if (Math.abs(sum - 100) > LOAD_SUM_TOLERANCE)
-			throw new Error(`layout_analysis: idealLoad sums to ${sum}, not 100`);
+			throw new AnalysisError('ideal_load_sum', { sum }, `idealLoad sums to ${sum}, not 100`);
+		// Each hand from the pinky to the index: a finger never carries less than
+		// the one before it.
+		for (const hand of model.ideal_finger_load_hands)
+			for (let i = 1; i < hand.length; i++)
+				if (load[hand[i]] < load[hand[i - 1]])
+					throw new AnalysisError(
+						'ideal_load_order',
+						{ finger: hand[i], below: hand[i - 1] },
+						`idealLoad.${hand[i]} is below idealLoad.${hand[i - 1]}`
+					);
 		return load;
+	}
+
+	const lowerCache = new Map();
+
+	/** A cell's lower case, kept once worked out (shortcutLeft reads every cell of every layout). */
+	function lowerCase(text) {
+		let lower = lowerCache.get(text);
+		if (lower === undefined) lowerCache.set(text, (lower = text.toLowerCase()));
+		return lower;
 	}
 
 	/**
 	 * Usefulness-weighted share of the shortcut letters on easy left-hand keys:
 	 * a letter counts its weight times the ease of its key (0 on the right hand).
 	 */
-	function shortcutLeft(layout, board) {
-		const { shortcut_letters: letters, shortcut_key_ease: ease } = data().model;
-		const where = {};
-		for (const [code, row] of Object.entries(layout.rows)) {
-			const letter = layout.command[code] !== undefined ? layout.command[code] : row[0];
+	function shortcutLeft(layout, board, table) {
+		const { letters, ease } = table;
+		const entries = shortcutEntries(letters);
+		// Letter → its key: a Map, as each layout names other letters.
+		const where = new Map();
+		for (const code in layout.rows) {
+			const letter =
+				layout.command[code] !== undefined ? layout.command[code] : layout.rows[code][0];
 			if (typeof letter !== 'string') continue;
-			const lower = letter.toLowerCase();
-			if (letters[lower] !== undefined && where[lower] === undefined) where[lower] = code;
+			const lower = lowerCase(letter);
+			if (entries.weights.has(lower) && !where.has(lower)) where.set(lower, code);
 		}
-		for (const [code, letter] of Object.entries(layout.command)) {
-			const lower = letter.toLowerCase();
-			if (letters[lower] !== undefined) where[lower] = code;
+		for (const code in layout.command) {
+			const lower = lowerCase(layout.command[code]);
+			if (entries.weights.has(lower)) where.set(lower, code);
 		}
 		let got = 0;
 		let all = 0;
-		for (const [letter, weight] of Object.entries(letters)) {
+		for (const [letter, weight] of entries.list) {
 			all += weight;
-			const code = where[letter];
+			const code = where.get(letter);
 			if (code === undefined || !board.index.has(code)) continue;
 			got += weight * (ease[code] || 0);
 		}
 		return all > 0 ? (100 * got) / all : 0;
 	}
 
+	// The model's shortcut letters as shortcutEntries gives them, built once.
+	let modelShortcutEntries = null;
+
+	/**
+	 * A shortcut table's letters as a Map and as entries in their order. The
+	 * model's own, which every analysis without custom shortcuts reads, are
+	 * built once; a custom table is a fresh copy (shortcuts()), built each time.
+	 */
+	function shortcutEntries(letters) {
+		const own = letters === data().model.shortcut_letters;
+		if (own && modelShortcutEntries !== null) return modelShortcutEntries;
+		const list = Object.entries(letters);
+		const out = { list, weights: new Map(list) };
+		if (own) modelShortcutEntries = out;
+		return out;
+	}
+
+	// ==================================
+	// ======= 7/ Ways of typing ========
+	// ==================================
+
+	const ngramMapCache = new WeakMap();
+
+	/**
+	 * Look-up maps of a prepared table: each bigram and trigram count by its
+	 * tokens (joined by TOKEN_SEP), and each table's total.
+	 * @param {object} table - From prepareNgrams() or tokenTable().
+	 * @returns {{bi: Map, tri: Map, bigrams: number, trigrams: number}} Maps.
+	 */
+	function ngramMaps(table) {
+		if (ngramMapCache.has(table)) return ngramMapCache.get(table);
+		const bi = new Map();
+		const tri = new Map();
+		let bigrams = 0;
+		let trigrams = 0;
+		for (const [a, b, n] of table.bi) {
+			bi.set(a + TOKEN_SEP + b, n);
+			bigrams += n;
+		}
+		for (const [a, b, c, n] of table.tri) {
+			tri.set(a + TOKEN_SEP + b + TOKEN_SEP + c, n);
+			trigrams += n;
+		}
+		const maps = { bi, tri, bigrams, trigrams };
+		ngramMapCache.set(table, maps);
+		return maps;
+	}
+
+	/**
+	 * The points one key pair takes from the score by the given weights, per
+	 * percentage point of the bigrams: the events of analyse()'s bigram rule
+	 * (SFB and its travel, pinky–ring pair, scissors, lateral stretch, rolls),
+	 * the same classification.
+	 */
+	function bigramPoints(board, w, k1, k2) {
+		const f1 = board.finger[k1];
+		const f2 = board.finger[k2];
+		const out = board.outOfPairs;
+		const grades = data().grades;
+		const sfb = () =>
+			w.sfb * grades.sfb[GRADES.sfb[sfbRowGrade(board, k1, k2)]] +
+			w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k2];
+		if (out[k1] || out[k2] || k1 === k2) return thumbSfb(board, k1, k2) ? sfb() : 0;
+		if (f1 === f2) return sfb();
+		if (board.hand[k1] !== board.hand[k2]) return 0;
+		const o1 = board.order[k1];
+		const o2 = board.order[k2];
+		let points = 0;
+		if (Math.min(o1, o2) === PINKY_ORDER && Math.max(o1, o2) === RING_ORDER) points += w.pinky_ring;
+		if (fingerRows(board, k1, k2) && Math.abs(board.row[k1] - board.row[k2]) >= ROW_JUMP_ROWS)
+			points += w.row_jump * cellFactor('row_jump', rowJumpCell(board, k1, k2), grades.row_jump);
+		if (fingerRows(board, k1, k2) && Math.abs(o1 - o2) === 1) {
+			const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
+			const shorter = longer === k1 ? k2 : k1;
+			const down = board.row[longer] - board.row[shorter];
+			if (down >= 2) points += w.scissors;
+			else if (down === 1) points += w.half_scissors;
+			if (board.lateral[k1] || board.lateral[k2]) points += w.lsb;
+		}
+		return points - (o2 > o1 ? w.roll_in : w.roll_out);
+	}
+
+	/**
+	 * The points one key triple takes from the score, per percentage point of
+	 * the trigrams: analyse()'s trigram rule (skipgram, redirects, rolls,
+	 * alternation).
+	 */
+	function trigramPoints(board, w, k1, k2, k3) {
+		const f1 = board.finger[k1];
+		const f2 = board.finger[k2];
+		const f3 = board.finger[k3];
+		const out = board.outOfPairs;
+		if (out[k1] || out[k2] || out[k3]) return 0;
+		let points =
+			f1 === f3 && k1 !== k3
+				? w.sfs +
+					SFS_DISTANCE_SHARE * w.sfb_distance * sameFingerCosts(board)[k1 * board.codes.length + k3]
+				: 0;
+		if (f1 === f2 || f2 === f3) return points;
+		const h1 = board.hand[k1];
+		const h2 = board.hand[k2];
+		const h3 = board.hand[k3];
+		if (h1 === h2 && h2 === h3) {
+			const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
+			if (d > 0) return points - (board.order[k2] > board.order[k1] ? w.roll3_in : w.roll3_out);
+			points += w.redirect;
+			const index =
+				board.order[k1] === INDEX_ORDER ||
+				board.order[k2] === INDEX_ORDER ||
+				board.order[k3] === INDEX_ORDER;
+			if (!index) points += w.redirect_bad;
+			return points;
+		}
+		if (h1 !== h2 && h2 !== h3 && data().grades.alternation.rewarded) points -= w.alternation;
+		return points;
+	}
+
+	const typingCostCache = new WeakMap();
+
+	/**
+	 * What each press and each key pair of a board costs, by the default
+	 * weights and graded costs of the metrics that add up over keystrokes
+	 * (score_weights.json):
+	 * in score points times the number of characters (bigrams for a pair),
+	 * so a sum divided by that number is the points it takes. The default
+	 * weights, not the user's: the way a typist types does not follow the
+	 * ranking weights, and rescore() stays exact without a new analysis. The
+	 * access weights (ACCESS_WEIGHTS) are the exception: unitCost reads the
+	 * user's from the plan (planCosts).
+	 * finger_imbalance and hand_imbalance are not sums over keystrokes and
+	 * do not take part.
+	 * @param {object} board - From keyboard().
+	 * @returns {{w: object, n: number, press: Float64Array, pair: Float64Array,
+	 *   triple: Float64Array}}
+	 */
+	function typingCosts(board) {
+		if (typingCostCache.has(board)) return typingCostCache.get(board);
+		const w = data().weights;
+		const n = board.codes.length;
+		const modifierKeys = new Set(Object.values(board.modifiers));
+		const press = new Float64Array(n);
+		for (let k = 0; k < n; k++) {
+			const f = board.finger[k];
+			press[k] = w.distance * data().grades.distance[fingerType(f)] * board.reach[k];
+			if (f === LEFT_THUMB || f === RIGHT_THUMB) continue;
+			if (f === 0 || f === 9) press[k] += 100 * w.pinky_load;
+			if (board.outer[k]) press[k] += 100 * w.outer_column;
+			if (!modifierKeys.has(k) && board.relRow[k] === 0) press[k] -= 100 * w.home_row;
+		}
+		const pair = new Float64Array(n * n);
+		for (let k1 = 0; k1 < n; k1++)
+			for (let k2 = 0; k2 < n; k2++) pair[k1 * n + k2] = 100 * bigramPoints(board, w, k1, k2);
+		// trigramPoints by the same weights, k1 k2 k3 at (k1 * n + k2) * n + k3,
+		// each worked out the first time it is read (NaN until then).
+		const triple = new Float64Array(n * n * n).fill(Number.NaN);
+		const costs = { w, n, press, pair, triple };
+		typingCostCache.set(board, costs);
+		return costs;
+	}
+
+	/**
+	 * Rewrites character tables into token tables where each chosen
+	 * two-character output (a chord) is one token: its occurrences leave the
+	 * counts of its two characters and become its own. A statistic that needs
+	 * a fourth character (a chord beside another split token) completes the
+	 * trigram table as a second-order Markov chain:
+	 * P(w | a, b) = tri(w, a, b) / bi(a, b).
+	 * @param {object} table - From prepareNgrams().
+	 * @param {string[]} chords - Two-character outputs; no character ends one
+	 *   and starts another, and none repeats its character.
+	 * @returns {object} A prepared table whose tokens are characters or chords.
+	 */
+	function tokenTable(table, chords) {
+		const key = chords.join(TOKEN_SEP);
+		const cached = tokenTableCache.get(table);
+		if (cached && cached.has(key)) return cached.get(key);
+		const out = buildTokenTable(table, chords);
+		(cached || tokenTableCache.set(table, new Map()).get(table)).set(key, out);
+		return out;
+	}
+
+	const tokenTableCache = new WeakMap();
+
+	/** tokenTable's work, uncached. */
+	function buildTokenTable(table, chords) {
+		const maps = ngramMaps(table);
+		const bi = (a, b) => maps.bi.get(a + TOKEN_SEP + b) || 0;
+		const tri = (a, b, c) => maps.tri.get(a + TOKEN_SEP + b + TOKEN_SEP + c) || 0;
+		const chordSet = new Set();
+		const startOf = new Map();
+		const endOf = new Map();
+		for (const chord of chords) {
+			const [x, y] = textPoints(chord);
+			chordSet.add(x + TOKEN_SEP + y);
+			(startOf.get(x) || startOf.set(x, []).get(x)).push(y);
+			(endOf.get(y) || endOf.set(y, []).get(y)).push(x);
+		}
+		// The token a ends when b follows: a chord w+a for the share of the
+		// pairs preceded by w, a itself for the rest.
+		const leftSplit = (a, b) => {
+			const ws = endOf.get(a);
+			const total = bi(a, b);
+			if (!ws || !(total > 0)) return [[a, 1]];
+			const out = [];
+			let rest = total;
+			for (const w of ws) {
+				const m = Math.min(rest, tri(w, a, b));
+				if (m > 0) out.push([w + a, m / total]);
+				rest -= m;
+			}
+			if (rest > 0) out.push([a, rest / total]);
+			return out;
+		};
+		// The token b starts after a: a chord b+y for the share followed by y.
+		const rightSplit = (a, b) => {
+			const ys = startOf.get(b);
+			const total = bi(a, b);
+			if (!ys || !(total > 0)) return [[b, 1]];
+			const out = [];
+			let rest = total;
+			for (const y of ys) {
+				const m = Math.min(rest, tri(a, b, y));
+				if (m > 0) out.push([b + y, m / total]);
+				rest -= m;
+			}
+			if (rest > 0) out.push([b, rest / total]);
+			return out;
+		};
+		// Each source n-gram gives distinct token n-grams (a chord token names
+		// the characters it joins), so entries are pushed, never merged; an
+		// n-gram no chord touches keeps its own entry.
+		const uni = [];
+		const biOut = [];
+		const triOut = [];
+		const push = (out, tokens, n) => {
+			if (n > 0) out.push(tokens.concat([n]));
+		};
+		for (const entry of table.uni) {
+			const [c, n] = entry;
+			if (!startOf.has(c) && !endOf.has(c)) {
+				uni.push(entry);
+				continue;
+			}
+			let rest = n;
+			for (const y of startOf.get(c) || []) rest -= bi(c, y);
+			for (const w of endOf.get(c) || []) rest -= bi(w, c);
+			push(uni, [c], Math.max(0, rest));
+		}
+		for (const chord of chords) {
+			const [x, y] = textPoints(chord);
+			push(uni, [chord], bi(x, y));
+		}
+		for (const entry of table.bi) {
+			const [a, b, n] = entry;
+			if (!endOf.has(a) && !startOf.has(b) && !startOf.has(a)) {
+				biOut.push(entry);
+				continue;
+			}
+			if (chordSet.has(a + TOKEN_SEP + b)) continue;
+			for (const [ta, pa] of leftSplit(a, b))
+				for (const [tb, pb] of rightSplit(a, b)) push(biOut, [ta, tb], n * pa * pb);
+		}
+		const before = new Map();
+		const after = new Map();
+		for (const entry of table.tri) {
+			const [a, b, c, n] = entry;
+			if (!startOf.has(a) && !startOf.has(b) && !endOf.has(a) && !startOf.has(c)) {
+				triOut.push(entry);
+				continue;
+			}
+			const ab = a + TOKEN_SEP + b;
+			const bc = b + TOKEN_SEP + c;
+			if (chordSet.has(bc)) (before.get(bc) || before.set(bc, []).get(bc)).push([a, n]);
+			if (chordSet.has(ab)) (after.get(ab) || after.set(ab, []).get(ab)).push([c, n]);
+			if (chordSet.has(ab) || chordSet.has(bc)) continue;
+			for (const [ta, pa] of leftSplit(a, b))
+				for (const [tc, pc] of rightSplit(b, c)) push(triOut, [ta, b, tc], n * pa * pc);
+		}
+		// A chord in the middle: w before it and c after it, joined through it.
+		for (const chord of chords) {
+			const [x, y] = textPoints(chord);
+			const key = x + TOKEN_SEP + y;
+			const total = bi(x, y);
+			if (!(total > 0)) continue;
+			for (const [w, nw] of before.get(key) || [])
+				for (const [c, nc] of after.get(key) || [])
+					for (const [tw, pw] of leftSplit(w, x))
+						for (const [tc, pc] of rightSplit(y, c))
+							push(triOut, [tw, chord, tc], ((nw * nc) / total) * pw * pc);
+		}
+		return { prepared: true, uni, bi: biOut, tri: triOut, totalChars: table.totalChars };
+	}
+
+	/**
+	 * How a layout types a corpus: which multi-character outputs replace
+	 * their characters' taps, and, for each character with several ways, the
+	 * way it is typed in each context.
+	 *
+	 * 1. Chords: a two-character output replaces the two taps of its bigram
+	 *    when it costs less than them (each way's own cost plus the pair
+	 *    between the taps); outputs that would overlap keep the one that saves
+	 *    the most. Longer outputs count in distinct_chars only.
+	 * 2. Repeat and magic keys (contextWays): where the text before a
+	 *    character makes such a key type it, the character is a context token
+	 *    (contextTable) whose ways add the key's, so step 3 chooses it there
+	 *    like any other way; the fixed path never takes it.
+	 * 3. Context: a character with several ways is typed, at each occurrence,
+	 *    the way that costs least with its neighbours: its own presses, the key
+	 *    pairs and triples it forms with the characters before and after it
+	 *    (typed their cheapest way), and the skipgram triples with the
+	 *    characters two places away, weighted by how often each follows in the
+	 *    corpus. A tie keeps the cheaper way out of context, so a layout with
+	 *    one way per character is typed exactly as before.
+	 * @param {object} compiled - From compileWays().
+	 * @param {object} board - From keyboard().
+	 * @param {object} charTable - From prepareNgrams().
+	 * @param {{fixed: boolean, access: object}} mode - From planMode(): fixed
+	 *   types every character its cheapest way out of context, with no chord
+	 *   (the fixed path the best one is compared with); access holds the
+	 *   access weights the choice costs a way's modifiers and dead keys by.
+	 * @param {object} [previousPlan] - The plan of a layout a few keys away on the
+	 *   same table (scoreSession; ignored for a layout with repeat or magic keys): when both have the same chords and
+	 *   multi-way tokens, only the choices whose context holds a token whose
+	 *   ways changed are made again, and the plan records what changed
+	 *   (plan.changed) for an incremental walk. The result is the plan made
+	 *   from nothing, to the last bit.
+	 * @param {{spare: object, changed: Set<string>|null}} [spares] - With
+	 *   previousPlan (scoreSession): the spareMaps() the plan's own ways are written
+	 *   into, and the characters whose lists may differ from those of the
+	 *   compile previous was planned from (null: unknown).
+	 * @returns {object} {table, ways, best, multi, chords, context?, choose, uniDist,
+	 *   leftDist, rightDist, pickAt, parts, before, after, changed?}.
+	 */
+	function planTyping(compiled, board, charTable, mode, previousPlan, spares) {
+		if (!compiled.context || mode.fixed)
+			return planWays(compiled, board, charTable, mode, previousPlan, spares);
+		// A layout with repeat or magic keys is planned from nothing: its
+		// context tokens are no characters of the incremental choice. Step 3
+		// weighs each way with its neighbours typed their cheapest way out of
+		// context, so two such ways in a row can meet on one finger unforeseen:
+		// the plan keeps them only when its whole path costs less than without.
+		const withKeys = planWays(compiled, board, charTable, mode);
+		if (!withKeys.context) return withKeys;
+		const without = planWays(
+			Object.assign({}, compiled, { context: null }),
+			board,
+			charTable,
+			mode
+		);
+		return planPoints(board, withKeys, charTable, mode.access) <
+			planPoints(board, without, charTable, mode.access)
+			? withKeys
+			: without;
+	}
+
+	/**
+	 * The points typingCost gives a plan's path: its stream walked, with the
+	 * presses measure() reads (the pinkies', the outer column's, the home
+	 * row's and the graded travel).
+	 * @param {object} board - From keyboard().
+	 * @param {object} plan - From planWays().
+	 * @param {object} charTable - From prepareNgrams().
+	 * @param {object} access - From accessWeights().
+	 * @returns {number} Points.
+	 */
+	function planPoints(board, plan, charTable, access) {
+		const c = streamCounts();
+		const keyCount = new Float64Array(board.codes.length);
+		walkTyped(board, plan, streamVisitor(board, c, keyCount, {}, null));
+		const modifierKeys = new Set(Object.values(board.modifiers));
+		let pinky = 0;
+		let outer = 0;
+		let home = 0;
+		for (let k = 0; k < keyCount.length; k++) {
+			const f = board.finger[k];
+			if (f === 0 || f === data().model.fingers.length - 1) pinky += keyCount[k];
+			if (f === LEFT_THUMB || f === RIGHT_THUMB) continue;
+			if (board.outer[k]) outer += keyCount[k];
+			if (!modifierKeys.has(k) && board.relRow[k] === 0) home += keyCount[k];
+		}
+		const parts = gradeParts(board, c, keyCount);
+		const distance = c.chars > 0 ? c.distance / c.chars : 0;
+		const travel =
+			gradedValue('distance', distance, parts.distance, data().grades.distance) * c.chars;
+		return typingCost(charTable, c, { pinky, outer, home, travel }, access);
+	}
+
+	/** planTyping's plan of one compile (its steps), never compared with another. */
+	function planWays(compiled, board, charTable, mode, previousPlan, spares) {
+		const previous = compiled.context ? undefined : previousPlan;
+		const from = compiled.context ? undefined : spares;
+		const plan = {
+			table: charTable,
+			ways: compiled.ways,
+			best: compiled.best,
+			multi: new Set(),
+			chords: [],
+			access: mode.access
+		};
+		if (mode.fixed) return plan;
+		const pc = planCosts(board, charTable, mode.access);
+		const unitMemo = new Map();
+		const unit = (way) => {
+			let cost = unitMemo.get(way);
+			if (cost === undefined) unitMemo.set(way, (cost = unitCost(pc, way)));
+			return cost;
+		};
+
+		// 1. Chords.
+		const candidates = [];
+		for (const [text, list] of compiled.texts) {
+			const parts = textPoints(text);
+			if (parts.length !== 2 || parts[0] === parts[1]) continue;
+			const n = pc.maps.bi.get(parts[0] + TOKEN_SEP + parts[1]);
+			if (!n) continue;
+			const a = compiled.ways.get(parts[0]);
+			const b = compiled.ways.get(parts[1]);
+			const taps = a && b ? unit(a[0]) + unit(b[0]) + crossCost(pc, a[0], b[0]) : INFINITY;
+			const chord = unit(list[0]);
+			if (chord < taps)
+				candidates.push({
+					text,
+					x: parts[0],
+					y: parts[1],
+					gain: taps === INFINITY ? INFINITY : (taps - chord) * n
+				});
+		}
+		candidates.sort((p, q) =>
+			p.gain !== q.gain
+				? q.gain > p.gain
+					? 1
+					: -1
+				: p.text < q.text
+					? -1
+					: p.text > q.text
+						? 1
+						: 0
+		);
+		const starts = new Set();
+		const ends = new Set();
+		for (const candidate of candidates) {
+			if (ends.has(candidate.x) || starts.has(candidate.y)) continue;
+			plan.chords.push(candidate.text);
+			starts.add(candidate.x);
+			ends.add(candidate.y);
+		}
+		if (plan.chords.length) {
+			plan.table = tokenTable(charTable, plan.chords);
+			plan.ways = new Map(compiled.ways);
+			plan.best = new Map(compiled.best);
+			for (const chord of plan.chords) {
+				plan.ways.set(chord, compiled.texts.get(chord));
+				plan.best.set(chord, compiled.texts.get(chord)[0]);
+			}
+		}
+		// 2. Repeat and magic keys: a character they type after its context is a
+		// token of its own there, with their ways beside the character's.
+		if (compiled.context) {
+			const ctx = contextTable(plan.table, compiled.context);
+			if (ctx.tokens.size > 0) {
+				plan.table = ctx.table;
+				if (plan.ways === compiled.ways) {
+					plan.ways = new Map(compiled.ways);
+					plan.best = new Map(compiled.best);
+				}
+				for (const [token, { char, keys }] of ctx.tokens) {
+					// The character's own ways first, its cheapest out of context at
+					// their head as for any token (the neighbours' choice reads it), then
+					// the keys' best first, in the room MAX_WAYS leaves (at least one).
+					const own = plan.ways.get(char) || [];
+					const lists = new Map();
+					for (const i of keys) offerWay(lists, token, compiled.context.keys[i].way);
+					const extra = lists
+						.get(token)
+						.filter((way) => !own.some((mine) => sameWayKeys(mine, way)));
+					const room = Math.max(1, MAX_WAYS - own.length);
+					const list = own
+						.slice(0, MAX_WAYS - Math.min(room, extra.length))
+						.concat(extra.slice(0, room));
+					plan.ways.set(token, list);
+					plan.best.set(token, list[0]);
+				}
+				plan.context = ctx;
+			}
+		}
+		// The alternatives: a dead key closed by a thumb key is not one. The
+		// pair metrics leave the space out, so such a way would hide an SFB
+		// behind an extra press no typist makes; it stays the way of a
+		// character that has no other, and the fixed path keeps its choice.
+		const { table } = plan;
+		const filtered = [];
+		const keptLists = [];
+		for (const [token] of table.uni) {
+			const list = plan.ways.get(token);
+			if (!list || list.length < 2) continue;
+			const kept = list.filter((way, i) => i === 0 || !way.terminated);
+			if (kept.length === list.length) continue;
+			filtered.push(token);
+			keptLists.push(kept);
+		}
+		if (filtered.length && plan.ways === compiled.ways) {
+			plan.ways = waysToFilter(compiled, previous, from, table);
+			if (from) plan.filtered = filtered;
+		}
+		for (let i = 0; i < filtered.length; i++) plan.ways.set(filtered[i], keptLists[i]);
+		if (plan.filtered) from.spare.mark(filtered);
+		const { ways, multi } = plan;
+
+		// 3. Context (planContext, on token ids).
+		for (const [token] of table.uni) {
+			const list = ways.get(token);
+			if (list && list.length > 1) multi.add(token);
+		}
+		if (multi.size === 0) return plan;
+		// Multi-way tokens are rare: the passes read only the n-grams that hold
+		// one, and the walk takes the others the fast way.
+		const parts = partition(table, multi);
+		plan.parts = parts;
+		const model = contextModel(table, parts, multi);
+		// From a previous plan on the same tokens and multi-way set (a search's
+		// last layout), only what a token whose ways changed can reach is
+		// decided again, by the same code as from nothing: the plan is the
+		// same to the last bit.
+		const prev =
+			previous &&
+			previous.parts === parts &&
+			previous.table === table &&
+			previous.ctx &&
+			previous.ctx.pc.board === board
+				? previous.ctx
+				: null;
+		const st = planContext(model, pc, ways, prev);
+		plan.ctx = st;
+		if (prev) plan.changed = model.changed;
+		plan.choose = (a, b, c) => {
+			const id = (token) => {
+				if (token === null) return -1;
+				const u = model.idOf.get(token);
+				if (u === undefined)
+					throw new Error(`layout_analysis: ${JSON.stringify(token)} is not a token of the plan`);
+				return st.wl[u] ? u : -1;
+			};
+			const ai = id(a);
+			const bi = id(b);
+			const ci = id(c);
+			const pair = (x, y) => {
+				const p = x < 0 ? undefined : model.pairOf.get(x * model.T + y);
+				return p === undefined ? -1 : p;
+			};
+			return chooseWay(st, ai, bi, ci, pair(ai, bi), ci < 0 ? -1 : pair(bi, ci));
+		};
+		return plan;
+	}
+
+	/**
+	 * A copy of a compile's ways for planTyping to filter: with a score
+	 * session's spare maps, the previous plan's own ways with only the
+	 * table's tokens that may differ written again (those the compile changed
+	 * and those the previous plan filtered), else a whole copy. A plan reads
+	 * its ways for the table's tokens alone, so the characters no n-gram holds
+	 * (most of the accented letters a letter swap compiles again) keep the
+	 * lists of an earlier compile there.
+	 * @param {object} compiled - From compileWays() or finishWaysFrom().
+	 * @param {object} [previous] - The previous plan.
+	 * @param {{spare: object, changed: Set<string>|null}} [from] - As planTyping.
+	 * @param {object} table - The plan's token table.
+	 * @returns {Map} Token → ways, filtered in place by planTyping.
+	 */
+	function waysToFilter(compiled, previous, from, table) {
+		if (!from) return new Map(compiled.ways);
+		const { spare, changed } = from;
+		if (changed === null || !previous || !previous.filtered || !spare.owns(previous.ways))
+			return spare.copyWhole(compiled.ways);
+		const ways = spare.copyOf(previous.ways);
+		const { idOf } = tableIds(table);
+		const read = [];
+		for (const key of changed) if (idOf.has(key)) read.push(key);
+		for (const keys of [read, previous.filtered]) {
+			for (const key of keys) {
+				const list = compiled.ways.get(key);
+				if (list === undefined) ways.delete(key);
+				else ways.set(key, list);
+			}
+			spare.mark(keys);
+		}
+		return ways;
+	}
+
+	/**
+	 * What the context choice reads of a board and a character table: the
+	 * typingCosts of the board, the access weights of the choice, the pair
+	 * and triple factors (N / B, N / T) of the table, and its n-gram maps.
+	 */
+	function planCosts(board, charTable, access) {
+		const base = typingCosts(board);
+		const maps = ngramMaps(charTable);
+		const nc = charTable.totalChars;
+		const rb = maps.bigrams > 0 ? nc / maps.bigrams : 0;
+		const rt = maps.trigrams > 0 ? nc / maps.trigrams : 0;
+		return {
+			board,
+			w: base.w,
+			access,
+			n: base.n,
+			press: base.press,
+			pair: base.pair,
+			triple: base.triple,
+			rb,
+			// 100 × N / T, the factor of a key triple's points.
+			rt100: 100 * rt,
+			maps
+		};
+	}
+
+	/** One key pair's cost in a plan (planCosts). */
+	function wayPair(pc, k1, k2) {
+		return pc.pair[k1 * pc.n + k2] * pc.rb;
+	}
+
+	/** One key triple's cost in a plan, its points worked out the first time. */
+	function wayTriple(pc, k1, k2, k3) {
+		const at = (k1 * pc.n + k2) * pc.n + k3;
+		let points = pc.triple[at];
+		if (points !== points) points = pc.triple[at] = trigramPoints(pc.board, pc.w, k1, k2, k3);
+		return pc.rt100 * points;
+	}
+
+	/**
+	 * A way's own cost: its presses (held modifiers included), the pairs and
+	 * triples inside it, and the per-character access metrics it adds to, by
+	 * the plan's access weights.
+	 */
+	function unitCost(pc, way) {
+		const keys = way.keys;
+		const width = way.width || 1;
+		let cost = 0;
+		for (const k of keys) cost += pc.press[k];
+		if (way.shift > 0) cost += way.shift * pc.press[shiftKeyFor(pc.board, keys[keys.length - 1])];
+		const held = way.held;
+		for (let i = 0; i < held.length; ) {
+			let j = i + 1;
+			while (j < held.length && held[j] === held[i]) j++;
+			cost += (j - i) * pc.press[held[i]];
+			i = j;
+		}
+		for (let i = 0; i + 1 < keys.length; i++) cost += wayPair(pc, keys[i], keys[i + 1]);
+		for (let i = 0; i + 2 < keys.length; i++)
+			cost += wayTriple(pc, keys[i], keys[i + 1], keys[i + 2]);
+		if (way.shift + way.altgr > 0) cost += 100 * pc.access.modifier_usage * width;
+		if (way.altgr > 0) cost += 100 * pc.access.altgr_usage * width;
+		if (way.dead) cost += 100 * pc.access.dead_key_usage * width;
+		return cost;
+	}
+
+	/**
+	 * The key pair and triples that start in way a and end in way b
+	 * (walkKeyStream's bigram step).
+	 */
+	function crossCost(pc, a, b) {
+		const ka = a.keys;
+		const kb = b.keys;
+		const la = ka.length;
+		const length = la + kb.length;
+		let cost = wayPair(pc, ka[la - 1], kb[0]);
+		for (let i = la < 2 ? 0 : la - 2; i < la; i++)
+			if (i + 2 < length)
+				cost += wayTriple(
+					pc,
+					ka[i],
+					i + 1 < la ? ka[i + 1] : kb[i + 1 - la],
+					i + 2 < la ? ka[i + 2] : kb[i + 2 - la]
+				);
+		return cost;
+	}
+
+	/** An insertion-ordered set of small integer ids, emptied at no cost. */
+	class IdSet {
+		/** @param {number} size - Ids are 0 … size - 1. */
+		constructor(size) {
+			this.mark = new Uint32Array(size);
+			this.list = new Int32Array(size);
+			this.size = 0;
+			this.tag = 1;
+		}
+
+		/** Empties the set. */
+		clear() {
+			this.size = 0;
+			this.tag += 1;
+			if (this.tag === UINT32_LAST) {
+				this.mark.fill(0);
+				this.tag = 1;
+			}
+		}
+
+		/** Adds an id, unless it is in already. */
+		add(id) {
+			if (this.mark[id] === this.tag) return;
+			this.mark[id] = this.tag;
+			this.list[this.size++] = id;
+		}
+
+		/** Whether an id is in. */
+		has(id) {
+			return this.mark[id] === this.tag;
+		}
+	}
+
+	const contextModelCache = new WeakMap();
+
+	/**
+	 * A partition's context n-grams on ids, for planContext and the score
+	 * session: the tokens of the table (tableIds), the touchTri and touchBi
+	 * entries as id columns, every pair they hold (as a first pair, a last
+	 * pair or a touchBi pair) as a pair id, and compressed lists (start,
+	 * items: the items of id x are items[start[x]] … items[start[x + 1] - 1],
+	 * in table order): the touchTri entries by first pair, by last pair, by
+	 * token (each entry once), by multi-way middle; the touchBi entries by
+	 * token; the uni entries by token; the rest's entries by token. Holds the
+	 * scratch buffers of the passes (a pass runs to its end before another
+	 * starts). Cached per partition.
+	 * @param {object} table - The token table.
+	 * @param {object} parts - From partition().
+	 * @param {Set<string>} multi - The multi-way tokens.
+	 * @returns {object} The model.
+	 */
+	function contextModel(table, parts, multi) {
+		let model = contextModelCache.get(parts);
+		if (model) return model;
+		const t = tableIds(table);
+		const tokens = t.tokens;
+		const T = tokens.length;
+		const idOf = new Map();
+		tokens.forEach((token, u) => idOf.set(token, u));
+		const many = new Uint8Array(T);
+		for (const token of multi) many[idOf.get(token)] = 1;
+		const pairOf = new Map();
+		const pairA = [];
+		const pairB = [];
+		const pairId = (a, b) => {
+			const key = a * T + b;
+			let p = pairOf.get(key);
+			if (p === undefined) {
+				p = pairA.length;
+				pairOf.set(key, p);
+				pairA.push(a);
+				pairB.push(b);
+			}
+			return p;
+		};
+		const M3 = parts.touchTri.length;
+		const tA = new Int32Array(M3);
+		const tB = new Int32Array(M3);
+		const tC = new Int32Array(M3);
+		const tN = new Float64Array(M3);
+		const tFirst = new Int32Array(M3);
+		const tLast = new Int32Array(M3);
+		parts.touchTri.forEach(([a, b, c, n], i) => {
+			tA[i] = idOf.get(a);
+			tB[i] = idOf.get(b);
+			tC[i] = idOf.get(c);
+			tN[i] = n;
+			tFirst[i] = pairId(tA[i], tB[i]);
+			tLast[i] = pairId(tB[i], tC[i]);
+		});
+		const M2 = parts.touchBi.length;
+		const bA = new Int32Array(M2);
+		const bB = new Int32Array(M2);
+		const bN = new Float64Array(M2);
+		const bPair = new Int32Array(M2);
+		parts.touchBi.forEach(([a, b, n], i) => {
+			bA[i] = idOf.get(a);
+			bB[i] = idOf.get(b);
+			bN[i] = n;
+			bPair[i] = pairId(bA[i], bB[i]);
+		});
+		const P = pairA.length;
+		// The touchBi entry of each pair (the last one, as a Map would keep), or -1.
+		const pairBi = new Int32Array(P).fill(-1);
+		for (let i = 0; i < M2; i++) pairBi[bPair[i]] = i;
+		const maps = ngramMaps(table);
+		const pairTotal = new Float64Array(P);
+		for (let p = 0; p < P; p++)
+			pairTotal[p] = maps.bi.get(tokens[pairA[p]] + TOKEN_SEP + tokens[pairB[p]]) || 0;
+		const lists = (size) => Array.from({ length: size }, () => []);
+		const byFirst = lists(P);
+		const byLast = lists(P);
+		const triOf = lists(T);
+		const middleOf = lists(T);
+		for (let i = 0; i < M3; i++) {
+			byFirst[tFirst[i]].push(i);
+			byLast[tLast[i]].push(i);
+			triOf[tA[i]].push(i);
+			if (tB[i] !== tA[i]) triOf[tB[i]].push(i);
+			if (tC[i] !== tA[i] && tC[i] !== tB[i]) triOf[tC[i]].push(i);
+			if (many[tB[i]]) middleOf[tB[i]].push(i);
+		}
+		const biOf = lists(T);
+		for (let i = 0; i < M2; i++) {
+			biOf[bA[i]].push(i);
+			if (bB[i] !== bA[i]) biOf[bB[i]].push(i);
+		}
+		const uniAt = lists(T);
+		const uniCount = new Float64Array(T);
+		for (let i = 0; i < t.uniId.length; i++) {
+			uniAt[t.uniId[i]].push(i);
+			uniCount[t.uniId[i]] += t.uniN[i];
+		}
+		const restBiOf = lists(T);
+		parts.restBiAt.forEach((at, j) => {
+			restBiOf[t.biA[at]].push(j);
+			if (t.biB[at] !== t.biA[at]) restBiOf[t.biB[at]].push(j);
+		});
+		const restTriOf = lists(T);
+		parts.restTriAt.forEach((at, j) => {
+			const [a, b, c] = [t.triA[at], t.triB[at], t.triC[at]];
+			restTriOf[a].push(j);
+			if (b !== a) restTriOf[b].push(j);
+			if (c !== a && c !== b) restTriOf[c].push(j);
+		});
+		const compressed = (all) => {
+			const start = new Int32Array(all.length + 1);
+			for (let x = 0; x < all.length; x++) start[x + 1] = start[x] + all[x].length;
+			const items = new Int32Array(start[all.length]);
+			all.forEach((list, x) => items.set(list, start[x]));
+			return { start, items };
+		};
+		model = {
+			table,
+			t,
+			tokens,
+			T,
+			P,
+			M2,
+			M3,
+			idOf,
+			pairOf,
+			many,
+			tA,
+			tB,
+			tC,
+			tN,
+			tFirst,
+			tLast,
+			bA,
+			bB,
+			bN,
+			bPair,
+			pairBi,
+			pairTotal,
+			byFirst: compressed(byFirst),
+			byLast: compressed(byLast),
+			triOf: compressed(triOf),
+			middleOf: compressed(middleOf),
+			biOf: compressed(biOf),
+			uniAt: compressed(uniAt),
+			uniCount,
+			restBiOf: compressed(restBiOf),
+			restTriOf: compressed(restTriOf),
+			restBiAt: parts.restBiAt,
+			restTriAt: parts.restTriAt,
+			// planContext's stamp (one per plan) and memos: a pair's side costs
+			// per way, valid for the plan whose stamp they carry; slot P holds
+			// those of a pair outside the model (plan.choose).
+			stamp: 0,
+			leftCost: new Float64Array((P + 1) * MAX_WAYS),
+			leftStamp: new Uint32Array(P),
+			rightCost: new Float64Array((P + 1) * MAX_WAYS),
+			rightStamp: new Uint32Array(P),
+			vector: new Float64Array(MAX_WAYS),
+			// The sets of an incremental pass (plan.changed reads the last five
+			// until the next pass).
+			dirty: new IdSet(T),
+			touched: new IdSet(M3),
+			dirtyBefore: new IdSet(P),
+			dirtyAfter: new IdSet(P),
+			repick: new IdSet(M3),
+			moved: new IdSet(M3),
+			rightKeys: new IdSet(P),
+			leftKeys: new IdSet(P),
+			redoTokens: new IdSet(T),
+			changedRight: new IdSet(P),
+			changedLeft: new IdSet(P),
+			changedTokens: new IdSet(T),
+			changed: null,
+			// The score session's walk: one stamp per entry, so each is walked once.
+			walkStamp: 0,
+			walkUni: new Uint32Array(t.uniId.length),
+			walkRestBi: new Uint32Array(parts.restBiAt.length),
+			walkRestTri: new Uint32Array(parts.restTriAt.length),
+			walkBi: new Uint32Array(M2),
+			walkTri: new Uint32Array(M3)
+		};
+		model.changed = {
+			dirty: model.dirty,
+			picks: model.moved,
+			rightKeys: model.changedRight,
+			leftKeys: model.changedLeft,
+			tokens: model.changedTokens
+		};
+		contextModelCache.set(parts, model);
+		return model;
+	}
+
+	/**
+	 * A plan's context state on a model (planContext): each token's ways and
+	 * their own costs, the skipgram tallies, the picks, the edge choices, the
+	 * distributions and shares of ways per pair and per token. Every array
+	 * is per id, a pair's or token's vector at id × MAX_WAYS.
+	 */
+	function contextState(model) {
+		const { T, P, M2, M3 } = model;
+		const W = MAX_WAYS;
+		return {
+			model,
+			pc: null,
+			stamp: 0,
+			// The state a plan made from this one is written into (planContext).
+			spare: null,
+			wl: new Array(T),
+			units: new Float64Array(T * W),
+			// The last key of the token two places before a multi-way token, and
+			// the first key of the one two places after, with their counts: per
+			// pair, a list of (key, count) in table order, at the pair's start in
+			// byLast (before) or byFirst (after).
+			beforeKey: new Int32Array(M3),
+			beforeSum: new Float64Array(M3),
+			beforeLen: new Int32Array(P),
+			afterKey: new Int32Array(M3),
+			afterSum: new Float64Array(M3),
+			afterLen: new Int32Array(P),
+			pickAt: new Int32Array(M3).fill(-1),
+			edgeR: new Int32Array(M2).fill(-1),
+			edgeRN: new Float64Array(M2),
+			edgeL: new Int32Array(M2).fill(-1),
+			edgeLN: new Float64Array(M2),
+			// A pair's distribution of ways (length 0: none): rightDist the ways
+			// of its second token, leftDist those of its first.
+			rightDist: new Float64Array(P * W),
+			rightLen: new Int32Array(P),
+			leftDist: new Float64Array(P * W),
+			leftLen: new Int32Array(P),
+			uniDist: new Float64Array(T * W),
+			uniLen: new Int32Array(T),
+			// The distributions normalised (length 1, share 1: none).
+			rightShare: new Float64Array(P * W),
+			rightShareLen: new Int32Array(P),
+			leftShare: new Float64Array(P * W),
+			leftShareLen: new Int32Array(P)
+		};
+	}
+
+	// The typed arrays of a context state, copied from a previous plan's.
+	const CONTEXT_ARRAYS = [
+		'units',
+		'beforeKey',
+		'beforeSum',
+		'beforeLen',
+		'afterKey',
+		'afterSum',
+		'afterLen',
+		'pickAt',
+		'edgeR',
+		'edgeRN',
+		'edgeL',
+		'edgeLN',
+		'rightDist',
+		'rightLen',
+		'leftDist',
+		'leftLen',
+		'uniDist',
+		'uniLen',
+		'rightShare',
+		'rightShareLen',
+		'leftShare',
+		'leftShareLen'
+	];
+	const ONE_SHARE = new Float64Array([1]);
+
+	/**
+	 * planTyping's context choice on ids. From nothing (prev null), or from
+	 * the state of a previous plan on the same model: then the new state is
+	 * written into the previous one's spare buffers (no allocation: a score
+	 * session keeps two states and alternates), only what a token whose ways
+	 * changed can reach is computed again, and model.changed lists what
+	 * changed for the walk. Every value is computed by the same code in the
+	 * same order either way, so both give the same state to the last bit.
+	 *
+	 * For each touchTri entry, its middle's way when it has several (pickAt);
+	 * for each pair, the ways of its multi-way token over the entries that
+	 * start (rightDist) or end (leftDist) with it, with the edge of its
+	 * bigram (the bigram's count less its trigram part, typed the way chosen
+	 * with no neighbour on the other side, kept in edgeR/edgeL); for each
+	 * multi-way token, its middles, its edges, then its occurrences alone
+	 * (uniDist).
+	 * @param {object} model - From contextModel().
+	 * @param {object} pc - From planCosts().
+	 * @param {Map} ways - Token → its ways (the plan's).
+	 * @param {object|null} prev - The previous plan's state, or null.
+	 * @returns {object} The plan's state (contextState()).
+	 */
+	function planContext(model, pc, ways, prev) {
+		const W = MAX_WAYS;
+		const { T, P, M3, many, tokens, tA, tB, tC, tN, tFirst, tLast } = model;
+		let st;
+		if (prev) {
+			st = prev.spare || (prev.spare = contextState(model));
+			for (const name of CONTEXT_ARRAYS) st[name].set(prev[name]);
+			st.spare = prev;
+		} else st = contextState(model);
+		model.stamp = model.stamp === UINT32_LAST ? 1 : model.stamp + 1;
+		if (model.stamp === 1) {
+			model.leftStamp.fill(0);
+			model.rightStamp.fill(0);
+		}
+		st.stamp = model.stamp;
+		st.pc = pc;
+		const wl = st.wl;
+		for (let u = 0; u < T; u++) {
+			const list = ways.get(tokens[u]);
+			if (list && list.length > W)
+				throw new Error(`layout_analysis: ${tokens[u]} has more than ${W} ways`);
+			wl[u] = list;
+		}
+		const { dirty, touched, dirtyBefore, dirtyAfter, repick, moved } = model;
+		const { rightKeys, leftKeys, redoTokens, changedRight, changedLeft, changedTokens } = model;
+		if (prev) {
+			dirty.clear();
+			touched.clear();
+			dirtyBefore.clear();
+			dirtyAfter.clear();
+			repick.clear();
+			moved.clear();
+			rightKeys.clear();
+			leftKeys.clear();
+			redoTokens.clear();
+			changedRight.clear();
+			changedLeft.clear();
+			changedTokens.clear();
+			const { uniId } = model.t;
+			for (let i = 0; i < uniId.length; i++)
+				if (!sameWays(prev.wl[uniId[i]], wl[uniId[i]])) dirty.add(uniId[i]);
+		}
+		// Each multi-way token's own cost per way.
+		for (let u = 0; u < T; u++)
+			if (many[u] && (!prev || dirty.has(u)))
+				for (let i = 0; i < wl[u].length; i++) st.units[u * W + i] = unitCost(pc, wl[u][i]);
+
+		// The skipgram tallies: from a previous plan, the entries that hold a
+		// token whose ways changed, and the pairs they feed, tallied again.
+		const { byFirst, byLast } = model;
+		if (prev) {
+			const { start, items } = model.triOf;
+			for (let d = 0; d < dirty.size; d++) {
+				const u = dirty.list[d];
+				for (let j = start[u]; j < start[u + 1]; j++) touched.add(items[j]);
+			}
+			for (let j = 0; j < touched.size; j++) {
+				const i = touched.list[j];
+				if (many[tC[i]]) dirtyBefore.add(tLast[i]);
+				if (many[tA[i]]) dirtyAfter.add(tFirst[i]);
+			}
+			for (let j = 0; j < dirtyBefore.size; j++) {
+				const p = dirtyBefore.list[j];
+				st.beforeLen[p] = 0;
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++)
+					tallyEntry(st, byLast.items[k], true, false);
+			}
+			for (let j = 0; j < dirtyAfter.size; j++) {
+				const p = dirtyAfter.list[j];
+				st.afterLen[p] = 0;
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++)
+					tallyEntry(st, byFirst.items[k], false, true);
+			}
+		} else for (let i = 0; i < M3; i++) tallyEntry(st, i, true, true);
+
+		// The picks: a pick reads its pair's before tally and its pair's after tally.
+		const pickAt = st.pickAt;
+		const pickEntry = (i) => {
+			const b = tB[i];
+			if (!many[b]) {
+				pickAt[i] = -1;
+				return;
+			}
+			const a = wl[tA[i]] ? tA[i] : -1;
+			const c = wl[tC[i]] ? tC[i] : -1;
+			pickAt[i] = chooseWay(st, a, b, c, tFirst[i], tLast[i]);
+		};
+		if (prev) {
+			for (let j = 0; j < touched.size; j++) {
+				repick.add(touched.list[j]);
+				moved.add(touched.list[j]);
+			}
+			for (let j = 0; j < dirtyBefore.size; j++) {
+				const p = dirtyBefore.list[j];
+				for (let k = byFirst.start[p]; k < byFirst.start[p + 1]; k++) repick.add(byFirst.items[k]);
+			}
+			for (let j = 0; j < dirtyAfter.size; j++) {
+				const p = dirtyAfter.list[j];
+				for (let k = byLast.start[p]; k < byLast.start[p + 1]; k++) repick.add(byLast.items[k]);
+			}
+			for (let j = 0; j < repick.size; j++) {
+				const i = repick.list[j];
+				const was = pickAt[i];
+				pickEntry(i);
+				if (pickAt[i] !== was) moved.add(i);
+			}
+		} else for (let i = 0; i < M3; i++) pickEntry(i);
+
+		// The distributions.
+		const { pairBi, bA, bB } = model;
+		if (!prev) {
+			for (let p = 0; p < P; p++) {
+				const i = pairBi[p];
+				if (byFirst.start[p + 1] > byFirst.start[p] || (i >= 0 && many[bB[i]]))
+					st.rightLen[p] = pairDist(st, true, p, st.rightDist, p * W);
+				if (byLast.start[p + 1] > byLast.start[p] || (i >= 0 && many[bA[i]]))
+					st.leftLen[p] = pairDist(st, false, p, st.leftDist, p * W);
+				share(st.rightDist, st.rightLen, st.rightShare, st.rightShareLen, p);
+				share(st.leftDist, st.leftLen, st.leftShare, st.leftShareLen, p);
+			}
+			for (let u = 0; u < T; u++) if (many[u]) st.uniLen[u] = tokenDist(st, u, st.uniDist, u * W);
+			return st;
+		}
+		// From a previous plan: the pairs whose distribution a moved middle or
+		// an edge choice may change are summed again; a token whose middles,
+		// edges or own ways changed is summed again.
+		for (let j = 0; j < moved.size; j++) {
+			const i = moved.list[j];
+			if (!many[tB[i]]) continue;
+			rightKeys.add(tFirst[i]);
+			leftKeys.add(tLast[i]);
+			redoTokens.add(tB[i]);
+		}
+		const { biOf, bPair } = model;
+		for (let d = 0; d < dirty.size; d++) {
+			const u = dirty.list[d];
+			if (many[u]) redoTokens.add(u);
+			for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) {
+				rightKeys.add(bPair[biOf.items[k]]);
+				leftKeys.add(bPair[biOf.items[k]]);
+			}
+		}
+		for (let j = 0; j < dirtyBefore.size; j++) rightKeys.add(dirtyBefore.list[j]);
+		for (let j = 0; j < dirtyAfter.size; j++) leftKeys.add(dirtyAfter.list[j]);
+		redoPairs(st, true, rightKeys, changedRight, redoTokens);
+		redoPairs(st, false, leftKeys, changedLeft, redoTokens);
+		const vector = model.vector;
+		for (let j = 0; j < redoTokens.size; j++) {
+			const u = redoTokens.list[j];
+			const length = tokenDist(st, u, vector, 0);
+			if (sameDist(vector, 0, length, st.uniDist, u * W, st.uniLen[u])) continue;
+			st.uniDist.set(vector.subarray(0, length), u * W);
+			st.uniLen[u] = length;
+			changedTokens.add(u);
+		}
+		for (let j = 0; j < changedRight.size; j++)
+			share(st.rightDist, st.rightLen, st.rightShare, st.rightShareLen, changedRight.list[j]);
+		for (let j = 0; j < changedLeft.size; j++)
+			share(st.leftDist, st.leftLen, st.leftShare, st.leftShareLen, changedLeft.list[j]);
+		return st;
+	}
+
+	/**
+	 * One touchTri entry's part of the skipgram tallies: of before (the pair
+	 * it ends with, when its last token has several ways) and of after (the
+	 * pair it starts with, when its first token has several).
+	 */
+	function tallyEntry(st, i, before, after) {
+		const m = st.model;
+		const x = m.tA[i];
+		const z = m.tC[i];
+		if (!m.many[z] && !m.many[x]) return;
+		const wx = st.wl[x];
+		const wy = st.wl[m.tB[i]];
+		const wz = st.wl[z];
+		if (!wx || !wy || !wz || wy[0].keys.length !== 1) return;
+		if (before && m.many[z]) {
+			const keys = wx[0].keys;
+			tally(
+				st.beforeKey,
+				st.beforeSum,
+				st.beforeLen,
+				m.byLast.start,
+				m.tLast[i],
+				keys[keys.length - 1],
+				m.tN[i]
+			);
+		}
+		if (after && m.many[x])
+			tally(
+				st.afterKey,
+				st.afterSum,
+				st.afterLen,
+				m.byFirst.start,
+				m.tFirst[i],
+				wz[0].keys[0],
+				m.tN[i]
+			);
+	}
+
+	/** Adds n to key k of pair p's tally (a list in the order the keys first come). */
+	function tally(keys, sums, length, start, p, k, n) {
+		const from = start[p];
+		const end = from + length[p];
+		for (let j = from; j < end; j++)
+			if (keys[j] === k) {
+				sums[j] += n;
+				return;
+			}
+		keys[end] = k;
+		sums[end] = 0 + n;
+		length[p] += 1;
+	}
+
+	/**
+	 * The way token b is typed between tokens a and c (-1: an edge): the one
+	 * of least own cost, side costs and triple across both neighbours. pl and
+	 * pr are the pair ids of a b and b c (-1: none in the model).
+	 */
+	function chooseWay(st, a, b, c, pl, pr) {
+		const m = st.model;
+		const W = MAX_WAYS;
+		const list = st.wl[b];
+		const units = st.units;
+		const own = b * W;
+		const left = a < 0 ? -1 : leftCosts(st, a, b, pl);
+		const right = c < 0 ? -1 : rightCosts(st, b, c, pr);
+		const leftCost = m.leftCost;
+		const rightCost = m.rightCost;
+		let across = -1;
+		let after = -1;
+		if (a >= 0 && c >= 0) {
+			const ka = st.wl[a][0].keys;
+			across = ka[ka.length - 1];
+			after = st.wl[c][0].keys[0];
+		}
+		let pick = 0;
+		let lowest = INFINITY;
+		for (let i = 0; i < list.length; i++) {
+			let cost = units[own + i];
+			if (left >= 0) cost += leftCost[left + i];
+			if (right >= 0) cost += rightCost[right + i];
+			if (across >= 0 && list[i].keys.length === 1)
+				cost += wayTriple(st.pc, across, list[i].keys[0], after);
+			// A tie (within rounding) keeps the earlier, cheaper-alone way.
+			if (i === 0 || cost < lowest - 1e-9 * Math.max(1, Math.abs(lowest))) {
+				lowest = cost;
+				pick = i;
+			}
+		}
+		return pick;
+	}
+
+	/**
+	 * Each way of b's cost beside the token a before it: the key pair and
+	 * triples across, and the skipgrams with the token before that, per
+	 * occurrence of the pair (before tally of pair p). Memoised per plan.
+	 * @returns {number} The offset of the costs in model.leftCost.
+	 */
+	function leftCosts(st, a, b, p) {
+		const m = st.model;
+		const at = (p < 0 ? m.P : p) * MAX_WAYS;
+		if (p >= 0 && m.leftStamp[p] === st.stamp) return at;
+		const list = st.wl[b];
+		const wa = st.wl[a][0];
+		const length = p < 0 || wa.keys.length !== 1 ? 0 : st.beforeLen[p];
+		const total = p < 0 ? 0 : m.pairTotal[p];
+		const from = p < 0 ? 0 : m.byLast.start[p];
+		const k0 = wa.keys[0];
+		for (let i = 0; i < list.length; i++) {
+			const way = list[i];
+			let cost = crossCost(st.pc, wa, way);
+			if (length > 0 && total > 0) {
+				let sum = 0;
+				for (let j = from; j < from + length; j++)
+					sum += st.beforeSum[j] * wayTriple(st.pc, st.beforeKey[j], k0, way.keys[0]);
+				cost += sum / total;
+			}
+			m.leftCost[at + i] = cost;
+		}
+		if (p >= 0) m.leftStamp[p] = st.stamp;
+		return at;
+	}
+
+	/** rightCosts: leftCosts' mirror, beside the token c after b (after tally of pair p). */
+	function rightCosts(st, b, c, p) {
+		const m = st.model;
+		const at = (p < 0 ? m.P : p) * MAX_WAYS;
+		if (p >= 0 && m.rightStamp[p] === st.stamp) return at;
+		const list = st.wl[b];
+		const wc = st.wl[c][0];
+		const length = p < 0 || wc.keys.length !== 1 ? 0 : st.afterLen[p];
+		const total = p < 0 ? 0 : m.pairTotal[p];
+		const from = p < 0 ? 0 : m.byFirst.start[p];
+		const k0 = wc.keys[0];
+		for (let i = 0; i < list.length; i++) {
+			const way = list[i];
+			let cost = crossCost(st.pc, way, wc);
+			if (length > 0 && total > 0) {
+				const last = way.keys[way.keys.length - 1];
+				let sum = 0;
+				for (let j = from; j < from + length; j++)
+					sum += st.afterSum[j] * wayTriple(st.pc, last, k0, st.afterKey[j]);
+				cost += sum / total;
+			}
+			m.rightCost[at + i] = cost;
+		}
+		if (p >= 0) m.rightStamp[p] = st.stamp;
+		return at;
+	}
+
+	/**
+	 * A pair's distribution, written at out[at…]: the trigram part, in table
+	 * order (the middles of the entries starting with the pair, side right:
+	 * its second token's ways; or ending with it, side left: its first
+	 * token's), then, for the bigram of a multi-way token, the way it takes
+	 * at a segment edge for the bigram's count less its trigram part
+	 * (recorded in the edges).
+	 * @returns {number} The vector's length, 0 for none.
+	 */
+	function pairDist(st, right, p, out, at) {
+		const m = st.model;
+		const list = right ? m.byFirst : m.byLast;
+		let length = 0;
+		for (let k = list.start[p]; k < list.start[p + 1]; k++) {
+			const i = list.items[k];
+			const b = m.tB[i];
+			if (!m.many[b]) continue;
+			if (length === 0) {
+				length = st.wl[b].length;
+				out.fill(0, at, at + length);
+			}
+			out[at + st.pickAt[i]] += m.tN[i];
+		}
+		const i = m.pairBi[p];
+		if (i < 0) return length;
+		const a = m.bA[i];
+		const b = m.bB[i];
+		const token = right ? b : a;
+		if (!m.many[token]) return length;
+		if (length === 0) {
+			length = st.wl[token].length;
+			out.fill(0, at, at + length);
+		}
+		let sum = 0;
+		for (let j = 0; j < length; j++) sum += out[at + j];
+		const rest = m.bN[i] - sum;
+		let o = -1;
+		if (rest > 0) {
+			o = right
+				? chooseWay(st, st.wl[a] ? a : -1, b, -1, p, -1)
+				: chooseWay(st, -1, a, st.wl[b] ? b : -1, -1, p);
+			out[at + o] += rest;
+		}
+		if (right) {
+			st.edgeR[i] = o;
+			st.edgeRN[i] = rest > 0 ? rest : 0;
+		} else {
+			st.edgeL[i] = o;
+			st.edgeLN[i] = rest > 0 ? rest : 0;
+		}
+		return length;
+	}
+
+	/**
+	 * A multi-way token's distribution, written at out[at…]: its middles in
+	 * table order, its bigram edges in table order, then its occurrences
+	 * alone. @returns {number} Its length.
+	 */
+	function tokenDist(st, u, out, at) {
+		const m = st.model;
+		const length = st.wl[u].length;
+		out.fill(0, at, at + length);
+		const { middleOf, biOf } = m;
+		for (let k = middleOf.start[u]; k < middleOf.start[u + 1]; k++) {
+			const i = middleOf.items[k];
+			out[at + st.pickAt[i]] += m.tN[i];
+		}
+		for (let k = biOf.start[u]; k < biOf.start[u + 1]; k++) {
+			const i = biOf.items[k];
+			if (m.bB[i] === u && st.edgeR[i] >= 0) out[at + st.edgeR[i]] += st.edgeRN[i];
+			if (m.bA[i] === u && st.edgeL[i] >= 0) out[at + st.edgeL[i]] += st.edgeLN[i];
+		}
+		let sum = 0;
+		for (let j = 0; j < length; j++) sum += out[at + j];
+		const rest = m.uniCount[u] - sum;
+		if (rest > 0) out[at + chooseWay(st, -1, u, -1, -1, -1)] += rest;
+		return length;
+	}
+
+	/**
+	 * Sums the distributions of the given pairs again (side right or left);
+	 * a pair whose vector changed goes to changed, and the token of a bigram
+	 * whose edge choice changed to tokens.
+	 */
+	function redoPairs(st, right, keys, changed, tokens) {
+		const m = st.model;
+		const W = MAX_WAYS;
+		const dist = right ? st.rightDist : st.leftDist;
+		const lengths = right ? st.rightLen : st.leftLen;
+		const edge = right ? st.edgeR : st.edgeL;
+		const edgeN = right ? st.edgeRN : st.edgeLN;
+		const vector = m.vector;
+		for (let j = 0; j < keys.size; j++) {
+			const p = keys.list[j];
+			const i = m.pairBi[p];
+			const was = i < 0 ? -1 : edge[i];
+			const wasN = i < 0 ? 0 : edgeN[i];
+			const length = pairDist(st, right, p, vector, 0);
+			if (!sameDist(vector, 0, length, dist, p * W, lengths[p])) {
+				changed.add(p);
+				dist.set(vector.subarray(0, length), p * W);
+				lengths[p] = length;
+			}
+			if (i >= 0 && (edge[i] !== was || edgeN[i] !== wasN)) tokens.add(right ? m.bB[i] : m.bA[i]);
+		}
+	}
+
+	/** Whether two distributions (vector, offset, length) are the same. */
+	function sameDist(x, xa, xl, y, ya, yl) {
+		if (xl !== yl) return false;
+		for (let j = 0; j < xl; j++) if (x[xa + j] !== y[ya + j]) return false;
+		return true;
+	}
+
+	/** A pair's shares of ways: its distribution normalised once (none: share 1 on its first way). */
+	function share(dist, lengths, out, outLengths, p) {
+		const at = p * MAX_WAYS;
+		const length = lengths[p];
+		let total = 0;
+		for (let j = 0; j < length; j++) total += dist[at + j];
+		if (total > 0) {
+			for (let j = 0; j < length; j++) out[at + j] = dist[at + j] / total;
+			outLengths[p] = length;
+		} else {
+			out[at] = 1;
+			outLengths[p] = 1;
+		}
+	}
+
+	const partitionCache = new WeakMap();
+	// Partitions kept per table: the multi-way sets of the layouts compared.
+	const PARTITIONS_PER_TABLE = 64;
+
+	/**
+	 * The n-grams of a table split by whether they hold a multi-way token:
+	 * touchBi, touchTri go through the context choice, restBi, restTri are
+	 * typed the fast way. Cached per table and set of multi-way tokens.
+	 * @param {object} table - A prepared (token) table.
+	 * @param {Set<string>} multi - The multi-way tokens.
+	 * @returns {{touchBi: Array, touchTri: Array, restBi: Array, restTri: Array,
+	 *   restBiAt: Int32Array, restTriAt: Int32Array}} restBiAt, restTriAt: the
+	 *   rest's entry indexes in the table.
+	 */
+	function partition(table, multi) {
+		const key = Array.from(multi).sort().join(TOKEN_SEP);
+		let byKey = partitionCache.get(table);
+		if (!byKey) partitionCache.set(table, (byKey = new Map()));
+		let out = byKey.get(key);
+		if (out) return out;
+		out = { touchBi: [], restBi: [], touchTri: [], restTri: [] };
+		for (const entry of table.bi)
+			(multi.has(entry[0]) || multi.has(entry[1]) ? out.touchBi : out.restBi).push(entry);
+		for (const entry of table.tri)
+			(multi.has(entry[0]) || multi.has(entry[1]) || multi.has(entry[2])
+				? out.touchTri
+				: out.restTri
+			).push(entry);
+		// The rest again as entry indexes of the table, for walkRest.
+		const t = tableIds(table);
+		const many = new Uint8Array(t.tokens.length);
+		t.tokens.forEach((token, i) => {
+			if (multi.has(token)) many[i] = 1;
+		});
+		const restBiAt = [];
+		const restTriAt = [];
+		for (let i = 0; i < t.biN.length; i++) if (!many[t.biA[i]] && !many[t.biB[i]]) restBiAt.push(i);
+		for (let i = 0; i < t.triN.length; i++)
+			if (!many[t.triA[i]] && !many[t.triB[i]] && !many[t.triC[i]]) restTriAt.push(i);
+		out.restBiAt = Int32Array.from(restBiAt);
+		out.restTriAt = Int32Array.from(restTriAt);
+		if (byKey.size >= PARTITIONS_PER_TABLE) byKey.clear();
+		byKey.set(key, out);
+		return out;
+	}
+
+	/**
+	 * Walks the key stream of a typing plan: walkKeyStream with each
+	 * multi-way token split over its ways as the plan types them. A pair of
+	 * two multi-way tokens, or a triple whose first or last token has several
+	 * ways, needs a fourth character: it is completed as a second-order Markov
+	 * chain of the trigrams (each side's share of ways, independent given the
+	 * pair or triple).
+	 * @param {object} board - From keyboard().
+	 * @param {object} plan - From planTyping().
+	 * @param {object} visit - As walkKeyStream.
+	 */
+	function walkTyped(board, plan, visit) {
+		const { table, multi } = plan;
+		if (multi.size === 0) {
+			walkKeyStream(board, plan.best, table, visit);
+			return;
+		}
+		const st = plan.ctx;
+		const t = tableIds(table);
+		for (let i = 0; i < t.uniId.length; i++)
+			walkTypedToken(board, st, t.uniId[i], t.uniN[i], 1, visit);
+		const seqs = t.tokens.map((token) => plan.best.get(token));
+		walkRest(board, t, seqs, plan.parts.restBiAt, plan.parts.restTriAt, visit);
+		for (let i = 0; i < st.model.M2; i++) walkTypedPair(st, i, 1, visit);
+		for (let i = 0; i < st.model.M3; i++) walkTypedTriple(st, i, 1, visit);
+	}
+
+	/**
+	 * One token (id u) typed n times, its count times sign (-1 takes it out):
+	 * alone, or split over its ways as the plan (state st) uses them (its
+	 * distribution sums to n).
+	 */
+	function walkTypedToken(board, st, u, n, sign, visit) {
+		const list = st.wl[u];
+		const token = st.model.tokens[u];
+		if (!list) {
+			visit.unsupported(token, sign * n);
+			return;
+		}
+		if (!st.model.many[u]) {
+			walkChar(board, list[0], token, sign * n, visit);
+			return;
+		}
+		const at = u * MAX_WAYS;
+		for (let i = 0; i < list.length; i++)
+			if (st.uniDist[at + i] > 0) walkChar(board, list[i], token, sign * st.uniDist[at + i], visit);
+	}
+
+	/** touchBi entry i of a plan (state st), its count times sign (-1 takes it out). */
+	function walkTypedPair(st, i, sign, visit) {
+		const m = st.model;
+		const la = st.wl[m.bA[i]];
+		const lb = st.wl[m.bB[i]];
+		if (!la || !lb) return;
+		const n = m.bN[i];
+		const p = m.bPair[i];
+		const many = m.many[m.bA[i]];
+		const pa = many ? st.leftShare : ONE_SHARE;
+		const ao = many ? p * MAX_WAYS : 0;
+		const al = many ? st.leftShareLen[p] : 1;
+		const manyB = m.many[m.bB[i]];
+		const pb = manyB ? st.rightShare : ONE_SHARE;
+		const bo = manyB ? p * MAX_WAYS : 0;
+		const bl = manyB ? st.rightShareLen[p] : 1;
+		for (let x = 0; x < al; x++) {
+			const sx = pa[ao + x];
+			if (!(sx > 0)) continue;
+			for (let y = 0; y < bl; y++) {
+				const sy = pb[bo + y];
+				if (sy > 0) walkPair(la[x], lb[y], sign * n * sx * sy, visit);
+			}
+		}
+	}
+
+	/** touchTri entry i of a plan (state st), its count times sign (-1 takes it out). */
+	function walkTypedTriple(st, i, sign, visit) {
+		const m = st.model;
+		const b = m.tB[i];
+		const lb = st.wl[b];
+		if (!lb) return;
+		const la = st.wl[m.tA[i]];
+		const ld = st.wl[m.tC[i]];
+		if (!la || !ld) return;
+		const n = m.tN[i];
+		const sb = m.many[b] ? lb[st.pickAt[i]] : lb[0];
+		const manyA = m.many[m.tA[i]];
+		const pa = manyA ? st.leftShare : ONE_SHARE;
+		const ao = manyA ? m.tFirst[i] * MAX_WAYS : 0;
+		const al = manyA ? st.leftShareLen[m.tFirst[i]] : 1;
+		const manyD = m.many[m.tC[i]];
+		const pd = manyD ? st.rightShare : ONE_SHARE;
+		const dO = manyD ? m.tLast[i] * MAX_WAYS : 0;
+		const dl = manyD ? st.rightShareLen[m.tLast[i]] : 1;
+		for (let x = 0; x < al; x++) {
+			const sx = pa[ao + x];
+			if (!(sx > 0)) continue;
+			for (let y = 0; y < dl; y++) {
+				const sy = pd[dO + y];
+				if (sy > 0) walkTriple(la[x], sb, ld[y], sign * n * sx * sy, visit);
+			}
+		}
+	}
+
+	/**
+	 * What the plan reports: each multi-way character's ways with how often
+	 * each was used, and the chords with their counts.
+	 * @param {object} board - From keyboard().
+	 * @param {object} plan - From planTyping().
+	 * @param {object} layout - The layout planned (library shape): its level ids.
+	 * @returns {{paths: object, chords: object, changed: number, alternatives:
+	 *   number}} alternatives: the characters with several ways; paths: char →
+	 *   [{kind, steps: [[code, level]], count}] best way first, a repeat or magic
+	 *   key's (kind repeat or magic) after the character's own; chords: text →
+	 *   count; changed: characters typed otherwise than their cheapest way out
+	 *   of context (chord characters included).
+	 */
+	function typingReport(board, plan, layout) {
+		const levels = levelTable(layout, board).ids;
+		const kind = (way) => {
+			if (way.context !== undefined) return way.context;
+			if (way.substituted) return 'substitution';
+			if (way.width) return 'chord';
+			if (way.dead) return 'dead';
+			if (way.altgr > 0) return 'altgr';
+			return way.shift > 0 ? 'shift' : 'direct';
+		};
+		const describe = (way, count) => ({
+			kind: kind(way),
+			steps: way.keys.map((k, i) => [board.codes[k], levels[way.layers[i]]]),
+			count
+		});
+		// A context token's ways are its character's (contextTable): one row each.
+		const contextual = plan.context ? plan.context.tokens : new Map();
+		const charOf = (token) => (contextual.has(token) ? contextual.get(token).char : token);
+		const merged = new Map();
+		const addPath = (char, way, count) => {
+			if (!(count > 0)) return;
+			const entry = describe(way, count);
+			const id = JSON.stringify([entry.kind, entry.steps]);
+			const ways = merged.get(char) || merged.set(char, new Map()).get(char);
+			if (ways.has(id)) ways.get(id).count += count;
+			else ways.set(id, entry);
+		};
+		const uniOf = new Map(plan.table.uni);
+		let changed = 0;
+		const done = new Set();
+		for (const token of plan.multi) {
+			const st = plan.ctx;
+			const u = st.model.idOf.get(token);
+			const at = u * MAX_WAYS;
+			const dist = Array.from(st.uniDist.subarray(at, at + st.uniLen[u]));
+			const list = plan.ways.get(token);
+			const char = charOf(token);
+			if (!merged.has(char)) merged.set(char, new Map());
+			list.forEach((way, i) => addPath(char, way, dist[i]));
+			done.add(token);
+			// A chord's characters all count as changed below; a context token's
+			// uses count when another way than the character's own cheapest.
+			if (contextual.has(token)) {
+				const own = plan.best.get(char);
+				list.forEach((way, i) => {
+					if (way !== own) changed += dist[i];
+				});
+			} else if (!plan.chords.includes(token))
+				changed += dist.reduce((sum, x) => sum + x, 0) - dist[0];
+		}
+		// The rest of the characters a context token splits: their one way.
+		for (const [token, { char }] of contextual) {
+			for (const t of [char, token]) {
+				if (done.has(t) || !plan.best.has(t)) continue;
+				done.add(t);
+				const n = uniOf.get(t) || 0;
+				addPath(char, plan.best.get(t), n);
+				if (t === token) changed += n;
+			}
+		}
+		const paths = {};
+		for (const [char, ways] of merged) {
+			const list = Array.from(ways.values());
+			// The character's own ways first, then the repeat and magic keys'.
+			paths[char] = list
+				.filter((entry) => entry.kind !== 'repeat' && entry.kind !== 'magic')
+				.concat(list.filter((entry) => entry.kind === 'repeat' || entry.kind === 'magic'));
+		}
+		const chords = {};
+		for (const [token, n] of plan.table.uni)
+			if (plan.chords.includes(token)) {
+				chords[token] = n;
+				changed += codeLength(token) * n;
+				if (!paths[token]) paths[token] = [describe(plan.ways.get(token)[0], n)];
+			}
+		// The characters with several ways, a context token's with its character's.
+		const alternatives = new Set(Array.from(plan.multi, charOf)).size;
+		return { paths, chords, changed, alternatives };
+	}
+
 	// =======================
-	// ======= 7/ Score ======
+	// ======= 8/ Score ======
 	// =======================
 
 	/** A copy of the default weights (score_weights.json). */
@@ -1137,16 +8466,257 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * The global score of an analysis: each metric adds weight × value points
-	 * when higher is better and subtracts them when lower is better.
-	 * @param {object} result - analyse() output (or {metrics}).
-	 * @param {object} [weights] - metric → points per unit; defaults when absent.
-	 * @returns {{total: number, contributions: object, weights: object}} Score.
-	 * @throws {Error} On a weight for an unknown or unscored metric, or a
-	 *   negative or non-finite weight.
+	 * The floors of the penalty metrics, each default replaced by the given
+	 * one (Cyanophage's optimiser: a share under its floor costs nothing).
+	 * @param {object} [given] - metric → floor in the metric's unit.
+	 * @returns {object} Every floor of score_weights.json, a copy.
+	 * @throws {Error} On a floor for a metric that has no weight or is not
+	 *   lower-is-better, or a negative or non-finite floor.
 	 */
-	function score(result, weights) {
+	function scoreFloors(given) {
+		const out = Object.assign({}, data().floors, given || {});
+		const weights = data().weights;
+		for (const [id, floor] of Object.entries(out)) {
+			if (!(id in weights) || METRICS[id].better !== 'lower')
+				throw new Error(`layout_analysis: ${id} is not a weighted penalty metric, it has no floor`);
+			if (!(floor >= 0) || !Number.isFinite(floor))
+				throw new Error(`layout_analysis: floor of ${id} must be a finite number >= 0`);
+		}
+		return out;
+	}
+
+	/** A copy of the default floors (score_weights.json), checked. */
+	function defaultFloors() {
+		return scoreFloors();
+	}
+
+	/**
+	 * The graded costs (GRADES), each default replaced by the given grade of
+	 * the same metric and event.
+	 * @param {object} [given] - metric → grade → factor (a part of a table
+	 *   keeps the other defaults).
+	 * @returns {object} Every table of score_weights.json « grades », a copy.
+	 * @throws {Error} On an unknown table or grade, a table that is not an
+	 *   object, or a negative or non-finite factor.
+	 */
+	function scoreGrades(given) {
+		const defaults = data().grades;
+		const out = {};
+		for (const metric of Object.keys(GRADES)) out[metric] = Object.assign({}, defaults[metric]);
+		for (const [metric, table] of Object.entries(given || {})) {
+			if (!(metric in GRADES)) throw new Error(`layout_analysis: ${metric} has no graded costs`);
+			if (table === null || typeof table !== 'object' || Array.isArray(table))
+				throw new Error(`layout_analysis: the grades of ${metric} are not an object`);
+			Object.assign(out[metric], table);
+		}
+		for (const [metric, grades] of Object.entries(GRADES)) {
+			const table = out[metric];
+			for (const grade of Object.keys(table))
+				if (!grades.includes(grade))
+					throw new Error(`layout_analysis: ${metric} has no grade ${grade}`);
+			for (const grade of grades) {
+				const why = gradeRefusal(metric, table[grade], grade);
+				if (why) throw new Error(`layout_analysis: grade ${grade} of ${metric} must be ${why}`);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * Why a grade's value is refused, by its table's kind (GRADE_KINDS):
+	 * 'a boolean' (a switch), 'a finite number >= 1' (a run multiplier, so a
+	 * run never weighs less than an alternation), 'a finite number >= 0' (a
+	 * factor or the run growth); '' when it is accepted.
+	 * @param {string} metric - A GRADES table.
+	 * @param {*} value - The value.
+	 * @param {string} grade - Its grade.
+	 * @returns {string}
+	 */
+	function gradeRefusal(metric, value, grade) {
+		const kind = GRADE_KINDS[metric];
+		if (kind === GRADE_SWITCH) return typeof value === 'boolean' ? '' : 'a boolean';
+		const least = gradeMinimum(metric, grade);
+		return typeof value === 'number' && Number.isFinite(value) && value >= least
+			? ''
+			: `a finite number >= ${least}`;
+	}
+
+	/** A copy of the default graded costs (score_weights.json), checked. */
+	function defaultGrades() {
+		return scoreGrades();
+	}
+
+	/**
+	 * The flat grades: every factor at 1 and the alternation rewarded, so each
+	 * graded metric weighs its plain value (the run scale keeps its defaults:
+	 * it changes nothing while hand_run weighs 0). With row_jump's and
+	 * hand_run's weights at 0 they give the single weights' score.
+	 * @returns {object} metric → grade → value.
+	 */
+	function flatGrades() {
+		const out = scoreGrades();
+		for (const [metric, grades] of Object.entries(GRADES)) {
+			if (GRADE_KINDS[metric] === GRADE_RUN) continue;
+			for (const grade of grades)
+				out[metric][grade] = GRADE_KINDS[metric] === GRADE_SWITCH ? true : 1;
+		}
+		return out;
+	}
+
+	/**
+	 * A graded metric's value as the score weighs it: each cell's part
+	 * (gradeParts) times its factor (the product of its grades; the travel's
+	 * cells are its finger types). When every cell has the same factor, the
+	 * value is the metric times it: the flat model of the single weights, to
+	 * the last bit. A switch counts the metric or nothing; hand_run follows
+	 * its run scale (handRunValue).
+	 * @param {string} id - A GRADES metric.
+	 * @param {number} value - Its metric value.
+	 * @param {object} parts - Its parts (result.parts[id]); a switch reads none.
+	 * @param {object} table - Its grades (scoreGrades()[id]).
+	 * @returns {number} The graded value, in the metric's unit.
+	 */
+	function gradedValue(id, value, parts, table) {
+		if (GRADE_KINDS[id] === GRADE_SWITCH) return table[GRADES[id][0]] ? value : 0;
+		if (GRADE_KINDS[id] === GRADE_RUN) return handRunValue(parts, table);
+		const cells = id in GRADE_CELLS ? GRADE_CELLS[id] : GRADES[id].map((grade) => [grade]);
+		const factors = cells.map((cell) => cell.reduce((product, grade) => product * table[grade], 1));
+		if (factors.every((factor) => factor === factors[0])) return factors[0] * value;
+		let sum = 0;
+		cells.forEach((cell, i) => {
+			sum += factors[i] * parts[cell.join('_')];
+		});
+		return sum;
+	}
+
+	/**
+	 * What a penalty metric's value costs above its floor: the value itself
+	 * under a floor of 0 (every metric is ≥ 0), else the part above the floor.
+	 */
+	function aboveFloor(value, floor) {
+		return floor > 0 ? Math.max(0, value - floor) : value;
+	}
+
+	// ==================================
+	// ======= 8b/ Mark (QWERTY index) ==
+	// ==================================
+
+	/**
+	 * The mark of a total: an index on QWERTY, like Alt Alpha Ranker's
+	 * (maintainer, 2026-11-24; docs/design/layout-analysis.md, « Mark »).
+	 * A layout's cost is minus its total (the penalties less the rewards, in
+	 * points), and the mark is 100 × (2 − cost / QWERTY's cost) on the same
+	 * corpus, board and settings: QWERTY reads 100, a layout costing 23 %
+	 * less than QWERTY reads 123, one costing nothing reads 200, and a net
+	 * reward reads above 200, with no ceiling. The index is linear in the
+	 * total, so it ranks as the total does and its differences are points
+	 * scaled by one number; a ratio of costs would not survive a cost at or
+	 * below 0, which the best layouts approach.
+	 * @param {number} total - A score total.
+	 * @param {number} reference - QWERTY's total on the same corpus, board and
+	 *   settings (score().reference), below 0.
+	 * @returns {number} The mark.
+	 * @throws {Error} When either is not finite; an AnalysisError
+	 *   `mark_reference_cost` ({cost}) when QWERTY's cost is not above 0 (its
+	 *   total at or above 0, settings that reward more than they penalise):
+	 *   no index can be read against it.
+	 */
+	function markIndex(total, reference) {
+		if (!Number.isFinite(total) || !Number.isFinite(reference))
+			throw new Error('layout_analysis: a mark needs a finite total and a finite QWERTY total');
+		if (!(reference < 0))
+			throw new AnalysisError(
+				'mark_reference_cost',
+				{ cost: -reference },
+				`QWERTY costs ${-reference} points on these settings; the mark needs it to cost more than 0`
+			);
+		return 100 * (2 - total / reference);
+	}
+
+	/**
+	 * A difference of marks in % of a base mark: how much the gap weighs
+	 * beside that mark (the optimizer's « an existing layout would do the
+	 * job », against the best existing layout's mark).
+	 * @param {number} gap - A difference of two marks.
+	 * @param {number} base - The mark it is a share of, above 0.
+	 * @returns {number} 100 × gap / base.
+	 * @throws {Error} When the gap is not finite or the base is not a finite
+	 *   mark above 0.
+	 */
+	function markPercent(gap, base) {
+		if (!Number.isFinite(gap) || !(base > 0) || !Number.isFinite(base))
+			throw new Error('layout_analysis: a mark percent needs a finite gap and a base mark above 0');
+		return (100 * gap) / base;
+	}
+
+	// QWERTY's measures per prepared table and analysis options, which the
+	// marks of every layout analysed on them are read against.
+	const referenceCache = new WeakMap();
+
+	/**
+	 * What QWERTY's total is computed from, weights aside: its metrics and
+	 * graded parts on the table with the same options (the board, format,
+	 * profile, ideal load, shortcut table, form weights, typing and the access
+	 * weights its ways are chosen by). A plain object: a result carries it
+	 * (result.referenceBasis) so score() and rescore() follow new weights.
+	 * @param {object} table - From prepareNgrams().
+	 * @param {object} opts - analyse() options.
+	 * @returns {{id: string, metrics: object, parts: object}}
+	 */
+	function referenceBasis(table, opts) {
+		let byOptions = referenceCache.get(table);
+		if (!byOptions) referenceCache.set(table, (byOptions = new Map()));
+		const own = Object.assign({}, opts, { keyGroups: false });
+		delete own.floors;
+		delete own.weights;
+		const key = JSON.stringify([own, accessWeights(opts.weights)]);
+		if (!byOptions.has(key)) {
+			const id = referenceLayout();
+			const qwerty = data().layouts.find((layout) => layout.id === id);
+			const measured = measure(qwerty, table, Object.assign({}, opts, { keyGroups: false }));
+			byOptions.set(key, { id, metrics: measured.metrics, parts: measured.parts });
+		}
+		const basis = byOptions.get(key);
+		return { id: basis.id, metrics: Object.assign({}, basis.metrics), parts: basis.parts };
+	}
+
+	/**
+	 * The value of a scored metric the score weighs: the metric itself, or
+	 * for a graded one (GRADES) its graded value.
+	 * @param {object} result - analyse() output (metrics and parts).
+	 * @param {string} id - A METRICS id.
+	 * @param {object} gradeOf - From scoreGrades().
+	 * @returns {number} In the metric's unit.
+	 * @throws {Error} When a graded metric's parts are missing.
+	 */
+	function weighedValue(result, id, gradeOf) {
+		const value = result.metrics[id];
+		if (!(id in GRADES)) return value;
+		if (GRADE_KINDS[id] === GRADE_SWITCH) return gradedValue(id, value, null, gradeOf[id]);
+		const parts = result.parts && result.parts[id];
+		if (!parts) throw new Error(`layout_analysis: the score of ${id} needs analyse()'s parts`);
+		return gradedValue(id, value, parts, gradeOf[id]);
+	}
+
+	/**
+	 * The global score of an analysis: each metric adds weight × value points
+	 * when higher is better and subtracts them when lower is better; a graded
+	 * metric (GRADES) weighs its graded value; a penalty metric counts only
+	 * its part above its floor (0 by default).
+	 * @param {object} result - analyse() output (metrics and parts).
+	 * @param {object} [weights] - metric → points per unit; defaults when absent.
+	 * @param {object} [floors] - penalty metric → floor; defaults when absent.
+	 * @param {object} [grades] - metric → grade → factor; defaults when absent.
+	 * @returns {{total: number, contributions: object, weights: object,
+	 *   floors: object, grades: object}} Score.
+	 * @throws {Error} On a weight for an unknown or unscored metric, or a
+	 *   negative or non-finite weight; on a floor scoreFloors() refuses or
+	 *   grades scoreGrades() refuses.
+	 */
+	function scoreTotals(result, weights, floors, grades) {
 		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		const floorOf = scoreFloors(floors);
+		const gradeOf = scoreGrades(grades);
 		const contributions = {};
 		let total = 0;
 		for (const [id, weight] of Object.entries(used)) {
@@ -1155,11 +8725,38 @@ var LAYOUT_ANALYSIS = (function () {
 				throw new Error(`layout_analysis: ${id} is not a scored metric`);
 			if (!(weight >= 0) || !Number.isFinite(weight))
 				throw new Error(`layout_analysis: weight of ${id} must be a finite number >= 0`);
+			const raw = weighedValue(result, id, gradeOf);
+			const value = metric.better === 'lower' ? aboveFloor(raw, floorOf[id] || 0) : raw;
 			const sign = metric.better === 'higher' ? 1 : -1;
-			contributions[id] = sign * weight * result.metrics[id];
+			contributions[id] = sign * weight * value;
 			total += contributions[id];
 		}
-		return { total, contributions, weights: used };
+		return { total, contributions, weights: used, floors: floorOf, grades: gradeOf };
+	}
+
+	/**
+	 * The global score of an analysis and its mark: scoreTotals(), then
+	 * QWERTY's total on the same corpus, board and settings (from
+	 * result.referenceBasis) and the mark, the total's index on it
+	 * (markIndex): QWERTY reads 100, higher is better with no ceiling.
+	 * @param {object} result - analyse() output (metrics, parts, referenceBasis).
+	 * @param {object} [weights] - As scoreTotals().
+	 * @param {object} [floors] - As scoreTotals().
+	 * @param {object} [grades] - As scoreTotals().
+	 * @returns {{total: number, reference: number, mark: number, contributions:
+	 *   object, weights: object, floors: object, grades: object}} Score;
+	 *   reference is QWERTY's total.
+	 * @throws {Error} As scoreTotals() and markIndex(), or when the result has
+	 *   no referenceBasis.
+	 */
+	function score(result, weights, floors, grades) {
+		const basis = result.referenceBasis;
+		if (!basis || !basis.metrics || !basis.parts)
+			throw new Error("layout_analysis: the mark needs analyse()'s referenceBasis");
+		const out = scoreTotals(result, weights, floors, grades);
+		out.reference = scoreTotals(basis, out.weights, out.floors, out.grades).total;
+		out.mark = markIndex(out.total, out.reference);
+		return out;
 	}
 
 	/**
@@ -1175,42 +8772,665 @@ var LAYOUT_ANALYSIS = (function () {
 		return rank(results);
 	}
 
-	/** Sorts results by score, best first, and numbers them. */
+	/**
+	 * The ranking order of two results: a complete layout before an incomplete
+	 * one (it cannot type a required character, so no score makes it usable),
+	 * then the higher score first.
+	 * @param {{incomplete: boolean, score: {total: number}}} a
+	 * @param {{incomplete: boolean, score: {total: number}}} b
+	 * @returns {number} Negative when a ranks before b.
+	 * @throws {Error} When a result does not say whether it is complete.
+	 */
+	function rankOrder(a, b) {
+		if (typeof a.incomplete !== 'boolean' || typeof b.incomplete !== 'boolean')
+			throw new Error('layout_analysis: a ranked result says whether it is complete');
+		if (a.incomplete !== b.incomplete) return a.incomplete ? 1 : -1;
+		return b.score.total - a.score.total;
+	}
+
+	/**
+	 * Sorts results, complete layouts first and each group by score, best
+	 * first, and numbers them.
+	 * @param {object[]} results - analyse() outputs (may come from different
+	 *   n-gram tables: the Comparer's text modes).
+	 * @returns {object[]} The same results, sorted, each with its rank (1-based).
+	 */
 	function rank(results) {
-		const sorted = results.slice().sort((a, b) => b.score.total - a.score.total);
+		const sorted = results.slice().sort(rankOrder);
 		sorted.forEach((result, i) => {
 			result.rank = i + 1;
 		});
 		return sorted;
 	}
 
-	/** Re-scores and re-ranks results with new weights (no re-analysis). */
-	function rescore(results, weights) {
-		for (const result of results) result.score = score(result, weights);
+	/**
+	 * Compares two analyses metric by metric: each value, the difference and
+	 * which one the metric prefers, then the mark the same way (its
+	 * difference is in % of QWERTY's cost, the index's unit).
+	 * @param {object} a - analyse() output, the layout read.
+	 * @param {object} b - analyse() output, the layout it is compared with.
+	 * @returns {{metrics: object, score: object}} metric → {a, b, delta, verdict},
+	 *   delta = a − b; verdict is `better` or `worse` for a, `same` when equal,
+	 *   `none` for a metric shown but not scored; score → {a, b, delta,
+	 *   verdict} of the marks.
+	 * @throws {Error} When either result lacks a metric of METRICS or its score.
+	 */
+	function diff(a, b) {
+		const verdict = (better, delta) => {
+			if (better === 'none') return 'none';
+			if (delta === 0) return 'same';
+			return (better === 'higher') === delta > 0 ? 'better' : 'worse';
+		};
+		const metrics = {};
+		for (const [id, metric] of Object.entries(METRICS)) {
+			const [x, y] = [a.metrics[id], b.metrics[id]];
+			if (!Number.isFinite(x) || !Number.isFinite(y))
+				throw new Error(`layout_analysis: diff needs the metric ${id} on both results`);
+			metrics[id] = { a: x, b: y, delta: x - y, verdict: verdict(metric.better, x - y) };
+		}
+		if (!a.score || !b.score) throw new Error('layout_analysis: diff needs both scores');
+		const delta = a.score.mark - b.score.mark;
+		return {
+			metrics,
+			score: {
+				a: a.score.mark,
+				b: b.score.mark,
+				delta,
+				verdict: verdict('higher', delta)
+			}
+		};
+	}
+
+	// Where each character of a layout is typed (typedPlaces), per rows object
+	// and board: the optimizer compares one layout with the whole library.
+	const placesCache = new WeakMap();
+
+	/**
+	 * Where a layout types each character: its cheapest way out of context
+	 * (compileWays().best, the engine's fixed path), written twice as a
+	 * signature: the keys and levels pressed (a dead key and the key after
+	 * it, AltGr and Shift as levels), and the finger, row and level of each
+	 * of those presses.
+	 * @param {object} layout - Library shape (layoutFromRows).
+	 * @param {object} board - From boardFor().
+	 * @returns {Map<string, {keys: string, fingerRows: string}>}
+	 */
+	function typedPlaces(layout, board) {
+		let byBoard = placesCache.get(layout.rows);
+		if (!byBoard) {
+			byBoard = new Map();
+			placesCache.set(layout.rows, byBoard);
+		}
+		const cached = byBoard.get(board);
+		if (cached && cached.dead === layout.dead) return cached.places;
+		const places = new Map();
+		for (const [char, way] of compileWays(layout, board, null).best) {
+			const keys = [];
+			const fingerRows = [];
+			for (let i = 0; i < way.keys.length; i++) {
+				const k = way.keys[i];
+				keys.push(`${board.codes[k]}:${way.layers[i]}`);
+				fingerRows.push(`${board.finger[k]}:${board.row[k]}:${way.layers[i]}`);
+			}
+			places.set(char, { keys: keys.join(' '), fingerRows: fingerRows.join(' ') });
+		}
+		byBoard.set(board, { dead: layout.dead, places });
+		return places;
+	}
+
+	/**
+	 * The weight of each corpus character in layoutSimilarity's weighted
+	 * shares: its occurrences in the corpus, the space left out (every layout
+	 * types it on the space bar). The optimizer's change penalty weighs a
+	 * moved character with the same numbers, so both read one weighting.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {Map<string, number>} Character → occurrences, in the table's order.
+	 */
+	function similarityWeights(ngrams) {
+		const out = new Map();
+		for (const [char, n] of prepareNgrams(ngrams).uni)
+			if (char !== SIMILARITY_SKIPPED) out.set(char, n);
+		return out;
+	}
+
+	/**
+	 * The plain form a layout that lacks a typographic character types it as
+	 * (the model's substitutions: « … » as « ... »), as the engine's ways do.
+	 * @returns {Object<string, string>} A copy: fancy character → plain text.
+	 */
+	function substitutions() {
+		return Object.assign({}, data().model.substitutions);
+	}
+
+	/**
+	 * The optimizer's change penalty settings (score_weights.json
+	 * change_penalty): score points per % of the corpus's characters moved,
+	 * weighted as layoutSimilarity weighs them.
+	 * @returns {{presets: Object<string, number>, defaultPreset: string,
+	 *   maxWeight: number, defaultLimit: number}} A copy; presets in the file's
+	 *   order; defaultLimit, the « at most N changed characters » a page starts on.
+	 * @throws {Error} When a weight is not in [0, maxWeight] or the default is no preset.
+	 */
+	function changePenalty() {
+		const raw = data().change_penalty;
+		if (!raw || typeof raw !== 'object')
+			throw new Error('layout_analysis: the data has no change_penalty');
+		const max = raw.max_weight;
+		if (!(typeof max === 'number' && Number.isFinite(max) && max > 0))
+			throw new Error(`layout_analysis: change_penalty max_weight ${max} is not a number > 0`);
+		for (const [id, weight] of Object.entries(raw.presets))
+			if (!(typeof weight === 'number' && weight >= 0 && weight <= max))
+				throw new Error(`layout_analysis: change_penalty preset ${id} is not in [0, ${max}]`);
+		if (!Object.prototype.hasOwnProperty.call(raw.presets, raw.default_preset))
+			throw new Error(`layout_analysis: change_penalty default ${raw.default_preset} is no preset`);
+		if (!(Number.isInteger(raw.default_limit) && raw.default_limit >= 0))
+			throw new Error(
+				`layout_analysis: change_penalty default_limit ${raw.default_limit} is not an integer ≥ 0`
+			);
+		return {
+			presets: Object.assign({}, raw.presets),
+			defaultPreset: raw.default_preset,
+			maxWeight: max,
+			defaultLimit: raw.default_limit
+		};
+	}
+
+	/**
+	 * How alike two layouts type a corpus, in two measures of two strictness:
+	 * `sameKey`, the share of the characters typed on the same keys at the
+	 * same levels (a dead key and its key both alike); `sameFingerRow`, the
+	 * share on the same keys, or on the same finger and row at the same level
+	 * for every press (a letter moved between the index's two columns).
+	 * `weighted` counts each corpus character by its occurrences, so moving
+	 * « e » weighs far more than moving a rare symbol; `unweighted` counts each
+	 * distinct corpus character once. A character is placed as the engine
+	 * types it out of context (its cheapest way: level, AltGr, dead key), each
+	 * layout on its own board (an angle-mod layout's fingering). The space,
+	 * which every layout types on the space bar, is left out; a character
+	 * neither layout types is left out, one only one types counts as moved.
+	 * Symmetric; 100 for two identical layouts.
+	 * @param {object} aInput - Library shape (see layoutFromRows).
+	 * @param {object} bInput - Library shape.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string, profile?: object}} [options] - As analyse().
+	 * @returns {{weighted: {sameKey: number, sameFingerRow: number},
+	 *   unweighted: {sameKey: number, sameFingerRow: number}, chars: number,
+	 *   occurrences: number}} Shares in %, and the distinct characters and
+	 *   occurrences compared.
+	 * @throws {AnalysisError} similarity_empty when the corpus has no
+	 *   character either layout types (the space aside).
+	 */
+	function layoutSimilarity(aInput, bInput, ngrams, options) {
+		const opts = options || {};
+		const keyboardId = opts.keyboard || DEFAULT_KEYBOARD;
+		const a = layoutFromRows(aInput);
+		const b = layoutFromRows(bInput);
+		const placesA = typedPlaces(a, boardFor(a, keyboardId, opts.profile));
+		const placesB = typedPlaces(b, boardFor(b, keyboardId, opts.profile));
+		let chars = 0;
+		let occurrences = 0;
+		const same = { key: 0, fingerRow: 0, keyN: 0, fingerRowN: 0 };
+		for (const [char, n] of similarityWeights(ngrams)) {
+			const pa = placesA.get(char);
+			const pb = placesB.get(char);
+			if (!pa && !pb) continue;
+			chars += 1;
+			occurrences += n;
+			const key = Boolean(pa && pb && pa.keys === pb.keys);
+			const fingerRow = key || Boolean(pa && pb && pa.fingerRows === pb.fingerRows);
+			if (key) {
+				same.key += 1;
+				same.keyN += n;
+			}
+			if (fingerRow) {
+				same.fingerRow += 1;
+				same.fingerRowN += n;
+			}
+		}
+		if (chars === 0)
+			throw new AnalysisError(
+				'similarity_empty',
+				{},
+				'no corpus character to compare the layouts on'
+			);
+		return {
+			weighted: {
+				sameKey: (100 * same.keyN) / occurrences,
+				sameFingerRow: (100 * same.fingerRowN) / occurrences
+			},
+			unweighted: {
+				sameKey: (100 * same.key) / chars,
+				sameFingerRow: (100 * same.fingerRow) / chars
+			},
+			chars,
+			occurrences
+		};
+	}
+
+	/**
+	 * The mark gap under which an existing layout « does the job » of an
+	 * optimized one (the optimizer's library comparison), in % of the best
+	 * existing layout's mark (markPercent): the model's similar_mark_gap.
+	 * @returns {number} A finite number ≥ 0.
+	 * @throws {Error} When the model's value is not one.
+	 */
+	function similarMarkGap() {
+		const gap = data().model.similar_mark_gap;
+		if (typeof gap !== 'number' || !Number.isFinite(gap) || gap < 0)
+			throw new Error(`layout_analysis: similar_mark_gap ${gap} is not a number ≥ 0`);
+		return gap;
+	}
+
+	/**
+	 * The layout every mark is named beside and the ranking's « relative »
+	 * view measures the others against, on every corpus (model
+	 * reference_layout: QWERTY, shared by every language, Alt Alpha Ranker's
+	 * baseline; maintainer, 2026-11-23).
+	 * @returns {string} A library layout id.
+	 * @throws {Error} When the model's reference is not a library layout.
+	 */
+	function referenceLayout() {
+		const id = data().model.reference_layout;
+		if (!data().layouts.some((layout) => layout.id === id))
+			throw new Error(`layout_analysis: reference layout ${id} is not in the library`);
+		return id;
+	}
+
+	/**
+	 * Re-scores and re-ranks results with new weights, floors or graded costs
+	 * (no re-analysis).
+	 * @param {object[]} results - analyse() outputs.
+	 * @param {object} [weights] - As score().
+	 * @param {object} [floors] - As score().
+	 * @param {object} [grades] - As score().
+	 * @returns {object[]} The same results, re-scored and ranked.
+	 * @throws {Error} When an access weight differs from the one a result's
+	 *   ways were chosen by: those weights change the typing, so the layouts
+	 *   must be analysed again.
+	 */
+	function rescore(results, weights, floors, grades) {
+		const access = accessWeights(weights);
+		for (const result of results) {
+			const used = result.typing && result.typing.access;
+			if (!used) throw new Error('layout_analysis: rescore needs analyse() results');
+			for (const id of ACCESS_WEIGHTS)
+				if (used[id] !== access[id])
+					throw new Error(
+						`layout_analysis: ${id} chooses the ways of typing; analyse again instead of rescore`
+					);
+		}
+		const scale = scoreGrades(grades).hand_run;
+		// Every score first: settings a mark refuses leave the results unchanged.
+		const scored = results.map((result) => {
+			// hand_run's value follows its scale: shown as the score weighs it.
+			const metrics = Object.assign({}, result.metrics, {
+				hand_run: handRunValue(result.parts.hand_run, scale)
+			});
+			return {
+				metrics,
+				score: score(Object.assign({}, result, { metrics }), weights, floors, grades)
+			};
+		});
+		results.forEach((result, i) => {
+			result.metrics.hand_run = scored[i].metrics.hand_run;
+			result.score = scored[i].score;
+		});
 		return rank(results);
+	}
+
+	// The score settings file (« Réglages du score », export and import): its
+	// format name, the one version this engine reads, and the analyser it is for.
+	// Version 2 (2026-11-19) adds the penalty floors; a version 1 file lacks
+	// them and the two metrics added with them, so it is refused (config_version)
+	// rather than read with guessed values. Version 3 (2026-11-21) adds the
+	// graded costs and the row_jump weight and floor, refused the same way.
+	const SCORE_CONFIG_FORMAT = 'ergopti-score-settings';
+	const SCORE_CONFIG_VERSION = 3;
+	const SCORE_CONFIG_ANALYSER = 'ergopti';
+	// Its entries, each read by the engine's own check of that setting.
+	const SCORE_CONFIG_KEYS = Object.freeze([
+		'format',
+		'schema_version',
+		'analyser',
+		'weights',
+		'floors',
+		'grades',
+		'ideal_load',
+		'shortcuts',
+		'form_weights'
+	]);
+
+	/**
+	 * The score settings as the file the Comparer exports: every weight of the
+	 * global score (a metric is in the score when its weight is above 0, the
+	 * access weights among them), the penalty floors, the graded costs, the ideal finger load,
+	 * the shortcut table and the compact form factors' weights, each checked as an analysis checks it.
+	 * @param {{weights: object, floors: object, grades: object, idealLoad: object,
+	 *   shortcuts: object, formWeights: object}} settings - The settings in use.
+	 * @returns {object} The file's JSON value.
+	 * @throws {AnalysisError} When a setting is one the import would refuse.
+	 */
+	function scoreConfig(settings) {
+		const out = {
+			format: SCORE_CONFIG_FORMAT,
+			schema_version: SCORE_CONFIG_VERSION,
+			analyser: SCORE_CONFIG_ANALYSER,
+			weights: Object.assign({}, settings.weights),
+			floors: scoreFloors(settings.floors),
+			grades: scoreGrades(settings.grades),
+			ideal_load: Object.assign({}, settings.idealLoad),
+			shortcuts: {
+				letters: Object.assign({}, settings.shortcuts.letters),
+				ease: Object.assign({}, settings.shortcuts.ease)
+			},
+			form_weights: Object.assign({}, settings.formWeights)
+		};
+		readScoreConfig(out);
+		return out;
+	}
+
+	/**
+	 * Reads a score settings file, whole or not at all: every entry present,
+	 * none unknown, each value checked, so a partial file is never applied.
+	 * @param {*} value - The file's parsed JSON.
+	 * @returns {{weights: object, floors: object, grades: object, idealLoad: object,
+	 *   shortcuts: object, formWeights: object}} The settings, ready for analyse().
+	 * @throws {AnalysisError} config_not_object, config_unknown_key,
+	 *   config_missing, config_format, config_version, config_analyser,
+	 *   config_weight_type, config_weight_range, or the refusal of the ideal
+	 *   load, shortcut table or form factor weights.
+	 */
+	function readScoreConfig(value) {
+		const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+		if (!isObject(value))
+			throw new AnalysisError('config_not_object', {}, 'a score settings file is a JSON object');
+		// Its format and version first: a file of an older version says so, not
+		// that it lacks the entries that version did not have.
+		if (value.format !== SCORE_CONFIG_FORMAT)
+			throw new AnalysisError(
+				'config_format',
+				{ found: String(value.format) },
+				`format ${value.format} is not ${SCORE_CONFIG_FORMAT}`
+			);
+		if (value.schema_version !== SCORE_CONFIG_VERSION)
+			throw new AnalysisError(
+				'config_version',
+				{ found: String(value.schema_version), expected: String(SCORE_CONFIG_VERSION) },
+				`score settings version ${value.schema_version} is not ${SCORE_CONFIG_VERSION}`
+			);
+		if (value.analyser !== SCORE_CONFIG_ANALYSER)
+			throw new AnalysisError(
+				'config_analyser',
+				{ found: String(value.analyser), expected: SCORE_CONFIG_ANALYSER },
+				`score settings for ${value.analyser}, not ${SCORE_CONFIG_ANALYSER}`
+			);
+		for (const key of Object.keys(value))
+			if (!SCORE_CONFIG_KEYS.includes(key))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key },
+					`unknown score settings entry ${key}`
+				);
+		for (const key of SCORE_CONFIG_KEYS)
+			if (!(key in value))
+				throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+		if (!isObject(value.weights))
+			throw new AnalysisError('config_weight_type', { key: 'weights' }, 'weights is not an object');
+		const defaults = data().weights;
+		for (const id of Object.keys(value.weights))
+			if (!(id in defaults))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key: `weights.${id}` },
+					`unknown weight ${id}`
+				);
+		const weights = {};
+		for (const id of Object.keys(defaults)) {
+			const key = `weights.${id}`;
+			if (!(id in value.weights))
+				throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+			const weight = value.weights[id];
+			if (typeof weight !== 'number')
+				throw new AnalysisError('config_weight_type', { key }, `${key} is not a number`);
+			if (!Number.isFinite(weight) || weight < 0)
+				throw new AnalysisError(
+					'config_weight_range',
+					{ key, value: weight },
+					`${key} must be a finite number >= 0`
+				);
+			weights[id] = weight;
+		}
+		if (!isObject(value.floors))
+			throw new AnalysisError('config_weight_type', { key: 'floors' }, 'floors is not an object');
+		const defaultFloorsOf = data().floors;
+		for (const id of Object.keys(value.floors))
+			if (!(id in defaultFloorsOf))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key: `floors.${id}` },
+					`unknown floor ${id}`
+				);
+		const floors = {};
+		for (const id of Object.keys(defaultFloorsOf)) {
+			const key = `floors.${id}`;
+			if (!(id in value.floors))
+				throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+			const floor = value.floors[id];
+			if (typeof floor !== 'number')
+				throw new AnalysisError('config_weight_type', { key }, `${key} is not a number`);
+			if (!Number.isFinite(floor) || floor < 0)
+				throw new AnalysisError(
+					'config_weight_range',
+					{ key, value: floor },
+					`${key} must be a finite number >= 0`
+				);
+			floors[id] = floor;
+		}
+		const grades = readConfigGrades(value.grades, isObject);
+		for (const key of ['ideal_load', 'shortcuts', 'form_weights'])
+			if (!isObject(value[key]))
+				throw new AnalysisError('config_weight_type', { key }, `${key} is not an object`);
+		return {
+			weights,
+			floors,
+			grades,
+			idealLoad: Object.assign({}, idealLoad(value.ideal_load)),
+			shortcuts: shortcuts(value.shortcuts),
+			formWeights: formFactorWeights(value.form_weights)
+		};
+	}
+
+	/**
+	 * The graded costs of a score settings file: every table and grade of
+	 * GRADES present, none unknown, each a finite number >= 0.
+	 * @param {*} value - The file's « grades ».
+	 * @param {function(*): boolean} isObject - readScoreConfig's object test.
+	 * @returns {object} metric → grade → factor.
+	 * @throws {AnalysisError} config_weight_type, config_unknown_key,
+	 *   config_missing, config_weight_range.
+	 */
+	function readConfigGrades(value, isObject) {
+		if (!isObject(value))
+			throw new AnalysisError('config_weight_type', { key: 'grades' }, 'grades is not an object');
+		for (const metric of Object.keys(value))
+			if (!(metric in GRADES))
+				throw new AnalysisError(
+					'config_unknown_key',
+					{ key: `grades.${metric}` },
+					`unknown graded metric ${metric}`
+				);
+		const out = {};
+		for (const [metric, ids] of Object.entries(GRADES)) {
+			const tableKey = `grades.${metric}`;
+			if (!(metric in value))
+				throw new AnalysisError(
+					'config_missing',
+					{ key: tableKey },
+					`the score settings lack ${tableKey}`
+				);
+			const table = value[metric];
+			if (!isObject(table))
+				throw new AnalysisError(
+					'config_weight_type',
+					{ key: tableKey },
+					`${tableKey} is not an object`
+				);
+			for (const grade of Object.keys(table))
+				if (!ids.includes(grade))
+					throw new AnalysisError(
+						'config_unknown_key',
+						{ key: `${tableKey}.${grade}` },
+						`unknown grade ${tableKey}.${grade}`
+					);
+			out[metric] = {};
+			for (const grade of ids) {
+				const key = `${tableKey}.${grade}`;
+				if (!(grade in table))
+					throw new AnalysisError('config_missing', { key }, `the score settings lack ${key}`);
+				const factor = table[grade];
+				const why = gradeRefusal(metric, factor, grade);
+				// A value of the wrong type, or of the right type out of range.
+				const expected = GRADE_KINDS[metric] === GRADE_SWITCH ? 'boolean' : 'number';
+				if (typeof factor !== expected)
+					throw new AnalysisError('config_weight_type', { key }, `${key} is not a ${expected}`);
+				if (why)
+					throw new AnalysisError(
+						'config_weight_range',
+						{ key, value: factor },
+						`${key} must be ${why}`
+					);
+				out[metric][grade] = factor;
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * The least value a numeric grade takes (1 for a run multiplier, 0 for a
+	 * factor or the run growth), for a page's input.
+	 * @param {string} metric - A GRADES table that is no switch.
+	 * @param {string} grade - One of its grades.
+	 * @returns {number}
+	 */
+	function gradeMinimum(metric, grade) {
+		if (GRADE_KINDS[metric] === GRADE_SWITCH)
+			throw new Error(`layout_analysis: ${metric} is a switch, not a number`);
+		return GRADE_KINDS[metric] === GRADE_RUN && grade !== RUN_GROWTH ? 1 : 0;
 	}
 
 	return {
 		METRICS,
+		GRADES,
+		GRADE_KINDS,
+		GRADE_SWITCH,
+		GRADE_RUN,
+		gradeMinimum,
+		ACCESS_WEIGHTS,
 		LAYER_IDS,
+		heldCodes,
+		heldCodesOf,
+		AnalysisError,
+		KEY_EVENTS,
+		KEY_COST_METRICS,
+		KEY_GAINS,
+		KEY_INFO_METRICS,
+		KEY_METRICS,
+		WORD_TABLE_SIZE,
+		WORD_EFFORT_METRICS,
+		SFS_DISTANCE_SHARE,
 		hashText,
 		keyboard,
+		layoutKeyboard,
 		fingeringProfile,
 		layoutFromRows,
+		contextOutput,
+		contextLabel,
+		levelsOf,
 		layoutFromComposerSource,
 		typingCodes,
+		thumbKeys: thumbKeyCodes,
+		modTapThumbKeys: modTapThumbKeyCodes,
+		spareThumbKeys,
+		keyboardFormats,
+		defaultKeyboardFormat,
+		formatHiddenKeys,
 		libraryLayouts,
 		compileLayout,
+		compileWays,
+		typingPlan,
+		typingRows,
+		metricDigits,
 		keyNgrams,
 		ngramsFromText,
+		ngramsFromKeystats,
 		prepareNgrams,
 		analyse,
+		measure,
+		scoreSession,
 		score,
+		markIndex,
+		markPercent,
+		keyScoreCost,
+		keyValues,
+		keyDiff,
+		standing,
+		percentiles,
+		PERCENTILE_MIN_REFERENCES,
+		bigramMatrix,
+		countWords,
+		wordTable,
+		wordsFromText,
+		wordEfforts,
+		effortDistribution,
+		traceText,
+		TRACE_PAIR_EVENTS,
+		TRACE_TRIPLE_EVENTS,
+		TRACE_MAX_CHARS,
+		MOVEMENT_CLASSES,
+		MOVEMENT_EXTRA,
+		RHYTHM_CLASSES,
+		movementTable,
+		movementBetter,
+		WINDOW_KINDS,
+		WINDOW_MAX_METRICS,
+		windowNames,
+		windowMetrics,
+		tapHoldKeys,
+		tapHoldReport,
+		rankAmong,
+		wordsWithKeys,
+		blendNgrams,
+		BLEND_CHARS,
+		pareto,
+		densityCurve,
+		compileQuery,
+		QueryError,
 		defaultWeights,
+		defaultFloors,
+		scoreFloors,
+		defaultGrades,
+		flatGrades,
+		scoreGrades,
+		accessWeights,
+		scoreConfig,
+		readScoreConfig,
 		defaultIdealLoad,
 		idealLoad,
+		defaultShortcuts,
+		shortcuts,
+		defaultFormFactorWeights,
+		formFactorWeights,
 		compare,
-		rescore
+		rank,
+		rankOrder,
+		rescore,
+		diff,
+		layoutSimilarity,
+		similarityWeights,
+		substitutions,
+		changePenalty,
+		similarMarkGap,
+		referenceLayout
 	};
 })();
 

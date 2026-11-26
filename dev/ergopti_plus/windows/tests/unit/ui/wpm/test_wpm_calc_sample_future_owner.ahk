@@ -29,7 +29,8 @@ _WPMF_Case(Mode) {
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)) . " timings=" . Timings.Digest
 			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\wpm_calc_sample_future_body.ahk")))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum)], _WPMR_Complete.Bind(State))
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory, String(Timings.Window), String(Timings.Minimum),
+			String(Timings.IdleReset)], _WPMR_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private WPM child must start")
 		Started := A_TickCount
 		while State.Calls == 0 && TickElapsed(Started) < 15000 {

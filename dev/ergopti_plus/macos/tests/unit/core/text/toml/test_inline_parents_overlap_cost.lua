@@ -29,18 +29,27 @@ local function count_lower_calls(body)
 end
 
 helpers.describe("inline scalar parents: overlap detection", function()
-	helpers.it("lowercases a bounded number of segments per row", function()
+	helpers.it("lowercases the same number of segments for every added row", function()
 		local Writer = require("core.text.engine.toml_codec.writer")
-		local rows = {}
-		for index = 1, 300 do
-			rows[index] = { section = "section_" .. index, key = "key", value = true }
+		--- Lowercase calls of one save of `count` rows.
+		local function calls_for(count)
+			local rows = {}
+			for index = 1, count do
+				rows[index] = { section = "section_" .. index, key = "key", value = true }
+			end
+			local calls, parents = count_lower_calls(function()
+				return Writer.source_inline_scalar_parents(SOURCE, rows)
+			end)
+			helpers.assert_eq(parents, {})
+			return calls
 		end
-		local calls, parents = count_lower_calls(function()
-			return Writer.source_inline_scalar_parents(SOURCE, rows)
-		end)
-		helpers.assert_eq(parents, {})
-		-- The pairwise scan made 181 200 calls here; one walk per row makes 3 000.
-		helpers.assert_true(calls <= 20 * #rows, "overlap scan is not linear: " .. calls .. " lower calls")
+		-- Linear means each block of 300 more rows costs what the previous block
+		-- did. The pairwise scan made 181 200 calls at 300 rows and four times
+		-- as many at 600, so its second block cost three times its first.
+		local first, second, third = calls_for(300), calls_for(600), calls_for(900)
+		helpers.assert_true(second > first, "the counter saw no per-row call, so it measured nothing")
+		helpers.assert_eq(third - second, second - first,
+			"overlap scan is not linear: " .. first .. ", " .. second .. ", " .. third .. " lower calls")
 	end)
 
 	helpers.it("still withholds a parent whose rows nest through a case-folded path", function()

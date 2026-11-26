@@ -24,6 +24,12 @@ ValueSchemaData() {
 			"unit", "mm",
 			"min", 1,
 			"max", 60),
+		"hotstrings.backspace_restore_window_ms", Map(
+			"file", "config.toml",
+			"type", "integer",
+			"unit", "ms",
+			"min", 50,
+			"max", 10000),
 		"hotstrings.cascade_max_arrows", Map(
 			"file", "config.toml",
 			"type", "integer",

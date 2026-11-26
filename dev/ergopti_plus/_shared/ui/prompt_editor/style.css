@@ -27,19 +27,20 @@
 	--border: var(--theme-separator);
 	--text: var(--theme-text);
 	--sub: var(--theme-sub);
-	--hint: var(--theme-gray);
+	/* Hints and chips are small text: 7:1 on their ground in both appearances (WCAG 1.4.6). */
+	--hint: var(--theme-hue-48484c);
 	--accent: var(--theme-accent);
 	--danger: var(--theme-danger);
 	--chip-bg: var(--theme-hue-ddeeff);
-	--chip-c: var(--theme-hue-1a4bbf);
+	--chip-c: var(--theme-hue-0a3a6e);
 	--chip-bd: rgba(26, 75, 191, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--hint: var(--theme-hue-636366);
+		--hint: var(--theme-hue-c4c4ca);
 		--chip-bg: var(--theme-hue-183060);
-		--chip-c: var(--theme-hue-93b8f8);
+		--chip-c: var(--theme-hue-c6d8f5);
 		--chip-bd: rgba(147, 184, 248, 0.28);
 	}
 }
@@ -92,6 +93,15 @@ h1 {
 	display: flex;
 	justify-content: space-between;
 	margin-bottom: 5px;
+}
+
+/* The token buttons: a toolbar list laid out as the buttons alone were. */
+.chip-bar {
+	list-style: none;
+}
+
+.chip-bar li {
+	display: inline;
 }
 
 label {
@@ -178,6 +188,7 @@ select:focus {
 	display: inline-block;
 	font-family: 'SF Mono', Menlo, monospace;
 	font-size: 11.5px;
+	font-style: normal;
 	margin: 0 2px;
 	padding: 1px 5px;
 	user-select: all;
@@ -246,8 +257,10 @@ select:focus {
 	filter: brightness(0.9);
 }
 
+/* The dark appearance's accent is too light under white text (3.6:1): the
+   save button keeps the deep blue in both (5.8:1, WCAG 1.4.3). */
 .btn-p {
-	background: var(--accent);
+	background: var(--theme-hue-004a99);
 	color: var(--theme-white);
 }
 
@@ -280,6 +293,7 @@ select:focus {
 	border-radius: 8px;
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 	display: none;
+	list-style: none;
 	min-width: 140px;
 	padding: 4px 0;
 	position: fixed;
@@ -302,4 +316,12 @@ select:focus {
 .ac-item:hover {
 	background: var(--chip-bg);
 	color: var(--chip-c);
+}
+
+/* The main landmark holds the page and keeps the body's column layout. */
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
 }

@@ -74,8 +74,7 @@ _MetaCheckBootDeferredTasks() {
 	; occurrence sits before ready — exactly the regression we must prevent.
 	for _, Probe in [
 		"SetTimer(WPMWidget_BootShow",
-		"SetTimer(BuildLanguageMenuDeferred",
-		"SetTimer(I18nWarmFallbacks" ] {
+		"SetTimer(BuildLanguageMenuDeferred" ] {
 		Pos := InStr(Body, Probe)
 		Assert(Pos > 0, "ErgoptiPlus.ahk must arm '" . Probe . "...' at boot")
 		Assert(Pos > ReadyPos,

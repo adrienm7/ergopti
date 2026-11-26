@@ -93,7 +93,7 @@ helpers.describe("logger: logs-folder resolver", function()
 			if type(home) == "string" and home ~= "" then
 				local expected = require("core.logger.engine.log_folders").default_logs_dir(home)
 				helpers.assert_eq(Logger.FALLBACK_LOG_DIR, expected)
-				helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, expected .. "ErgoptiPlus_boot.log")
+				helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, expected .. "boot_journal.log")
 			else
 				helpers.assert_eq(Logger.FALLBACK_LOG_DIR, "/tmp/" .. AppDirs.macos.folder_name .. "/")
 			end

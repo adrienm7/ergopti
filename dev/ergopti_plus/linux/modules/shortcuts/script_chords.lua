@@ -27,6 +27,10 @@
 --- 5. A change made while paused is saved at once and runs from the resume:
 ---    the chords live at pause time keep answering until then, so the chord
 ---    that resumes cannot move away under a paused daemon.
+--- 6. A chord is a sequence: AltGr pressed, then the slot's key, with no other
+---    key pressed between (the hook's prior_role). Typing AltGr symbols then
+---    Enter or Backspace before AltGr is up is text: on Ergopti+ a fast « (# »
+---    then Enter paused the driver (the maintainer, 2026-11-17), as on Windows.
 --- ==============================================================================
 
 local M = {}
@@ -36,7 +40,7 @@ local Logger = require("core.logger.engine.shim")
 local ShortcutCatalogue = require("shortcuts.engine.catalogue")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Paths = require("core.fs.engine.paths")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ScriptChords = require("keyboard.engine.layers.script_chords")
 local TomlCodec = require("core.text.engine.toml_codec")
 local TomlWriter = require("core.text.engine.toml_codec.writer")
@@ -244,7 +248,7 @@ end
 --- Reads every slot and the switch from config.toml, or the manifest defaults.
 local function load_assignments()
 	if _assignments then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("script_chords: cannot read configuration: " .. tostring(detail))
@@ -312,7 +316,7 @@ end
 --- @param value any
 --- @return boolean committed
 local function persist(key, value)
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local assignments, enabled, generation = _assignments, _chords_on, _dispatch_generation
 	local bytes, status = TomlWriter.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then return false end
@@ -394,6 +398,16 @@ function M.slot_runs(slot_id, paused)
 	return ScriptChords.runs(M.catalogue(), assignments[slot_id], chords_on, paused)
 end
 
+--- The slot whose chord the tray shows beside an action's row: the first slot
+--- whose live chord runs it (the shared rule, ScriptChords.hint_slot).
+--- @param action string The tray row's action id.
+--- @return string|nil slot_id Nil when no chord runs it.
+function M.hint_slot(action)
+	load_assignments()
+	local assignments, chords_on = live_chords()
+	return ScriptChords.hint_slot(M.catalogue(), assignments, chords_on, action)
+end
+
 
 
 
@@ -425,7 +439,7 @@ function M.init(opts)
 end
 
 --- Decides one key press from the keyboard hook's consumption callback.
---- @param detail table { code, mods } as the hook reports it.
+--- @param detail table { code, mods, prior_role } as the hook reports it.
 --- @return boolean consumed True when the press is a chord whose slot runs an
 ---   action; it then never reaches the application.
 function M.on_key(detail)
@@ -433,6 +447,8 @@ function M.on_key(detail)
 	if type(detail) ~= "table" or type(detail.code) ~= "number" then return false end
 	local mods = type(detail.mods) == "table" and detail.mods or {}
 	if not mods.altgr then return false end
+	-- Only right after AltGr itself: « (# » then Enter while AltGr is held is text.
+	if detail.prior_role ~= "altgr" then return false end
 	for _, name in ipairs(BLOCKING_MODIFIERS) do
 		if mods[name] then return false end
 	end

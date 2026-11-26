@@ -8,7 +8,9 @@
 --- FEATURES & RATIONALE:
 --- 1. Effective speed. Every character that reaches the page counts — typed,
 ---    expanded or generated — because the readout answers "how fast is text
----    appearing", which is what a hotstring or a completion speeds up.
+---    appearing", which is what a hotstring or a completion speeds up. The
+---    characters a producer erased (a trigger, rewritten text) are taken back
+---    first, so the count is the produced text (MET-17).
 --- 2. Zero after a pause. A burst's speed is not the user's speed ten seconds
 ---    later; after timings [keystats] wpm_idle_reset_ms without a character
 ---    the readout reads 0.
@@ -89,11 +91,56 @@ function M.record(tracker, count, now_ms)
 	prune(tracker, now_ms)
 end
 
---- Records a physical input independently of the effective character count.
+--- Takes back `count` characters a producer erased at `now_ms` (a hotstring's
+--- trigger, the text an AI rewrite replaced): the newest stamps at or before
+--- that time leave the window, so the speed counts the text on the page, not
+--- the keys pressed (maintainer decision MET-17, 2026-11-21, macOS's rule).
+--- @param tracker table
+--- @param count integer
+--- @param now_ms number
+function M.retract(tracker, count, now_ms)
+	count = math.floor(tonumber(count) or 0)
+	local stamps = tracker.stamps
+	local index = #stamps
+	while count > 0 and index > 0 do
+		if stamps[index] <= now_ms then
+			table.remove(stamps, index)
+			count = count - 1
+		end
+		index = index - 1
+	end
+end
+
+--- Records a text key independently of the effective character count.
 --- @param tracker table
 --- @param now_ms number
 function M.record_input(tracker, now_ms)
 	Activity.record_input(tracker.activity, now_ms)
+end
+
+--- Observes a key that is not text by itself (see activity.observe_key).
+--- @param tracker table
+--- @param role string|nil
+--- @param code any
+--- @param shortcut boolean
+--- @param now_ms number
+function M.observe_key(tracker, role, code, shortcut, now_ms)
+	Activity.observe_key(tracker.activity, role, code, shortcut, now_ms)
+end
+
+--- Observes a modifier release (see activity.observe_release).
+--- @param tracker table
+--- @param code any
+--- @param now_ms number
+function M.observe_release(tracker, code, now_ms)
+	Activity.observe_release(tracker.activity, code, now_ms)
+end
+
+--- Ends the typing burst (a click or a focus change).
+--- @param tracker table
+--- @param now_ms number
+function M.record_break(tracker, now_ms)
+	Activity.record_break(tracker.activity, now_ms)
 end
 
 --- Names where the last text came from: "hotstring" (with its group as the
@@ -122,7 +169,7 @@ end
 --- Effective speed, the last producer, and separately owned input/source activity.
 --- @param tracker table
 --- @param now_ms number
---- @return table { wpm, source, source_variant, source_time, last_input_time, source_holds } — times in seconds.
+--- @return table { wpm, source, source_variant, source_time, last_input_time, last_break_time, source_holds } — times in seconds.
 function M.stats(tracker, now_ms)
 	prune(tracker, now_ms)
 	local wpm = 0

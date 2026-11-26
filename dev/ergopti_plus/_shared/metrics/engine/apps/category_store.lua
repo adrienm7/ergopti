@@ -44,6 +44,10 @@ M.LEGACY_SCORE_PREFIX = "app_score."
 -- The category an application holds before the user picks one
 M.DEFAULT_CATEGORY = "Unknown"
 
+-- The score an application holds before the user gives it one (Windows:
+-- KLAppCatConst.UNEDITED_SCORE)
+M.UNEDITED_SCORE = 0
+
 
 
 
@@ -64,14 +68,16 @@ function M.score_valid(score)
 end
 
 --- Reads a score typed in an editor prompt through the shared value check (a
---- decimal point or comma, surrounding blanks ignored).
+--- decimal point or comma, surrounding blanks ignored). A blank answer goes back
+--- to the score of an application never edited (maintainer decision of
+--- 2026-11-22, PCK-13 for overrides).
 --- @param text any The prompt's answer.
 --- @param translate function i18n accessor, for the localized refusal naming the range.
 --- @return number|nil score
 --- @return string|nil refusal The localized refusal text when the entry is refused.
 function M.parse_score_entry(text, translate)
 	local ValueCheck = require("settings.engine.value_check")
-	local typed = ValueCheck.parse_entry(score_declaration(), text)
+	local typed = ValueCheck.parse_entry(score_declaration(), text, M.UNEDITED_SCORE)
 	if typed.ok then return typed.value end
 	return nil, ValueCheck.refusal_text(SCORE_KEY, typed, translate)
 end

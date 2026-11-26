@@ -1,7 +1,7 @@
 ﻿; tests/unit/core/ui/webview/test_model_browser_startup_owner.ahk
 
 ; ==============================================================================
-; MODULE: Native Model Browser Startup Ownership Tests
+; MODULE: Model Browser Startup Ownership Tests
 ; DESCRIPTION:
 ; Actual public opens survive or retire across real native Close callbacks.
 ; Complete child receipts are captured before cleanup can affect the result.
@@ -33,7 +33,7 @@ _MBSTO_Case(Mode) {
 		Fixture := _DriverDir . "\tests\fixtures\model_browser_startup_owner_body.ahk"
 		AssertTrue(FileExist(Fixture), "The native child fixture must exist")
 		Includes := "", Seen := Map()
-		for Symbol in ["LLM_GetModelIndex", "JsonStringLiteral", "FSRead", "WMPresentWindow"] {
+		for Symbol in ["LLM_GetModelIndex", "JsonStringLiteral", "FSRead", "WMPresentWindow", "ReadingPrefs_SeedScript"] {
 			Dependency := _DriverProductionFileForSymbol(Symbol)
 			AssertTrue(Dependency != "" && !Seen.Has(Dependency), "Every real presentation/catalogue owner must be unique")
 			Seen[Dependency] := true
@@ -125,10 +125,10 @@ for _MBSTO_SubscriptionMode in ["subscription-owner-current", "subscription-owne
 		_MBSTO_Case.Bind(_MBSTO_SubscriptionMode))
 
 for _MBSTO_SdkMode in ["subscription-throw-current", "subscription-throw-retired", "subscription-throw-cleanup-reopen", "subscription-throw-direct"]
-	Test("Model browser SDK refusal: " . _MBSTO_SdkMode . " preserves fallback ownership (model-subscription-sdk-failure-owner)",
+	Test("Model browser SDK refusal: " . _MBSTO_SdkMode . " refuses or stays silent by ownership (model-subscription-sdk-failure-owner)",
 		_MBSTO_Case.Bind(_MBSTO_SdkMode))
 
-Test("Model browser SDK refusal: real Close during unwind keeps fallback canceled (model-subscription-sdk-reset-close-owner)",
+Test("Model browser SDK refusal: real Close during unwind keeps the opening canceled (model-subscription-sdk-reset-close-owner)",
 	_MBSTO_Case.Bind("subscription-throw-unwind-close"))
 
 for _MBSTO_RetryMode in ["retry-current", "retry-reentry"]

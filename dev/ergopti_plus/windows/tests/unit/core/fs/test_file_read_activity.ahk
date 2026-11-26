@@ -192,7 +192,7 @@ _FRAI_NativeModuleSource(Name) {
 ; Only these three module names are admitted; they never select driver paths.
 _FRAI_CopyNativeModules(Directory, Fixture) {
 	Symbols := Map("file_system.ahk", "_FSReadUtf8ExactImpl",
-		"config_write_lease.ahk", "_ConfigWriteLeaseTryAcquire",
+		"write_lease.ahk", "_ConfigWriteLeaseTryAcquire",
 		"file_read_activity.ahk", "FileReadActivityEnter")
 	FixtureSource := FileRead(A_ScriptDir . "\support\" . Fixture, "UTF-8")
 	Published := Map()

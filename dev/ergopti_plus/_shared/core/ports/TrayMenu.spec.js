@@ -6,20 +6,35 @@
  * DESCRIPTION:
  * Contract for the OS-level system tray / menubar icon and menu port. Every
  * driver adapter that manages the application's tray presence MUST satisfy
- * this interface. The port abstracts AHK's Menu class (Windows system tray)
- * and Hammerspoon's hs.menubar (macOS status bar) behind a unified surface.
+ * this interface. The port abstracts AHK's Menu class (Windows system tray),
+ * Hammerspoon's hs.menubar (macOS status bar) and libayatana-appindicator
+ * (Linux StatusNotifierItem) behind a unified surface.
  *
  * FEATURES & RATIONALE:
- * 1. Icon state machine: the tray icon has three visual states — "active"
- *    (script running normally), "paused" (user paused expansions), "disabled"
- *    (error / not initialized). The adapter maps each state to a platform icon.
- * 2. Declarative menu: callers pass a tree of MenuNode objects; the adapter
+ * 1. An icon is an image file. setIcon takes an option map whose `image` names
+ *    an existing file, and answers whether that file is now drawn. The icon has
+ *    two states, running and paused, each drawn from its own logo by the pause
+ *    owner of its driver (Windows TrayApplyStateIcon, macOS update_icon, Linux
+ *    setPaused); none draws an error or an update icon.
+ *
+ *    CORRECTED 2026-11-21 (TRAY-04). This port used to declare setIcon(state)
+ *    over three states, "active", "paused" and "disabled" (error), that
+ *    « adapters MUST accept ». No adapter ever took a state: Windows took
+ *    { image, title }, macOS { image, imageData, title }, Linux { icon }. Its
+ *    vectors asserted only that setIcon('active') did not throw, which every
+ *    adapter satisfied by ignoring the string, so they could never fail.
+ * 2. Fail fast on a missing file. A missing or unreadable image is refused with
+ *    one logged error and the previous icon stays; the adapter never draws
+ *    another image in its place (TRAY-05). The pause owners, which must show
+ *    something, draw a warning sign and say in the icon's name that the file is
+ *    missing.
+ * 3. Declarative menu: callers pass a tree of MenuNode objects; the adapter
  *    renders the platform menu from that tree. Callers do NOT call platform
  *    menu APIs directly.
- * 3. Feature-gate: items can carry an `enabled` flag. Disabled items are shown
- *    greyed out and their onClick is never called. This lets domain code gate
+ * 4. Feature-gate: items can carry a `disabled` flag. Disabled items are shown
+ *    greyed out and their fn is never called. This lets domain code gate
  *    features without branching on platform details.
- * 4. Checkbox support: items can carry a `checked` flag for toggle features.
+ * 5. Checkbox support: items can carry a `checked` flag for toggle features.
  * ==============================================================================
  */
 
@@ -37,13 +52,20 @@
  */
 const portContract = {
 	name: 'TrayMenu',
-	version: '1.0.0',
+	version: '2.0.0',
 
 	/**
-	 * setIcon(state) — Update the tray icon to reflect the given state.
-	 *   @param {string} state  "active" | "paused" | "disabled"
-	 *   @returns {void}
-	 *   @error_behavior "log_and_return".
+	 * setIcon(opts) — Draw an image file as the tray icon.
+	 *   @param {object} opts  Option map (a Lua table, an AHK Map).
+	 *   @param {string} opts.image  Absolute path to an existing image file.
+	 *          Adapter-only extras, outside this port: Windows `title` sets the
+	 *          tooltip, macOS `title` is text beside the icon and `imageData` a
+	 *          prebuilt hs.image.
+	 *   @returns {boolean} true when the image is drawn; false when opts is not
+	 *          a map, `image` is absent or empty, the file is missing or cannot
+	 *          be loaded, or the native call refuses it. A refusal logs one
+	 *          error and leaves the previous icon; no other image is drawn.
+	 *   @error_behavior "log_and_return" (false).
 	 *
 	 * setMenu(nodes) — Replace the tray menu with the given node tree.
 	 *   @param {Array<MenuNode>} nodes  Flat list of top-level menu items.
@@ -65,10 +87,7 @@ const portContract = {
 		setMenu: { arity: 1, required: true },
 		setTooltip: { arity: 1, required: true },
 		destroy: { arity: 0, required: true }
-	},
-
-	/** Valid icon states. Adapters MUST accept all three. */
-	ICON_STATES: ['active', 'paused', 'disabled']
+	}
 
 	/**
 	 * MenuNode shape (informative — not validated at runtime):
@@ -161,27 +180,35 @@ const FIXTURE_MENU = [
 
 /**
  * Returns test vectors for TrayMenu compliance.
+ *
+ * The setIcon vectors read what the native layer received, not only that no
+ * exception escaped: each mirror replays them by id against its real adapter
+ * (macOS test_adapter_contract_vectors_input_and_system.lua, Windows
+ * test_adapter_contract_vectors.ahk, Linux test_tray_menu_adapter.lua), and
+ * each fails on an adapter that ignores its argument.
  * @returns {Array<object>}
  */
 function contractTestVectors() {
 	return [
 		{
-			id: 'set_icon_active',
-			description: "setIcon('active') does not throw.",
-			input: { state: 'active' },
-			assert: { no_exception: true }
+			id: 'set_icon_draws_the_image',
+			description: 'setIcon({ image }) with an existing file draws that file and returns true.',
+			input: { opts: { image: '<an existing image file>' } },
+			assert: { returns: true, native_icon: '<that file>' }
 		},
 		{
-			id: 'set_icon_paused',
-			description: "setIcon('paused') does not throw.",
-			input: { state: 'paused' },
-			assert: { no_exception: true }
+			id: 'set_icon_refuses_a_missing_file',
+			description:
+				'setIcon({ image }) with a missing file returns false, logs an error naming it, and draws nothing.',
+			input: { opts: { image: '<a missing file>' } },
+			assert: { returns: false, error_logged: true, native_icon: '<unchanged>' }
 		},
 		{
-			id: 'set_icon_disabled',
-			description: "setIcon('disabled') does not throw.",
-			input: { state: 'disabled' },
-			assert: { no_exception: true }
+			id: 'set_icon_refuses_a_state_name',
+			description:
+				"setIcon('active'), the state string an earlier version of this port declared, returns false and draws nothing.",
+			input: { opts: 'active' },
+			assert: { returns: false, native_icon: '<unchanged>' }
 		},
 		{
 			id: 'set_menu_renders_without_exception',
@@ -196,19 +223,7 @@ function contractTestVectors() {
 				{ call: 'setMenu', args: [FIXTURE_MENU] },
 				{
 					call: 'setMenu',
-					args: [
-						[
-							{
-								id: 'single',
-								label: 'Item',
-								enabled: true,
-								checked: false,
-								onClick: null,
-								children: [],
-								separator: false
-							}
-						]
-					]
+					args: [[{ id: 'single', title: 'Item', checked: false, fn: null }]]
 				},
 				{ assert: 'no_exception' }
 			]
@@ -229,7 +244,7 @@ function contractTestVectors() {
 			description: 'Calling setIcon() after destroy() does not crash.',
 			steps: [
 				{ call: 'destroy' },
-				{ call: 'setIcon', args: ['active'] },
+				{ call: 'setIcon', args: [{ image: '<an existing image file>' }] },
 				{ assert: 'no_exception' }
 			]
 		}

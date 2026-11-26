@@ -164,12 +164,15 @@ fi
 echo "${E2E_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${E2E_USER}"
 chmod 0440 "/etc/sudoers.d/${E2E_USER}"
 E2E_HOME="$(getent passwd "${E2E_USER}" | cut -d: -f6)"
-# Only what the installer reads from a checkout: the product tree, the layout
+# Only what the installer reads from a checkout: the product tree, the XKB
+# helpers it stages beside the driver (install/xkb_helpers.sh), the layout
 # registry it installs beside the driver and the version source. The whole
 # repository would drag node_modules along.
 rm -rf "${E2E_HOME}/ergopti"
-mkdir -p "${E2E_HOME}/ergopti/static/layouts"
+mkdir -p "${E2E_HOME}/ergopti/static/layouts" "${E2E_HOME}/ergopti/static/ergopti/linux"
 cp -r "${SRC}/static/ergopti_plus" "${E2E_HOME}/ergopti/static/"
+cp -r "${SRC}/static/ergopti/linux/xkb_generation" "${SRC}/static/ergopti/linux/xkb_installation" \
+	"${E2E_HOME}/ergopti/static/ergopti/linux/"
 cp -r "${SRC}/static/layouts/registry" "${E2E_HOME}/ergopti/static/layouts/"
 cp "${SRC}/package.json" "${E2E_HOME}/ergopti/"
 # Source installs require the reviewed canonical builder, not a host binary.

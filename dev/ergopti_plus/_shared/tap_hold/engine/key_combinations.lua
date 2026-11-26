@@ -9,6 +9,12 @@ local M = {
 	PAIR_SEPARATOR = "_then_",
 	NONE = "none",
 }
+-- Actions no chord runs on any OS: the one-shot Shift, under its AutoHotkey and
+-- Linux id and its Karabiner id (maintainer decision of 2026-11-06, « One-shot
+-- Shift is a generic action on every OS »). A driver may refuse more where its
+-- chord cannot receive an action natively; Windows mirrors this list in
+-- KEY_COMBINATION_CHORD_REFUSED_ACTIONS.
+M.CHORD_REFUSED_EVERYWHERE = { one_shot_shift = true, sticky_shift = true }
 local TableUtil = require("core.text.engine.table_util")
 local ConfigKeys = require("settings.engine.keys")
 local function id(value)
@@ -102,13 +108,15 @@ function M.new(options)
 		activity(token)
 		local chosen, chosen_sequence
 		if enabled then
+			-- The first key may be held on any keyboard, as on Windows and macOS
+			-- (maintainer decision KCD-7 of 2026-11-21): its earliest press on any
+			-- source counts. Each press keeps its own source for its release.
 			for _, pair in ipairs(pairs_by_second[event.key]) do
-				-- Conservative first slice: an ordered pair belongs to one exact
-				-- physical keyboard. Cross-device combinations are not admitted.
-				local first_down = down[event.source .. "\0" .. pair.first]
-				if first_down and not (event.blocked_first or {})[pair.first]
-					and (chosen_sequence == nil or first_down.sequence < chosen_sequence) then
-					chosen, chosen_sequence = pair, first_down.sequence
+				for _, first_down in pairs(down) do
+					if first_down.key == pair.first and not (event.blocked_first or {})[pair.first]
+						and (chosen_sequence == nil or first_down.sequence < chosen_sequence) then
+						chosen, chosen_sequence = pair, first_down.sequence
+					end
 				end
 			end
 		end
@@ -200,6 +208,12 @@ function M.plan_chord_copy(source, options)
 	assert(type(source) == "string" and type(options) == "table" and type(options.entries) == "table",
 		"exact source and declared copy catalogue required")
 	assert(type(options.is_action) == "function", "native action admission required")
+	-- A tap the host admits but no chord can run (Windows and Linux refuse the
+	-- one-shot Shift, a program launch and the monitor Alt-Tab in a chord) keeps
+	-- its pair's chord as it is and is reported, as Windows has always done:
+	-- one such tap must not refuse the copy of every other pair.
+	local is_chord_action = options.is_chord_action or options.is_action
+	assert(type(is_chord_action) == "function", "native chord admission must be a function")
 	assert(options.tap_section == nil or options.tap_section == M.TAP_SECTION, "copy source section must be explicitly declared")
 	local Codec = require("core.text.engine.toml_codec")
 	local KeyPath = require("core.text.engine.toml_codec.key_path")
@@ -221,7 +235,7 @@ function M.plan_chord_copy(source, options)
 	if symmetric == nil then symmetric = declared.combo_symmetric end
 	local settings = M.chord_settings({ simultaneous_threshold_ms = delay, combo_symmetric = symmetric })
 	assert(combos.enabled == nil or type(combos.enabled) == "boolean", "chord source gate must be an exact boolean")
-	local rows, output, seen = {}, {}, {}
+	local rows, output, seen, skipped = {}, {}, {}, {}
 	for _, entry in ipairs(options.entries) do
 		assert(type(entry) == "table" and chord_token(entry.id) and not seen[entry.id], "unique copy pair required")
 		seen[entry.id] = true
@@ -237,14 +251,19 @@ function M.plan_chord_copy(source, options)
 			assert(id(value) and (value == M.NONE or options.is_action(value) == true), "chord source contains an unadmitted action")
 			slots[slot] = value
 		end
-		output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.tap }
-		if slots.tap ~= slots.combo then
+		if slots.tap ~= M.NONE and is_chord_action(slots.tap) ~= true then
+			skipped[#skipped + 1] = { id = entry.id, action = slots.tap }
+			output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.combo }
+		else
+			output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.tap }
+		end
+		if output[entry.id].combo ~= slots.combo then
 			local row = { section = KeyPath.render({ ConfigKeys.KEY.MOD_COMBOS, "config", entry.id }), key = "combo" }
 			if slots.tap == M.NONE then row.delete = true else row.value = slots.tap end
 			rows[#rows + 1] = row
 		end
 	end
-	return { source = source, rows = rows, changes = #rows, mod_combos_config = output,
+	return { source = source, rows = rows, changes = #rows, mod_combos_config = output, skipped = skipped,
 		mod_combos_enabled = combos.enabled, settings = settings }
 end
 

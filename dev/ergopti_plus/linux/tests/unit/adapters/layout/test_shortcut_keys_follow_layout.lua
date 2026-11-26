@@ -27,7 +27,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 
 	helpers.it("resolves ctrl+w to AZERTY's w key, not KEY_W (which is z there)", function()
 		with_layout(AZERTY)
-		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		local Emitter = helpers.load_module("gestures.engine.combo_emitter")
 		local parsed = Emitter.parse("ctrl+w")
 		helpers.assert_eq(parsed.keys, { 44 }, "Ctrl+KEY_W is Ctrl+Z (undo) on AZERTY")
 		helpers.assert_eq(parsed.mods, { 29 })
@@ -35,7 +35,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 
 	helpers.it("pastes with the key that types v on Ergopti", function()
 		with_layout(ERGOPTI)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		-- A clipboard that holds what was last written: the paste reads it back
@@ -59,14 +59,14 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 			is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.clipboard"] = nil
+		package.loaded["clipboard.adapters.clipboard"] = nil
 		local emitted = {}
 		local channel = { emit = function(code, value)
 			emitted[#emitted + 1] = { code = code, value = value }
 			return true
 		end }
 		local ok, err = pcall(function()
-			require("adapters.clipboard").paste_text("é", channel, function() end)
+			require("clipboard.adapters.clipboard").paste_text("é", channel, function() end)
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		helpers.assert_true(ok, tostring(err))
@@ -90,7 +90,7 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 		code, level_mods = Layout.shortcut_keycode("1", 2)
 		helpers.assert_eq({ code, level_mods }, { 2, {} },
 			"a digit on its own US key stays that key: toolkits read Ctrl+KEY_1 as Ctrl+1")
-		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		local Emitter = helpers.load_module("gestures.engine.combo_emitter")
 		helpers.assert_eq(Emitter.parse("ctrl+period"), { mods = { 29, 42 }, keys = { 51 } })
 		helpers.assert_eq(Emitter.parse("ctrl+shift+period"), { mods = { 29, 42 }, keys = { 51 } },
 			"a Shift the chord already holds is not pressed twice")

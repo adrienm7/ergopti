@@ -1,22 +1,17 @@
 ﻿; tests/unit/core/ui/editors/test_magic_key_capture_settlement.ahk
 
-; The actual editors run in an isolated child with only their native factory
-; and physical-state lookup ports bound. GUI Close, Suspend, the Stop owner,
+; The actual editor runs in an isolated child with only its native factory
+; bound. GUI Close, Suspend, the Stop owner,
 ; capture poll and nested successor all execute their genuine product paths.
 _MESC_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_ReadScalar", "MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
-		"_MagicKeySourceCapturePoll", "_MagicKeySourcePressedScan", "_MagicKeySourceCaptureKeyDown"] {
+	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_FillUnitRun", "_SIHO_ReadScalar", "MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the editor fixture requires its genuine owner: " . Name)
-		if Name == "MagicKeyEditor" || Name == "MagicKeySourceCapture" {
+		if Name == "MagicKeyEditor" {
 			Definition := StrReplace(Definition, "InputHook(", "_MESC_CreateHook(", true, &Bindings)
 			AssertEqual(1, Bindings, "only the native factory is bound in " . Name)
-		}
-		if Name == "MagicKeySourceCapture" {
-			Definition := StrReplace(Definition, "_MagicKeySourceCaptureState()", "_MESC_CreateSourceState()", true, &Bindings)
-			AssertEqual(1, Bindings, "only physical-state construction is bound in the source editor")
 		}
 		Code .= Definition . "`n"
 	}
@@ -31,14 +26,6 @@ _MESC_Complete(State, Code, Output, ErrorText) {
 _MESC_Case(Editor, Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "a preceding unsettled editor child must retire before another opens")
-	SourceState := _MagicKeySourceCaptureState((*) => false)
-	AssertTrue(SourceState.Scans.Length > 0, "the physical fixture uses the real manifest's candidate roster")
-	Scan := SourceState.Scans[1]
-	Code := LayoutRegistry_KeyCode(Scan, LayoutRegistry_Keycodes())
-	AssertTrue(MagicKeySourceIsCandidate(Code), "the fixture's physical key must be admitted by the actual manifest")
-	Scans := ""
-	for Candidate in SourceState.Scans
-		Scans .= (Scans == "" ? "" : ",") . Candidate
 	Script := A_Temp . "\ergopti_magic_capture_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".ahk"
 	AssertFalse(FileExist(Script), "the editor child requires a fresh source")
 	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MESC_ChildSource()) != 0)
@@ -46,8 +33,7 @@ _MESC_Case(Editor, Mode) {
 	PreviousCritical := Critical("Off")
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, Editor, Mode, Code, Scan, Scans,
-				String(TimingsGet("ui", "magic_key_capture_poll_ms")), String(TimingsGet("ui", "magic_key_capture_timeout_ms"))],
+			["/ErrorStdOut=UTF-8", Script, Editor, Mode],
 			_MESC_Complete.Bind(State))
 		AssertTrue(Handle.start(), "the real editor child must start")
 		Started := A_TickCount
@@ -95,16 +81,15 @@ _MESC_Case(Editor, Mode) {
 	AssertTrue(Retired, "the exact editor child must retire before its source is removed")
 }
 
-for _MESC_Editor in ["character", "source"]
-	for _MESC_Mode in ["live", "cancel", "completed-close", "completed-paused-resumed", "completed-close-successor", "stop-refusal", "stop-reentrant"]
-		Test("Magic Key capture settlement: " . _MESC_Editor . " " . _MESC_Mode . " (magic-key-capture-settlement)",
-			_MESC_Case.Bind(_MESC_Editor, _MESC_Mode))
+for _MESC_Mode in ["live", "cancel", "completed-close", "completed-paused-resumed", "completed-close-successor", "stop-refusal", "stop-reentrant"]
+	Test("Magic Key capture settlement: character " . _MESC_Mode . " (magic-key-capture-settlement)",
+		_MESC_Case.Bind("character", _MESC_Mode))
 
-; EDD-1, decided by the coordinator on 2026-11-14: the physical magic key
-; capture runs while paused and saves the key at once; it stays inert until
-; resume. Before, a paused driver refused it (paused-magic-capture).
-Test("Magic Key capture settlement: source paused-live persists the key captured while paused (paused-magic-capture)",
-	_MESC_Case.Bind("source", "paused-live"))
+; The magic key character capture runs while paused (EDD-1, decided by the
+; coordinator on 2026-11-14): it refused in silence while paused, its tray row
+; live (paused-magic-capture).
+Test("Magic Key capture settlement: character paused-live persists the character captured while paused (paused-magic-capture)",
+	_MESC_Case.Bind("character", "paused-live"))
 
 for _MESC_ScalarMode in ["scalar-pair", "invalid-high-BMP", "invalid-low", "invalid-max"]
 	Test("Magic Key scalar settlement: " . _MESC_ScalarMode . " never persists partial units (magic-key-scalar-settlement)",

@@ -45,8 +45,8 @@ function M.run(parent_pid, database)
 	-- SQLite creates rollback journals and WAL/SHM after replacing this process.
 	ffi.C.umask(private.creation_mask)
 	-- The private runtime's sqlite3 by absolute path; execvp searches PATH only
-	-- for a source run, which has no prefix (infra/owned_programs.lua).
-	local values = { require("infra.owned_programs").resolve("sqlite3"), "-init", "/dev/null", "-bail", "-noheader", database }
+	-- for a source run, which has no prefix (settings/engine/preferences/owned_programs.lua).
+	local values = { require("settings.engine.preferences.owned_programs").resolve("sqlite3"), "-init", "/dev/null", "-bail", "-noheader", database }
 	local argv = ffi.new("char *[?]", #values + 1)
 	for index, value in ipairs(values) do argv[index - 1] = ffi.cast("char *", value) end
 	ffi.C.execvp(values[1], argv)

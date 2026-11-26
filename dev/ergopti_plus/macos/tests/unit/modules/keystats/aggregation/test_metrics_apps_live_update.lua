@@ -103,6 +103,7 @@ local function load_dashboard(options)
 		read_manifest = function() return {}, true end,
 	}
 	package.loaded["modules.keystats.context_tracker"] = {
+		is_initialized = function() return true end,
 		get_active_app_snapshot = function() return nil end,
 	}
 

@@ -677,8 +677,8 @@ helpers.describe("linux-sqlite-null-boundary", function()
 			helpers.assert_nil(entry.first_typed_min)
 			helpers.assert_nil(entry.last_typed_min)
 			helpers.assert_eq(entry.burst_length_buckets["nul\0é"], 2)
-			-- The legacy decoder contract belongs to its existing callers.
-			helpers.assert_type(Json.decode('{"legacy":null}').legacy, "table")
+			-- The default decode drops a null member; the lossless one keeps it tagged.
+			helpers.assert_nil(Json.decode('{"legacy":null}').legacy)
 			helpers.assert_true(Json.is_null(Json.decode_lossless('{"tagged":null}').tagged))
 		end)
 	end)

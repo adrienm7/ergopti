@@ -216,17 +216,17 @@ helpers.describe("HS-012 pause-owner class-wide settlement matrix", function()
 				__index = function() return function() return true end end,
 			})
 		end
-		package.loaded["modules.gestures.engine"] = permissive({
+		package.loaded["gestures.engine.engine"] = permissive({
 			unblock_scroll = function() return true end,
 		})
-		package.loaded["modules.gestures.actions"] = permissive({
+		package.loaded["gestures.engine.actions"] = permissive({
 			force_cleanup = function()
 				cleanup_calls = cleanup_calls + 1
 				return cleanup_calls ~= 2
 			end,
 		})
-		package.loaded["modules.gestures"] = nil
-		local real_gestures = helpers.load_with_stubs("modules.gestures")
+		package.loaded["gestures.engine"] = nil
+		local real_gestures = helpers.load_with_stubs("gestures.engine")
 		-- A loaded module is OFF until the saved preference applies; pause an ON one.
 		helpers.assert_true(real_gestures.enable_all())
 		local script_control = load_inventory_context({
@@ -248,9 +248,9 @@ helpers.describe("HS-012 pause-owner class-wide settlement matrix", function()
 		helpers.assert_true(script_control.resume_all())
 		helpers.assert_eq(real_gestures.is_suspended(), false)
 		script_control.stop()
-		package.loaded["modules.gestures"] = nil
-		package.loaded["modules.gestures.engine"] = nil
-		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["gestures.engine"] = nil
+		package.loaded["gestures.engine.engine"] = nil
+		package.loaded["gestures.engine.actions"] = nil
 	end)
 
 	for _, owner in ipairs(OWNER_IDS) do

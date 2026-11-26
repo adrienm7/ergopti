@@ -56,10 +56,11 @@ ScreenBrightnessRequest(Action, Done := 0) {
 		Critical(PreviousCritical)
 	Spawn := IsObject(ScreenBrightnessOwner.spawn_fn)
 		? ScreenBrightnessOwner.spawn_fn : ShellRunner_SpawnTreeOwned
-	Args := ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
+	; ShellRunner_SpawnTreeOwned starts the console with CREATE_NO_WINDOW.
+	Args := ShellRunner_WinPsArgs("-File",
 		_VendorDir . "\ergopti_brightness_worker.ps1", "-PolicyPath",
-		_SharedDir . "\shortcuts\data\actions\brightness.json", "-Action", Action]
-	try Handle := Spawn.Call("powershell.exe", Args,
+		_SharedDir . "\shortcuts\data\actions\brightness.json", "-Action", Action)
+	try Handle := Spawn.Call(ShellRunner_WinPsPath(), Args,
 		ScreenBrightnessCompleted.Bind(Id), , , Data["max_receipt_bytes"])
 	catch as Err {
 		if ScreenBrightnessOwner.job == Job

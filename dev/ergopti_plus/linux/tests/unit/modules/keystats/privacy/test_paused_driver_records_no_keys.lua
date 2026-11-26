@@ -46,7 +46,8 @@ local function environment_for(state, recorded)
 		InputEvent = { VALUE_DOWN = 1 },
 		TapHold = { observe_copy_activity = function() end },
 		gestures = { release_clicks_on_activity = function() end },
-		secure_focus_guard = { blocks_text = function() return false end },
+		secure_focus_guard = { blocks_text = function() return false end,
+			text_automation = function() return true, "field", "field_admitted" end },
 		user_hotstring_native = nil,
 		keystats = {
 			is_unrecorded_app = function() return false end,
@@ -58,7 +59,11 @@ local function environment_for(state, recorded)
 			discard_roi = function() end,
 			record_roi_key = function() end,
 		},
-		keyboard_hook = { source_device_identity = function() return "device" end },
+		keyboard_hook = {
+			source_device_identity = function() return "device" end,
+			held_modifiers = function() return {} end,
+			held_modifier_role = function() return false end,
+		},
 		Monotonic = { now_ms = function() return 0 end },
 		script_actions = {
 			is_paused = function() return state.paused end,
@@ -133,7 +138,7 @@ helpers.describe("a paused Linux driver records no keys (EDD-1)", function()
 			"the resume starts the focused application's time again")
 		helpers.assert_true(source:find("if system_metrics and not script_actions.is_paused() then", 1, true) ~= nil,
 			"the system day sampler waits for the resume")
-		helpers.assert_true(listener:find('require("modules.gestures.pointer_spotlight").dismiss()', 1, true) ~= nil,
+		helpers.assert_true(listener:find('require("gestures.engine.pointer_spotlight").dismiss()', 1, true) ~= nil,
 			"the pause ends the spotlight overlay, as on Windows and macOS")
 	end)
 end)

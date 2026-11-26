@@ -51,6 +51,7 @@
 					}
 				]
 			},
+			"geometry": "iso",
 			"source_sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba",
 			"licence_file": "LICENSE"
 		},
@@ -141,7 +142,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "833630c9d45fb1c7af96c32289a28385b04c5ac323682765e8a7916482c1dad8",
+				"sha256": "51ccc661a8faeeca330bdf84b8d74c0fb5e88deee3732aa2887c4bed1f18c6f4",
 				"files": [
 					{
 						"path": "ergopti.keylayout",
@@ -152,14 +153,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -170,8 +165,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10199,
-						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
+						"size": 9515,
+						"sha256": "119226fcda165735fa788a347d1845f46691fceb530b5d93d305533b70070fce"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -188,11 +183,12 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
+			"geometry": "iso",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -258,7 +254,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "9128beaa29ad37bae4a9633e5e8c965cee30467dddc28ada0ad9ddff6387968c",
+				"sha256": "1832a7093f91a38b65ad5483ac5da68789650c266b95e20c3f44f98c69aa149f",
 				"files": [
 					{
 						"path": "ergopti_ansi.keylayout",
@@ -269,14 +265,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -287,8 +277,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10199,
-						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
+						"size": 9515,
+						"sha256": "119226fcda165735fa788a347d1845f46691fceb530b5d93d305533b70070fce"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -305,11 +295,12 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
+			"geometry": "ansi",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -375,7 +366,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "81e58889702c96761f4773e7e87792b23c43786e09c047e79403aa52bac2922c",
+				"sha256": "f450983240e31e29ec5a2c0b49b642742c8d8b60cbf7ec0e25c8794d40b1f91c",
 				"files": [
 					{
 						"path": "ergopti_plus.keylayout",
@@ -386,14 +377,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -404,8 +389,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10199,
-						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
+						"size": 9515,
+						"sha256": "119226fcda165735fa788a347d1845f46691fceb530b5d93d305533b70070fce"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -422,11 +407,12 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
+			"geometry": "iso",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -492,7 +478,7 @@
 				"name": "Ergopti+",
 				"version": "2.2.2",
 				"description": {},
-				"sha256": "6e72e2ce30fa18e3addc2cacbf2c2da65e6c3a197e086fd0b9913d93b6ea1018",
+				"sha256": "1c85b8eaf1cedbdd0c34428b47bede4d4688f8890b3b3b8ca4253aa466a0ed39",
 				"files": [
 					{
 						"path": "ergopti_plus_ansi.keylayout",
@@ -503,14 +489,8 @@
 					{
 						"path": "hotstrings/distancesreduction.toml",
 						"file": "ergopti/hotstrings/distancesreduction.toml",
-						"size": 23634,
-						"sha256": "394d0973e281eeffb49007b18379392b50dae8bbae87692dedb70a967219797d"
-					},
-					{
-						"path": "hotstrings/magickeyreplace.toml",
-						"file": "ergopti/hotstrings/magickeyreplace.toml",
-						"size": 1315,
-						"sha256": "972c666259dc453e809072bf2f7eeac781af16c4b72bcbcb72ea7512dddfbfaa"
+						"size": 25950,
+						"sha256": "17c35f6e4dd6da011a5ad620d759af071b4a48a5b83b39b512ae29eb1fb5a2ab"
 					},
 					{
 						"path": "hotstrings/repeatcorrections.toml",
@@ -521,8 +501,8 @@
 					{
 						"path": "hotstrings/rolls.toml",
 						"file": "ergopti/hotstrings/rolls.toml",
-						"size": 10199,
-						"sha256": "b8b15765876fac1e1b931b990592c5249aaeea7f4fbe4aea03847d9bf249ea84"
+						"size": 9515,
+						"sha256": "119226fcda165735fa788a347d1845f46691fceb530b5d93d305533b70070fce"
 					},
 					{
 						"path": "hotstrings/sfbsreduction.toml",
@@ -539,11 +519,12 @@
 					{
 						"path": "manifest.toml",
 						"file": "ergopti/manifest.toml",
-						"size": 1615,
-						"sha256": "553ef11689017669ce587e1dc658b1845570ab1f6de92d643c3e4703eb30c76a"
+						"size": 1223,
+						"sha256": "381bd5b7923341606c869871ccc3951bbffb725907cd8e6433dff6bd7ae9a67a"
 					}
 				]
 			},
+			"geometry": "ansi",
 			"xkb": {
 				"keysym_overrides": [
 					[

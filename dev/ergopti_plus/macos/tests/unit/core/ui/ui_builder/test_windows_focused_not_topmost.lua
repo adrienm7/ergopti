@@ -222,7 +222,7 @@ end)
 --- @return table healthcheck, table context
 local function load_healthcheck(view)
 	for _, name in ipairs({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
+		"diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
 		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -251,7 +251,7 @@ local function load_healthcheck(view)
 	end
 	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["ui.healthcheck.helpers"] = {}
+	package.loaded["diagnostics.ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -260,7 +260,7 @@ local function load_healthcheck(view)
 		build_injected_html = function() return "<html></html>" end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
 	}, { __index = real })
-	local healthcheck = require("ui.healthcheck.core")
+	local healthcheck = require("diagnostics.ui.healthcheck.core")
 	healthcheck.run = function() return {} end
 	return healthcheck, context
 end
@@ -309,8 +309,8 @@ end)
 --- @return table dialog, table timers
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
-		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
-		"core.i18n.engine.locale", "core.ui.ui.builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
+		"diagnostics.ui.error_dialog", "diagnostics.ui.healthcheck.core", "diagnostics.ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
+		"core.i18n.engine.locale", "core.ui.ui.builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "menu.engine.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -347,10 +347,10 @@ local function load_error_dialog(view, app)
 		get = function(_, default) return default end,
 		set = function() return true end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 	}
-	package.loaded["ui.healthcheck.core"] = {
+	package.loaded["diagnostics.ui.healthcheck.core"] = {
 		DRIVER = "macos",
 		config = function()
 			return {
@@ -367,7 +367,7 @@ local function load_error_dialog(view, app)
 			}
 		end,
 	}
-	package.loaded["ui.healthcheck.report"] = {
+	package.loaded["diagnostics.ui.healthcheck.report"] = {
 		redaction_context = function() return { home = "/Users/jdoe", user = "jdoe" } end,
 		perform = function() return { ok = true } end,
 	}
@@ -376,7 +376,7 @@ local function load_error_dialog(view, app)
 		build_injected_html = function() return "<html></html>" end,
 		get_app_geometry = function() return { width = 560, height = 460 } end,
 	}, { __index = real })
-	return require("ui.error_dialog"), timers
+	return require("diagnostics.ui.error_dialog"), timers
 end
 
 helpers.describe("ui-focus-not-topmost: error window (macOS)", function()
@@ -476,9 +476,9 @@ helpers.describe("ui-focus-not-topmost: toggles present a covered window (macOS)
 			"the add-hotstring entry must not close a covered editor that may hold typed text")
 
 		local editor = helpers.read_driver_unit("function M.is_editor_focused()")
+		-- The editor's own global shortcut left on 2026-11-21: Ctrl+★ is the
+		-- secondary_star slot, whose action opens the editor through its owner.
 		helpers.assert_true(editor ~= nil, "the hotstring editor must exist")
-		helpers.assert_true(editor:find("if _webview and _is_focused then M.close() else M.open(\"shortcut\") end",
-			1, true) ~= nil, "the editor shortcut must present a covered editor instead of closing it")
 	end)
 
 end)

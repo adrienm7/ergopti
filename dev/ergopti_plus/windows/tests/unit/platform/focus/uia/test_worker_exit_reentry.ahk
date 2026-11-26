@@ -9,8 +9,8 @@
 
 #Requires AutoHotkey v2.0
 
-; Bound real scheduler and native release observation without changing driver deadlines.
-global _UER_NATIVE_WAIT_MS := 2000
+; Real scheduler and native release observations are bounded by the suite's
+; TEST_NATIVE_SETTLE_TIMEOUT_MS, without changing driver deadlines.
 
 _UER_ExitReentry(RequestFn, ReplaceWorker := false, ReenterClose := false) {
 	Fields := ["handle", "worker_hwnd", "worker_process_handle", "worker_generation",
@@ -162,7 +162,7 @@ _UER_NativeTaskRetired(Task) {
 }
 
 _UER_RetireNativeHandle(Handle, Record) {
-	global _UER_NATIVE_WAIT_MS
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	if Record["start_calls"] == 0
 		return Handle.terminate() == true && Record["started_pid"] == 0
 			&& Handle.processId() == 0
@@ -173,7 +173,7 @@ _UER_RetireNativeHandle(Handle, Record) {
 		Handle.terminate()
 		if _UER_NativeTaskRetired(Record["task"])
 			return true
-		if TickExpired64(Started, _UER_NATIVE_WAIT_MS)
+		if TickExpired64(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS)
 			return false
 		; Native termination is asynchronous; pump the actual owners until they
 		; publish release, preserving failure if capture or HANDLE debt remains.
@@ -187,7 +187,7 @@ _UER_RetireNativeHandle(Handle, Record) {
 ; The late constructor must never publish over a newer worker or start a
 ; process after cancellation. Every handle remains in the fixture ledger.
 _UER_ConstructorReentry(Mode, CompleteBeforeCleanup := false) {
-	global _UER_NATIVE_WAIT_MS
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS
 	Fields := ["starting_generation", "handle", "worker_hwnd", "worker_process_handle", "worker_generation",
 		"request_generation", "pending", "start_deadline_fn", "start_failure_tick",
 		"start_diagnostic", "handlers_registered", "spawn_fn", "post_fn", "open_process_fn",
@@ -226,7 +226,7 @@ _UER_ConstructorReentry(Mode, CompleteBeforeCleanup := false) {
 		if State["constructors"] == 1 {
 			SetTimer(Reenter, -1)
 			Started := A_TickCount
-			while State["timer_calls"] == 0 && !TickExpired64(Started, _UER_NATIVE_WAIT_MS)
+			while State["timer_calls"] == 0 && !TickExpired64(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS)
 				Sleep(10)
 			AssertEqual(1, State["timer_calls"],
 				"the real scheduler must deliver reentry outside any publication Critical")
@@ -312,7 +312,7 @@ _UER_ConstructorReentry(Mode, CompleteBeforeCleanup := false) {
 			AssertTrue(Task is Map, "the observer must retain the actual native ShellRunner owner")
 			AssertTrue(UIASW_Stop("canceled"), "native UIA retirement must be acknowledged")
 			Started := A_TickCount
-			while Task["Phase"] != SR_LEGACY_PHASE_TERMINAL && !TickExpired64(Started, _UER_NATIVE_WAIT_MS) {
+			while Task["Phase"] != SR_LEGACY_PHASE_TERMINAL && !TickExpired64(Started, TEST_NATIVE_SETTLE_TIMEOUT_MS) {
 				_SR_Poll()
 				Sleep(10)
 			}

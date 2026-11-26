@@ -47,7 +47,7 @@ local REPORT_KEYS = {
 }
 
 local DEFAULT_DEPS = {
-	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
+	open = function(target, on_done) return require("apps.adapters.desktop_opener").open(target, on_done) end,
 	exists = function(path) return require("core.fs.adapters.file_system").exists(path) end,
 	path_status = function(path) return require("core.fs.adapters.file_system").path_status(path) end,
 	notify = function(message) return require("platform.system.notifier").send(message, { level = "error" }) end,
@@ -74,12 +74,12 @@ local DEFAULT_DEPS = {
 	read_uri_list = function(admitted)
 		local function guarded_press(combo)
 			if admitted() ~= true then return false end
-			return require("modules.gestures.combo_emitter").press(combo)
+			return require("gestures.engine.combo_emitter").press(combo)
 		end
-		return require("adapters.clipboard").read_selection_uri_list(
+		return require("clipboard.adapters.clipboard").read_selection_uri_list(
 			guarded_press, require("core.events.loop").sleep_ms)
 	end,
-	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
+	write_clipboard = function(text) return require("clipboard.adapters.clipboard").write(text) end,
 	notify_success = function(message)
 		return require("platform.system.notifier").send(message, { level = "success" })
 	end,

@@ -564,7 +564,7 @@ local function install_session()
 		resolve_asset = function(release) return deps().installer.find_asset(release) end,
 		download = function(asset, _, done)
 			return deps().installer.stage(asset, function(staged, stage, detail, failure_receipt)
-				done(staged, stage == "verify" and ReleaseInstall.REASON.verify or ReleaseInstall.REASON.download,
+				done(staged, ReleaseInstall.download_reason(stage, false),
 					detail, failure_receipt)
 			end) == true
 		end,

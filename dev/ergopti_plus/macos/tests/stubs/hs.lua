@@ -785,6 +785,7 @@ M.eventtap = {
 			scrollWheelEventMomentumPhase = 10,
 			mouseEventDeltaX = 11,
 			mouseEventDeltaY = 12,
+			mouseEventClickState = 13,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
@@ -1406,6 +1407,28 @@ M.pasteboard = {
 		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = nil
 	end,
+	-- libpasteboard.m writeItemForType: a trailing boolean is `add`; with it the
+	-- type joins the current item without clearContents, so the count holds.
+	writeDataForUTI = function(...)
+		local args = table.pack(...)
+		local add = false
+		if args.n >= 3 and type(args[args.n]) == "boolean" then
+			add = args[args.n]
+			args.n = args.n - 1
+		elseif args.n >= 3 and args[args.n] == nil then
+			args.n = args.n - 1
+		end
+		local name, uti, bytes
+		if args.n == 2 then uti, bytes = args[1], args[2] else name, uti, bytes = args[1], args[2], args[3] end
+		assert(type(uti) == "string" and type(bytes) == "string", "writeDataForUTI needs a UTI and its bytes")
+		local key = pasteboard_key(name)
+		if not add or PASTEBOARD_DATA[key] == nil then
+			PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
+			PASTEBOARD_DATA[key] = {}
+		end
+		PASTEBOARD_DATA[key][uti] = bytes
+		return true
+	end,
 }
 M.osascript = { applescript = function(_) return false, nil, "" end }
 M.spaces = {
@@ -1484,7 +1507,7 @@ M.task = { new = function(_, _)
 	return task
 end }
 -- usercontent is the JavaScript bridge every webview UI builds at module load
--- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
+-- time (ui/download_window, ai/ui/model_browser, …). Omitting it made those modules
 -- unloadable under the harness, so their logic could only ever be source-guarded.
 M.webview = {
 	new = function() return {} end,

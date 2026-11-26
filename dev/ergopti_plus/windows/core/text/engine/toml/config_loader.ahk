@@ -57,7 +57,7 @@
 ; never be enumerated in the static, compile-time manifest:
 ;   - ``hotstrings.personal.<name>`` — <name> is a user-chosen personal
 ;     hotstring category created at runtime via the personal TOML editor
-;     (see EnsurePersonalHotstringFeature in infra/personal_features.ahk).
+;     (see EnsurePersonalHotstringFeature in settings/engine/preferences/personal_features.ahk).
 ; Editor UI preferences are separately enumerated in the foreign ownership
 ; registry. Their keys never become dynamic feature paths during this walk.
 /**
@@ -580,8 +580,9 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		} else {
 		; Feature entries own a nested value table while their manifest path ends
 		; at the feature id itself. These domains mirror config.schema.json: a
-		; negative delay disables the downstream gate, and an unbounded personal
-		; pattern length makes the combinatorial registration loop unsafe.
+		; negative delay disables the downstream gate. Any other leaf, such as the
+		; retired personal-info pattern_max_length, is unused and offered for
+		; cleanup.
 			Entry := ManifestFindEntryByPath(CurrentSection)
 			if !(Entry is Map) || Entry.Get("type", "") != "feature"
 				return ""
@@ -589,10 +590,6 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 				ExpectedType := "boolean"
 			else if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 				ExpectedType := "non-negative number"
-			else if (Key == ConfigLeaf.PATTERN_MAX_LENGTH
-					&& CurrentSection
-						== ConfigKey.HOTSTRINGS_DYNAMIC_TEXT_EXPANSION_PERSONAL_INFORMATION)
-				ExpectedType := "integer from 1 through 16"
 			else
 				return ""
 		}
@@ -646,9 +643,6 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				return TickTryDurationMsFromSeconds(Value, &DurationMs)
 			return true
-		case "integer from 1 through 16":
-			return (!IsSet(RawValue) || LiteralKind == "number")
-				&& Value is Integer && Value >= 1 && Value <= 16
 		case "string", "action":
 			return (!IsSet(RawValue) || LiteralKind == "string")
 				&& Value is String
@@ -773,8 +767,9 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	; Admit the complete semantic image before applying any feature. A native
 	; read refusal must never mean an empty configuration whose defaults may
 	; later overwrite the source; the existing session latch retains that debt.
+	; The boot read stretch serves the generation it already admitted.
 	global _ConfigBootReadFailed
-	try Snapshot := ConfigTomlReadSnapshot(FilePath)
+	try Snapshot := ConfigTomlReadBootServedSnapshot(FilePath)
 	catch as Err {
 		if !TOML_UnreadableFile(FilePath) {
 			RejectedOverrides += 1

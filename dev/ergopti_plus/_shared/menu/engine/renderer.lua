@@ -8,7 +8,7 @@
 --- dispatching each item type to the appropriate render function.
 ---
 --- WHY THIS IS SHARED AND WHAT MADE IT LOOK OTHERWISE.
---- It lived in ``macos/infra/manifest_menu.lua``, 561 lines, and read as a
+--- It lived in ``macos/menu/engine/manifest_menu.lua``, 561 lines, and read as a
 --- Hammerspoon module: its docstrings say "hs.menubar item table" throughout.
 --- It made exactly ONE Hammerspoon call — ``hs.json.decode`` — and the "hs.menubar
 --- item table" is a plain Lua table of ``{title, fn, menu, checked, disabled}``.
@@ -255,7 +255,7 @@ local LOG = "menu.engine.renderer"
 -- How deep a list provider's rows may nest. A provider returning a table that
 -- contains itself would recurse until the stack gave out, taking the whole menu
 -- with it, so this is a runaway-recursion guard — NOT a statement about how deep
--- a menu may legitimately be. Kept equal to windows/infra/manifest_menu.ahk's
+-- a menu may legitimately be. Kept equal to windows/menu/engine/manifest_menu.ahk's
 -- MR_MAX_LIST_DEPTH so a list that renders on one driver cannot be silently
 -- truncated on another.
 --
@@ -307,6 +307,11 @@ local HOTSTRING_SUBS_FALLBACK = {
 ---                          stubs the driver logger can observe them, which is
 ---                          how every one of this renderer's four unit files is
 ---                          written.
+---   command_unavailable function|nil  Optional: command id → the locale key of
+---                          why that declared command cannot run now, or nil.
+---                          Its row is drawn greyed with that reason (the Linux
+---                          tray greys the rows opening a window the system
+---                          cannot draw).
 --- @return table|nil renderer, string|nil error
 function M.new(deps)
 	if type(deps) ~= "table" then
@@ -334,7 +339,13 @@ function M.new(deps)
 		return nil, "deps.logger missing"
 	end
 
+	if deps.command_unavailable ~= nil and type(deps.command_unavailable) ~= "function" then
+		BootLogger.error(LOG, "new(): deps.command_unavailable must be a function — renderer not created.")
+		return nil, "deps.command_unavailable invalid"
+	end
+
 	local platform      = deps.platform
+	local command_unavailable = deps.command_unavailable
 	local manifest_path = deps.manifest_path
 	local json_decode   = deps.json_decode
 	local i18n          = deps.i18n
@@ -449,6 +460,13 @@ function M.new(deps)
 		return TextUtils.trim(head)
 	end
 
+	-- A greyed row's label carries only the head of its reason (« label —
+	-- Unavailable »). Its `tooltip` carries the whole translated reason: a
+	-- tray with item tooltips (macOS) shows it on hover, and the Linux tray,
+	-- whose dbusmenu has none, draws it in inert rows below the row
+	-- (tray/adapters/menu.lua). Without it a field screenshot read « Also
+	-- reorder the three edge keys — Unavailable » and nothing else.
+
 	--- The reason a greyed row names: the first `disabled_reasons` entry whose
 	--- state getter answers true (a configuration saved by a newer version),
 	--- otherwise its `disabled_reason_key`. A malformed entry or a missing getter
@@ -492,7 +510,8 @@ function M.new(deps)
 				tostring(item.id or item.i18n), manifest_key)
 			return nil
 		end
-		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
+		local reason = i18n.get(item.reason_key)
+		return { title = i18n.get(item.i18n) .. " — " .. reason_head(reason), disabled = true, tooltip = reason }
 	end
 
 	--- Whether a menu's enable row reads off. An unanswered state is not "off":
@@ -530,12 +549,14 @@ function M.new(deps)
 	--- @param roles table Finished row -> off_rule_role.
 	--- @param reason_key string Locale key of the shared reason.
 	local function apply_category_off(rows, roles, reason_key)
-		local suffix = " — " .. reason_head(i18n.get(reason_key))
+		local reason = i18n.get(reason_key)
+		local suffix = " — " .. reason_head(reason)
 		for _, row in ipairs(rows) do
 			local role = roles[row]
 			if row.title ~= "-" and role ~= "live" then
 				if (not row.disabled or role == "unreasoned") and type(row.title) == "string" then
 					row.title = row.title .. suffix
+					if row.tooltip == nil then row.tooltip = reason end
 				end
 				row.disabled = true
 				row.fn = nil
@@ -650,8 +671,18 @@ function M.new(deps)
 				-- greyed row with a reason, « label — head of the reason », and has
 				-- nothing to run.
 				local greyed = row.disabled == true and type(row.disabled_reason_key) == "string"
-				if greyed then entry.title = row.label .. " — " .. reason_head(i18n.get(row.disabled_reason_key)) end
+				if greyed then
+					local reason = i18n.get(row.disabled_reason_key)
+					entry.title, entry.tooltip = row.label .. " — " .. reason_head(reason), reason
+				elseif row.disabled == true and type(row.tooltip) == "string" then
+					-- A declared row handed over as data (command_row) whose label
+					-- already carries the head of its reason.
+					entry.tooltip = row.tooltip
+				end
 				if row.checked ~= nil then entry.checked = row.checked and true or false end
+				-- One choice of a single-choice group: a tray that has radio items
+				-- (Linux dbusmenu) draws it as one; the others draw the same check.
+				if row.radio == true and row.checked ~= nil then entry.radio = true end
 				-- An optional per-row image, the Lua twin of the AutoHotkey renderer's
 				-- `icon`. Without it a provider had to choose between reaching the
 				-- renderer and keeping its icons: the bundled-apps list went through an
@@ -728,14 +759,19 @@ function M.new(deps)
 				for field in next, child do
 					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
 						and field ~= "disabled" and field ~= "image" and field ~= "joins_reload"
-						and field ~= "bypasses_reload" then return nil end
+						and field ~= "bypasses_reload" and field ~= "radio" and field ~= "tooltip" then return nil end
 				end
+				-- A greyed row's full reason (see reason_head).
+				local tooltip = rawget(child, "tooltip")
+				if tooltip ~= nil and type(tooltip) ~= "string" then return nil end
 				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
 				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
 				local joins_reload = rawget(child, "joins_reload")
 				if joins_reload ~= nil and joins_reload ~= true then return nil end
 				local bypasses_reload = rawget(child, "bypasses_reload")
 				if bypasses_reload ~= nil and bypasses_reload ~= true then return nil end
+				local radio = rawget(child, "radio")
+				if radio ~= nil and (radio ~= true or rawget(child, "checked") == nil) then return nil end
 				if type(title) ~= "string" or title == "" or (action ~= nil and type(action) ~= "function")
 					or (subtree ~= nil and type(subtree) ~= "table") or (action ~= nil and subtree ~= nil)
 					or (checked ~= nil and type(checked) ~= "boolean")
@@ -747,7 +783,7 @@ function M.new(deps)
 					row = { separator = true }
 				else
 					row = { label = title, action = action, checked = checked, disabled = disabled, image = image,
-						joins_reload = joins_reload, bypasses_reload = bypasses_reload }
+						joins_reload = joins_reload, bypasses_reload = bypasses_reload, radio = radio, tooltip = tooltip }
 					if subtree ~= nil then
 						row.items = convert(subtree, depth + 1)
 						if row.items == nil then return nil end
@@ -866,10 +902,14 @@ function M.new(deps)
 					for field in next, row do
 						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
 							and field ~= "checked" and field ~= "disabled" and field ~= "joins_reload"
-							and field ~= "bypasses_reload" then return false end
+							and field ~= "bypasses_reload" and field ~= "tooltip" and field ~= "radio" then return false end
 					end
+					-- A row drawn as an image names itself through its tooltip,
+					-- the text VoiceOver reads for it (the macOS canvas badge).
+					if rawget(row, "tooltip") ~= nil and type(rawget(row, "tooltip")) ~= "string" then return false end
 					if rawget(row, "joins_reload") ~= nil and rawget(row, "joins_reload") ~= true then return false end
 					if rawget(row, "bypasses_reload") ~= nil and rawget(row, "bypasses_reload") ~= true then return false end
+					if rawget(row, "radio") ~= nil and (rawget(row, "radio") ~= true or rawget(row, "checked") == nil) then return false end
 					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
 					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
 					if type(title) ~= "string" or (title == "" and image == nil)
@@ -967,6 +1007,7 @@ function M.new(deps)
 			sub[#sub + 1] = {
 				label   = label,
 				checked = current == value,
+				radio   = true,
 				action  = function() return fn(value) end,
 			}
 		end
@@ -986,6 +1027,7 @@ function M.new(deps)
 			sub[#sub + 1] = {
 				label   = i18n.get(item.custom_i18n),
 				checked = custom_current,
+				radio   = true,
 				action  = function() return custom_fn() end,
 			}
 			if custom_current and type(current) == "number" then
@@ -1126,6 +1168,23 @@ function M.new(deps)
 			end
 			return stand_in
 		end
+		-- A command the driver says cannot run now (a window the system cannot
+		-- draw) is greyed with its reason, like a row greyed by `disabled_when`.
+		if command_unavailable ~= nil then
+			local asked, blocked = pcall(command_unavailable, cmd_id)
+			if not asked or (blocked ~= nil and (type(blocked) ~= "string" or blocked == "")) then
+				Logger.error(LOG, "The availability of command '%s' (%s.%s) could not be read (%s) — row refused.",
+					tostring(cmd_id), manifest_key, row_id, tostring(blocked))
+				return nil
+			end
+			if blocked ~= nil then
+				local reason = i18n.get(blocked)
+				local greyed = { title = (title or i18n.get(i18n_key)) .. " — " .. reason_head(reason),
+					disabled = true, tooltip = reason }
+				if rawget(item, "label_prefix") ~= nil then greyed.title = prefix .. greyed.title end
+				return greyed
+			end
+		end
 		local built = {
 			title    = title or i18n.get(i18n_key),
 			fn       = fn,
@@ -1158,6 +1217,7 @@ function M.new(deps)
 			local action = built.fn
 			return {
 				label = built.title, disabled = built.disabled,
+				tooltip = built.disabled and built.tooltip or nil,
 				action = type(action) == "function" and function(...)
 					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
 					return action(...)
@@ -1471,7 +1531,7 @@ function M.new(deps)
 						else
 							local stand_in = greyed_stand_in(key, item)
 							if not stand_in then return nil end
-							row = { label = stand_in.title, disabled = true }
+							row = { label = stand_in.title, disabled = true, tooltip = stand_in.tooltip }
 						end
 					elseif item.type == "command" then
 						row = R.command_row(key, item.id, commands, getters)
@@ -1613,6 +1673,7 @@ function M.new(deps)
 			local action = built.fn
 			return {
 				label = built.title, checked = built.checked, disabled = built.disabled,
+				tooltip = built.disabled and built.tooltip or nil,
 				action = type(action) == "function" and function(...)
 					if R.resolve_disabled_when(manifest_key, row_id, getters) then return false end
 					return action(...)
@@ -1750,7 +1811,8 @@ function M.new(deps)
 					if disabled and reason ~= nil then
 						reason = disabled_reason(manifest_key, item, getters)
 						if reason == nil then goto continue end
-						title = title .. " — " .. reason_head(i18n.get(reason))
+						reason = i18n.get(reason)
+						title = title .. " — " .. reason_head(reason)
 						fn = nil
 					end
 					flush_sep()
@@ -1759,6 +1821,7 @@ function M.new(deps)
 						fn       = fn,
 						checked  = R.resolve_checked_when(manifest_key, toggle_id, getters),
 						disabled = disabled or nil,
+						tooltip  = disabled and reason or nil,
 					})
 					item_count = item_count + 1
 				end
@@ -2177,7 +2240,7 @@ function M.new(deps)
 		-- Admit every nested source before platform iteration can observe it.
 		local source = reasoned_group_snapshot(declared)
 		if not source then return nil end
-		local quit, tail_boundary, record_owners = nil, nil, {}
+		local record_owners = {}
 		for index = 1, #declared do
 			local row = rawget(declared, index)
 			if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "id")) ~= "string" then return nil end
@@ -2201,10 +2264,6 @@ function M.new(deps)
 					end
 					if count ~= #allowed then return nil end
 				end
-				if is_for_platform(row) then tail_boundary = index end
-			elseif row.id == "quit" and is_for_platform(row) then
-				if quit ~= nil or row.type ~= "command" or type(row.i18n) ~= "string" or row.i18n == "" then return nil end
-				quit = { row = row, boundary = tail_boundary }
 			end
 		end
 		local owner = rawget(R, "top_level_separator_receiver")
@@ -2219,10 +2278,6 @@ function M.new(deps)
 		return function(row)
 			if not current() then return nil end
 			if row == "current" then return true end
-			if row == "linux_quit_last" then
-				if platform ~= "linux" or not quit or quit.boundary == nil then return nil end
-				row = rawget(declared, quit.boundary)
-			end
 			if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
 			local matches = 0
 			for _, entry in ipairs(declared) do if rawequal(row, entry) then matches = matches + 1 end end
@@ -2379,6 +2434,286 @@ function M.new(deps)
 	end
 
 	return R
+end
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 2/ Reason Rows ===========================
+-- ==================================================
+-- ==================================================
+
+-- The widest reason line, in columns (a CJK character counts two), and the
+-- indent that sets a reason line apart from a row of its own.
+local REASON_LINE_COLUMNS = 60
+local REASON_INDENT = "    "
+
+--- The columns a UTF-8 word takes: two for a wide (CJK) character.
+--- @param word string
+--- @return number
+local function columns(word)
+	local count = 0
+	for character in word:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		count = count + ((#character >= 3 and character >= "\226\186\128") and 2 or 1)
+	end
+	return count
+end
+
+--- Splits a reason into lines of at most REASON_LINE_COLUMNS columns, at
+--- spaces, and inside a word only when the word alone is wider (CJK text
+--- has no spaces).
+--- @param text string
+--- @return table lines
+local function wrap_reason(text)
+	local lines, line, width = {}, "", 0
+	local function push(word, word_width)
+		if line ~= "" and width + 1 + word_width > REASON_LINE_COLUMNS then
+			lines[#lines + 1] = line
+			line, width = "", 0
+		end
+		line = line == "" and word or (line .. " " .. word)
+		width = width == 0 and word_width or (width + 1 + word_width)
+	end
+	for word in text:gmatch("%S+") do
+		local word_width = columns(word)
+		if word_width <= REASON_LINE_COLUMNS then
+			push(word, word_width)
+		else
+			local piece, piece_width = "", 0
+			for character in word:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+				local character_width = columns(character)
+				if piece_width + character_width > REASON_LINE_COLUMNS then
+					push(piece, piece_width)
+					piece, piece_width = "", 0
+				end
+				piece, piece_width = piece .. character, piece_width + character_width
+			end
+			if piece ~= "" then push(piece, piece_width) end
+		end
+	end
+	if line ~= "" then lines[#lines + 1] = line end
+	return lines
+end
+
+--- The part of a greyed row's reason its label does not already show: the
+--- label ends with « — head of the reason », so the rows below carry what
+--- follows the head's colon; a label without the head gets the whole reason.
+--- @param title string The row's label.
+--- @param reason string The row's full translated reason.
+--- @return string|nil rest Nil when the label already shows all of it.
+local function reason_rest(title, reason)
+	local trimmed = TextUtils.trim(reason)
+	if trimmed == "" then return nil end
+	local cut, mark_length = nil, 0
+	for _, mark in ipairs({ ":", "\239\188\154" }) do
+		local at = trimmed:find(mark, 1, true)
+		if at and (cut == nil or at < cut) then cut, mark_length = at, #mark end
+	end
+	local head = TextUtils.trim(cut and trimmed:sub(1, cut - 1) or trimmed)
+	local suffix = " — " .. head
+	if #title < #suffix or title:sub(-#suffix) ~= suffix then return trimmed end
+	if not cut then return nil end
+	local rest = TextUtils.trim(trimmed:sub(cut + mark_length))
+	return rest ~= "" and rest or nil
+end
+
+--- The tree a tray without item tooltips draws (Linux dbusmenu): every greyed row that carries its reason
+--- (`tooltip`, set by the shared renderer) is followed by inert rows saying
+--- it, so the reason is not reduced to the head the label carries,
+--- « — Unavailable ». Module-level: it needs no manifest, decoder or i18n. A list with
+--- nothing to add is returned as it is, so an unchanged menu stays the same
+--- table for the in-place patch.
+---
+--- A reason is said once per menu, below the first greyed row that carries
+--- it: a category switched off greys every row of its submenu with the same
+--- reason, and saying it under each one doubled Shortcuts, Gestures and
+--- Tap-Holds until KDE Plasma could not show their first row, the very switch
+--- the reason points to (Arch field report, 2026-11-25). The later rows keep
+--- their head, « — Category off », and their tooltip.
+--- @param items table Array of rows.
+--- @return table items
+function M.with_reason_rows(items)
+	if type(items) ~= "table" then return items end
+	local out, changed, said = {}, false, {}
+	for _, item in ipairs(items) do
+		local row = item
+		if type(item) == "table" and type(item.menu) == "table" then
+			local menu = M.with_reason_rows(item.menu)
+			if menu ~= item.menu then
+				row = {}
+				for key, value in pairs(item) do row[key] = value end
+				row.menu, changed = menu, true
+			end
+		end
+		out[#out + 1] = row
+		if type(item) == "table" and item.disabled == true and type(item.tooltip) == "string"
+			and type(item.title) == "string" and item.title ~= "-" then
+			local rest = reason_rest(item.title, item.tooltip)
+			if rest and not said[rest] then
+				said[rest] = true
+				for _, line in ipairs(wrap_reason(rest)) do
+					out[#out + 1] = { title = REASON_INDENT .. line, disabled = true }
+				end
+				changed = true
+			end
+		end
+	end
+	return changed and out or items
+end
+
+--- The tree a tray that cannot scroll back up draws (KDE Plasma's dbusmenu
+--- client on Wayland opens a menu taller than the screen from the panel up,
+--- with a scroll arrow at the bottom only, so the first rows of Gestures and
+--- Shortcuts, their switch among them, could not be reached: Arch field
+--- report, 2026-11-25). A submenu holding more than `limit` rows and
+--- separators turns each titled section (a « — Title — » header and the rows
+--- below it, up to the next separator or header) into a submenu named by that
+--- title, and a list still too long, such as the forty-odd Ctrl + letter
+--- slots, into submenus named by their first and last rows. AppKit and Win32
+--- scroll a long menu both ways, so only the Linux tray adapter calls this;
+--- the menu model, the click replay and every row's action stay as built.
+
+--- Whether a row is a separator.
+--- @param row table
+--- @return boolean
+local function is_fold_separator(row)
+	return row.separator == true or row.title == "-"
+end
+
+--- The title a section header names, or nil for any other row: an inert,
+--- greyed row whose label the shared header decoration frames.
+--- @param row table
+--- @return string|nil
+local function fold_header_title(row)
+	if row.disabled ~= true or row.fn ~= nil or row.menu ~= nil or type(row.title) ~= "string" then return nil end
+	local Header = require("menu.engine.section_header_data")
+	local prefix, suffix = Header.prefix, Header.suffix
+	local title = row.title
+	if #title <= #prefix + #suffix or title:sub(1, #prefix) ~= prefix or title:sub(-#suffix) ~= suffix then
+		return nil
+	end
+	return title:sub(#prefix + 1, -#suffix - 1)
+end
+
+--- Folds the sections of an overlong list into submenus.
+--- @param items table
+--- @param limit integer
+--- @return table
+local function fold_menu_sections(items, limit)
+	local out, index, folded = {}, 1, {}
+	while index <= #items do
+		local row = items[index]
+		local title = fold_header_title(row)
+		if title == nil then
+			out[#out + 1] = row
+			index = index + 1
+		else
+			local body, next_index = {}, index + 1
+			while next_index <= #items and not is_fold_separator(items[next_index])
+				and fold_header_title(items[next_index]) == nil do
+				body[#body + 1] = items[next_index]
+				next_index = next_index + 1
+			end
+			if #body > 0 then
+				-- Two folded sections read as one list: the separator between them goes.
+				if #out >= 2 and is_fold_separator(out[#out]) and folded[out[#out - 1]] then out[#out] = nil end
+				local section = { title = title, menu = M.fold_tall_menus(body, limit) }
+				folded[section] = true
+				out[#out + 1] = section
+			else
+				out[#out + 1] = row
+			end
+			index = next_index
+		end
+	end
+	return out
+end
+
+--- The part of a row's label that names it: the text before its value
+--- (« Ctrl + A » of « Ctrl + A → Copy »), without a reason row's indent.
+--- @param row table
+--- @return string
+local function fold_row_head(row)
+	local title = tostring(row.title or "")
+	return ((title:match("^(.-) → ") or title):gsub("^%s+", ""))
+end
+
+--- Whether a row is the indented reason line drawn below a greyed row: it
+--- stays in the same chunk as its row.
+--- @param row table
+--- @return boolean
+local function is_fold_reason(row)
+	return row.disabled == true and row.fn == nil and type(row.title) == "string" and row.title:match("^    %S") ~= nil
+end
+
+--- Splits the longest run of rows between separators into submenus named by
+--- their first and last rows (« Ctrl + A … Ctrl + M »), until the list fits.
+--- The names come from the rows' own labels, already in the user's language.
+--- @param items table
+--- @param limit integer
+--- @return table
+local function fold_long_runs(items, limit)
+	local out = items
+	while #out > limit do
+		local best_start, best_count, start = nil, 0, nil
+		for index = 1, #out + 1 do
+			local row = out[index]
+			if row == nil or is_fold_separator(row) then
+				if start and index - start > best_count then best_start, best_count = start, index - start end
+				start = nil
+			elseif start == nil then
+				start = index
+			end
+		end
+		if best_count < 2 then break end
+		local chunks = math.ceil(best_count / limit)
+		if chunks < 2 then chunks = 2 end
+		local size = math.ceil(best_count / chunks)
+		local rebuilt = {}
+		for index = 1, best_start - 1 do rebuilt[#rebuilt + 1] = out[index] end
+		local index, last = best_start, best_start + best_count - 1
+		while index <= last do
+			local chunk = {}
+			while index <= last and (#chunk < size or is_fold_reason(out[index])) do
+				chunk[#chunk + 1] = out[index]
+				index = index + 1
+			end
+			rebuilt[#rebuilt + 1] = { title = fold_row_head(chunk[1]) .. " … " .. fold_row_head(chunk[#chunk]), menu = M.fold_tall_menus(chunk, limit) }
+		end
+		for rest = last + 1, #out do rebuilt[#rebuilt + 1] = out[rest] end
+		if #rebuilt >= #out then break end
+		out = rebuilt
+	end
+	return out
+end
+
+--- Bounds every submenu of a tree, at every depth.
+--- @param items table Array of rows, as the renderer draws them.
+--- @param limit integer Entries per submenu.
+--- @return table items The same table when nothing had to change.
+function M.fold_tall_menus(items, limit)
+	if type(items) ~= "table" then return items end
+	assert(type(limit) == "number" and limit >= 2, "a submenu bound is required")
+	local out, changed = {}, false
+	for index, item in ipairs(items) do
+		local row = item
+		if type(item) == "table" and type(item.menu) == "table" then
+			local menu = M.fold_tall_menus(item.menu, limit)
+			if menu ~= item.menu then
+				row = {}
+				for key, value in pairs(item) do row[key] = value end
+				row.menu, changed = menu, true
+			end
+		end
+		out[index] = row
+	end
+	if #out > limit then
+		local folded = fold_menu_sections(out, limit)
+		if #folded > limit then folded = fold_long_runs(folded, limit) end
+		if #folded < #out then return folded end
+	end
+	return changed and out or items
 end
 
 return M

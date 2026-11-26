@@ -45,6 +45,10 @@
 		"arrow_right": { "i18n": "key_name.arrow_right" },
 		"context_menu": { "i18n": "key_name.context_menu" },
 		"num_lock": { "i18n": "key_name.num_lock" },
+		"muhenkan": { "i18n": "key_name.muhenkan" },
+		"henkan": { "i18n": "key_name.henkan" },
+		"kana_mode": { "i18n": "key_name.kana_mode" },
+		"ro": { "i18n": "key_name.ro" },
 		"volume_mute": { "i18n": "key_name.volume_mute" },
 		"volume_down": { "i18n": "key_name.volume_down" },
 		"volume_up": { "i18n": "key_name.volume_up" }
@@ -69,7 +73,9 @@
 			"NumpadMultiply": "*",
 			"NumpadSubtract": "-",
 			"NumpadAdd": "+",
-			"NumpadDecimal": "."
+			"NumpadDecimal": ".",
+			"IntlYen": "¥",
+			"NumpadComma": ","
 		}
 	},
 	"aliases": {
@@ -104,6 +110,10 @@
 		"arrowright": "arrow_right",
 		"contextmenu": "context_menu",
 		"numlock": "num_lock",
+		"nonconvert": "muhenkan",
+		"convert": "henkan",
+		"kanamode": "kana_mode",
+		"intlro": "ro",
 		"audiovolumemute": "volume_mute",
 		"audiovolumedown": "volume_down",
 		"audiovolumeup": "volume_up"

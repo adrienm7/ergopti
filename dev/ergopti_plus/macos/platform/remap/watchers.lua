@@ -587,7 +587,7 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		return nil
 	end
 	if ControlSentinels == nil then
-		local owner_ok, owner_or_err = pcall(require, "modules.keymap.control_sentinels")
+		local owner_ok, owner_or_err = pcall(require, "hotstrings.engine.expander.control_sentinels")
 		if not owner_ok then
 			Logger.error(LOG, "CapsWord control signal owner could not be loaded: %s.", tostring(owner_or_err))
 			return nil

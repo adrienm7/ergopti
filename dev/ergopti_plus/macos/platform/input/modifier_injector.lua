@@ -6,7 +6,7 @@
 --- Adds a set of modifier flags to the NEXT key event the user produces, then
 --- removes itself. This is the OS half of a one-shot ("sticky") modifier; the
 --- policy half — which modifiers, for how long, and what toggling one twice
---- means — lives in modules/gestures/sticky_modifiers.lua and never touches
+--- means — lives in gestures/engine/sticky_modifiers.lua and never touches
 --- Hammerspoon.
 ---
 --- FEATURES & RATIONALE:
@@ -26,10 +26,10 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("core.logger.engine.logger")
-local EventProvenance = require("adapters.event_provenance")
+local EventProvenance = require("diagnostics.adapters.event_provenance")
 local SyntheticInput = require("platform.input.synthetic_input")
 local KeyEventHealth = require("core.logger.engine.key_event_health")
-local ControlSentinels = require("modules.keymap.control_sentinels")
+local ControlSentinels = require("hotstrings.engine.expander.control_sentinels")
 
 local LOG = "platform.input.modifier_injector"
 

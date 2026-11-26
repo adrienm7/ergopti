@@ -295,7 +295,7 @@ _KLSCR_ShutdownCloseNativeChain() {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Done)
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while !IsObject(Receipt) && TickElapsed(Started) < 5000 {
+		while !IsObject(Receipt) && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(10)
 		}

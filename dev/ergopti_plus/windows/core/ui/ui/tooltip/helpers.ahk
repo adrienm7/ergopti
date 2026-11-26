@@ -403,6 +403,110 @@ _TooltipNotifySurfacePresented(Items, SurfaceToken) {
 				"Visible-decision post-present callback failed: " . Err.Message)
 }
 
+; A tooltip appears beside the caret and never takes the focus, so a screen
+; reader says nothing of it. While one runs, the text a sighted user reads is
+; announced to it through the tooltip window as a live region: the previews that would fire
+; (not the struck-through alternates) and a finished prediction's selected
+; line (not the streaming partials). A re-render of the same text within
+; [ui] tooltip_announce_repeat_ms is not said again. Decided by the agent on 2026-11-17, to review by the maintainer: the
+; screen reader's own running flag is the opt-in, with no Ergopti+ setting.
+global _TooltipLastAnnouncement := ""
+global _TooltipLastAnnouncementTick := 0
+
+; The words a screen reader says for a presented tooltip.
+; @param Items {Array} The hotstring rows the surface shows.
+; @param LlmRecord {Object|Integer} The surface's prediction record, or 0.
+; @returns {String} "" when there is nothing to say.
+_TooltipAnnouncementText(Items, LlmRecord) {
+		Parts := []
+		if (Items is Array) {
+			for Item in Items {
+				if !IsObject(Item) || !Item.HasOwnProp("Text") || Item.Text == ""
+					continue
+				if Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+					continue
+				; A shown category glyph is read as the category it stands for:
+				; the shape tells the categories apart, its name says which. It
+				; comes first, as the badge comes first in the row.
+				Shown := Item.HasOwnProp("Glyph") && Item.Glyph != ""
+					&& Item.HasOwnProp("GlyphNameKey") && Item.GlyphNameKey != ""
+				Parts.Push(Shown ? t(Item.GlyphNameKey) . ", " . Item.Text : Item.Text)
+			}
+		}
+		if IsObject(LlmRecord) && LlmRecord.HasOwnProp("IsFinal") && LlmRecord.IsFinal
+				&& LlmRecord.HasOwnProp("Slots") && (LlmRecord.Slots is Array)
+				&& LlmRecord.Slots.Length >= LlmRecord.ActiveIdx {
+			Slot := LlmRecord.Slots[LlmRecord.ActiveIdx]
+			if !_LLM_SlotIsPlaceholder(Slot)
+				Parts.Push(_LLM_SlotGetText(Slot))
+		}
+		Text := ""
+		for Part in Parts
+			Text .= (Text == "" ? "" : "`n") . Part
+		return Text
+}
+
+; Sends a presented tooltip's text to the running screen reader, on a fresh
+; timer turn: the caller is the keyboard's hot path. The menu's
+; hotstrings.preview_announcements switch (2026-11-21) silences it while a
+; screen reader runs, as on macOS and Linux.
+; @param ScreenReaderFn {Func|Integer} Replaces A11ySystem_ScreenReaderOn (tests).
+; @param AnnounceFn {Func|Integer} Replaces A11ySystem_Announce (tests).
+; @param SwitchFn {Func|Integer} Replaces the preview_announcements switch read (tests).
+; @returns {String} The text handed to the screen reader, "" when none was.
+_TooltipAnnouncePresented(Items, Surface, ScreenReaderFn := 0, AnnounceFn := 0, SwitchFn := 0) {
+		global _TooltipLastAnnouncement, _TooltipLastAnnouncementTick
+		try {
+			SwitchOn := IsObject(SwitchFn) ? SwitchFn.Call()
+				: HSE_PreviewSwitchCurrent(ConfigLeaf.PREVIEW_ANNOUNCEMENTS)
+			ReaderOn := SwitchOn && (IsObject(ScreenReaderFn) ? ScreenReaderFn.Call() : A11ySystem_ScreenReaderOn())
+			if !ReaderOn {
+				_TooltipLastAnnouncement := ""
+				return ""
+			}
+			Record := (IsObject(Surface) && Surface.HasOwnProp("LlmPresented")) ? Surface.LlmPresented : 0
+			Text := _TooltipAnnouncementText(Items, Record)
+			if (Text == "")
+				return ""
+			if (Text == _TooltipLastAnnouncement
+					&& A_TickCount - _TooltipLastAnnouncementTick < TimingsGet("ui", "tooltip_announce_repeat_ms"))
+				return ""
+			Hwnd := 0
+			if (IsObject(Surface) && IsObject(Surface.Gui)) {
+				; A surface hidden and destroyed before this turn left nothing on
+				; screen to read; its Hwnd would throw « Gui has no window » and
+				; open the error window (screen reader on, 2026-11-18).
+				if !_TooltipGuiHasWindow(Surface.Gui)
+					return ""
+				Hwnd := Surface.Gui.Hwnd
+			}
+			_TooltipLastAnnouncement := Text
+			_TooltipLastAnnouncementTick := A_TickCount
+			Announce := IsObject(AnnounceFn) ? AnnounceFn : A11ySystem_Announce
+			SetTimer(() => Announce.Call(Hwnd, Text), -1)
+			return Text
+		} catch Error as Err {
+			_UiOracleReportError("Tooltip screen-reader notice failed: " . Err.Message)
+			return ""
+		}
+}
+
+; Whether a Gui still owns its window: AutoHotkey throws on any property of a
+; destroyed Gui, and Hwnd is the one read that has no side effect. The read is
+; an assignment because a bare « G.Hwnd » statement is a method call in v2.
+; @param G {Gui} The surface's Gui.
+; @returns {Boolean}
+_TooltipGuiHasWindow(G) {
+		try {
+			Hwnd := G.Hwnd
+			return Hwnd != 0
+		} catch Error as Err {
+			if InStr(Err.Message, "has no window")
+				return false
+			throw Err
+		}
+}
+
 ; Oracle hooks are intentionally invoked inside short presentation/hide
 ; transactions. Their exceptional diagnostics must not turn an inherited
 ; keyboard-path Critical span into synchronous logger I/O.
@@ -646,6 +750,9 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
 			HotPath_BreakdownMark("notify", _hpPostPresent, Breakdown)
 			_hpPostPresent := HotPath_Now()
+			_TooltipAnnouncePresented(PublishItems, PreparedSurface)
+			HotPath_BreakdownMark("announce", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
 		}
 		if IsSet(_LLM_TooltipScheduleMetricDrain)
 			_LLM_TooltipScheduleMetricDrain()
@@ -785,34 +892,147 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 		return true
 }
 
+; The chip a preview row draws its category glyph in: the first cell of the
+; row, before the output, filled in the glyph grey with the glyph in the row's
+; tint, so it reads as an annotation and not as text the expansion types. One
+; column for the whole stack, as wide as its widest glyph; no glyph, no column
+; and no gap. The port of
+; _shared/hotstrings/engine/category_glyph.lua badge_geometry, pinned by the
+; same vectors.
+; @param GlyphW {Number} Widest glyph of the stack, 0 when none is shown.
+; @param GlyphH {Number} Tallest glyph of the stack.
+; @param PadX {Number} [layout] glyph_badge_pad_x.
+; @param PadY {Number} [layout] glyph_badge_pad_y.
+; @param Gap {Number} [layout] glyph_badge_gap.
+; @returns {Object} { W, H, Zone }: the chip's size, and how far right of the
+;   row's padding the output starts.
+TooltipGlyphBadge(GlyphW, GlyphH, PadX, PadY, Gap) {
+	if (GlyphW <= 0)
+		return { W: 0, H: 0, Zone: 0 }
+	W := GlyphW + 2 * PadX
+	return { W: W, H: GlyphH + 2 * PadY, Zone: W + Gap }
+}
+
+; The glyph a tooltip row shows, "" when it shows none.
+; @param Item {Object}
+; @returns {String}
+_TooltipItemGlyph(Item) {
+	return Item.HasOwnProp("Glyph") ? Item.Glyph : ""
+}
+
+; The trigger label a tooltip row draws at its right, "" when it has none.
+; @param Item {Object}
+; @returns {String}
+_TooltipItemLabel(Item) {
+	return Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+}
+
+; The badge column of a stack, measured at the trigger label's size.
+; @param Items {Array}
+; @returns {Object} As TooltipGlyphBadge.
+_TooltipMeasureGlyphBadge(Items) {
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_GLYPH_BADGE_PAD_X, _TOOLTIP_GLYPH_BADGE_PAD_Y
+	global _TOOLTIP_GLYPH_BADGE_GAP
+	GlyphW := 0
+	GlyphH := 0
+	for , Item in Items {
+		Glyph := _TooltipItemGlyph(Item)
+		if (Glyph == "")
+			continue
+		Size := _TooltipMeasureTextSize(Glyph, _TOOLTIP_LABEL_FONT_SIZE)
+		GlyphW := Max(GlyphW, Size.W)
+		GlyphH := Max(GlyphH, Size.H)
+	}
+	return TooltipGlyphBadge(GlyphW, GlyphH, _TOOLTIP_GLYPH_BADGE_PAD_X,
+		_TOOLTIP_GLYPH_BADGE_PAD_Y, _TOOLTIP_GLYPH_BADGE_GAP)
+}
+
+; The height a row's content takes: its text, or its badge when that is taller.
+; @param TextH {Number}
+; @param Glyph {String}
+; @param Badge {Object} As TooltipGlyphBadge.
+; @returns {Number}
+_TooltipRowContentH(TextH, Glyph, Badge) {
+	return (Glyph != "") ? Max(TextH, Badge.H) : TextH
+}
+
+; The colour of a row's annotations (trigger label, glyph badge): a dimmed row
+; dims them with its text, so the whole row reads as one that will not fire.
+; @param BaseHex {String}
+; @param IsDimmed {Boolean}
+; @returns {String}
+_TooltipAnnotationColorHex(BaseHex, IsDimmed) {
+	global UI_HIGH_CONTRAST, _TOOLTIP_DIM_COLOR_HEX
+	return IsDimmed ? (UI_HIGH_CONTRAST ? _TOOLTIP_DIM_COLOR_HEX : "707070") : BaseHex
+}
+
+; The font options of a row's annotation (trigger label, glyph) in a colour.
+; @param ColorHex {String}
+; @returns {String}
+_TooltipAnnotationFont(ColorHex) {
+	global _TOOLTIP_LABEL_FONT_SIZE
+	return "norm c" . ColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE
+}
+
+; Draws a row's glyph chip at (X, Y): one Text control filled in the chip
+; colour, the glyph centred on it in the row's own tint. One control and no
+; window region is the whole cost of the chip on the keystroke path: a frame
+; (a second control) or rounded corners (a region per control) each cost about
+; as much again (decided by the agent on 2026-11-20,
+; docs/memory/maintainer-decisions.md). SS_CENTERIMAGE (0x200) centres the
+; single line vertically.
+; @param G {Gui}
+; @param Glyph {String}
+; @param Badge {Object} As TooltipGlyphBadge.
+; @param X {Number}
+; @param Y {Number}
+; @param BgHex {String} The row's tint, the glyph's colour.
+; @param ChipHex {String} The chip's fill.
+_TooltipDrawGlyphBadge(G, Glyph, Badge, X, Y, BgHex, ChipHex) {
+	global _TOOLTIP_FONT_NAME
+	G.SetFont(_TooltipAnnotationFont(BgHex), _TOOLTIP_FONT_NAME)
+	G.Add("Text", Format("Center +0x200 Background{1} x{2} y{3} w{4} h{5}",
+		ChipHex, X, Y, Badge.W, Badge.H), Glyph)
+}
+
 ; Draws hotstring rows heading a prediction Gui (llm.trigger.while_hotstring_tooltip
 ; = "both") the way _TooltipBuildGui draws the hotstring stack: same tint bands,
 ; text colours and rules, at the geometry _LLM_TooltipHeaderLayout chose.
 _TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
 	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
-	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_TEXT_HEX, _TOOLTIP_GLYPH_BADGE_HEX
 	for Idx, Item in Items {
 		RowY := Header.RowY[Idx]
 		RowH := Header.RowH[Idx]
 		ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+		BgHex := _TooltipMixTintHex(ColorHex)
 		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TooltipMixTintHex(ColorHex), RowY, TotalW, RowH), "")
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
 		IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+		; The glyph badge first, at the far left, as in the hotstring stack.
+		TextH := Header.Sizes[Idx].H
+		ContentH := Header.ContentH[Idx]
+		Glyph := _TooltipItemGlyph(Item)
+		if (Glyph != "" && Header.Badge.W > 0)
+			_TooltipDrawGlyphBadge(G, Glyph, Header.Badge, _TOOLTIP_PADDING_X,
+				RowY + _TOOLTIP_PADDING_Y + (ContentH - Header.Badge.H) // 2, BgHex,
+				_TooltipAnnotationColorHex(_TOOLTIP_GLYPH_BADGE_HEX, IsDimmed))
+		TextY := RowY + _TOOLTIP_PADDING_Y + (ContentH - TextH) // 2
 		if IsDimmed
 			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 		else
-			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
-			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
-		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+			G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", Header.TextX,
+			TextY, Header.TextW, TextH), Item.Text)
+		Label := _TooltipItemLabel(Item)
 		if (Label != "" && Header.LabelW > 0) {
 			LabelSize := Header.LabelSizes[Idx]
 			G.SetFont("norm c" . (IsDimmed ? _TOOLTIP_DIM_COLOR_HEX : _TOOLTIP_LABEL_COLOR_HEX)
 				. " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
 			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 				TotalW - _TOOLTIP_PADDING_X - Header.LabelW,
-				RowY + _TOOLTIP_PADDING_Y + Max(0, (Header.Sizes[Idx].H - LabelSize.H) // 2),
+				TextY + Max(0, (TextH - LabelSize.H) // 2),
 				Header.LabelW, LabelSize.H), Label)
 		}
 		G.SetFont("s1", _TOOLTIP_FONT_NAME)
@@ -842,7 +1062,7 @@ _TooltipRowNeedsBand(BgHex, GuiBgHex) {
 ; is a single window with a single GDI region, exactly like the Hammerspoon canvas.
 _TooltipBuildGui(Items) {
 		global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_LABEL_GAP
-		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_TEXT_HEX, _TOOLTIP_DIM_COLOR_HEX, UI_HIGH_CONTRAST
 
 		G := 0
 		try {
@@ -866,7 +1086,7 @@ _TooltipBuildGui(Items) {
 		MaxLabelW := 0
 		LabelSizes := []
 		for , Item in Items {
-				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				Label := _TooltipItemLabel(Item)
 				if (Label != "") {
 						LS := _TooltipMeasureTextSize(Label, _TOOLTIP_LABEL_FONT_SIZE)
 						LabelSizes.Push(LS)
@@ -878,7 +1098,11 @@ _TooltipBuildGui(Items) {
 		}
 
 		LabelZone := MaxLabelW > 0 ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
-		TotalW := _TOOLTIP_PADDING_X + MaxW + LabelZone + _TOOLTIP_PADDING_X
+		; The category glyph badge is the first cell of a row: the output moves
+		; right by its column, which is empty when no row shows a glyph.
+		Badge := _TooltipMeasureGlyphBadge(Items)
+		TextX := _TOOLTIP_PADDING_X + Badge.Zone
+		TotalW := TextX + MaxW + LabelZone + _TOOLTIP_PADDING_X
 		Count := Items.Length
 		SEP_H := 1   ; 1 px separator between rows, in logical pixels
 
@@ -887,8 +1111,9 @@ _TooltipBuildGui(Items) {
 		TotalH := 0
 		for Idx, Item in Items {
 				S := Sizes[Idx]
-				RowH := _TOOLTIP_PADDING_Y + S.H + _TOOLTIP_PADDING_Y
-				RowMeta.Push({ H: RowH, Y: TotalH })
+				ContentH := _TooltipRowContentH(S.H, _TooltipItemGlyph(Item), Badge)
+				RowH := _TOOLTIP_PADDING_Y + ContentH + _TOOLTIP_PADDING_Y
+				RowMeta.Push({ H: RowH, Y: TotalH, ContentH: ContentH })
 				TotalH += RowH
 				if (Idx < Count)
 						TotalH += SEP_H
@@ -926,24 +1151,17 @@ _TooltipBuildGui(Items) {
 						G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
 				}
 
-				; Main text overlay. Dimmed alternates (rows beyond the firing one of
-				; their group) get gray text + strikethrough so the user sees what is
-				; available without confusing it with the actual outcome. ``norm``
-				; resets any prior Strike/Bold/Italic before applying this row's style.
-				if IsDimmed {
-						G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				} else if Item.HasOwnProp("TextColorHex") {
-						; The LLM loading panel: macOS draws its label italic in the
-						; shared loading_text colour.
-						G.SetFont("norm italic c" . Item.TextColorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				} else {
-						G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				}
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-						_TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
+				; The category glyph badge, first cell of the row: framed so the glyph
+				; reads as an annotation, not as text the expansion will type.
+				Glyph := _TooltipItemGlyph(Item)
+				if (Glyph != "")
+						_TooltipDrawGlyphBadge(G, Glyph, Badge, _TOOLTIP_PADDING_X,
+								RowY + _TOOLTIP_PADDING_Y + (Meta.ContentH - Badge.H) // 2, BgHex,
+								_TooltipAnnotationColorHex(_TOOLTIP_GLYPH_BADGE_HEX, IsDimmed))
+				TextY := RowY + _TOOLTIP_PADDING_Y + (Meta.ContentH - S.H) // 2
 
 				; Trigger label on the right.
-				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				Label := _TooltipItemLabel(Item)
 				if (Label != "" and LabelZone > 0) {
 						LS := LabelSizes[Idx]
 						LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
@@ -955,14 +1173,30 @@ _TooltipBuildGui(Items) {
 						; centering to kick in (multi-line text); for single-line rows the
 						; centering offset is 0 and no upward shift is needed.
 						DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
-						LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
+						LabelY := TextY + CenterOffset - DescenderFix + StarFix
 						; Dimmed rows get a darker label so the entire row reads as
 						; "disabled" — same visual treatment as the main text.
-						LabelColorHex := IsDimmed ? "707070" : _TOOLTIP_LABEL_COLOR_HEX
-						G.SetFont("norm c" . LabelColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+						G.SetFont(_TooltipAnnotationFont(_TooltipAnnotationColorHex(_TOOLTIP_LABEL_COLOR_HEX, IsDimmed)),
+								_TOOLTIP_FONT_NAME)
 						G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
 								LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
 				}
+
+				; Main text overlay. Dimmed alternates (rows beyond the firing one of
+				; their group) get gray text + strikethrough so the user sees what is
+				; available without confusing it with the actual outcome. ``norm``
+				; resets any prior Strike/Bold/Italic before applying this row's style.
+				if IsDimmed {
+						G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				} else if Item.HasOwnProp("TextColorHex") {
+						; The LLM loading panel: macOS draws its label italic in the
+						; shared loading_text colour.
+						G.SetFont("norm italic c" . Item.TextColorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				} else {
+						G.SetFont("norm c" . _TOOLTIP_TEXT_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				}
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+						TextX, TextY, MaxW, S.H), Item.Text)
 
 				; 1 px separator — same opacity as the tooltip border (white alpha=0.25).
 				; Colors are pre-blended in UI_SEP_COLOR_HEX during UiStyle_LoadSharedConst.
@@ -1526,8 +1760,12 @@ _TooltipResolveAccent(contextKey) {
 ; hex falls back to the neutral default background. Returns a hex string
 ; without the leading '#', upper-case (the form Gui.BackColor expects).
 _TooltipMixTintHex(AccentHex) {
-		global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION
+		global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION, UI_HIGH_CONTRAST
 
+		; A contrast theme gives every row its own tooltip background: a hue wash
+		; would sit under the theme text colour at an unknown contrast.
+		if UI_HIGH_CONTRAST
+				return _TOOLTIP_DEFAULT_BG_HEX
 		H := Trim(AccentHex)
 		if (SubStr(H, 1, 1) == "#") {
 				H := SubStr(H, 2)
@@ -1548,8 +1786,10 @@ _TooltipMixTintHex(AccentHex) {
 		MinC := Min(R, G, B)
 		Delta := MaxC - MinC
 
-		; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback
-		if (Delta <= 0.0001) {
+		; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback:
+		; under ACHROMATIC_CHROMA of tint.js the imposed saturation would turn a
+		; faint tint (the palette's grey #6e6e73) into a saturated navy.
+		if (Delta < 0.05) {
 				return _TOOLTIP_DEFAULT_BG_HEX
 		}
 

@@ -53,9 +53,19 @@ end
 -- ========================================
 -- ========================================
 
+--- Prints one line in the shared format (spec § 3), the timestamp at second
+--- resolution. The fallback used to print "[WARN]" where the spec and every
+--- other sink print "[WARNING]", and let a format error escape into the caller
+--- (logger parity audit LOG-07).
 local function _log(level, tag, fmt, ...)
-	local msg = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
-	print(string.format("[%s] [%s] %s", level, tag, msg))
+	local count = select("#", ...)
+	local msg = tostring(fmt)
+	if count > 0 then
+		local ok, result = pcall(string.format, fmt, ...)
+		msg = ok and result or string.format("%s  [!! log format failed: %s \u{2014} %d arg(s) not substituted]",
+			tostring(fmt), tostring(result), count)
+	end
+	print(string.format("%s:000 [%s] [%s] %s", os.date("%Y-%m-%d %H:%M:%S"), level, tostring(tag), msg))
 end
 
 M.debug   = function(t, f, ...) _log("DEBUG",   t, f, ...) end
@@ -65,7 +75,7 @@ M.info    = function(t, f, ...) _log("INFO",    t, f, ...) end
 M.start   = function(t, f, ...) _log("START",   t, f, ...) end
 M.success = function(t, f, ...) _log("SUCCESS", t, f, ...) end
 M.evidence = function(t, f, ...) _log("INFO",   t, f, ...) end
-M.warn    = function(t, f, ...) _log("WARN",    t, f, ...) end
+M.warn    = function(t, f, ...) _log("WARNING", t, f, ...) end
 M.error   = function(t, f, ...) _log("ERROR",   t, f, ...) end
 
 return M

@@ -641,6 +641,18 @@ sleep(3)
 stop_daemon()
 Keyboard.close()
 
+-- The panel stand-in hosts the icon for the whole session, so the daemon's
+-- tray host check (TRAY-03) must find it: a « no tray » window opened over
+-- the editor takes the focus the "//" and Super+Space checks type into.
+do
+	local fh = io.open(log, "r")
+	local text = fh and fh:read("*a") or ""
+	if fh then fh:close() end
+	if not text:find("[tray.host_check] Tray host present", 1, true) then
+		failures[#failures + 1] = "the daemon did not find the tray host that showed its icon"
+	end
+end
+
 if #failures == 0 then
 	print("  ok   the prediction was requested with the entry's key and typed on a bare 1")
 	os.exit(0)

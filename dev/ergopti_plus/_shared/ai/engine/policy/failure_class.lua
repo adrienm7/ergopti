@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One verdict for every driver: macOS and Linux call this module, Windows
----    mirrors it in windows/modules/llm/api_common.ahk. Both replay
+---    mirrors it in windows/ai/engine/api/common.ahk. Both replay
 ---    _shared/tests/corpus/llm/auth_failure_vectors.json.
 --- 2. A failure is a string ("HTTP 401: ..." or a plain message) or a table
 ---    { status?, reason?, message? }. HTTP 401 and 403 are authentication or

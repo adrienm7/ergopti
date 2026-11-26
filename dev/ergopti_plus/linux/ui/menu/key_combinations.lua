@@ -1,13 +1,15 @@
 --- ui/menu/key_combinations.lua
 
 --- Renders shared ordered slots through the actual native picker and publisher.
---- Same-device chord choices retain the original source and publication owner.
+--- Chord choices retain the original source and publication owner.
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Shared = require("tap_hold.engine.key_combinations")
 local HoldOptions = require("tap_hold.engine.hold_options")
 local KeyCatalog = require("tap_hold.engine.key_catalog")
-local Features = require("infra.manifest_reader")
+local Features = require("menu.engine.manifest_reader")
 local Codec = require("core.text.engine.toml_codec")
+local CombinationLabels = require("tap_hold.engine.combination_labels")
+local LabelValue = require("core.i18n.engine.label_value")
 local M = {}
 
 --- Builds the manifest's ordered-pair group, using a native context's UI ports.
@@ -15,7 +17,7 @@ local M = {}
 --- @param ui table Shared renderer, translator, picker, prompt and feedback ports.
 --- @return table rows Native submenu rows.
 function M.build(ctx,ui)
-	local declaration = Features.find_entry_by_path("category_enabled.key_combinations")
+	local declaration = Features.find_entry_by_path(require("settings.engine.keys").KEY.CATEGORY_ENABLED_KEY_COMBINATIONS)
 	if type(declaration) ~= "table" or declaration.type ~= "boolean" or declaration.default ~= true then return {} end
 	local th,actions = ctx.tap_holds,ctx.gestures
 	local pairs = require("modules.shortcuts.key_combinations")
@@ -57,7 +59,7 @@ function M.build(ctx,ui)
 	end
 	local editable = snapshot() ~= nil
 	local function action_label(action)
-		if action==Shared.NONE then return t("tap_hold.tap.none") end
+		if action==Shared.NONE then return t("dialog.action_picker.disabled") end
 		return ui.action_label(action,actions)
 	end
 	local function hold_option(value)
@@ -105,9 +107,14 @@ function M.build(ctx,ui)
 			return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
 		end)
 	end
+	-- The Windows layout (maintainer decision KCD-8 of 2026-11-21, shared in
+	-- tap_hold.engine.combination_labels): one submenu per first key, ticked
+	-- when any of its pairs is set, then one row per pair and its summary,
+	-- naming its tap, hold and chord in that order.
 	local function hand_rows(hand)
-		local rows={}
+		local groups={}
 		for _,first in ipairs(KeyCatalog.of_hand(keys,hand)) do
+			local rows,any={},false
 			for _,second in ipairs(keys) do
 				if first.id~=second.id then
 					local pair=Shared.pair(first.id,second.id)
@@ -138,18 +145,23 @@ function M.build(ctx,ui)
 						end
 						return slots
 					end})
-					rows[#rows+1]={label=label.."  :  "..tap_label.."  /  "..hold_label,checked=assigned or nil,submenu=sub}
+					any=any or assigned
+					local summary=CombinationLabels.summary({tap=tap~=Shared.NONE and tap_label or nil,
+						hold=hold~=Shared.NONE and hold_label or nil,chord=chord~=Shared.NONE and action_label(chord) or nil},
+						t("dialog.action_picker.disabled"))
+					rows[#rows+1]={label=LabelValue.compose(t,label,summary),checked=assigned or nil,submenu=sub}
 				end
 			end
+			groups[#groups+1]={label=ui.key_label(first),checked=any or nil,items=rows}
 		end
-		return rows
+		return groups
 	end
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
 	render.commands[require("settings.engine.keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
 		local committed=feedback(Scope.set_enabled(desired,source))
-		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
+		if committed==true then require("menu.ui.builder.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
 	render.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]=function()
@@ -187,7 +199,8 @@ function M.build(ctx,ui)
 				-- The shared value check names the accepted range; a refusal writes nothing.
 				local ValueCheck=require("settings.engine.value_check")
 				local key=require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS
-				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected)
+				-- A blank answer resets it to its default (maintainer decision PCK-13).
+				local typed=ValueCheck.parse_entry(ValueCheck.declaration(key),selected,delay_entry.default)
 				if not typed.ok then
 					ui.error(ValueCheck.refusal_text(key,typed,t),t("dialog.value_check.title"))
 					return false

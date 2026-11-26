@@ -287,8 +287,14 @@ local function traverse(backend, retain_focus)
 	-- tree against a one-second deadline. Without a window manager nothing is
 	-- ACTIVE and the whole desktop is searched, as before.
 	local scoped, owned = {}, {}
+	-- No ACTIVE frame among the listed applications: the focused window belongs
+	-- to no application on the accessibility bus (a toolkit that registers only
+	-- on demand, a terminal without accessibility). A positive answer, unlike a
+	-- failed or ambiguous walk, so the resident watcher reports it as such.
+	local no_active_frame = false
 	if type(backend.active) == "function" then
 		local apps = backend.children(root)
+		no_active_frame = type(apps) == "table"
 		if type(apps) == "table" then
 			for _, app in ipairs(apps) do
 				owned[#owned + 1] = app
@@ -327,14 +333,15 @@ local function traverse(backend, retain_focus)
 		for _, node in ipairs(owned) do backend.release(node) end
 		backend.release(root)
 	end
+	no_active_frame = no_active_frame and #scoped == 0
 	if not ok then
 		discard_handles()
 		Logger.debug(LOG, "AT-SPI traversal failed — %s", tostring(traversal_error))
-		return nil, false
+		return nil, false, nil, nil, no_active_frame
 	end
-	if failed or focused_count ~= 1 then discard_handles(); return nil, false, nil end
+	if failed or focused_count ~= 1 then discard_handles(); return nil, false, nil, nil, no_active_frame end
 	focused_identity.active_scope = #scoped > 0
-	return focused_role, true, focused_identity, handles
+	return focused_role, true, focused_identity, handles, no_active_frame
 end
 
 --- Runs the native traversal in the current process.
@@ -432,15 +439,20 @@ end
 --- @return table|nil snapshot
 --- @return boolean conclusive
 --- @return table|nil handles Worker-owned GObject references.
+--- @return boolean absent True when no listed application owns the active
+--- frame: the focused window is not on the accessibility bus at all.
 function M._get_native_watch_snapshot()
-	local backend = load_native_backend()
-	if not backend then return nil, false end
+	local backend = _backend_for_test or load_native_backend()
+	if not backend then return nil, false, nil, false end
 	local root = backend.root()
-	if root == nil then return nil, false end
+	if root == nil then return nil, false, nil, false end
 	backend.clear_tree(root)
 	backend.release(root)
-	local role, conclusive, identity, handles = traverse(backend, true)
-	if not conclusive then return nil, false end
+	local role, conclusive, identity, handles, absent = traverse(backend, true)
+	-- Absent only without a conclusive answer: with no window manager nothing
+	-- is ACTIVE either, and a single focused field found desktop-wide stays
+	-- the answer it always was.
+	if not conclusive then return nil, false, nil, absent == true end
 	local snapshot = { role = role, active_scope = identity.active_scope == true,
 		native_bus_name = identity.native_bus_name, native_object_path = identity.native_object_path }
 	if handles then handles.snapshot = snapshot end

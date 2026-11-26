@@ -327,7 +327,7 @@ platforms = ["ahk", "hs", "linux"]
 # ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
 # This section and all 45 of its features exclude Linux — 11 are ["ahk","hs"],
 # 34 are ["hs"], none mentions linux. But the Linux driver ships
-# modules/gestures/manager.lua, a _build_gestures tray submenu, Linux-specific
+# gestures/engine/manager.lua, a _build_gestures tray submenu, Linux-specific
 # defaults (swipe_3_left, swipe_4_up, tap_3, tap_4) and a test file. What it has
 # no reader for is TOUCH INPUT: manager.lua's own header calls the libinput
 # subprocess a TODO.
@@ -374,11 +374,15 @@ platforms = ["ahk", "hs", "linux"]
 # ===== 3.1 script =====
 # ======================
 
+# Empty, the neutral value, is the absent row: the system language when a
+# catalogue matches it, else English (identifiers.json locales.system_fallback),
+# on the three OS. A chosen locale, French included, differs from it, so it is
+# always written and never deleted as neutral (maintainer decision, 2026-11-21).
 [[features.script]]
 id = "locale"
 requires = { macos = [], linux = [], windows = [] }
-default = "fr"
-recommended = "fr"
+default = ""
+recommended = ""
 family = "setting"
 type = "string"
 description_key = "menu.script.locale"
@@ -406,6 +410,35 @@ recommended = true
 family = "setting"
 type = "boolean"
 description_key = "menu.debug.show_error_dialog"
+
+# The reading choices of the app's own windows, ticked from the Configuration
+# menu: the font (a hyperlegible or a dyslexia font) and the WCAG 1.4.12 text
+# spacing. Every WebView window's host seeds them before the page's scripts as
+# window.__ergopti_reading, which _shared/ui/a11y_prefs.js applies before the
+# first paint, with the same names and values as the website's reading
+# settings (the site keeps its own, per browser). The values are a11y_prefs.js's
+# own lists, first one its default; test-reading-preferences-seed.cjs pins them.
+[[features.script]]
+id = "reading_font"
+requires = { macos = [], linux = [], windows = [] }
+default = "default"
+recommended = "default"
+family = "setting"
+type = "enum"
+enum_values = ["default", "hyperlegible", "dyslexic"]
+description_key = "menu.configuration.reading_font"
+platforms = ["ahk", "hs", "linux"]
+
+[[features.script]]
+id = "reading_spacing"
+requires = { macos = [], linux = [], windows = [] }
+default = "default"
+recommended = "default"
+family = "setting"
+type = "enum"
+enum_values = ["default", "wide"]
+description_key = "menu.configuration.reading_spacing"
+platforms = ["ahk", "hs", "linux"]
 
 # "auto" reads the AltGr family from the layout; true and false force it when
 # that probe is wrong. It is a parameter, not an activation: it tells the driver
@@ -466,54 +499,15 @@ family = "setting"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
-# The physical key that types the magic key while `hotstrings.magic_key.replace`
-# is on, named by its W3C KeyboardEvent.code like a layout extension's
-# [extension.magic_key] declaration, so one value means the same key on every
-# driver: Windows resolves it to a scan code, macOS to a virtual keycode and
-# Linux to an evdev code, all through _shared/layouts/data/keycodes/physical_keys.json.
-# "auto" leaves the key to the layout: on Windows the emulated layout's declared
-# key, or the key typing magic_key_source_char on the OS layout, or the key the
-# built-in Ergopti layout declares; on macOS and Linux the OS keyboard layout,
-# which types the magic key itself (the driver remaps nothing). The candidates
-# are the character keys a registry layout defines
-# (_shared/layouts/data/mac_keycodes.json) except Space, which every
-# hotstring terminator relies on; tools/test/test-magic-key-source.cjs pins both
-# lists together. It replaced the Windows-only magic_key_source_scan in config
-# schema v5 (migrations.toml), so a value is a parameter of the replace feature,
-# not an activation of its own.
-[[features.hotstrings]]
-id = "magic_key_source"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = "auto"
-recommended = "auto"
-family = "setting"
-type = "enum"
-enum_values = ["auto", "Backquote", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY", "KeyU", "KeyI", "KeyO", "KeyP", "BracketLeft", "BracketRight", "KeyA", "KeyS", "KeyD", "KeyF", "KeyG", "KeyH", "KeyJ", "KeyK", "KeyL", "Semicolon", "Quote", "Backslash", "IntlBackslash", "KeyZ", "KeyX", "KeyC", "KeyV", "KeyB", "KeyN", "KeyM", "Comma", "Period", "Slash"]
-description_key = "menu.hotstrings.magic_key_source"
-
-# The character whose key Windows looks for on the OS layout when no key is
-# chosen and no emulated layout declares one. The Lua drivers have no such
-# detection: without a choice their OS layout types the magic key itself.
-[[features.hotstrings]]
-id = "magic_key_source_char"
-default = "j"
-recommended = "j"
-family = "setting"
-type = "string"
-description_key = "menu.hotstrings.magic_key_source_char"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.magic_key_detection_is_windows"
-
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
-# it was written: macOS ships the engine (modules/keymap/expander.lua
+# it was written: macOS ships the engine (hotstrings/engine/expander/expander.lua
 # try_repeat_feature) AND the toggle, and has for as long as that file has
 # existed. It recorded who implemented the feature first, not what the platforms
 # can do — the same mistake already corrected for hotstring_extensions and
 # magic_key_config. Nothing here touches an OS API: it is "if the character just
 # typed is the magic key and nothing matched, replace it with the one before it",
 # which is as portable as the buffer it reads.
-# Linux gained it in modules/hotstrings/repeat_key.lua.
+# Linux gained it in hotstrings/engine/repeat_key.lua.
 [[features.hotstrings]]
 id = "repeat_key_enabled"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
@@ -522,6 +516,39 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
+
+# Whether a Backspace pressed right after an expansion undoes it: the output
+# goes and the text typed for it comes back, the terminator that fired it
+# included: « adn » then Space types « ADN » and a Space, and Backspace leaves
+# « adn » and a Space, not « ADN ». A trigger fired by the magic key comes back
+# without the magic key, which is an action and not text, and a consumed
+# terminator, never typed, does not come back either. Off, the
+# Backspace deletes the last character, as everywhere else. The rule is one
+# shared function, _shared/hotstrings/engine/backspace_restore.lua, which the
+# AutoHotkey port replays from _shared/tests/corpus/hotstrings/
+# backspace_restore_vectors.json.
+[[features.hotstrings]]
+id = "backspace_restore_enabled"
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+type = "boolean"
+description_key = "menu.hotstrings.backspace_restore_enabled"
+
+# How long after an expansion that Backspace still undoes it, in milliseconds.
+# Past the window, or after any other key, the Backspace deletes the last
+# character. The menu offers the `preset_values` plus a free entry for any
+# other whole number of the value schema's range.
+[[features.hotstrings]]
+id = "backspace_restore_window_ms"
+requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+default = 500
+recommended = 500
+family = "setting"
+type = "number"
+preset_values = [250, 500, 1000, 2000]
+description_key = "menu.hotstrings.backspace_restore_window"
 
 # Seconds without a keystroke after which the next key starts a new word, as
 # if a delimiter had been typed: a word-start hotstring fires again after a
@@ -684,6 +711,34 @@ family = "setting"
 cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_colored_tooltips"
+
+# A symbol per category beside each preview row's trigger label, so a reader who
+# cannot tell the tints apart tells the categories apart (the maintainer chose a
+# glyph over a text label on 2026-11-19). On by default: it costs one character
+# and answers a contrast need the tint alone cannot.
+[[features.hotstrings]]
+id = "preview_category_glyphs"
+requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+cleared = false
+type = "boolean"
+description_key = "menu.hotstrings.preview_category_glyphs"
+
+# Whether a running screen reader is told the hotstring previews and the
+# finished AI predictions (the maintainer asked for a switch on 2026-11-21). On
+# by default: nothing is said without a screen reader, and a screen-reader user
+# who finds the notices noisy turns them off here.
+[[features.hotstrings]]
+id = "preview_announcements"
+requires = { macos = [], linux = ["evdev", "uinput", "xdotool"], windows = [] }
+default = true
+recommended = true
+family = "setting"
+cleared = false
+type = "boolean"
+description_key = "menu.hotstrings.preview_announcements"
 
 [[features.hotstrings]]
 id = "preview_star_enabled"
@@ -954,24 +1009,6 @@ type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_equal"
 
 [[features.hotstrings.rolls]]
-id = "chevron_greater"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.rolls.chevron_greater"
-
-[[features.hotstrings.rolls]]
-id = "chevron_less"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.rolls.chevron_less"
-
-[[features.hotstrings.rolls]]
 id = "close_chevron_tag"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = { enabled = false, time_activation_seconds = 0.5 }
@@ -1084,15 +1121,6 @@ description_key = "menu.hotstrings.rolls.paren_quote"
 # ======================================
 # ===== 3.2.5 hotstrings.magic_key =====
 # ======================================
-
-[[features.hotstrings.magic_key]]
-id = "replace"
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false }
-recommended = { enabled = true }
-family = "feature"
-type = "feature"
-description_key = "menu.hotstrings.magic_key.replace"
 
 [[features.hotstrings.magic_key]]
 id = "repeat_corrections"
@@ -1328,8 +1356,8 @@ description_key = "menu.hotstrings.user_code.title"
 [[features.hotstrings.dynamic]]
 id = "text_expansion_personal_information"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false, pattern_max_length = 1 }
-recommended = { enabled = false, pattern_max_length = 1 }
+default = { enabled = false }
+recommended = { enabled = false }
 family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.text_expansion_personal_information"
@@ -2021,18 +2049,20 @@ type = "boolean"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 requires = { windows = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+reason_key = "platform_reason.take_note_settings_are_windows"
 
+# Empty means the user's Desktop: a shipped folder path names a folder that
+# exists on one machine only (maintainer decision SNU-10, 2026-11-21).
 [[features.shortcuts.take_note]]
 id = "destination_folder"
-default = "D:\\Bureau"
-recommended = "D:\\Bureau"
+default = ""
+recommended = ""
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
 requires = { windows = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+reason_key = "platform_reason.take_note_settings_are_windows"
 
 # ===================================
 # ===== 3.5.1 shortcuts.a_grave =====
@@ -2059,6 +2089,39 @@ recommended = "v"
 family = "setting"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+
+
+# ================================
+# ===== 3.5.1b shortcuts.star =====
+# ================================
+
+# The key that types ★ at its base level, when the layout has one, joins the
+# accented-letter shortcuts (maintainer's decision of 2026-11-21): Ctrl+★ acts
+# as Ctrl+<letter>, so a user who wants Ctrl+★ to save picks « s ». Off in an
+# empty configuration and in the recommended setup: the save rule this replaces
+# was a user's choice.
+[[features.shortcuts.star]]
+id = "enabled"
+default = false
+recommended = false
+family = "feature"
+type = "boolean"
+description_key = "menu.shortcuts.star"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
+
+[[features.shortcuts.star]]
+id = "letter"
+default = "s"
+recommended = "s"
+family = "setting"
+type = "string"
+description_key = "menu.shortcuts.star.letter"
 platforms = ["ahk", "linux"]
 requires = { windows = [], linux = ["evdev", "uinput"] }
 reason_key = "platform_reason.accented_shortcuts_need_a_layout_file_on_macos"
@@ -2216,64 +2279,8 @@ family = "setting"
 type = "boolean"
 description_key = "menu.tapholds.symmetric"
 
-# ====================================
-# ===== 3.5.6 shortcuts.personal =====
-# ====================================
-
-[[features.shortcuts.personal]]
-id = "laptop_broken_key"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.laptop_broken_key"
-
-[[features.shortcuts.personal]]
-id = "mouse_drag_window"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.mouse_drag_window"
-
-[[features.shortcuts.personal]]
-id = "mouse_tab_switching"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.mouse_tab_switching"
-
-[[features.shortcuts.personal]]
-id = "professional_environment"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = false
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.professional_environment"
-
-[[features.shortcuts.personal]]
-id = "programmable_keyboard"
-platforms = ["ahk"]
-requires = { windows = [] }
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "menu.shortcuts.personal.programmable_keyboard"
-
-
-
 # ==========================================
-# ===== 3.5.7 shortcuts.script_control =====
+# ===== 3.5.6 shortcuts.script_control =====
 # ==========================================
 
 # The script-management chords start with their preset in an empty
@@ -2358,32 +2365,69 @@ description_key = "menu.shortcuts.script_control.script_altgr_escape"
 
 
 # ====================================
-# ===== 3.5.8 shortcuts.keyboard =====
+# ===== 3.5.7 shortcuts.keyboard =====
 
+# The key that types ★ at its base level, when the layout has one: Win+★
+# (Windows, Super+★ on Linux) and Ctrl+★ (macOS) open the hotstrings editor in
+# an empty configuration, the maintainer's decision of 2026-11-21. A layout
+# without such a key binds nothing, so no default ships there. The chord is an
+# ordinary slot of its modifier's submenu, which the user may clear. The shared
+# policy is _shared/shortcuts/engine/star_slot_core.lua.
 [[features.shortcuts.keyboard]]
-id = "magic_editor"
-platforms = ["ahk", "hs", "linux"]
-requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
+id = "meta_star"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.star_slot_is_ctrl_on_macos"
 default = "open_hotstrings_editor"
 recommended = "open_hotstrings_editor"
 family = "feature"
 active_by_default = true
-rule_exception = "Maintainer decision of 2026-10-02: the conditional editor shortcut ships on; it follows only the unmodified physical magic source and types nothing."
+rule_exception = "Maintainer decision of 2026-11-21: the ★ key's editor shortcut ships on wherever the layout types ★ at its base level, and types nothing."
 cleared = "none"
 type = "action"
-description_key = "menu.shortcuts.keyboard.magic_editor"
+description_key = "menu.shortcuts.keyboard.meta_star"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_star"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.star_slot_is_ctrl_on_macos"
+default = "open_hotstrings_editor"
+recommended = "open_hotstrings_editor"
+family = "feature"
+active_by_default = true
+rule_exception = "Maintainer decision of 2026-11-21: the ★ key's editor shortcut ships on wherever the layout types ★ at its base level, and types nothing."
+cleared = "none"
+type = "action"
+description_key = "menu.shortcuts.keyboard.secondary_star"
 # ====================================
 
 # ===== 4.8b ahk.shortcuts.keyboard ========
+# Ctrl+B wraps the line in parentheses on the three OS, and Ctrl+O is the
+# « Capture → texte » action (maintainer's decision of 2026-11-25). The
+# Microsoft bold remap Windows recommended on Ctrl+B was removed the same day;
+# the v23 to v24 config step drops a saved binding to it.
 [[features.shortcuts.keyboard]]
 id = "primary_b"
-platforms = ["ahk"]
-requires = { windows = [] }
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
-recommended = "microsoft_bold"
+recommended = "surround_parens"
 family = "feature"
 type = "action"
-description_key = "menu.shortcuts.keyboard.ctrl_b"
+description_key = "shortcuts.label_ctrl_b"
+
+[[features.shortcuts.keyboard]]
+id = "primary_o"
+platforms = ["ahk", "linux"]
+requires = { windows = [], linux = ["evdev", "uinput"] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "ocr_screenshot"
+family = "feature"
+type = "action"
+description_key = "shortcuts.label_ctrl_o"
 
 [[features.shortcuts.keyboard]]
 id = "meta_a"
@@ -2535,18 +2579,18 @@ family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.meta_quote"
 
-# "Generate an AI prediction" on the chord each OS leaves for it; the key is
-# swallowed so the OS never sees it (Win+Space no longer switches the input
-# language on Windows; macOS warns when its own input-source shortcut still
-# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut. The
-# binding is Ergopti's recommendation only: the default stays neutral ("none").
+# The chord each OS leaves for "Generate an AI prediction"; once assigned, the
+# key is swallowed so the OS never sees it (Win+Space no longer switches the
+# input language on Windows; macOS warns when its own input-source shortcut
+# still owns Ctrl+Space). Neither the default nor the recommendation binds it
+# (maintainer's decision of 2026-11-22): the user assigns it.
 [[features.shortcuts.keyboard]]
 id = "secondary_space"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
-recommended = "llm_generate_prediction"
+recommended = "none"
 family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
@@ -2629,12 +2673,23 @@ type = "action"
 description_key = "shortcuts.label_ctrl_m"
 
 [[features.shortcuts.keyboard]]
-id = "secondary_o"
+id = "secondary_b"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "surround_parens"
+family = "feature"
+type = "action"
+description_key = "shortcuts.label_ctrl_b"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_o"
+platforms = ["hs"]
+requires = { macos = [] }
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "ocr_screenshot"
 family = "feature"
 type = "action"
 description_key = "shortcuts.label_ctrl_o"
@@ -2777,7 +2832,7 @@ platforms = ["ahk", "linux"]
 requires = { linux = ["evdev", "uinput"], windows = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
-recommended = "llm_generate_prediction"
+recommended = "none"
 family = "feature"
 type = "action"
 description_key = "menu.shortcuts.keyboard.super_space"
@@ -2785,7 +2840,7 @@ description_key = "menu.shortcuts.keyboard.super_space"
 
 
 # ====================================
-# ===== 3.5.9 shortcuts.tap_keys =====
+# ===== 3.5.8 shortcuts.tap_keys =====
 # ====================================
 
 # The three keys at the edges of the number row, tapped alone. Each runs the
@@ -2828,9 +2883,9 @@ description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 
 
 
-# ======================================
-# ===== 3.5.10 shortcuts.caps_word =====
-# ======================================
+# =====================================
+# ===== 3.5.9 shortcuts.caps_word =====
+# =====================================
 
 # What ends CapsWord on its own, the same settings on every driver; the policy
 # is _shared/keyboard/engine/caps_word_auto_off.lua and its AHK port, both replaying
@@ -2880,7 +2935,7 @@ description_key = "menu.caps_word.terminators_header"
 
 
 # ==============================================
-# ===== 3.5.11 shortcuts.caps_word.pointer =====
+# ===== 3.5.10 shortcuts.caps_word.pointer =====
 # ==============================================
 
 # The pointer actions that end CapsWord: the hand has left the keyboard. One
@@ -2987,7 +3042,7 @@ description_key = "menu.caps_word.pointer.other_buttons"
 #   says to turn them off first (menu.gestures.recommended_reason_macos). The
 #   three-finger swipes are off in a default macOS install.
 # - Windows: every slot is a system gesture, but the driver writes the touchpad
-#   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
+#   registry itself (gestures/adapters/touchpad_registry.ahk, backed up first),
 #   so Windows runs only Ergopti's action: no double action.
 [[features.gestures]]
 id = "enabled"
@@ -4260,11 +4315,17 @@ family = "setting"
 type = "number"
 description_key = "menu.gestures.sensitivities"
 
+# The two layer switches of the emulated layout (base and Shift; AltGr and
+# Shift+AltGr below) are on by default and only choose layers: the layout
+# selection (emulated_layout, else ergopti_variant) is the one gate, so with
+# « None » selected they do nothing and a new installation emulates nothing
+# (maintainer decision of 2026-11-23).
 [[features.layout]]
 id = "ergopti_base"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = false
+default = true
+rule_exception = "Maintainer decision of 2026-11-23: the layer switches only choose which layers of the selected layout are emulated; the layout selection, None by default, is their gate, so a fresh install emulates nothing."
 recommended = true
 family = "feature"
 type = "boolean"
@@ -4278,6 +4339,9 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 [[features.layout]]
 id = "direct_access_digits"
 platforms = ["ahk", "hs", "linux"]
+# Linux applies it live only on X11 and on GNOME or KDE under Wayland
+# (linux/ui/menu/menu_layouts.lua greys the rows elsewhere).
+degraded = { linux = "platform_reason.number_row_live_session" }
 requires = { macos = [], linux = [], windows = [] }
 default = "native"
 recommended_per_platform = { ahk = "digits", hs = "native", linux = "native" }
@@ -4319,6 +4383,9 @@ description_key = "menu.layout.virtual_keyboard"
 [[features.layout]]
 id = "number_row_reorder_edges"
 platforms = ["ahk", "hs", "linux"]
+# Linux applies it live only on X11 and on GNOME or KDE under Wayland
+# (linux/ui/menu/menu_layouts.lua greys the rows elsewhere).
+degraded = { linux = "platform_reason.number_row_live_session" }
 requires = { macos = [], linux = [], windows = [] }
 default = false
 recommended = false
@@ -4330,7 +4397,8 @@ description_key = "menu.layout.number_row_edges"
 id = "ergopti_alt_gr"
 platforms = ["ahk", "hs", "linux"]
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = false
+default = true
+rule_exception = "Maintainer decision of 2026-11-23: the layer switches only choose which layers of the selected layout are emulated; the layout selection, None by default, is their gate, so a fresh install emulates nothing."
 recommended = true
 family = "feature"
 type = "boolean"
@@ -4400,17 +4468,6 @@ family = "setting"
 type = "boolean"
 description_key = "menu.layout.emulate_bottom_row"
 
-[[features.layout]]
-id = "ctrl_magic_save"
-platforms = ["ahk"]
-requires = { windows = [] }
-reason_key = "platform_reason.layout_emulation_is_windows_only"
-default = false
-recommended = false
-family = "feature"
-type = "boolean"
-description_key = "menu.layout.ctrl_magic_save"
-
 # The registry layout (static/layouts/registry, _shared/layouts/data) the
 # three drivers emulate by reading its .keylayout over whatever system layout is
 # installed, "" for none. While set it supersedes the Ergopti emulation above. A
@@ -4419,12 +4476,68 @@ description_key = "menu.layout.ctrl_magic_save"
 [[features.layout]]
 id = "emulated_layout"
 platforms = ["ahk", "hs", "linux"]
+# macOS holds a layout's custom modifier on every key but Caps Lock (Neo's Mod3
+# there): an event tap never sees Caps Lock held.
+degraded = { macos = "platform_reason.caps_lock_level_not_held_on_macos" }
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
 default = ""
 recommended = ""
 family = "feature"
 type = "string"
 description_key = "menu.layout.emulated_layout"
+
+# The layouts chosen last for the emulation, most recent first, which the
+# « Layout to emulate » menu offers at its top before « Others… » (maintainer
+# decision of 2026-11-25). Every selection writes it with emulated_layout
+# (_shared/layouts/engine/emulation/recents.lua, the Windows twin in
+# modules/keymap/keylayout/emulation_recents.ahk); « None » is never recorded, and its length is
+# emulation.recent_count of _shared/layouts/data/defaults.json. Usage history,
+# not a choice: empty, it is never written, so an older configuration reads
+# as no recents.
+[[features.layout]]
+id = "emulated_layout_recents"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = [], windows = [] }
+default = []
+recommended = []
+family = "setting"
+type = "array"
+description_key = "menu.layout.emulation_recents"
+
+# « Touches de jeu » (maintainer decision of 2026-11-26): which key identity a
+# game reads while Ergopti types, the character staying Ergopti's. "physical"
+# keeps every key at its physical place (WASD stays WASD, the engines' own
+# convention), "letters" makes the key that types an Ergopti letter be that
+# letter's key of the system layout. Every emulated key is sent held, down on
+# press and up on release, in both choices. The shared resolver is
+# _shared/layouts/engine/emulation/game_keys.lua (Windows twin
+# modules/keymap/keylayout/game_keys.ahk), pinned by
+# _shared/tests/corpus/layouts/game_keys_vectors.json.
+[[features.layout]]
+id = "game_keys"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = [], windows = [] }
+default = "physical"
+recommended = "physical"
+family = "setting"
+type = "enum"
+enum_values = ["physical", "letters"]
+description_key = "menu.layout.game_keys"
+
+# The per-application override of game_keys: the application's identity on
+# its OS (executable name on Windows, bundle identifier on macOS, WM class or
+# Wayland app_id on Linux, the identities the other per-application lists use)
+# to "physical" or "letters". An application listed here is a game: its held
+# keys skip the tap-hold delays. Absent, every application follows game_keys.
+[[features.layout]]
+id = "game_keys_apps"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = [], linux = [], windows = [] }
+default = {}
+recommended = {}
+family = "setting"
+type = "map"
+description_key = "menu.layout.game_keys_apps"
 
 
 
@@ -4474,17 +4587,17 @@ description_key = "menu.category_enabled.tap_holds"
 
 # The « Combinaisons de touches » switch under Shortcuts: the only gate of the
 # key combinations, which the Shortcuts master no longer reaches (decision of
-# 2026-09-29), each pair keeping its own slots. macOS keeps the same switch as
-# [mod_combos] enabled in tap_hold.toml, beside the rules it gates. Its
+# 2026-09-29), each pair keeping its own slots. It is the master on all three
+# OS, and [mod_combos] enabled covers only the chords (maintainer decision
+# KCD-6 of 2026-11-21). Its
 # neutral value is on: the gate can only narrow what each pair already binds,
 # so it activates nothing alone. An absent key must leave the pairs live, and
 # the sparse writer deletes a value equal to the default, so a default of off
 # would both disable upgraded configs and never persist.
 [[features.category_enabled]]
 id = "key_combinations"
-platforms = ["ahk", "linux"]
-requires = { linux = ["evdev", "uinput"], windows = [] }
-reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos"
+platforms = ["ahk", "hs", "linux"]
+requires = { macos = ["karabiner"], linux = ["evdev", "uinput"], windows = [] }
 default = true
 recommended = true
 family = "setting"
@@ -4600,17 +4713,6 @@ recommended = true
 family = "feature"
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["hs"]
-requires = { macos = [] }
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "cmd_star"
-default = false
-recommended = true
-family = "feature"
-type = "boolean"
-description_key = "shortcuts.label_cmd_star"
 platforms = ["hs"]
 requires = { macos = [] }
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
@@ -4886,7 +4988,7 @@ note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboar
 id = "emulated_layout"
 label_key = "onboarding.layout.emulated_layout"
 platforms = ["ahk", "hs", "linux"]
-choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_base" = false, "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
+choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
 
 [[onboarding.pages.keyboard_layout.controls]]
 id = "alt_gr_emulation"
@@ -4932,18 +5034,18 @@ neutral_label_key = "onboarding.hotstrings.all_languages"
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
-# Linux keeps its existing rare-symbol policy; common-character presets are
-# offered only where the runtime accepts them. Custom Linux answers go through
-# the same shared validator as the tray before the wizard changes preferences.
+# Every OS accepts any one character (maintainer's decision of 2026-11-21:
+# « ù » on AZERTY and « ; » on QWERTY are the layout defaults). Linux's bridge
+# shows its refusals through the localized dialog keys (validation).
 platforms = ["ahk", "hs", "linux"]
-validation = { linux = "safe_magic_key" }
+validation = { linux = "one_character" }
 label_key = "onboarding.magic_key.desc"
 hint_key = "onboarding.magic_key.choose_freely"
 custom_label_key = "onboarding.magic_key.option_custom"
 # One code point, as config.schema.json and every runtime validate it: a longer
 # custom trigger would be saved, then stop the Windows driver at every start.
 max_characters = 1
-options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave", platforms = ["ahk", "hs"] }, { value = ";", label_key = "onboarding.magic_key.option_semicolon", platforms = ["ahk", "hs"] }]
+options = [{ value = "★", label_key = "onboarding.magic_key.option_blackstar" }, { value = "ù", label_key = "onboarding.magic_key.option_ugrave" }, { value = ";", label_key = "onboarding.magic_key.option_semicolon" }]
 
 [onboarding.pages.llm]
 title_key = "menu.llm.title"

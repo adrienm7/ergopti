@@ -4,7 +4,7 @@
 ; MODULE: ClipWait Binary Data Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "getselection-clipwait-binary-freeze" audit
-; finding in infra/hotstrings/hotstring_engine.ahk.
+; finding in hotstrings/engine/matcher/engine.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The asynchronous selection poll must accept binary clipboard formats. If it
@@ -28,12 +28,14 @@
 ; ============================================================
 ; ============================================================
 
-_CWB_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol, wherever it lives: a
+; base name stops naming one file once the structure plan renames its owner.
+_CWB_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 _CWB_AsyncPollAcceptsBinaryWithoutWaiting() {
-	Src := _CWB_ReadSource("hotstring_engine.ahk")
+	Src := _CWB_ReadSource("_SelectionCapturePoll")
 	Body := _DriverFuncBody("_SelectionCapturePoll")
 
 	Assert(Body != "", "_SelectionCapturePoll() must exist in hotstring_engine.ahk")

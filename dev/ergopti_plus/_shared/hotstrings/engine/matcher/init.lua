@@ -57,6 +57,7 @@ local TableUtil = require("core.text.engine.table_util")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Cascade = require("hotstrings.engine.matcher.cascade")
 local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
+local ActionEntry = require("hotstrings.engine.matcher.action_entry")
 -- Lua 5.4 only: LuaJIT has no integer subtype, so the guarded use stays inert there.
 local math_type = math.type
 
@@ -684,6 +685,11 @@ function M.new()
 				-- The replacement presses a key: it is not plain text for a preview or
 				-- a cascade, and the caret is no longer behind it after it fired.
 				has_key_tokens = source.has_key_tokens == true,
+				-- An action entry (action_entry.lua): what runs after the edit, and
+				-- whether the trigger is erased first. Absent on a text entry.
+				action        = source.action,
+				workflow      = source.workflow,
+				erase_trigger = ActionEntry.erase_of(source),
 				-- Registration order, the FINAL tiebreak. Lua's table.sort is not
 				-- stable, so two entries equal on every other key came out in an order
 				-- that depended on the sort's internals — a collision could elect a
@@ -870,31 +876,27 @@ function M.new()
 		-- this; Linux did not, so a trigger followed by a typographic colon simply
 		-- never matched there.
 		--
-		-- The space is REQUIRED, not merely tolerated: a bare ":" with no nbsp
-		-- before it is mid-sequence text — the ":" of ":D" — and must not end a
-		-- hotstring. Only the end-char path is affected; a trigger whose own last
-		-- codepoint is ":" still fires on the auto path untouched.
+		-- The space is tolerated, not required: a bare ":" or ";" ends a trigger
+		-- too, on the three OS (maintainer decision HCD-2, 2026-11-21: the user is
+		-- responsible for the hotstrings they create, and no shipped catalogue
+		-- rule misfires, test-hotstring-bare-colon-catalogue.cjs). A trigger whose
+		-- own last codepoint is ":" still fires on the auto path untouched.
 		local end_map, end_len, end_repl, nbsp_stripped = nil, nil, nil, false
 		local end_final_noop = false
 		if is_terminator and not text_is_claimed then
 			local typed = cps[buf_len]
 			local body_len = buf_len - 1
-			local eligible = true
 			if typed == ":" or typed == ";" then
 				local preceding = body_len >= 1 and cps[body_len] or nil
 				if preceding == NNBSP_CHAR or preceding == NBSP_CHAR then
 					body_len = body_len - 1
 					nbsp_stripped = true
-				else
-					eligible = false
 				end
 			end
-			if eligible then
-				local noop_len, noop
-				end_map, noop_len, end_repl, noop = best_match(body_len, false)
-				end_len = noop_len
-				end_final_noop = noop == true
-			end
+			local noop_len, noop
+			end_map, noop_len, end_repl, noop = best_match(body_len, false)
+			end_len = noop_len
+			end_final_noop = noop == true
 			if not end_map then nbsp_stripped = false end
 		end
 
@@ -966,7 +968,7 @@ function M.new()
 				M.CASCADE_MIN_ARROWS, M.CASCADE_MAX_ARROWS, tostring(max_arrows))
 			return first
 		end
-		if first.final_result or first.is_private or first.has_key_tokens then return first end
+		if first.final_result or first.is_private or first.has_key_tokens or first.action then return first end
 
 		local gate = options.cascade_gate
 		local consumed = options.terminator_consumed == true
@@ -1163,6 +1165,9 @@ function M.new()
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
 			has_key_tokens     = mapping.has_key_tokens,
+			action             = mapping.action,
+			workflow           = mapping.workflow,
+			erase_trigger      = mapping.erase_trigger,
 			-- The expansion delay's interval: last input letter to expander. An
 			-- earlier pause in the trigger does not count (the delay measures how
 			-- long the user waited before giving the expander); other shared-engine
@@ -1179,6 +1184,16 @@ function M.new()
 		result.replay_terminator = InjectionPlan.tail(
 			result.end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
 			result.consume_terminator, result.terminator)
+		if mapping.action then
+			-- The edit before the action: this engine always sees the event on screen.
+			local plan = ActionEntry.plan({
+				path = via_end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+				trigger_len = tlen, event_len = 1, event_on_screen = true, event_text = ch,
+				terminator = result.terminator, consume_terminator = terminator_consumed,
+				nbsp_stripped = nbsp_stripped == true, output = replacement or "", erase_trigger = mapping.erase_trigger,
+			})
+			result.backspace_count, result.replacement, result.replay_terminator = plan.erase, plan.text, plan.tail
+		end
 		return result
 	end
 
@@ -1279,6 +1294,40 @@ function M.new()
 			_start_is_line_start = false
 		end
 		Logger.debug(LOG, "Expansion applied: buffer %d codepoint(s).", #_buf_cps)
+	end
+
+	--- Rewrites the buffer to the text a Backspace undo typed back in place of an
+	--- expansion: what preceded the trigger, then the restored trigger and its
+	--- terminator. The buffer then reads what the line reads, so the trigger key
+	--- typed again expands at once (« adn★ », Backspace, « ★ » gives « ADN »
+	--- again), and a word-only rule still sees the letters before the trigger.
+	--- Windows (HSE_UndoExpansion) and macOS (undo_on_backspace) do the same.
+	--- @param text string What the buffer holds from its start to the caret.
+	--- @param at_boundary boolean Whether the buffer's start abuts a word boundary,
+	---        as it did before the expansion.
+	--- @param typed_at_ms number|false The restore's monotonic time, the stamp of
+	---        every restored codepoint; false when the caller keeps no timing.
+	function engine:restore(text, at_boundary, typed_at_ms)
+		if type(text) ~= "string" then error("engine:restore(): the text must be a string", 2) end
+		if type(at_boundary) ~= "boolean" then error("engine:restore(): the boundary must be a boolean", 2) end
+		if typed_at_ms ~= false and type(typed_at_ms) ~= "number" then
+			error("engine:restore(): the time must be a number or false", 2)
+		end
+		_buf_cps = {}
+		_buf_times = {}
+		for _, cp in ipairs((utf8_codepoints(text))) do
+			_buf_cps[#_buf_cps + 1] = cp
+			_buf_times[#_buf_times + 1] = typed_at_ms
+		end
+		_start_is_boundary = at_boundary
+		_start_is_line_start = false
+		_final_noop_pending = false
+		while #_buf_cps > BUFFER_MAX_CHARS do
+			table.remove(_buf_cps, 1)
+			table.remove(_buf_times, 1)
+			_start_is_boundary = false
+		end
+		Logger.debug(LOG, "Buffer restored: %d codepoint(s).", #_buf_cps)
 	end
 
 	--- Returns the current rolling typing buffer as a UTF-8 string. The LLM

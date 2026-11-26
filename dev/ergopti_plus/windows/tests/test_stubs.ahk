@@ -75,14 +75,7 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; The physical magic key as the boot resolves it (feature_state.ahk and
-    ; LayoutRegistry_MagicKeySource): automatic, not chosen, on the shipped key.
-    "MagicKeySource", "auto",
-    "MagicKeySourceScan", "SC02E",
-    "MagicKeySourceChar", "j",
-    "MagicKeySourceChosen", false,
-    "MagicKeySourceFollowsOsLayout", false,
-    "MagicKeySourceOverridesEmulation", false,
+    "MagicKeyDefault", "★",
     "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
     "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
     "LogLevel", "INFO",
@@ -121,7 +114,7 @@ global Features := Map(
         ),
         "take_note", Map(
             "dated_notes",        false,
-            "destination_folder", "D:\\Bureau",
+            "destination_folder", "",
         ),
         ; Letter pickers (phase 11) — accented base-layer keys, configurable
         ; target latin letter consumed by ErgoptiBaseMapping.
@@ -129,6 +122,7 @@ global Features := Map(
         "e_circ",   Map("enabled", true, "letter", "x"),
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
+        "star",     Map("enabled", false, "letter", "s"),
         ; The number-row tap keys: an action id per key, "none" when unassigned.
         "tap_keys", Map(
             "number_row_left",    "screen_capture",
@@ -136,10 +130,10 @@ global Features := Map(
             "number_row_right_2", "none",
         ),
     ),
-    ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
+    ; hotstrings/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
-    ; (time_activation_seconds, pattern_max_length) from the manifest, but
+    ; (time_activation_seconds) from the manifest, but
     ; tests don't exercise those — the "enabled" key alone is enough to
     ; satisfy the migrated `if Features["hotstrings"][...][...]["enabled"]`
     ; gates without crashing.
@@ -168,8 +162,6 @@ global Features := Map(
             "ez",                       Map("enabled", true),
             "ct",                       Map("enabled", true),
             "close_chevron_tag",        Map("enabled", true),
-            "chevron_less",             Map("enabled", true),
-            "chevron_greater",          Map("enabled", true),
             "chevron_equal",            Map("enabled", true),
             "comment_open",             Map("enabled", true),
             "comment_close",            Map("enabled", true),
@@ -201,7 +193,6 @@ global Features := Map(
             "multiple_punctuation_marks", Map("enabled", true),
         ),
         "magic_key", Map(
-            "replace",                      Map("enabled", true),
             "repeat_corrections",           Map("enabled", true),
             "text_expansion",               Map("enabled", true),
             "text_expansion_auto",          Map("enabled", true),
@@ -216,19 +207,19 @@ global Features := Map(
             "iban_prefixes",                     Map("enabled", true),
             "phone_prefixes",                    Map("enabled", true),
             "ssn_prefixes",                      Map("enabled", true),
-            "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
+            "text_expansion_personal_information", Map("enabled", true),
         ),
         ; Personal sub-Map — in production this is populated from the user's
         ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures
         ; + the reverse mirror); tests pre-seed a representative shape so the
-        ; v2 read sites in modules/hotstrings.ahk and
-        ; ui/personal_toml_editor.ahk find a configured Map.
+        ; v2 read sites in hotstrings/hotstrings.ahk and
+        ; hotstrings/ui/personal_toml_editor.ahk find a configured Map.
         "personal", Map(
             "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
         ),
     ),
-    ; ui/tray_menu.ahk's LLM tray populator now reads from this
+    ; menu/ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the
     ; legacy _LlmSavedOpts shape that LLM_Menu_Init expects. Manifest
     ; defaults match production; tests don't fire the LLM menu but the
@@ -337,7 +328,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
 ; Mirrors the pruning thresholds of core/lifecycle/engine/boot.ahk: AppState_TouchLastSentKey
-; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
+; (hotstrings/engine/matcher/send.ahk) reads them on every timestamp write.
 global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 global RemappedList := Map()
@@ -626,13 +617,30 @@ SimulateMicrosoftOffice() {
 ; dedicated function called from run_all.ahk's body).
 global _AHK_SendText  := (Text) => 0   ; no-op — never reaches SendText()
 global _AHK_SendInput := (Keys) => 0   ; no-op — never reaches SendInput()
+global _AHK_SendEvent := (Keys) => 0   ; no-op — never reaches SendEvent()
+global _AHK_InputHookFactory := (Options) => _NoOpInputHook()
+
+; Stands in for the InputHook an expansion burst holds the user's keys with: a
+; real one would take the keys typed on the desktop while a test dispatches.
+class _NoOpInputHook {
+    Input := ""
+    InProgress := false
+    EndReason := ""
+    EndKey := ""
+    EndMods := ""
+    KeyOpt(Keys, KeyOptions) => 0
+    Start() => 0
+    Stop() => 0
+}
 
 ; InstallSendNoOps must be called AFTER #Include text_sender.ahk in run_all.ahk
-; to win the last-assignment race and lock both globals to no-ops.
+; to win the last-assignment race and lock every primitive to a no-op.
 InstallSendNoOps() {
-    global _AHK_SendText, _AHK_SendInput
+    global _AHK_SendText, _AHK_SendInput, _AHK_SendEvent, _AHK_InputHookFactory
     _AHK_SendText  := (Text) => 0
     _AHK_SendInput := (Keys) => 0
+    _AHK_SendEvent := (Keys) => 0
+    _AHK_InputHookFactory := (Options) => _NoOpInputHook()
 }
 
 
@@ -644,7 +652,7 @@ InstallSendNoOps() {
 ; ====================================================================
 ; =====================================================================
 
-; These functions are called by modules/llm/prediction_engine.ahk at
+; These functions are called by ai/engine/prediction/engine.ahk at
 ; runtime. In production they live in core/ui/ui/tooltip/tooltip_llm.ahk and
 ; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
@@ -868,6 +876,7 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
 global _Stub_AppendLogRows := []      ; recorded KL_AppendLog entries (Map each)
 global _Stub_RoiHotstringCalls := []  ; recorded KL_Roi_OnHotstring calls
 global _Stub_WpmPushCalls := []       ; recorded WPMWidget_Push calls
+global _Stub_WpmRetractCalls := []    ; recorded WPMWidget_Retract calls
 global _Stub_FlushBufferCalls := 0    ; how many times the typing buffer was flushed
 global _Stub_AppendLogAccept := true
 global _Stub_AppendLogRejectSuspend := false
@@ -925,10 +934,17 @@ KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
         is_private: is_private ? true : false })
 }
 
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "", NowTick := unset) {
     global _Stub_WpmPushCalls
     _Stub_WpmPushCalls.Push({ is_hs: is_hs, is_ai: is_ai, is_ac: is_ac,
         category: category, section: section })
+}
+
+; Records the count and how many samples preceded it, so a test can read that a
+; producer took back what it erased before its output (MET-17).
+WPMWidget_Retract(Count, NowTick := unset) {
+    global _Stub_WpmPushCalls, _Stub_WpmRetractCalls
+    _Stub_WpmRetractCalls.Push({ count: Count, pushes_before: _Stub_WpmPushCalls.Length })
 }
 
 class Keystats {

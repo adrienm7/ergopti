@@ -20,6 +20,7 @@
 
 #Include keystats_hotstring_units.ahk
 #Include keystats_local_time.ahk
+#Include %A_LineFile%\..\..\..\_generated\registry_limits.ahk
 
 
 
@@ -48,6 +49,14 @@ class KLReadConst {
 		; an 815 MB store; held in ":memory:" it made the worker use about 1 GB.
 		; On a bounded private disk database only this much of it is resident.
 		static WORKER_PAGE_CACHE_KIB := 65536
+		; Growth a refresh may write into the copy-on-write overlay of the shared
+		; image (KLR_OpenOverlayCandidate): a floor for the replayed days, plus a
+		; multiple of the tail's SQL for the rows it adds. Past it SQLite reports
+		; SQLITE_FULL and the refresh fails without publishing. The floor is
+		; [limits] metrics_overlay_slack_bytes: the detached worker runs before
+		; any registry load, so it reads the generated table.
+		static WORKER_OVERLAY_SLACK_BYTES := RegistryLimitsCount("limits", "metrics_overlay_slack_bytes")
+		static WORKER_OVERLAY_SLACK_PER_TAIL_BYTE := 32
 }
 
 
@@ -296,6 +305,26 @@ KLR_CloneCandidate(Source) {
 		return SQLite_CloneInto(Source, KLR_OpenCandidate)
 }
 
+; Opens the writable candidate of a refresh on the read-only image a worker
+; attached, without copying it: a copy-on-write overlay of the very file the
+; image was validated from (SQLite_OpenCopyOnWrite). The shared file is never
+; written, so every other worker keeps reading the image it attached, and a
+; failure anywhere in the refresh is undone by closing the overlay. The whole
+; image was copied here before, 6 to 20 s on a 1.1 GB image even for 47 KB of
+; new ledger bytes.
+; @param Source {Integer} The read-only image handle (KLRCache.readonly).
+; @param Tails {Map} The prepared ledger tails the refresh will apply.
+; @returns {Integer} The overlay handle; throws when it cannot be built.
+KLR_OpenOverlayCandidate(Source, Tails) {
+		TailBytes := 0
+		for _, Tail in Tails
+				TailBytes += StrLen(Tail["sql"])
+		return SQLite_OpenCopyOnWrite(Source,
+				KLReadConst.WORKER_OVERLAY_SLACK_BYTES
+						+ TailBytes * KLReadConst.WORKER_OVERLAY_SLACK_PER_TAIL_BYTE,
+				KLReadConst.WORKER_PAGE_CACHE_KIB)
+}
+
 ; Append a single diagnostic line to prefetch.log, but only when the logger
 ; is at DEBUG level. KLR_BuildDatabase runs on every ingest tick (every ~5 s
 ; while a dashboard is open) — sometimes on the keystroke-servicing thread —
@@ -397,7 +426,19 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 
 				candidate := 0
-				if KLRCache.disposable && !KLRCache.readonly {
+				if KLRCache.readonly {
+						; The image every worker shares: write through a private overlay.
+						overlay_tick := HotPath_Now()
+						try {
+								candidate := KLR_OpenOverlayCandidate(KLRCache.db, update["tails"])
+						} catch Error as Failure {
+								try LoggerError("KLReader", "Metrics image overlay failed: {1} Refresh was not published.", Failure.Message)
+								return KLR_ReleaseCandidate(0)
+						} finally {
+								HotPath_LogIfSlow("KLR.CandidateOverlay", overlay_tick,
+										update["tails"].Count . " ledger tail(s)")
+						}
+				} else if KLRCache.disposable {
 						; Nothing else can observe a worker's handle, and the image is
 						; hundreds of megabytes: cloning it to protect a reader that does
 						; not exist would cost more than the refresh. A failure below
@@ -417,7 +458,18 @@ KLR_BuildDatabase(metrics_dir) {
 								return KLR_ReleaseCandidate(0)
 						}
 				}
+				; A worker replays only the app-days the tail changed; the triggers that
+				; record them see exactly the rows SQLite inserted or deleted.
+				scoped := KLRCache.disposable
+				if scoped && !KLR_ReplayScopeBegin(candidate) {
+						try LoggerError("KLReader", "Replay scope capture could not be installed; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
 				applied := KLR_ApplyIncrementalWithCountUnits(candidate, update["tails"], logPath)
+				if scoped && !KLR_ReplayScopeEndCapture(candidate) {
+						try LoggerError("KLReader", "Replay scope capture could not be removed; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
 				if !applied.Get("ok", false) {
 						; Only source failures may suppress a retry; internal recount failures
 						; can recover without a write. For incomplete/invalid tails, after
@@ -432,7 +484,11 @@ KLR_BuildDatabase(metrics_dir) {
 				; drain the live walker delta into the same unpublished candidate.
 				refresh_dates := KLRCache.disposable
 						? KLR_CacheAffectedDates(update["tails"]) : 0
-				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable) {
+				if scoped && !KLR_ReplayScopeBuild(candidate, refresh_dates) {
+						try LoggerError("KLReader", "Replay scope could not be built; refresh was not published.")
+						return KLR_ReleaseCandidate(candidate)
+				}
+				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable, scoped) {
 						try LoggerError("KLReader",
 								"Typing projection preparation failed; retaining the last-good dashboard projection.")
 						return KLR_ReleaseCandidate(candidate)
@@ -446,7 +502,7 @@ KLR_BuildDatabase(metrics_dir) {
 				if (refresh_dates is Array) {
 						KLR_PrefetchDebug(logPath, "KLR refresh scope: "
 								. refresh_dates.Length . " day(s)")
-						if !KLR_ClearAggregates(candidate, refresh_dates)
+						if !KLR_ClearAggregates(candidate, refresh_dates, scoped)
 								return KLR_ReleaseCandidate(candidate)
 				}
 				if !KLR_RebuildAggregates(candidate, refresh_dates) {
@@ -458,13 +514,15 @@ KLR_BuildDatabase(metrics_dir) {
 						KLR_PrefetchDebug(logPath, "KLR scoped aggregates in "
 								. (A_TickCount - refresh_tick) . "ms")
 						refresh_tick := A_TickCount
-						if (KLR_RebuildWalkerAggregates(candidate, true, refresh_dates) < 0) {
+						if (KLR_RebuildWalkerAggregates(candidate, true, refresh_dates, scoped) < 0) {
 								try LoggerError("KLReader",
 										"Walker refresh failed; retaining the last-good dashboard projection.")
 								return KLR_ReleaseCandidate(candidate)
 						}
 						KLR_PrefetchDebug(logPath, "KLR scoped walker replay in "
 								. (A_TickCount - refresh_tick) . "ms")
+						if scoped && !KLR_ReplayScopeDrop(candidate)
+								return KLR_ReleaseCandidate(candidate)
 				} else {
 						try KLR_InjectKlwBatch(candidate)
 						catch Any as Failure {
@@ -1432,7 +1490,7 @@ _KLR_TypingCountsMissing(ThinkPause) {
 ; @param Dates {Integer|Array} 0 for all dates, otherwise affected replay dates.
 ; @param IncludePayload {Boolean} Whether to retain clear events for the walker.
 ; @returns {Boolean} Whether every requested projection row was prepared.
-KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
+KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true, Scoped := false) {
 		ThinkPause := KLWConst.THINK_PAUSE_MS
 		if !KLR_EnsureTypingProjectionTable(db)
 				return false
@@ -1453,7 +1511,8 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "LEFT JOIN klr_reader_typing_counts AS c "
 						. "ON c.device_id=t.device_id AND c.event_id=t.id "
-						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. "WHERE (" . _KLR_TypingCountsMissing(ThinkPause) . (IncludePayload
+								? " OR (p.device_id IS NULL" . (Scoped ? KLR_ReplayScopeSql("t") : "") . ")" : "")
 						. ")" . _KLR_DateScope(Dates, "t.date") . ";")
 						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true, ThinkPause)
 		} catch {
@@ -1566,8 +1625,10 @@ _KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false, ThinkPause :
 ; @param db {Integer} Open database handle.
 ; @param Dates {Integer|Array} 0 for every row, else the dates to clear.
 ; @returns {Boolean} Whether every deletion succeeded; discard the candidate on failure.
-KLR_ClearAggregates(db, Dates := 0) {
+KLR_ClearAggregates(db, Dates := 0, Scoped := false) {
 	Scope := _KLR_DateScope(Dates, "date")
+	if Scoped
+		return _KLR_ClearReplayScope(db, Scope)
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
 	            "agg_app_day_session", "agg_app_day_chars_class",
 	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
@@ -1581,6 +1642,37 @@ KLR_ClearAggregates(db, Dates := 0) {
 	            "ngram_scancodes"]
 		if !KLR_ExecAggregateStep(db, "clear " . tbl,
 				"DELETE FROM " . tbl . " WHERE 1=1" . Scope . ";")
+			return false
+	return true
+}
+
+; Tables a scoped replay clears per app-day: what the logical and window
+; sweeps write (walker-owned or shared with an SQL rollup, keyed by app). The
+; system sweep's tables are cleared only for a whole replayed day; the SQL-only
+; table is cleared for every affected day, as its rollup rebuilds it whole.
+class KLRReplayTables {
+	static PER_APP := ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
+		"agg_app_day_session", "agg_app_day_chars_class", "agg_app_day_errors",
+		"agg_app_day_ergo", "agg_app_day_layouts", "agg_app_day_titles",
+		"agg_app_day_hourly", "agg_app_day_hourly_min5", "ngram_chars",
+		"ngram_bigrams", "ngram_trigrams", "ngram_quadgrams", "ngram_pentagrams",
+		"ngram_hexagrams", "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
+		"ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes", "ngram_scancodes"]
+	static WHOLE_DAY := ["agg_app_day_kc_hold", "agg_system_day"]
+	static SQL_ONLY := ["agg_app_day_switches_to"]
+}
+
+_KLR_ClearReplayScope(db, DateScope) {
+	for tbl in KLRReplayTables.PER_APP
+		if !KLR_ExecAggregateStep(db, "clear " . tbl,
+				"DELETE FROM " . tbl . " WHERE 1=1" . DateScope . KLR_ReplayScopeSql(tbl) . ";")
+			return false
+	for tbl in KLRReplayTables.WHOLE_DAY
+		if !KLR_ExecAggregateStep(db, "clear " . tbl,
+				"DELETE FROM " . tbl . " WHERE 1=1" . DateScope . KLR_ReplayScopeSql(tbl, false) . ";")
+			return false
+	for tbl in KLRReplayTables.SQL_ONLY
+		if !KLR_ExecAggregateStep(db, "clear " . tbl, "DELETE FROM " . tbl . " WHERE 1=1" . DateScope . ";")
 			return false
 	return true
 }
@@ -1625,6 +1717,102 @@ _KLR_DateScope(Dates, Column) {
 	; An empty scope selects nothing, never everything: a caller that computed
 	; zero affected dates must not silently fall back to a full rebuild.
 	return (Literals = "") ? " AND 0" : " AND " . Column . " IN (" . Literals . ")"
+}
+
+; ======================================================
+; Replay scope: the app-days a ledger tail changed
+; ======================================================
+;
+; A refresh used to clear and replay every app of every day the tail named:
+; 4 to 33 s on a heavy day for a tail of a few keystrokes. The walker's state is
+; keyed by app (the n-gram context) and by app and day (bursts, sessions,
+; errors), and each row it writes carries the app of the event that produced it,
+; so the logical and window sweeps of one app never read or write another app's
+; state. A scoped refresh therefore clears and replays only the (device, day,
+; app) the tail inserted into or deleted from. The system sweep writes per-day
+; rows with no app (agg_system_day): a tail that touches events_system, or an
+; event with no app, rebuilds that device's whole day as before. Days the tail
+; named without changing a replayed row keep their walker rows; their SQL
+; rollups still recompute, and those upsert to the same values.
+;
+; The capture uses TEMP triggers on the candidate, so it records the rows SQLite
+; actually changed: a re-appended row that INSERT OR IGNORE skips, or one the
+; purge guard refuses, adds nothing, and a purge's deletions add their days.
+
+class KLRReplayScope {
+	; Event tables whose rows a replay sweep reads, and whether they carry the app.
+	static SOURCES := Map("events_typing", true, "events_llm", true, "events_shortcut", true,
+		"events_window_switch", true, "events_system", false)
+}
+
+; Starts recording the app-days the next writes touch.
+; @param db {Integer} The private candidate, before the tail is applied.
+; @returns {Boolean} Whether the capture is installed.
+KLR_ReplayScopeBegin(db) {
+	if !KLR_EnsureTypingProjectionTable(db)
+		return false
+	Sql := "CREATE TEMP TABLE klr_replay_touched (device_id TEXT NOT NULL, date TEXT NOT NULL, "
+		. "app TEXT NOT NULL, PRIMARY KEY (device_id, date, app)) WITHOUT ROWID;"
+	for Table, HasApp in KLRReplayScope.SOURCES {
+		for Op, Row in Map("INSERT", "NEW", "DELETE", "OLD", "UPDATE", "OLD") {
+			Rows := (Op = "UPDATE") ? ["OLD", "NEW"] : [Row]
+			Body := ""
+			for Ref in Rows {
+				; A day-wide sweep, or an event without an app, rebuilds the whole day.
+				App := HasApp
+					? "CASE WHEN COALESCE(" . Ref . ".app,'')='' THEN '*' ELSE " . Ref . ".app END"
+					: "'*'"
+				; A trigger body cannot qualify the table it writes: TEMP is searched first.
+				Body .= "INSERT OR IGNORE INTO klr_replay_touched VALUES ("
+					. Ref . ".device_id," . Ref . ".date," . App . ");"
+			}
+			Sql .= "CREATE TEMP TRIGGER klr_replay_touch_" . Table . "_" . StrLower(Op)
+				. " AFTER " . Op . " ON " . Table . " BEGIN " . Body . " END;"
+		}
+	}
+	return SQLite_Exec(db, Sql)
+}
+
+; Stops recording; the touched rows stay for KLR_ReplayScopeBuild.
+; @param db {Integer} The private candidate.
+; @returns {Boolean} Whether every capture trigger is gone.
+KLR_ReplayScopeEndCapture(db) {
+	Sql := ""
+	for Table in KLRReplayScope.SOURCES
+		for Op in ["insert", "delete", "update"]
+			Sql .= "DROP TRIGGER temp.klr_replay_touch_" . Table . "_" . Op . ";"
+	return SQLite_Exec(db, Sql)
+}
+
+; Builds temp.klr_replay_scope: the touched app-days of the affected days, with
+; app '*' for a whole replayed day.
+; @param db {Integer} The private candidate.
+; @param Dates {Array} The days the tail named (KLR_CacheAffectedDates).
+; @returns {Boolean} Whether the scope table is ready.
+KLR_ReplayScopeBuild(db, Dates) {
+	if !(Dates is Array)
+		throw ValueError("A replay scope needs the affected days.")
+	return SQLite_Exec(db, "CREATE TEMP TABLE klr_replay_scope (device_id TEXT NOT NULL, "
+		. "date TEXT NOT NULL, app TEXT NOT NULL, PRIMARY KEY (device_id, date, app)) WITHOUT ROWID;"
+		. "INSERT INTO temp.klr_replay_scope SELECT device_id, date, app FROM temp.klr_replay_touched "
+		. "WHERE 1=1" . _KLR_DateScope(Dates, "date") . ";"
+		. "DROP TABLE temp.klr_replay_touched;")
+}
+
+; @param db {Integer} The private candidate, once its replay is done.
+; @returns {Boolean} Whether the scope table is gone.
+KLR_ReplayScopeDrop(db) {
+	return SQLite_Exec(db, "DROP TABLE temp.klr_replay_scope;")
+}
+
+; SQL fragment keeping a row of Alias inside the replay scope.
+; @param Alias {String} Table name or alias with device_id, date (and app).
+; @param PerApp {Boolean} False for a table without app: only whole days match.
+; @returns {String} An " AND EXISTS (...)" clause.
+KLR_ReplayScopeSql(Alias, PerApp := true) {
+	return " AND EXISTS (SELECT 1 FROM temp.klr_replay_scope AS rs WHERE rs.device_id=" . Alias
+		. ".device_id AND rs.date=" . Alias . ".date AND "
+		. (PerApp ? "rs.app IN ('*'," . Alias . ".app)" : "rs.app='*'") . ")"
 }
 
 ; The unchanged-ledger resident path updates a published handle rather than an
@@ -1890,14 +2078,16 @@ KLR_ReplaySweep(db, sql, Consumer, Sweep, DeviceId) {
 ;   affected days in full — after KLR_ClearAggregates dropped them — reproduces
 ;   exactly the same rows a cold rebuild would, including the JSON bucket blobs
 ;   that a tail-only replay would truncate (klr-reader-durable-cache).
-KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
+; @param Scoped {Boolean} True to replay only temp.klr_replay_scope, the
+;   app-days a tail changed (KLR_ReplayScopeBegin), each still in full.
+KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0, Scoped := false) {
 		global KLRReplay, KLRLastReplayFailure
 		KLRLastReplayFailure := Map()
 		if !db
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
-		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates, true, Scoped)) {
 				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
 						"unknown", "unknown",
 						"typing projection preparation failed")
@@ -1921,7 +2111,9 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 		try {
 				accepted_marker := SQLite_Q(KLWConst.LLM_ACCEPTED_METRICS_SOURCE)
 				date_scope := _KLR_DateScope(Dates, "date")
-				devices := SQLite_Query(db,
+				devices := Scoped
+						? SQLite_Query(db, "SELECT DISTINCT device_id FROM temp.klr_replay_scope ORDER BY device_id;")
+						: SQLite_Query(db,
 						"SELECT DISTINCT device_id FROM ("
 						. "SELECT device_id FROM events_typing WHERE 1=1" . date_scope . " "
 						. "UNION SELECT device_id FROM events_shortcut WHERE 1=1" . date_scope . " "
@@ -1954,20 +2146,22 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								. "FROM events_typing AS t JOIN temp.klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
-								. _KLR_DateScope(Dates, "t.date")
+								. _KLR_DateScope(Dates, "t.date") . (Scoped ? KLR_ReplayScopeSql("t") : "")
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
 								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key, utc_offset_min FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
+								. (Scoped ? KLR_ReplayScopeSql("events_llm") : "")
 								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, '' AS context, "
 								. "'' AS prediction, 0 AS deletes, key AS shortcut_key, utc_offset_min "
 								. "FROM events_shortcut" . device_where
+								. (Scoped ? KLR_ReplayScopeSql("events_shortcut") : "")
 								. " ORDER BY id;"
 						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms, utc_offset_min FROM events_window_switch"
-								. device_where . " ORDER BY ts, id;"
+								. device_where . (Scoped ? KLR_ReplayScopeSql("events_window_switch") : "") . " ORDER BY ts, id;"
 						system_sql := "SELECT ts, action, metadata_json, utc_offset_min FROM events_system"
-								. device_where . " ORDER BY ts, id;"
+								. device_where . (Scoped ? KLR_ReplayScopeSql("events_system", false) : "") . " ORDER BY ts, id;"
 
 						if !KLR_ReplaySweep(db, logical_sql,
 								KLR_ReplayLogicalRow, "logical", device_id) {

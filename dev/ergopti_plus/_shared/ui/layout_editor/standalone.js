@@ -11,9 +11,15 @@
  * ErgoptiPlus mounts the same editor in its layout editor window with a host
  * that saves through the driver and ships the same export assets
  * (layout_editor_window/script.js, _generated/export_assets.js).
+ * Every tab and its unsaved edits are kept in this browser's IndexedDB as the
+ * user types (LayoutEditorWorkspace.indexedDbStore, persistent storage asked
+ * for), so a reload, F5 or a crash restores them; nothing leaves the device.
  * Framed by the site (/studio, « Éditer »), it posts its height to the parent
  * ({type: 'ergopti-layout-editor:height', height}) on load and on every
  * resize (the analysis panel opening, a panel unfolding), so the frame fits.
+ * A layout the Studio's optimizer hands over (LAYOUT_ANALYSIS_FILES
+ * .takeEditorHandoff) opens in a new tab; its « get it » download
+ * (takeEditorIntent) then runs from the export tool.
  * ==============================================================================
  */
 
@@ -114,12 +120,54 @@
 	const lang = new URLSearchParams(location.search).get('lang');
 	if (lang && /^[a-z]{2}$/.test(lang)) window._i18n_locale = lang;
 
+	// A browser that keeps no data for the page (IndexedDB refused) still edits:
+	// the page says the tabs are not kept, through the store's refusal.
+	let workspace;
+	try {
+		workspace = LayoutEditorWorkspace.indexedDbStore(window);
+	} catch (error) {
+		workspace = { load: () => Promise.reject(error), save: () => Promise.reject(error) };
+	}
+
 	window.layoutEditor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: download,
 		saveBinary: download,
 		loadSources: registrySources,
-		exportAssets: loadExportAssets
+		exportAssets: loadExportAssets,
+		// The site's Studio opens on a copy of Ergopti, as the app's does (maintainer, 2026-11-15).
+		startFrom: 'ergopti',
+		workspace,
+		// « Compare with other layouts »: the Comparer is the Studio's other framed
+		// page, so the layout waits in this tab's storage while the Studio opens it.
+		compare:
+			window.parent !== window
+				? (layout) => {
+						window.LAYOUT_ANALYSIS_FILES.handOff(layout);
+						window.parent.postMessage(
+							{ type: window.LAYOUT_ANALYSIS_FILES.OPEN_COMPARER_MESSAGE },
+							location.origin
+						);
+					}
+				: undefined,
+		// « Optimize this layout »: the Optimiser is the Studio's third framed page,
+		// so the layout's id waits in this tab's storage while the Studio opens it.
+		optimize:
+			window.parent !== window
+				? (layout) => {
+						window.LAYOUT_ANALYSIS_FILES.handOffToOptimizer(layout.id);
+						window.parent.postMessage(
+							{ type: window.LAYOUT_ANALYSIS_FILES.OPEN_OPTIMIZER_MESSAGE },
+							location.origin
+						);
+					}
+				: undefined
 	});
+
+	// A layout the Studio's optimizer handed to « Éditer » opens in a tab of its
+	// own, and is downloaded when the optimizer's « get it » asked for it.
+	const handed = window.LAYOUT_ANALYSIS_FILES.takeEditorHandoff();
+	const intent = window.LAYOUT_ANALYSIS_FILES.takeEditorIntent();
+	if (handed) window.layoutEditor.openLayout(handed, intent || undefined);
 
 	// The message the framing page (the site's /studio) listens for to size its frame.
 	const HEIGHT_MESSAGE = 'ergopti-layout-editor:height';

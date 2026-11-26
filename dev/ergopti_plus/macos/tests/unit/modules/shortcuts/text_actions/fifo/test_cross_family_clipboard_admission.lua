@@ -7,7 +7,7 @@ local Destination = require("tests.support.text_destination_receipt")
 
 --- Runs one scenario with the actual Text owner composed into the Apps world.
 local function with_text_and_apps(body)
-	helpers.with_fresh_modules({ "modules.shortcuts.actions.text", "modules.keymap.utils" }, function()
+	helpers.with_fresh_modules({ "modules.shortcuts.actions.text", "hotstrings.engine.expander.utils" }, function()
 		World.with_world({}, function(w)
 			Destination.install()
 			local board = hs.pasteboard
@@ -57,8 +57,8 @@ helpers.describe("Clipboard borrowers share one admission (clipboard-cross-famil
 	end)
 
 	helpers.it("(clipboard-cross-family-admission) the admission ignores the asker and fails closed", function()
-		helpers.with_fresh_modules({ "infra.clipboard_borrowers" }, function()
-			local Borrowers = require("infra.clipboard_borrowers")
+		helpers.with_fresh_modules({ "clipboard.borrowers" }, function()
+			local Borrowers = require("clipboard.borrowers")
 			local held = false
 			Borrowers.register("one", function() return held end)
 			helpers.assert_nil(Borrowers.foreign_holder("two"), "an idle family holds nothing")

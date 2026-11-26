@@ -15,7 +15,7 @@
  * FEATURES & RATIONALE:
  * 1. One algorithm, three languages: the Lua port
  *    (_shared/diagnostics/engine/reports/redact.lua) and the AHK port
- *    (windows/infra/redact.ahk) replay the same vectors
+ *    (windows/diagnostics/engine/reports/redact.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/redaction_vectors.json).
  * 2. Secrets first, so a token that happens to contain the account name is
  *    removed whole rather than half-rewritten.
@@ -229,7 +229,8 @@
 
 	/**
 	 * Replaces e-mail addresses: a local part, an @, and a dotted domain ending
-	 * in a top-level label of at least two letters.
+	 * in a top-level label of at least two letters, unless a colon and a digit
+	 * follow it: that is a source location such as File.swift:62.
 	 * @param {string} text
 	 * @param {object} rules
 	 * @returns {string}
@@ -252,6 +253,8 @@
 				})
 			)
 				return null;
+			// A colon and a digit right after it make a source location (File.swift:62)
+			if (/^:[0-9]$/.test(source.substring(stop + 1, stop + 3))) return null;
 			return { text: rules.email_placeholder, last: stop, first: start };
 		});
 	}

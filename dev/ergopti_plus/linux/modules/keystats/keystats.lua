@@ -38,7 +38,7 @@ local Timings   = require("core.timing.engine.timings")
 local EvdevCodes = require("platform.input.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
-local Manifest      = require("infra.manifest_reader")
+local Manifest      = require("menu.engine.manifest_reader")
 local PrivateWindow = require("metrics.engine.view.private_window")
 -- WPM ring cap single-sourced from the shared keystats metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
@@ -123,7 +123,7 @@ local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
 local SystemMetrics = nil
-local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keystats.system_metrics")
+local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keystats.system.system_metrics")
 if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
 
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
@@ -297,10 +297,13 @@ local _capture_boundary = 0
 local _typing_boundary = {}
 local _app_key_boundary = {}
 
--- Persisted manifest cache keyed by SQLite's monotonic revision. The live
--- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
--- every two seconds without ever serving stale keystrokes.
-local _manifest_cache = { revision = nil, manifest = nil }
+-- Persisted projections keyed by SQLite's monotonic revision: the manifest,
+-- and today's n-grams for the typing dashboard's live refresh (one sqlite3 CLI
+-- read of today cost about 650 ms of the daemon's only thread on a 30-day
+-- store). The live delta is layered on a copy, so an open dashboard avoids a
+-- CLI query every two seconds without ever serving stale keystrokes. One
+-- table: this chunk is at LuaJIT's 200-local limit.
+local _projection_cache = { manifest = {}, today = {} }
 
 -- Whether password-field suppression is active.
 local _suppressed = false
@@ -385,14 +388,21 @@ local function exclusion_set(list)
 	return set
 end
 
--- Whether the focused window is a private/incognito browser session. Set from
+-- The focused window's privacy verdicts, one table: the main chunk is at
+-- LuaJIT's 200-local limit.
+-- private_window: whether it is a private/incognito browser session. Set from
 -- the focus-change callback, never computed on the keystroke path.
-local _private_window = false
-
--- Whether the AT-SPI adapter reported a secure field on the focused window.
+-- secure_field: whether the AT-SPI adapter reported a secure field on it.
 -- Also set from the focus-change callback: the probe spawns a subprocess and
 -- has no business running once per keystroke.
-local _secure_field = false
+-- epoch: moved by every verdict a touch's context must not outlive
+-- (record_pointer, set_secure_field), but a pointer press's own withdrawal,
+-- made while withdrawing is set (withdraw_for_pointer), and the focus
+-- worker's answer to it.
+-- gesture: the context of the last press or touch report made in an admitted
+-- field ({ app, epoch }), in which the pointer's activity is counted while its
+-- own withdrawal leaves the field unknown (pointer-span-context).
+local _verdict = { private_window = false, secure_field = false, epoch = 0, withdrawing = false, gesture = nil }
 
 -- Password managers and credential UIs: the Linux fragments of the shared list
 -- (_shared/data/secure_apps.json), the one macOS and Windows read, matched as
@@ -443,14 +453,19 @@ local _storage_blocked = false
 
 --- The single decision point for "may this keystroke be recorded?".
 --- Every recording entry point asks this and nothing else, so a new filter is
---- added in one place and cannot be forgotten on one of the five paths.
+--- added in one place and cannot be forgotten on one of the five paths. A
+--- touch's clicks ask it when the touch begins, then with collection_only
+--- when they are made (record_pointer).
+--- @param collection_only boolean|nil Consent, storage and pauses only, not
+--- the focused field and window, whose verdicts the touch's context carries.
 --- @return boolean
-local function may_record()
+local function may_record(collection_only)
 	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
 	if _suppressed or _pause.user or _pause.script then return false end
-	if _secure_filter_enabled and _secure_field then return false end
-	if _private_filter_enabled and _private_window then return false end
+	if collection_only == true then return true end
+	if _secure_filter_enabled and _verdict.secure_field then return false end
+	if _private_filter_enabled and _verdict.private_window then return false end
 	return true
 end
 
@@ -687,7 +702,7 @@ end
 --- @param metrics_dir string|nil Override of <config>/metrics (tests).
 --- @return table|string identity, or the refusal.
 LedgerSetup.resolve = function(hostname, metrics_dir)
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local ports = MetricsLedger.native_ports()
 	local identity, reason = MetricsLedger.resolve_identity({
 		metrics_dir = metrics_dir or ConfigPaths.config("metrics"),
@@ -719,7 +734,7 @@ end
 --- @param metrics_dir string|nil Override of <config>/metrics (tests).
 LedgerSetup.start = function(identity, metrics_dir)
 	local ledger = MetricsLedger.new({
-		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		metrics_dir = metrics_dir or require("settings.engine.paths").config("metrics"),
 		identity = identity,
 		store = { query_rows = SqliteWriter.query_rows, get_meta = SqliteWriter.get_meta, exec_sql = SqliteWriter.exec_sql },
 		fs = MetricsLedger.native_ports(),
@@ -754,7 +769,7 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 	end
 	local store = { query_rows = SqliteWriter.query_rows, exec_sql = SqliteWriter.exec_sql }
 	_ledger.importer = LedgerImport.new({
-		metrics_dir = metrics_dir or require("infra.config_paths").config("metrics"),
+		metrics_dir = metrics_dir or require("settings.engine.paths").config("metrics"),
 		local_device_id = identity.device_id, schema = schema, store = store,
 		fs = LedgerImport.native_ports(), digest_stream = Digest.stream,
 		rebuild = function(device_id)
@@ -770,7 +785,8 @@ LedgerSetup.start_import = function(identity, metrics_dir)
 end
 
 --- Initialises the keystats.
---- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir? }
+--- @param opts table { log_dir?, password_apps?, sqlite_path?, metrics_dir?, defer?,
+---   persistent_sqlite? (the daemon: one long-lived sqlite3 for the synchronous writer) }
 function M.init(opts)
 	if _flush_state or _flush_stopping or _reset_request then return false end
 	if not Preferences.admit() then return false end
@@ -788,7 +804,7 @@ function M.init(opts)
 	-- Through the resolver. The old "~" fallback was not expanded by io.open —
 	-- Lua does no tilde expansion — so with HOME unset the keystats wrote its
 	-- database into a literal directory named "~" beside the process.
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	_log_dir = options.log_dir or ConfigPaths.config("logs")
 	_sqlite_path = options.sqlite_path or ConfigPaths.metrics_path()
 
@@ -807,7 +823,10 @@ function M.init(opts)
 	-- A usable writer must also acknowledge migration and actual registration.
 	_sqlite_admitted = false
 	local open_called, open_result, open_reason = false, false, "sqlite_unavailable"
-	if SqliteWriter then open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path) end
+	if SqliteWriter then
+		open_called, open_result, open_reason = pcall(SqliteWriter.open_db, _sqlite_path,
+			{ persistent_child = options.persistent_sqlite == true })
+	end
 	local sqlite_opened = open_called and open_result == true
 	-- The device id is the one of this host's by_device/ folder, which the
 	-- other drivers import; the ledger is refused, never the local store.
@@ -980,8 +999,14 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
-	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+	-- Only text starts or keeps a typing burst (TWD-2): a correction, a new line
+	-- or a Tab is neutral, as on Windows, which pushes characters only.
+	if not is_correction and type(ch) == "string" and ch ~= "" and ch ~= "\n" and ch ~= "\r" and ch ~= "\t"
+		and type(timestamp_ms) == "number" then
 		LiveWpm.record_input(_live, timestamp_ms)
+	elseif type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		-- A correction, a new line or a Tab keeps a live burst going (TWD-2).
+		LiveWpm.observe_key(_live, "neutral", nil, false, timestamp_ms)
 	end
 	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
@@ -1110,6 +1135,13 @@ local function media_policy()
 	return _media_policy or nil
 end
 
+--- Reads the media catalogue before the first key instead of on its press.
+--- A refused catalogue is logged by media_policy() and stays refused.
+--- @return boolean loaded
+function M.load_media_policy()
+	return media_policy() ~= nil
+end
+
 --- The semantic media identity of an evdev key, nil for every other key.
 --- @param scancode any Linux evdev key code.
 --- @return string|nil media_id
@@ -1177,17 +1209,41 @@ end
 --- @param app_id string|nil Focused application identifier.
 --- @param scancode number Linux evdev key code.
 --- @param timestamp_ms number Event time in ms.
-function M.record_physical_key(app_id, scancode, timestamp_ms)
+--- @param shortcut boolean|nil A Ctrl, Alt or Super chord: it ends the typing burst.
+--- @param keymap_role string|false|nil The modifier role the live keymap gave the
+---   key (keyboard_hook.held_modifier_role), false for none, nil when unknown.
+function M.record_physical_key(app_id, scancode, timestamp_ms, shortcut, keymap_role)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
 	-- The history stamp is rounded; pointer activity uses this same precise clock.
-	LiveWpm.record_input(_live, Monotonic.now_ms())
+	-- A physical key alone never starts a typing burst: text does (ingest_keydown).
+	-- The typing burst rule (TWD-2): evdev code → role from the shared files.
+	local TypingKeys = require("metrics.engine.wpm.typing_keys")
+	local index, index_err, first_failure = TypingKeys.native_index("evdev")
+	if first_failure then
+		Logger.error(LOG, "Typing burst keys unreadable (%s): no key ends a burst until a reload.", tostring(index_err))
+	end
+	-- The keymap, not the position, says whether a modifier types text.
+	local role = TypingKeys.keymap_role(index and index[scancode] or nil, keymap_role)
+	LiveWpm.observe_key(_live, role, scancode, shortcut == true, Monotonic.now_ms())
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)
 	for _, app in ipairs({ live, dated }) do
 		app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
 	end
+end
+
+--- Records one physical key release: a modifier tapped alone ends the burst.
+--- @param scancode number Linux evdev key code.
+function M.record_physical_release(scancode)
+	if not may_record() or type(scancode) ~= "number" then return end
+	LiveWpm.observe_release(_live, scancode, Monotonic.now_ms())
+end
+
+--- Ends the typing burst: the focus moved to another window.
+function M.end_typing_burst()
+	LiveWpm.record_break(_live, Monotonic.now_ms())
 end
 
 ensure_pending = function(app_id, clock, after_exclusion)
@@ -1443,9 +1499,8 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 		app.hs_triggers = app.hs_triggers + 1
 		app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
 	end
-	append_synthetic_events(app_id, replacement, "hotstring",
-		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
-		is_private, clock)
+	local erased = deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or "")
+	append_synthetic_events(app_id, replacement, "hotstring", erased, is_private, clock)
 	-- This public delimiter already exists in the physical input journal. Keep
 	-- its replay in the ordered stream without changing the logical replacement.
 	if type(replay_terminator) == "string" and replay_terminator ~= "" then
@@ -1454,7 +1509,11 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	if type(timestamp_ms) == "number" then
 		-- The group names the colour the readouts take; a private expansion
 		-- still colours them — the colour says a hotstring fired, not what it typed.
-		LiveWpm.record(_live, char_count(replacement), timestamp_ms)
+		-- The live speed counts the produced text: the erased trigger leaves it
+		-- and the replayed delimiter comes back (MET-17, as on macOS).
+		local replayed = type(replay_terminator) == "string" and char_count(replay_terminator) or 0
+		LiveWpm.retract(_live, erased, timestamp_ms)
+		LiveWpm.record(_live, char_count(replacement) + replayed, timestamp_ms)
 		LiveWpm.mark_source(_live, "hotstring", h_type, timestamp_ms)
 	end
 	if is_private then
@@ -1550,28 +1609,94 @@ end
 --- @param source any|nil Pointer device identity.
 --- @param at_us number|nil Kernel time of a frame, in microseconds.
 function M.record_pointer(kind, code, value, source, at_us)
-	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
+	local admitted = may_record() and not M.is_unrecorded_app(_focused_app_id)
+	-- A touch carries the context it lands in: its landing runs the click
+	-- callback, which withdraws the field's verdict, and the tap-to-click it
+	-- becomes ends on a later frame, as a clickpad press follows the landing.
+	-- A mouse press is counted before that withdrawal
+	-- (pointer-press-before-click); a touch's clicks are counted where it
+	-- began (tap-click-touch-context), while no other verdict has been
+	-- delivered since. false is a context in which nothing is recorded.
+	local context = false
+	if admitted and type(_focused_app_id) == "string" then
+		context = { app = _focused_app_id, epoch = _verdict.epoch }
+		-- A press or a touch begins a gesture: its own withdrawal of the field
+		-- leaves the wheel turns, the travel and the next press or touch of a
+		-- double-click or double tap counted here (pointer-span-context).
+		if kind == "press" or kind == "contact" then _verdict.gesture = context end
+	end
+	-- A gesture's context outlives only the pointer's own withdrawals: a
+	-- verdict delivered since, another focused application (on_app_focus), a
+	-- pause or an exclusion ends it, and nothing is recorded under an ended
+	-- one. The withdrawal forgot the focused application; the gesture keeps it.
+	local gesture = nil
+	if not admitted and _verdict.gesture then
+		local began_in = _verdict.gesture
+		if began_in.epoch == _verdict.epoch and may_record(true) and not M.is_unrecorded_app(began_in.app) then
+			gesture, context = began_in, began_in
+		else
+			_verdict.gesture = nil
+		end
+	end
+	local delta
+	if not admitted and not gesture then
 		_pointer.discard_frames()
 		_pointer.forget_position()
 		-- Keep device lifecycle, queue-loss and touch state in sync while
-		-- collection is off; what they would add is not recorded.
-		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" then
-			_pointer.observe(kind, code, value, source, at_us)
+		-- collection is off; only the clicks of a touch begun admitted remain.
+		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" or kind == "press" then
+			delta = _pointer.observe(kind, code, value, source, at_us, context)
 		end
-		return
+		if not (delta and delta.touch_context) then return end
+	else
+		delta = _pointer.observe(kind, code, value, source, at_us, context)
+		if not delta then return end
 	end
-	local delta = _pointer.observe(kind, code, value, source, at_us)
-	if not delta then return end
+	local clicks, touch_clicks = delta.clicks, 0
+	local began = delta.touch_context
+	if began ~= nil then
+		clicks = 0
+		if began and began.epoch == _verdict.epoch and may_record(true) and not M.is_unrecorded_app(began.app) then
+			touch_clicks = delta.clicks
+		elseif admitted or gesture then
+			-- A verdict read since the touch began is the one the click meets.
+			clicks = delta.clicks
+		end
+	end
+	if touch_clicks == 0 and not admitted and not gesture then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
-	local app_id = _focused_app_id
+	local function credit(app_id, added_clicks, scrolls, distance)
+		local pending = ensure_pending(app_id, clock)
+		local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
+		mouse.clicks = mouse.clicks + added_clicks
+		mouse.scrolls = mouse.scrolls + scrolls
+		mouse.distance = mouse.distance + distance
+		pending.mouse = mouse
+	end
+	if touch_clicks > 0 then credit(began.app, touch_clicks, 0, 0) end
+	local app_id = admitted and _focused_app_id or (gesture and gesture.app)
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
-	local pending = ensure_pending(app_id, clock)
-	local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
-	mouse.clicks = mouse.clicks + delta.clicks
-	mouse.scrolls = mouse.scrolls + delta.scrolls
-	mouse.distance = mouse.distance + delta.distance
-	pending.mouse = mouse
+	if clicks > 0 or delta.scrolls > 0 or delta.distance > 0 then credit(app_id, clicks, delta.scrolls, delta.distance) end
+end
+
+--- Runs a pointer press's withdrawal of the focused field's verdict, the
+--- click callback's. A touch keeps the context it began in through it, as
+--- its clicks are counted there, and so does the gesture a press or a touch
+--- begins, whose wheel turns, travel and next click are counted there too;
+--- every other verdict, delivered or withdrawn, ends both (record_pointer).
+--- @param withdraw function The withdrawal.
+function M.withdraw_for_pointer(withdraw)
+	assert(type(withdraw) == "function", "a pointer withdrawal is a function")
+	assert(not _verdict.withdrawing, "a pointer withdrawal does not nest")
+	_verdict.withdrawing = true
+	local ok, failure = pcall(withdraw)
+	_verdict.withdrawing = false
+	if not ok then
+		-- Whatever it left half done is no withdrawal a touch may cross.
+		_verdict.epoch = _verdict.epoch + 1
+		error(failure, 0)
+	end
 end
 
 -- The events_llm kinds, with the fields each may carry. The table's CHECK constraint
@@ -1702,6 +1827,7 @@ function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, 
 	end
 	append_synthetic_events(app_id, text, kind, deletes, false, clock)
 	if type(timestamp_ms) == "number" then
+		LiveWpm.retract(_live, deletes, timestamp_ms)
 		LiveWpm.record(_live, char_count(text), timestamp_ms)
 		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
 	end
@@ -1713,6 +1839,9 @@ end
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
 	if _focused_app_id ~= app_id then _pointer.discard_frames(); _pointer.reseed() end
+	-- Another application is news of the field: the pointer's activity is no
+	-- longer the gesture's (record_pointer).
+	if _verdict.gesture and _verdict.gesture.app ~= app_id then _verdict.gesture = nil end
 	M.observe_hold_focus(app_id)
 	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
@@ -1881,27 +2010,41 @@ local function persisted_manifest()
 	-- An unavailable store cannot certify that no historical rows exist.
 	if not (sqlite_available() and SqliteReader) then return {}, false end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
-	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
-		return _manifest_cache.manifest, true
+	local cached = _projection_cache.manifest
+	if cached.manifest and revision ~= nil and cached.revision == revision then
+		return cached.manifest, true
 	end
 	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
 	-- A partial manifest is shown but never cached, so the next read retries
 	if complete then
-		_manifest_cache = { revision = revision, manifest = fresh }
+		_projection_cache.manifest = { revision = revision, manifest = fresh }
 	end
 	return fresh, complete == true
 end
 
 --- Drops the cached projection so the next read rebuilds from the database.
----
---- The dashboard's reset control asks for exactly this: it clears the filters
---- and expects the next payload to be a clean rebuild. Linux answered nothing
---- at all, so the button reset the page and left the backend serving the same
---- cached manifest it had before — the one visible symptom being that a reset
---- changed nothing.
-function M.clear_cache()
+--- @return boolean True once it is dropped; false while a flush owes the store.
+function M.forget_manifest()
 	if M.has_flush_debt() or _flush_stopping then return false end
-	_manifest_cache = { revision = nil, manifest = nil }
+	_projection_cache = { manifest = {}, today = {} }
+	return true
+end
+
+--- The dashboard's reset control: the cached projection, and Ergopti Studio's
+--- saved « My typing » read, derived from the same store (Windows retires both
+--- on the same reset).
+---
+--- The reset clears the filters and expects the next payload to be a clean
+--- rebuild. Linux answered nothing at all, so the button reset the page and
+--- left the backend serving the same cached manifest it had before — the one
+--- visible symptom being that a reset changed nothing.
+--- @return boolean True once neither remains.
+function M.clear_cache()
+	if not M.forget_manifest() then return false end
+	if _sqlite_path ~= nil and not require("modules.keystats.studio_snapshot").retire(_sqlite_path) then
+		Logger.error(LOG, "The saved Ergopti Studio read could not be retired; caches were not fully purged.")
+		return false
+	end
 	Logger.info(LOG, "Dashboard cache cleared at the user's request.")
 	return true
 end
@@ -1958,8 +2101,8 @@ function M.set_app_category(app_name, category, score, receipt)
 	if not AppCategoryFile.save(model, source) then return false end
 	-- The cached manifest was built before the edit, and the page re-reads
 	-- immediately after it. Without this the user sees their change reverted and
-	-- tries again.
-	M.clear_cache()
+	-- tries again. The Studio's saved read holds no category: it stays.
+	M.forget_manifest()
 	Logger.debug(LOG, "Category for '%s': %s (score %s).", app_name, category, tostring(score))
 	return true
 end
@@ -2091,6 +2234,40 @@ function M.get_range_payload(start_date, end_date, apps)
 	return payload
 end
 
+--- Today's n-grams of every app, for the typing dashboard's live refresh.
+--- The page keeps the history it holds, so only today's rows are projected:
+--- the persisted ones, read from SQLite once per revision and day, plus the
+--- unflushed delta, layered on a copy as in a range read.
+--- @return table|nil payload { today, today_date, incomplete? }; nil, reason
+---   while a flush is pending or the projection is unavailable.
+function M.get_today_payload()
+	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
+	local clock = observe_calendar()
+	local date = clock.date
+	local revision = sqlite_available() and SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
+	local persisted, complete
+	local cached = _projection_cache.today
+	if cached.today and revision ~= nil and cached.revision == revision and cached.date == date then
+		persisted, complete = cached.today, true
+	else
+		-- An unavailable store cannot certify that today has no persisted rows.
+		persisted, complete = {}, false
+		if sqlite_available() then
+			local bounds = SqliteReader.split_bounds(date, date, date)
+			local read
+			read, complete = SqliteReader.read_range_split_today(_sqlite_path, date, date, nil, bounds.today)
+			persisted, complete = read.today or {}, complete == true
+		end
+		-- A partial read is shown but never kept, so the next refresh retries
+		_projection_cache.today = { revision = complete and revision or nil, date = date,
+			today = complete and persisted or nil }
+	end
+	local payload = { historical = empty_ngrams(), today = TableUtil.deep_copy(persisted) }
+	add_live_ngram_delta(payload, nil, date, date, clock)
+	return { today = payload.today, today_date = date, incomplete = not complete or nil }
+end
+
 
 -- =========================================
 -- =========================================
@@ -2155,8 +2332,12 @@ settle_capture_policy = function()
 	if not may_record() then _capture_boundary = _capture_boundary + 1 end
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		Roi.owner.discard(Roi.state)
-		_pointer.discard_frames()
-		_pointer.forget_position()
+		-- A pointer press's own withdrawal keeps the travel of its gesture,
+		-- which is counted where it began (record_pointer).
+		if not _verdict.withdrawing then
+			_pointer.discard_frames()
+			_pointer.forget_position()
+		end
 		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
@@ -2387,18 +2568,34 @@ end
 --- Records whether the focused window is a private/incognito browser session.
 --- @param is_private boolean
 function M.set_private_window(is_private)
-	_private_window = (is_private == true)
+	_verdict.private_window = (is_private == true)
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
-	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
+	Logger.debug(LOG, "Private browsing window: %s.", tostring(_verdict.private_window))
 end
 
 --- Records the AT-SPI adapter's secure-field verdict for the focused window.
 --- Consulted IN ADDITION to the app-name list, never instead of it.
 --- @param is_secure boolean
-function M.set_secure_field(is_secure)
-	_secure_field = (is_secure == true)
+--- @param read boolean|nil true for a verdict read from the field, a password
+--- role included; false for a withdrawal that carries no news of the field
+--- (focus_guard INVARIANTS 5); nil for any other withdrawal. A read, and a
+--- withdrawal made outside a pointer press's own, end the context a touch
+--- began in (record_pointer).
+function M.set_secure_field(is_secure, read)
+	local was = _verdict.secure_field
+	_verdict.secure_field = (is_secure == true)
+	if read == true or (read == nil and not _verdict.withdrawing) then _verdict.epoch = _verdict.epoch + 1 end
 	settle_capture_policy()
-	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
+	-- Logged on a change, one sentence per state: the logger folds repeats of
+	-- one format, so a single « %s » line hid every admission behind the
+	-- withdrawals around it (run_pointer_metrics_live.lua waits on these).
+	if _verdict.secure_field == was then return end
+	if _verdict.secure_field then
+		Logger.debug(LOG, "Focused field unknown or secure: metrics paused.")
+	else
+		Logger.debug(LOG, "Focused field admitted: metrics recorded.")
+	end
 end
 
 --- Admits one privacy-filter change, or says why it was refused. A metrics
@@ -2422,6 +2619,7 @@ function M.set_private_filter_enabled(enabled)
 		return false
 	end
 	_private_filter_enabled = wanted
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
 	return true
@@ -2472,6 +2670,7 @@ function M.set_secure_filter_enabled(enabled)
 		return false
 	end
 	_secure_filter_enabled = wanted
+	_verdict.epoch = _verdict.epoch + 1
 	settle_capture_policy()
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
 	return true
@@ -2688,8 +2887,8 @@ function M.get_privacy_state()
 		secure_filter_enabled      = _secure_filter_enabled,
 		system_auth_filter_enabled = _system_auth_filter_enabled,
 		encrypt                    = _encrypt_enabled,
-		private_window             = _private_window,
-		secure_field               = _secure_field,
+		private_window             = _verdict.private_window,
+		secure_field               = _verdict.secure_field,
 		suppressed                 = _suppressed,
 		suspended                  = _pause.user,
 	}
@@ -3254,7 +3453,7 @@ function M.pump_flush()
 			_walker_contexts = marks.walker
 			_persisted_open_walk = marks.open_walk
 			if marks.recovered then _recovered_walks = nil end
-			_manifest_cache = { revision = nil, manifest = nil }
+			_projection_cache = { manifest = {}, today = {} }
 			_last_flush_committed, _flush_state = true, nil
 			-- Committed rows wait for the ledger's next bounded export.
 			_ledger.pending = true
@@ -3726,14 +3925,20 @@ function _maintenance.advance()
 		if request.tombstone then
 			-- A failed COMMIT retains its snapshot in _flush_state, so a settled
 			-- store after the tombstone's dispatch is that tombstone committed.
-			_manifest_cache = { revision = nil, manifest = nil }
+			_projection_cache = { manifest = {}, today = {} }
 			if _last_flush_committed ~= true then
 				-- Never let a refused purge commit later with a later flush.
 				for index, event in ipairs(_pending_system_events) do
 					if event == request.tombstone then table.remove(_pending_system_events, index); break end
 				end
 			end
-			return _maintenance.finish(request, _last_flush_committed == true)
+			if _last_flush_committed ~= true then return _maintenance.finish(request, false) end
+			-- Ergopti Studio shows its saved read at once: it must not show what was purged.
+			if not require("modules.keystats.studio_snapshot").retire(_sqlite_path) then
+				Logger.error(LOG, "Metrics purge applied, but the saved Ergopti Studio read could not be removed.")
+				return _maintenance.finish(request, false)
+			end
+			return _maintenance.finish(request, true)
 		end
 		local Maintenance = require("metrics.engine.maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)

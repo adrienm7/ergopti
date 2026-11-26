@@ -16,20 +16,18 @@
 #Requires AutoHotkey v2.0
 
 global SRTOW_CHILD_SLEEP_MS := 1600
-global SRTOW_PID_WAIT_MS := 5000
+; Every wait for a PID receipt, an exit signal, a natural completion or the
+; racing poller tick is bounded by the suite's TEST_NATIVE_SETTLE_TIMEOUT_MS:
+; it returns as soon as its signal arrives, so the bound only decides when a
+; stalled runner fails. The late-effect and OnDone sleeps below are absence
+; windows tied to the child's own delays, and the terminate() return bound is
+; the production confirmation budget, so all three keep their own values.
 global SRTOW_PID_POLL_MS := 10
 global SRTOW_LATE_EFFECT_WAIT_MS := 1800
 global SRTOW_TERMINATE_RETURN_MAX_MS := 1500
-; Ceiling of every bounded wait for an asynchronous native exit or cleanup
-; signal. The waits return as soon as the signal arrives, so the ceiling only
-; costs time on a genuine failure; it matches the other event waits because a
-; loaded CI runner once took over 500 ms to signal a terminated job child.
-global SRTOW_EXIT_SIGNAL_SETTLE_MS := 5000
 global SRTOW_NATURAL_CHILD_DELAY_MS := 800
-global SRTOW_NATURAL_WAIT_MS := 5000
 global SRTOW_ONDONE_SETTLE_MS := 250
 global SRTOW_POLLER_RACE_YIELD_MS := 25
-global SRTOW_POLLER_RACE_WAIT_MS := 1000
 global SRTOW_NATURAL_EXIT_CODE := 7
 global SRTOW_SYNCHRONIZE := 0x00100000
 global SRTOW_WAIT_OBJECT_0 := 0
@@ -55,7 +53,7 @@ _SRTOW_DeleteIfPresent(Path) {
 
 _SRTOW_WaitForChildPid(PidPath) {
 	local started_tick := A_TickCount
-	while TickElapsed(started_tick) < SRTOW_PID_WAIT_MS {
+	while TickElapsed(started_tick) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		try {
 			if FileExist(PidPath) {
 				local raw_pid := Trim(FileRead(PidPath))
@@ -83,7 +81,7 @@ _SRTOW_ExactProcessWait(ProcessHandle) {
 
 _SRTOW_WaitForExactProcessExit(ProcessHandle) {
 	local started_tick := A_TickCount
-	while TickElapsed(started_tick) < SRTOW_EXIT_SIGNAL_SETTLE_MS {
+	while TickElapsed(started_tick) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 		if _SRTOW_ExactProcessWait(ProcessHandle) == SRTOW_WAIT_OBJECT_0
 			return true
 		Sleep(SRTOW_PID_POLL_MS)
@@ -95,7 +93,7 @@ _SRTOW_WaitForTreeRegistryIdle() {
 	global _SR_TreeOwnedTasks, _SR_TreePollRunning
 	local started_tick := A_TickCount
 	while (_SR_TreeOwnedTasks.Count != 0 || _SR_TreePollRunning)
-			&& TickElapsed(started_tick) < SRTOW_NATURAL_WAIT_MS
+			&& TickElapsed(started_tick) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 		Sleep(SRTOW_PID_POLL_MS)
 	return _SR_TreeOwnedTasks.Count = 0 && !_SR_TreePollRunning
 }
@@ -282,18 +280,18 @@ _SRTOW_NaturalCompletionWaitsForDescendant() {
 
 		local root_wait_started := A_TickCount
 		while handle.processId() != 0
-				&& TickElapsed(root_wait_started) < SRTOW_NATURAL_WAIT_MS
+				&& TickElapsed(root_wait_started) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 			Sleep(SRTOW_PID_POLL_MS)
 		Assert(handle.processId() == 0,
 			"the poller must reap and close the exited cmd.exe root within the test deadline")
 		Assert(done_count = 0,
 			"OnDone must remain fenced after root exit while its delayed descendant is active")
 
-		Assert(_SRTOW_WaitForFile(marker_path, SRTOW_NATURAL_WAIT_MS),
+		Assert(_SRTOW_WaitForFile(marker_path, TEST_NATIVE_SETTLE_TIMEOUT_MS),
 			"the surviving descendant must publish its delayed marker")
 		local done_wait_started := A_TickCount
 		while done_count = 0
-				&& TickElapsed(done_wait_started) < SRTOW_NATURAL_WAIT_MS
+				&& TickElapsed(done_wait_started) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 			Sleep(SRTOW_PID_POLL_MS)
 		Assert(done_count = 1 && marker_existed_at_done,
 			"OnDone must fire exactly once only after the descendant marker exists and the full Job tree is empty")
@@ -349,7 +347,7 @@ _SRTOW_DiscardModeNeverStagesOutput() {
 		Assert(handle.start(),
 			"the discard-mode fixture must start its owned PowerShell tree")
 		local wait_started := A_TickCount
-		while done_count = 0 && TickElapsed(wait_started) < SRTOW_NATURAL_WAIT_MS
+		while done_count = 0 && TickElapsed(wait_started) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 			Sleep(SRTOW_PID_POLL_MS)
 
 		Assert(done_count = 1 && IsObject(observed_state),
@@ -408,7 +406,7 @@ _SRTOW_PollerTimerAndFlagTransitionTogether() {
 			else {
 				local handshake_started := A_TickCount
 				while publish_count = 0
-					&& TickElapsed(handshake_started) < SRTOW_POLLER_RACE_WAIT_MS
+					&& TickElapsed(handshake_started) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 					Sleep(1)
 				Assert(publish_count = 1,
 					"positive control: an unfenced stale disarm must admit the racing publisher")
@@ -433,7 +431,7 @@ _SRTOW_PollerTimerAndFlagTransitionTogether() {
 		_SR_TreePoll(_SRTOW_ApplyTimer)
 		local wait_started := A_TickCount
 		while publish_count = 0
-			&& TickElapsed(wait_started) < SRTOW_POLLER_RACE_WAIT_MS
+			&& TickElapsed(wait_started) < TEST_NATIVE_SETTLE_TIMEOUT_MS
 			Sleep(1)
 
 		Assert(publish_count = 1 && scheduler["Calls"].Length = 2,

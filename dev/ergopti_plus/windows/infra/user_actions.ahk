@@ -4,7 +4,7 @@
 ; MODULE: User Actions
 ; DESCRIPTION:
 ; The run_command and open_path actions of Windows: the Windows half of
-; _shared/shortcuts/engine/user_action_parameter.lua and the macOS and Linux user_actions.lua.
+; _shared/shortcuts/engine/actions/user_action_parameter.lua and the macOS and Linux user_actions.lua.
 ; _shared/tests/corpus/action_parameters/user_action_vectors.json pins the values.
 ;
 ; FEATURES & RATIONALE:
@@ -149,7 +149,7 @@ global _UserActionPorts := 0
 
 _UserActionDefaultPorts() {
 	static Ports := Map(
-		"notify", (Text) => TrayTip(Text, "ErgoptiPlus", "Iconx Mute"),
+		"notify", (Text) => NotifierSend(Text, Map("level", "error")),
 		"copy", CB_Write,
 		"type", (Text) => SendFinalResult(Text, true, true),
 		"open_terminal", _UserActionOpenTerminal,
@@ -245,6 +245,18 @@ _UserCommandShellLine() {
 	; inner cmd.exe /s keeps as the end of the command's own text.
 	return '"' . Shell . '" /d /v:on /s /c "chcp 65001 >nul & >"!' . USER_COMMAND_OUT_VARIABLE . '!" 2>"!'
 		. USER_COMMAND_ERR_VARIABLE . '!" "' . Shell . '" /d /s /c "!' . USER_COMMAND_VARIABLE . '!""'
+}
+
+; Builds the hidden run_command child for another owner of a hidden command (a
+; workflow shell step), so this module stays the one that launches a user's
+; shell: the command text, its stdout and stderr paths go in the private
+; USER_COMMAND_* variables of Environment. The caller starts the handle.
+; @param {String} Environment The child's environment block (ShellRunner_BuildEnvironment).
+; @param {Func} OnDone Called with the exit code when the child ends.
+; @returns {Object} The tree-owned process handle, not yet started.
+UserActionHiddenShell(Environment, OnDone) {
+	return ShellRunner_SpawnTreeOwnedCommand(_UserActionComSpec(), _UserCommandShellLine(),
+		Environment, EnvGet("USERPROFILE"), OnDone, , , 0, false, true)
 }
 
 ; Runs a run_command binding.
@@ -471,6 +483,12 @@ _UserCommandRead(Path) {
 	if DllCall("msvcrt\memchr", "Ptr", Bytes, "Int", 0, "UPtr", Bytes.Size, "CDecl Ptr")
 		return false
 	return StrGet(Bytes, Bytes.Size, "UTF-8")
+}
+
+; A capture of a hidden command read as strict UTF-8, for another owner of one.
+; @returns {String|Boolean} As _UserCommandRead.
+UserActionReadCapture(Path) {
+	return _UserCommandRead(Path)
 }
 
 ; The first non-blank line of a process's error output, bounded, for a notice.

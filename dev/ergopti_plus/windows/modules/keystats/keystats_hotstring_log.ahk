@@ -13,7 +13,7 @@
 ; field, once inside the ``tag`` marker. That contract needs a regression test
 ; that inspects the row itself, and the rest of modules/keystats/keystats.ahk
 ; installs OS hooks at load, so the headless suite cannot include it. Splitting
-; the record out is what lets tests/unit/modules/hotstrings/engine/test_hotstring_fire_log_privacy.ahk
+; the record out is what lets tests/unit/hotstrings/engine/engine/test_fire_log_privacy.ahk
 ; drive the real function against a recording KL_AppendLog instead of asserting
 ; on a copy of it.
 ;
@@ -159,6 +159,9 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", categ
 	; can resolve the correct color and skip coloring for neutral groups.
 	; Counted from the real replacement: the widget measures keystrokes saved,
 	; and a private expansion saved exactly as many as a public one.
+	; The live speed counts the produced text: the erased trigger leaves the
+	; window first (maintainer decision MET-17, 21 November 2026, as on macOS).
+	try WPMWidget_Retract(StrLen(trigger))
 	repl_len := StrLen(replacement)
 	Loop repl_len
 		try WPMWidget_Push(true, false, false, category, section)

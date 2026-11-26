@@ -11,7 +11,7 @@
 	"drivers": {
 		"macos": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
 		"linux": "Replays every vector (_shared/tests/lua/ai/request_plan_contract.lua).",
-		"windows": "Replays every vector (windows/tests/unit/modules/llm/prediction/test_llm_request_plan.ahk)."
+		"windows": "Replays every vector (windows/tests/unit/ai/prediction/test_request_plan.ahk)."
 	},
 	"vectors": [
 		{

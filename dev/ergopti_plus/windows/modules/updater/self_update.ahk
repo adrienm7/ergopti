@@ -10,6 +10,10 @@
 ; updater/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\core\ui\engine\webview\availability.ahk
+
+#Include %A_LineFile%\..\..\..\core\ui\engine\font_scale.ahk
+
 
 
 
@@ -767,8 +771,11 @@ _Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
 }
 
 ; The one balloon both release announcements show, under the same title.
+; Raises when the notifier refused it, so the caller keeps the release unannounced
+; and offers it again at the next check.
 _Updater_ShowReleaseBalloon(Text) {
-	TrayTip(Text, t("updater.tray_new_version_title"))
+	if !NotifierSend(Text, Map("title", t("updater.tray_new_version_title"), "sound", true))
+		throw Error("The notifier did not show the release balloon.")
 }
 
 ; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray
@@ -891,6 +898,11 @@ global _UpdaterLifecycleRecoveryPending := false
 global _UpdaterLifecycleRecoveryNoticeShown := false
 global _UpdaterLifecycleRecoveryNoticeRequested := false
 global _UpdaterLifecycleRecoveryAttemptCount := 0
+; The window that shows an update download's progress and its Cancel (UPD-07),
+; configured once by root boot: the shared download window, kind app_update.
+global _UpdaterDownloadProgressPresenter := 0
+; The progress of the running transaction: { Epoch, Percent, Shown }, or 0.
+global _UpdaterDownloadProgress := 0
 
 ; The four-event handshake is timer-polled on the AHK side. Every wait is a
 ; zero-time probe; only the exact native PowerShell worker performs blocking waits
@@ -1363,20 +1375,24 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 			_Updater_CloseGui(_Updater_PromptGui)
 		return
 	}
+	; The notes pane is the shared release-notes page: without WebView2 the
+	; prompt refuses in words instead of showing a plain-text substitute.
+	if !WebView_RequireAvailable("update prompt")
+		return
 	G := Gui_Create("+Resize +MinSize720x420", t("updater.update_window_title"))
 	_Updater_PromptGui := G
-	G.SetFont("s11 bold", "Segoe UI")
+	Gui_SetFont(G, "s11 bold", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
 	; Header: "Update available — vX.Y.Z" so the user immediately sees the
 	; tag they're about to install. Date below if we have one.
 	HeaderText := Format(t("updater.update_dialog_header"), Release.Tag)
 	G.Add("Text", "xm w700", HeaderText)
-	G.SetFont("s9 norm")
+	Gui_SetFont(G, "s9 norm")
 	if (Release.HasProp("PublishedAt") and Release.PublishedAt != "") {
-		G.Add("Text", "xm y+2 cGray w700", SubStr(Release.PublishedAt, 1, 10))
+		G.Add("Text", "xm y+2 w700", SubStr(Release.PublishedAt, 1, 10))
 	}
-	G.SetFont("s10 norm")
+	Gui_SetFont(G, "s10 norm")
 	G.Add("Text", "xm y+10 w700", t("updater.update_dialog_changelog"))
 
 	; Placeholder that WebView2 overlays — same height as the former Edit control.
@@ -1404,45 +1420,24 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 
 	; Spin up WebView2 after Show() (Hwnd is valid then) and load the shared
 	; release-notes page: the release's changelog, rendered like the Versions window.
-	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
-	if UseWV {
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		WVC := unset
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	try {
+		; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
+		; second Chromium process boots and reopens are near-instant.
+		WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
+		G.WVC := WVC
 		try {
-			; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
-			; second Chromium process boots and reopens are near-instant.
-			WVC := WebView2.create(BodyPane.Hwnd, , WebView_SharedEnvironment(loader))
-			G.WVC := WVC
-		} catch as Err {
-			try LoggerWarn("Updater", "WebView2 create failed in update prompt: {1}.", Err.Message)
-			UseWV := false
+			s := WVC.CoreWebView2.Settings
+			s.AreDevToolsEnabled              := false
+			s.AreDefaultContextMenusEnabled   := false
+			s.IsStatusBarEnabled              := false
+			s.AreBrowserAcceleratorKeysEnabled := false
 		}
-		if UseWV and IsSet(WVC) {
-			try {
-				s := WVC.CoreWebView2.Settings
-				s.AreDevToolsEnabled              := false
-				s.AreDefaultContextMenusEnabled   := false
-				s.IsStatusBarEnabled              := false
-				s.AreBrowserAcceleratorKeysEnabled := false
-			}
-			WVC.Fill()
-			try {
-				G.WVSub := _Updater_NavigateReleaseNotes(WVC, Release)
-			} catch as Err {
-				try LoggerWarn("Updater", "Update prompt shows the native notes instead: {1}.", Err.Message)
-				try WVC.Close()
-				G.WVC := 0
-				UseWV := false
-			}
-		}
-	}
-	if (!UseWV or !IsSet(WVC)) {
-		; Fallback: replace the placeholder with a plain read-only Edit showing the
-		; changelog section (or the localized empty-notes message).
-		BodyPane.GetPos(&bx, &by, &bw, &bh)
-		BodyText := _Updater_ReleaseNotesToPlain(Release.Body)
-		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
-			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
+		WVC.Fill()
+		G.WVSub := _Updater_NavigateReleaseNotes(WVC, Release)
+	} catch as Err {
+		_Updater_CloseGui(G)
+		return WebView_RefuseUnavailable("update prompt", Err.Message)
 	}
 	; WebView2 creation/navigation can pump the suspend reactor. A prompt owned
 	; by an async request must not survive if its generation changed mid-build.
@@ -1741,6 +1736,19 @@ _Updater_StagingFailureIsVerification(Stdout) {
 	return (Stdout is String) && (InStr(Stdout, "SHA-256") || InStr(Stdout, "too small"))
 }
 
+; The modal box of a staging failure no Versions window follows. A refused
+; digest names the integrity check, as that window and the Linux download
+; window do: « check your connection » sent the user after a network that
+; worked (UPD-01).
+; @param Failure {Map} The parsed staging failure.
+; @param Tag {String} The release being installed.
+; @returns {String}
+_Updater_StagingFailureNotice(Failure, Tag) {
+	if (Failure["reason"] == "verify")
+		return StrReplace(t("changelog_window.install_error_verify"), "{tag}", Tag)
+	return t("updater.install_error_download")
+}
+
 
 ; Configures only native callbacks. The UI translates the shared contract's
 ; safe report; neither the envelope nor the retained owner is a page payload.
@@ -1966,7 +1974,7 @@ _Updater_RetryManagedFailure(Owner, Observer := unset) {
 	return _Updater_StartObservedInstall(Release, IsSet(Observer) ? Observer : _UpdaterInstallObserver, Owner["request"], Owner) == true
 }
 
-_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
+_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Tag, Observation := 0) {
 	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
 	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
 	if Owner is Map
@@ -1997,7 +2005,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
 		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
 			Failure["receipt"], Observation.Observer, Observation.Epoch)
 			if _Updater_InstallObservationCurrent(Observation)
-				Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+				Ui_MsgBox(_Updater_StagingFailureNotice(Failure, Tag), t("updater.window_title"), "Icon!")
 		return true
 	}
 	Observed := _Updater_NotifyInstallPhase("failed",
@@ -2175,7 +2183,14 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
 		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
-	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
+	; A release the public feed names (the Versions window's newest feed row)
+	; carries no asset list: its asset has the conventional URL, and its size and
+	; digest come from its signature below, never from the feed.
+	FeedOnly := Release.HasProp("FeedOnly") && Release.FeedOnly == true
+	Asset := FeedOnly ? {Url: AssetSignature_FeedAssetUrl(AssetName, Release.Tag)}
+		: _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
+	if FeedOnly && Asset.Url == ""
+		Asset := 0
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -2209,16 +2224,33 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 
 	; Before the transaction and the download: every install path, the release
-	; installer's included, ends here. The fetch can pump messages.
-	SignatureAllows := AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
+	; installer's included, ends here. The fetch can pump messages. A feed
+	; release is downloaded once here to compute the size and the digest its
+	; required signature covers; the staging worker then enforces both.
+	if FeedOnly {
+		Asset := AssetSignature_AuthenticateFeedAsset(AssetName, Release.Tag, Request)
+		if HasSuspendOverride {
+			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+				return false
+		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+			return false
+		}
+		if !IsObject(Asset) {
+			_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_feed_signature", "Icon!", 0, InstallObserver)
+			return false
+		}
+		AssetUrl := Asset.Url
+	}
+	SignatureAllows := FeedOnly ? true : AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
+	; A refused signature is named as one, never as an unexpected error (UPD-10)
 	if !SignatureAllows {
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
+		_Updater_ReportInstallFailure("updater.install_error_signature", "changelog_window.install_error_signature", "Icon!", 0, InstallObserver)
 		return false
 	}
 
@@ -2314,9 +2346,10 @@ _Updater_SwapWorkerPath() {
 ; only that name prefix to the -File worker. Environment values are data, never
 ; PowerShell source, and unlike cmd.exe arguments they are not subject to the
 ; wrapper's %VAR% expansion. No script file is written on the menu thread.
-; Bundled -File scripts still need -ExecutionPolicy Bypass: it applies to this
-; process only, and the default Windows client policy (Restricted) refuses
-; every script file without it.
+; Bundled -File scripts still need a process execution policy: the default
+; Windows client policy (Restricted) refuses every script file. RemoteSigned
+; runs them, as the bundle is extracted by this exe and carries no
+; Mark-of-the-Web, and the swap script is written by the staging worker.
 _Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
@@ -2349,8 +2382,7 @@ _Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
-	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", WorkerPath, "-TransportPrefix", Prefix]
+	Args := ShellRunner_WinPsArgs("-File", WorkerPath, "-TransportPrefix", Prefix)
 	for Arg in Args {
 		if (InStr(Arg, "`n") or InStr(Arg, "`r"))
 			throw ValueError("Staging worker arguments unexpectedly contain a newline")
@@ -2437,6 +2469,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 				if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
 					throw Error("Curl capture transaction is no longer current.")
 				_UpdaterDownloadArtifacts.CurlCapture := Capture
+				; The authenticated length is the progress's denominator (UPD-07)
+				_UpdaterDownloadArtifacts.AuthenticatedSize := AuthenticatedSize
 			} finally Critical(PreviousCritical)
 			SplitPath(NewExe, , &CaptureParent)
 			Capture.Acquire(CaptureParent)
@@ -2510,6 +2544,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		return
 	}
 	SetTimer(_Updater_MonitorStagingWorker, UPDATER_ASYNC_POLL_MS)
+	_Updater_ShowDownloadProgress(Tag, StagingEpoch)
 }
 
 ; Cancels the subprocess while native Suspend is active. ShellRunner deliberately
@@ -2521,9 +2556,106 @@ _Updater_MonitorStagingWorker(*) {
 		SetTimer(_Updater_MonitorStagingWorker, 0)
 		return
 	}
-	if !A_IsSuspended
+	if !A_IsSuspended {
+		_Updater_PublishDownloadProgress()
 		return _Updater_EnforceDownloadDeadline()
+	}
 	_Updater_CancelSelfUpdateForSuspend()
+}
+
+; Hands the updater the window of its download's progress, once, at boot.
+; @param Presenter {Object} Show(Tag, OnCancel) -> Boolean, Update(Percent),
+;   Done(Succeeded, Message) and Close(). Its close box must not cancel: the
+;   update goes on without its window (UPD-05); only OnCancel stops it.
+Updater_ConfigureDownloadProgressPresenter(Presenter) {
+	global _UpdaterDownloadProgressPresenter
+	if IsObject(_UpdaterDownloadProgressPresenter)
+		throw Error("The update download progress window was configured twice")
+	for Name in ["Show", "Update", "Done", "Close"]
+		if !HasMethod(Presenter, Name)
+			throw TypeError("Invalid update download progress window: no " . Name)
+	_UpdaterDownloadProgressPresenter := Presenter
+}
+
+; The whole percentage of an authenticated download, capped at 99 until it is
+; verified; -1 when nothing is known yet.
+_Updater_DownloadProgressPercent(Received, Total) {
+	if !(Received is Integer) || !(Total is Integer) || Total <= 0 || Received <= 0
+		return -1
+	return Min(99, Floor(Received * 100 / Total))
+}
+
+; Opens the progress window of one transaction (UPD-07).
+_Updater_ShowDownloadProgress(Tag, StagingEpoch) {
+	global _UpdaterDownloadProgressPresenter, _UpdaterDownloadProgress
+	_UpdaterDownloadProgress := {Epoch: StagingEpoch, Percent: -1, Shown: false}
+	Presenter := _UpdaterDownloadProgressPresenter
+	if !IsObject(Presenter) {
+		try LoggerError("Updater", "No update download window is configured; {1} downloads without its progress.", Tag)
+		return false
+	}
+	Shown := false
+	try Shown := Presenter.Show(Tag, _Updater_CancelDownloadFromWindow.Bind(StagingEpoch)) == true
+	catch as Err
+		try LoggerError("Updater", "The update download window could not open: {1}.", Err.Message)
+	if !Shown
+		try LoggerInfo("Updater", "The download window is busy; {1} downloads with its progress in the tray only.", Tag)
+	_UpdaterDownloadProgress.Shown := Shown
+	return Shown
+}
+
+; Publishes the bytes the staging worker received, read from the parent-owned
+; capture it writes (ObserveBody), as a new whole percentage only.
+_Updater_PublishDownloadProgress() {
+	global _UpdaterDownloadProgress, _UpdaterDownloadProgressPresenter, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadWorker, _UpdaterSelfUpdateEpoch
+	Progress := _UpdaterDownloadProgress
+	Artifacts := _UpdaterDownloadArtifacts
+	if !IsObject(Progress) || !Progress.Shown || Progress.Epoch != _UpdaterSelfUpdateEpoch
+		|| !IsObject(Artifacts) || !Artifacts.HasOwnProp("CurlCapture") || !Artifacts.HasOwnProp("AuthenticatedSize")
+		return false
+	Received := 0
+	try Received := Artifacts.CurlCapture.ObserveBody(_UpdaterDownloadWorker, Artifacts.AuthenticatedSize)
+	catch as Err {
+		try LoggerWarn("Updater", "The update download progress could not be read: {1}.", Err.Message)
+		return false
+	}
+	Percent := _Updater_DownloadProgressPercent(Received, Artifacts.AuthenticatedSize)
+	if (Percent < 0 || Percent == Progress.Percent)
+		return false
+	Progress.Percent := Percent
+	try _UpdaterDownloadProgressPresenter.Update(Percent)
+	catch as Err
+		try LoggerWarn("Updater", "The update download progress could not be shown: {1}.", Err.Message)
+	return true
+}
+
+; Ends one transaction's progress: a verified download says so, any other end
+; closes its window.
+_Updater_FinishDownloadProgress(StagingEpoch, Verified) {
+	global _UpdaterDownloadProgress, _UpdaterDownloadProgressPresenter
+	Progress := _UpdaterDownloadProgress
+	if !IsObject(Progress) || Progress.Epoch != StagingEpoch
+		return false
+	_UpdaterDownloadProgress := 0
+	if !Progress.Shown
+		return false
+	try {
+		if Verified
+			_UpdaterDownloadProgressPresenter.Done(true, t("menu.about.update_installing"))
+		else
+			_UpdaterDownloadProgressPresenter.Close()
+	} catch as Err
+		try LoggerWarn("Updater", "The update download window could not be closed: {1}.", Err.Message)
+	return true
+}
+
+; The window's Cancel: the only user action that stops an update download.
+_Updater_CancelDownloadFromWindow(StagingEpoch) {
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return false
+	return _Updater_CancelSelfUpdateTransaction("Update download cancelled from its window.", true, false,
+		StagingEpoch, true)
 }
 
 _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
@@ -2587,7 +2719,7 @@ _Updater_ReleaseDownloadRetirement(Owner) {
 	} finally Critical(PreviousCritical)
 }
 
-_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
+_Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0, ByUser := false) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
@@ -2600,6 +2732,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	Observation := 0
 	HadTransaction := false
 	Retirement := 0
+	CancelledEpoch := 0
 	PreviousCritical := Critical("On")
 	try {
 		if IsObject(_UpdaterDownloadRetirement)
@@ -2630,6 +2763,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		_UpdaterExitInvocation := 0
 		_Updater_RetireManagedFailure()
 		_UpdaterDownloadInProgress := false
+		CancelledEpoch := _UpdaterSelfUpdateEpoch
 		_UpdaterSelfUpdateEpoch += 1
 	} finally {
 		Critical(PreviousCritical)
@@ -2637,6 +2771,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	try {
 		if IsObject(Worker)
 			try Worker.terminate()
+		_Updater_FinishDownloadProgress(CancelledEpoch, false)
 		if (Owner is Map)
 			_Updater_CloseSwapOwner(Owner, true)
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, true)
@@ -2648,7 +2783,12 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	if SurfacePausedRequest and IsObject(Request)
 		_Updater_RequestMayPublish(Request, true, 0, true)
 	if HadTransaction {
-		try LoggerError("Updater", LogMessage)
+		; A user's Cancel is no error
+		if ByUser {
+			try LoggerInfo("Updater", LogMessage)
+		} else {
+			try LoggerError("Updater", LogMessage)
+		}
 		if _Updater_InstallObservationValid(Observation)
 			_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
 				Observation.Observer, Observation.Epoch)
@@ -2766,6 +2906,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		return
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
+	_Updater_FinishDownloadProgress(StagingEpoch, ExitCode == 0 && Stdout == "READY")
 	global _UpdaterDownloadArtifacts
 	Observation := FailureOwner is Map
 		? {Observer: FailureOwner.Get("install_observer", 0), Epoch: FailureOwner.Get("install_observer_epoch", -1)}
@@ -2800,7 +2941,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if (ExitCode != 0 or Stdout != "READY") {
 		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
 		Failure := _Updater_ParseStagingFailure(Stdout)
-		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Observation)
+		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Tag, Observation)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
@@ -3170,12 +3311,12 @@ _Updater_CreateSuspendedSwapOwner(SwapScriptPath, NewExe, CurrentExe, Transactio
 		}
 
 		PowerShellPath := _Updater_PowerShellPath()
-		Args := [PowerShellPath, "-NoProfile", "-NonInteractive", "-ExecutionPolicy",
-			"Bypass", "-File", SwapScriptPath, Owner["ReadyName"], Owner["CommitName"],
+		Args := ShellRunner_WinPsArgv([PowerShellPath, "-NoProfile", "-NonInteractive"],
+			"-File", SwapScriptPath, Owner["ReadyName"], Owner["CommitName"],
 			Owner["AckName"], Owner["FinalExitName"], LocalHandles["ParentHandle"], NewExe,
 			CurrentExe, UPDATER_SWAP_PROBATION_MS, UPDATER_SWAP_BOOT_READY_TIMEOUT_MS,
 			UPDATER_SWAP_RESTORE_ATTEMPTS,
-			UPDATER_SWAP_RESTORE_RETRY_MS, SwapScriptPath . ".log"]
+			UPDATER_SWAP_RESTORE_RETRY_MS, SwapScriptPath . ".log")
 		CommandLine := ""
 		for Arg in Args
 			CommandLine .= (CommandLine == "" ? "" : " ") . _Updater_QuoteCreateProcessArg(Arg)
@@ -3415,8 +3556,8 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 _Updater_ShowDeferredSwapFailureNotice(*) {
 	; A failure balloon is not an update offer: a click on it must not open the
 	; update prompt.
-	NotifyFn := (*) => (_Updater_ReleaseBalloon(), TrayTip(t("updater.install_error"),
-		t("updater.title_update"), "Iconx Mute"))
+	NotifyFn := (*) => (_Updater_ReleaseBalloon(), NotifierSend(t("updater.install_error"),
+		Map("title", t("updater.title_update"), "level", "error")))
 	ArmRetryFn := (DelayMs) => TimerArmOneShotMs(
 		_Updater_ShowDeferredSwapFailureNotice, DelayMs)
 	if _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn,

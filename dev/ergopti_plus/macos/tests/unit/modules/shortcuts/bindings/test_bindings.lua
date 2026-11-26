@@ -194,7 +194,7 @@ helpers.describe("shortcuts.bindings: public API", function()
 		-- Drift guard: the macOS default MUST equal the
 		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
 		-- silently diverge from the AHK driver, which reads the same default.
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
 	end)
 end)
@@ -231,10 +231,12 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("lists the Cmd+* switch that is not a catalogue action", function()
+	-- Cmd+★ → Cmd+S left on 2026-11-21 (the magic key is a configured character).
+	helpers.it("no longer lists the modifiers + magic key save switch", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.cmd_star, "missing shortcut: cmd_star")
+		helpers.assert_nil(seen.cmd_star, "retired switch still listed: cmd_star")
+		helpers.assert_true(seen.wrap_text_if_selected, "missing shortcut: wrap_text_if_selected")
 	end)
 
 	helpers.it("no longer lists the switches that became role-named slots", function()
@@ -245,12 +247,12 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("includes the standalone tap_keys and layer_wheel entries", function()
+	helpers.it("includes the standalone tap_keys entry and not the layer's wheel", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
 		helpers.assert_true(seen.tap_keys)
 		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
-		helpers.assert_true(seen.layer_wheel)
+		helpers.assert_nil(seen.layer_wheel, "the layer's wheel is no shortcut: modules/shortcuts/layer_wheel.lua")
 		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
@@ -261,12 +263,6 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("orders cmd_* entries before the catch-all bucket", function()
-		local idx = {}
-		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.cmd_star < idx.tap_keys)
-		helpers.assert_true(idx.cmd_star < idx.layer_wheel)
-	end)
 end)
 
 
@@ -285,33 +281,33 @@ helpers.describe("shortcuts.bindings: enable/disable", function()
 	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("is_bound is false before enable(), while the preference is on", function()
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("enable() binds the hotkey and keeps the preference on", function()
-		helpers.assert_eq(B.enable("cmd_star"), true)
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
-		helpers.assert_eq(B.is_bound("cmd_star"), true)
+		helpers.assert_eq(B.enable("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("enable() is idempotent — re-enabling does not crash", function()
-		B.enable("cmd_star")
-		B.enable("cmd_star")
-		helpers.assert_eq(B.is_enabled("cmd_star"), true)
-		helpers.assert_eq(B.is_bound("cmd_star"), true)
+		B.enable("wrap_text_if_selected")
+		B.enable("wrap_text_if_selected")
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), true)
 	end)
 
 	helpers.it("disable() unbinds the hotkey and switches the preference off", function()
-		helpers.assert_eq(B.disable("cmd_star"), true)
-		helpers.assert_eq(B.is_enabled("cmd_star"), false)
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
+		helpers.assert_eq(B.disable("wrap_text_if_selected"), true)
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
 	end)
 
 	helpers.it("disable() is idempotent — disabling an inactive id does nothing", function()
-		B.disable("cmd_star")
-		helpers.assert_eq(B.is_enabled("cmd_star"), false)
-		helpers.assert_eq(B.is_bound("cmd_star"), false)
+		B.disable("wrap_text_if_selected")
+		helpers.assert_eq(B.is_enabled("wrap_text_if_selected"), false)
+		helpers.assert_eq(B.is_bound("wrap_text_if_selected"), false)
 	end)
 end)
 

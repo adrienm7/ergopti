@@ -107,6 +107,33 @@ helpers.describe("updater (linux): the check falls back on the public feed", fun
 		helpers.assert_eq(manager.get_state(), "idle")
 	end)
 
+	-- UPD-06: a failed check said « Could not reach GitHub » whatever it knew
+	local FEED_DOWN = { ok = false, status = 0, body = "", error = "feed refused" }
+	for _, case in ipairs({
+		{ id = "an exhausted rate limit", api = { ok = false, status = 403, body = "", error = "HTTP 403",
+			rate_limit = { remaining = "0", reset = "86400" } }, expect = "update_check.error_rate_limited" },
+		{ id = "a proxy that asks for authentication", api = { ok = false, status = 0, body = "", error = "proxy",
+			failure_receipt = { stage = "proxy_connect", backend = "curl", failure_provenance = "verified",
+				proxy_connect_status = 407, curl_exit = 56, tls_verification = "enforced" } },
+			expect = "network.failure.proxy" },
+		{ id = "a refused certificate", api = { ok = false, status = 0, body = "", error = "tls",
+			failure_receipt = { stage = "tls", backend = "curl", failure_provenance = "verified", curl_exit = 60,
+				tls_verification = "enforced" } }, expect = "network.failure.certificate" },
+		{ id = "an unproven cause", api = { ok = false, status = 0, body = "", error = "connect",
+			failure_receipt = { stage = "connect", backend = "curl", failure_provenance = "unavailable", curl_exit = 7 } },
+			expect = "updater.no_connection" },
+	}) do
+		helpers.it("upd-06: names " .. case.id .. " once the feed failed too", function()
+			local manager = boot("2.3.0")
+			script(manager, case.api, FEED_DOWN)
+			local answer = check(manager)
+			helpers.assert_eq(answer.result.state, "error")
+			helpers.assert_eq(answer.result.reason_key, case.expect)
+			local I18n = require("core.i18n.engine.i18n")
+			helpers.assert_true(I18n.get(case.expect) ~= case.expect, case.expect .. " is localized")
+		end)
+	end
+
 	helpers.it("check-only: a proxy page served as the feed is refused", function()
 		local manager = boot("2.3.0")
 		script(manager, { ok = false, status = 0, body = "", error = "proxy refused" },

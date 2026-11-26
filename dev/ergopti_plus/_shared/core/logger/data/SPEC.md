@@ -1,8 +1,8 @@
 # Ergopti+ — Logger Specification (cross-driver)
 
 This document is the **single source of truth** for the logger contract shared by
-**all three** drivers. `windows/lib/logger.ahk`, `macos/lib/logger.lua` and
-`_shared/core/logger/engine/init.lua` MUST conform to every behaviour described here.
+**all three** drivers. `windows/core/logger/engine/logger.ahk`,
+`macos/core/logger/engine/logger.lua` and `_shared/core/logger/engine/init.lua` MUST conform to every behaviour described here.
 Divergences are listed explicitly in
 [§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
 
@@ -151,7 +151,14 @@ The caller-supplied tag is wrapped in square brackets verbatim.
 [menu_llm]
 ```
 
-### 3.4 Full example lines
+### 3.4 Format failure
+
+A format error never costs the line and never passes for a normal one: the
+body is the unformatted template followed by
+`  [!! log format failed: <error> — N arg(s) not substituted]`. The
+`format_failure` cases of `parity_vectors.json` pin it on the three drivers.
+
+### 3.5 Full example lines
 
 ```
 2026-05-26 14:32:15:042 [INFO] [TapHoldLoader] Tap-hold config loaded (8 key(s), 2 layer(s)).
@@ -176,9 +183,26 @@ active level are discarded and never written to any output.
 | 40            | ERROR only                                               |
 
 String aliases accepted by `set_level()`:
-`"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40.
+`"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40, and every
+variant name (`"trace"` → 10, `"success"` → 20…), in any case. An unknown name
+raises; it never selects a level silently.
 
-Default level: **10** (all variants active).
+Default level of the shared core: **10** (all variants active). Each driver
+then applies the stored `script.log_level` through one rule: the threshold of
+its declared name (the eight of the manifest, matched without case), or the
+manifest default (INFO) with a warning when the value is no declared name.
+Windows resolves it in `LoggerResolveLevel`, macOS and Linux in
+`_shared/core/logger/engine/level_setting.lua`; the `level_setting` cases of
+`_shared/tests/corpus/logger/parity_vectors.json` hold the three to it.
+
+The menus set the level through one switch, Debug > « Detailed log »
+(maintainer, 2026-11-24), over the same `script.log_level` value: it reads
+ticked when the stored level's threshold lets through more than the default's
+(DEBUG, TRACE, DONE), and a click stores the default when ticked, else DEBUG.
+Any other declared value stays valid in `config.toml` and reads unticked.
+Windows owns it in `LoggerIsDetailed` and `LoggerDetailedToggleTarget`, macOS
+and Linux in `level_setting.lua` (`is_detailed`, `detailed_toggle_target`);
+the `detailed_log` cases of `parity_vectors.json` hold the three to it.
 
 A line that passes the filter can still be withheld by one of the two
 suppression layers below. Both are implemented once in the shared Lua core
@@ -228,7 +252,7 @@ in between, or one whose arguments change. Repeat collapsing does.
   first. The next occurrence after a close is emitted and opens a new streak.
 - **Summary.** A closed streak that withheld at least one line emits one line at
   its own variant and under its own module, so a collapsed warning still reaches
-  the errors-only file and a topical file still receives it:
+  the errors-only file:
 
   ```
   TIMESTAMP [LEVEL] [module] ↑ "<text>" repeated N more time(s) between <first> and <last>[ (last: <body>)].
@@ -272,7 +296,7 @@ only by arguments, and the same check may run again a minute later. Folded by
 
 - **Rendering.** An INFO line: severity 20, label `[INFO]`, sink variant
   `info`. It is filtered by the level threshold exactly like `info`, and it
-  reaches the same files, ring buffer and topical sub-files.
+  reaches the same files and ring buffer.
 - **Exemption.** It is never withheld by § 4.1 (not even when identical to the
   previous line) and never opens or joins a § 4.2 streak. It is accepted like
   any other line, so it closes an open § 4.1 streak first; the lines around it
@@ -359,6 +383,7 @@ after the line's native ACK. Linux: the daemon installs the shared core's
 | Rotation       | Daily — a new file is created when the calendar day changes   |
 | Retention      | Files older than **14 days** are deleted on the next rotation |
 | Purge strategy | Based on date in filename, not file modification time         |
+| Cutoff         | A file dated before today minus 14 calendar days, any hour    |
 
 The logs folder, the file-name prefixes and the crash-reports subfolder are
 declared once in [`paths/app_dirs.toml`](../../fs/data/paths/app_dirs.toml) and generated
@@ -391,47 +416,53 @@ admission, a second start that yielded). The file name is declared once in
 `paths/app_dirs.toml`; on Linux it only ever carries the closed messages of
 `core/logger/engine/bootstrap_log.lua`, because the privacy policy is not loaded yet.
 
-### 6.2 Fan-out sub-files
+### 6.2 One log file, one export archive
 
-In addition to the main log, the logger routes each line to one or more
-topical sub-files when the line matches the sub-file's routing rule.
+Every line goes to the daily log and nowhere else, apart from the
+WARNING/ERROR mirror `ErgoptiPlus_errors_YYYY-MM-DD.log`, which the health
+check's recent issues, the error dialog and « Open today's errors file » read.
+The topical sub-files every driver used to fan lines out to were retired on
+2026-11-25 (§ 7): testers had to send dozens of files when the daily log already
+held every line.
 
-Routing rules are defined in [`sub_files.toml`](./sub_files.toml) (see § 7).
-
-Every sub-file uses the same UTF-8 encoding, CRLF/LF line endings, and
-daily rotation as the main log. The retention policy (14 days) also applies.
+« Export the logs (zip) » in the Debug menu hands a tester the one file to send:
+the daily logs and errors mirrors of the last `days` days, the files written
+before the logger can start (`bootstrap.log`; on macOS the launcher's
+`launcher.log`, fatal report and reload breadcrumb) and the crash reports, each
+copied through the field report's privacy rules. The selection, the archive
+name and the scrub rules are declared once in
+[`log_export.toml`](./log_export.toml) and replayed by every driver against
+[`log_export_vectors.json`](../../../tests/corpus/logger/log_export_vectors.json).
 
 ### 6.3 Write strategy
 
-- Lines are buffered and flushed on a timer interval (≤ 500 ms).
-- Lines at `WARNING` or `ERROR` severity trigger an immediate forced flush
-  to prevent data loss on crash.
+- Windows buffers lines and appends them on its `flush_interval_ms` tick
+  (500 ms); an `ERROR` line forces an immediate durable flush, a `WARNING`
+  waits for the tick. Linux writes and flushes every line. macOS hands every
+  line to the native worker, which acknowledges each batch once written.
+- A refused write is never silent. Windows keeps the refused lines queued and
+  retries them on its tick, reporting what its queue cap dropped; Linux retires
+  the refused file, reopens it with the first line after `flush_interval_ms`,
+  and writes how many lines it missed first; the shared core reports the lines
+  a raising sink lost in a `[WARNING] [logger]` line after the next accepted
+  one (the `sink_failure` cases of `parity_vectors.json`).
 - The file handle is kept open for the process lifetime to minimise I/O overhead.
 
 ---
 
-## 7. Sub-file Routing (`sub_files.toml`)
+## 7. Retired Sub-files
 
-Each entry in [`sub_files.toml`](./sub_files.toml) defines one topical sub-file:
-
-```toml
-[[sub_files]]
-name     = "gestures"                  # suffix of ErgoptiPlus_<name>.log
-patterns = ["[gestures", "gesture"]    # substring patterns matched against the full log line
-platforms = ["ahk", "hs", "linux"]    # Windows, macOS, Linux: which drivers write it
-```
-
-A log line is routed to a sub-file if **any** of its `patterns` is found as a
-substring of the full formatted line (case-sensitive). The match is against the
-complete line including timestamp, level, and module tag.
-
-A topic that exists on several drivers is declared for all of them, so the same
-file name answers the same question on every OS. Each driver spells its module
-tags in its own style, hence one pattern list per topic that names every
-spelling. Topical files carry no date in their name: the first write of a new day
-truncates a file whose first line is from an earlier day (macOS by modification
-time, Linux by that first line). Only MLX and Karabiner (macOS products) and the
-Windows layout, dispatch and tray topics are single-platform.
+Until 2026-11-25 each driver also appended a matching line to a topical file
+(`ErgoptiPlus_hotstrings.log`, `ErgoptiPlus_llm.log`, …), routed by a table
+generated from `sub_files.toml`. Every such line was a copy of a daily-log line,
+so nothing was lost when the fan-out was removed. The old file names are
+declared once as `[logs.files] retired_topical_logs` in
+[`paths/app_dirs.toml`](../../fs/data/paths/app_dirs.toml): each driver's
+retention sweep (and the macOS native worker's) deletes a regular file of
+exactly one of those names directly in the logs folder, and nothing else, so an
+upgraded install loses its old sub-files on the first start. `karabiner_kc.log`
+in the macOS metrics folder is the Karabiner key-count ledger, not a log, and is
+not affected.
 
 ---
 
@@ -545,7 +576,9 @@ Errors caught by `try`/`pcall` on non-hot paths are logged, never discarded.
 
 ## References
 
-- AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)
-- HS implementation: [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
-- Sub-file routing: [`sub_files.toml`](./sub_files.toml)
+- AHK implementation: [`windows/core/logger/engine/logger.ahk`](../../../../windows/core/logger/engine/logger.ahk)
+- HS implementation: [`macos/core/logger/engine/logger.lua`](../../../../macos/core/logger/engine/logger.lua)
+- Linux sink: [`linux/core/logger/engine/sink.lua`](../../../../linux/core/logger/engine/sink.lua)
+- Parity corpus: [`parity_vectors.json`](../../../tests/corpus/logger/parity_vectors.json)
+- Log export archive: [`log_export.toml`](./log_export.toml)
 - Test vectors: [`test_vectors.json`](./test_vectors.json)

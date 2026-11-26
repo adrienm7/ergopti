@@ -134,7 +134,7 @@ function M.resolve_build_identity(commit_opts)
 	local is_local = M.is_local_source() or version == "local"
 	local kind = is_local and VersionLabel.KIND_LOCAL or VersionLabel.KIND_RELEASE
 	local ok, commit, source = pcall(function()
-		return require("infra.diagnostic_snapshot").resolve_commit(commit_opts)
+		return require("diagnostics.engine.reports.snapshot").resolve_commit(commit_opts)
 	end)
 	if not ok then
 		Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))

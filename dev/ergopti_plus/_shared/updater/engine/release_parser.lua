@@ -77,6 +77,26 @@ function M.parse_asset_url(body, asset_name)
 end
 
 
+--- Extracts the byte size GitHub declares for a named asset, for the progress
+--- of its download (UPD-07); the transfer never trusts it for its checks.
+--- @param body string Raw single-release JSON object.
+--- @param asset_name string The asset filename to find.
+--- @return integer|nil size A positive whole size, or nil when none is declared.
+function M.parse_asset_size(body, asset_name)
+	if type(body) ~= "string" or body == "" or type(asset_name) ~= "string" or asset_name == "" then return nil end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.assets) ~= "table" then return nil end
+	for _, asset in ipairs(release.assets) do
+		if type(asset) == "table" and asset.name == asset_name then
+			local size = asset.size
+			if type(size) == "number" and size > 0 and size == math.floor(size) then return size end
+			return nil
+		end
+	end
+	return nil
+end
+
+
 --- Extracts the "html_url" field from a single-release JSON object.
 --- @param body string Raw JSON
 --- @return string url or ""

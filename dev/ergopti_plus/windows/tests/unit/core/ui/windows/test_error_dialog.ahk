@@ -341,6 +341,44 @@ _TED_RealSharingSink() {
 }
 Test("error window: actual sharing caller retains snapshot and excludes private details", _TED_RealSharingSink)
 
+; Without WebView2 the error was only a TrayTip, gone in seconds and never
+; in the history: the error the window exists for was lost. It now stays on
+; screen in a modal box naming the errors file (error-dialog-no-webview).
+_TED_NoWindowKeepsTheErrorOnScreen() {
+	global _LOGGER_TEST_SINK
+	Shown := [], Logs := []
+	PreviousSink := _LOGGER_TEST_SINK
+	Record := Map("kind", "error", "module", "synthetic", "message", "Flush failed: disk full", "time", "local")
+	Fields := Map("log_path", "C:\synthetic-owner\logs\ErgoptiPlus_errors_2026-11-25.log")
+	try {
+		TestMsgBoxResponder((Text, Title, Options) => (Shown.Push(Map("text", Text, "title", Title, "options", Options)), "OK"))
+		LoggerSetTestSink((Line) => Logs.Push(Line))
+		_ErrorDialog_AnnounceWithoutWindow(Record, Fields, "the WebView2 binding is not loaded")
+		_LoggerFlushRepeats(true)
+	} finally {
+		LoggerSetTestSink(PreviousSink)
+		TestMsgBoxResponder("")
+	}
+	AssertEqual(1, Shown.Length, "the error is shown in exactly one message box")
+	AssertContains(Shown[1]["text"], t("error_dialog.heading"), "the box says an error happened")
+	AssertContains(Shown[1]["text"], "Flush failed: disk full", "the box names the error")
+	AssertContains(Shown[1]["text"], StrReplace(t("error_dialog.logged_in"), "%s", Fields["log_path"]),
+		"the box names the errors file that holds it")
+	AssertContains(Shown[1]["options"], "Iconx", "the box is an error box")
+	Warned := 0
+	for Line in Logs
+		if InStr(Line, "[WARNING]") && InStr(Line, "the error is shown in a message box")
+			Warned += 1
+	AssertEqual(1, Warned, "the missing window is logged once, with the box that replaced the notice")
+	Source := _StripFullLineComments(_DriverFuncBody("_ErrorDialog_Open"))
+	Assert(Source != "", "_ErrorDialog_Open must be readable")
+	AssertFalse(InStr(Source, "NotifierSend("), "a missing window never leaves the error to a transient notice")
+	AssertEqual(2, StrSplit(Source, "_ErrorDialog_AnnounceWithoutWindow(").Length - 1,
+		"both refusals (WebView2 unavailable, controller not created) keep the error on screen")
+}
+Test("error window: without WebView2 the error stays on screen and names its file (error-dialog-no-webview)",
+	_TED_NoWindowKeepsTheErrorOnScreen)
+
 #Include ../webview/test_error_dialog_startup_owner.ahk
 
 

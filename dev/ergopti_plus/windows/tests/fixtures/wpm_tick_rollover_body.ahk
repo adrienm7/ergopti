@@ -30,7 +30,7 @@ _WPMR_Push(Tick, Ai := false, Ac := false) {
 
 _WPMR_Main() {
 	global _WPMR
-	if A_Args.Length != 4
+	if A_Args.Length != 5
 		ExitApp(2)
 	_WPMR := {Mode: A_Args[1], Now: 0, Reads: 0}
 	Primary := 0, PreviousSuspend := A_IsSuspended, PreviousCritical := A_IsCritical
@@ -38,8 +38,10 @@ _WPMR_Main() {
 		Suspend(false)
 		WPMWidgetConst.WINDOW_MS := Integer(A_Args[3])
 		WPMWidgetConst.WPM_MIN_DURATION_MS := Integer(A_Args[4])
-		_WPMR_Require(WPMWidgetConst.WINDOW_MS == 15000 && WPMWidgetConst.WPM_MIN_DURATION_MS == 2000,
-			"These fixed vectors require the actual shared 15000/2000 ms timing contract.")
+		WPMWidgetConst.IDLE_RESET_MS := Integer(A_Args[5])
+		_WPMR_Require(WPMWidgetConst.WINDOW_MS == 15000 && WPMWidgetConst.WPM_MIN_DURATION_MS == 2000
+			&& WPMWidgetConst.IDLE_RESET_MS == 5000,
+			"These fixed vectors require the actual shared 15000/2000/5000 ms timing contract.")
 		_WPMR_Require(WPMWidget._ring.Length == 0 && WPMWidget._ring_head == 0,
 			"A fresh genuine state class must own an empty ring.")
 		WPMWidget.visible := true
@@ -60,6 +62,21 @@ _WPMR_Main() {
 				_WPMR_Push(19500, false, true)
 				_WPMR.Now := 20000
 				Expected := 12, ExpectedAi := false, ExpectedAc := true, ExpectedRows := 3
+			case "idle-reset-after-burst":
+				; Inside the 15 s window but past the shared idle reset: macOS and
+				; Linux read 0 here, the window alone gave 6 (met-01).
+				_WPMR_Push(1000)
+				_WPMR_Push(1500)
+				_WPMR_Push(2000)
+				_WPMR.Now := 7001
+				Expected := 0, ExpectedAi := false, ExpectedAc := false, ExpectedRows := 3
+			case "idle-reset-boundary":
+				; Exactly the idle reset after the last character still reads the burst.
+				_WPMR_Push(1000)
+				_WPMR_Push(1500)
+				_WPMR_Push(2000)
+				_WPMR.Now := 7000
+				Expected := 6, ExpectedAi := false, ExpectedAc := false, ExpectedRows := 3
 			default:
 				throw ValueError("Unknown WPM clock vector")
 		}
@@ -76,6 +93,10 @@ _WPMR_Main() {
 			_WPMR_Require(FirstRawAge == 0x100000000 + 1500 && SecondRawAge == 0x100000000 + 1000
 				&& FirstRawAge > WPMWidgetConst.WINDOW_MS && SecondRawAge > WPMWidgetConst.WINDOW_MS,
 				"Both retained real producer rows must genuinely be older than the rolling window.")
+		else if InStr(_WPMR.Mode, "idle-reset-") == 1
+			_WPMR_Require(FirstRawAge < WPMWidgetConst.WINDOW_MS
+				&& _WPMR.Now - WPMWidget._last_tick >= WPMWidgetConst.IDLE_RESET_MS,
+				"The idle vectors must lie inside the rolling window and at or past the idle reset.")
 		else if _WPMR.Mode == "expired-and-minimum"
 			_WPMR_Require(FirstRawAge == WPMWidgetConst.WINDOW_MS + 1,
 				"The AI-only first row must really lie outside the shared rolling window.")

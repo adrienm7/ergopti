@@ -58,7 +58,7 @@ _SRTCR_CloseRecovery(Kind, Forced) {
 			"UInt", ProtectFromClose, "UInt", 0, "Int"))
 		Scope.Protected := 0
 		Started := A_TickCount
-		while !Scope.Results.Length && TickElapsed(Started) < SRTOW_EXIT_SIGNAL_SETTLE_MS {
+		while !Scope.Results.Length && TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS {
 			_SR_TreePoll()
 			Sleep(SRTOW_PID_POLL_MS)
 		}

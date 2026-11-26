@@ -19,27 +19,33 @@
 local helpers = require("tests.helpers")
 -- Every case installs its own indicator double; the module end puts the real
 -- entries back so no later module meets the double.
-local restore_loaded = helpers.keep_loaded({ "platform.tray.appindicator", "adapters.tray_menu" })
+local restore_loaded = helpers.keep_loaded({ "tray.adapters.appindicator", "tray.adapters.menu",
+	"core.i18n.engine.i18n", "tray.protocol", "core.logger.engine.shim" })
 
 --- Installs a stand-in indicator and loads the adapter over it.
 --- @param available boolean Whether the machine can host a tray.
 --- @return table adapter, table log
 local function with_indicator(available)
 	local log = { menus = {}, icons = {}, pumps = 0, created = nil, destroyed = 0 }
-	package.loaded["platform.tray.appindicator"] = {
+	package.loaded["tray.adapters.appindicator"] = {
 		is_available = function() return available end,
-		create = function(id, icon, title)
+		create = function(id, icon, title, description)
 			if not available then return false end
-			log.created = { id = id, icon = icon, title = title }
+			log.created = { id = id, icon = icon, title = title, description = description }
 			return true
 		end,
 		set_menu = function(items) log.menus[#log.menus + 1] = items ; return true end,
-		set_icon = function(icon) log.icons[#log.icons + 1] = icon ; return true end,
+		set_icon = function(icon, description)
+			log.icons[#log.icons + 1] = icon
+			log.descriptions = log.descriptions or {}
+			log.descriptions[#log.icons] = description
+			return true
+		end,
 		pump = function() log.pumps = log.pumps + 1 ; return 0 end,
 		destroy = function() log.destroyed = log.destroyed + 1 end,
 		is_live = function() return log.created ~= nil end,
 	}
-	return helpers.load_module("adapters.tray_menu"), log
+	return helpers.load_module("tray.adapters.menu"), log
 end
 
 
@@ -85,6 +91,75 @@ helpers.describe("tray_menu: with a backend", function()
 				.. "would be a second menu vocabulary to keep in sync")
 	end)
 
+	helpers.it("(greyed-reason-rows) draws a greyed row's reason below it, at every depth", function()
+		local tray, log = with_indicator(true)
+		local reason = "Unavailable: Only an X11 session, or GNOME, KDE or Hyprland on Wayland, applies this live."
+		local tree = {
+			{ title = "Layout", menu = {
+				{ title = "Also reorder the three edge keys — Unavailable", disabled = true, tooltip = reason },
+				{ title = "Next", fn = function() end },
+			} },
+		}
+		tray.setMenu(tree)
+		local drawn = log.menus[#log.menus][1].menu
+		local said = {}
+		for index = 2, #drawn - 1 do
+			helpers.assert_eq(drawn[index].disabled, true, "a reason row runs nothing")
+			helpers.assert_eq(drawn[index].fn, nil)
+			helpers.assert_true(#drawn[index].title <= 4 + 60 + 8, "a reason line stays narrow: " .. drawn[index].title)
+			said[#said + 1] = drawn[index].title:gsub("^%s+", "")
+		end
+		helpers.assert_true(#said >= 2, "a long reason wraps over several rows")
+		helpers.assert_eq(table.concat(said, " "),
+			"Only an X11 session, or GNOME, KDE or Hyprland on Wayland, applies this live.")
+		helpers.assert_eq(drawn[#drawn].title, "Next")
+		helpers.assert_eq(tray.getMenu(), tree, "the menu model itself is kept as the builder made it")
+		helpers.assert_eq(#tree[1].menu, 2)
+	end)
+
+	-- Arch field report of 2026-11-25 (KDE Plasma, Wayland): a feature switched
+	-- off greyed every row of its submenu with one reason, said under each, and
+	-- Plasma could not scroll back up to the switch.
+	helpers.it("(tray-submenu-height) says a shared reason once and folds an overlong submenu", function()
+		local tray, log = with_indicator(true)
+		local reason = "Category off: tick the first row of this menu to use it"
+		local rows = { { title = "Enable", checked = false, fn = function() end }, { title = "-" } }
+		for group = 1, 3 do
+			rows[#rows + 1] = { title = "— Group " .. group .. " —", disabled = true }
+			for slot = 1, 9 do
+				rows[#rows + 1] = { title = "Slot " .. group .. "." .. slot .. " — Category off", disabled = true, tooltip = reason }
+			end
+			rows[#rows + 1] = { title = "-" }
+		end
+		tray.setMenu({ { title = "Gestures", checked = false, menu = rows } })
+		local drawn = log.menus[#log.menus][1].menu
+		helpers.assert_eq(drawn[1].title, "Enable", "the switch stays the first row")
+		helpers.assert_true(#drawn <= require("tray.adapters.menu").MAX_SUBMENU_ENTRIES, "drawn: " .. #drawn)
+		local told = 0
+		local function count(items)
+			for _, row in ipairs(items) do
+				if row.title == "    tick the first row of this menu to use it" then told = told + 1 end
+				if row.menu then count(row.menu) end
+			end
+		end
+		count(drawn)
+		helpers.assert_eq(told, 1, "the reason is said below its first greyed row only")
+		helpers.assert_eq(drawn[3].title, "Group 1", "each section opens as a submenu named by its header")
+		helpers.assert_eq(#tray.getMenu()[1].menu, #rows, "the menu model itself is kept as the builder made it")
+	end)
+
+	helpers.it("(greyed-reason-rows) says a reason whole when the label lacks its head, and wraps CJK text", function()
+		local tray = require("menu.engine.renderer")
+		local drawn = tray.with_reason_rows({ { title = "Row", disabled = true, tooltip = "Not here: never" } })
+		helpers.assert_eq(drawn[2].title, "    Not here: never")
+		local cjk = string.rep("\228\184\173", 50)
+		drawn = tray.with_reason_rows({ { title = "Row — X", disabled = true, tooltip = "X\239\188\154" .. cjk } })
+		helpers.assert_eq(#drawn, 3, "fifty wide characters take two lines of sixty columns")
+		helpers.assert_eq(drawn[2].title, "    " .. string.rep("\228\184\173", 30))
+		local plain = { { title = "Row — Off", disabled = true, tooltip = "Off" }, { title = "Live", disabled = true } }
+		helpers.assert_true(tray.with_reason_rows(plain) == plain, "nothing to add keeps the same table")
+	end)
+
 	helpers.it("builds both fallback menus with one builder (appimage-catalogue-tray-screenshot)", function()
 		local tray, log = with_indicator(true)
 		local quit, details, logs = function() end, function() end, function() end
@@ -120,6 +195,63 @@ helpers.describe("tray_menu: with a backend", function()
 		helpers.assert_eq(log.destroyed, 1, "destroy reaches the backend")
 		tray.setMenu({ { title = "B" } })
 		helpers.assert_true(log.created ~= nil, "and the reload path can bring it back")
+	end)
+
+	-- The setIcon vectors of TrayMenu.spec.js 2.0.0 read what the indicator
+	-- received. The earlier spec's setIcon('active') could not fail: this
+	-- adapter ignored the string, as it ignored { title } (TRAY-04).
+	local function with_errors()
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		package.loaded["core.logger.engine.shim"] = logger
+		local tray, log = with_indicator(true)
+		return tray, log, errors
+	end
+
+	helpers.it("set_icon_draws_the_image", function()
+		local tray, log = with_errors()
+		local logo = helpers.load_module("core.fs.engine.paths").shared("tray/data/ergopti_tray.png")
+		helpers.assert_eq(tray.setIcon({ image = logo }), true, "set_icon_draws_the_image: an existing file is drawn")
+		helpers.assert_eq(log.icons[#log.icons], logo, "set_icon_draws_the_image: the indicator draws that file")
+	end)
+
+	helpers.it("set_icon_refuses_a_missing_file", function()
+		local tray, log, errors = with_errors()
+		tray.start()
+		local base = os.tmpname()
+		os.remove(base)
+		local missing = base .. "-tray-04-missing.png"
+		helpers.assert_eq(tray.setIcon({ image = missing }), false,
+			"set_icon_refuses_a_missing_file: a missing file is refused")
+		helpers.assert_eq(#log.icons, 0, "set_icon_refuses_a_missing_file: nothing else is drawn in its place")
+		helpers.assert_eq(#errors, 1, "set_icon_refuses_a_missing_file: the refusal is logged")
+		helpers.assert_contains(errors[1], missing)
+	end)
+
+	helpers.it("set_icon_refuses_a_state_name", function()
+		local tray, log, errors = with_errors()
+		tray.start()
+		helpers.assert_eq(tray.setIcon("active"), false, "set_icon_refuses_a_state_name: the old state string")
+		helpers.assert_eq(tray.setIcon({ title = "Ergopti" }), false, "a map without an image is refused too")
+		helpers.assert_eq(#log.icons, 0)
+		helpers.assert_eq(#errors, 2)
+	end)
+
+	helpers.it("destroy_then_set_icon_is_safe", function()
+		local tray, log = with_errors()
+		tray.start()
+		tray.destroy()
+		local logo = helpers.load_module("core.fs.engine.paths").shared("tray/data/ergopti_tray.png")
+		helpers.assert_eq(tray.setIcon({ image = logo }), true, "destroy_then_set_icon_is_safe: the icon comes back")
+		helpers.assert_eq(log.icons[#log.icons], logo)
+	end)
+
+	helpers.it("start brings the icon up with the state's logo", function()
+		local tray, log = with_indicator(true)
+		helpers.assert_eq(tray.start(), true)
+		helpers.assert_contains(log.created.icon, "ergopti_tray.png")
+		helpers.assert_eq(with_indicator(false).start(), false, "no backend, no icon, and the daemon is told")
 	end)
 
 	helpers.it("pumps without blocking", function()
@@ -192,6 +324,55 @@ end)
 -- =================================================================
 -- =================================================================
 
+helpers.describe("tray_menu: the icon is named for screen readers (a11y-tray-description)", function()
+
+	--- Installs a locale catalogue double and loads the adapter over it.
+	--- @param strings table|nil Translations by key; nil while none is loaded.
+	--- @return table adapter, table log, table strings
+	local function with_catalogue(strings)
+		package.loaded["core.i18n.engine.i18n"] = {
+			has = function(key) return strings ~= nil and strings[key] ~= nil end,
+			get = function(key)
+				if strings == nil or strings[key] == nil then error("get() of a missing key answers the key itself") end
+				return strings[key]
+			end,
+		}
+		local tray, log = with_indicator(true)
+		return tray, log, strings
+	end
+
+	helpers.it("names the icon at creation and says the paused state in words", function()
+		local tray, log = with_catalogue({
+			["accessibility.tray_tip"] = "Ergopti+",
+			["accessibility.tray_tip_paused"] = "Ergopti+ (en pause)",
+		})
+		tray.setMenu({})
+		helpers.assert_eq(log.created.description, "Ergopti+",
+			"an empty description leaves Orca with a file name or nothing")
+		tray.setPaused(true)
+		helpers.assert_eq(log.descriptions[#log.icons], "Ergopti+ (en pause)",
+			"the greyed logo is the only other sign of a pause, and a screen reader cannot see it")
+		tray.setPaused(false)
+		helpers.assert_eq(log.descriptions[#log.icons], "Ergopti+")
+	end)
+
+	helpers.it("relabels after the catalogue loads or changes, once", function()
+		local strings = {}
+		local tray, log = with_catalogue(strings)
+		tray.setMenu({})
+		helpers.assert_eq(log.created.description, "", "never the key itself before the catalogue loads")
+		strings["accessibility.tray_tip"] = "Ergopti+"
+		strings["accessibility.tray_tip_paused"] = "Ergopti+ (paused)"
+		tray.setMenu({})
+		helpers.assert_eq(#log.icons, 1, "the menu build after the catalogue loads names the icon")
+		helpers.assert_eq(log.descriptions[1], "Ergopti+")
+		tray.setMenu({})
+		helpers.assert_eq(#log.icons, 1, "an unchanged description is not re-sent over D-Bus")
+	end)
+
+end)
+
+
 helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 
 	helpers.it("shows the bundled logo from the shared tree", function()
@@ -250,6 +431,69 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 		helpers.assert_true(ok, tostring(icon))
 		helpers.assert_eq(icon, Paths.shared("tray/data/ergopti_tray.png"),
 			"the icon is the shared root's own path to the logo")
+	end)
+
+end)
+
+
+helpers.describe("tray_menu: a missing logo file is said, not swapped (tray-05)", function()
+
+	helpers.it("a missing paused logo never resolves to the running one", function()
+		local luv = require("luv")
+		local root = os.tmpname()
+		os.remove(root)
+		assert(luv.fs_mkdir(root, 448))
+		assert(luv.fs_mkdir(root .. "/tray", 448))
+		assert(luv.fs_mkdir(root .. "/tray/data", 448))
+		local running = root .. "/tray/data/ergopti_tray.png"
+		local handle = assert(io.open(running, "wb"))
+		handle:write("\137PNG\r\n\26\n")
+		handle:close()
+		local Protocol = helpers.load_module("tray.protocol")
+		local paused_icon, paused_missing = Protocol.resolve_tray_icon(root, true)
+		local running_icon, running_missing = Protocol.resolve_tray_icon(root, false)
+		os.remove(running)
+		luv.fs_rmdir(root .. "/tray/data")
+		luv.fs_rmdir(root .. "/tray")
+		luv.fs_rmdir(root)
+		helpers.assert_eq(paused_icon, "", "a paused daemon drawn with the running logo looks running")
+		helpers.assert_eq(paused_missing, root .. "/tray/data/ergopti_tray_paused.png",
+			"the missing file is named for the log")
+		helpers.assert_eq(running_icon, running)
+		helpers.assert_eq(running_missing, nil)
+	end)
+
+	helpers.it("draws the warning sign, logs the file once and says so", function()
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		package.loaded["core.logger.engine.shim"] = logger
+		local missing = "/usr/lib/ergopti/_shared/tray/data/ergopti_tray_paused.png"
+		package.loaded["tray.protocol"] = {
+			resolve_tray_icon = function(_, paused)
+				if paused then return "", missing end
+				return "/usr/lib/ergopti/_shared/tray/data/ergopti_tray.png", nil
+			end,
+		}
+		package.loaded["core.i18n.engine.i18n"] = {
+			has = function() return true end,
+			get = function(key) return "<" .. key .. ">" end,
+		}
+		local tray, log = with_indicator(true)
+		tray.setMenu({})
+		tray.setPaused(true)
+		helpers.assert_eq(log.icons[#log.icons], "dialog-warning",
+			"the warning sign, not the running logo and not a keyboard glyph")
+		helpers.assert_eq(log.descriptions[#log.icons], "<accessibility.tray_tip_paused_icon_missing>",
+			"a screen reader hears that the paused logo is missing")
+		helpers.assert_eq(#errors, 1, "the missing file is logged")
+		helpers.assert_contains(errors[1], missing)
+		tray.setPaused(false)
+		tray.setPaused(true)
+		helpers.assert_eq(#errors, 1, "once, not at every pause")
+		tray.setPaused(false)
+		helpers.assert_eq(log.descriptions[#log.icons], "<accessibility.tray_tip>",
+			"the running state, whose logo exists, is named as usual")
 	end)
 
 end)

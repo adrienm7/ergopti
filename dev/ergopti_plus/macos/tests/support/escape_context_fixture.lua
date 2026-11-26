@@ -10,22 +10,22 @@ local helpers = require("tests.helpers")
 
 local STUBBED_MODULES = {
 	"core.logger.engine.logger",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"modules.keymap.utils",
+	"hotstrings.engine.expander.utils",
 	"core.text.engine.utils",
-	"modules.llm",
+	"ai.engine",
 	"platform.input.keycodes",
 	"modules.keystats",
 	"core.ui.ui.tooltip",
-	"modules.llm.prediction_engine",
-	"modules.keymap.registry",
-	"modules.hotstrings.hotstrings_config",
-	"modules.keymap.expander",
-	"infra.manifest_reader",
-	"modules.keymap.llm_bridge",
-	"modules.diagnostics.hid_diagnostic_mailbox",
+	"ai.engine.prediction.engine",
+	"hotstrings.engine.expander.registry",
+	"hotstrings.engine.catalogue.config",
+	"hotstrings.engine.expander.expander",
+	"menu.engine.manifest_reader",
+	"ai.engine.bridge",
+	"diagnostics.engine.hid_diagnostic_mailbox",
 }
 
 local function load_fixture(options, lifetime)
@@ -40,7 +40,7 @@ local function load_fixture(options, lifetime)
 	local hides = 0
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
@@ -59,7 +59,7 @@ local function load_fixture(options, lifetime)
 			return {}, true
 		end,
 	}
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		plain_text = function(value) return tostring(value or "") end,
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
@@ -69,7 +69,7 @@ local function load_fixture(options, lifetime)
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
 	}
-	package.loaded["modules.llm"] = {
+	package.loaded["ai.engine"] = {
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
@@ -95,10 +95,11 @@ local function load_fixture(options, lifetime)
 		hide_forced = function() hides = hides + 1; return true end,
 		hide_forced_silent = function() hides = hides + 1; return true end,
 		tint = function() return nil end,
+		glyph = function() return nil, nil end,
 	}
 	package.loaded["core.ui.ui.tooltip"] = tooltip
 
-	package.loaded["modules.llm.prediction_engine"] = setmetatable({
+	package.loaded["ai.engine.prediction.engine"] = setmetatable({
 		init = function() return true end,
 		set_runtime_guard = function() end,
 		reset = function() engine_resets = engine_resets + 1; return true end,
@@ -106,24 +107,24 @@ local function load_fixture(options, lifetime)
 	}, {
 		__index = function() return function() end end,
 	})
-	package.loaded["modules.keymap.registry"] = {
+	package.loaded["hotstrings.engine.expander.registry"] = {
 		mappings_for_tail = function() return nil end,
 		mappings_for_star_tail = function() return nil end,
 	}
-	package.loaded["modules.hotstrings.hotstrings_config"] = {
+	package.loaded["hotstrings.engine.catalogue.config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["modules.keymap.expander"] = {
+	package.loaded["hotstrings.engine.expander.expander"] = {
 		would_fire = function() return nil end,
 		resolve_magic_action = function() return nil end,
 		perform_text_replacement = function() return false end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "*" end,
 	}
 
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = require("modules.keymap.llm_bridge")
+	package.loaded["ai.engine.bridge"] = nil
+	local Bridge = require("ai.engine.bridge")
 	lifetime.bridge = Bridge
 	local state = {
 		buffer = "agé",
@@ -138,7 +139,7 @@ local function load_fixture(options, lifetime)
 		is_repeat_feature_enabled = function() return false end,
 	}
 	-- The bridge owns an AI context independent of the hotstring buffer.
-	require("modules.keymap.llm_context").seed(state, state.buffer, "")
+	require("ai.engine.api.context").seed(state, state.buffer, "")
 	helpers.assert_true(Bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

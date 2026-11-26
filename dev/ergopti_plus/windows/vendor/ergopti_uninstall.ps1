@@ -17,6 +17,11 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Framework assemblies are loaded by strong name: loading them through the
+# type compiler cmdlet counts toward the antivirus surface of the exe
+# (tools/ci/windows-exe-av-surface.json) although nothing is compiled.
+$FormsAssembly = 'System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'
+$VisualBasicAssembly = 'Microsoft.VisualBasic, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a'
 
 function Get-ErgoptiExecutableHash {
 	param([string]$Path)
@@ -202,7 +207,7 @@ try {
 	$oldHandle = $parent.SafeWaitHandle
 	$parent.SafeWaitHandle = [Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$ParentHandle, $true)
 	$oldHandle.Dispose()
-	Add-Type -AssemblyName Microsoft.VisualBasic
+	[void][Reflection.Assembly]::Load($VisualBasicAssembly)
 	$authorize = {
 		[void]$ready.Set()
 		# Parent exit, timeout or a crash without COMMIT never authorizes removal.
@@ -223,7 +228,7 @@ try {
 	[void](Invoke-ErgoptiRemoval $Executable $ExpectedHash $authorize $waitOwner $recycle $unregister)
 } catch {
 	[Console]::Error.WriteLine($_.Exception.Message)
-	Add-Type -AssemblyName System.Windows.Forms
+	[void][Reflection.Assembly]::Load($FormsAssembly)
 	[void][Windows.Forms.MessageBox]::Show($FailureText, $FailureTitle)
 	exit 1
 } finally {

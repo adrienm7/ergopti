@@ -38,7 +38,7 @@ helpers.describe("boot privacy admission", function()
 							end,
 						}))()
 					end
-					helpers.assert_eq(name, "adapters.boot_fatal")
+					helpers.assert_eq(name, "diagnostics.adapters.boot_fatal")
 					if mode == "require_throw" then error("PRIVATE_REPORT_IMPORT_REFUSAL") end
 					return { report = function(...)
 						observed.reports[#observed.reports + 1] = table.pack(...)

@@ -4,7 +4,11 @@
  * The native session retains source ownership and action parameters. This page
  * selects registry positions manually; browser key events are never capture proof.
  */
-const post = makeHostBridge('physical_shortcuts_bridge');
+const bridge = makeHostBridge('physical_shortcuts_bridge');
+// Every message crosses as JSON text, on the three OS: each host decodes it
+// keeping null (the shared lossless decoder, AutoHotkey's JSON_NULL), so an
+// explicit null is never read as an absent field (physical_editor_contract.lua).
+const post = (message) => bridge(JSON.stringify(message));
 let strings = {};
 // The host names each modifier and position from the shared key name table.
 let names = { modifiers: {}, positions: {} };
@@ -15,6 +19,8 @@ let selection = 0;
 let pending = false;
 let writable = true;
 let captureAvailable = false;
+// A native position capture is waiting for its key, which may be Escape.
+let capturing = false;
 const modifierNames = ['ctrl', 'alt', 'shift', 'super'];
 const node = (id) => document.getElementById(id);
 
@@ -47,6 +53,7 @@ function busy(value) {
 }
 
 function changed() {
+	capturing = false;
 	post({ action: 'cancel_position' });
 	selection += 1;
 	token = null;
@@ -71,9 +78,9 @@ function render() {
 	node('entries').replaceChildren();
 	node('empty').hidden = entries.length !== 0 || !writable;
 	for (const record of entries) {
-		const row = document.createElement('div');
+		const row = document.createElement('li');
 		row.className = 'entry';
-		const label = document.createElement('span');
+		const label = document.createElement('p');
 		label.textContent =
 			modifierNames
 				.filter((name) => record.mods[name])
@@ -121,6 +128,13 @@ function init(data) {
 		node(id).textContent = strings[id];
 	}
 	document.title = strings.title;
+	// The strings come in the user's language: the root says which, and its
+	// direction, as for the other windows (WCAG 3.1.1, PCK-22). Every host
+	// seeds it.
+	if (typeof window._i18n_locale === 'string' && window._i18n_locale)
+		window.setPageLocale(window._i18n_locale);
+	else
+		console.error('physical shortcuts: no window._i18n_locale seeded; the page language stays en');
 	node('position').replaceChildren();
 	for (const position of data.positions) {
 		const option = document.createElement('option');
@@ -161,6 +175,7 @@ function selected(data) {
 
 // Only the still-owned native request fills the manual draft; page keys cannot mint it.
 function captured(data) {
+	capturing = false;
 	if (data.request_id !== selection || node('editor').hidden || !writable) return;
 	node('position').value = data.code;
 	for (const name of modifierNames) node('mod-' + name).checked = data.mods[name] === true;
@@ -190,7 +205,15 @@ function result(data) {
 	status('saved');
 }
 
+// Drops the open draft, as its Cancel button does.
+function cancelDraft() {
+	changed();
+	node('editor').hidden = true;
+	busy(false);
+}
+
 function refused(reason) {
+	capturing = false;
 	busy(false);
 	status(reason || 'save_failed');
 }
@@ -202,13 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (node('editor').hidden) edit(null);
 		else changed();
 		post({ action: 'capture_position', request: { request_id: selection } });
+		capturing = true;
 	});
 	node('position').addEventListener('change', changed);
-	node('cancel').addEventListener('click', () => {
-		changed();
-		node('editor').hidden = true;
-		busy(false);
-	});
+	node('cancel').addEventListener('click', cancelDraft);
 	node('choose').addEventListener('click', () => {
 		if (pending || !writable) return;
 		if (!node('position').value || node('position').selectedOptions[0]?.disabled) {
@@ -236,4 +256,16 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 	node('close').addEventListener('click', () => post({ action: 'close' }));
 	post({ action: 'ready' });
+});
+
+// Escape cancels an open draft, as its Cancel button does, else closes the
+// window: the page holds the keyboard, so no host window sees the key
+// (PCK-19). A position capture in progress owns the keyboard, Escape included,
+// and an IME composition keeps its own Escape.
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
+	if (event.defaultPrevented || capturing) return;
+	event.preventDefault();
+	if (node('editor').hidden) post({ action: 'close' });
+	else cancelDraft();
 });

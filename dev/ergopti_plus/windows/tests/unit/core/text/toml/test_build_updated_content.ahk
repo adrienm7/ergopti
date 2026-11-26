@@ -17,7 +17,7 @@
 #Include ../../../../test_stubs.ahk
 #Include ../../../../../core/fs/adapters/file_system.ahk
 #Include ../../../../../_generated/app_dirs.ahk
-#Include ../../../../../infra/app_folders.ahk
+#Include ../../../../../apps/engine/folders.ahk
 #Include ../../../../../core/text/engine/toml/helpers.ahk
 
 

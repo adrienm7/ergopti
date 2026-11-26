@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.fs.adapters.storage",
-	"infra.preferences",
-	"infra.config_paths",
+	"settings.engine.preferences.preferences",
+	"settings.engine.paths",
 	"platform.input.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
-	"modules.gestures.actions",
+	"menu.engine.manifest_reader",
+	"gestures.engine.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
 
@@ -89,14 +89,14 @@ local function with_subject(initial_action, scenario)
 	}
 	package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
 	-- Neutral manifest defaults acquire no extra native handles in this fixture.
-	package.loaded["infra.manifest_reader"] = nil
+	package.loaded["menu.engine.manifest_reader"] = nil
 	local logger = helpers.make_logger_stub()
 	logger.callback = function(_, _, fn, ...)
 		local ok, result = xpcall(fn, debug.traceback, ...)
 		return ok, result
 	end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		-- The transaction under test is independent of which ids exist; the
 		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).
 		is_assignable = function(action_id) return type(action_id) == "string" end,

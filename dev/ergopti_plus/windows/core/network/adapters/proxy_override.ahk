@@ -34,7 +34,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include %A_LineFile%\..\..\..\..\modules\llm\api_token_crypto.ahk
+#Include %A_LineFile%\..\..\..\..\ai\engine\api\token_crypto.ahk
 
 ; The variable the route owner reads, as on macOS (network_env.lua)
 global PROXY_OVERRIDE_ENVIRONMENT := "ERGOPTI_PROXY_OVERRIDE"

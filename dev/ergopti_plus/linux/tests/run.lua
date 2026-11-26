@@ -241,6 +241,12 @@ end
 local notices_escaped = require("tests.support.notify_send_guard").report(function(line)
 	io.stderr:write("tests/run.lua: " .. line)
 end)
+-- No test reached a real dialog either: the guard makes the host record the
+-- request and exit without a window (tests/support/dialog_host_guard.lua). A
+-- dialog that reached it means a fixture left the dialog host unstubbed.
+local dialogs_escaped = require("tests.support.dialog_host_guard").report(function(line)
+	io.stderr:write("tests/run.lua: " .. line)
+end)
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
@@ -252,7 +258,7 @@ if r.failed > 0 then
 	end
 	os.exit(1)
 end
-if notices_escaped then os.exit(1) end
+if notices_escaped or dialogs_escaped then os.exit(1) end
 if helpers.timing_failed() then
 	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)

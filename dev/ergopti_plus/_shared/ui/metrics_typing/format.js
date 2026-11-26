@@ -9,8 +9,9 @@
  * DOM writes — all functions return HTML strings or plain values.
  *
  * FEATURES & RATIONALE:
- * 1. Universal Number Formatting: Space-separated thousands, M/Md abbreviation,
- *    hover tooltip showing exact value for abbreviated numbers.
+ * 1. Universal Number Formatting: the interface language's grouping and
+ *    decimal mark, a compact form from a million on, and a hover tooltip
+ *    showing the exact value of a grouped or abbreviated number.
  * 2. Modifier Colors: Each modifier key (Cmd/Ctrl/Option/Shift/Fn) gets a
  *    distinct color to aid at-a-glance pattern recognition.
  * 3. Control Key Red Styling: Escape, arrows, Backspace, Fn keys are rendered
@@ -59,7 +60,32 @@ var escape_html = escapeHtml;
 // ======================================
 
 /**
- * Formats a number with French locale conventions (plain text, no HTML).
+ * The page's own locale for numbers: the interface language the host seeded
+ * (window._i18n_locale), the one the dates already follow. Every number was
+ * formatted in French (thin-space thousands, decimal comma, « Md ») whatever
+ * the interface language (MET-07).
+ * @returns {string|undefined} A BCP 47 tag, or undefined before any seed.
+ */
+function number_locale() {
+	return typeof window !== 'undefined' && window._i18n_locale ? window._i18n_locale : undefined;
+}
+
+/**
+ * Formats a value in the interface language: exact below a million, compact
+ * (one decimal, « 1.2M », « 1,2 M », « 1,2 Md »…) from a million on.
+ * @param {number} value - A finite number.
+ * @returns {{text: string, abbreviated: boolean}}
+ */
+function format_number_parts(value) {
+	const abbreviated = Math.abs(value) >= 1_000_000;
+	const options = abbreviated
+		? { notation: 'compact', maximumFractionDigits: 1 }
+		: { maximumFractionDigits: 20 };
+	return { text: new Intl.NumberFormat(number_locale(), options).format(value), abbreviated };
+}
+
+/**
+ * Formats a number in the interface language (plain text, no HTML).
  * Identical logic to format_number() but returns a plain string safe for use
  * in Chart.js tooltip callbacks, which render text verbatim and must not
  * receive HTML tags.
@@ -69,73 +95,36 @@ var escape_html = escapeHtml;
 function format_number_plain(num) {
 	if (num === null || num === undefined || isNaN(num)) return '0';
 	const parsed = typeof num === 'string' ? parseFloat(num) : num;
-	const is_neg = parsed < 0;
-	const abs_val = Math.abs(parsed);
-	const prefix = is_neg ? '-' : '';
-
-	if (abs_val >= 1_000_000_000) {
-		return (
-			prefix + (abs_val / 1_000_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0Md'
-		);
-	}
-	if (abs_val >= 1_000_000) {
-		return (
-			prefix + (abs_val / 1_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0M'
-		);
-	}
-
-	const str = abs_val.toString();
-	const parts = str.split('.');
-	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-	return prefix + parts.join(',');
+	return format_number_parts(parsed).text;
 }
 
 /**
  * Wraps an abbreviated display value in a tooltip showing the exact number.
- * @param {string} display - The abbreviated text (e.g. "1,2 M").
+ * @param {string} display - The abbreviated text (e.g. "1.2M").
  * @param {number} exact   - The exact numeric value.
  * @returns {string} HTML span with tooltip.
  */
 function wrap_exact_tooltip(display, exact) {
-	// Use toLocaleString with 'fr-FR' for native French number formatting in the tooltip
-	const exact_str = Number(exact).toLocaleString('fr-FR', { maximumFractionDigits: 20 });
-	return `<span class="num-tooltip" title="${exact_str}">${display}</span>`;
+	const exact_str = new Intl.NumberFormat(number_locale(), { maximumFractionDigits: 20 }).format(
+		Number(exact)
+	);
+	return `<data class="num-tooltip" value="${Number(exact)}" title="${exact_str}">${display}</data>`;
 }
 
 /**
- * Formats a number with French locale conventions: space-separated thousands,
- * comma decimal point, M/Md abbreviation for large values, exact-value tooltip.
+ * Formats a number in the interface language: its thousands separator and
+ * decimal mark, a compact form from a million on, and the exact value in a
+ * tooltip whenever the display is grouped or abbreviated.
  * @param {number|string} num - The number to format.
  * @returns {string} HTML string with formatted number (may contain a tooltip span).
  */
 function format_number(num) {
 	if (num === null || num === undefined || isNaN(num)) return '0';
 	const parsed = typeof num === 'string' ? parseFloat(num) : num;
-	const is_neg = parsed < 0;
-	const abs_val = Math.abs(parsed);
-	const prefix = is_neg ? '-' : '';
-
-	if (abs_val >= 1_000_000_000) {
-		const abbr =
-			(abs_val / 1_000_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0Md';
-		return wrap_exact_tooltip(prefix + abbr, parsed);
-	}
-	if (abs_val >= 1_000_000) {
-		const abbr = (abs_val / 1_000_000).toFixed(1).replace('.0', '').replace('.', ',') + '\u00A0M';
-		return wrap_exact_tooltip(prefix + abbr, parsed);
-	}
-
-	// Apply space as thousands separator
-	const str = abs_val.toString();
-	const parts = str.split('.');
-	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-	const formatted = parts.join(',');
-
-	// Tooltip only when a thousands separator was actually inserted
-	if (abs_val >= 1000) {
-		return wrap_exact_tooltip(prefix + formatted, parsed);
-	}
-	return prefix + formatted;
+	const { text } = format_number_parts(parsed);
+	// Tooltip only when the display groups or abbreviates the digits
+	if (Math.abs(parsed) >= 1000) return wrap_exact_tooltip(text, parsed);
+	return text;
 }
 
 /**
@@ -183,13 +172,16 @@ function format_display_key(str) {
 	s = s.replace(/\n/g, '[[NEWLINE]]');
 	s = s.replace(/\[BS\]/gi, '[[BACKSPACE]]');
 
-	s = s.replace(/\[\[SPACE\]\]/g, '<span class="shortcut-chip shortcut-key-control">Space</span>');
-	s = s.replace(/\[\[NBSP\]\]/g, '<span class="key-control space-badge">NBSP</span>');
-	s = s.replace(/\[\[NNBSP\]\]/g, '<span class="key-control space-badge">NNBSP</span>');
-	s = s.replace(/\[\[NEWLINE\]\]/g, '<span style="color:var(--text-muted);">&#x21B5;</span>');
+	s = s.replace(/\[\[SPACE\]\]/g, '<kbd class="shortcut-chip shortcut-key-control">Space</kbd>');
+	s = s.replace(/\[\[NBSP\]\]/g, '<kbd class="key-control space-badge">NBSP</kbd>');
+	s = s.replace(/\[\[NNBSP\]\]/g, '<kbd class="key-control space-badge">NNBSP</kbd>');
+	s = s.replace(
+		/\[\[NEWLINE\]\]/g,
+		'<kbd class="key-newline" style="color:var(--text-muted);">&#x21B5;</kbd>'
+	);
 	s = s.replace(
 		/\[\[BACKSPACE\]\]/g,
-		'<span class="shortcut-chip shortcut-key-control">BackSpace</span>'
+		'<kbd class="shortcut-chip shortcut-key-control">BackSpace</kbd>'
 	);
 	return s;
 }
@@ -209,14 +201,13 @@ function format_seq_chips(str) {
 			if (is_key_marker(token)) {
 				const lower = token.toLowerCase();
 				const sym = CONTROL_KEY_SYMBOLS[lower] ?? lower.toUpperCase();
-				return `<span class="shortcut-chip shortcut-key-control">${escape_html(sym)}</span>`;
+				return `<kbd class="shortcut-chip shortcut-key-control">${escape_html(sym)}</kbd>`;
 			}
-			if (token === '\u00A0') return `<span class="shortcut-chip shortcut-key-control">NBSP</span>`;
-			if (token === '\u202F')
-				return `<span class="shortcut-chip shortcut-key-control">NNBSP</span>`;
-			if (token === ' ') return `<span class="shortcut-chip shortcut-key-control">Space</span>`;
-			if (token === '\n') return `<span class="mono-space seq-space">&#x21B5;</span>`;
-			return `<span class="mono-space">${escape_html(token)}</span>`;
+			if (token === '\u00A0') return `<kbd class="shortcut-chip shortcut-key-control">NBSP</kbd>`;
+			if (token === '\u202F') return `<kbd class="shortcut-chip shortcut-key-control">NNBSP</kbd>`;
+			if (token === ' ') return `<kbd class="shortcut-chip shortcut-key-control">Space</kbd>`;
+			if (token === '\n') return `<kbd class="mono-space seq-space">&#x21B5;</kbd>`;
+			return `<kbd class="mono-space">${escape_html(token)}</kbd>`;
 		})
 		.join('');
 }
@@ -300,7 +291,7 @@ function format_shortcut_key(str) {
 			}
 
 			const plus = idx < parts.length - 1 ? '<span class="shortcut-plus">+</span>' : '';
-			return `<span class="${cls}">${escape_html(label)}</span>${plus}`;
+			return `<kbd class="${cls}">${escape_html(label)}</kbd>${plus}`;
 		})
 		.join('');
 }
@@ -318,12 +309,24 @@ function format_shortcut_key(str) {
  * @returns {string} SVG HTML string.
  */
 function get_trend_svg(valid_points) {
-	const stable_svg =
-		'<svg class="trend-svg stable" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
-	const up_svg =
-		'<svg class="trend-svg up"     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
-	const down_svg =
-		'<svg class="trend-svg down"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline></svg>';
+	// The arrow is an image named by its direction: its shape alone told it.
+	const arrow = (direction, name, shape) =>
+		`<svg class="trend-svg ${direction}" role="img" aria-label="${escape_html(name)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${shape}</svg>`;
+	const stable_svg = arrow(
+		'stable',
+		_t('ui_typing.trend_stable'),
+		'<line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline>'
+	);
+	const up_svg = arrow(
+		'up',
+		_t('ui_typing.trend_up'),
+		'<line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline>'
+	);
+	const down_svg = arrow(
+		'down',
+		_t('ui_typing.trend_down'),
+		'<line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline>'
+	);
 
 	if (!valid_points || valid_points.length < 2) return stable_svg;
 

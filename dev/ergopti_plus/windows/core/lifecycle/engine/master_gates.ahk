@@ -20,6 +20,10 @@
 ;    configuration. The menu greys their rows with that reason.
 ; 4. Geometry hotstrings remain an explicit user choice on every layout.
 ;    Selecting a registry layout never changes their enabled state.
+; 5. The layout selection is the only gate of the layer switches (maintainer
+;    decision of 2026-11-23): with « None » selected the base and AltGr
+;    layers are turned off here, never in the saved configuration, so their
+;    on-by-default switches do nothing until a layout is selected.
 ; ============================================================================== 
 
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
@@ -129,6 +133,9 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Layout master: a disabled category has already turned the selection off.
 		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
+		; « None » selected: the layer switches select no layout.
+		_MG_GateLayersOnSelection(FeaturesTarget)
+
 		; Shortcuts master. The key combinations are not among its switches: their
 		; slots hold actions, read from config.toml by infra/key_combinations.ahk,
 		; and only their own gate (KeyCombinations) governs them, as on macOS.
@@ -226,6 +233,26 @@ LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
 		return (Selected != "") ? Reason : ""
 }
 
+; Turns the base and AltGr layer switches off in ``FeaturesTarget`` while no
+; layout is selected there (ErgoptiLayout_LayoutIsSelected).
+; @param {Map} FeaturesTarget - The Features Map to update.
+; @returns {Integer} Number of layer switches turned off.
+_MG_GateLayersOnSelection(FeaturesTarget) {
+		if !FeaturesTarget.Has("layout") || !(FeaturesTarget["layout"] is Map)
+				return 0
+		if ErgoptiLayout_LayoutIsSelected(FeaturesTarget)
+				return 0
+		Layout := FeaturesTarget["layout"]
+		Count := 0
+		for Id in [ConfigLeaf.ERGOPTI_BASE, ConfigLeaf.ERGOPTI_ALT_GR] {
+				if Layout.Has(Id) && Layout[Id] {
+						Layout[Id] := false
+						Count += 1
+				}
+		}
+		return Count
+}
+
 ; Turns the superseded features off in ``FeaturesTarget`` when a registry layout
 ; is selected there (a non-empty ``emulated_layout`` string).
 ; @param {Map} FeaturesTarget - The Features Map to update.
@@ -306,7 +333,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
 		; reverted: it defeats the fail-fast contract that an invalid canonical
 		; manifest must throw on EVERY call, which
-		; tests/unit/infra/config/persistence/test_master_gates.ahk pins. The re-read was only harmful because
+		; tests/unit/settings/engine/persistence/test_master_gates.ahk pins. The re-read was only harmful because
 		; ToggleCategoryAllFeatures ran this under Critical; that Critical span was
 		; removed (F-01), so a few ms of FileRead + JsonParse per live category toggle
 		; no longer sits on the keyboard-hook starvation path and is not worth trading

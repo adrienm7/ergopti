@@ -393,14 +393,6 @@ default_key_ahk = ""
 default_key_hs = "cmd+shift+v"
 platforms = ["hs"]
 
-[[shortcuts]]
-id = "cmd_star"
-label_key = "shortcuts.label_cmd_star"
-description_key = "shortcuts.label_cmd_star"
-default_key_ahk = ""
-default_key_hs = "cmd+*"
-platforms = ["hs"]
-
 
 
 

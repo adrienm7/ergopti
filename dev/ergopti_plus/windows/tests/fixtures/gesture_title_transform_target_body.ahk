@@ -12,7 +12,7 @@ global SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[3]), _SendHook := 0
 global Features := Map("shortcuts", Map(ConfigLeaf.WRAP_TEXT_IF_SELECTED, true)), _WS_Disabled := Map()
 global UIA_SELECTION_MAX_AGE_MS := Integer(A_Args[4]), _UIA_SelectionCache := 0
 global _WRF := {Mode: A_Args[2], A: 0, B: 0, EditA: 0, EditB: 0, Armed: false, RenderCalls: 0,
-	Mutated: false, OwnSequence: 0, OwnToken: 0, RestoreCallback: 0, RestoreFired: false, Sends: [], Fallbacks: [], Rings: [], ManagerPublications: 0, CopyCalls: 0, Transforming: false, TransformDone: false, TransformElapsed: -1, TransformCritical: -1, MoveCalls: 0, MovedInsideTransform: false, Initial: "", Seed: "owned renderer seed", Payload: "[alpha]", Failure: 0}
+	Mutated: false, OwnSequence: 0, OwnToken: 0, RestoreCallback: 0, RestoreFired: false, Sends: [], Fallbacks: [], Rings: [], ManagerPublications: 0, CopyCalls: 0, Transforming: false, TransformDone: false, TransformElapsed: -1, BuildElapsed: -1, TransformCritical: -1, MoveCalls: 0, MovedInsideTransform: false, Initial: "", Seed: "owned renderer seed", Payload: "[alpha]", Failure: 0}
 LoggerWarn(*) => 0
 LoggerError(*) => 0
 LoggerDebug(*) => 0
@@ -150,11 +150,13 @@ _WRF_Main() {
 	try {
 		; A larger valid selection measures the real transform's scheduling
 		; behavior. No extra wait or artificial callout enters its production loop.
-		_WRF.Payload := ""
-		loop 30000 {
-			_WRF.Initial .= "alpha beta "
-			_WRF.Payload .= "Alpha Beta "
-		}
+		; Built in one pass: appending to an object property copies the whole
+		; string at each step, and 30000 appends to two such strings took most
+		; of the parent's budget (gesture-title-build-quadratic).
+		BuildStarted := A_TickCount
+		_WRF.Initial := StrReplace(Format("{:30000}", ""), " ", "alpha beta ")
+		_WRF.Payload := StrReplace(Format("{:30000}", ""), " ", "Alpha Beta ")
+		_WRF.BuildElapsed := A_TickCount - BuildStarted
 		_WRF.A := Gui(, "Ergopti original selection owner")
 		; AHK applies EM_LIMITTEXT only after CreateWindowEx. Install the long
 		; real selection after creating the control, not as its window caption.
@@ -187,7 +189,7 @@ _WRF_Main() {
 		if IsObject(_WRF.Failure)
 			throw _WRF.Failure
 		FileAppend("OBSERVATION gesture-title-transform-target mode=" . _WRF.Mode . " moved_inside_transform=" . _WRF.MovedInsideTransform . " move_calls=" . _WRF.MoveCalls
-			. " input_units=" . StrLen(_WRF.Initial) . " transform_ms=" . _WRF.TransformElapsed
+			. " input_units=" . StrLen(_WRF.Initial) . " build_ms=" . _WRF.BuildElapsed . " transform_ms=" . _WRF.TransformElapsed
 			. " transform_critical=" . _WRF.TransformCritical . " manager_publications=" . _WRF.ManagerPublications . " copy_calls=" . _WRF.CopyCalls . " sends=" . _WRF.Sends.Length
 			. " wrong_target=" . (_WRF.Sends.Length ? _WRF.Sends[1]["hwnd"] != Before["hwnd"] : false)
 			. " a_wrapped=" . (_WRF.EditA.Value == _WRF.Payload) . " b_wrapped=" . (_WRF.EditB.Value == _WRF.Payload)

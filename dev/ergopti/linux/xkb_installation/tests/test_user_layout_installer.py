@@ -112,6 +112,23 @@ class UserInstallerTests(unittest.TestCase):
             installer.activate("ergol", self.root, {"XDG_SESSION_TYPE": "X11"})
         self.assertEqual(activation.exception.kind, installer.KIND_XORG_SESSION)
 
+    def test_a_compositor_without_a_setting_names_the_session(self) -> None:
+        """wlroots-session-reason: Sway reads its layout from its own file only;
+        the refusal says so (session_unsupported) instead of a generic failure,
+        and the layout stays installed."""
+        self.install("ergol", "French (Ergo-L)")
+        sway = {"XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "sway"}
+        with mock.patch.object(installer, "activate_layout", return_value=False):
+            report = installer.activate("ergol", self.root, sway)
+        self.assertFalse(report["ok"], report)
+        self.assertEqual(report["code"], installer.WAYLAND_SESSION_UNSUPPORTED)
+        self.assertIn("ergol", installer.read_manifest(self.root))
+        # A desktop with a setting that refused keeps the generic failure.
+        gnome = {"XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "GNOME"}
+        with mock.patch.object(installer, "activate_layout", return_value=False):
+            report = installer.activate("ergol", self.root, gnome)
+        self.assertNotIn("code", report)
+
     def test_wayland_and_unknown_sessions_still_install(self) -> None:
         for session in ({"XDG_SESSION_TYPE": "wayland"}, {}):
             self.assertFalse(installer.is_xorg_session(session), session)

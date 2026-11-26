@@ -6,8 +6,9 @@
 --- Reads and writes the [layout] settings of the layout emulation in
 --- config.toml: which layout is emulated (emulated_layout, ergopti_variant,
 --- ergopti_base), its AltGr layer (ergopti_alt_gr) and its four row switches
---- (emulate_<row>). The emulation (modules/keymap/layout_emulation.lua) reads
---- them through the shared resolver; this module writes them for the menu.
+--- (emulate_<row>), and « Touches de jeu » (game_keys, game_keys_apps). The
+--- emulation (modules/keymap/layout_emulation.lua) reads them through the
+--- shared resolvers; this module writes them for the menu.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read on every use, so a hand edit applies the next time the emulation reloads.
@@ -17,13 +18,14 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
-local ConfigPaths = require("infra.config_paths")
+local Manifest = require("menu.engine.manifest_reader")
+local ConfigPaths = require("settings.engine.paths")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Settings = require("layouts.engine.emulation.settings")
+local GameKeys = require("layouts.engine.emulation.game_keys")
 local LOG = "infra.layout_emulation_preferences"
 
 --- Reads config.toml and its exact source.
@@ -36,9 +38,10 @@ function M.snapshot()
 end
 
 --- The emulation settings in force.
+--- @param config table|nil A parsed config.toml already read; read now when nil.
 --- @return table settings layouts/engine/emulation/settings.lua's resolve result.
-function M.settings()
-	return Settings.resolve((M.snapshot()), Manifest.default_for,
+function M.settings(config)
+	return Settings.resolve(config or (M.snapshot()), Manifest.default_for,
 		function(segments, detail) ConfigOutdated.report(segments, detail, Logger) end)
 end
 
@@ -79,15 +82,33 @@ function M.set_switch(path, value)
 end
 
 --- Chooses the emulated layout: "none", a built-in Ergopti variant or a registry id.
+--- The layout chosen leads the recent layouts, written in the same batch.
 --- @param choice string
 --- @return boolean committed
 function M.choose(choice)
-	local values = Settings.choice_values(choice)
+	local values = Settings.choice_values(choice, M.settings().recents)
 	if values == nil then
 		Logger.error(LOG, "Refused emulated layout choice %s.", tostring(choice))
 		return false
 	end
 	return publish(values)
+end
+
+--- The « Touches de jeu » settings in force.
+--- @param config table|nil A parsed config.toml already read; read now when nil.
+--- @return table settings layouts/engine/emulation/game_keys.lua's resolve result.
+function M.game_keys(config)
+	return GameKeys.resolve(config or (M.snapshot()), Manifest.default_for,
+		function(segments, detail) ConfigOutdated.report(segments, detail, Logger) end)
+end
+
+--- Sets the global « Touches de jeu » choice, or an application's own.
+--- @param app string|nil The application's WM class or app_id; nil for the global choice.
+--- @param choice string|nil "physical" or "letters"; nil to follow the global one again.
+--- @return boolean committed
+function M.set_game_keys(app, choice)
+	local values = GameKeys.write_values(M.game_keys(), "linux", app, choice)
+	return values ~= nil and publish(values)
 end
 
 return M

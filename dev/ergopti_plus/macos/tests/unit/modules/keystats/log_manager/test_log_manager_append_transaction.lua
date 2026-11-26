@@ -26,7 +26,7 @@ local MUTATED_PACKAGE_SLOTS = {
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode",
+	"modules.keystats.physical_accounting_mode", "modules.keystats.studio_snapshot",
 	"tests.stubs.hs",
 }
 
@@ -260,6 +260,9 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		ms = function() return 2000 end,
 		count = function() return 65536 end,
 	}
+	-- A fresh cache retires Ergopti Studio's saved read of the previous one at
+	-- init; this non-IO volume has none to remove.
+	package.loaded["modules.keystats.studio_snapshot"] = { retire = function() return true end }
 
 	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 	package.loaded["core.fs.adapters.file_system"] = {

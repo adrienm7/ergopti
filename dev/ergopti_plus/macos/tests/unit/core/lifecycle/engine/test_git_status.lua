@@ -29,8 +29,8 @@ package.loaded["core.fs.adapters.file_system"] = {
 	read   = function(p) return contents[p] end,
 }
 
-package.loaded["infra.git_status"] = nil
-local git_status = require("infra.git_status")
+package.loaded["diagnostics.engine.reports.git_status"] = nil
+local git_status = require("diagnostics.engine.reports.git_status")
 
 local function reset()
 	for k in pairs(existing) do existing[k] = nil end

@@ -1,9 +1,9 @@
 ﻿; tests/fixtures/magic_key_startup_close_body.ahk
 
-; Only the native hook factory/physical-state ports are passive. The private Gui
+; Only the native hook factory is passive. The private Gui
 ; subclass calls genuine Show before sending native WM_CLOSE to its visible HWND.
 ; This is a deterministic lifecycle boundary, not a claim about human timing.
-if A_Args.Length != 7 || !Map("character", true, "source", true).Has(A_Args[1])
+if A_Args.Length != 2 || A_Args[1] != "character"
 	ExitApp(2)
 if !Map("constructor-close", true, "show-close", true).Has(A_Args[2])
 	ExitApp(2)
@@ -11,10 +11,8 @@ if !Map("constructor-close", true, "show-close", true).Has(A_Args[2])
 ; before it can observe the older constructor resuming.
 Persistent(true)
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
-global HOTKEY_MODIFIER_VKS := Map()
-global _MSUC := { Editor: A_Args[1], Mode: A_Args[2], Code: A_Args[3], Scan: A_Args[4],
-	Scans: StrSplit(A_Args[5], ","), Poll: Integer(A_Args[6]), Timeout: Integer(A_Args[7]),
-	Window: 0, Hwnd: 0, Hook: 0, State: 0, Shows: 0, CloseSent: 0, CloseVisible: 0,
+global _MSUC := { Editor: A_Args[1], Mode: A_Args[2],
+	Window: 0, Hwnd: 0, Hook: 0, Shows: 0, CloseSent: 0, CloseVisible: 0,
 	FactoryVisible: false, HiddenActive: false, WaitVisible: false, Calls: 0, Value: "", Errors: 0 }
 OnExit(_MSUC_Exit)
 
@@ -26,6 +24,10 @@ _MSUC_Require(Condition, Message) {
 t(Key) {
 	return Key
 }
+
+; The prompt names the layout's default through the shared display rule.
+global ScriptInformation := Map("MagicKeyDefault", "a")
+MagicKeyShown(Char) => Char
 
 class _MSUC_Gui extends Gui {
 	Show(Options := "") {
@@ -70,10 +72,6 @@ ModifyMagicKey(Window, Value) {
 	_MSUC_Record("character", Value)
 }
 
-ModifyMagicKeySource(Value) {
-	_MSUC_Record("source", Value)
-}
-
 _MSUC_Record(Editor, Value) {
 	global _MSUC
 	_MSUC_Require(Editor == _MSUC.Editor, "The genuine editor must use its own persistence route.")
@@ -81,47 +79,10 @@ _MSUC_Record(Editor, Value) {
 	_MSUC.Value := Value
 }
 
-TimingsGet(Section, Key) {
-	global _MSUC
-	_MSUC_Require(Section == "ui", "Only editor UI timings are bound.")
-	if Key == "magic_key_capture_poll_ms"
-		return _MSUC.Poll
-	_MSUC_Require(Key == "magic_key_capture_timeout_ms", "No other timer is substituted.")
-	return _MSUC.Timeout
-}
-
-TimingsGetSec(Section, Key) {
-	return TimingsGet(Section, Key) / 1000.0
-}
-
-LayoutRegistry_Keycodes() {
-	return "fixture-selected-lookup"
-}
-
-LayoutRegistry_KeyCode(Scan, Keycodes) {
-	global _MSUC
-	_MSUC_Require(Scan == _MSUC.Scan && Keycodes == "fixture-selected-lookup", "The physical answer must retain its admitted scan.")
-	return _MSUC.Code
-}
-
-_MSUC_CreateSourceState() {
-	global _MSUC
-	_MSUC.State := { Scans: _MSUC.Scans.Clone(), IsDown: _MSUC_IsDown, Held: Map(), Scan: "", Refused: false }
-	return _MSUC.State
-}
-
-_MSUC_IsDown(Scan) {
-	global _MSUC
-	return _MSUC.Mode == "constructor-close" && _MSUC.CloseSent == 0 && Scan == _MSUC.Scan
-}
-
 _MSUC_CreateHook(Options, EndKeys := "") {
 	global _MSUC
 	_MSUC_Require(!IsObject(_MSUC.Hook), "The genuine entry point must construct exactly one hook.")
-	if _MSUC.Editor == "character"
-		_MSUC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "The character constructor must remain genuine.")
-	else
-		_MSUC_Require(Options == "L0 I T" . (_MSUC.Timeout / 1000.0) && EndKeys == "", "The source constructor must remain genuine.")
+	_MSUC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "The character constructor must remain genuine.")
 	_MSUC.FactoryVisible := DllCall("User32\IsWindowVisible", "Ptr", _MSUC.Hwnd, "Int") != 0
 	if _MSUC.Mode == "constructor-close" && _MSUC.FactoryVisible {
 		_MSUC_CloseVisible(_MSUC.Window)
@@ -137,9 +98,6 @@ class _MSUC_Hook {
 	__New() {
 		this.Input := "", this.EndKey := "", this.EndReason := "", this.InProgress := false
 		this.Starts := 0, this.Stops := 0, this.Waits := 0
-	}
-	KeyOpt(Keys, Options) {
-		_MSUC_Require(Keys == "{All}" && Options == "NS", "The physical capture must retain suppression and notification.")
 	}
 	Start() {
 		this.Starts += 1
@@ -168,10 +126,8 @@ class _MSUC_Hook {
 		if this.InProgress {
 			if _MSUC.CloseSent
 				this.Stop()
-			else if _MSUC.Editor == "character" {
+			else
 				this.EndKey := "a", this.EndReason := "EndKey", this.InProgress := false
-			} else
-				_MagicKeySourceCapturePoll(_MSUC.State, this)
 		}
 	}
 }
@@ -199,10 +155,7 @@ _MSUC_Exit(*) {
 }
 
 try {
-	if _MSUC.Editor == "character"
-		MagicKeyEditor()
-	else
-		MagicKeySourceCapture()
+	MagicKeyEditor()
 	Hook := _MSUC.Hook
 	_MSUC_Require(IsObject(Hook) && Hook.Starts == 1 && Hook.Waits <= 1 && _MSUC.Shows == 1,
 		"The genuine entry must construct, start and show exactly once without a repeated wait.")
@@ -213,7 +166,7 @@ try {
 	if _MSUC.Mode == "constructor-close" {
 		_MSUC_Require(!_MSUC.FactoryVisible && _MSUC.CloseSent == 0 && Hook.Waits == 1 && _MSUC.WaitVisible,
 			"Cold construction must finish hidden, then expose one valid live dialog without closing an invisible Gui.")
-		_MSUC_Require(_MSUC.Calls == 1 && _MSUC.Value == (_MSUC.Editor == "character" ? "a" : _MSUC.Code),
+		_MSUC_Require(_MSUC.Calls == 1 && _MSUC.Value == "a",
 			"The uninterrupted constructor control must persist its exact answer once after real Show.")
 	} else {
 		_MSUC_Require(_MSUC.CloseSent == 1 && _MSUC.CloseVisible == 1 && !Hook.InProgress && _MSUC.Calls == 0,

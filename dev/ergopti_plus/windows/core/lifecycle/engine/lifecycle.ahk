@@ -313,10 +313,10 @@ _ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
 ; @returns {Map} The successor's "pid" and owned process "handle".
 LifecycleLaunchSuccessor() {
 	LifecycleRetireWorkers()
-	Target := A_IsCompiled
-		? '"' . A_ScriptFullPath . '" /restart'
-		: '"' . A_AhkPath . '" /restart "' . A_ScriptFullPath . '"'
-	return ReloadSuccessorLaunch(Target, A_InitialWorkingDir)
+	; The successor judges the whole reload against its budget at boot completion
+	; (core/timing/engine/reload_timing.ahk).
+	return ReloadTimingLaunchStamped(() => ReloadSuccessorLaunch(ReloadSuccessorCommand(A_IsCompiled,
+		A_AhkPath, A_ScriptFullPath), A_InitialWorkingDir))
 }
 
 ; Stops the detached workers before a successor launches. A worker that re-runs
@@ -483,7 +483,7 @@ ToggleSuspend(*) {
 		; Acquire the completion owner before publishing pending state. A rejected
 		; timer must leave the pause action immediately retryable instead of
 		; stranding a request that has neither completion nor timeout callbacks.
-		SetTimer(_SuspendPendingPoll, 25)
+		SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))
 		_SuspendPendingSince := PendingSince
 		_SuspendPending := true
 		LoggerWarn("Lifecycle", "Suspend deferred until custom-combination prefix keys are released (held: {1}).",
@@ -538,6 +538,9 @@ _LifecycleStopUIAWorkerForSuspend() {
 
 Ergopti_OnSuspendEnter() {
 	global _LifecycleKeepAwakeAtPause
+	; A key the emulation holds for a game gets its up now: a paused driver holds nothing.
+	if IsSet(GameKeys_ReleaseAll)
+		GameKeys_ReleaseAll()
 	; Retire RAM-only note continuations before any suspend step can yield.
 	if IsSet(TakeNoteRevokePending)
 		TakeNoteRevokePending()
@@ -563,6 +566,9 @@ Ergopti_OnSuspendEnter() {
 	}
 	if IsSet(ProgramActions_Stop)
 		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	; A pause stops the running user workflows: none resumes half-way later.
+	if IsSet(WorkflowsAbortAll)
+		_LifecycleRunRequiredStep(Transition, "user-workflows", WorkflowsAbortAll)
 	if IsSet(UserHotstringsInvalidate)
 		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if IsSet(LLM_AuxInvalidate)
@@ -907,20 +913,14 @@ _SuspendStateWatchdog() {
 				_SuspendRestoreFromMarker()
 		}
 		if (A_IsSuspended == _LastSuspendState) {
-				if !A_IsSuspended {
-						RootService := 0
-						if IsSet(_TrayRootServiceRetained)
-								RootService := _TrayRootServiceRetained
-						_TrayRootServiceRetainedWork(RootService)
-				} else if IsSet(_TrayRootFirstPublicationPending)
-						&& _TrayRootFirstPublicationPending() {
-						; A pause restored after a reload can land while the boot
-						; build of the tray root is staging, which makes that root
-						; stale. It is the one retained root served under a pause:
-						; without it the paused driver keeps the boot menu, without
-						; the row that lifts the pause (first-root-under-pause).
-						_TrayRootServiceRetainedWork(_TrayRootServiceRetained)
-				}
+				; The retained tray root is served paused or not: a root is
+				; rebuilt under the pause too (EDD-1), and a pause restored after
+				; a reload while the boot root was staging must still leave the
+				; paused driver its row that lifts the pause (first-root-under-pause).
+				RootService := 0
+				if IsSet(_TrayRootServiceRetained)
+						RootService := _TrayRootServiceRetained
+				_TrayRootServiceRetainedWork(RootService)
 				return
 		}
 		if _TransitionBusy
@@ -934,6 +934,15 @@ _SuspendStateWatchdog() {
 		} finally {
 				_TransitionBusy := false
 		}
+		; The feature rows stay live under a pause (EDD-1): one root rebuild
+		; once the transition settled lets every submenu show what waits for the
+		; resume, and lifts it again on resume (pause-root-rebuild).
+		if IsSet(TrayMenu_RebuildForPauseState)
+				TrayMenu_RebuildForPauseState()
+		; An AI submenu build held while the transition was in flight is served
+		; now that it settled, the pause included (EDD-1).
+		if IsSet(LLM_Menu_ServiceBuilds)
+				LLM_Menu_ServiceBuilds()
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
 ; after the keystats is started). AHK v2 Reload() and ExitApp() tear the process
@@ -1580,6 +1589,12 @@ Ergopti_OnShutdown(reason, code) {
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()
+		; A keep-awake session still running is the day's awake_ms, as on macOS
+		; and Linux. Its stop credits it before the keystats' terminal drain, and
+		; only here: a refused exit above keeps keep-awake running.
+		try StopActivitySimulation(false)
+		catch as Err
+			try LoggerError("Lifecycle", "Keep-awake shutdown stop failed: {1}.", Err.Message)
 		KeystatsStopped := false
 		try KeystatsStopped := KL_Stop()
 		catch as Err
@@ -1760,7 +1775,8 @@ BuildTrayMenuDeferred() {
 		BuildAccepted := RebuildTrayMenu(0, _TrayRootBuildBoot, false)
 		if !((BuildAccepted is Integer) and BuildAccepted == 1) {
 			; A pause restored while the root was staging is an expected refusal,
-			; not a failure: the watchdog publishes the first root under the pause.
+			; not a failure: the staged root is stale, and the watchdog publishes
+			; the retained one under the pause.
 			if A_IsSuspended {
 				try LoggerInfo("TrayMenu", "Deferred tray-menu build interrupted by the restored pause; the watchdog rebuilds it under the pause.")
 			} else {
@@ -1788,18 +1804,16 @@ UpdateTrayIcon() {
 		; throw on a not-yet-built menu item. The icon swap below still happens.
 		if A_IsSuspended {
 				try A_TrayMenu.Check(MenuSuspend)
-				if FileExist(IconPathDisabled)
-						TraySetIcon(IconPathDisabled, , True)
+				TrayApplyStateIcon(true, IconPathDisabled)
 		}
 		else {
 				try A_TrayMenu.Uncheck(MenuSuspend)
-				if FileExist(IconPath)
-						TraySetIcon(IconPath)
+				TrayApplyStateIcon(false, IconPath)
 		}
-		; Rebuilds are refused while paused, so the live root is what the user
-		; sees: grey every feature submenu on pause and restore them on resume.
-		; The global rows, « Suspendre » included, are not feature rows.
-		TrayMenu_ApplyPauseGreying(A_IsSuspended)
+		; The icon tells the pause to the eye; the tooltip, which a screen
+		; reader reads as the icon's name, tells it in words, and says when
+		; the state's logo file is missing (TRAY-05).
+		TrayPublishStateTip(A_IsSuspended)
 		MenuPopulation_Resume()
 }
 ; The tray menu's own « Recharger » item — the single most obviously

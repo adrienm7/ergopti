@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * A layout's score as each major public layout analyser computes it (KLA and
  * its SteveP fork, KLAnext, a200, carpalx, keygen, genkey, cmini, Oxeylyzer,
- * the Ergo-L analyser and Keyboard Layout Optimizer), beside Ergopti's own
+ * the Ergo-L analyser, Keyboard Layout Optimizer, the Cyanophage optimiser and
+ * keycraft), beside Ergopti's own
  * global score. Each scorer is reimplemented from the analyser's published
  * source or results (formulas only, no code copied); the formula, constants,
  * revision read, licence and fidelity of each are in
@@ -24,6 +25,9 @@
  * 3. Constants come from LAYOUT_ANALYSIS_DATA.analysers
  *    (_shared/layouts/data/analysis/analyser_models.json); an unknown analyser
  *    or keyboard throws.
+ * 4. Fidelity is per corpus a scorer reads: a text's own counts (genkey's and
+ *    Oxeylyzer's skipgrams) or the n-gram tables alone, where the trigrams'
+ *    chain stands for them; each score names the fidelity of its own tables.
  * ==============================================================================
  */
 
@@ -32,6 +36,26 @@
 var LAYOUT_ANALYSER_SCORES = (function () {
 	'use strict';
 
+	// The built-ins as locals. The Node tests run the scorers in a vm context,
+	// where each read of a global goes through the context's interceptor,
+	// about a thousand times slower than a local one; the scorers' loops read
+	// Math, Number and the typed arrays millions of times.
+	const {
+		Array,
+		Boolean,
+		Error,
+		Float64Array,
+		Int32Array,
+		Map,
+		Math,
+		Number,
+		Object,
+		Set,
+		String,
+		Uint8Array,
+		WeakMap
+	} = globalThis;
+
 	// ============================
 	// ======= 1/ Constants =======
 	// ============================
@@ -39,6 +63,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	const FINGERS = ['lp', 'lr', 'lm', 'li', 'lt', 'rt', 'ri', 'rm', 'rr', 'rp'];
 	const LEFT_THUMB = 4;
 	const RIGHT_THUMB = 5;
+	// The levels the other analysers read: base, Shift, AltGr, Shift+AltGr.
+	const FOUR_LEVELS = 4;
 	// Order of the analysers in a result and in the Comparer's columns.
 	const ORDER = [
 		'kla',
@@ -50,6 +76,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		'genkey',
 		'oxeylyzer',
 		'dariogoetz',
+		'cyanophage',
+		'keycraft',
 		'cmini',
 		'ergol'
 	];
@@ -69,7 +97,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * One analyser's entry of the generated data.
 	 * @param {string} id - An analyser id.
 	 * @returns {object} {name, author, url, repository, revision, licence,
-	 *   fidelity, better, unit, digits, model}.
+	 *   fidelity: {text, tables}, better, unit, digits, model}.
 	 * @throws {Error} On an unknown analyser or missing data.
 	 */
 	function entry(id) {
@@ -109,6 +137,23 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
+	 * A prepared table with its line breaks and tabs back in its n-grams, for
+	 * the analysers that read the whole text: ngramsFromText keeps them in its
+	 * break tables. A table without them (a count table) is returned as is.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{uni: Array, bi: Array, tri: Array}} The n-grams.
+	 */
+	function withBreaks(table) {
+		const breaks = table.breaks;
+		if (!breaks) return table;
+		return perCorpus(table, 'with-breaks', () => ({
+			uni: table.uni.concat(breaks.uni),
+			bi: table.bi.concat(breaks.bi),
+			tri: table.tri.concat(breaks.tri)
+		}));
+	}
+
+	/**
 	 * Which key types each character, the way an analyser that knows one key per
 	 * character looks it up: keys in the given order, layers in the given order,
 	 * the first hit wins. Dead keys and multi-character outputs are not seen.
@@ -132,16 +177,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 
 	/**
 	 * The finger of each key on our fingering of a keyboard (the layout's
-	 * standard or angle fingering), for the analysers that read the fingering
+	 * standard or angle fingering, with the optional keys it types on), for the analysers that read the fingering
 	 * from the layout file.
 	 * @returns {{board: object, finger: Map<string, number>}} Board and code → finger.
 	 */
 	function ourFingers(layout, keyboardId, profile) {
-		const E = engine();
-		const board =
-			keyboardId === 'iso' && layout.fingering === 'angle'
-				? E.keyboard('iso_angle', profile)
-				: E.keyboard(keyboardId, profile);
+		// The layout's own board: the angle fingering, its Tab or Enter key.
+		const board = engine().layoutKeyboard(layout, keyboardId, profile);
 		const finger = new Map();
 		board.codes.forEach((code, k) => finger.set(code, board.finger[k]));
 		return { board, finger };
@@ -190,11 +232,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const geometry = model.geometry[form];
 		const codes = Object.keys(geometry);
 		const index = new Map(codes.map((code, k) => [code, k]));
+		// KLAnext's own layout files finger a few keys their way (the Space thumb,
+		// Dvorak's number row), by library layout id.
+		const own = (model.layout_fingering && model.layout_fingering[layout.id]) || {};
 		const finger = codes.map((code) =>
 			fingerFor(
 				ctx,
 				code,
-				fingerIndex((angle && model.angle_fingering[code]) || model.fingering[code])
+				fingerIndex(own[code] || (angle && model.angle_fingering[code]) || model.fingering[code])
 			)
 		);
 		const custom = customModel(ctx);
@@ -248,6 +293,11 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * trigrams), and how often each character starts or ends a run.
 	 */
 	function klaBigrams(table, strokes) {
+		// A table from ngramsFromText brings its line breaks and tabs apart.
+		const breaks = table.breaks;
+		const uni = breaks ? table.uni.concat(breaks.uni) : table.uni;
+		const bi = breaks ? table.bi.concat(breaks.bi) : table.bi;
+		const tri = breaks ? table.tri.concat(breaks.tri) : table.tri;
 		const pairs = [];
 		const into = new Map();
 		const outOf = new Map();
@@ -256,31 +306,36 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			into.set(b, (into.get(b) || 0) + n);
 			outOf.set(a, (outOf.get(a) || 0) + n);
 		};
-		for (const [a, b, n] of table.bi) if (strokes.has(a) && strokes.has(b)) add(a, b, n);
-		for (const [a, x, b, n] of table.tri)
-			if (!strokes.has(x) && strokes.has(a) && strokes.has(b)) add(a, b, n);
+		for (const [x, y, n] of bi) if (strokes.has(x) && strokes.has(y)) add(x, y, n);
+		for (const [x, skipped, y, n] of tri)
+			if (!strokes.has(skipped) && strokes.has(x) && strokes.has(y)) add(x, y, n);
 		let starts = [];
 		let ends = [];
-		for (const [char, n] of table.uni) {
+		for (const [char, n] of uni) {
 			if (!strokes.has(char)) continue;
 			const s = n - (into.get(char) || 0);
 			const e = n - (outOf.get(char) || 0);
 			if (s > 0) starts.push([char, s]);
 			if (e > 0) ends.push([char, e]);
 		}
-		// Tables cut at line breaks (ngramsFromText) hold no "\n": the S runs of
-		// such a text were joined by S − 1 line breaks, which KLA types as Enter.
-		// Each run's end and the next run's start are paired through Enter in
-		// proportion; one run in S keeps its true start and end.
+		// Tables cut at line breaks without their break tables (a count table, a
+		// word list) hold no "\n": the S runs of such a text were joined by S − 1
+		// line breaks, which KLA types as Enter. Each run's end and the next run's
+		// start are paired through Enter in proportion; one run in S keeps its
+		// true start and end.
 		const runs = starts.reduce((sum, [, n]) => sum + n, 0);
-		if (runs > 1 && !table.uni.some(([char]) => char === '\n') && strokes.has('\n')) {
+		let enters = 0;
+		if (runs > 1 && !uni.some(([char]) => char === '\n') && strokes.has('\n')) {
+			enters = runs - 1;
 			const joined = (runs - 1) / runs;
 			for (const [char, n] of ends) add(char, '\n', n * joined);
 			for (const [char, n] of starts) add('\n', char, n * joined);
 			starts = starts.map(([char, n]) => [char, n / runs]);
 			ends = ends.map(([char, n]) => [char, n / runs]);
 		}
-		return { pairs, starts, ends };
+		// Every character of the text, typed or not, Enter and Tab included.
+		const characters = uni.reduce((sum, [, n]) => sum + n, 0) + enters;
+		return { pairs, starts, ends, characters };
 	}
 
 	/**
@@ -295,8 +350,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 * @param {object} bigrams - klaBigrams().
 	 * @param {Function} move - (finger, fromKey, toKey, pressing) → distance.
 	 * @returns {object} {presses, distance[f], usage[f], sameFinger[f],
-	 *   sameFingerNoRepeat[f], sameHand[g], sameHandNoRepeat[g]} with g
-	 *   0 left, 1 right, 2 thumbs.
+	 *   sameFingerNoRepeat[f], sameHand[g], sameHandNoRepeat[g], sameSide[h]}
+	 *   with g 0 left, 1 right, 2 thumbs, and h the hand, its thumb included
+	 *   (repeats counted).
 	 */
 	function klaSimulate(board, strokes, bigrams, move) {
 		const c = {
@@ -306,7 +362,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			sameFinger: new Float64Array(10),
 			sameFingerNoRepeat: new Float64Array(10),
 			sameHand: new Float64Array(3),
-			sameHandNoRepeat: new Float64Array(3)
+			sameHandNoRepeat: new Float64Array(3),
+			sameSide: new Float64Array(2)
 		};
 		const group = (f) => (isThumb(f) ? 2 : handOf(f));
 		const pos = new Int32Array(10);
@@ -343,6 +400,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 						c.sameFinger[f] += n;
 						if (prevKey !== key) c.sameFingerNoRepeat[f] += n;
 					}
+					if (handOf(prevFinger) === handOf(f)) c.sameSide[handOf(f)] += n;
 					const g = group(f);
 					if (group(prevFinger) === g) {
 						c.sameHand[g] += n;
@@ -509,21 +567,16 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	}
 
 	/**
-	 * KLAnext, reconstructed from its published tables: weighted distance (with
-	 * a fixed cost per press), weighted same-finger presses (repeats included)
-	 * and weighted same-hand bigrams, each per character bigram; lower is better.
+	 * KLAnext, reconstructed from its output on texts written to isolate each
+	 * term (docs/design/analyser-scores.md): over the characters of the text
+	 * (Enter, Tab and the characters it cannot type included), the weighted
+	 * distance with a fixed cost per press, the weighted same-finger presses
+	 * (repeats included) and the square of the weighted share of presses on the
+	 * hand of the previous one (thumbs with their hand); lower is better.
 	 */
 	function scoreKlanext(ctx) {
-		const { model, strokes, bigrams, counters: c } = klaRun(ctx, 'klanext', euclid);
+		const { model, bigrams, counters: c } = klaRun(ctx, 'klanext', euclid);
 		const handWeight = [model.hand_weight.left, model.hand_weight.right];
-		let total = 0;
-		let sameHand = 0;
-		for (const [a, b, n] of bigrams.pairs) {
-			total += n;
-			const fa = strokes.get(a).finger;
-			const fb = strokes.get(b).finger;
-			if (handOf(fa) === handOf(fb) && fa !== fb) sameHand += n * handWeight[handOf(fa)];
-		}
 		let distance = 0;
 		let sameFinger = 0;
 		FINGERS.forEach((id, f) => {
@@ -531,11 +584,12 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			distance += w * (c.distance[f] + model.press_overhead_px * c.usage[f]);
 			sameFinger += w * c.sameFinger[f];
 		});
-		const per = (v) => (total > 0 ? v / total : 0);
+		const sameHand = handWeight[0] * c.sameSide[0] + handWeight[1] * c.sameSide[1];
+		const per = (v) => (bigrams.characters > 0 ? v / bigrams.characters : 0);
 		const parts = {
 			distance: model.c_distance * per(distance),
 			same_finger: model.c_same_finger * per(sameFinger),
-			same_hand: model.c_same_hand * per(sameHand)
+			same_hand: model.c_same_hand * per(sameHand) ** 2
 		};
 		return {
 			value: parts.distance + parts.same_finger + parts.same_hand,
@@ -763,56 +817,107 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	// ======= 5/ carpalx ======
 	// =========================
 
+	// Rounds of carpalx's chain through deleted characters: runs of deleted
+	// characters longer than this between two letters are rare (a line of
+	// punctuation), and each round adds one character.
+	const CARPALX_CHAIN_ROUNDS = 12;
+
 	/**
 	 * carpalx's letter triads of a corpus: lower case, a-z only, every other
 	 * character deleted (so triads join across spaces and punctuation, within a
-	 * line), identical triplets dropped. A triad across one deleted run is
-	 * estimated from the trigrams and bigrams (Markov), the rest is exact.
-	 * @returns {Map<string, number>} Triad → count.
+	 * line), identical triplets dropped. Each trigram (a y b) around a letter y
+	 * gives the triads (x y z) of x, the letter before y in its line, and z,
+	 * the letter after: a itself when it is a letter, else the letters reached
+	 * by the trigrams' second-order chain through the deleted characters
+	 * (backward from a y, forward from y b), x and z independent given a y b.
+	 * The chain's bigram counts the runs that end there, so a line's end stops
+	 * it as carpalx's line does. Exact for letters-only text.
+	 * @returns {object} Triads as typed arrays of letter indexes and counts.
 	 */
 	function carpalxTriads(table) {
-		const GAP = '#';
-		const letter = (char) => {
-			const lower = char.toLowerCase();
-			return lower.length === 1 && lower >= 'a' && lower <= 'z' ? lower : GAP;
+		const SEP = '\u0000';
+		const letters = new Map();
+		const letterOf = (char) => {
+			if (!letters.has(char)) {
+				const lower = char.toLowerCase();
+				letters.set(
+					char,
+					lower.length === 1 && lower >= 'a' && lower <= 'z' ? lower.charCodeAt(0) - 97 : -1
+				);
+			}
+			return letters.get(char);
 		};
-		const tri = new Map();
-		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
-		for (const [a, b, c, n] of table.tri) add(tri, letter(a) + letter(b) + letter(c), n);
-		// Over one gap: the letters that follow "y #" and those that precede "# y".
-		const gapNext = new Map();
-		const gapPrev = new Map();
-		const list = (map, key) => {
-			if (!map.has(key)) map.set(key, { total: 0, items: [] });
-			return map.get(key);
+		const bi = new Map();
+		for (const [a, b, n] of table.bi) bi.set(a + SEP + b, n);
+		// States of the chain, keyed by two characters: forward (p, c) with c
+		// deleted, backward (c, y) with c deleted; each with its next characters.
+		const forward = new Map();
+		const backward = new Map();
+		const step = (map, key, char, n, total) => {
+			if (!map.has(key)) map.set(key, []);
+			map.get(key).push([char, n / total]);
 		};
-		for (const [t, n] of tri) {
-			if (t[0] === GAP || t[1] !== GAP || t[2] === GAP) continue;
-			const next = list(gapNext, t[0]);
-			next.total += n;
-			next.items.push([t[2], n]);
-			const prev = list(gapPrev, t[2]);
-			prev.total += n;
-			prev.items.push([t[0], n]);
+		for (const [a, b, c, n] of table.tri) {
+			if (letterOf(b) < 0) step(forward, a + SEP + b, c, n, bi.get(a + SEP + b));
+			if (letterOf(b) < 0) step(backward, b + SEP + c, a, n, bi.get(b + SEP + c));
 		}
-		const triads = new Map();
-		const offer = (key, n) => {
-			if (key[0] === key[1] && key[1] === key[2]) return;
-			add(triads, key, n);
+		// Letter distribution reached from each state, by fixed-point iteration
+		// (each round reaches one more deleted character).
+		const solve = (map, nextKey) => {
+			let reach = new Map();
+			for (let round = 0; round < CARPALX_CHAIN_ROUNDS; round++) {
+				const next = new Map();
+				for (const [key, steps] of map) {
+					const v = new Float64Array(26);
+					for (const [char, p] of steps) {
+						const l = letterOf(char);
+						if (l >= 0) v[l] += p;
+						else {
+							const further = reach.get(nextKey(key, char));
+							if (further) for (let i = 0; i < 26; i++) v[i] += p * further[i];
+						}
+					}
+					next.set(key, v);
+				}
+				reach = next;
+			}
+			return reach;
 		};
-		for (const [t, n] of tri) {
-			if (t[1] === GAP) continue;
-			if (t[0] !== GAP && t[2] !== GAP) offer(t, n);
-			else if (t[0] !== GAP) {
-				// x y #, then z over the gap: n(x y #) · n(y # z) / n(y # ·).
-				const next = gapNext.get(t[1]);
-				if (next) for (const [z, m] of next.items) offer(t[0] + t[1] + z, (n * m) / next.total);
-			} else if (t[2] !== GAP) {
-				// x over the gap, then # y z: n(x # y) / n(· # y) · n(# y z).
-				const prev = gapPrev.get(t[1]);
-				if (prev) for (const [x, m] of prev.items) offer(x + t[1] + t[2], (n * m) / prev.total);
+		const ahead = solve(forward, (key, char) => key.slice(key.indexOf(SEP) + 1) + SEP + char);
+		const behind = solve(backward, (key, char) => char + SEP + key.slice(0, key.indexOf(SEP)));
+		const counts = new Float64Array(26 * 26 * 26);
+		const unit = (l) => {
+			const v = new Float64Array(26);
+			v[l] = 1;
+			return v;
+		};
+		for (const [a, y, b, n] of table.tri) {
+			const ly = letterOf(y);
+			if (ly < 0) continue;
+			const la = letterOf(a);
+			const lb = letterOf(b);
+			const left = la >= 0 ? unit(la) : behind.get(a + SEP + y);
+			const right = lb >= 0 ? unit(lb) : ahead.get(y + SEP + b);
+			if (!left || !right) continue;
+			for (let x = 0; x < 26; x++) {
+				if (left[x] === 0) continue;
+				for (let z = 0; z < 26; z++)
+					if (right[z] !== 0 && !(x === ly && ly === z))
+						counts[(x * 26 + ly) * 26 + z] += n * left[x] * right[z];
 			}
 		}
+		const triads = new Map();
+		counts.forEach((n, k) => {
+			if (n > 0)
+				triads.set(
+					String.fromCharCode(
+						97 + Math.floor(k / 676),
+						97 + (Math.floor(k / 26) % 26),
+						97 + (k % 26)
+					),
+					n
+				);
+		});
 		// As typed arrays of letter indexes, so a layout is scored in one pass.
 		const size = triads.size;
 		const out = {
@@ -921,7 +1026,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				w.finger * model.finger_penalty[key.finger];
 			keys[i] = key;
 		}
-		const threshold = (model.min_triad_count * triads.total) / model.reference_triads;
+		const threshold = model.min_triad_count;
 		const { kb, kp, ks, k1, k2, k3 } = model.k;
 		let kept = 0;
 		let dropped = 0;
@@ -983,7 +1088,14 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const model = entry('keygen').model;
 		const init = new Set(Array.from(model.init_chars));
 		const posOf = new Map(model.pos_to_code.map((code, p) => [code, p]).filter(([c]) => c));
-		const keyOf = keyOfChar(ctx.layout, model.pos_to_code.filter(Boolean), [0, 1]);
+		// keygen fills its character map with the base layer, then the Shift
+		// layer, each in key order: a character on two keys takes the last.
+		const keyOf = new Map();
+		for (const layer of [0, 1])
+			for (const code of model.pos_to_code) {
+				const cell = code && ctx.layout.rows[code] ? ctx.layout.rows[code][layer] : null;
+				if (single(cell)) keyOf.set(cell, { code, layer });
+			}
 		const keys = new Map();
 		const centre = new Set(model.center);
 		for (const [char, { code }] of keyOf) {
@@ -1117,10 +1229,15 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			if (hb === hc) p.same_hand += (0.5 * left[hb] * right[hb]) / n;
 			else p.alternating_hand += (0.5 * left[hc] * right[hb]) / n;
 		}
-		// keygen divides by the file's length, line breaks included: a text cut
-		// into R runs (characters − bigrams) had R − 1 of them.
+		// keygen divides by the file's length, line breaks and tabs included:
+		// counted in the break tables of ngramsFromText (blank lines and
+		// indentation too); a table without them, cut into R runs (characters −
+		// bigrams), had at least R − 1 of them.
+		const breaks = ctx.table.breaks;
 		const runs = ctx.table.totalChars - ctx.table.bi.reduce((sum, entry) => sum + entry[2], 0);
-		const length = ctx.table.totalChars + Math.max(0, runs - 1);
+		const length =
+			ctx.table.totalChars +
+			(breaks ? breaks.uni.reduce((sum, entry) => sum + entry[1], 0) : Math.max(0, runs - 1));
 		const parts = {};
 		let total = 0;
 		for (const [k, v] of Object.entries(p)) {
@@ -1135,6 +1252,112 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	// ========================
 
 	/**
+	 * genkey's corpus, built from a prepared table: its letters, its bigrams
+	 * and its skipgrams. genkey counts a pair of characters g apart (g from 1
+	 * to 9, every character between them kept by its filter) with the weight
+	 * 1/2^(g−1). The tables hold the gap of 1 (the trigrams); the longer gaps
+	 * are carried forward by the trigrams' second-order chain, P(c | a b) =
+	 * trigram(abc) / bigram(ab), whose bigram also counts the runs that end
+	 * after b, so a run's end stops the chain as genkey's reset does. A table
+	 * counted from a text (textTables) brings genkey's exact skipgrams instead.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{uni: Map, bi: Map, skip: Map}} Letter → n, pair → n, pair → weight.
+	 */
+	function genkeyTables(table) {
+		const model = entry('genkey').model;
+		const norm = genkeyNorm(model);
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		const uni = new Map();
+		const bi = new Map();
+		const tri = new Map();
+		for (const [c, n] of table.uni) {
+			const x = norm(c);
+			if (x) add(uni, x, n);
+		}
+		for (const [a, b, n] of table.bi) {
+			const x = norm(a);
+			const y = norm(b);
+			if (x && y) add(bi, x + y, n);
+		}
+		for (const [a, m, b, n] of table.tri) {
+			const x = norm(a);
+			const y = norm(m);
+			const z = norm(b);
+			if (x && y && z) add(tri, x + y + z, n);
+		}
+		// A table counted from a text brings genkey's own skipgrams (textTables).
+		const own = table.analysers && table.analysers.genkey;
+		if (own) return { uni, bi, skip: new Map(Object.entries(own.skipgrams)) };
+		const skip = new Map();
+		const next = new Map();
+		for (const [abc, n] of tri) {
+			add(skip, abc[0] + abc[2], n);
+			const ab = abc.slice(0, 2);
+			if (!next.has(ab)) next.set(ab, []);
+			next.get(ab).push([abc[2], n / bi.get(ab)]);
+		}
+		// chain: (first character, last two) → count, for the current gap.
+		let chain = tri;
+		for (let gap = 2; gap <= model.skipgram_max_gap; gap++) {
+			const weight = model.skipgram_decay ** (gap - 1);
+			const longer = new Map();
+			for (const [key, n] of chain) {
+				const follow = next.get(key.slice(1));
+				if (!follow) continue;
+				for (const [c, p] of follow) add(longer, key[0] + key[2] + c, n * p);
+			}
+			for (const [key, n] of longer) add(skip, key[0] + key[2], weight * n);
+			chain = longer;
+		}
+		return { uni, bi, skip };
+	}
+
+	/** genkey's character filter: lower case, its substitutions, its valid set. */
+	function genkeyNorm(model) {
+		const valid = new Set(Array.from(model.valid_chars));
+		return (char) => {
+			const lower = char.toLowerCase();
+			const sub = model.substitutions[lower] || lower;
+			return valid.has(sub) ? sub : null;
+		};
+	}
+
+	/**
+	 * genkey's skipgrams of a text, as its corpus reader counts them: a pair of
+	 * characters g apart (g from 1 to its largest gap) with the weight
+	 * decay^(g−1), every character between them kept by its filter. A character
+	 * the filter drops, a line break among them, starts a new run.
+	 * @param {string} text - The corpus text.
+	 * @returns {object} pair → weight.
+	 */
+	function genkeyTextSkipgrams(text) {
+		const model = entry('genkey').model;
+		const norm = genkeyNorm(model);
+		const weights = [];
+		for (let gap = 1; gap <= model.skipgram_max_gap; gap++)
+			weights.push(model.skipgram_decay ** (gap - 1));
+		const skip = {};
+		let run = [];
+		for (const char of text) {
+			const x = norm(char);
+			if (x === null) {
+				run = [];
+				continue;
+			}
+			// run[run.length - 1] is the previous character: gap 0, a bigram.
+			for (let gap = 1; gap <= weights.length; gap++) {
+				const i = run.length - 1 - gap;
+				if (i < 0) break;
+				const key = run[i] + x;
+				skip[key] = (skip[key] || 0) + weights[gap - 1];
+			}
+			run.push(x);
+			if (run.length > weights.length + 1) run.shift();
+		}
+		return skip;
+	}
+
+	/**
 	 * genkey's score: weighted finger speed (same-finger bigrams and
 	 * skipgrams times squared distance, over each finger's speed), lateral
 	 * stretch bigrams and index imbalance; lower is better. Corpus filter:
@@ -1142,12 +1365,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 */
 	function scoreGenkey(ctx) {
 		const model = entry('genkey').model;
-		const valid = new Set(Array.from(model.valid_chars));
-		const norm = (char) => {
-			const lower = char.toLowerCase();
-			const sub = model.substitutions[lower] || lower;
-			return valid.has(sub) ? sub : null;
-		};
+		const t = perCorpus(ctx.table, 'genkey:tables', genkeyTables);
 		const angle = ctx.layout.fingering === 'angle' || ctx.keyboard === 'iso_angle';
 		const rows = ctx.keyboard === 'ansi' ? model.rows_ansi : model.rows_iso;
 		const keys = new Map();
@@ -1155,8 +1373,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			codes.forEach((code, col) => {
 				const row = ctx.layout.rows[code];
 				if (!row || typeof row[0] !== 'string' || row[0] === '') return;
-				const char = norm(Array.from(row[0])[0]);
-				if (!char) return;
+				// Its layout reader lower-cases a key and nothing else: a key whose
+				// character the corpus filter substitutes (« " » for « ' ») is never
+				// typed, and must not take the place of the key the corpus reaches.
+				const char = Array.from(row[0])[0].toLowerCase();
 				let finger = model.column_fingers[Math.min(col, model.column_fingers.length - 1)];
 				if (angle && r === 2 && model.angle_fingers[col] !== undefined)
 					finger = model.angle_fingers[col];
@@ -1170,14 +1390,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				keys.set(char, { r, col, finger });
 			})
 		);
-		const letters = new Map();
-		for (const [c, n] of ctx.table.uni) {
-			const x = norm(c);
-			if (x) letters.set(x, (letters.get(x) || 0) + n);
-		}
 		let T = 0;
 		const index = [0, 0];
-		for (const [c, n] of letters) {
+		for (const [c, n] of t.uni) {
 			const k = keys.get(c);
 			if (!k) continue;
 			T += n;
@@ -1193,29 +1408,24 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		let lsb = 0;
 		const lsbPairs = new Set(model.lsb_finger_pairs.map(([a, b]) => `${a}/${b}`));
 		let sfbDistinct = 0;
-		for (const [a, b, n] of ctx.table.bi) {
-			const x = norm(a);
-			const y = norm(b);
-			const ka = x && keys.get(x);
-			const kb = y && keys.get(y);
+		for (const [xy, n] of t.bi) {
+			const ka = keys.get(xy[0]);
+			const kb = keys.get(xy[1]);
 			if (!ka || !kb) continue;
 			if (ka.finger === kb.finger) {
 				speed[ka.finger] += model.sfb * n * dist(ka, kb);
-				if (x !== y) sfbDistinct += n;
+				if (xy[0] !== xy[1]) sfbDistinct += n;
 			} else if (
 				(lsbPairs.has(`${ka.finger}/${kb.finger}`) || lsbPairs.has(`${kb.finger}/${ka.finger}`)) &&
 				Math.abs(ka.col - kb.col) >= model.lsb_min_dx
 			)
 				lsb += n;
 		}
-		for (const [a, m, b, n] of ctx.table.tri) {
-			const x = norm(a);
-			const y = norm(b);
-			if (!x || !y || !norm(m)) continue;
-			const ka = keys.get(x);
-			const kb = keys.get(y);
+		for (const [xy, n] of t.skip) {
+			const ka = keys.get(xy[0]);
+			const kb = keys.get(xy[1]);
 			if (!ka || !kb || ka.finger !== kb.finger) continue;
-			speed[ka.finger] += model.dsfb * model.skipgram_scale * n * dist(ka, kb);
+			speed[ka.finger] += model.dsfb * n * dist(ka, kb);
 		}
 		let fspeed = 0;
 		const parts = {};
@@ -1258,15 +1468,72 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return null;
 	}
 
+	// The chain below stops once a pass moves the held counts by less than this
+	// share of the corpus's characters: below a double's precision on a count.
+	const HELD_SHIFT_PRECISION = 1e-12;
+	// Oxeylyzer's saved counts: the totals around ours over which a count's
+	// truncation loss is averaged. Our token totals came within a few tens of
+	// its own on the texts measured; a wider window changes the mean loss by
+	// less than 1 %.
+	const HELD_TOTAL_WINDOW = 64;
+
 	/**
-	 * Oxeylyzer's token n-grams of a corpus, from the character tables: a
-	 * capital that follows an unshifted character is preceded by a Shift token,
-	 * which no layout of Oxeylyzer's types, so the n-grams across it score
-	 * nothing but still count; skip-2 and skip-3 grams are not in the tables
-	 * and are taken equal to skip-1.
+	 * For Oxeylyzer's cleaner, the share of each bigram (a, b) whose last kept
+	 * character at or before a is shifted, so that a capital at b holds Shift
+	 * and writes no Shift token. Exact when a is kept or one dropped character
+	 * follows a kept one; across longer runs of dropped characters, carried by
+	 * the trigrams' second-order chain, H(a b) = Σw T(w a b) · H(w a) / B(w a),
+	 * iterated to its fixed point (a run of spaces loops on itself).
+	 * @param {{uni: Array, bi: Array, tri: Array}} all - Every n-gram of the text.
+	 * @param {Function} of - Character → its Oxeylyzer token, null if dropped.
+	 * @returns {Function} (a, b) → share from 0 to 1.
+	 */
+	function oxeyHeldShift(all, of) {
+		const count = new Map();
+		let total = 0;
+		for (const [, n] of all.uni) total += n;
+		for (const [a, b, n] of all.bi) count.set(a + b, (count.get(a + b) || 0) + n);
+		const after = all.tri.filter(([, m]) => of(m) === null);
+		let held = new Map();
+		const shareOf = (map, a, b) => {
+			const t = of(a);
+			if (t) return t.shift ? 1 : 0;
+			const c = count.get(a + b);
+			return c ? (map.get(a + b) || 0) / c : 0;
+		};
+		for (;;) {
+			const next = new Map();
+			for (const [w, a, b, n] of after) {
+				const r = shareOf(held, w, a);
+				if (r > 0) next.set(a + b, (next.get(a + b) || 0) + n * r);
+			}
+			let moved = 0;
+			for (const [key, n] of next) moved += Math.abs(n - (held.get(key) || 0));
+			for (const [key, n] of held) if (!next.has(key)) moved += n;
+			held = next;
+			if (moved <= HELD_SHIFT_PRECISION * total) break;
+		}
+		return (a, b) => shareOf(held, a, b);
+	}
+
+	/**
+	 * Oxeylyzer's token n-grams of a corpus, from the character tables. Its
+	 * cleaner writes a Shift token before a capital unless the last character
+	 * it kept was shifted too (a dropped character between them does not
+	 * release Shift); a dropped character is a gap no n-gram spans. No layout
+	 * types the Shift token, so the n-grams through it score nothing but count
+	 * in the totals, and a skipgram can span it (x, Shift, y). The text is read
+	 * whole, line breaks included (they are dropped characters, and Shift is
+	 * held across them). Whether Shift is held across a run of dropped
+	 * characters is exact across one, and carried by the trigrams'
+	 * second-order chain across longer runs (a blank line, an indentation).
+	 * A table counted from a text (textTables) brings its exact bigrams,
+	 * skipgrams of gaps 1 to 3 and totals; without it, skip-2 and skip-3 grams
+	 * are taken equal to skip-1.
 	 */
 	function oxeyTables(table) {
 		const model = entry('oxeylyzer').model;
+		const all = withBreaks(table);
 		const tok = new Map();
 		const of = (char) => {
 			if (!tok.has(char)) tok.set(char, oxeyToken(model, char));
@@ -1280,45 +1547,181 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		let shiftTokens = 0;
 		let bigramTotal = 0;
 		let trigramTotal = 0;
-		for (const [c, n] of table.uni) {
+		for (const [c, n] of all.uni) {
 			const t = of(c);
 			if (!t) continue;
 			chars += n;
 			if (t.shift) shiftTokens += n;
 		}
-		// A shift token is written when a capital follows an unshifted character.
+		const held = oxeyHeldShift(all, of);
+		// Whether t writes a Shift token after the last kept token, prev.
 		const shiftAfter = (prev, t) => t.shift && !(prev && prev.shift);
-		for (const [a, b, n] of table.bi) {
-			const x = of(a);
+		// Bigrams starting with a capital, to split into run starts and the rest.
+		const shiftedFirst = new Map();
+		for (const [a, b, n] of all.bi) {
 			const y = of(b);
+			// A capital after a character that holds Shift writes no Shift token.
+			if (y && y.shift) shiftTokens -= n * held(a, b);
+			const x = of(a);
 			if (!x || !y) continue;
-			if (x.shift && y.shift) shiftTokens -= n;
-			if (shiftAfter(x, y)) bigramTotal += 2 * n;
-			else {
-				bigramTotal += n;
-				add(bigrams, x.token + y.token, n);
-			}
+			bigramTotal += n;
+			if (x.shift) add(shiftedFirst, a + b, n);
+			if (shiftAfter(x, y)) {
+				// x, Shift, y: a token trigram and a skipgram through the Shift token.
+				trigramTotal += n;
+				add(skip, x.token + y.token, n);
+			} else add(bigrams, x.token + y.token, n);
 		}
-		for (const [a, m, c, n] of table.tri) {
+		for (const [a, m, c, n] of all.tri) {
 			const x = of(a);
 			const y = of(m);
 			const z = of(c);
+			// Shift, y, z where y writes the Shift token.
+			if (y && z && y.shift) {
+				trigramTotal += n * (1 - held(a, m));
+				shiftedFirst.set(m + c, shiftedFirst.get(m + c) - n);
+			}
 			if (!x || !z) continue;
 			const breakAtM = y && shiftAfter(x, y);
 			const breakAtZ = shiftAfter(y || x, z);
 			if (!breakAtM && !breakAtZ) add(skip, x.token + z.token, n);
-			if (!y) continue;
+			if (!y || breakAtM) continue;
 			trigramTotal += n;
-			if (!breakAtM && !breakAtZ) add(trigrams, x.token + y.token + z.token, n);
+			if (!breakAtZ) add(trigrams, x.token + y.token + z.token, n);
 		}
+		// A capital starting a run writes its Shift token: Shift, y, z.
+		for (const n of shiftedFirst.values()) trigramTotal += Math.max(0, n);
+		shiftTokens = Math.max(0, shiftTokens);
+		// Oxeylyzer saves each count as a percentage of its table's total and
+		// reads it back truncated to an integer, often one lower: its rare
+		// n-grams may lose one count. Whether a count loses one depends on the
+		// bits of its table's total (from 7 % to 73 % of the n-grams on the
+		// texts measured). A whole total is Oxeylyzer's own (the held-Shift
+		// chain was exact): its round trip is followed. A fractional one is the
+		// chain's estimate: each count loses its mean loss over the totals
+		// within HELD_TOTAL_WINDOW of it.
+		const roundTrip = (n, T) => Math.trunc((n / (T / 100) / 100) * T);
+		const stored = (map, total) => {
+			if (!(total > 0)) return;
+			const whole = Math.round(total);
+			if (Math.abs(total - whole) < HELD_SHIFT_PRECISION * whole) {
+				for (const [key, n] of map) map.set(key, roundTrip(n, whole));
+				return;
+			}
+			const loss = new Map();
+			for (const [key, n] of map) {
+				if (!loss.has(n)) {
+					let lost = 0;
+					for (let T = whole - HELD_TOTAL_WINDOW; T <= whole + HELD_TOTAL_WINDOW; T++)
+						lost += n - roundTrip(n, T);
+					loss.set(n, lost / (2 * HELD_TOTAL_WINDOW + 1));
+				}
+				map.set(key, n - loss.get(n));
+			}
+		};
+		// A table counted from a text brings Oxeylyzer's own token pairs and
+		// totals (textTables): its skipgrams of every gap, each count read back
+		// from its saved share exactly. Its trigrams still come from the chain,
+		// stored on their exact total.
+		const own = table.analysers && table.analysers.oxeylyzer;
+		if (own) {
+			const exact = (counts, total) => {
+				const map = new Map(Object.entries(counts));
+				stored(map, total);
+				return map;
+			};
+			stored(trigrams, own.totals.trigrams);
+			return {
+				bigrams: exact(own.bigrams, own.totals.bigrams),
+				skips: own.skipgrams.map((counts, g) => exact(counts, own.totals.skipgrams[g])),
+				trigrams,
+				chars: own.chars,
+				bigramTotal: own.totals.bigrams,
+				trigramTotal: own.totals.trigrams
+			};
+		}
+		stored(bigrams, bigramTotal + shiftTokens);
+		stored(trigrams, trigramTotal);
 		return {
 			bigrams,
-			skip,
+			// Without a text, skip-1 stands for skip-2 and skip-3.
+			skips: Array.from({ length: OXEY_SKIP_GAPS }, () => skip),
 			trigrams,
-			chars: chars + Math.max(0, shiftTokens),
-			bigramTotal,
+			chars: chars + shiftTokens,
+			// Every Shift token starts a bigram with its capital.
+			bigramTotal: bigramTotal + shiftTokens,
 			trigramTotal
 		};
+	}
+
+	// Oxeylyzer's skipgram gaps (skipgrams, skipgrams2, skipgrams3).
+	const OXEY_SKIP_GAPS = 3;
+	// The Shift token of Oxeylyzer's cleaner, in textTables' token stream; no
+	// layout types it, so the pairs holding it count in the totals only.
+	const OXEY_SHIFT = '\u21d1';
+
+	/**
+	 * Oxeylyzer's token counts of a text, as its cleaner and counter read it
+	 * whole: each character becomes its token, a capital or a Shift form
+	 * writes the Shift token first unless Shift is still held (only a kept
+	 * unshifted character releases it), and a dropped character is a gap no
+	 * n-gram ends on, though a skipgram spans it. Line breaks are read as one
+	 * line feed, as the n-gram tables read them.
+	 * @param {string} text - The corpus text.
+	 * @returns {{chars: number, bigrams: object, skipgrams: object[], totals:
+	 *   {bigrams: number, skipgrams: number[], trigrams: number}}} The token
+	 *   pairs without the Shift token, and every total.
+	 */
+	function oxeyTextTables(text) {
+		const model = entry('oxeylyzer').model;
+		const tokens = [];
+		let held = false;
+		for (const char of text.replace(/\r\n?/g, '\n')) {
+			const t = oxeyToken(model, char);
+			if (!t) tokens.push(null);
+			else if (!t.shift) {
+				held = false;
+				tokens.push(t.token);
+			} else {
+				if (!held) tokens.push(OXEY_SHIFT);
+				held = true;
+				tokens.push(t.token);
+			}
+		}
+		const bigrams = {};
+		const skipgrams = [];
+		const totals = { bigrams: 0, skipgrams: [], trigrams: 0 };
+		for (let g = 0; g < OXEY_SKIP_GAPS; g++) {
+			skipgrams.push({});
+			totals.skipgrams.push(0);
+		}
+		const add = (map, a, b) => {
+			if (a === OXEY_SHIFT || b === OXEY_SHIFT) return;
+			map[a + b] = (map[a + b] || 0) + 1;
+		};
+		let chars = 0;
+		for (let i = 0; i < tokens.length; i++) {
+			const x = tokens[i];
+			if (x === null) continue;
+			chars++;
+			const y = tokens[i + 1];
+			if (y === undefined || y === null) continue;
+			totals.bigrams++;
+			add(bigrams, x, y);
+			if (tokens[i + 2] !== undefined && tokens[i + 2] !== null) totals.trigrams++;
+		}
+		for (let i = 0; i < tokens.length; i++) {
+			const x = tokens[i];
+			if (x === null) continue;
+			for (let g = 1; g <= OXEY_SKIP_GAPS; g++) {
+				const y = tokens[i + g + 1];
+				if (y === undefined) break;
+				if (y === null) continue;
+				totals.skipgrams[g - 1]++;
+				add(skipgrams[g - 1], x, y);
+			}
+		}
+		return { chars, bigrams, skipgrams, totals };
 	}
 
 	/** Oxeylyzer's trigram class of three finger numbers (LP 0 … RP 9). */
@@ -1375,8 +1778,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const w = model.weights;
 		const r = w.sfs / w.sfbs;
 		const mix = (a, b, weight) => {
-			const s = t.skip.get(a + b) || 0;
-			return Math.trunc(((t.bigrams.get(a + b) || 0) + (r + r * r + r * r * r) * s) * weight);
+			let n = t.bigrams.get(a + b) || 0;
+			for (let g = 0; g < t.skips.length; g++) n += r ** (g + 1) * (t.skips[g].get(a + b) || 0);
+			return Math.trunc(n * weight);
 		};
 		const both = (a, b, weight) => mix(a, b, weight) + mix(b, a, weight);
 		const flen = (f) => model.f_len[['p', 'r', 'm', 'i', 't'][orderOf(f)]];
@@ -1722,11 +2126,13 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		}
 		if (!best.has('\n')) best.set('\n', { code: model.enter_key, layer: 0, mods: [] });
 		for (const [char, b] of best) {
+			// A character of a higher layer is pressed as its base-layer key, the
+			// one the tool resolves it to (same index, same base symbol).
 			const key = keyOf(b.code, false);
-			if (layout.rows[b.code] && layout.rows[b.code][b.layer] === char) key.symbol = char;
+			if (b.layer === 0 && layout.rows[b.code] && layout.rows[b.code][0] === char)
+				key.symbol = char;
 			strokes.set(char, {
-				// Same physical key, same pair costs: the cost cache is indexed by key.
-				key: Object.assign({}, key, { symbol: char, id: `${b.code}:${b.layer}` }),
+				key: b.layer === 0 ? Object.assign({}, key, { symbol: char }) : key,
 				mods: b.mods.map((m) => keyOf(m, true))
 			});
 		}
@@ -1779,7 +2185,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const unbalancing = (a, b) =>
 			a.hand === b.hand && !a.thumb && !b.thumb ? Math.abs(a.ux - b.ux) + Math.abs(a.uy - b.uy) : 0;
 		// The three bigram costs of each pair of keys, computed once.
-		const pairs = new Float64Array(size * size * 4).fill(NaN);
+		const pairs = new Float64Array(size * size * 4).fill(Number.NaN);
 		const costs = (a, b) => {
 			const at = (a.index * size + b.index) * 4;
 			if (Number.isNaN(pairs[at])) {
@@ -1807,6 +2213,10 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			oxey_outward_rolls: 0
 		};
 		const found = { uni: 0, bi: 0, tri: 0 };
+		// The tool reads the whole text: Enter is typed, and an n-gram from a line
+		// break to another character is left out (below); the break tables of
+		// ngramsFromText hold those n-grams, a table without them has none.
+		const tables = withBreaks(ctx.table);
 		const all = { uni: 0, bi: 0, tri: 0 };
 		// Each character's expansion with unit weight, built once: One (the key
 		// and its modifiers), Two (the pairs among them) and Three (triples).
@@ -1826,7 +2236,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const three = (st, w) => st.three.map(([triple, factor]) => [triple, w * factor]);
 		// Unigrams: finger and hand load, modifier usage, key costs.
 		const load = new Float64Array(10);
-		for (const [c, n] of ctx.table.uni) {
+		for (const [c, n] of tables.uni) {
 			all.uni += n;
 			const s = strokes.get(c);
 			if (!s) continue;
@@ -1845,13 +2255,17 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			raw.movement_pattern += w * pairs[at + 2];
 			raw.no_handswitch_after_unbalancing_key += w * pairs[at + 3];
 		};
-		for (const [c1, c2, n] of ctx.table.bi) {
+		for (const [c1, c2, n] of tables.bi) {
 			all.bi += n;
+			// Left out after a line break before any lookup: found, at no cost.
+			if (c1 === '\n' && c2 !== '\n') {
+				found.bi += n;
+				continue;
+			}
 			const s1 = strokes.get(c1);
 			const s2 = strokes.get(c2);
 			if (!s1 || !s2) continue;
 			found.bi += n;
-			if (c1 === '\n' && c2 !== '\n') continue;
 			bigram(s1.key, s2.key, n);
 			for (const m of s1.mods) bigram(m, s2.key, n);
 			for (const m of s1.mods) for (const o of s2.mods) bigram(m, o, n);
@@ -1916,27 +2330,41 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				}
 			}
 		};
-		for (const [c1, c2, c3, n] of ctx.table.tri) {
+		// The tool sums the weights of the key trigrams first (the ones a
+		// character trigram and its modifier expansions share), then costs each
+		// once: irregularity is not linear in the weight.
+		const gathered = new Map();
+		const gather = (a, b, c, w) => {
+			const id = (a.index * size + b.index) * size + c.index;
+			const old = gathered.get(id);
+			if (old) old[3] += w;
+			else gathered.set(id, [a, b, c, w]);
+		};
+		for (const [c1, c2, c3, n] of tables.tri) {
 			all.tri += n;
+			if ((c1 === '\n' && c2 !== '\n') || (c2 === '\n' && c3 !== '\n')) {
+				found.tri += n;
+				continue;
+			}
 			const s1 = strokes.get(c1);
 			const s2 = strokes.get(c2);
 			const s3 = strokes.get(c3);
 			if (!s1 || !s2 || !s3) continue;
 			found.tri += n;
-			if ((c1 === '\n' && c2 !== '\n') || (c2 === '\n' && c3 !== '\n')) continue;
 			if (s1.mods.length + s2.mods.length + s3.mods.length === 0) {
-				trigram(s1.key, s2.key, s3.key, n);
+				gather(s1.key, s2.key, s3.key, n);
 				continue;
 			}
 			const s = [s1, s2, s3];
 			const [o1, o2, o3] = s.map(one);
-			for (const a of o1) for (const b of o2) for (const c of o3) trigram(a, b, c, n);
-			for (const [[a, b], w] of two(s[0], n)) for (const c of o2) trigram(a, b, c, w);
-			for (const a of o1) for (const [[b, c], w] of two(s[1], n)) trigram(a, b, c, w);
-			for (const [[a, b], w] of two(s[1], n)) for (const c of o3) trigram(a, b, c, w);
-			for (const a of o2) for (const [[b, c], w] of two(s[2], n)) trigram(a, b, c, w);
-			for (const st of s) for (const [[a, b, c], w] of three(st, n)) trigram(a, b, c, w);
+			for (const a of o1) for (const b of o2) for (const c of o3) gather(a, b, c, n);
+			for (const [[a, b], w] of two(s[0], n)) for (const c of o2) gather(a, b, c, w);
+			for (const a of o1) for (const [[b, c], w] of two(s[1], n)) gather(a, b, c, w);
+			for (const [[a, b], w] of two(s[1], n)) for (const c of o3) gather(a, b, c, w);
+			for (const a of o2) for (const [[b, c], w] of two(s[2], n)) gather(a, b, c, w);
+			for (const st of s) for (const [[a, b, c], w] of three(st, n)) gather(a, b, c, w);
 		}
+		for (const [a, b, c, w] of gathered.values()) trigram(a, b, c, w);
 		raw.irregularity = Math.sqrt(raw.irregularity);
 		// Finger balance: sample standard deviation of load over intended load.
 		const fingers = FINGERS.map((id, i) => i).filter((i) => !isThumb(i));
@@ -1975,8 +2403,670 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		return { value, parts };
 	}
 
+	// ======================================
+	// ======= 11/ Cyanophage optimiser =====
+	// ======================================
+
+	/**
+	 * Cyanophage's corpus from a prepared table. Its tool reads a list of words
+	 * and counts each one as « word » with a space on both sides; the space's
+	 * count is then halved and the trigrams seen 30 times or fewer are dropped.
+	 * A text is read as its words: lower case, split at whitespace. Every count
+	 * of that word list follows from the n-grams inside words, which a table
+	 * holds whole (they never span a line break or a tab): a word starts at y
+	 * as often as y is not preceded by a letter of its word, L(y) − Σx W(x y),
+	 * and a one-character word is counted by inclusion and exclusion.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{letters: Map, bigrams: Map, trigrams: Map, length: number}}
+	 *   Character, bigram and trigram counts and its input length (the
+	 *   characters of the words and one space per word).
+	 */
+	function cyanophageTables(table) {
+		const model = entry('cyanophage').model;
+		const space = ' ';
+		const all = withBreaks(table);
+		const lower = new Map();
+		// The character of a word list, or null for whitespace (a word break).
+		const of = (c) => {
+			if (!lower.has(c)) {
+				const l = c.toLowerCase();
+				lower.set(c, /^\s$/u.test(c) ? null : Array.from(l).length === 1 ? l : c);
+			}
+			return lower.get(c);
+		};
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		const letters = new Map();
+		const inner2 = new Map();
+		const inner3 = new Map();
+		for (const [c, n] of all.uni) {
+			const x = of(c);
+			if (x !== null) add(letters, x, n);
+		}
+		for (const [a, b, n] of all.bi) {
+			const x = of(a);
+			const y = of(b);
+			if (x !== null && y !== null) add(inner2, x + y, n);
+		}
+		for (const [a, m, b, n] of all.tri) {
+			const x = of(a);
+			const y = of(m);
+			const z = of(b);
+			if (x !== null && y !== null && z !== null) add(inner3, x + y + z, n);
+		}
+		// Each character's count followed and preceded by a letter of its word,
+		// and each inner bigram's count preceded and followed by one.
+		const followed = new Map();
+		const preceded = new Map();
+		for (const [xy, n] of inner2) {
+			const [x, y] = Array.from(xy);
+			add(followed, x, n);
+			add(preceded, y, n);
+		}
+		const extendedLeft = new Map();
+		const extendedRight = new Map();
+		const surrounded = new Map();
+		for (const [xyz, n] of inner3) {
+			const [x, y, z] = Array.from(xyz);
+			add(extendedLeft, y + z, n);
+			add(extendedRight, x + y, n);
+			add(surrounded, y, n);
+		}
+		const bigrams = new Map(inner2);
+		const trigrams = new Map(inner3);
+		let words = 0;
+		let length = 0;
+		for (const [x, n] of letters) {
+			const starts = n - (preceded.get(x) || 0);
+			const ends = n - (followed.get(x) || 0);
+			const alone = starts - (followed.get(x) || 0) + (surrounded.get(x) || 0);
+			words += starts;
+			length += n;
+			if (starts > 0) add(bigrams, space + x, starts);
+			if (ends > 0) add(bigrams, x + space, ends);
+			if (alone > 0) add(trigrams, space + x + space, alone);
+		}
+		for (const [xy, n] of inner2) {
+			const first = n - (extendedLeft.get(xy) || 0);
+			const last = n - (extendedRight.get(xy) || 0);
+			if (first > 0) add(trigrams, space + xy, first);
+			if (last > 0) add(trigrams, xy + space, last);
+		}
+		for (const [xyz, n] of trigrams) if (n <= model.trigram_min_count) trigrams.delete(xyz);
+		// Two spaces per word, halved.
+		letters.set(space, words);
+		return { letters, bigrams, trigrams, length: length + words };
+	}
+
+	/**
+	 * Cyanophage's keys for one layout: each grid cell's character (the base
+	 * layer of its key), row, column, finger (1 to 10 from the left pinky, the
+	 * thumbs 5 and 6) and effort; the space bar is its fixed thumb key. A
+	 * character on two cells takes the later one in the grid's order, as its
+	 * worker's lookup does.
+	 * @returns {Map<string, {row: number, col: number, finger: number, effort: number}>}
+	 */
+	function cyanophageKeys(ctx) {
+		const model = entry('cyanophage').model;
+		const keys = new Map();
+		const custom = customModel(ctx);
+		for (const cell of model.grid) {
+			const row = ctx.layout.rows[cell.code];
+			const char = row && single(row[0]) ? row[0] : null;
+			if (char === null || char === ' ') continue;
+			let finger = cell.finger;
+			if (custom && custom.finger.has(cell.code)) finger = custom.finger.get(cell.code) + 1;
+			keys.set(char, { row: cell.row, col: cell.col, finger, effort: cell.effort });
+		}
+		const s = model.space;
+		keys.set(' ', { row: s.row, col: s.col, finger: s.finger, effort: s.effort });
+		return keys;
+	}
+
+	/**
+	 * Cyanophage's optimiser score, lower is better: the sum of eleven terms,
+	 * each max(0, (metric − its floor) · its weight) but the vowels term, on
+	 * its matrix of 3 rows of 12 columns. The metrics: SFB, its pinky and ring
+	 * shares, scissors, pinky–ring scissors, wide scissors, lateral stretches
+	 * and same-finger skipgrams as a percentage of the input length; effort per
+	 * character (each character's grid effort, and again for each character of
+	 * every trigram kept, as its worker sums it); the vowels on the minority
+	 * hand; the hand imbalance in points. A bigram with a character the layout
+	 * lacks is skipped: the worker then reads the previous bigram's key, an
+	 * order-dependent slip no table can follow.
+	 */
+	function scoreCyanophage(ctx) {
+		const model = entry('cyanophage').model;
+		const t = perCorpus(ctx.table, 'cyanophage:tables', cyanophageTables);
+		const keys = cyanophageKeys(ctx);
+		const raw = {
+			sfb: 0,
+			effort: 0,
+			psfb: 0,
+			rsfb: 0,
+			scissors: 0,
+			prscissors: 0,
+			wide_scissors: 0,
+			lsb: 0,
+			sfs: 0
+		};
+		const hands = [0, 0];
+		const vowels = [0, 0];
+		const vowelSet = new Set(Array.from(model.vowels));
+		for (const [c, n] of t.letters) {
+			const k = keys.get(c);
+			if (!k) continue;
+			raw.effort += k.effort * n;
+			const hand = k.col <= model.left_last_col ? 0 : 1;
+			if (k.row <= model.alpha_last_row) hands[hand] += n;
+			if (vowelSet.has(c)) vowels[hand] += 1;
+		}
+		const pinky = new Set(model.pinkies);
+		const ring = new Set(model.rings);
+		const pinkyRing = new Set(model.pinky_ring_pairs.map(([a, b]) => `${a}/${b}`));
+		const lsbPairs = new Map(model.lsb_pairs.map(([a, b, w]) => [`${a}/${b}`, w]));
+		for (const [ab, n] of t.bigrams) {
+			const [a, b] = Array.from(ab);
+			const k1 = keys.get(a);
+			const k2 = keys.get(b);
+			if (!k1 || !k2) continue;
+			if (k1.finger === k2.finger && a !== b) {
+				raw.sfb += n;
+				if (pinky.has(k1.finger)) raw.psfb += n;
+				if (ring.has(k1.finger)) raw.rsfb += n;
+				continue;
+			}
+			const left = k1.col <= model.left_last_col && k2.col <= model.left_last_col;
+			const right = k1.col > model.left_last_col && k2.col > model.left_last_col;
+			if ((!left && !right) || k1.row > model.alpha_last_row || k2.row > model.alpha_last_row)
+				continue;
+			const dRow = Math.abs(k1.row - k2.row);
+			const dCol = Math.abs(k1.col - k2.col);
+			if (dRow === 2) {
+				if (dCol === 1) raw.scissors += n;
+				else if (dCol > 1) raw.wide_scissors += n;
+			}
+			if (pinkyRing.has(`${k1.finger}/${k2.finger}`) && dRow >= 1) raw.prscissors += n;
+			const lsb = lsbPairs.get(`${k1.col}/${k2.col}`);
+			if (lsb !== undefined) raw.lsb += lsb * n;
+		}
+		for (const [abc, n] of t.trigrams) {
+			const [a, b, c] = Array.from(abc);
+			const k1 = keys.get(a);
+			const k2 = keys.get(b);
+			const k3 = keys.get(c);
+			for (const k of [k1, k2, k3]) if (k) raw.effort += k.effort * n;
+			// The worker reads a character it lacks as no finger: a skipgram
+			// around it still counts.
+			if (!k1 || !k3 || k1.finger !== k3.finger || (k2 && k2.finger === k1.finger)) continue;
+			if (
+				Math.abs(k1.row - k3.row) >= 1 &&
+				k1.row <= model.alpha_last_row &&
+				k3.row <= model.alpha_last_row
+			)
+				raw.sfs += n;
+		}
+		const L = t.length;
+		const left = pct(hands[0], hands[0] + hands[1]);
+		const parts = {
+			sfb: pct(raw.sfb, L),
+			effort: L > 0 ? raw.effort / L : 0,
+			psfb: pct(raw.psfb, L),
+			rsfb: pct(raw.rsfb, L),
+			scissors: pct(raw.scissors, L),
+			prscissors: pct(raw.prscissors, L),
+			wide_scissors: pct(raw.wide_scissors, L),
+			lsb: pct(raw.lsb, L),
+			sfs: pct(raw.sfs, L),
+			vowels: Math.min(vowels[0], vowels[1]),
+			hand_balance: Math.abs(left - (100 - left))
+		};
+		let value = 0;
+		for (const [term, { weight, min, clamp }] of Object.entries(model.terms)) {
+			const s = (parts[term] - min) * weight;
+			value += clamp ? Math.max(0, s) : s;
+		}
+		return { value, parts };
+	}
+
+	// =========================
+	// ======= 12/ keycraft ====
+	// =========================
+
+	// keycraft's grid: three rows of twelve keys, then six thumb keys.
+	const KC_KEYS = 42;
+	const KC_COLUMNS = 12;
+	const KC_THUMB_ROW = 3;
+	const KC_FIRST_THUMB = 36;
+	const KC_MAIN_ROWS = 3;
+	const KC_HOME_ROW = 1;
+	const KC_TYPES = ['rowstag', 'anglemod', 'ortho', 'colstag'];
+
+	/** keycraft's lower case of one code point (Go's unicode.ToLower: one code point). */
+	function kcLower(char) {
+		// The full mapping gives « i̇ » for « İ », Go's simple mapping « i ».
+		return Array.from(char.toLowerCase())[0];
+	}
+
+	/**
+	 * keycraft's corpus as its reader counts a text, from the prepared tables:
+	 * lower case, every white space a reset (no n-gram holds one, and none is
+	 * counted), the skipgram the first and last characters of each trigram.
+	 * Its totals count every n-gram, typed by the layout or not. The tables'
+	 * n-grams that hold a line break or a tab (`breaks`) hold white space, so
+	 * the main tables give every n-gram keycraft counts.
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {object} Character ids, counts by id and totals.
+	 */
+	function keycraftTables(table) {
+		const model = entry('keycraft').model;
+		const space = new Set(model.whitespace.map((cp) => String.fromCodePoint(cp)));
+		const ids = new Map();
+		const id = (char) => {
+			if (space.has(char)) return -1;
+			const lower = kcLower(char);
+			if (!ids.has(lower)) ids.set(lower, ids.size);
+			return ids.get(lower);
+		};
+		const uniById = new Map();
+		const bi = new Map();
+		const tri = new Map();
+		const skip = new Map();
+		const add = (map, key, n) => map.set(key, (map.get(key) || 0) + n);
+		let uniTotal = 0;
+		let biTotal = 0;
+		let triTotal = 0;
+		for (const [c, n] of table.uni) {
+			const x = id(c);
+			if (x < 0) continue;
+			add(uniById, x, n);
+			uniTotal += n;
+		}
+		const pairs = [];
+		for (const [a, b, n] of table.bi) {
+			const x = id(a);
+			const y = id(b);
+			if (x < 0 || y < 0) continue;
+			pairs.push([x, y, n]);
+			biTotal += n;
+		}
+		const triples = [];
+		for (const [a, m, b, n] of table.tri) {
+			const x = id(a);
+			const y = id(m);
+			const z = id(b);
+			if (x < 0 || y < 0 || z < 0) continue;
+			triples.push([x, y, z, n]);
+			triTotal += n;
+		}
+		// Pair keys need every id: a pair is x · K + y.
+		const K = ids.size;
+		for (const [x, y, n] of pairs) add(bi, x * K + y, n);
+		for (const [x, y, z, n] of triples) {
+			add(tri, (x * K + y) * K + z, n);
+			add(skip, x * K + z, n);
+		}
+		const uni = new Float64Array(K);
+		for (const [x, n] of uniById) uni[x] = n;
+		const T = tri.size;
+		const tA = new Int32Array(T);
+		const tB = new Int32Array(T);
+		const tC = new Int32Array(T);
+		const tN = new Float64Array(T);
+		let i = 0;
+		for (const [key, n] of tri) {
+			tC[i] = key % K;
+			tB[i] = Math.floor(key / K) % K;
+			tA[i] = Math.floor(key / K / K);
+			tN[i] = n;
+			i++;
+		}
+		return { ids, K, uni, bi, skip, tA, tB, tC, tN, uniTotal, biTotal, triTotal };
+	}
+
+	/** Row and column of a grid key (a thumb key: row 3, its column 0 to 5). */
+	function kcRowCol(k) {
+		return k >= KC_FIRST_THUMB
+			? [KC_THUMB_ROW, k - KC_FIRST_THUMB]
+			: [Math.floor(k / KC_COLUMNS), k % KC_COLUMNS];
+	}
+
+	/**
+	 * Column and row distances of two grid keys on keycraft's geometry: a
+	 * row stagger (rowstag, anglemod), a column stagger (colstag) or none.
+	 */
+	function kcDistance(model, type, k1, k2) {
+		const [r1, c1] = kcRowCol(k1);
+		const [r2, c2] = kcRowCol(k2);
+		const rowStag = type === 'rowstag' || type === 'anglemod';
+		const col = rowStag
+			? Math.abs(c1 + model.row_stagger[r1] - (c2 + model.row_stagger[r2]))
+			: Math.abs(c1 - c2);
+		const row =
+			type === 'colstag'
+				? Math.abs(r1 + model.column_stagger[c1] - (r2 + model.column_stagger[c2]))
+				: Math.abs(r1 - r2);
+		return { col, row };
+	}
+
+	/**
+	 * One layout on keycraft's grid: each key's character (its corpus id, −1
+	 * for none or a character the corpus never holds), finger and hand.
+	 * @param {object} model - keycraft's model.
+	 * @param {string} type - rowstag, anglemod, ortho or colstag.
+	 * @param {Array<string|null>} chars - The 42 keys' characters.
+	 * @param {Array<number|null>} [fingers] - A finger per key overriding keycraft's.
+	 * @returns {object} The keys.
+	 */
+	function kcKeys(model, type, chars, fingers) {
+		const official = model.key_finger[type === 'anglemod' ? 'anglemod' : 'standard'];
+		const keys = [];
+		const placed = new Set();
+		for (let k = 0; k < KC_KEYS; k++) {
+			const [row, col] = kcRowCol(k);
+			let char = chars[k];
+			// keycraft refuses a character on two keys: the first one keeps it.
+			if (char !== null && placed.has(char)) char = null;
+			if (char !== null) placed.add(char);
+			const custom = fingers ? fingers[k] : null;
+			const finger = custom === null || custom === undefined ? official[k] : custom;
+			// Its hand is the key's side, a thumb's by its three keys; a key the user
+			// fingers otherwise takes the finger's hand.
+			const side = row === KC_THUMB_ROW ? (col < 3 ? 0 : 1) : col < 6 ? 0 : 1;
+			const hand = custom === null || custom === undefined ? side : handOf(finger);
+			keys.push({ k, row, col, char, finger, hand });
+		}
+		return keys;
+	}
+
+	/**
+	 * keycraft's metrics of one layout (internal/keycraft/analyser.go): loads
+	 * and their deviations, same-finger, lateral-stretch and scissor bigrams and
+	 * skipgrams, and the trigram classes, each in percent.
+	 * @param {object} t - keycraftTables() output.
+	 * @param {string} type - The grid's geometry.
+	 * @param {object[]} keys - kcKeys() output.
+	 * @returns {object} Metric name → value.
+	 */
+	function kcMetrics(t, type, keys) {
+		const model = entry('keycraft').model;
+		const K = t.K;
+		// Corpus id of each key's character, −1 when the corpus has none.
+		const cid = new Int32Array(KC_KEYS).fill(-1);
+		const keyOf = new Int32Array(K).fill(-1);
+		for (const key of keys) {
+			if (key.char === null || !t.ids.has(key.char)) continue;
+			cid[key.k] = t.ids.get(key.char);
+			keyOf[cid[key.k]] = key.k;
+		}
+		const M = {};
+		// Loads (analyseHand).
+		let mainTotal = 0;
+		let pinkyOff = 0;
+		const handCount = [0, 0];
+		const fingerCount = new Float64Array(10);
+		const columnCount = new Float64Array(KC_COLUMNS);
+		const rowCount = new Float64Array(KC_THUMB_ROW + 1);
+		const penalty = new Map(model.pinky_penalties.map(([r, c, p]) => [`${r}/${c}`, p]));
+		for (let x = 0; x < K; x++) {
+			const n = t.uni[x];
+			const k = keyOf[x];
+			if (k < 0 || n === 0) continue;
+			const key = keys[k];
+			if (key.row < KC_MAIN_ROWS) {
+				mainTotal += n;
+				handCount[key.hand] += n;
+				fingerCount[key.finger] += n;
+				columnCount[key.col] += n;
+				if (key.finger === 0 || key.finger === 9) {
+					const p = penalty.get(`${key.row}/${key.col}`);
+					if (p !== undefined) pinkyOff += p * n;
+				}
+			}
+			rowCount[key.row] += n;
+		}
+		const totFactor = mainTotal > 0 ? 100 / mainTotal : 0;
+		M.POH = pinkyOff * totFactor;
+		M.H0 = handCount[0] * totFactor;
+		M.H1 = handCount[1] * totFactor;
+		M.HLD = Math.abs(M.H0 - model.target_hand_load[0]) + Math.abs(M.H1 - model.target_hand_load[1]);
+		let fld = 0;
+		for (let f = 0; f < 10; f++) {
+			const v = fingerCount[f] * totFactor;
+			M[`F${f}`] = v;
+			const diff = v - model.target_finger_load[f];
+			// A pinky counts only above its target.
+			if (f === 0 || f === 9) {
+				if (diff > 0) fld += diff;
+			} else fld += Math.abs(diff);
+		}
+		M.FLD = fld;
+		for (let c = 0; c < KC_COLUMNS; c++) M[`C${c}`] = columnCount[c] * totFactor;
+		let rld = 0;
+		for (let r = 0; r <= KC_THUMB_ROW; r++) {
+			const v = rowCount[r] * totFactor;
+			M[`R${r}`] = v;
+			if (r < KC_MAIN_ROWS) {
+				const diff = v - model.target_row_load[r];
+				// The home row counts below its target, the others above.
+				rld = r === KC_HOME_ROW ? rld - diff : rld + diff;
+			}
+		}
+		M.RLD = rld;
+		// Key pairs (layout.go): same finger, lateral stretches, scissors.
+		const used = (k) => keys[k].char !== null;
+		const sfb = [];
+		for (let k1 = 0; k1 < KC_KEYS - 1; k1++) {
+			if (!used(k1)) continue;
+			for (let k2 = k1 + 1; k2 < KC_KEYS; k2++)
+				if (used(k2) && keys[k1].finger === keys[k2].finger) sfb.push([k1, k2], [k2, k1]);
+		}
+		const lsbMin = new Map(model.lsb_finger_pairs.map(([a, b, d]) => [`${a}/${b}`, d]));
+		const lsb = [];
+		for (let k1 = 0; k1 < KC_KEYS; k1++) {
+			if (!used(k1)) continue;
+			for (let k2 = 0; k2 < KC_KEYS; k2++) {
+				if (k1 === k2 || !used(k2)) continue;
+				const min = lsbMin.get(`${keys[k1].finger}/${keys[k2].finger}`);
+				if (min !== undefined && kcDistance(model, type, k1, k2).col >= min) lsb.push([k1, k2]);
+			}
+		}
+		// Its fixed stretches of the row-staggered bottom row, whatever the keys hold.
+		for (const pair of model.lsb_extra[type]) lsb.push(pair);
+		const scissors = (configs) => {
+			const out = [];
+			for (const { first, second, fingers } of configs) {
+				const set = new Set(fingers.map(([a, b]) => `${a}/${b}`));
+				for (let i1 = first[0]; i1 <= first[1]; i1++) {
+					if (!used(i1)) continue;
+					for (let i2 = second[0]; i2 <= second[1]; i2++)
+						if (used(i2) && set.has(`${keys[i1].finger}/${keys[i2].finger}`))
+							out.push([i1, i2], [i2, i1]);
+				}
+			}
+			return out;
+		};
+		const fsb = scissors(model.full_scissors);
+		const hsb = scissors(model.half_scissors);
+		const count = (list, map) => {
+			let n = 0;
+			for (const [k1, k2] of list) {
+				const x = cid[k1];
+				const y = cid[k2];
+				if (x >= 0 && y >= 0) n += map.get(x * K + y) || 0;
+			}
+			return n;
+		};
+		// A corpus without a pair or a triple outside white space (one short word)
+		// counts their shares as 0, as keycraft guards its loads; its own
+		// division by zero would give NaN.
+		const biFactor = t.biTotal > 0 ? 100 / t.biTotal : 0;
+		M.SFB = count(sfb, t.bi) * biFactor;
+		M.LSB = count(lsb, t.bi) * biFactor;
+		M.FSB = count(fsb, t.bi) * biFactor;
+		M.HSB = count(hsb, t.bi) * biFactor;
+		const skipFactor = t.triTotal > 0 ? 100 / t.triTotal : 0;
+		M.SFS = count(sfb, t.skip) * skipFactor;
+		M.LSS = count(lsb, t.skip) * skipFactor;
+		M.FSS = count(fsb, t.skip) * skipFactor;
+		M.HSS = count(hsb, t.skip) * skipFactor;
+		// Trigrams (analyseTrigrams).
+		let rl2SFB = 0;
+		let rl2In = 0;
+		let rl2Out = 0;
+		let altSFS = 0;
+		let altNml = 0;
+		let rl3SFB = 0;
+		let rl3In = 0;
+		let rl3Out = 0;
+		let redWeak = 0;
+		let redSFS = 0;
+		let redNml = 0;
+		const LI = 3;
+		const RI = 6;
+		const weak = (f) => f < LI || f > RI;
+		for (let i = 0; i < t.tN.length; i++) {
+			const a = keyOf[t.tA[i]];
+			const b = keyOf[t.tB[i]];
+			const c = keyOf[t.tC[i]];
+			if (a < 0 || b < 0 || c < 0) continue;
+			const n = t.tN[i];
+			const k0 = keys[a];
+			const k1 = keys[b];
+			const k2 = keys[c];
+			const f0 = k0.finger;
+			const f1 = k1.finger;
+			const f2 = k2.finger;
+			if (k0.hand === k2.hand) {
+				if (k0.hand !== k1.hand) {
+					if (f0 === f2 && a !== c) altSFS += n;
+					else altNml += n;
+				} else if (f0 === f1 || f1 === f2) rl3SFB += n;
+				else if (f0 < f1 === f1 < f2) {
+					if (f0 < f1 === (k0.hand === 0)) rl3In += n;
+					else rl3Out += n;
+				} else if (weak(f0) && weak(f1) && weak(f2)) redWeak += n;
+				else if (f0 === f2 && a !== c) redSFS += n;
+				else redNml += n;
+			} else if (k0.hand === k1.hand) {
+				if (f0 === f1) rl2SFB += n;
+				else if (f0 < f1 === (k1.hand === 0)) rl2In += n;
+				else rl2Out += n;
+			} else if (f1 === f2) rl2SFB += n;
+			else if (f1 < f2 === (k2.hand === 0)) rl2In += n;
+			else rl2Out += n;
+		}
+		const triFactor = t.triTotal > 0 ? 100 / t.triTotal : 0;
+		M['RED-WEAK'] = redWeak * triFactor;
+		M['RED-SFS'] = redSFS * triFactor;
+		M['RED-NML'] = redNml * triFactor;
+		M.RED = M['RED-NML'] + M['RED-SFS'] + M['RED-WEAK'];
+		M['ALT-SFS'] = altSFS * triFactor;
+		M['ALT-NML'] = altNml * triFactor;
+		M.ALT = M['ALT-NML'] + M['ALT-SFS'];
+		M['2RL-SFB'] = rl2SFB * triFactor;
+		M['2RL-IN'] = rl2In * triFactor;
+		M['2RL-OUT'] = rl2Out * triFactor;
+		M['2RL'] = M['2RL-SFB'] + M['2RL-IN'] + M['2RL-OUT'];
+		M['3RL-SFB'] = rl3SFB * triFactor;
+		M['3RL-IN'] = rl3In * triFactor;
+		M['3RL-OUT'] = rl3Out * triFactor;
+		M['3RL'] = M['3RL-SFB'] + M['3RL-IN'] + M['3RL-OUT'];
+		M.FLW = M['2RL-IN'] + M['2RL-OUT'] + M['3RL-IN'] + M['3RL-OUT'] + M['ALT-NML'];
+		M['IN:OUT'] = (M['2RL-IN'] + M['3RL-IN']) / (M['2RL-OUT'] + M['3RL-OUT']);
+		return M;
+	}
+
+	/** A reference layout's 42 characters: a space is an empty key. */
+	function kcReferenceChars(keys) {
+		const chars = Array.from(keys);
+		if (chars.length !== KC_KEYS)
+			throw new Error(`analyser_scores: a keycraft reference layout has ${chars.length} keys`);
+		return chars.map((c) => (c === ' ' ? null : c));
+	}
+
+	/** The median of sorted values (scorer.go Median). */
+	function kcMedian(sorted) {
+		const mid = Math.floor(sorted.length / 2);
+		return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+	}
+
+	/**
+	 * The median and interquartile range of each weighted metric over
+	 * keycraft's reference layouts on one corpus (scorer.go
+	 * computeMediansAndIQR: Q1 the median of the lower half, Q3 of the upper).
+	 * @param {object} table - prepareNgrams() output.
+	 * @returns {{medians: object, iqrs: object}} Metric → value.
+	 */
+	function keycraftReference(table) {
+		const model = entry('keycraft').model;
+		const t = perCorpus(table, 'keycraft:tables', keycraftTables);
+		const values = {};
+		for (const metric of Object.keys(model.weights)) values[metric] = [];
+		for (const layout of model.reference_layouts) {
+			if (!KC_TYPES.includes(layout.type))
+				throw new Error(`analyser_scores: keycraft layout ${layout.name} type ${layout.type}`);
+			const M = kcMetrics(
+				t,
+				layout.type,
+				kcKeys(model, layout.type, kcReferenceChars(layout.keys))
+			);
+			for (const metric of Object.keys(model.weights)) values[metric].push(M[metric]);
+		}
+		const medians = {};
+		const iqrs = {};
+		for (const [metric, list] of Object.entries(values)) {
+			const sorted = list.slice().sort((a, b) => a - b);
+			const n = sorted.length;
+			medians[metric] = kcMedian(sorted);
+			iqrs[metric] =
+				kcMedian(sorted.slice(Math.floor((n + 1) / 2))) -
+				kcMedian(sorted.slice(0, Math.floor(n / 2)));
+		}
+		return { medians, iqrs };
+	}
+
+	/**
+	 * keycraft's score (`keycraft rank`, ranking.go computeScores): the sum of
+	 * weight × (metric − median) / IQR over its weighted metrics, median and
+	 * IQR taken over its reference layouts on the same corpus; higher is
+	 * better. A shipped corpus carries them (`references`, from
+	 * referenceTables), any other is scored against its own once.
+	 */
+	function scoreKeycraft(ctx) {
+		const model = entry('keycraft').model;
+		const t = perCorpus(ctx.table, 'keycraft:tables', keycraftTables);
+		const shipped = ctx.table.references && ctx.table.references.keycraft;
+		const ref = shipped || perCorpus(ctx.table, 'keycraft:reference', keycraftReference);
+		const angle = ctx.layout.fingering === 'angle' || ctx.keyboard === 'iso_angle';
+		const type = ctx.keyboard === 'ortho' ? 'ortho' : angle ? 'anglemod' : 'rowstag';
+		const positions = model.positions[ctx.keyboard === 'ansi' ? 'ansi' : 'iso'];
+		const custom = customModel(ctx);
+		const chars = [];
+		const fingers = [];
+		for (const code of positions) {
+			const row = code === null ? null : ctx.layout.rows[code];
+			const cell = row ? row[0] : null;
+			chars.push(single(cell) ? kcLower(cell) : null);
+			fingers.push(
+				custom && code !== null && custom.finger.has(code) ? custom.finger.get(code) : null
+			);
+		}
+		const M = kcMetrics(t, type, kcKeys(model, type, chars, custom ? fingers : null));
+		let value = 0;
+		const parts = {};
+		for (const [metric, weight] of Object.entries(model.weights)) {
+			parts[metric] = M[metric];
+			const iqr = ref.iqrs[metric];
+			if (typeof iqr !== 'number' || typeof ref.medians[metric] !== 'number')
+				throw new Error(`analyser_scores: keycraft has no reference for ${metric}`);
+			if (iqr === 0) continue;
+			value += (weight * (M[metric] - ref.medians[metric])) / iqr;
+		}
+		return { value, parts };
+	}
+
 	// ==========================
-	// ======= 11/ Public API ====
+	// ======= 13/ Public API ====
 	// ==========================
 
 	const SCORERS = {
@@ -1990,7 +3080,9 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		cmini: scoreCmini,
 		oxeylyzer: scoreOxeylyzer,
 		ergol: scoreErgol,
-		dariogoetz: scoreDariogoetz
+		dariogoetz: scoreDariogoetz,
+		cyanophage: scoreCyanophage,
+		keycraft: scoreKeycraft
 	};
 
 	const FINGERINGS = ['official', 'custom'];
@@ -2007,7 +3099,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		const profile = options ? options.profile : undefined;
 		E.keyboard(keyboardId, profile);
 		return {
-			layout: E.layoutFromRows(layout),
+			layout: fourLevels(E.layoutFromRows(layout)),
 			table: E.prepareNgrams(ngrams),
 			keyboard: keyboardId,
 			profile,
@@ -2028,7 +3120,7 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 				repository: e.repository,
 				revision: e.revision,
 				licence: e.licence,
-				fidelity: e.fidelity,
+				fidelity: Object.assign({}, e.fidelity),
 				better: e.better,
 				unit: e.unit,
 				digits: e.digits,
@@ -2037,9 +3129,53 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 		});
 	}
 
-	function finish(id, raw) {
+	/**
+	 * What a scorer reads in a table: « text » when it carries a text's own
+	 * counts (textTables), else « tables », the n-grams alone (a word list, a
+	 * count table, a blend, « Ma frappe »).
+	 */
+	function corpusOf(table) {
+		return table.analysers ? 'text' : 'tables';
+	}
+
+	/**
+	 * How faithful one analyser's score is on one corpus (analyser_models.json
+	 * names it per corpus: genkey is exact on a text, close on tables).
+	 * @param {string} id - An analyser id (see analysers()).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {string} exact, close or approximate.
+	 * @throws {Error} On an unknown analyser or malformed tables.
+	 */
+	function fidelity(id, ngrams) {
+		if (!SCORERS[id]) throw new Error(`analyser_scores: unknown analyser ${id}`);
+		return entry(id).fidelity[corpusOf(engine().prepareNgrams(ngrams))];
+	}
+
+	function finish(id, raw, table) {
 		const e = entry(id);
-		return Object.assign({ id, better: e.better, fidelity: e.fidelity, unit: e.unit }, raw);
+		return Object.assign(
+			{ id, better: e.better, fidelity: e.fidelity[corpusOf(table)], unit: e.unit },
+			raw
+		);
+	}
+
+	/**
+	 * A layout as the other analysers read it: four levels (base, Shift, AltGr,
+	 * Shift+AltGr). A layout's own levels beyond them (Neo's Mod4, a tap-hold's
+	 * layer) are left out, as their own tools cannot hold them, and the third
+	 * and fourth are read as AltGr's (LAYOUT_FORMATS.levelLosses says so in
+	 * the exports).
+	 * @param {object} layout - Library shape, checked.
+	 * @returns {object} The same layout when it has the default four levels.
+	 */
+	function fourLevels(layout) {
+		if (!layout.levels) return layout;
+		const rows = {};
+		for (const [code, row] of Object.entries(layout.rows)) {
+			const four = row.slice(0, FOUR_LEVELS);
+			if (four.some((cell) => cell !== null)) rows[code] = four;
+		}
+		return Object.assign({}, layout, { rows, levels: undefined, modifiers: undefined });
 	}
 
 	/**
@@ -2057,7 +3193,8 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 	 */
 	function score(id, layout, ngrams, options) {
 		if (!SCORERS[id]) throw new Error(`analyser_scores: unknown analyser ${id}`);
-		return finish(id, SCORERS[id](context(layout, ngrams, options)));
+		const ctx = context(layout, ngrams, options);
+		return finish(id, SCORERS[id](ctx), ctx.table);
 	}
 
 	/**
@@ -2074,13 +3211,44 @@ var LAYOUT_ANALYSER_SCORES = (function () {
 			const ctx = context(layout, ngrams, Object.assign({}, options, { fingering }));
 			for (const id of ORDER) {
 				if (!out[id]) out[id] = {};
-				out[id][fingering] = finish(id, SCORERS[id](ctx));
+				out[id][fingering] = finish(id, SCORERS[id](ctx), ctx.table);
 			}
 		}
 		return out;
 	}
 
-	return { ORDER, analysers, score, scoreAll };
+	/**
+	 * The counts of a text that only the text itself gives some analysers,
+	 * beside its n-gram tables: genkey's skipgrams of gaps 1 to 9 and
+	 * Oxeylyzer's token pairs of gaps 1 to 3 with its exact totals. Set as
+	 * `analysers` on the tables of that text (ngramsFromText), the scorers read
+	 * them instead of carrying the trigrams' chain forward.
+	 * @param {string} text - The corpus text.
+	 * @returns {{genkey: {skipgrams: object}, oxeylyzer: object}} The counts.
+	 */
+	function textTables(text) {
+		if (typeof text !== 'string') throw new Error('analyser_scores: textTables needs a text');
+		return {
+			genkey: { skipgrams: genkeyTextSkipgrams(text) },
+			oxeylyzer: oxeyTextTables(text)
+		};
+	}
+
+	/**
+	 * The statistics some analysers take over their own reference layouts on
+	 * one corpus: keycraft's median and interquartile range of each weighted
+	 * metric over the layouts of its `data/layouts`. Set as `references` on
+	 * the corpus's tables (the codegen ships them in every built-in corpus),
+	 * the scorer reads them instead of scoring the reference layouts itself.
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @returns {{keycraft: {medians: object, iqrs: object}}} The statistics.
+	 * @throws {Error} On malformed tables.
+	 */
+	function referenceTables(ngrams) {
+		return { keycraft: keycraftReference(engine().prepareNgrams(ngrams)) };
+	}
+
+	return { ORDER, analysers, fidelity, score, scoreAll, textTables, referenceTables };
 })();
 
 // Node (tests) reads the module through a vm context or require().

@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/dynamic_hotstrings_prefix.v1.json",
-	"description": "Cross-driver regression corpus for the personal-info dynamic-hotstrings prefix-counting logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'prefix_count_vectors' pins compute_prefix_counts() (the phone/SSN/IBAN threshold arithmetic, mirrored by AHK's CountDynamicSection and Lua's compute_prefix_counts); 'spaced_prefix_vectors' pins spaced_prefix() (the shortest-prefix-containing-N-non-space-chars helper). Expected values are computed programmatically from the shared Lua reference (_shared/hotstrings/engine/dynamic/core.lua), not hand-typed.",
+	"description": "Cross-driver regression corpus for the personal-info dynamic-hotstrings prefix-counting logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'prefix_count_vectors' pins compute_prefix_counts() (the phone/SSN/IBAN threshold arithmetic, mirrored by AHK's CountDynamicSection and Lua's compute_prefix_counts); 'spaced_prefix_vectors' pins spaced_prefix() (the shortest-prefix-containing-N-non-space-chars helper); 'international_prefix_vectors' pins international_prefix() (the +33 trigger standing for the first plain_count characters of a stored number, mirrored by AHK's _DynHS_InternationalPrefix). Expected values are computed programmatically from the shared Lua reference (_shared/hotstrings/engine/dynamic/core.lua), not hand-typed.",
 	"version": "1.0.0",
 	"prefix_count_vectors": [
 		{
@@ -219,6 +219,36 @@
 			"spaced": " 12 34",
 			"raw_count": 2,
 			"expected": " 12"
+		}
+	],
+	"international_prefix_vectors": [
+		{
+			"id": "intl_prefix_trunk_zero",
+			"description": "A stored national number: the trunk zero is not dialled, so 0612 gives +33612.",
+			"phone": "0612345678",
+			"plain_count": 4,
+			"expected": "+33612"
+		},
+		{
+			"id": "intl_prefix_no_trunk_zero",
+			"description": "A number stored without its trunk zero keeps its first digit: 612345678 gives +336123, never +33123.",
+			"phone": "612345678",
+			"plain_count": 4,
+			"expected": "+336123"
+		},
+		{
+			"id": "intl_prefix_zero_only_prefix",
+			"description": "Only the first character is a trunk zero; a later zero is kept.",
+			"phone": "0102030405",
+			"plain_count": 4,
+			"expected": "+33102"
+		},
+		{
+			"id": "intl_prefix_short_number",
+			"description": "A number shorter than the plain count yields every digit it has.",
+			"phone": "061",
+			"plain_count": 4,
+			"expected": "+3361"
 		}
 	]
 }

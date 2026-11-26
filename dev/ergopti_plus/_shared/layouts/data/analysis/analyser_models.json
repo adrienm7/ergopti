@@ -9,7 +9,7 @@
 			"repository": "https://github.com/patorjk/keyboard-layout-analyzer",
 			"revision": "7ef2fe6 (2019-12-27)",
 			"licence": "MIT (LICENSE.txt)",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "higher",
 			"unit": "points",
 			"digits": 2,
@@ -271,7 +271,7 @@
 			"repository": "https://github.com/stevep99/keyboard-layout-analyzer",
 			"revision": "945fe9f (2021-05-01)",
 			"licence": "no licence file in the fork; fork of the MIT KLA",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "higher",
 			"unit": "points",
 			"digits": 2,
@@ -538,9 +538,9 @@
 			"author": "Ian Douglas",
 			"url": "https://klanext.keyboard-design.com",
 			"repository": "",
-			"revision": "closed source; published result tables in the Ergo-L repository (03c6c7c)",
-			"licence": "none published (closed source); only published numbers used",
-			"fidelity": "approximate",
+			"revision": "closed source, version 0.06; its output on probe texts and 14 presets, read on its site (2026-11-18)",
+			"licence": "none published (closed source); only its output numbers used",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "lower",
 			"unit": "points",
 			"digits": 2,
@@ -634,11 +634,12 @@
 				"altgr_key": "AltRight",
 				"enter_key": "Enter",
 				"tab_key": "Tab",
-				"fallbacks": {
-					"’": "'",
-					"“": "\"",
-					"”": "\"",
-					"–": "-"
+				"fallbacks": {},
+				"layout_fingering": {
+					"colemak": { "Space": "rt" },
+					"dvorak": { "Digit6": "li", "Digit8": "ri", "Digit9": "rm", "Digit0": "rr" },
+					"qwerty": { "Space": "rt" },
+					"workman": { "Space": "rt" }
 				},
 				"geometry": {
 					"standard": {
@@ -769,7 +770,7 @@
 						"ControlRight": [714.5, 225.5, 76]
 					}
 				},
-				"press_overhead_px": 21.0526312,
+				"press_overhead_px": 21.052631579,
 				"finger_weight": {
 					"lp": 3.67,
 					"lr": 2.9,
@@ -786,9 +787,9 @@
 					"left": 1.1,
 					"right": 1.0
 				},
-				"c_distance": 0.4392,
-				"c_same_finger": 491.25,
-				"c_same_hand": 29.43
+				"c_distance": 0.44,
+				"c_same_finger": 492,
+				"c_same_hand": 68.2
 			}
 		},
 		"a200": {
@@ -798,7 +799,7 @@
 			"repository": "https://github.com/Waterdragen/akl-ws",
 			"revision": "8141890 (2024-03-25)",
 			"licence": "GPL-3.0 (repository LICENSE.txt)",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "none",
 			"unit": "%",
 			"digits": 2,
@@ -826,7 +827,7 @@
 			"repository": "https://github.com/narze/carpalx",
 			"revision": "0.12, mirror 95f46d0 (2016-11-27)",
 			"licence": "GPL-2.0-or-later (bin/carpalx header)",
-			"fidelity": "close",
+			"fidelity": { "text": "close", "tables": "close" },
 			"better": "lower",
 			"unit": "effort",
 			"digits": 3,
@@ -910,7 +911,6 @@
 				},
 				"path_cost": "ph + 0.3*pr + 0.3*pf",
 				"min_triad_count": 10,
-				"reference_triads": 9151165,
 				"extension": {
 					"IntlBackslash": {
 						"row": 3,
@@ -927,7 +927,7 @@
 			"repository": "https://github.com/xsznix/keygen",
 			"revision": "37ae949 (2024-09-09)",
 			"licence": "MIT (stated in the README; no licence file)",
-			"fidelity": "close",
+			"fidelity": { "text": "close", "tables": "close" },
 			"better": "lower",
 			"unit": "penalty per character",
 			"digits": 3,
@@ -1055,7 +1055,7 @@
 			"repository": "https://github.com/semilin/genkey",
 			"revision": "1.2, f1f4173 (2024-07-03)",
 			"licence": "GPL-3.0-or-later (LICENSE)",
-			"fidelity": "approximate",
+			"fidelity": { "text": "exact", "tables": "close" },
 			"better": "lower",
 			"unit": "points",
 			"digits": 2,
@@ -1141,7 +1141,8 @@
 				"key_travel": 0.01,
 				"sfb": 1.0,
 				"dsfb": 0.5,
-				"skipgram_scale": 1.5486,
+				"skipgram_max_gap": 9,
+				"skipgram_decay": 0.5,
 				"fspeed_scale": 800,
 				"lsb_finger_pairs": [
 					[3, 2],
@@ -1164,7 +1165,7 @@
 			"repository": "https://github.com/Apsu/cmini",
 			"revision": "0db088e (2026-08-23)",
 			"licence": "GPL-3.0 (LICENSE)",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "none",
 			"unit": "%",
 			"digits": 2,
@@ -1178,7 +1179,7 @@
 			"repository": "https://github.com/O-X-E-Y/oxeylyzer",
 			"revision": "5a85ca0 (2026-11-12), data-files 9cd336c",
 			"licence": "Apache-2.0 (LICENCE.md)",
-			"fidelity": "close",
+			"fidelity": { "text": "close", "tables": "close" },
 			"better": "higher",
 			"unit": "points",
 			"digits": 3,
@@ -1280,6 +1281,91 @@
 				}
 			}
 		},
+		"cyanophage": {
+			"name": "Cyanophage optimiser",
+			"author": "cyanophage",
+			"url": "https://cyanophage.github.io/optimiser.html",
+			"repository": "https://github.com/cyanophage/cyanophage.github.io",
+			"revision": "optimiser.js e562433, worker.js 9e55a49 (2025-10-12); site b02780b (2026-06-12)",
+			"licence": "none published (no licence file): only its formula and constants are used, no code",
+			"fidelity": { "text": "exact", "tables": "exact" },
+			"better": "lower",
+			"unit": "points",
+			"digits": 2,
+			"model": {
+				"grid": [
+					{ "code": "KeyQ", "row": 0, "col": 1, "finger": 1, "effort": 3 },
+					{ "code": "KeyW", "row": 0, "col": 2, "finger": 2, "effort": 2 },
+					{ "code": "KeyE", "row": 0, "col": 3, "finger": 3, "effort": 1 },
+					{ "code": "KeyR", "row": 0, "col": 4, "finger": 4, "effort": 1 },
+					{ "code": "KeyT", "row": 0, "col": 5, "finger": 4, "effort": 2 },
+					{ "code": "KeyY", "row": 0, "col": 6, "finger": 7, "effort": 2 },
+					{ "code": "KeyU", "row": 0, "col": 7, "finger": 7, "effort": 1 },
+					{ "code": "KeyI", "row": 0, "col": 8, "finger": 8, "effort": 1 },
+					{ "code": "KeyO", "row": 0, "col": 9, "finger": 9, "effort": 2 },
+					{ "code": "KeyP", "row": 0, "col": 10, "finger": 10, "effort": 3 },
+					{ "code": "BracketLeft", "row": 0, "col": 11, "finger": 10, "effort": 7 },
+					{ "code": "KeyA", "row": 1, "col": 1, "finger": 1, "effort": 2 },
+					{ "code": "KeyS", "row": 1, "col": 2, "finger": 2, "effort": 0 },
+					{ "code": "KeyD", "row": 1, "col": 3, "finger": 3, "effort": 0 },
+					{ "code": "KeyF", "row": 1, "col": 4, "finger": 4, "effort": 0 },
+					{ "code": "KeyG", "row": 1, "col": 5, "finger": 4, "effort": 1 },
+					{ "code": "KeyH", "row": 1, "col": 6, "finger": 7, "effort": 1 },
+					{ "code": "KeyJ", "row": 1, "col": 7, "finger": 7, "effort": 0 },
+					{ "code": "KeyK", "row": 1, "col": 8, "finger": 8, "effort": 0 },
+					{ "code": "KeyL", "row": 1, "col": 9, "finger": 9, "effort": 0 },
+					{ "code": "Semicolon", "row": 1, "col": 10, "finger": 10, "effort": 2 },
+					{ "code": "Quote", "row": 1, "col": 11, "finger": 10, "effort": 6 },
+					{ "code": "IntlBackslash", "row": 2, "col": 0, "finger": 1, "effort": 7 },
+					{ "code": "KeyZ", "row": 2, "col": 1, "finger": 1, "effort": 6 },
+					{ "code": "KeyX", "row": 2, "col": 2, "finger": 2, "effort": 2.1 },
+					{ "code": "KeyC", "row": 2, "col": 3, "finger": 3, "effort": 1.1 },
+					{ "code": "KeyV", "row": 2, "col": 4, "finger": 4, "effort": 1.1 },
+					{ "code": "KeyB", "row": 2, "col": 5, "finger": 4, "effort": 3.1 },
+					{ "code": "KeyN", "row": 2, "col": 6, "finger": 7, "effort": 3.1 },
+					{ "code": "KeyM", "row": 2, "col": 7, "finger": 7, "effort": 1.1 },
+					{ "code": "Comma", "row": 2, "col": 8, "finger": 8, "effort": 1.1 },
+					{ "code": "Period", "row": 2, "col": 9, "finger": 9, "effort": 2.1 },
+					{ "code": "Slash", "row": 2, "col": 10, "finger": 10, "effort": 6 }
+				],
+				"space": { "row": 3, "col": 6, "finger": 6, "effort": 0 },
+				"left_last_col": 5,
+				"alpha_last_row": 2,
+				"trigram_min_count": 30,
+				"vowels": "aeiou",
+				"pinkies": [1, 10],
+				"rings": [2, 9],
+				"pinky_ring_pairs": [
+					[1, 2],
+					[2, 1],
+					[9, 10],
+					[10, 9]
+				],
+				"lsb_pairs": [
+					[5, 3, 1],
+					[3, 5, 1],
+					[5, 2, 0.5],
+					[2, 5, 0.5],
+					[6, 8, 1],
+					[8, 6, 1],
+					[6, 9, 0.5],
+					[9, 6, 0.5]
+				],
+				"terms": {
+					"sfb": { "weight": 4, "min": 0.3, "clamp": true },
+					"effort": { "weight": 4, "min": 0, "clamp": true },
+					"psfb": { "weight": 0.7, "min": 0, "clamp": true },
+					"rsfb": { "weight": 0.3, "min": 0, "clamp": true },
+					"scissors": { "weight": 0.8, "min": 0, "clamp": true },
+					"prscissors": { "weight": 0.8, "min": 0.2, "clamp": true },
+					"wide_scissors": { "weight": 0.5, "min": 0.05, "clamp": true },
+					"lsb": { "weight": 0.5, "min": 0.12, "clamp": true },
+					"sfs": { "weight": 0.2, "min": 0, "clamp": true },
+					"vowels": { "weight": 3, "min": 0, "clamp": false },
+					"hand_balance": { "weight": 0.7, "min": 1, "clamp": true }
+				}
+			}
+		},
 		"ergol": {
 			"name": "Ergo-L analyser / Kalamine statistics",
 			"author": "Nuclear-Squid (Léo Cazenave), Fabien Cazenave",
@@ -1287,7 +1373,7 @@
 			"repository": "https://github.com/Nuclear-Squid/ergol",
 			"revision": "Ergo-L 03c6c7c (2026-09-22), Kalamine a9724bf (2026-04-19)",
 			"licence": "Ergo-L: WTFPL v2 (LICENSE); Kalamine: MIT (LICENSE)",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "none",
 			"unit": "%",
 			"digits": 2,
@@ -1412,7 +1498,7 @@
 			"repository": "https://github.com/dariogoetz/keyboard_layout_optimizer",
 			"revision": "8c8ec9f (2026-04-24), config/evaluation/default.yml",
 			"licence": "GPL-3.0-or-later (LICENSE)",
-			"fidelity": "exact",
+			"fidelity": { "text": "exact", "tables": "exact" },
 			"better": "lower",
 			"unit": "cost",
 			"digits": 1,
@@ -1939,6 +2025,263 @@
 				},
 				"same_key_mod_factor": 0.03125,
 				"cost_tie": 0.01
+			}
+		},
+		"keycraft": {
+			"name": "keycraft",
+			"author": "Barend Scholtus (rbscholtus)",
+			"url": "https://github.com/rbscholtus/keycraft",
+			"repository": "https://github.com/rbscholtus/keycraft",
+			"revision": "f8c6419 (2026-11-25)",
+			"licence": "BSD-3-Clause (LICENSE, Copyright 2025, 2026 Barend Scholtus)",
+			"fidelity": { "text": "exact", "tables": "exact" },
+			"better": "higher",
+			"unit": "points",
+			"digits": 2,
+			"model": {
+				"whitespace": [
+					9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199,
+					8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288
+				],
+				"positions": {
+					"iso": [
+						"Tab",
+						"KeyQ",
+						"KeyW",
+						"KeyE",
+						"KeyR",
+						"KeyT",
+						"KeyY",
+						"KeyU",
+						"KeyI",
+						"KeyO",
+						"KeyP",
+						"BracketLeft",
+						"CapsLock",
+						"KeyA",
+						"KeyS",
+						"KeyD",
+						"KeyF",
+						"KeyG",
+						"KeyH",
+						"KeyJ",
+						"KeyK",
+						"KeyL",
+						"Semicolon",
+						"Quote",
+						"IntlBackslash",
+						"KeyZ",
+						"KeyX",
+						"KeyC",
+						"KeyV",
+						"KeyB",
+						"KeyN",
+						"KeyM",
+						"Comma",
+						"Period",
+						"Slash",
+						null,
+						null,
+						null,
+						null,
+						"Space",
+						null,
+						null
+					],
+					"ansi": [
+						"Tab",
+						"KeyQ",
+						"KeyW",
+						"KeyE",
+						"KeyR",
+						"KeyT",
+						"KeyY",
+						"KeyU",
+						"KeyI",
+						"KeyO",
+						"KeyP",
+						"BracketLeft",
+						"CapsLock",
+						"KeyA",
+						"KeyS",
+						"KeyD",
+						"KeyF",
+						"KeyG",
+						"KeyH",
+						"KeyJ",
+						"KeyK",
+						"KeyL",
+						"Semicolon",
+						"Quote",
+						null,
+						"KeyZ",
+						"KeyX",
+						"KeyC",
+						"KeyV",
+						"KeyB",
+						"KeyN",
+						"KeyM",
+						"Comma",
+						"Period",
+						"Slash",
+						null,
+						null,
+						null,
+						null,
+						"Space",
+						null,
+						null
+					]
+				},
+				"key_finger": {
+					"standard": [
+						0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3,
+						3, 6, 6, 7, 8, 9, 9, 4, 4, 4, 5, 5, 5
+					],
+					"anglemod": [
+						0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 0, 1, 2, 3, 3, 6, 6, 7, 8, 9, 9, 0, 1, 2, 3, 3,
+						3, 6, 6, 7, 8, 9, 9, 4, 4, 4, 5, 5, 5
+					]
+				},
+				"row_stagger": [0, 0.25, 0.75, 0],
+				"column_stagger": [0.35, 0.35, 0.1, 0, 0.1, 0.2, 0.2, 0.1, 0, 0.1, 0.35, 0.35],
+				"lsb_finger_pairs": [
+					[2, 3, 2],
+					[3, 2, 2],
+					[1, 3, 3.5],
+					[3, 1, 3.5],
+					[0, 1, 2],
+					[1, 0, 2],
+					[7, 6, 2],
+					[6, 7, 2],
+					[8, 6, 3.5],
+					[6, 8, 3.5],
+					[9, 8, 2],
+					[8, 9, 2]
+				],
+				"lsb_extra": {
+					"rowstag": [
+						[1, 26],
+						[2, 27],
+						[3, 28]
+					],
+					"anglemod": [[3, 28]],
+					"ortho": [],
+					"colstag": []
+				},
+				"full_scissors": [
+					{
+						"first": [24, 29],
+						"second": [0, 5],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3],
+							[0, 1],
+							[1, 2]
+						]
+					},
+					{
+						"first": [30, 35],
+						"second": [6, 11],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6],
+							[9, 8],
+							[8, 7]
+						]
+					}
+				],
+				"half_scissors": [
+					{
+						"first": [12, 17],
+						"second": [0, 5],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3]
+						]
+					},
+					{
+						"first": [24, 29],
+						"second": [12, 17],
+						"fingers": [
+							[2, 0],
+							[2, 1],
+							[2, 3],
+							[1, 0],
+							[1, 3]
+						]
+					},
+					{
+						"first": [18, 23],
+						"second": [6, 11],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6]
+						]
+					},
+					{
+						"first": [30, 35],
+						"second": [18, 23],
+						"fingers": [
+							[7, 6],
+							[7, 8],
+							[7, 9],
+							[8, 9],
+							[8, 6]
+						]
+					}
+				],
+				"target_hand_load": [50, 50],
+				"target_finger_load": [7, 10, 16, 17, 0, 0, 17, 16, 10, 7],
+				"target_row_load": [17.5, 75, 7.5],
+				"pinky_penalties": [
+					[0, 0, 2],
+					[0, 1, 1.5],
+					[1, 0, 1],
+					[1, 1, 0],
+					[2, 0, 2],
+					[2, 1, 1.5],
+					[0, 11, 2],
+					[0, 10, 1.5],
+					[1, 11, 1],
+					[1, 10, 0],
+					[2, 11, 2],
+					[2, 10, 1.5]
+				],
+				"weights": {
+					"SFB": -8,
+					"LSB": -4,
+					"FSB": -2.666,
+					"HSB": -1.333,
+					"SFS": -3,
+					"LSS": -1,
+					"FSS": -0.666,
+					"HSS": -0.333,
+					"RED": -0.001,
+					"RED-WEAK": -2.666,
+					"RED-SFS": -0.001,
+					"RED-NML": -1.333,
+					"ALT-SFS": -0.001,
+					"2RL-SFB": -0.001,
+					"3RL-SFB": -0.001,
+					"FLW": 8,
+					"HLD": -0.5,
+					"FLD": -1.5,
+					"RLD": -1,
+					"POH": -2
+				}
 			}
 		}
 	}

@@ -382,10 +382,12 @@ final class OwnedRuntimeInstallJournal {
 		completed = true
 	}
 	/// Removes only an unpublished recorded namespace. No service retirement or execution absence is inferred.
+	/// A journal holding only its header (a failure between `create()` and the stage's first record) recorded no
+	/// vnode, so retiring it removes the journal alone instead of leaving a ledger that refuses every later install.
 	func retireUnpublished() throws {
 		lock.lock(); defer { lock.unlock() }
 		try verify()
-		guard !publicationIntent, !nodes.isEmpty else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
+		guard !publicationIntent else { throw OwnedRuntimeInstallFailure.traced(.cleanupPending) }
 		for node in nodes.reversed() where !removed.contains(node.path) {
 			let parent = try openParent(node.path); defer { Darwin.close(parent) }
 			if retireIntent == nil {

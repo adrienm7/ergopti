@@ -402,6 +402,49 @@ _RunTrayMenuContractVectors() {
 		Assert(!ContractThrew, "TrayMenuDestroy must not throw: " . Err)
 	}
 	Test("TrayMenu: destroy does not throw", _Result_destroy)
+
+	; The setIcon vectors read A_IconFile, the icon AutoHotkey draws: the earlier
+	; spec's setIcon('active') passed because the adapter ignored the string, so
+	; nothing a setIcon did could fail (TRAY-04).
+	Logo := A_ScriptDir . "\..\..\..\img\logo\logo_simple.ico"
+	_Result_set_icon_draws_the_image() {
+		try {
+			Assert(FileExist(Logo) != "", "the fixture logo must exist: " . Logo)
+			AssertTrue(TrayMenuSetIcon(Map("image", Logo)), "set_icon_draws_the_image: an existing file is drawn")
+			AssertTrue(InStr(A_IconFile, "logo_simple.ico") > 0, "set_icon_draws_the_image: AutoHotkey draws that file, not " . A_IconFile)
+		} finally TrayMenuDestroy()
+	}
+	Test("TrayMenu: set_icon_draws_the_image (tray-04-2026-11-21)", _Result_set_icon_draws_the_image)
+
+	_Result_set_icon_refuses_a_missing_file() {
+		try {
+			AssertTrue(TrayMenuSetIcon(Map("image", Logo)))
+			Before := A_IconFile
+			Missing := A_Temp . "\tray-04-missing-" . A_TickCount . ".ico"
+			AssertFalse(TrayMenuSetIcon(Map("image", Missing)), "set_icon_refuses_a_missing_file: a missing file is refused")
+			AssertEqual(Before, A_IconFile, "set_icon_refuses_a_missing_file: the previous icon stays, nothing else is drawn")
+		} finally TrayMenuDestroy()
+	}
+	Test("TrayMenu: set_icon_refuses_a_missing_file (tray-04-2026-11-21)", _Result_set_icon_refuses_a_missing_file)
+
+	_Result_set_icon_refuses_a_state_name() {
+		try {
+			AssertTrue(TrayMenuSetIcon(Map("image", Logo)))
+			Before := A_IconFile
+			AssertFalse(TrayMenuSetIcon("active"), "set_icon_refuses_a_state_name: the old state string is refused")
+			AssertFalse(TrayMenuSetIcon(Map("state", "paused")), "set_icon_refuses_a_state_name: a map without an image is refused")
+			AssertEqual(Before, A_IconFile)
+		} finally TrayMenuDestroy()
+	}
+	Test("TrayMenu: set_icon_refuses_a_state_name (tray-04-2026-11-21)", _Result_set_icon_refuses_a_state_name)
+
+	_Result_destroy_then_set_icon_is_safe() {
+		try {
+			TrayMenuDestroy()
+			AssertTrue(TrayMenuSetIcon(Map("image", Logo)), "destroy_then_set_icon_is_safe: the icon comes back")
+		} finally TrayMenuDestroy()
+	}
+	Test("TrayMenu: destroy_then_set_icon_is_safe (tray-04-2026-11-21)", _Result_destroy_then_set_icon_is_safe)
 }
 _RunTrayMenuContractVectors()
 

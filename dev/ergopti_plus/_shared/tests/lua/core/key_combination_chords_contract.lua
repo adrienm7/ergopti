@@ -70,6 +70,40 @@ function M.register(h)
     h.assert_eq(pcall(plan, source), false, source)
    end
   end)
+  h.it("(kcl-copy-skips-chordless-tap) a tap no chord runs keeps its chord and is reported", function()
+   local source = '[mod_combos.config.caps_lock_then_tab]\ntap = "copy"\n[mod_combos.config.tab_then_caps_lock]\ntap = "paste"\ncombo = "copy"\n'
+   local candidate = Policy.plan_chord_copy(source, { entries = entries,
+    settings = { simultaneous_threshold_ms = 100, combo_symmetric = false },
+    is_action = function(action) return action == "copy" or action == "paste" end,
+    is_chord_action = function(action) return action == "copy" end })
+   h.assert_eq(candidate.changes, 1); h.assert_eq(candidate.rows[1].value, "copy")
+   h.assert_eq(candidate.rows[1].section, "mod_combos.config.caps_lock_then_tab")
+   h.assert_eq(candidate.mod_combos_config.tab_then_caps_lock, { tap = "paste", hold = "none", combo = "copy" })
+   h.assert_eq(candidate.skipped, { { id = "tab_then_caps_lock", action = "paste" } })
+   h.assert_eq(plan(source).skipped, {}, "without a chord admission every admitted tap copies")
+   h.assert_eq(pcall(Policy.plan_chord_copy, source, { entries = entries, is_action = function() return true end,
+    is_chord_action = true, settings = { simultaneous_threshold_ms = 100, combo_symmetric = false } }), false)
+  end)
+  local copy_file = assert(io.open(root .. "/tests/corpus/tap_hold/key_combination_chord_copy.json", "rb"))
+  local copy_corpus = require("core.text.engine.json").decode(copy_file:read("*a")); copy_file:close()
+  assert(#copy_corpus.cases >= 5, "the chord copy corpus lost its cases")
+  local copy_entries = {}
+  for _, pair_id in ipairs(copy_corpus.pairs) do copy_entries[#copy_entries + 1] = { id = pair_id } end
+  for _, case in ipairs(copy_corpus.cases) do
+   h.it("(kcd-1-copy-each-order) chord copy corpus: " .. case.name, function()
+    local candidate = Policy.plan_chord_copy(case.source, { entries = copy_entries, tap_section = Policy.TAP_SECTION,
+     settings = { simultaneous_threshold_ms = 100, combo_symmetric = false },
+     is_action = function(action) return action == "copy" or action == "paste" or action == "one_shot_shift" end,
+     is_chord_action = function(action) return Policy.CHORD_REFUSED_EVERYWHERE[action] ~= true end })
+    local got = {}
+    for _, row in ipairs(candidate.rows) do
+     h.assert_eq(row.key, "combo"); got[row.section] = row.delete and "<delete>" or row.value
+    end
+    local want = {}
+    for _, row in ipairs(case.rows) do want[row.section] = row.delete and "<delete>" or row.value end
+    h.assert_eq(got, want, case.name)
+   end)
+  end
   h.it("neutral document and already copied slots require no owned row", function()
    local empty = plan(""); h.assert_eq(empty.changes, 0); h.assert_eq(empty.settings.combo_symmetric, false)
    h.assert_eq(empty.settings.simultaneous_threshold_ms, 100)

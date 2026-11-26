@@ -1,0 +1,103 @@
+{
+	"description": "Cross-driver contract of the hotstring category glyph resolver (_shared/hotstrings/engine/category_glyph.lua and windows/hotstrings/engine/catalogue/category_glyph.ahk). Each vector gives the category's [_meta] fields (omitted when unset), the per-category default (omitted when the category has none) and the expected glyph, name key and refused fields; the shared defaults apply to every vector. badge_vectors pin the filled chip a preview row draws its glyph in, the first cell of the row: the chip starts at the row's padding, it is the widest glyph plus glyph_badge_pad_x on each side and the tallest plus glyph_badge_pad_y above and below, and the output text starts zone (the chip plus glyph_badge_gap) further right. A stack without a glyph has no badge and no gap: the output keeps the padding it had before the glyphs. The trigger label stays alone at the right. badge_layout holds the geometry the vectors use, not the shipped values.",
+	"defaults": {
+		"default_glyph": "•",
+		"default_name_key": "hs_config.cat_other",
+		"max_codepoints": 2
+	},
+	"vectors": [
+		{
+			"id": "meta_declares_both",
+			"meta": { "glyph": "✓", "glyph_name_key": "hs_config.cat_autocorrection" },
+			"expected": { "glyph": "✓", "name_key": "hs_config.cat_autocorrection" }
+		},
+		{
+			"id": "meta_wins_over_category_default",
+			"meta": { "glyph": "★" },
+			"category_glyph": "✎",
+			"category_name_key": "hs_config.cat_personal",
+			"expected": { "glyph": "★", "name_key": "hs_config.cat_personal" }
+		},
+		{
+			"id": "category_default_when_meta_is_silent",
+			"meta": {},
+			"category_glyph": "✎",
+			"category_name_key": "hs_config.cat_personal",
+			"expected": { "glyph": "✎", "name_key": "hs_config.cat_personal" }
+		},
+		{
+			"id": "shared_default_when_nothing_is_declared",
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "variation_selector_is_one_glyph",
+			"meta": { "glyph": "✓︎" },
+			"expected": { "glyph": "✓︎", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "astral_glyph_is_accepted",
+			"meta": { "glyph": "𝄞" },
+			"expected": { "glyph": "𝄞", "name_key": "hs_config.cat_other" }
+		},
+		{
+			"id": "a_word_is_refused",
+			"meta": { "glyph": "fix" },
+			"category_glyph": "✎",
+			"expected": {
+				"glyph": "✎",
+				"name_key": "hs_config.cat_other",
+				"rejected": { "glyph": "fix" }
+			}
+		},
+		{
+			"id": "whitespace_is_refused",
+			"meta": { "glyph": " " },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": " " } }
+		},
+		{
+			"id": "a_glyph_with_a_space_is_refused",
+			"meta": { "glyph": "✓ " },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": "✓ " } }
+		},
+		{
+			"id": "empty_glyph_is_refused",
+			"meta": { "glyph": "" },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": "" } }
+		},
+		{
+			"id": "non_string_glyph_is_refused",
+			"meta": { "glyph": 7 },
+			"expected": { "glyph": "•", "name_key": "hs_config.cat_other", "rejected": { "glyph": 7 } }
+		},
+		{
+			"id": "malformed_name_key_is_refused",
+			"meta": { "glyph": "✓", "glyph_name_key": "Autocorrection" },
+			"expected": {
+				"glyph": "✓",
+				"name_key": "hs_config.cat_other",
+				"rejected": { "glyph_name_key": "Autocorrection" }
+			}
+		}
+	],
+	"badge_layout": { "glyph_badge_pad_x": 3, "glyph_badge_pad_y": 1, "glyph_badge_gap": 8 },
+	"badge_vectors": [
+		{
+			"id": "a_glyph_gets_a_chip_before_the_output",
+			"glyph_w": 10,
+			"glyph_h": 15,
+			"expected": { "w": 16, "h": 17, "zone": 24 }
+		},
+		{
+			"id": "the_widest_glyph_sets_the_column",
+			"glyph_w": 14,
+			"glyph_h": 20,
+			"expected": { "w": 20, "h": 22, "zone": 28 }
+		},
+		{
+			"id": "no_glyph_no_column_no_gap",
+			"glyph_w": 0,
+			"glyph_h": 0,
+			"expected": { "w": 0, "h": 0, "zone": 0 }
+		}
+	]
+}

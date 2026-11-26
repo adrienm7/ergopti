@@ -31,8 +31,8 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 --- @param body function Receives (handler, state, values, pushed).
 local function with_bridge(stored, body)
 	local saved_storage = package.loaded["core.fs.adapters.storage"]
-	local saved_paths = package.loaded["infra.config_paths"]
-	local saved_picker = package.loaded["ui.config_dir_picker"]
+	local saved_paths = package.loaded["settings.engine.paths"]
+	local saved_picker = package.loaded["settings.ui.dir_picker"]
 	local values = stored
 	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, fallback)
@@ -47,13 +47,13 @@ local function with_bridge(stored, body)
 			return true
 		end,
 	}
-	package.loaded["infra.config_paths"] = nil
-	package.loaded["ui.config_dir_picker"] = {
+	package.loaded["settings.engine.paths"] = nil
+	package.loaded["settings.ui.dir_picker"] = {
 		pick = function(_, _, _, current) return "/picked/from/" .. tostring(current) end,
 	}
-	package.loaded["ui.paths_editor.bridge"] = nil
+	package.loaded["settings.ui.paths_editor.bridge"] = nil
 	local ok, err = pcall(function()
-		local handler = helpers.load_module("ui.paths_editor.bridge")
+		local handler = helpers.load_module("settings.ui.paths_editor.bridge")
 		local pushed = {}
 		-- The running sink: a save must move it, since the daemon outlives
 		-- this editor's reload.
@@ -81,9 +81,9 @@ local function with_bridge(stored, body)
 		body(handler, state, values, pushed)
 	end)
 	package.loaded["core.fs.adapters.storage"] = saved_storage
-	package.loaded["infra.config_paths"] = saved_paths
-	package.loaded["ui.config_dir_picker"] = saved_picker
-	package.loaded["ui.paths_editor.bridge"] = nil
+	package.loaded["settings.engine.paths"] = saved_paths
+	package.loaded["settings.ui.dir_picker"] = saved_picker
+	package.loaded["settings.ui.paths_editor.bridge"] = nil
 	if not ok then error(err, 0) end
 end
 
@@ -91,7 +91,7 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 	helpers.it("sends the current and the default logs folder", function()
 		with_bridge({ ["paths.logs_dir"] = "/sync/" .. FOLDER }, function(handler, state)
 			local result = handler.on_message({ action = "ready" }, state)
-			local ConfigPaths = require("infra.config_paths")
+			local ConfigPaths = require("settings.engine.paths")
 			helpers.assert_eq(result.data.logsDir, "/sync/" .. FOLDER)
 			helpers.assert_eq(result.data.defaultLogsDir, ConfigPaths.default_logs_dir())
 		end)
@@ -224,7 +224,7 @@ helpers.describe("paths-editor-atomic: related directory overrides", function()
 			helpers.assert_eq(result.saved, true)
 			helpers.assert_eq(calls, 1)
 			helpers.assert_nil(values["paths.config_dir"]); helpers.assert_nil(values["paths.logs_dir"])
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			helpers.assert_eq(paths.get_config_dir(), paths.default_config_dir())
 			helpers.assert_eq(paths.get_logs_dir(), paths.default_logs_dir())
 		end)

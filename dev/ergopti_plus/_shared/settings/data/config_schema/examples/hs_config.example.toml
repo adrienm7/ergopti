@@ -43,7 +43,9 @@ trigger_char = "★"
 # which drivers honour it is declared in the manifest's "platforms" field.
 expansion_delay = 0.75
 preview_ai_enabled = true
+preview_announcements = true
 preview_autocorrect_enabled = true
+preview_category_glyphs = true
 preview_colored_tooltips = true
 preview_star_enabled = true
 
@@ -66,9 +68,6 @@ time_activation_seconds = 0.5
 [hotstrings.rolls.hc]
 enabled = true
 time_activation_seconds = 0.5
-
-[hotstrings.magic_key.replace]
-enabled = true
 
 [hotstrings.dynamic.date_fr]
 enabled = true
@@ -218,7 +217,6 @@ chatgpt_url = "https://chat.openai.com"
 
 [shortcuts.keys]
 cmd_shift_v = true
-cmd_star = true
 ctrl_a = true
 ctrl_d = true
 ctrl_e = true
@@ -357,7 +355,3 @@ swipe_5_down = 3.5
 
 [hotstrings.editor]
 close_on_add = false
-
-[hotstrings.editor.shortcut]
-key = "★"
-mods = ["ctrl"]

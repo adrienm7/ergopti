@@ -29,7 +29,7 @@ over the file, destroying the settings it did not know.
 `config.toml` carries its version in `[_meta] schema_version`. One data file,
 `_shared/settings/data/config_schema/migrations.toml`, is the only registry of versions
 and of the steps between them; every driver reads it at runtime (Windows with
-`windows/infra/config_migrate.ahk`, macOS and Linux with
+`windows/settings/engine/migration/migrate.ahk`, macOS and Linux with
 `_shared/settings/engine/migration/migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
 drivers whose files it changes and an ordered list of ops drawn from a closed,
 data-only set: `rename`, `rename_prefix`, `move_section`, `merge_into`,
@@ -147,11 +147,11 @@ placeholder stamped with the current version.
 
 - Registry: `static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml`
 - Interpreters: `static/ergopti_plus/_shared/settings/engine/migration/migrate.lua`,
-  `static/ergopti_plus/windows/infra/config_migrate.ahk`
+  `static/ergopti_plus/windows/settings/engine/migration/migrate.ahk`
 - Corpus: `static/ergopti_plus/_shared/tests/corpus/config_migrations/`,
   `static/ergopti_plus/_shared/tests/corpus/config_migration_registries/`
 - Gates: `tools/test/test-config-migrations.cjs` (registry shape, closed op set,
   reference replay, interpreter wiring),
-  `static/ergopti_plus/windows/tests/unit/infra/config/migration/test_config_migrate.ahk`,
-  `static/ergopti_plus/macos/tests/unit/infra/config/test_config_migrate.lua`,
-  `static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua`
+  `static/ergopti_plus/windows/tests/unit/settings/engine/migration/test_migrate.ahk`,
+  `static/ergopti_plus/macos/tests/unit/settings/migration/test_migrate.lua`,
+  `static/ergopti_plus/linux/tests/unit/settings/migration/test_migrate.lua`

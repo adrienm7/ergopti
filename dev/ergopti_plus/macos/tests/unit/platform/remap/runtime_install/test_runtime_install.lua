@@ -101,6 +101,51 @@ helpers.describe("owned runtime first install", function()
 		end
 	end)
 
+	-- Field report 2026-11-15: every attempt read « the helper left cleanup pending » while the launcher's own log
+	-- line named the helper trail's errno 24 (owned-install-trail-cause).
+	helpers.it("names the helper trail's cause of a cleanup left pending", function()
+		local trail = "fd-limit-256-to-10240,refused-source-root-dup-errno-24-fds-250-of-256:OwnedRuntimeInstallWorker.swift:239,"
+			.. "publish-failed-source,refused-cleanupPending:OwnedRuntimeInstallJournal.swift:388"
+		local installer, world = fake(function()
+			return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|" .. trail .. "\n"
+		end)
+		local result
+		installer.install(function(ok, reason, detail, cause)
+			result = { ok = ok, reason = reason, detail = detail, cause = cause }
+		end)
+		helpers.assert_eq(result.reason, "install_cleanup_pending")
+		helpers.assert_eq(result.cause, "source-root-dup-errno-24-fds-250-of-256")
+		helpers.assert_eq(result.detail, "the helper left cleanup pending at step helper, trail " .. trail)
+		helpers.assert_eq(#world.commands, 1, "no activation after a cleanup left pending")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause("publish-failed-source"), "publish-failed-source")
+		helpers.assert_nil(Install.trail_cause(nil))
+		helpers.assert_eq(#Install.trail_cause("refused-" .. string.rep("x", 90)), Install.CAUSE_MAX_LENGTH)
+		-- A line whose trail breaks the closed grammar is not read as a trail.
+		local odd = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|a b\n" end)))
+		helpers.assert_eq(odd.reason, "install_unanswered")
+	end)
+
+	-- Field report 2026-11-23: the redaction read `refused-destination@OwnedRuntimeFirstInstallOwner.swift:62` as an
+	-- e-mail address, so the log, the error dialog and the report all said `<email>:62` instead of the cause.
+	helpers.it("keeps the helper trail's refusal through the diagnostics redaction", function()
+		local trail = "refused-destination:OwnedRuntimeFirstInstallOwner.swift:62,publish-failed-destination"
+		local result = install((fake(function()
+			return 77, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|helper|" .. trail .. "\n"
+		end)))
+		helpers.assert_eq(result.reason, "install_refused")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause(trail), "destination")
+		-- The pinned 16.3.0-ergopti.6 helper still writes `@` before the file.
+		helpers.assert_eq(Install.trail_cause("refused-destination@OwnedRuntimeFirstInstallOwner.swift:62"), "destination")
+		local file = assert(io.open(helpers.shared("diagnostics/data/redaction.json"), "rb"))
+		local rules = require("core.text.engine.json").decode(file:read("*a"))
+		file:close()
+		local redacted = require("diagnostics.engine.reports.redact").apply(result.detail, rules, {})
+		helpers.assert_eq(redacted, result.detail)
+		helpers.assert_true(redacted:find("refused-destination:OwnedRuntimeFirstInstallOwner.swift:62", 1, true) ~= nil, redacted)
+	end)
+
 	helpers.it("refuses without a launcher and when the manager is absent or fails", function()
 		local installer, world = fake(function() error("unreachable") end,
 			{ launcher = function() return nil, "no bundle" end })
@@ -148,5 +193,58 @@ helpers.describe("owned runtime first install", function()
 		helpers.assert_eq(#results, 2)
 		helpers.assert_eq(results[1], true)
 		helpers.assert_eq(results[2], true)
+	end)
+
+	-- Field report 2026-11-24: an earlier install's journal made every helper refuse at its exclusive create, and the
+	-- dialog showed only the helper's trail. The administrator shell now retires that journal, and stops before
+	-- touching anything when a live helper still holds it (stale-install-journal).
+	helpers.it("names another install still running apart from a cleanup left pending (stale-install-journal)", function()
+		local busy = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|77|install_busy\n" end)))
+		helpers.assert_eq(busy.reason, "install_busy")
+		helpers.assert_true(busy.detail:find("nothing was stopped or removed", 1, true) ~= nil, busy.detail)
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.REASON.BUSY, "install_busy")
+		-- The same step under another status is not the busy refusal.
+		local other = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|1|install_busy\n" end)))
+		helpers.assert_eq(other.reason, "install_failed")
+		-- The step the shell names is the launcher's own constant.
+		local source = assert(require("tests.support.source_file").read(helpers.driver_root()
+			.. "/launcher/Sources/ErgoptiPlus/UninstallWorker.swift"))
+		helpers.assert_true(source:find('static let busyStep = "' .. Install.BUSY_STEP .. '"', 1, true) ~= nil,
+			"BUSY_STEP must match OwnedRuntimeUninstall.busyStep")
+	end)
+
+	helpers.it("tells the user what to do after a cleanup left pending or another install (stale-install-journal)", function()
+		local Install = require("platform.remap.runtime_install")
+		local cases = {
+			{ Install.REASON.CLEANUP_PENDING, "karabiner.owned_install.failed_cleanup_pending" },
+			{ Install.REASON.BUSY, "karabiner.owned_install.failed_busy" },
+			{ Install.REASON.FAILED, "karabiner.owned_install.failed" },
+		}
+		for _, case in ipairs(cases) do
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+			local alerts, scheduled = {}, {}
+			local dialog_util = { block_alert = function(title, body, first)
+				alerts[#alerts + 1] = { title = title, body = body }
+				return first
+			end }
+			local deferred = { after = function(_, fn) scheduled[#scheduled + 1] = fn; return true end }
+			local Dialog = helpers.load_with_stubs("ai.ui.owned_runtime_install", {
+				["core.ui.engine.dialog_util"] = dialog_util,
+				["core.timing.engine.deferred_work"] = deferred,
+			})
+			package.loaded["core.ui.engine.dialog_util"] = dialog_util
+			package.loaded["core.timing.engine.deferred_work"] = deferred
+			local started = Dialog.open({
+				install_owned_runtime = function(on_done) on_done(false, case[1], "detail"); return true end,
+			}, function() error("a failed install never reloads") end)
+			helpers.assert_eq(started, true)
+			helpers.assert_eq(#scheduled, 1, case[1])
+			scheduled[1]()
+			helpers.assert_eq(alerts[2].body, case[2], case[1])
+			package.loaded["core.ui.engine.dialog_util"] = nil
+			package.loaded["core.timing.engine.deferred_work"] = nil
+			package.loaded["ai.ui.owned_runtime_install"] = nil
+		end
 	end)
 end)

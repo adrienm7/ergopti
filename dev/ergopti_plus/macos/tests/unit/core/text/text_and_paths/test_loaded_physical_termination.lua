@@ -86,7 +86,7 @@ local function fixture(options)
 		quit_layout_step = { run = function() state.layout_calls = state.layout_calls + 1; return true end },
 	}, { __index = _G })
 	if options.mlx then
-		loaded["ui.menu.menu_llm"] = {
+		loaded["ai.ui.menu"] = {
 			stop_mlx_server = function(callback) state.mlx_calls = state.mlx_calls + 1; state.mlx_callback = callback; return true end,
 			terminate_helper_processes = function() return true end,
 			retire_owned_ollama = function(callback) callback(true, "fixture daemon retired"); return true end,

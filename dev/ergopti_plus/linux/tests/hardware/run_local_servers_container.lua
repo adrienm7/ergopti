@@ -27,7 +27,7 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 	end
 end
 
-local Servers = require("modules.llm.local_servers")
+local Servers = require("ai.engine.local_servers.local_servers")
 local EventLoop = require("core.events.loop")
 
 local finished, changed = false, nil

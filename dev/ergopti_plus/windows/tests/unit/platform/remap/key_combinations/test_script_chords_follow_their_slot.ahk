@@ -143,16 +143,20 @@ Test("script chords: the submenu switch off leaves every chord to the system (sc
 ; injecting host input. The suffix-only twins retain their actual released-host
 ; check; this isolates the combination route and its slot ownership.
 _SCFS_CriteriaAskTheSlot(Pressed := true) {
-	global TapHold, _ALTGR_PHYSICAL_STATE_QUERY
-	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true), Query: _ALTGR_PHYSICAL_STATE_QUERY }
+	global TapHold, _ALTGR_PHYSICAL_STATE_QUERY, _ALTGR_PRIOR_KEY_QUERY
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true), Query: _ALTGR_PHYSICAL_STATE_QUERY,
+		Prior: _ALTGR_PRIOR_KEY_QUERY }
 	try {
 		TapHold := Map("keys", Map(), "layers", Map())
 		_ALTGR_PHYSICAL_STATE_QUERY := (Key) => Pressed
+		; A shortcut: AltGr pressed, then its key (altgr-shortcut-sequence-2026-11-17).
+		_ALTGR_PRIOR_KEY_QUERY := () => "sc138"
 		_SCFS_WithAssignments(_SCFS_Assignments("none"), _SCFS_CriteriaExpect.Bind(false))
 		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(Pressed))
 		_SCFS_WithAssignments(_SCFS_Assignments(""), _SCFS_CriteriaExpect.Bind(false), false)
 	} finally {
 		_ALTGR_PHYSICAL_STATE_QUERY := Saved.Query
+		_ALTGR_PRIOR_KEY_QUERY := Saved.Prior
 		TapHold := Saved.TapHold
 		_TestRestoreAltGrFamily(Saved.Family)
 	}

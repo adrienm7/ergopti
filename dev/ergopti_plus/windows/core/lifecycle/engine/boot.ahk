@@ -12,7 +12,7 @@
 ; FEATURES & RATIONALE:
 ; 1. In-place include: AHK runs top-level statements in #Include order, so
 ;    relocating this block to its own file and #Include-ing it at the original
-;    line preserves boot order exactly (same technique as infra/feature_state.ahk).
+;    line preserves boot order exactly (same technique as settings/engine/preferences/feature_state.ahk).
 ; 2. Thin entry: keeps ErgoptiPlus.ahk focused on the #Include manifest and the
 ;    high-level boot orchestration rather than the line-by-line init detail.
 ; 3. No directives/hotkeys: this block is pure top-level initialisation, so it
@@ -71,7 +71,7 @@ ConfigTransitionRecoverAtBootOrThrow(_PathsFile)
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
-; Defaults to %LOCALAPPDATA%\Ergopti\config\ (infra/app_folders.ahk); must end
+; Defaults to %LOCALAPPDATA%\Ergopti\config\ (apps/engine/folders.ahk); must end
 ; with a backslash.
 global _DefaultConfigDir := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\config\")
@@ -160,9 +160,10 @@ global IconPath := _LogoDir . "\logo_simple.ico"
 global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
 ; Set the custom tray icon immediately so the default green AHK icon never
-; appears — even briefly during the module loading phase that follows.
-if FileExist(IconPath)
-		TraySetIcon(IconPath)
+; appears — even briefly during the module loading phase that follows. A
+; missing logo is logged and drawn as the warning sign, never left as the
+; AutoHotkey icon (TRAY-05).
+TrayApplyStateIcon(false, IconPath)
 
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
 ; autohotkey/ holds driver-specific files; hotstrings/ holds the shared TOML

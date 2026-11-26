@@ -19,7 +19,7 @@ local helpers, fresh_client =
 helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("keeps blocking process APIs out of the LLM transport path", function()
 		local scanned = 0
-		for _, relative in ipairs({ "core.network.adapters.http_client", "modules.llm.api_ollama" }) do
+		for _, relative in ipairs({ "core.network.adapters.http_client", "ai.engine.api.api_ollama" }) do
 			local source = assert(helpers.read_module_source(relative))
 			scanned = scanned + 1
 			helpers.assert_true(source:find("io.popen", 1, true) == nil,

@@ -4,8 +4,8 @@
 --- MODULE: Diversity Temperature — Shared Lua Implementation
 --- DESCRIPTION:
 --- The temperature of each variant when several predictions are asked one
---- after another. The macOS backends (modules/llm/api_common.lua) and the Linux
---- engine (modules/llm/inference.lua) both compute it here, from the
+--- after another. The macOS backends (ai/engine/api/common.lua) and the Linux
+--- engine (ai/engine/local_servers/inference.lua) both compute it here, from the
 --- `diversity_temperature` section of _shared/ai/data/inference.json.
 ---
 --- FEATURES & RATIONALE:
@@ -17,7 +17,7 @@
 --- 3. The result never exceeds the policy's maximum.
 ---
 --- The AutoHotkey twin is LLM_ApiCommon_GetDiversityTemp in
---- windows/modules/llm/api_common.ahk. Pinned by
+--- windows/ai/engine/api/common.ahk. Pinned by
 --- _shared/tests/corpus/llm/temperature_vectors.json.
 --- ==============================================================================
 

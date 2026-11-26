@@ -59,6 +59,14 @@ global TEST_NOT_EXECUTED_COUNT := 0
 ; report.cjs parse the same spelling.
 global TEST_NOT_EXECUTED_MARKER := " # SKIP NOT EXECUTED: "
 
+; How long a test waits for a real child process or a local peer to settle by
+; itself. Each such wait polls its explicit condition, so a healthy run returns
+; as soon as the child does; this bound only decides when a stalled one fails.
+; A hosted Windows runner ran 10 to 50 times slower than usual for minutes
+; (CI run 45247903986): 330 ms PowerShell children took over 5 s and a 2.7 s
+; managed request over 30 s, so short per-test literals failed healthy code.
+global TEST_NATIVE_SETTLE_TIMEOUT_MS := 60000
+
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
 ; Default false when no runner pre-declares it (run_all sets true for --dry-run).
@@ -784,31 +792,31 @@ global TEST_MODULE_GROUPS := [
 	; Source-scanning meta tests of the whole driver.
 	["meta", "^meta/"],
 	; Local LLM server panel (view preparation, discovery, panel actions).
-	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	["llm-server-panel", "^unit/ai/servers/test_local_server_panel"],
 	; Every other local and managed LLM server test: sharing, publication, Ollama.
-	["llm-servers", "^unit/modules/llm/servers/"],
+	["llm-servers", "^unit/ai/servers/"],
 	; LLM terminal navigation owner.
-	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	["llm-terminal", "^unit/ai/nav_event_owner/"],
 	; The rest of the LLM module: prediction, menus, API clients.
-	["llm", "^unit/modules/llm/"],
+	["llm", "^unit/ai/"],
 	; Configuration version transitions.
-	["config-transition", "^unit/infra/config/transition/"],
+	["config-transition", "^unit/settings/engine/transition/"],
 	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
-	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	["config-scope-global", "^unit/settings/engine/scope/test_(global_config_scope|restore_recommended_no_confirm|menus|shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
 	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
-	["config-scope-features", "^unit/infra/config/scope/"],
+	["config-scope-features", "^unit/settings/engine/scope/"],
 	; Configuration storage, TOML and the updater.
-	["config-updater", "^unit/infra/config/|^unit/core/text/toml/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
-	; Hotstrings, dynamic hotstrings and shortcuts.
-	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	; Keyboard remapping, layouts and gestures.
-	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	["config-updater", "^unit/settings/engine/|^unit/core/text/toml/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	; Hotstrings (with their keyboard layout expander), dynamic hotstrings and shortcuts.
+	["hotstrings-shortcuts", "^unit/(hotstrings|modules/shortcuts)/"],
+	; Keyboard remapping, layouts, gestures and the Take note action a gesture runs.
+	["keymap-gestures", "^unit/(platform/remap|modules/keymap|modules/take_note|gestures)/"],
 	; Keystats capture, storage and metrics.
 	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
-	["ui", "^unit/ui/"],
+	["ui", "^unit/(ui|menu|ai|apps|diagnostics/ui)/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|tray|ai|apps|clipboard|diagnostics)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.
@@ -1382,6 +1390,37 @@ MsgBox(Text := "", Title := "", Options := "") {
 	TestMsgBoxCount(true)
 	Responder := TestMsgBoxResponder()
 	return IsObject(Responder) ? Responder(Text, Title, Options) : ""
+}
+
+; A real InputBox is a native window: a test path that reached one showed it on
+; the desktop and waited for a person. The stub answers Cancel, like the user
+; closing it, unless a test answers in the user's place.
+InputBox(Prompt := "", Title := "", Options := "", Default := "") {
+	TestInputBoxCount(true)
+	Responder := TestInputBoxResponder()
+	return IsObject(Responder) ? Responder(Prompt, Title, Options, Default) : {Result: "Cancel", Value: ""}
+}
+
+; Lets one test answer the stubbed InputBox. Always clear it (pass "") in the
+; test's finally block.
+; @param {Func|String} Responder Called with (Prompt, Title, Options, Default),
+;     returning {Result, Value}; "" clears.
+; @returns {Func|String} The responder in force.
+TestInputBoxResponder(Responder?) {
+	static Current := ""
+	if IsSet(Responder)
+		Current := Responder
+	return Current
+}
+
+; Counts the input dialogs the stub above absorbed.
+; @param {Boolean} Record True to count one more dialog.
+; @returns {Integer} Dialogs absorbed so far.
+TestInputBoxCount(Record := false) {
+	static Count := 0
+	if Record
+		Count += 1
+	return Count
 }
 
 ; Lets one test answer the stubbed MsgBox in place of the user, for code that

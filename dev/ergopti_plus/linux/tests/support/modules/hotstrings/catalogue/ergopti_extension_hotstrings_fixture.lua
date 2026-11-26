@@ -36,6 +36,45 @@ local function exists(path)
 	return fh ~= nil
 end
 
+--- The lines of a shipped file that contain a plain text, counted from the file
+--- itself rather than through the loader the tests compare it with.
+--- @param path string
+--- @param needle string|nil Plain text to find; nil matches with pattern.
+--- @param pattern string|nil Lua pattern a whole line must match.
+--- @return number
+local function count_lines(path, needle, pattern)
+	local fh = assert(io.open(path, "rb"))
+	local text = fh:read("*a")
+	fh:close()
+	local count = 0
+	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+		line = line:gsub("\r$", "")
+		if (needle and line:find(needle, 1, true)) or (pattern and line:match(pattern)) then count = count + 1 end
+	end
+	assert(count > 0, "the shipped file must hold what is counted: " .. path)
+	return count
+end
+
+--- The folder of the Ergopti extension this checkout ships.
+--- @return string
+local function ergopti_dir()
+	return Paths.shared_root() .. "/../../layouts/registry/ergopti"
+end
+
+--- The inline entries one shipped Ergopti hotstrings file holds.
+--- @param stem string File name without .toml.
+--- @return number
+local function file_entries(stem)
+	return count_lines(ergopti_dir() .. "/hotstrings/" .. stem .. ".toml", "= { output = ")
+end
+
+--- The hotstring bindings the shipped Ergopti manifest declares: each becomes
+--- one bound file of the discovered extension.
+--- @return number
+local function manifest_bindings()
+	return count_lines(ergopti_dir() .. "/manifest.toml", nil, "^%[extension%.hotstring_bindings%.[^%]]+%]$")
+end
+
 --- The shipped roots: bundled extensions, then the Ergopti extension when shipped.
 --- @param with_ergopti boolean Whether the registry ships the Ergopti extension.
 --- @return table
@@ -53,8 +92,8 @@ end
 --- @return table catalogue
 --- @return table found
 local function load(with_ergopti)
-	local Loader = helpers.load_module("modules.hotstrings.loader")
-	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local Loader = helpers.load_module("hotstrings.engine.loader")
+	local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 	local found = Extensions.scan(roots(with_ergopti), {
 		list_dirs = Loader.list_subdirs, list_files = Loader.find_toml_files, read_file = Loader.read_file,
 	})
@@ -89,7 +128,7 @@ end
 --- The independent pre-move reference shared by all three native suites.
 --- @return table
 local function distance_reference()
-	local text = assert(require("modules.hotstrings.loader").read_file(
+	local text = assert(require("hotstrings.engine.loader").read_file(
 		Paths.shared("tests/corpus/hotstrings/distance_reduction_entries.json")))
 	return Json.decode(text)
 end
@@ -127,7 +166,7 @@ end
 --- @param dir string
 --- @return table categories
 local function load_with_user_folder(dir)
-	local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local Config = helpers.load_module("hotstrings.engine.catalogue.config")
 	-- The engine accepts the catalogue: the owner publishes a catalogue only
 	-- once its engine has, so a silent stub would leave every category out.
 	Config.init({ load_mappings = function() return true end }, dir)
@@ -153,13 +192,15 @@ local function with_offline_shipped_probe(body)
 		observed.network = observed.network + 1
 		error("the offline shipped source must not fetch network data")
 	end
-	FileSystem.read = function(path)
-		observed.reads[#observed.reads + 1] = path
-		if observed.refuse and path == Paths.shared(observed.refuse) then return nil end
-		return previous_read(path)
-	end
 	local ok, err = pcall(function()
+		-- Loading the registry resolves its failure codes from the layout
+		-- defaults; the reads recorded are the resolution's alone.
 		local Registry = helpers.load_module(registry_name)
+		FileSystem.read = function(path)
+			observed.reads[#observed.reads + 1] = path
+			if observed.refuse and path == Paths.shared(observed.refuse) then return nil end
+			return previous_read(path)
+		end
 		body(Registry, observed)
 	end)
 	Http.get, FileSystem.read = previous_get, previous_read
@@ -172,7 +213,7 @@ end
 --- @param configure function Receives the recording native ports and actual owner list.
 --- @param body function Receives the fresh actual Loader.
 local function with_exact_loader_ports(configure, body)
-	local names = { "lfs", "luv", "modules.hotstrings.loader", "core.network.engine.curl_identity" }
+	local names = { "lfs", "luv", "hotstrings.engine.loader", "core.network.engine.curl_identity" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local Exact = require("core.network.engine.curl_identity")
@@ -187,9 +228,9 @@ local function with_exact_loader_ports(configure, body)
 	end
 	package.loaded.luv = native
 	package.loaded.lfs = { attributes = function() return { mode = "file", dev = 11, ino = 100 } end }
-	package.loaded["modules.hotstrings.loader"] = nil
+	package.loaded["hotstrings.engine.loader"] = nil
 	local ok, err = pcall(function()
-		local Loader = require("modules.hotstrings.loader")
+		local Loader = require("hotstrings.engine.loader")
 		configure(Loader, native, state, owners, Exact)
 		body(Loader, native, state, owners)
 	end)
@@ -206,6 +247,8 @@ return {
 	Extensions = Extensions,
 	registry_settings = registry_settings,
 	exists = exists,
+	file_entries = file_entries,
+	manifest_bindings = manifest_bindings,
 	roots = roots,
 	load = load,
 	mapping = mapping,

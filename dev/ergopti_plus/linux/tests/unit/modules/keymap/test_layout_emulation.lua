@@ -31,11 +31,10 @@ local KEY_Q, KEY_D, KEY_C, KEY_BACKSLASH, KEY_BACKSPACE, KEY_F1 = 16, 32, 46, 43
 local function fixture(layout, overrides)
 	package.loaded["modules.keymap.layout_emulation"] = nil
 	local M = require("modules.keymap.layout_emulation")
-	local record = { typed = {}, dispatched = {}, shortcuts = {}, keys = {}, now = 0, paused = false, typable = true,
-		magic = nil }
+	local record = { typed = {}, dispatched = {}, shortcuts = {}, keys = {}, now = 0, paused = false, typable = true }
 	local deps = {
 		read_config = function() return { layout = layout } end,
-		default_for = require("infra.manifest_reader").default_for,
+		default_for = require("menu.engine.manifest_reader").default_for,
 		source = function(id)
 			for _, entry in ipairs(INDEX.layouts) do
 				if entry.id == id then
@@ -60,8 +59,12 @@ local function fixture(layout, overrides)
 		end,
 		now_ms = function() return record.now end,
 		caps_locked = function() return false end,
-		magic_evdev = function() return record.magic end,
 		is_active = function() return not record.paused end,
+		ergopti_family = function() return "ergopti" end,
+		typed_text = function() return record.before or "" end,
+		-- The session layout's keys: none unless a case names some, so a press
+		-- keeps the typed route the older cases pin.
+		resolve_key = function(char) return record.session_keys and record.session_keys[char] or nil end,
 	}
 	for key, value in pairs(overrides or {}) do deps[key] = value end
 	M.init(deps)
@@ -79,6 +82,38 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not M.status().active, "nothing is emulated")
 		helpers.assert_true(not press(M, KEY_Q), "the key passes")
 		helpers.assert_eq(#record.typed, 0, "nothing typed")
+	end)
+
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): before it, every
+	-- emulated character was typed as a tap and again on each repeat, so a game
+	-- could neither bind nor hold it.
+	helpers.it("holds the session layout's key that types the character (game-keys-held)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		helpers.assert_true(M.reload(), "the shipped Ergopti layout loads")
+		record.session_keys = { ["è"] = { keycode = 26, mods = {} } }
+		local consumed, repeat_callback, release_callback, hold = press(M, KEY_Q, {}, "q")
+		helpers.assert_true(consumed, "the press is consumed")
+		helpers.assert_eq(#record.typed, 0, "nothing typed: the key itself goes out")
+		helpers.assert_eq(hold and hold.code, 26, "held on the session layout's key that types è")
+		helpers.assert_nil(release_callback, "the hook owns the held key's release")
+		helpers.assert_eq(#record.dispatched, 0, "the character path waits for the down on the wire")
+		hold.after()
+		helpers.assert_eq(record.dispatched, { "è" }, "then sees the character once")
+		helpers.assert_true(repeat_callback({ code = KEY_Q, mods = {}, value = 2 }), "the held key's repeat")
+		helpers.assert_eq(#record.typed, 0, "a repeat is never re-typed")
+		helpers.assert_eq(record.dispatched, { "è", "è" }, "each repeat the wire took reaches the character path")
+		helpers.assert_true(not repeat_callback({ code = KEY_D, mods = {}, value = 2 }), "another key's repeat is refused")
+	end)
+
+	helpers.it("keeps the typed route for a character the session layout cannot type as held (game-keys-text-route)", function()
+		local M, record = fixture({ ergopti_base = true, ergopti_variant = "ergopti" })
+		M.reload()
+		record.session_keys = { ["È"] = { keycode = 26, mods = { "shift" } } }
+		local consumed, _, _, hold = press(M, KEY_Q, {}, "q")
+		helpers.assert_true(consumed and hold == nil, "è has no key of its own: typed")
+		helpers.assert_eq(record.typed, { "è" })
+		local _, _, _, shifted = press(M, KEY_Q, { shift = true }, "Q")
+		helpers.assert_eq(shifted and shifted.code, 26, "È with the hand's Shift is the same key, held")
 	end)
 
 	helpers.it("types the built-in Ergopti variant in the grabbed key's place", function()
@@ -141,6 +176,50 @@ helpers.describe("layout emulation (Linux consumption)", function()
 		helpers.assert_true(not press(M, KEY_F1, { ctrl = true }), "a key outside the layout passes")
 	end)
 
+	-- The Windows built-in base reads the four accented-letter choices; the
+	-- shared emulation took every chord from the Command level, so Ctrl+è stayed
+	-- Ctrl+Z whatever letter the user chose, or with the shortcut off.
+	helpers.it("sends the letter chosen for an accented key of an Ergopti layout (accented-emulated)", function()
+		local function family_source(id)
+			for _, entry in ipairs(INDEX.layouts) do
+				if entry.id == id then
+					return { id = id, text = read_all(Paths.shared("../../layouts/registry/" .. entry.file)),
+						convention = entry.keycode_convention, composer = false, family = entry.family }
+				end
+			end
+			return nil, "not shipped"
+		end
+		local config = { layout = { emulated_layout = "ergopti", ergopti_base = true },
+			shortcuts = { e_grave = { enabled = true, letter = "k" } } }
+		local M, record = fixture({}, { source = family_source, read_config = function() return config end })
+		helpers.assert_true(M.reload())
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true }), "Ctrl+è is replaced")
+		helpers.assert_eq(record.shortcuts, { "k" }, "the letter chosen for è, not the Command level's z")
+		helpers.assert_eq(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }), "k", "the shortcut slots match it too")
+		helpers.assert_true(M.owns_chord({ code = KEY_Q, mods = { ctrl = true } }),
+			"the OS-layout accented shortcuts leave the key to the emulation")
+		-- Switched off, the chord keeps the accented letter, as « Désactivé » on Windows.
+		config.shortcuts.e_grave = { enabled = false, letter = "k" }
+		helpers.assert_true(M.reload())
+		helpers.assert_true(press(M, KEY_Q, { ctrl = true }))
+		helpers.assert_eq(record.shortcuts, { "k", "è" })
+		-- Another family keeps its own Command level.
+		config.layout.emulated_layout = "ergol"
+		config.shortcuts.e_grave = { enabled = true, letter = "k" }
+		helpers.assert_true(M.reload())
+		helpers.assert_eq(M.status().id, "ergol")
+		helpers.assert_true(M.chord_key({ code = KEY_Q, mods = { ctrl = true } }) ~= "k",
+			"ergol's chord comes from its Command level, not the choice")
+	end)
+
+	helpers.it("leaves the chords of a key it does not emulate to the OS layout (accented-emulated)", function()
+		local M = fixture({ emulated_layout = "ergopti", ergopti_base = false, ergopti_alt_gr = true })
+		helpers.assert_true(M.reload())
+		helpers.assert_true(M.status().active, "AltGr alone is emulated")
+		helpers.assert_eq(M.owns_chord({ code = KEY_Q, mods = { ctrl = true } }), false,
+			"the OS layout types the base layer, so its accented shortcuts apply")
+	end)
+
 	-- Windows registers a keyboard slot on the key that types its letter in the
 	-- emulated layout; Linux matched the system layout's key (ILX-001).
 	helpers.it("names the emulated letter of a chord for the shortcut slots, typing nothing (ilx-001-slot-emulated-letter)", function()
@@ -183,10 +262,10 @@ helpers.describe("layout emulation (Linux consumption)", function()
 	-- the rule macOS now follows too (ILD-2, decided by the maintainer on
 	-- 2026-11-11; ctrl-altgr-logical): the production chord carries no AltGr.
 	helpers.it("presses Ctrl and the logical key for Ctrl+AltGr, AltGr suspended (ctrl-altgr-logical)", function()
-		local saved = { combo = package.loaded["modules.gestures.combo_emitter"],
+		local saved = { combo = package.loaded["gestures.engine.combo_emitter"],
 			layout = package.loaded["adapters.keyboard_layout"] }
 		local chords = {}
-		package.loaded["modules.gestures.combo_emitter"] = {
+		package.loaded["gestures.engine.combo_emitter"] = {
 			KEYSYM_TO_CODE = { z = 44 },
 			press_codes = function(modifiers, keys)
 				chords[#chords + 1] = { modifiers = modifiers, keys = keys }
@@ -198,11 +277,11 @@ helpers.describe("layout emulation (Linux consumption)", function()
 			package.loaded["modules.keymap.layout_emulation"] = nil
 			local M = require("modules.keymap.layout_emulation")
 			local deps = M.production_deps({ injector = {}, is_paused = function() return false end,
-				dispatch_char = function() return false end, magic_evdev = function() return nil end, dry_run = false })
+				dispatch_char = function() return false end, dry_run = false })
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, altgr = true }))
 			helpers.assert_true(deps.emit_shortcut("z", KEY_Q, { ctrl = true, shift = true, altgr = true }))
 		end)
-		package.loaded["modules.gestures.combo_emitter"] = saved.combo
+		package.loaded["gestures.engine.combo_emitter"] = saved.combo
 		package.loaded["adapters.keyboard_layout"] = saved.layout
 		package.loaded["modules.keymap.layout_emulation"] = nil
 		if not ok then error(problem, 0) end
@@ -229,12 +308,9 @@ helpers.describe("layout emulation (Linux consumption)", function()
 			"another key's repeat is not its own")
 	end)
 
-	helpers.it("lets the physical magic key, a pause and a failed typing through", function()
+	helpers.it("lets a pause and a failed typing through", function()
 		local M, record = fixture({ emulated_layout = "ergopti_plus", ergopti_base = true })
 		M.reload()
-		record.magic = KEY_C
-		helpers.assert_true(not press(M, KEY_C), "the magic key keeps its unshifted press")
-		record.magic = nil
 		record.paused = true
 		helpers.assert_true(not press(M, KEY_Q), "a paused driver passes every key")
 		record.paused = false
@@ -244,11 +320,31 @@ helpers.describe("layout emulation (Linux consumption)", function()
 	end)
 
 	helpers.it("keeps the AltGr layer alone when the base layer is off", function()
-		local M, record = fixture({ emulated_layout = "ergol", ergopti_alt_gr = true })
+		local M, record = fixture({ emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true })
 		M.reload()
 		helpers.assert_true(not press(M, KEY_Q), "the base level is the system layout's")
 		helpers.assert_true(press(M, KEY_Q, { altgr = true }), "AltGr is emulated")
 		helpers.assert_eq(record.typed, { "^" }, "Ergo-L's AltGr symbol")
+	end)
+
+	-- The number-row menu counted any running emulation as typing the row, so
+	-- it offered an ordering nothing applied with the base layer or the number
+	-- row switched off (emulated-number-row-availability).
+	helpers.it("says it orders the number row only with its base layer and number row on (emulated-number-row-availability)", function()
+		for _, case in ipairs({
+			{ { ergopti_base = true, ergopti_variant = "ergopti" }, true },
+			{ { ergopti_base = true, ergopti_variant = "ergopti", emulate_number_row = false }, false },
+			{ { emulated_layout = "ergol", ergopti_base = false, ergopti_alt_gr = true }, false },
+		}) do
+			local M = fixture(case[1])
+			helpers.assert_true(M.reload(), "the layout loads")
+			helpers.assert_true(M.status().active, "the emulation runs")
+			helpers.assert_eq(M.status().number_row, case[2], "the number row typed by the emulation")
+			M._reset_for_test()
+		end
+		local M = fixture({})
+		M.reload()
+		helpers.assert_eq(M.status().number_row, false, "nothing emulated orders nothing")
 	end)
 
 	helpers.it("leaves a row switched off to the system layout (emulation-row-switch-null-registry)", function()
@@ -280,6 +376,7 @@ end)
 
 -- evdev codes of the keys the source emulation cases press.
 local KEY_A, KEY_SPACE, KEY_TAB, KEY_HOME, KEY_INTL, KEY_INSERT = 30, 57, 15, 102, 86, 110
+local KEY_APOSTROPHE = 40
 
 --- A module emulating the source fixture's compiled layout with the emulation
 --- fixture's Linux table on top (_shared/tests/corpus/layouts/source/).
@@ -296,6 +393,24 @@ local function source_fixture(table_)
 end
 
 helpers.describe("layout emulation (Linux): a layout source's records", function()
+	-- layout-context-keys-emulation: a layout's own repeat and magic keys type
+	-- from the hotstrings' buffer, the text typed before the press.
+	helpers.it("types a layout's repeat and magic keys from the text typed before (layout-context-keys)", function()
+		local corpus = "tests/corpus/layouts/source/"
+		local M, record = source_fixture(Json.decode(read_all(Paths.shared(corpus .. "context_emulation.json"))).linux)
+		helpers.assert_true(M.reload(), "the composed layout and its table load")
+		record.before = "book"
+		helpers.assert_true(press(M, KEY_INTL), "the repeat key is the emulation's")
+		record.before = "the"
+		helpers.assert_true(press(M, KEY_APOSTROPHE), "the magic key is the emulation's")
+		record.before = "ace"
+		helpers.assert_true(press(M, KEY_APOSTROPHE))
+		helpers.assert_eq(record.typed, { "k", "d", "s" }, "each typed what its text before makes it type")
+		record.before = "x"
+		helpers.assert_true(press(M, KEY_APOSTROPHE), "a magic key typing nothing is still taken")
+		helpers.assert_eq(record.typed, { "k", "d", "s" }, "and types nothing")
+	end)
+
 	helpers.it("types a held custom modifier's layer until the key's release (source-emulation)", function()
 		local M, record = source_fixture()
 		helpers.assert_true(M.reload(), "the composed layout and its table load")
@@ -403,5 +518,73 @@ helpers.describe("layout emulation (Linux): a layout source's records", function
 		M.reset()
 		helpers.assert_true(press(M, KEY_A))
 		helpers.assert_eq(record.typed, { "a" }, "the custom modifier no longer holds")
+	end)
+end)
+
+-- evdev codes of Neo 2's keys the level cases press.
+local KEY_CAPSLOCK, KEY_RIGHTALT, KEY_Y, KEY_H, KEY_EQUAL = 58, 100, 21, 35, 13
+
+local function neo_table()
+	return Json.decode(read_all(Paths.shared("tests/corpus/layouts/source/neo2_emulation.json"))).linux
+end
+
+--- The hook's question for a Caps Lock or AltGr press.
+local function held_key(M, code, mods)
+	return M.on_held_modifier_key({ code = code, mods = mods or {}, value = 1 })
+end
+
+helpers.describe("layout emulation (Linux): Neo 2's Mod3 and Mod4 on Caps Lock and AltGr", function()
+	helpers.it("holds Mod4 on AltGr until its release, its repeats swallowed (layout-levels-emulation)", function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload(), "the Neo table loads")
+		local receipt = held_key(M, KEY_RIGHTALT)
+		helpers.assert_eq(type(receipt), "table", "AltGr is the emulation's plain key")
+		helpers.assert_true(receipt.consume == true and type(receipt.release_callback) == "function")
+		helpers.assert_true(receipt.repeat_callback({ code = KEY_RIGHTALT, mods = {} }), "its repeats are swallowed")
+		helpers.assert_true(press(M, KEY_Y), "a Mod4 key is typed by the emulation")
+		helpers.assert_true(press(M, KEY_H, { altgr = true }), "an AltGr the hook still reports is no level")
+		helpers.assert_eq(record.typed, { "¡", "¿" })
+		helpers.assert_true(receipt.release_callback({ code = KEY_RIGHTALT, value = 0 }))
+		helpers.assert_true(press(M, KEY_Y), "the keylayout types the base level again")
+		helpers.assert_true(record.typed[3] ~= "¡", "the release returns to the base level")
+	end)
+
+	helpers.it("holds Mod3 on Caps Lock and types the Mod4 dead diaeresis on the next key (layout-levels-emulation)",
+		function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		local caps = held_key(M, KEY_CAPSLOCK)
+		helpers.assert_eq(type(caps), "table", "Caps Lock is the emulation's plain key, never the lock")
+		helpers.assert_true(press(M, KEY_H))
+		helpers.assert_eq(record.typed, { "?" }, "Mod3 types its level")
+		caps.release_callback({ code = KEY_CAPSLOCK, value = 0 })
+		local altgr = held_key(M, KEY_RIGHTALT)
+		local consumed, on_repeat = press(M, KEY_EQUAL)
+		helpers.assert_true(consumed, "the dead key is consumed")
+		helpers.assert_true(on_repeat({ code = KEY_EQUAL, mods = {} }), "its auto-repeat types nothing")
+		helpers.assert_eq(record.typed, { "?" }, "a dead key types nothing yet")
+		altgr.release_callback({ code = KEY_RIGHTALT, value = 0 })
+		helpers.assert_true(press(M, KEY_D), "the next key composes")
+		helpers.assert_eq(record.typed, { "?", "ä" })
+	end)
+
+	helpers.it("leaves Caps Lock and AltGr their roles while paused (layout-levels-emulation)", function()
+		local M, record = source_fixture(neo_table())
+		helpers.assert_true(M.reload())
+		record.paused = true
+		helpers.assert_eq(held_key(M, KEY_CAPSLOCK), nil, "a paused driver leaves the lock")
+		helpers.assert_eq(held_key(M, KEY_RIGHTALT), nil, "and AltGr")
+	end)
+
+	helpers.it("leaves Caps Lock and AltGr their roles for the Ergopti layouts (ergopti-emulation-unchanged)", function()
+		local pinned = Json.decode(read_all(Paths.shared("tests/corpus/layouts/source/ergopti_emulation.json")))
+		for file, tables in pairs(pinned) do
+			local M = source_fixture(tables.linux)
+			helpers.assert_true(M.reload(), file .. ": the table loads")
+			helpers.assert_true(not M.holds_modifier_key("CapsLock") and not M.holds_modifier_key("AltRight"),
+				file .. ": neither key holds a modifier")
+			helpers.assert_eq(held_key(M, KEY_CAPSLOCK), nil, file .. ": Caps Lock stays the lock")
+			helpers.assert_eq(held_key(M, KEY_RIGHTALT), nil, file .. ": AltGr stays the XKB level")
+		end
 	end)
 end)

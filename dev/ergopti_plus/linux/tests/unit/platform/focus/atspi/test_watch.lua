@@ -87,6 +87,11 @@ local function fixture()
 		create_transport = function() return transport end,
 		start_process = function() state.started = state.started + 1; state.settled = false; return operation end,
 		pause = function() state.now = state.now + 1; if state.on_pause then state.on_pause() end end,
+		restore_accessibility = function()
+			state.restored = (state.restored or 0) + 1
+			if state.restore_refused then return false, "injected refusal" end
+			return true
+		end,
 	})
 	function state.ready()
 		helpers.assert_true(state.watch.start())
@@ -159,7 +164,7 @@ helpers.describe("AT-SPI focus watcher: current native authority", function()
 	helpers.it("keeps programmable destination ownership on the resident receipt and clears it on unknown", function()
 		local state = fixture()
 		state.ready()
-		local destination = require("adapters.user_hotstring_destination")
+		local destination = require("hotstrings.adapters.user_hotstring_destination")
 		helpers.assert_eq(destination.capture().path, "/field/one")
 		state.message("unknown")
 		state.watch.pump()
@@ -343,6 +348,30 @@ helpers.describe("AT-SPI focus watcher: causal input barrier", function()
 		state.message("snapshot")
 		helpers.assert_nil(state.watch.barrier(), "a late earlier answer cannot authorize a later sample")
 		helpers.assert_nil(state.watch.snapshot())
+	end)
+
+	helpers.it("(linux-output-barrier-budget) admits a slower answer only within the budget its caller passes", function()
+		local lease = require("core.timing.engine.timings").ms("privacy", "atspi_probe_timeout_ms")
+		for _, budget in ipairs({ "input", lease }) do
+			local state = fixture()
+			state.ready()
+			-- The application answers 100 ms late, as GTK does while it still draws
+			-- the Backspaces an expansion just sent it.
+			state.on_pause = function()
+				if state.now == 1100 then state.message("snapshot") end
+			end
+			local answer = state.watch.barrier(budget ~= "input" and budget or nil)
+			if budget == "input" then
+				helpers.assert_nil(answer, "an input callback still waits no longer than its short budget")
+			else
+				helpers.assert_eq(answer and answer.role, 61, "an output boundary admits the late fresh answer")
+			end
+		end
+		local state = fixture()
+		state.ready()
+		for _, refused in ipairs({ 0, 1.5, lease + 1, "20" }) do
+			assert_false((pcall(state.watch.barrier, refused)), "a budget beyond the receipt lease is refused")
+		end
 	end)
 
 	helpers.it("admits an on-time native answer when the parent resumes after its deadline", function()
@@ -565,5 +594,87 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		state.running = true
 		helpers.assert_true(state.watch.start())
 		helpers.assert_eq(state.started, 2)
+	end)
+end)
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Authority Reasons ==============
+-- ===========================================
+-- ===========================================
+
+helpers.describe("AT-SPI focus watcher: the authority it holds", function()
+	-- Field report, KDE Plasma Wayland, 2026-11-25: every withheld hotstring
+	-- looked alike. The guard names the reason from this answer.
+	helpers.it("(text-automation-window) names a window on no application of the bus as absent", function()
+		local state = fixture()
+		helpers.assert_eq(state.watch.authority(), "unavailable", "no worker yet")
+		state.ready()
+		helpers.assert_eq(state.watch.authority(), "field")
+		state.on_pause = function()
+			if not state.answered then state.answered = true; state.message("absent") end
+		end
+		helpers.assert_eq(state.watch.barrier(), nil)
+		helpers.assert_eq(state.watch.authority(), "absent")
+		state.answered = false
+		state.on_pause = function()
+			if not state.answered then state.answered = true; state.message("unknown") end
+		end
+		helpers.assert_eq(state.watch.barrier(), nil)
+		helpers.assert_eq(state.watch.authority(), "unanswered", "an inconclusive walk is not an absent window")
+	end)
+
+	helpers.it("(text-automation-window) reports the session's accessibility switch from readiness", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		helpers.assert_eq(state.watch.accessibility(), "enabled_now")
+	end)
+
+	helpers.it("(text-automation-window) refuses an unknown accessibility state", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "maybe" })
+		state.watch.pump()
+		helpers.assert_eq(state.watch.authority(), "unavailable")
+	end)
+end)
+
+helpers.describe("AT-SPI focus watcher: the session's accessibility switch at stop", function()
+	helpers.it("(a11y-switch-restore) turns the switch back off when its worker turned it on", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, 1, "the switch Ergopti turned on is turned off at stop")
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, 1, "a second stop restores nothing more")
+	end)
+
+	helpers.it("(a11y-switch-restore) leaves a switch it found on untouched", function()
+		local state = fixture()
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop())
+		helpers.assert_eq(state.restored, nil, "a screen reader's or the user's switch is not Ergopti's to turn off")
+	end)
+
+	helpers.it("(a11y-switch-restore) does not hold the shutdown on a refused restore", function()
+		local state = fixture()
+		state.restore_refused = true
+		helpers.assert_true(state.watch.start())
+		state.message("ready", { accessibility = "enabled_now" })
+		helpers.assert_true(state.watch.pump())
+		state.retire()
+		helpers.assert_true(state.watch.stop(), "the process and pipes settled; the switch is only logged")
+		helpers.assert_eq(state.restored, 1)
 	end)
 end)

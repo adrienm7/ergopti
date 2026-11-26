@@ -1,0 +1,280 @@
+--- tests/unit/core/ui/test_system_accessibility.lua
+
+--- ==============================================================================
+--- MODULE: Desktop accessibility settings and the preview window (Linux)
+--- DESCRIPTION:
+--- The cairo-drawn preview had no text for AT-SPI and stayed translucent under
+--- the desktop's high contrast. These cases pin the background reading of the
+--- GNOME settings (never on the keystroke path, never before the daemon starts
+--- it), the window's accessible name and role (a notification Orca speaks while
+--- the screen reader is on, a tooltip otherwise), and the opaque panel high
+--- contrast asks for (a11y-linux-settings).
+--- ==============================================================================
+
+local h = require("tests.helpers")
+
+local restore_loaded = h.keep_loaded({ "core.process.adapters.shell_runner", "core.ui.adapters.system_accessibility" })
+
+--- Loads the settings adapter over a controlled gsettings.
+--- @param answers table Output per "schema key", or false for a failed read.
+--- @param installed boolean|nil False when gsettings is missing.
+--- @return table module, table log, function done
+local function load_settings(answers, installed)
+	local ShellRunner = require("core.process.adapters.shell_runner")
+	local log = { spawned = {}, callbacks = {} }
+	local has_command = ShellRunner.has_command
+	ShellRunner.has_command = function(binary) return binary == "gsettings" and installed ~= false end
+	ShellRunner._set_async_runner(function(executable, args, _options, callback)
+		log.spawned[#log.spawned + 1] = executable .. " " .. table.concat(args, " ")
+		log.callbacks[#log.callbacks + 1] = function()
+			local answer = answers[args[2] .. " " .. args[3]]
+			callback({ ok = answer ~= nil and answer ~= false, stdout = answer or "" })
+		end
+		return { cancel = function() end }
+	end)
+	package.loaded["core.ui.adapters.system_accessibility"] = nil
+	local module = require("core.ui.adapters.system_accessibility")
+	return module, log, function()
+		ShellRunner._reset_async_runner()
+		ShellRunner.has_command = has_command
+	end
+end
+
+--- Delivers every pending gsettings answer.
+--- @param log table
+local function settle(log)
+	local callbacks = log.callbacks
+	log.callbacks = {}
+	for _, callback in ipairs(callbacks) do callback() end
+end
+
+h.describe("desktop accessibility settings (a11y-linux-settings)", function()
+	h.it("(a11y-linux-settings) reads nothing until the daemon starts it", function()
+		local module, log, done = load_settings({})
+		local settings = module.settings(100)
+		h.assert_eq(#log.spawned, 0, "a test or an import must never start gsettings")
+		h.assert_eq(settings, { screen_reader = false, high_contrast = false, reduce_motion = false, text_scale = 1 })
+		done()
+	end)
+
+	h.it("(a11y-linux-settings) reads the screen reader, high contrast and animations in the background", function()
+		local module, log, done = load_settings({
+			["org.gnome.desktop.a11y.applications screen-reader-enabled"] = "true\n",
+			["org.gnome.desktop.a11y.interface high-contrast"] = "true\n",
+			["org.gnome.desktop.interface enable-animations"] = "false\n",
+			["org.gnome.desktop.interface text-scaling-factor"] = "1.25\n",
+		})
+		h.assert_true(module.start(100))
+		h.assert_eq(#log.spawned, 4)
+		h.assert_eq(log.spawned[1], "gsettings get org.gnome.desktop.a11y.applications screen-reader-enabled")
+		h.assert_eq(module.settings(100).screen_reader, false, "answered from the cache until the read lands")
+		settle(log)
+		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = true, reduce_motion = true, text_scale = 1.25 })
+		h.assert_eq(module.start(), false, "a second start is refused")
+		done()
+	end)
+
+	h.it("(a11y-linux-drawn) the first drawn surface starts the reading, the others reuse it", function()
+		local module, log, done = load_settings({})
+		h.assert_true(module.ensure_started(100), "the first surface to bind GTK starts it")
+		local spawned = #log.spawned
+		h.assert_eq(module.ensure_started(100), false, "a second surface starts nothing")
+		h.assert_eq(#log.spawned, spawned)
+		done()
+	end)
+
+	h.it("(a11y-linux-settings) refreshes a stale cache, never a fresh one", function()
+		local module, log, done = load_settings({})
+		module.start(100)
+		settle(log)
+		module.settings(101)
+		h.assert_eq(#log.spawned, 4, "a preview per keystroke must not start a child each time")
+		module.settings(200)
+		h.assert_eq(#log.spawned, 8)
+		done()
+	end)
+
+	h.it("(a11y-linux-settings) a desktop without a schema reads that setting as off", function()
+		local module, log, done = load_settings({
+			["org.gnome.desktop.a11y.applications screen-reader-enabled"] = "true\n",
+			["org.gnome.desktop.a11y.interface high-contrast"] = false,
+			["org.gnome.desktop.interface enable-animations"] = "No such schema\n",
+		})
+		module.start(100)
+		settle(log)
+		h.assert_eq(module.settings(100), { screen_reader = true, high_contrast = false, reduce_motion = false, text_scale = 1 })
+		done()
+	end)
+
+	h.it("(a11y-linux-settings) without gsettings, every setting reads as off and nothing starts", function()
+		local module, log, done = load_settings({}, false)
+		h.assert_true(module.start(100))
+		module.settings(200)
+		h.assert_eq(#log.spawned, 0)
+		h.assert_eq(module.settings(300), { screen_reader = false, high_contrast = false, reduce_motion = false, text_scale = 1 })
+		done()
+	end)
+
+	h.it("(a11y-linux-settings) parses only a gsettings boolean", function()
+		local module, _, done = load_settings({})
+		h.assert_eq(module.parse_boolean("true\n"), "true")
+		h.assert_eq(module.parse_boolean(" false "), "false")
+		h.assert_nil(module.parse_boolean("'true'"))
+		h.assert_nil(module.parse_boolean(nil))
+		done()
+	end)
+
+	h.it("(a11y-linux-text-scale) parses only a text scale GNOME accepts", function()
+		local module, _, done = load_settings({})
+		h.assert_eq(module.parse_scale("1.5\n"), 1.5)
+		h.assert_eq(module.parse_scale(" 1 "), 1)
+		h.assert_nil(module.parse_scale("4.0"), "above the schema's range")
+		h.assert_nil(module.parse_scale("0.1"), "below the schema's range")
+		h.assert_nil(module.parse_scale("No such key"))
+		h.assert_nil(module.parse_scale(nil))
+		done()
+	end)
+
+	h.it("(a11y-linux-text-scale) an unreadable text scale stays at 1", function()
+		local module, log, done = load_settings({ ["org.gnome.desktop.interface text-scaling-factor"] = "nan\n" })
+		module.start(100)
+		settle(log)
+		h.assert_eq(module.settings(100).text_scale, 1)
+		done()
+	end)
+end)
+
+h.describe("the preview at the desktop's text scale (a11y-linux-text-scale)", function()
+	local Renderer = h.load_module("core.ui.adapters.graphics_renderer")
+	local style = { fonts = { main = "Sans" }, sizes = { main = 12, hint = 9, info = 10 }, layout = { pad_x = 8 } }
+
+	h.it("(a11y-linux-text-scale) multiplies every font size, never the paddings", function()
+		local scaled = Renderer.scaled_style(style, 1.5)
+		h.assert_eq(scaled.sizes, { main = 18, hint = 13.5, info = 15 })
+		h.assert_eq(scaled.layout.pad_x, 8)
+		h.assert_eq(style.sizes.main, 12, "the shared style is never mutated")
+		h.assert_true(rawequal(Renderer.scaled_style(style, 1.5), scaled), "one table per scale, not per keystroke")
+		h.assert_true(rawequal(Renderer.scaled_style(style, 1), style))
+		h.assert_true(rawequal(Renderer.scaled_style(style, nil), style))
+	end)
+
+	h.it("(a11y-linux-text-scale) the shown preview sets its text at the desktop's scale", function()
+		local names = { "core.ui.adapters.graphics_renderer", "core.ui.adapters.system_accessibility",
+			"core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.tint" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local ok, err = pcall(function()
+			package.loaded["core.ui.adapters.system_accessibility"] = {
+				ensure_started = function() return false end, name_window = function() return true end,
+				settings = function() return { screen_reader = false, high_contrast = false, text_scale = 2 } end,
+			}
+			package.loaded["core.ui.engine.tooltip.layout"] = { compute_position = function() return { x = 0, y = 0 } end }
+			package.loaded["core.ui.engine.tooltip.tint"] = { mix = function() return {} end }
+			local noop = function() end
+			local sizes, visible = {}, false
+			local window = setmetatable({
+				get_screen = function() return { get_rgba_visual = function() return nil end } end,
+				get_visible = function() return visible end,
+				show_all = function() visible = true end,
+			}, { __index = function() return noop end })
+			local renderer = require("core.ui.adapters.graphics_renderer")
+			renderer._set_binding_for_test({ Gtk = { Window = function() return window end },
+				Pango = { FontDescription = { from_string = function()
+					return { set_size = function(_, size) sizes[#sizes + 1] = size end }
+				end } },
+				PangoCairo = { create_layout = function() return { set_font_description = noop,
+					set_text = noop, get_pixel_size = function() return 10, 10 end } end },
+				cairo = { Context = { create = noop }, ImageSurface = { create = noop }, Region = { create = noop } },
+			})
+			h.assert_true(renderer.show({ { text = "bonjour" } }, { style = {
+				fonts = { main = "Sans" }, sizes = { main = 12, hint = 9 },
+				layout = { pad_x = 1, pad_y = 1, line_spacing = 1, label_gap = 1, llm_max_content_width = 100 },
+				positioning = {}, tint = {}, colors = { bg = {} },
+			} }))
+			h.assert_eq(sizes[1], 24 * 1024, "measured at twice the size under a text scale of 2")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
+end)
+
+h.describe("the preview window for AT-SPI (a11y-linux-preview)", function()
+	local Renderer = h.load_module("core.ui.adapters.graphics_renderer")
+	local Atk = { Role = { NOTIFICATION = "notification", TOOL_TIP = "tool-tip" } }
+
+	--- A window double recording its accessible's role and name.
+	--- @return table window, table accessible
+	local function window_double()
+		local accessible = {}
+		function accessible:set_role(role) self.role = role end
+		function accessible:set_name(name) self.name = name end
+		return { get_accessible = function() return accessible end }, accessible
+	end
+
+	h.it("(a11y-linux-preview) names the window by the rows that will be sent", function()
+		h.assert_eq(Renderer.accessible_text({
+			{ text = "bonjour", label = "★" },
+			{ text = "bonsoir", dimmed = true },
+			{ text = "salut", struck = true },
+			{ text = "coucou" },
+		}), "bonjour ★; coucou")
+	end)
+
+	h.it("(a11y-linux-preview) a tooltip, or a notification Orca speaks while the screen reader is on", function()
+		local window, accessible = window_double()
+		h.assert_true(Renderer.describe_window(window, Atk, { { text = "bonjour" } }, false))
+		h.assert_eq(accessible.role, "tool-tip")
+		h.assert_eq(accessible.name, "bonjour")
+		h.assert_true(Renderer.describe_window(window, Atk, { { text = "salut" } }, true))
+		h.assert_eq(accessible.role, "notification")
+		h.assert_eq(accessible.name, "salut")
+	end)
+
+	h.it("(preview-announcements-2026-11-21) the menu's switch keeps Orca silent with the screen reader on", function()
+		local window, accessible = window_double()
+		h.assert_true(Renderer.announcements_enabled(), "the notices are on by default")
+		Renderer.set_announcements_enabled(false)
+		local ok, err = pcall(function()
+			h.assert_true(Renderer.describe_window(window, Atk, { { text = "salut" } }, true))
+			h.assert_eq(accessible.role, "tool-tip", "switch off: a tooltip Orca does not speak")
+			h.assert_eq(accessible.name, "salut", "the window stays named for a reader who reaches it")
+		end)
+		Renderer.set_announcements_enabled(true)
+		if not ok then error(err, 0) end
+		h.assert_true(Renderer.describe_window(window, Atk, { { text = "salut" } }, true))
+		h.assert_eq(accessible.role, "notification", "switch on: a notification again")
+	end)
+
+	h.it("(preview-announcements-2026-11-21) the preview toggle reaches the renderer the suggestions share", function()
+		local saved = package.loaded["core.ui.ui.tooltip.preview"]
+		local saved_renderer = package.loaded["core.ui.adapters.graphics_renderer"]
+		package.loaded["core.ui.ui.tooltip.preview"] = nil
+		package.loaded["core.ui.adapters.graphics_renderer"] = Renderer
+		local ok, err = pcall(function()
+			local Preview = require("core.ui.ui.tooltip.preview")
+			Preview.set_enabled("announce", false)
+			h.assert_eq(Renderer.announcements_enabled(), false, "the preview's toggle silences the shared renderer")
+			Preview.set_enabled("announce", true)
+			h.assert_eq(Renderer.announcements_enabled(), true)
+		end)
+		Renderer.set_announcements_enabled(true)
+		package.loaded["core.ui.ui.tooltip.preview"] = saved
+		package.loaded["core.ui.adapters.graphics_renderer"] = saved_renderer
+		if not ok then error(err, 0) end
+	end)
+
+	h.it("(a11y-linux-preview) without Atk, or a window that refuses, the preview still draws", function()
+		local window = window_double()
+		h.assert_eq(Renderer.describe_window(window, nil, {}, true), false)
+		h.assert_eq(Renderer.describe_window({}, Atk, {}, true), false)
+	end)
+
+	h.it("(a11y-linux-preview) high contrast draws the panel opaque", function()
+		local panel = { red = 0.1, green = 0.2, blue = 0.3, alpha = 0.85 }
+		h.assert_true(rawequal(Renderer.contrast_background(panel, false), panel))
+		h.assert_eq(Renderer.contrast_background(panel, true), { red = 0.1, green = 0.2, blue = 0.3, alpha = 1 })
+		h.assert_eq(panel.alpha, 0.85, "the shared style is never mutated")
+	end)
+end)
+
+restore_loaded()

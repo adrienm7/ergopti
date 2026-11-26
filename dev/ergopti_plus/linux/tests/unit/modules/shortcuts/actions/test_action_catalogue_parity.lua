@@ -24,7 +24,7 @@
 
 local helpers = require("tests.helpers")
 
-local MANAGER = "modules.gestures.manager"
+local MANAGER = "gestures.engine.manager"
 
 --- Loads a fresh manager whose logger records every warning and error.
 --- @return table manager, table warnings
@@ -38,7 +38,7 @@ local function recording_manager()
 	package.loaded[MANAGER] = nil
 	-- The workspace provider captures its shell and display dependencies when
 	-- required. Earlier native fixtures may have replaced either table.
-	package.loaded["modules.gestures.workspace_switcher"] = nil
+	package.loaded["gestures.adapters.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
 	package.loaded["core.logger.engine.shim"] = saved
 	if not ok then error(manager, 0) end
@@ -53,7 +53,7 @@ local function daemon_handlers()
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local Shortcuts = helpers.load_module("modules.shortcuts.manager")
-	local Prediction = helpers.load_module("modules.llm.prediction_engine")
+	local Prediction = helpers.load_module("ai.engine.prediction.engine")
 	local noop = function() end
 	return ActionHandlers.compose(
 		ScriptActions.new({ reset = noop, reload = noop, quit = noop }).handlers, Shortcuts, Prediction)
@@ -310,7 +310,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("greys the agent's manual actions with the AI notice while the AI is off (ai-off-picker)", function()
-		local engine = "modules.llm.prediction_engine"
+		local engine = "ai.engine.prediction.engine"
 		local previous, switch = package.loaded[engine], { enabled = false }
 		package.loaded[engine] = { is_enabled = function() return switch.enabled end }
 		local ok, err = pcall(function()
@@ -354,7 +354,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
-		local name = "modules.gestures.workspace_switcher"
+		local name = "gestures.adapters.workspace_switcher"
 		local saved = package.loaded[name]
 		local Display = require("core.ui.engine.display_server")
 		Display._set_for_test(Display.X11, "xfce")
@@ -399,7 +399,7 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M.init({ enabled = false, persist = false })
 		M._test_begin_reading({})
 		helpers.assert_true(M.enable(), "the test reader must permit enabling gestures")
-		local menu_builder = helpers.load_module("ui.menu.builder")
+		local menu_builder = helpers.load_module("menu.ui.builder.builder")
 		local items, opened = nil, 0
 		-- Building a tray does not open a GTK window. Use the same owned native
 		-- webview edge as the dispatcher cases, even when real lgi is installed.
@@ -411,11 +411,15 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M.stop_reading()
 
 		local slot_rows = 0
+		-- « È → raccourcis de Z » names an accented key's letter, not a slot's
+		-- action: its submenu is the alphabet.
+		local accented = "^" .. require("core.i18n.engine.i18n").get("shortcuts.accented_row")
+			:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("{[12]}", ".+") .. "$"
 		local function walk(rows)
 			for _, row in ipairs(rows or {}) do
 				if type(row) == "table" then
 					if type(row.title) == "string" and row.title:find(" → ", 1, true)
-						and type(row.menu) == "table" then
+						and not row.title:match(accented) and type(row.menu) == "table" then
 						slot_rows = slot_rows + 1
 						-- The picker rows, plus a swipe's mode and step groups
 						-- (each a submenu of its own), never the whole catalogue.

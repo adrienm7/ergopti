@@ -8,13 +8,14 @@ local EXPECTED_BRIDGES = {
   "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
   "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
   "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
-  "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge", "layer_editor_bridge", "layout_manager_bridge",
-  "layout_editor_window_bridge", "update_check_bridge",
+  "healthcheck", "error_dialog", "config_cleanup_bridge", "layout_manager_bridge",
+  "layout_editor_window_bridge", "update_check_bridge", "field_report", "emulation_picker_bridge",
+  "hsWorkflows", "hsKeepAwake",
 }
 
 -- This independently authored contract rejects missing, duplicate and foreign names.
 local function exact_bridge_registry(names)
-  if type(names) ~= "table" or #names ~= 22 then return false end
+  if type(names) ~= "table" or #names ~= #EXPECTED_BRIDGES then return false end
   local expected, seen = {}, {}
   for _, name in ipairs(EXPECTED_BRIDGES) do expected[name] = true end
   for _, name in ipairs(names) do
@@ -67,8 +68,8 @@ helpers.describe("core.ui.ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 22 bridges including the physical editor", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 22)
+    helpers.it("has exactly the expected bridges including the physical editor, the workflows and the anti-sleep library", function()
+      helpers.assert_eq(#WH.get_bridge_names(), #EXPECTED_BRIDGES)
       helpers.assert_true(exact_bridge_registry(WH.get_bridge_names()))
     end)
   end)
@@ -86,7 +87,7 @@ helpers.describe("core.ui.ui.webkit_host", function()
         duplicate[#duplicate + 1] = name == "physical_shortcuts_bridge" and "healthcheck" or name
       end
       helpers.assert_true(not exact_bridge_registry(missing))
-      helpers.assert_eq(#duplicate, 22)
+      helpers.assert_eq(#duplicate, #EXPECTED_BRIDGES)
       helpers.assert_true(not exact_bridge_registry(duplicate))
       duplicate[1] = "foreign_bridge"
       helpers.assert_true(not exact_bridge_registry(duplicate))
@@ -98,7 +99,13 @@ helpers.describe("core.ui.ui.webkit_host", function()
       helpers.assert_true(WH.is_valid_bridge("healthcheck"), "healthcheck valid")
       helpers.assert_true(WH.is_valid_bridge("metrics_apps_bridge"), "metrics valid")
       helpers.assert_true(WH.is_valid_bridge("metrics_typing_bridge"), "typing metrics valid")
-      helpers.assert_true(WH.is_valid_bridge("token_bridge"), "token valid")
+    end)
+
+    -- The Hugging Face token page is opened by macOS only. Linux registered a
+    -- bridge for it that spoke an LLM settings protocol the page never posts.
+    helpers.it("pck-18: no Linux bridge claims the token page it never opens", function()
+      helpers.assert_true(not WH.is_valid_bridge("token_bridge"), "token bridge retired")
+      helpers.assert_nil(WH.APP_BRIDGES.token_prompt, "no page-to-bridge entry for token_prompt")
     end)
 
     helpers.it("returns false for unknown bridges", function()

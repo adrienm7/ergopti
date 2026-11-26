@@ -102,7 +102,7 @@ _SRNT_RefusedTermination(Route := "published-failure", Reenter := false) {
 		loop {
 			if _SR_LegacyTerminateClaim(Claim, true, AcceptTree, AcceptDirect)
 				break
-			AssertTrue(TickElapsed(Started) < SRTOW_EXIT_SIGNAL_SETTLE_MS,
+			AssertTrue(TickElapsed(Started) < TEST_NATIVE_SETTLE_TIMEOUT_MS,
 				"accepted native termination must eventually settle its cleanup debt")
 			Sleep(SRTOW_PID_POLL_MS)
 		}

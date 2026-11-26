@@ -67,8 +67,8 @@ function M.with_world(config, body)
 			package.loaded[name] = nil
 		end
 	end
-	helpers.load_with_stubs("modules.gestures")
-	local actions = require("modules.gestures.actions")
+	helpers.load_with_stubs("gestures.engine")
+	local actions = require("gestures.engine.actions")
 	actions.init({ action_params = {} })
 	local front_app = {
 		title = function() return "E2EApp" end, name = function() return "E2EApp" end,
@@ -82,14 +82,14 @@ function M.with_world(config, body)
 	_G.hs.timer.secondsSinceEpoch = function() return world.clock end
 
 	for _, name in ipairs({
-		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
-		"modules.llm.api_mlx", "modules.llm.parser", "modules.llm.prompt_builder",
-		"modules.llm.streaming_handler", "modules.llm.warmup_controller", "modules.llm.app_filter",
-		"modules.llm.api_common", "modules.llm.prediction_engine", "modules.llm.progressive_reveal",
+		"ai.engine", "ai.engine.settings.profiles", "ai.engine.api.remote", "ai.engine.api.ollama",
+		"ai.engine.api.mlx", "ai.engine.api.parser", "ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler", "ai.engine.local_servers.warmup_controller", "ai.engine.prediction.app_filter",
+		"ai.engine.api.common", "ai.engine.prediction.engine", "ai.engine.prediction.progressive_reveal",
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	package.loaded["hotstrings.engine.expander.utils"] = { is_ignored_window = function() return false end, window_mode_admits = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return world.paused end }
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -122,6 +122,7 @@ function M.with_world(config, body)
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function() return true end,
 		hide_forced_silent = function() return true end,
 	}
@@ -132,7 +133,7 @@ function M.with_world(config, body)
 	local saved_get = i18n.get
 	i18n.get = function(key) return Locale.get(key) or key end
 
-	local core = require("modules.llm")
+	local core = require("ai.engine")
 	local core_state = get_upvalue(core.get_active_profile, "CoreState")
 	assert(type(core_state) == "table", "the LLM core state must be reachable")
 	core_state.backend = "api"
@@ -149,7 +150,7 @@ function M.with_world(config, body)
 	local _, ready_index = get_upvalue(api.is_ready, "_is_ready")
 	assert(ready_index, "the remote readiness flag must be reachable")
 	debug.setupvalue(api.is_ready, ready_index, true)
-	local engine = require("modules.llm.prediction_engine")
+	local engine = require("ai.engine.prediction.engine")
 	-- The TimerScheduler port: the real adapter, recording the delays the engine arms.
 	local real_scheduler = require("core.events.timer_scheduler")
 	local scheduler = {}
@@ -186,7 +187,7 @@ function M.with_world(config, body)
 	engine.set_llm_sequential_mode(false)
 	engine.set_llm_debounce(config.debounce_ms / 1000)
 	engine.set_llm_min_words(0)
-	package.loaded["modules.keymap"] = {
+	package.loaded["hotstrings.engine.expander"] = {
 		request_prompt_prediction = engine.request_prompt_prediction,
 		request_manual_prediction = engine.request_manual_prediction,
 		toggle_live_prompt = engine.toggle_live_prompt,

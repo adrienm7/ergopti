@@ -24,7 +24,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 	for _, scenario in ipairs({
 		{ module = "tests.unit.core.logger.test_perf_counters", owned = { "core.logger.engine.perf_counters", "core.fs.engine.paths", "core.text.engine.toml_codec.reader" } },
 		{ module = "tests.unit.infra.test_phase_stats", owned = {
-			"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
+			"infra.phase_stats", "core.process.adapters.shell_runner", "menu.ui.builder.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
 			"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 		} },
 		{ module = "tests.unit.core.lifecycle.test_boot_profiler_summary", owned = { "core.logger.engine.boot_profiler", "infra.phase_stats" } },
@@ -42,7 +42,7 @@ if ]] .. string.format("%q", mode) .. [[ == "warm" then require("core.timing.eng
 local helpers = require("tests.helpers")
 helpers.reset_results()
 local logger = require("core.logger.engine.shim")
-require("ui.menu.llm_config_guard")
+require("ai.ui.menu.config_guard")
 local modules = { ]] .. table.concat(owned, ", ") .. [[ }
 local previous = {}
 for _, name in ipairs(modules) do
@@ -55,7 +55,7 @@ for _, name in ipairs(modules) do
 end
 assert(package.loaded["core.logger.engine"] == logger, "the fixture must restore the original genuine core")
 assert(package.loaded["core.logger.engine.shim"] == logger, "the fixture must restore the captured logger identity")
-require("tests.unit.ui.menu.llm.test_ai_config_parents")
+require("tests.unit.menu.llm.test_ai_config_parents")
 local result = helpers.get_results()
 assert(result.failed == 0, "all actual fixture and retained-click guard assertions must pass")
 assert(result.passed > 2, "the actual instrumentation cases and both guard cases must execute")

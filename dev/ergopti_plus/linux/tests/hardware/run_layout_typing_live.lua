@@ -11,9 +11,9 @@
 --- production wiring (M.start), the shared emulation engine, the registry's
 --- shipped .keylayout files, adapters/keyboard_layout.lua and
 --- adapters/xkb_capture.lua on the server's own keymap (libxkbcommon),
---- modules/hotstrings/injector.lua, platform/input/modifier_broker.lua,
+--- hotstrings/engine/injector.lua, platform/input/modifier_broker.lua,
 --- platform/input/uinput_writer.lua, modules/shortcuts/accented_shortcuts.lua,
---- modules/gestures/combo_emitter.lua, and modules/keymap/layout_registry.lua
+--- gestures/engine/combo_emitter.lua, and modules/keymap/layout_registry.lua
 --- with the real Python installer for the Bépo user-tree install.
 ---
 --- Replaced edges: the last uinput hop is XTest (tests/hardware/lib/
@@ -263,12 +263,12 @@ Writer._set_path_for_test(fake_node)
 local runner_python = (capture("command -v python3 2>/dev/null"):gsub("%s+$", ""))
 package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, runner_python) end }
 
-local Injector = require("modules.hotstrings.injector")
+local Injector = require("hotstrings.engine.injector")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local XkbCapture = require("adapters.xkb_capture")
 local Emulation = require("modules.keymap.layout_emulation")
 local Accented = require("modules.shortcuts.accented_shortcuts")
-local ComboEmitter = require("modules.gestures.combo_emitter")
+local ComboEmitter = require("gestures.engine.combo_emitter")
 local NumberRow = require("infra.number_row_preferences")
 local EvdevCodes = require("platform.input.evdev_codes")
 
@@ -390,7 +390,6 @@ local function start_emulation(document)
 		injector = Injector,
 		is_paused = function() return false end,
 		dispatch_char = function(char) _chars[#_chars + 1] = char end,
-		magic_evdev = function() return nil end,
 	}), "the emulation did not start")
 end
 

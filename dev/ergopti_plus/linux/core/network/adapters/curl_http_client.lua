@@ -19,6 +19,7 @@ local ShellRunner = require("core.process.adapters.shell_runner")
 local LibuvExit = require("core.lifecycle.engine.shutdown.libuv_exit")
 local BodyPipe = require("core.network.engine.http_body_pipe")
 local OutputTarget = require("core.network.engine.http_output_target")
+local EventLoop = require("core.events.loop")
 local NativeTimer = require("core.timing.engine.native_timer")
 local ExactIdentity = require("core.network.engine.curl_identity")
 local RedirectReceipt = require("core.network.engine.http_redirect_receipt")
@@ -50,6 +51,30 @@ local NATIVE_TRAILER_BYTES = #STATUS_MARKER + #PROXY_MARKER + 32
 local MAX_SAFE_INTEGER = 9007199254740991
 -- Only genuine preflight capabilities can reuse admitted private header bytes.
 local prepared_headers = setmetatable({}, { __mode = "k" })
+
+-- The HTTP status of a conditional request whose cached copy is still current.
+local HTTP_NOT_MODIFIED = 304
+
+--- Whether caller headers carry a cache validator (If-None-Match, If-Modified-Since).
+--- @param headers table
+--- @return boolean
+local function has_validator_header(headers)
+	for name in pairs(headers) do
+		local lower = tostring(name):lower()
+		if lower == "if-none-match" or lower == "if-modified-since" then return true end
+	end
+	return false
+end
+
+--- Whether a result is the 304 a conditional request asked for. The result
+--- stays not ok (no body came back), but it is the answer, not a failure: it
+--- is logged as such instead of an ERROR the user sees in the error window.
+--- @param result table Port result envelope.
+--- @param conditional boolean Whether the request carried a validator.
+--- @return boolean
+function M.is_not_modified_answer(result, conditional)
+	return conditional == true and type(result) == "table" and tonumber(result.status) == HTTP_NOT_MODIFIED
+end
 
 --- Exposes the existing native default to the private managed wrapper.
 --- @return number
@@ -428,6 +453,8 @@ local function finish(request, result, suppress_callback, transport_failure)
 	end
 	if result.ok then
 		Logger.debug(LOG, "HTTP request completed (status=%d).", result.status or 0)
+	elseif M.is_not_modified_answer(result, request.caller_validator == true or request.sent_validator ~= nil) then
+		Logger.debug(LOG, "HTTP request answered 304 Not Modified: the caller's cached copy is current.")
 	elseif result.error ~= "cancelled" then
 		if transport_failure == true and request.failure_log_level == "warn" and optional_service_failure(request, result) then
 			Logger.warn(LOG, "HTTP request failed: %s.", tostring(result.error))
@@ -863,7 +890,11 @@ local function bind_output_target(request, target)
 			end) or not readable() then return false end
 		paused = false -- A synchronous callback may legitimately pause a new write.
 		local called, ack, err = pcall(luv.read_start, reader, read_callback)
-		return called and ack ~= nil and ack ~= false and err == nil and exact()
+		local resumed = called and ack ~= nil and ack ~= false and err == nil
+		-- curl has kept writing while paused: the next chunk is already in the
+		-- pipe, and libuv registers the restarted reader only on its next poll.
+		if resumed then EventLoop.wake() end
+		return resumed and exact()
 	end
 	function input:abort(ticket, producer)
 		if not rawequal(producer, operation) or not OutputTarget.owns(target, ticket, producer) or not exact() then return false end
@@ -1017,11 +1048,13 @@ local function admit_metadata(url, headers, body, options)
 		etag_expected_url = options.etag_expected_url, etag_expected_value = options.etag_expected_value,
 		output_path = options.output_path,
 		output_target = output_target,
+		-- Told the bytes an owned archive output received, for its progress (UPD-07)
+		on_progress = output_target ~= nil and type(options.on_progress) == "function" and options.on_progress or nil,
 		max_download_bytes = options.max_download_bytes,
 		receive_idle_timeout_ms = options.receive_idle_timeout_ms,
 		proxy_selection = options.proxy_selection,
-		-- The private runtime's curl unless the caller pinned one (infra/owned_programs.lua).
-		curl_executable = options.curl_executable or require("infra.owned_programs").path("curl"),
+		-- The private runtime's curl unless the caller pinned one (settings/engine/preferences/owned_programs.lua).
+		curl_executable = options.curl_executable or require("settings.engine.preferences.owned_programs").path("curl"),
 		curl_executable_identity = copy_executable_identity(options.curl_executable_identity),
 		curl_executable_identity_exact = ExactIdentity.copy(options.curl_executable_identity_exact),
 		proxy_metrics_available = options.proxy_metrics_available == true and type(options.curl_executable) == "string",
@@ -1173,6 +1206,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			stderr_eof = false,
 			exited = false,
 			terminal = false,
+			-- A 304 answers a request that carried a validator: the caller reuses
+			-- its cached copy (layouts catalogue.resolve_index), so it is no error.
+			caller_validator = type(headers) == "table" and has_validator_header(headers),
 		}
 	end
 	if authorized then
@@ -1269,6 +1305,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 	if request_options.output_target then
 		request.output_bytes, request.max_download_bytes = 0, request_options.max_download_bytes
+		request.on_progress = request_options.on_progress
 		if not bind_output_target(request, request_options.output_target) then
 			finish(request, { ok = false, status = 0, body = "", error = "archive output binding refused" })
 			return false
@@ -1505,6 +1542,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 				terminate_group(request)
 				finish(request, { ok = false, status = 0, body = "", error = "archive output refused",
 					failure_receipt = request.output_sink:failure() })
+			elseif request.on_progress then
+				local ok, progress_err = pcall(request.on_progress, request.output_bytes)
+				if not ok then Logger.error(LOG, "HTTP progress callback raised: %s.", ErrorDescription.describe(progress_err)) end
 			end
 		elseif request.buffered then
 			request.stdout_text = request.stdout_text .. chunk

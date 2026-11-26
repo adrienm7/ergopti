@@ -164,6 +164,18 @@ _NRP_UseLayout(Layout) {
 	MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
 }
 
+; The OS layout as a fresh installation leaves it: « None » selected and the
+; layer switches at their manifest default, on since the maintainer decision of
+; 2026-11-23, so the selection alone keeps the built-in emulation off and a
+; source that stores neither switch agrees with this intent.
+; @param {String} Digits The stored number-row ordering.
+; @returns {Map} A layout section for _NRP_UseLayout.
+_NRP_NoSelectionLayout(Digits) {
+	Defaults := ManifestBuildFeaturesMap()["layout"]
+	return Map("emulated_layout", "", "ergopti_base", Defaults["ergopti_base"],
+		"ergopti_alt_gr", Defaults["ergopti_alt_gr"], "ergopti_variant", "none", "direct_access_digits", Digits)
+}
+
 ; « Digits first » stored on AZERTY, then the built-in Ergopti and the Ergo-L
 ; emulation over it, then AZERTY again: the stored choice is never rewritten,
 ; it is inert where it cannot reorder the row and applies again on AZERTY with
@@ -278,8 +290,10 @@ _NRP_NativeSymbolsFirst() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile]
 	Dir := _KLT_TempDir()
 	try {
-		Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
-			"ergopti_variant", "none", "direct_access_digits", "symbols")
+		; The base switch is on and « None » selected: the selection gate alone
+		; leaves the row to the OS layout.
+		Native := _NRP_NoSelectionLayout("symbols")
+		AssertTrue(Native["ergopti_base"], "the fixture must leave the base switch on so the selection gate is exercised")
 		_NRP_UseLayout(Native)
 		KLE_Model := 0
 		KLE_Id := ""
@@ -320,7 +334,6 @@ _NRP_AssertQwertySymbolsFirst(Hkl) {
 	AssertEqual("1", NumberRowSymbolsFirstText(0x02, true, Hkl, false), "and its digit with Shift")
 	AssertEqual(")", NumberRowSymbolsFirstText(0x0B, false, Hkl, false), "the 0 key types its Shift symbol")
 	AssertEqual("0", NumberRowSymbolsFirstText(0x0B, true, Hkl, false))
-	AssertEqual("!", LayerEditor_CurrentEmulation()["character"].Call("SC002"), "the layer editor shows the swapped level")
 	Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
 	Items := Rows[1]["items"]
 	AssertTrue(Items[3]["checked"], "the stored symbols-first choice is ticked")
@@ -498,8 +511,7 @@ _NRP_EdgeKeysFollowTheChoice() {
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile, _NumberRowEdgesLogged,
 		_NumberRowForegroundLayout, _DigitRowProfiles]
 	Dir := _KLT_TempDir()
-	Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
-		"ergopti_variant", "none", "direct_access_digits", "symbols")
+	Native := _NRP_NoSelectionLayout("symbols")
 	Azerty := 0x7E57040C, Qwerty := 0x7E570409
 	Symbols := ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"]
 	AzPlain := Map(), AzShift := Map(), UsPlain := Map(), UsShift := Map()
@@ -521,7 +533,11 @@ _NRP_EdgeKeysFollowTheChoice() {
 			; Off: the edge keys keep the layout's own levels on AZERTY, QWERTY and Ergopti.
 			for Vec in [[Azerty, "digits", false], [Qwerty, "symbols", false], [Qwerty, "symbols", true]] {
 				Layout["direct_access_digits"] := Vec[2]
-				Layout["ergopti_base"] := Vec[3]
+				; The selection turns the built-in Ergopti on; the base switch stays
+				; at its default, on, so « None » must keep the emulation off by
+				; itself. The gate turns the switch off in Layout, hence the reset.
+				Layout["ergopti_base"] := Native["ergopti_base"]
+				Layout["ergopti_variant"] := Vec[3] ? "ergopti" : "none"
 				_NRP_UseLayout(Layout)
 				KLE_Model := 0
 				KLE_Id := ""
@@ -687,7 +703,9 @@ Test("number row: with the layout off a stored « digits first » says it is not
 _NRP_NoHardcodedEdgeTable() {
 	Source := _DriverSourceNoComments()
 	StrReplace(Source, "NumberRowEdgeText(", , , &Readers)
-	AssertTrue(Readers >= 5, "the edge-key readers must be found (" . Readers . ")")
+	; The definition and its three readers: the magic editor, the tap keys and the
+	; number-row send (the retired layer editor page was the fifth).
+	AssertTrue(Readers >= 4, "the edge-key readers must be found (" . Readers . ")")
 	for Pattern in ['0x29, "$"', '0x0C, "%"', '0x0D, "="', "ErgoptiNumberRowEdgeMapping"]
 		AssertEqual(0, InStr(Source, Pattern), "no hardcoded edge table: " . Pattern)
 	AssertEqual(0, RegExMatch(Source, '"\$"\s*,[^\n]*"%"\s*,[^\n]*"="'), "no « $ % = » literal list")
@@ -788,12 +806,6 @@ _NRP_RowScopes() {
 		AssertTrue(Criteria["*SC010"].Call(), "a top-row key passes through to the OS layout")
 		AssertTrue(Criteria["+SC010"].Call(), "on its Shift level too")
 		AssertFalse(Criteria["*SC01E"].Call(), "a home-row key stays with the emulation")
-		Magic := ScriptInformation["MagicKeySourceScan"]
-		if LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
-			AssertFalse(Criteria[StrUpper(Magic)].Call(StrUpper(Magic)), "the magic key keeps its plain press")
-			AssertEqual(ScriptInformation["MagicKeySourceChosen"], Criteria["*" . StrUpper(Magic)].Call("*" . StrUpper(Magic)),
-				"only a chosen source's modified presses follow the native row")
-		}
 		Layout["ergopti_base"] := false
 		_NRP_UseLayout(Layout)
 		AssertFalse(Criteria["*SC010"].Call(), "without the built-in emulation nothing passes through")
@@ -930,9 +942,6 @@ _NRP_RegisteredSymbols() {
 		_SendHook := _HOOK_RecordSend
 		CapsBefore := GetKeyState("CapsLock", "T")
 		for Index, Sc in Corpus["scancodes"] {
-			Legend := LayerEditor_CurrentEmulation()["character"].Call(Sc)
-			AssertEqual(Corpus["emulated"]["shift"][Index], Legend,
-				"the actual layer-editor legend follows the same unshifted symbols source")
 			for Shift in [false, true] {
 				Row := Capture.Rows[Shift ? "+" . Sc : Sc]
 				AssertTrue(Row.Criterion.Call(), "the original KLE owner admits its actual key")
@@ -1025,7 +1034,7 @@ _NRP_MenuFixture(Path, Mode := "native") {
 _NRP_MenuNativeOwners() {
 	global Features, CategoryEnabled, LayerEnabled, ConfigurationFile, _TrayRootLifecycleEpoch, _LayoutPollRetry
 	Saved := [Features, CategoryEnabled, LayerEnabled, ConfigurationFile,
-		MasterGateState().Clone(), _TrayRootLifecycleEpoch, A_IsSuspended, MagicEditorState()["configuration_generation"], _LayoutPollRetry]
+		MasterGateState().Clone(), _TrayRootLifecycleEpoch, A_IsSuspended, StarSlotState()["configuration_generation"], _LayoutPollRetry]
 	Dir := _KLT_TempDir()
 	ConfigurationFile := Dir . "config.toml"
 	try {
@@ -1080,7 +1089,7 @@ _NRP_MenuNativeOwners() {
 				case "pause": Suspend(true)
 				case "master": CategoryEnabled["Layout"] := false
 				case "configuration":
-					MagicEditorConfigurationChanged()
+					StarSlotConfigurationChanged()
 				case "lifecycle": _TrayRootLifecycleEpoch += 1
 				case "native-source":
 					Hkl := GetForegroundKeyboardLayout()
@@ -1116,7 +1125,7 @@ _NRP_MenuNativeOwners() {
 		for Key, Value in Saved[5]
 			State[Key] := Value
 		_TrayRootLifecycleEpoch := Saved[6]
-		MagicEditorState()["configuration_generation"] := Saved[8]
+		StarSlotState()["configuration_generation"] := Saved[8]
 		_LayoutPollRetry := Saved[9]
 		DirDelete(Dir, true)
 	}

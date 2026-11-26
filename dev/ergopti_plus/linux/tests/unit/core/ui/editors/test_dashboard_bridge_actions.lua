@@ -242,11 +242,12 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 		local keystats, counts = counting_keystats()
 		local state = { keystats = keystats }
 		local first = Bridge.on_message("ready", state)
-		local reset = Bridge.on_message({ action = "clear_cache" }, state)
+		local reset = Bridge.on_message({ action = "clear_cache", reset_id = 3 }, state)
 		helpers.assert_eq(counts.full, 2, "the reset answers with a rebuilt payload")
 		helpers.assert_true(reset ~= first and reset.metrics_manifest ~= nil,
 			"the page applies every reply as data: the reset reply must carry the rebuilt dashboard")
 		helpers.assert_true(reset.cleared)
+		helpers.assert_eq(reset.reset_id, 3, "the reply names the page's Reset (met-19)")
 		helpers.assert_eq(Bridge.on_message("ready", state), reset, "the next opening never sees the old cache")
 		Bridge._reset()
 	end)

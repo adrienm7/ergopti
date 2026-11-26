@@ -78,7 +78,7 @@ end
 --- @param updater_defaults table Decoded _shared/updater/data/defaults.json.
 --- @param installed_channel string|nil Installed build owner channel; nil for standalone default resolution.
 --- @return table|nil settings { owner, repo, folder, index_file, branch, url_template, timeout_ms,
----   max_file_bytes, local_folder, installed_file, etag_file, ergopti_family }
+---   max_file_bytes, local_folder, installed_file, etag_file, session_selection_file, ergopti_family }
 --- @return string|nil error Exact reason when the defaults are unusable.
 function M.resolve(layout_defaults, updater_defaults, installed_channel)
 	local registry = type(layout_defaults) == "table" and layout_defaults.registry or nil
@@ -109,12 +109,13 @@ function M.resolve(layout_defaults, updater_defaults, installed_channel)
 		local_folder = registry.local_folder,
 		installed_file = registry.installed_file,
 		etag_file = registry.etag_file,
+		session_selection_file = registry.session_selection_file,
 		ergopti_family = registry.ergopti_family,
 	}
 	if type(settings.folder) ~= "string" or not settings.folder:match(FOLDER_PATTERN) then
 		return nil, "registry.folder is not a repository path"
 	end
-	for _, key in ipairs({ "index_file", "branch", "local_folder", "installed_file", "etag_file" }) do
+	for _, key in ipairs({ "index_file", "branch", "local_folder", "installed_file", "etag_file", "session_selection_file" }) do
 		if type(settings[key]) ~= "string" or not settings[key]:match(NAME_PATTERN) then
 			return nil, "registry." .. key .. " is not a plain name"
 		end

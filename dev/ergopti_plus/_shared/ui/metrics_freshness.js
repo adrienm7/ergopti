@@ -124,19 +124,22 @@
 
 	let root = null;
 	let applied_revision = -1;
-	let freshness_view = { visible: false, failed: false, text: '' };
+	// The host's state, not its wording: the text is built from it at each
+	// render, so a locale that lands after it rewords the banner (MET-15).
+	let freshness_state = null;
 	const incomplete_parts = { manifest: false, range: false };
 
 	function ensure_root() {
 		if (root) return;
 		const style = document.createElement('style');
 		style.textContent =
-			'#metrics_freshness_banner{position:sticky;top:0;z-index:49;padding:8px 14px;font-size:13px;' +
+			'#metrics_freshness_banner{position:sticky;top:0;z-index:49;margin:0;padding:8px 14px;font-size:13px;' +
 			'background:rgba(59,130,246,0.12);border-bottom:1px solid rgba(59,130,246,0.35);display:none}' +
 			'#metrics_freshness_banner.failed{background:rgba(220,53,69,0.16);border-color:rgba(220,53,69,0.5)}' +
 			'#metrics_freshness_banner.incomplete{background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.5)}';
 		document.head.appendChild(style);
-		root = document.createElement('div');
+		// A line of text: a paragraph, announced as a status when it changes.
+		root = document.createElement('p');
 		root.id = 'metrics_freshness_banner';
 		root.setAttribute('role', 'status');
 		root.setAttribute('aria-live', 'polite');
@@ -151,6 +154,11 @@
 	 */
 	function render() {
 		ensure_root();
+		const freshness_view = describe_freshness(
+			freshness_state,
+			window._i18n_strings,
+			window._i18n_locale
+		);
 		const notice = describe_incomplete(incomplete_parts, window._i18n_strings);
 		const texts = [freshness_view.visible ? freshness_view.text : '', notice].filter(Boolean);
 		root.style.display = texts.length ? 'block' : 'none';
@@ -162,7 +170,7 @@
 	api.show = function (freshness, revision) {
 		if (!Number.isSafeInteger(revision) || revision < applied_revision) return false;
 		applied_revision = revision;
-		freshness_view = describe_freshness(freshness, window._i18n_strings, window._i18n_locale);
+		freshness_state = freshness;
 		render();
 		return true;
 	};
@@ -180,5 +188,10 @@
 		incomplete_parts[part] = incomplete === true;
 		render();
 	};
+
+	// Windows injects the locale after the first publication: reword then.
+	document.addEventListener('i18n:applied', function () {
+		if (root) render();
+	});
 	window.metrics_freshness = api;
 })();

@@ -670,7 +670,7 @@ end
 --- @param owner string Stable producer/feature owner.
 --- @param event_type integer Native mouse event type.
 --- @param position table Native mouse position.
---- @param options table|nil { phase, modifiers, source_state_id }.
+--- @param options table|nil { phase, modifiers, source_state_id, click_state, button_number }.
 --- @param cleanup boolean Whether this is an already-owned release/compensation.
 --- @return table|nil prepared Opaque prepared event owner.
 --- @return string|nil detail Construction/tagging refusal detail.
@@ -719,6 +719,26 @@ local function prepare_mouse_event(owner, event_type, position, options, cleanup
 		end
 	end
 
+	-- A click sequence's state (2 on a double-click's second down and up) and a
+	-- middle button's number: without them Quartz reads two single clicks, or
+	-- the default other button.
+	for _, field in ipairs({ { "click_state", "mouseEventClickState", 1 }, { "button_number", "mouseEventButtonNumber", 0 } }) do
+		local value = options[field[1]]
+		if value ~= nil then
+			if math.tointeger(value) == nil or value < field[3] then
+				return nil, field[1] .. " must be an integer of at least " .. field[3]
+			end
+			local property = properties[field[2]]
+			if property == nil then return nil, field[2] .. " is unavailable" end
+			local set_ok, set_result = xpcall(function()
+				return set_property(event_or_error, property, value)
+			end, debug.traceback)
+			if not set_ok or set_result == nil or set_result == false then
+				return nil, tostring(set_result)
+			end
+		end
+	end
+
 	_generation = _generation + 1
 	local tag = register_record({
 		generation = _generation,
@@ -753,11 +773,20 @@ local function prepare_mouse_event(owner, event_type, position, options, cleanup
 end
 
 
+--- The native mouse event type of a name (leftMouseDown, otherMouseUp...),
+--- so a producer names its events without reaching for the OS API itself.
+--- @param name string An hs.eventtap.event.types name.
+--- @return integer event_type
+function M.mouse_event_type(name)
+	return assert(event_types[name], "synthetic_input: unknown mouse event type " .. tostring(name))
+end
+
+
 --- Prepares one forward mouse action while lifecycle admission is open.
 --- @param owner string Stable producer/feature owner.
 --- @param event_type integer Native mouse event type.
 --- @param position table Native mouse position.
---- @param options table|nil { phase, modifiers, source_state_id }.
+--- @param options table|nil { phase, modifiers, source_state_id, click_state, button_number }.
 --- @return table|nil prepared Opaque prepared event owner.
 --- @return string|nil detail Construction/tagging refusal detail.
 function M.prepare_mouse_event(owner, event_type, position, options)
@@ -1453,7 +1482,7 @@ local function build_key_pair(batch, modifiers, key, unicode, loopback, selftest
 	local ordinal = tx.next_ordinal + 1
 	-- Unicode text rides a carrier key the user is not holding: a key-down of a
 	-- key still down is lost, and with it the replacement's first character.
-	local code = unicode and require("adapters.unicode_carrier").keycode() or key
+	local code = unicode and require("clipboard.adapters.unicode_carrier").keycode() or key
 	local down = assert(new_key_event(modifiers, code, true),
 		"platform.input.synthetic_input: newKeyEvent returned nil for keyDown")
 	local up = assert(new_key_event(modifiers, code, false),
@@ -2209,7 +2238,7 @@ function M.keyStrokes(batch, value)
 	local observable_start = batch.has_observable_action
 	local first_observable_start = batch.first_observable_ordinal
 	local ok, err = xpcall(function()
-		if select(2, require("adapters.unicode_carrier").keycode()) then
+		if select(2, require("clipboard.adapters.unicode_carrier").keycode()) then
 			defer_diagnostic("debug",
 				"Synthetic text moved off a held key (%d byte(s)); its first character would have been lost.",
 				#value)
@@ -2802,7 +2831,7 @@ do
 	--- Emits one field-run selftest key pair, posted globally like a loopback so
 	--- the keymap tap sees it. The record's selftest field lets the keymap decode
 	--- it as typing, but only while the field run's scratch window has the focus
-	--- (modules/keymap/selftest_gate.lua); everywhere else it is consumed. The
+	--- (hotstrings/engine/expander/selftest_gate.lua); everywhere else it is consumed. The
 	--- class is a record field, not a tag bit: once its record is evicted the key
 	--- is ordinary synthetic output, which no tap counts or expands. It is a
 	--- replacement effect, so it publishes no action epoch that would reset the

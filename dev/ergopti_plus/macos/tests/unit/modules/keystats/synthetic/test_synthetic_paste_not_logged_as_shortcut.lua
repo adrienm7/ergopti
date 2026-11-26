@@ -78,9 +78,9 @@ local function load_fixture()
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return nil end }
-	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end,
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return nil end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return true end }
+	package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end,
 		metrics_cache_dir = function() return "/tmp/metrics_cache" end }
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -141,7 +141,7 @@ local function load_fixture()
 		clipboard = clipboard,
 		paused = paused,
 		synthetic = require("platform.input.synthetic_input"),
-		provenance = require("adapters.event_provenance"),
+		provenance = require("diagnostics.adapters.event_provenance"),
 		hs = require("hs"),
 		cleanup = function()
 			for _, name in ipairs({
@@ -153,11 +153,11 @@ local function load_fixture()
 				"modules.keystats.watchers",
 				"core.process.adapters.lifecycle",
 				"platform.input.keyboard_hook",
-				"adapters.event_provenance",
+				"diagnostics.adapters.event_provenance",
 				"platform.input.synthetic_input",
-				"modules.keymap",
-				"infra.manifest_reader",
-				"infra.config_paths",
+				"hotstrings.engine.expander",
+				"menu.engine.manifest_reader",
+				"settings.engine.paths",
 			}) do
 				package.loaded[name] = nil
 			end

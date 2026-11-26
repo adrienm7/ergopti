@@ -53,7 +53,6 @@ local function new_context(config)
 		failures = {},
 		rejected = {},
 		recoveries = {},
-		route_calls = 0,
 		activation_order = {},
 	}
 
@@ -233,7 +232,6 @@ local function new_context(config)
 		log_dir = "/tmp/ergopti/logs",
 		retention_days = 21,
 		max_batch_records = config.batch_records or 1,
-		route_overlap_bytes = config.route_overlap_bytes or 16,
 		scheduler = scheduler,
 		clock = function() return state.clock end,
 		bootstrap_socket_factory = function()
@@ -243,12 +241,6 @@ local function new_context(config)
 			end
 			if state.bootstrap_construct_mode == "nil" then return nil end
 			return bootstrap
-		end,
-		route_line = function(line)
-			state.route_calls = state.route_calls + 1
-			if state.route_mode == "throw" then error("synthetic routing failure") end
-			if state.route_mode == "invalid" then return false end
-			return line:find("LLM", 1, true) and { "ErgoptiPlus_llm.log" } or {}
 		end,
 		on_delivered = function(record)
 			state.delivered[#state.delivered + 1] = record

@@ -76,6 +76,7 @@ global PLC_TIMER_DRIVER    := 0
 ; Win32 process rights and wait results for callers that own a child process.
 global PLC_PROCESS_TERMINATE := 0x0001
 global PLC_SYNCHRONIZE       := 0x00100000
+global PLC_PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
 global PLC_WAIT_OBJECT_0     := 0x00000000
 global PLC_WAIT_TIMEOUT      := 0x00000102
 
@@ -344,6 +345,15 @@ PLC_OpenProcessHandle(ProcessId, DesiredAccess) {
 		"Int", false, "UInt", ProcessId, "Ptr")
 	catch
 		return 0
+}
+
+; The exit code of an ended process, through a handle that holds
+; PLC_PROCESS_QUERY_LIMITED_INFORMATION. Raises when Windows cannot read it.
+PLC_ProcessExitCode(Handle) {
+	ExitCode := 0
+	if !DllCall("Kernel32\GetExitCodeProcess", "Ptr", Handle, "UInt*", &ExitCode, "Int")
+		throw OSError(A_LastError, "GetExitCodeProcess", "The process exit code could not be read")
+	return ExitCode
 }
 
 PLC_TerminateProcessHandle(Handle, ExitCode := 1) {

@@ -8,14 +8,16 @@
 --- keyboards" from a copy of the production writer. When the writer gained
 --- relative axes for the navigation layer's wheel, every such source advertised
 --- EV_REL, the hook refused to grab it and "The whole daemon, live" failed at
---- "Hook owns both real virtual source grabs" with nothing logged. These cases replay the writer's device setup
---- through a recorder and judge the event mask with the hook's own grab policy.
+--- "Hook owns both real virtual source grabs" with nothing logged. Pointer
+--- output now has its own device; these cases replay the writer's keyboard
+--- setup through a recorder and judge the event mask with the hook's own grab
+--- policy.
 --- ==============================================================================
 
 package.loaded["tests.support.adapters.synthetic_input.uinput_writer_fixture"] = nil
 local Fixture = require("tests.support.adapters.synthetic_input.uinput_writer_fixture")
 local helpers, recorder = Fixture.helpers, Fixture.recorder
-local Finder = require("modules.hotstrings.device_finder")
+local Finder = require("hotstrings.engine.device_finder")
 local KeyboardSource = require("tests.hardware.keyboard_source_writer")
 
 -- Resolved as require resolves it, so the writer can move without this test pinning its path.
@@ -43,26 +45,20 @@ end
 
 helpers.describe("keyboard-only fixture sources", function()
 
-	helpers.it("(keyboard-source-fixture) the production writer is refused as a grabbed source", function()
+	-- KDE Plasma 6 (2026-11-25): the production device advertised the wheel's
+	-- relative axes and the mouse buttons beside its keys, so udev classified
+	-- it as a mouse and the desktop disabled the touchpad. It is a plain
+	-- keyboard now, exactly what the hook's own grab policy accepts.
+	helpers.it("(keyboard-source-fixture) the production writer is a plain keyboard", function()
 		local production = assert(loadfile(WRITER_PATH))()
-		local allowed = Finder.is_interceptable_event_mask(registered_mask(production))
-		helpers.assert_true(not allowed, "the production device advertises the wheel's relative axes")
+		local allowed, reason = Finder.is_interceptable_event_mask(registered_mask(production))
+		helpers.assert_true(allowed == true, "the production keyboard advertises no pointer capability: " .. tostring(reason))
 	end)
 
 	helpers.it("(keyboard-source-fixture) the fixture writer is a source the hook grabs", function()
 		local source = KeyboardSource.load("Ergopti Fixture Source", WRITER_PATH)
 		local allowed, reason = Finder.is_interceptable_event_mask(registered_mask(source))
 		helpers.assert_true(allowed == true, "a fixture keyboard must be interceptable: " .. tostring(reason))
-	end)
-
-	helpers.it("(keyboard-source-fixture) the fixture differs from the writer by that registration only", function()
-		local file = assert(io.open(WRITER_PATH, "rb"))
-		local production = file:read("*a")
-		file:close()
-		local fixture = KeyboardSource.keyboard_source(WRITER_PATH)
-		helpers.assert_eq(#production - #fixture, #KeyboardSource.RELATIVE_REGISTRATION)
-		local at = production:find(KeyboardSource.RELATIVE_REGISTRATION, 1, true)
-		helpers.assert_eq(production:sub(1, at - 1) .. production:sub(at + #KeyboardSource.RELATIVE_REGISTRATION), fixture)
 	end)
 
 	helpers.it("(keyboard-source-fixture) every kernel harness builds its sources through the fixture", function()

@@ -13,11 +13,11 @@ local helpers = require("tests.helpers")
 local M = {}
 
 local CAPTURED_STACK = {
-	"modules.keymap.utils",
-	"modules.keymap.terminator_replay",
+	"hotstrings.engine.expander.utils",
+	"hotstrings.engine.expander.terminator_replay",
 	"platform.input.text_sender",
-	"adapters.clipboard",
-	"adapters.event_provenance",
+	"clipboard.adapters.clipboard",
+	"diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 }

@@ -1,0 +1,12 @@
+--- tests/unit/ai/engine/prediction/test_parser_unicode_escapes.lua
+local helpers = require("tests.helpers")
+local Parser = require("ai.engine.api.parser_core")
+
+helpers.describe("prediction Unicode escapes", function()
+	helpers.it("inserts a supplementary character represented by a UTF-16 surrogate pair", function()
+		local result = Parser.process_prediction("bonjour", "bonjour",
+			"TAIL_CORRECTED: bonjour\nNEXT_WORDS: \\uD83D\\uDE00")
+		helpers.assert_true(result ~= nil)
+		helpers.assert_eq(result.to_type, " 😀")
+	end)
+end)

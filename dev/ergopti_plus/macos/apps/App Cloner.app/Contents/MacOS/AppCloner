@@ -152,7 +152,7 @@ def cloner_python_refusal(app_root, cloner_python):
     """Return why the managed Python cannot run App Cloner, or None.
 
     The interpreter is the versionless link Ergopti's Apps menu passes after
-    installing the pinned PyObjC (modules/llm/ensure-managed-pyobjc.sh); the
+    installing the pinned PyObjC (ai/engine/ensure-managed-pyobjc.sh); the
     modules it must import are that installer's own import check.
     """
     if not cloner_python.startswith("/") or os.path.basename(cloner_python) != "python3":
@@ -160,7 +160,7 @@ def cloner_python_refusal(app_root, cloner_python):
     if not os.access(cloner_python, os.X_OK):
         return "the managed Python link does not resolve to an interpreter"
     manifest_path = os.path.join(
-        os.path.dirname(os.path.dirname(app_root)), "modules", "llm", "managed-pyobjc.json"
+        os.path.dirname(os.path.dirname(app_root)), "ai", "engine", "managed-pyobjc.json"
     )
     try:
         with open(manifest_path, encoding="utf-8") as manifest_file:

@@ -58,7 +58,7 @@ LLM_DisplayShowAllReady(Count, Blocked := false) {
  */
 LLM_DisplayStreamingCapable(Platform, Backend) {
 	return (Platform == "hs" && (Backend == "ollama" || Backend == "mlx"))
-		|| (Platform == "linux" && Backend == "ollama")
+		|| ((Platform == "ahk" || Platform == "linux") && Backend == "ollama")
 }
 
 /**

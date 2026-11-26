@@ -42,7 +42,7 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 			start = function() calls.keyboard = calls.keyboard + 1; return true end,
 			stop  = function() return true end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			resume_after_cleanup = function()
 				calls.actions = calls.actions + 1
 				return true
@@ -65,7 +65,7 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 		package.loaded["modules.shortcuts.bindings"]        = nil
 		package.loaded["modules.shortcuts.script_control"]  = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		package.loaded["modules.gestures.actions"]          = nil
+		package.loaded["gestures.engine.actions"]          = nil
 		package.loaded["modules.shortcuts"]                 = nil
 	end)
 end)

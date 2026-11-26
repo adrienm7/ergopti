@@ -58,8 +58,22 @@ if args.ready_file:
 if args.state_file:
     record_state()
     window.connect("notify::is-active", record_state)
+
+
+def end_of_life():
+    """Quits, first recording the window as inactive: a window that is gone holds
+    no activation, and a last « active » left behind would read as a window
+    that never resigned."""
+    if args.state_file:
+        staged = args.state_file.with_name(args.state_file.name + ".tmp")
+        staged.write_text("inactive")
+        staged.replace(args.state_file)
+    Gtk.main_quit()
+    return False
+
+
 window.show_all()
 entry.grab_focus()
 window.present()
-GLib.timeout_add_seconds(args.lifetime_seconds, Gtk.main_quit)
+GLib.timeout_add_seconds(args.lifetime_seconds, end_of_life)
 Gtk.main()

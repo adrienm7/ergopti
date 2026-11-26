@@ -149,13 +149,17 @@ helpers.describe("release_installer: staging and replacement dispatch", function
 		helpers.assert_eq(call.args[8], "/Applications/ErgoptiPlus.app")
 		helpers.assert_true(call.args[6]:match("^/Applications/%.ergopti%-release%-install%-%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d%-%d+$") ~= nil, "the private stage belongs to the destination parent, regardless of TMPDIR")
 		call.on_done(0, "READY " .. call.args[6] .. "/app/ErgoptiPlus.app\n", "")
-		call.on_done(10, "", "curl: (6) Could not resolve host")
+		call.on_done(10, "FAILED native:offline\n", "curl: (6) Could not resolve host")
 		call.on_done(21, "", "")
 		call.on_done(27, "", "code object is not signed")
 		helpers.assert_eq(results[1][1], call.args[6] .. "/app/ErgoptiPlus.app")
 		helpers.assert_eq(results[2][2], "download")
+		-- UPD-11: the download failure keeps its receipt for the Versions window
+		helpers.assert_eq(results[2][4].network_status, "disconnected", "upd-11: the failure receipt is handed on")
 		helpers.assert_eq(results[3][2], "verify")
-		helpers.assert_eq(results[4][2], "verify")
+		helpers.assert_nil(results[3][4], "a check failure is no network failure")
+		-- UPD-10: a refused code signature is its own stage
+		helpers.assert_eq(results[4][2], "signature")
 		helpers.assert_nil(results[4][1])
 	end)
 
@@ -287,11 +291,34 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 		if opts.parent_readonly then assert(sh("chmod 700 " .. quote(dir)) == 0) end
 		local called = read(calls) or ""
 		local retained_archive = read(dir .. "/stage/release." .. (opts.format or "zip"))
+		local _, stage_exists = sh("[ -e " .. quote(dir .. "/stage") .. " ] && echo yes || echo no")
 		local _, permissions = sh("if [ -d " .. quote(dir .. "/stage") .. " ]; then python3 -c "
 			.. quote("import os,stat,sys; print(stat.S_IMODE(os.stat(sys.argv[1]).st_mode))") .. " " .. quote(dir .. "/stage") .. "; fi")
 		sh("rm -rf " .. quote(dir))
-		return status, output, called, retained_archive, permissions
+		return status, output, called, retained_archive, permissions, stage_exists == "yes\n"
 	end
+
+	-- UPD-11: a failed stage left its .ergopti-release-install- folder beside
+	-- the app, and its download failure printed nothing a receipt could carry.
+	helpers.it("upd-11: a failed download prints its closed fact and removes its stage", function()
+		local status, output, called, _, _, exists = stage({ curl_fails = true })
+		helpers.assert_eq(status, Installer.EXIT_DOWNLOAD, output)
+		helpers.assert_eq(called, "curl\n")
+		helpers.assert_eq(output, "FAILED curl:22\n")
+		helpers.assert_eq(exists, false, "the failed stage is removed")
+	end)
+
+	helpers.it("upd-11: every refused check removes its stage, a READY one keeps it", function()
+		for _, options in ipairs({ { digest = string.rep("0", 64) }, { version = "0.0.0-dev.138" },
+			{ unsigned = true }, { format = "tar.xz", extract_fails = true } }) do
+			local status, _, _, _, _, exists = stage(options)
+			helpers.assert_true(status ~= 0)
+			helpers.assert_eq(exists, false, "a refused stage is removed (exit " .. tostring(status) .. ")")
+		end
+		local status, _, _, _, _, exists = stage({})
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(exists, true, "the verified app stays for the swap")
+	end)
 
 	helpers.it("retires only the verified owned archive before READY and refuses failed retirement", function()
 		local status, output, _, archive, permissions = stage({})
@@ -376,6 +403,34 @@ helpers.describe("release_installer: the staging script under /bin/sh", function
 		local status, output = stage({ unsigned = true })
 		helpers.assert_eq(status, 27)
 		helpers.assert_true(output:find("READY", 1, true) == nil)
+	end)
+end)
+
+helpers.describe("release_installer: the download failure receipt (upd-11)", function()
+	local Installer = fresh_installer()
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local function contract()
+		local handle = assert(io.open(Paths.shared("core/network/data/managed_network.json"), "rb"))
+		local text = handle:read("*a")
+		handle:close()
+		return require("core.network.engine.failure").new(Json.decode(text))
+	end
+
+	helpers.it("upd-11: names the cause each closed fact proves, and no more", function()
+		local failure = contract()
+		for _, case in ipairs({
+			{ "FAILED native:offline\n", "offline" }, { "FAILED native:certificate\n", "certificate" },
+			{ "FAILED native:proxy\n", "proxy" }, { "FAILED native:file_write\n", "unknown" },
+			{ "FAILED native:connect\n", "unknown" }, { "FAILED curl:5\n", "proxy" },
+			{ "FAILED curl:60\n", "certificate" }, { "FAILED curl:22\n", "unknown" },
+			{ "FAILED native:forged\n", "unknown" }, { "", "unknown" }, { "READY /x\n", "unknown" },
+		}) do
+			local receipt = Installer.failure_receipt(case[1])
+			local report = failure.classify(receipt, {})
+			helpers.assert_eq(report.cause, case[2], case[1])
+			helpers.assert_true(report.evidence ~= "invalid_receipt", "a well-formed receipt: " .. case[1])
+		end
 	end)
 end)
 

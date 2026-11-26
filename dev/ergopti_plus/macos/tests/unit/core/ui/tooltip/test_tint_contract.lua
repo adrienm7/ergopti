@@ -144,6 +144,12 @@ local TINT_VECTORS = {
 		expected_hex = "#242424",
 	},
 	{
+		id           = "near_gray",
+		description  = "The palette grey (#6E6E73, a faint blue) → default dark background, not navy.",
+		accent_hex   = "#6E6E73",
+		expected_hex = "#242424",
+	},
+	{
 		id           = "no_accent",
 		description  = "Nil accent → falls back to default dark background.",
 		accent_hex   = nil,
@@ -169,15 +175,15 @@ helpers.describe("Tooltip: tint contract vectors", function()
 
 	helpers.it("uses CSS short and alpha colors for hotstring tint (tooltip-css-hex)", function()
 		local config = require("core.ui.ui.tooltip.config")
-		local original = package.loaded["modules.hotstrings.hotstrings_config"]
+		local original = package.loaded["hotstrings.engine.catalogue.config"]
 		local ok, err = xpcall(function()
 			for _, value in ipairs({ "#f80", "#f80a", "#ff8800", "#ff880080" }) do
-				package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { color = value } end }
+				package.loaded["hotstrings.engine.catalogue.config"] = { resolve = function() return { color = value } end }
 				local color = config.tint("hotstring_star")
 				helpers.assert_eq(rgba_to_hex(color), "#FF8800")
 			end
 		end, debug.traceback)
-		package.loaded["modules.hotstrings.hotstrings_config"] = original
+		package.loaded["hotstrings.engine.catalogue.config"] = original
 		if not ok then error(err, 0) end
 		local parse = require("core.ui.engine.color_hex").parse
 		for _, invalid in ipairs({ "#abcd0", "#1234567", "#12xz", "##abc" }) do

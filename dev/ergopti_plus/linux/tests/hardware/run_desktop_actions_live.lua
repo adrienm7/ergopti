@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Run by run_desktop_actions_live.sh on Xvfb with a private session bus and a
 --- throwaway HOME. Each action goes through the gesture manager's public
---- executor (modules/gestures/manager.lua execute_action), the one the
+--- executor (gestures/engine/manager.lua execute_action), the one the
 --- gestures and keyboard shortcuts call, and its effect is read back from the
 --- desktop itself:
 ---   1. empty_trash, whose question is cancelled, leaves a real gio trash as
@@ -49,8 +49,8 @@ local function settle(predicate, seconds)
 end
 
 require("core.i18n.engine.i18n").init()
-local Manager = require("modules.gestures.manager")
-local BackgroundCommands = require("modules.gestures.background_commands")
+local Manager = require("gestures.engine.manager")
+local BackgroundCommands = require("gestures.engine.background_commands")
 -- The daemon defers the result collector through its own event-loop adapter;
 -- this host runs a bare luv loop, so it collects in the predicate.
 local function idle()

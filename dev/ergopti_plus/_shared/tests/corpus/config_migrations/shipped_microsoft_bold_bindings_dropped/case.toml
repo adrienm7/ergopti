@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_microsoft_bold_bindings_dropped/case.toml
+
+[case]
+description = "v24 empties the shipped Windows keyboard slots bound to the removed microsoft_bold remap; a slot bound to another action keeps it."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 23
+to_version = 24

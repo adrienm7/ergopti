@@ -15,15 +15,15 @@ local MODULES = {
 	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"core.ui.engine.notifications",
-	"modules.llm",
-	"ui.menu.menu_llm.model_switcher",
-	"ui.menu.menu_llm.profile_label",
-	"ui.menu.menu_llm.profiles_manager",
+	"ai.engine",
+	"ai.ui.menu.models.switcher",
+	"ai.ui.menu.profile_label",
+	"ai.ui.menu.profiles_manager",
 	"ui.menu.shortcut_utils",
-	"ui.menu.preferences_transaction",
-	"ui.prompt_editor",
+	"settings.ui.menu.preferences_transaction",
+	"ai.ui.prompt_editor",
 }
 
 --- Clones plain state so durable and rendered snapshots cannot alias live tables.
@@ -166,7 +166,7 @@ local function with_fixture(options, body)
 			i18n = package.loaded["core.i18n.engine.i18n"],
 			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
@@ -177,7 +177,7 @@ local function with_fixture(options, body)
 				return true
 			end,
 		}
-		package.loaded["modules.llm"] = {
+		package.loaded["ai.engine"] = {
 			BUILTIN_PROFILES = builtins,
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			get_active_profile = get_runtime_profile,
@@ -206,7 +206,7 @@ local function with_fixture(options, body)
 				return true
 			end,
 		}
-		package.loaded["ui.menu.menu_llm.profile_label"] = {
+		package.loaded["ai.ui.menu.profile_label"] = {
 			format = function(label) return label end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {
@@ -219,7 +219,7 @@ local function with_fixture(options, body)
 				return false
 			end,
 		}
-		package.loaded["ui.prompt_editor"] = {
+		package.loaded["ai.ui.prompt_editor"] = {
 			scope_idle = function() return options.editor_busy ~= true end,
 			open = function(profile, callback)
 				editor_open_count = editor_open_count + 1
@@ -311,8 +311,8 @@ local function with_fixture(options, body)
 			get_model_info = function() return {params = 1} end,
 			get_presets = function() return {} end,
 		}
-		package.loaded["ui.menu.preferences_transaction"] = nil
-		local PreferencesTransaction = require("ui.menu.preferences_transaction")
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
+		local PreferencesTransaction = require("settings.ui.menu.preferences_transaction")
 		local preferences = {
 			save = function()
 				save_count = save_count + 1
@@ -358,8 +358,8 @@ local function with_fixture(options, body)
 			end,
 		}
 
-		package.loaded["ui.menu.menu_llm.model_switcher"] = nil
-		local switcher = require("ui.menu.menu_llm.model_switcher").new({
+		package.loaded["ai.ui.menu.models.switcher"] = nil
+		local switcher = require("ai.ui.menu.models.switcher").new({
 			state = state,
 			models_mgr = models_mgr,
 			keymap = {
@@ -399,8 +399,8 @@ local function with_fixture(options, body)
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		package.loaded["ai.ui.menu.profiles_manager"] = nil
+		local manager = require("ai.ui.menu.profiles_manager").new(deps, models_mgr)
 		runtime_calls = {}
 		set_profiles_calls = {}
 

@@ -186,3 +186,40 @@ _WVSO_HostPauseAdmission(View, Lines, Unhandled, Failure) {
 }
 Test("WebView script: paused admission cannot retain work for resume (webview-script-pause)",
 	_WVSO_WithFixture.Bind(_WVSO_HostPauseAdmission))
+
+; A configuration window keeps its page under a pause (EDD-1): the Studio
+; answered nothing while paused on Windows, so a save, an install or an
+; emulation waited forever, where macOS and Linux answer it (LTP-03).
+_WVSO_ConfigurationHostRunsPaused(View, Lines, Unhandled, Failure) {
+	Host := _WVSO_PausedHost()
+	Host.AppId := "private-configuration-fixture"
+	Host.WebView := View
+	Host.Ready := true
+	Received := []
+	Host.Opts := Map("RunsWhilePaused", true, "OnMessage", (Owner, Payload) => Received.Push(Payload["action"]))
+	try {
+		Suspend(true)
+		Host.Eval("privatePausedAnswer();")
+		Started := A_TickCount
+		while Host.Deliveries == 0 && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertEqual(1, View.Scripts.Length, "a configuration window answers its page while paused")
+		AssertEqual("privatePausedAnswer();", View.Scripts[1])
+		Host._DispatchMessage(Host.Epoch, Map("action", "source_save"))
+		AssertEqual(1, Received.Length, "its page's message reaches its host while paused")
+		; Every other window stays fenced.
+		Host.Opts["RunsWhilePaused"] := false
+		Host.Eval("privateFencedCommand();")
+		Host._DispatchMessage(Host.Epoch, Map("action", "source_save"))
+		AssertEqual(1, View.Scripts.Length, "a window that is not configuration submits nothing while paused")
+		AssertEqual(1, Received.Length, "nor receives its page's messages")
+	} finally {
+		Host.Close()
+		Suspend(false)
+	}
+	Body := _DriverFuncBody("_LayEdWin_TryOpen")
+	Assert(Body != "", "the Studio window opener must be readable")
+	AssertContains(Body, '"RunsWhilePaused", true', "the Studio window is a configuration window")
+}
+Test("WebView script: a configuration window such as the Studio runs while paused (ltp-03-studio-paused)",
+	_WVSO_WithFixture.Bind(_WVSO_ConfigurationHostRunsPaused))

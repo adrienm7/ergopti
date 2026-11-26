@@ -1,0 +1,1824 @@
+{
+	"ergopti.toml": {
+		"macos": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "macos",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock",
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "kana",
+					"selectors": [
+						{
+							"required": [
+								"kana"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_kana",
+					"selectors": [
+						{
+							"required": [
+								"kana",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"linux": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "linux",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock",
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "kana",
+					"selectors": [
+						{
+							"required": [
+								"kana"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_kana",
+					"selectors": [
+						{
+							"required": [
+								"kana",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"windows": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "windows",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock",
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "kana",
+					"selectors": [
+						{
+							"required": [
+								"kana"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_kana",
+					"selectors": [
+						{
+							"required": [
+								"kana",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		}
+	},
+	"ergopti/ergopti.keylayout": {
+		"macos": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "macos",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"linux": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "linux",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"windows": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti",
+			"platform": "windows",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		}
+	},
+	"ergopti_plus/ergopti_plus.keylayout": {
+		"macos": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus",
+			"platform": "macos",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"linux": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus",
+			"platform": "linux",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"windows": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus",
+			"platform": "windows",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		}
+	},
+	"ergopti_ansi/ergopti_ansi.keylayout": {
+		"macos": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_ansi",
+			"platform": "macos",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"linux": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_ansi",
+			"platform": "linux",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"windows": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_ansi",
+			"platform": "windows",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		}
+	},
+	"ergopti_plus_ansi/ergopti_plus_ansi.keylayout": {
+		"macos": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus_ansi",
+			"platform": "macos",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"linux": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus_ansi",
+			"platform": "linux",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		},
+		"windows": {
+			"format": "ergopti-layout-emulation",
+			"version": 1,
+			"layout": "ergopti_plus_ansi",
+			"platform": "windows",
+			"modifiers": [],
+			"layers": [
+				{
+					"id": "base",
+					"selectors": [
+						{
+							"required": [],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift",
+					"selectors": [
+						{
+							"required": [
+								"shift"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_caps_lock",
+					"selectors": [
+						{
+							"required": [
+								"shift",
+								"caps_lock"
+							],
+							"optional": []
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "control",
+					"selectors": [
+						{
+							"required": [
+								"control"
+							],
+							"optional": [
+								"alt",
+								"shift",
+								"caps_lock",
+								"meta"
+							]
+						},
+						{
+							"required": [
+								"meta"
+							],
+							"optional": [
+								"control",
+								"alt",
+								"shift",
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "alt",
+					"selectors": [
+						{
+							"required": [
+								"alt"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				},
+				{
+					"id": "shift_alt",
+					"selectors": [
+						{
+							"required": [
+								"alt",
+								"shift"
+							],
+							"optional": [
+								"caps_lock"
+							]
+						}
+					],
+					"native": true,
+					"keys": {}
+				}
+			],
+			"shortcuts": [],
+			"tap_holds": [],
+			"remaps": [],
+			"not_emulated": []
+		}
+	}
+}

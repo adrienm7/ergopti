@@ -105,8 +105,8 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 			helpers.assert_eq(record_payload.line, first_line)
 			helpers.assert_eq(record_payload.calendar_date, "2001-02-03",
 				"worker date rotation must derive from the canonical record timestamp")
-			helpers.assert_eq(record_payload.topics[1], "ErgoptiPlus_llm.log",
-				"topical routes must use the native worker's validated filename contract")
+			helpers.assert_nil(record_payload.topics,
+				"a record carries no topics: every line goes to the daily log only")
 		end)
 	end)
 
@@ -526,27 +526,7 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 				local utf8_ok, utf8_length = pcall(utf8.len, payload.line)
 				helpers.assert_true(utf8_ok and utf8_length ~= nil,
 					"a byte boundary must never publish malformed UTF-8")
-				helpers.assert_eq(payload.topics[1], "ErgoptiPlus_llm.log",
-					"each fragment must route from the immutable original record")
-				context:ack(sequence)
-			end
-			helpers.assert_eq(context.transport.status().queued, 0)
-		end)
-	end)
-
-	helpers.it("routes a literal that crosses a timer-owned fragment boundary", function()
-		Fixture.with_fixture(function()
-			local context = new_context({ route_overlap_bytes = 2 })
-			configure(context)
-			local line = string.rep("x", 7999) .. "LLM" .. string.rep("y", 100)
-			local retained, enqueue_err = context.transport.enqueue(line, "info")
-			helpers.assert_not_nil(retained, tostring(enqueue_err))
-			for sequence = 1, 2 do
-				context.state.pump()
-				local payload = context:payload()
-				helpers.assert_eq(payload.sequence, sequence)
-				helpers.assert_eq(payload.topics[1], "ErgoptiPlus_llm.log",
-					"bounded routing windows must preserve a cross-boundary literal")
+				helpers.assert_nil(payload.topics, "a fragment carries no topics")
 				context:ack(sequence)
 			end
 			helpers.assert_eq(context.transport.status().queued, 0)

@@ -1,6 +1,8 @@
 --- tests/unit/core/ui/webview/test_native_lifecycle.lua
 
 local helpers = require("tests.helpers")
+-- The page sends its messages as JSON text (physical_shortcuts/script.js).
+local Json = require("core.text.engine.json")
 
 -- Independent actual manager resource identity/retirement assertions.
 local run_contract = function(helpers,load_manager,load_host)
@@ -125,8 +127,8 @@ local run_contract = function(helpers,load_manager,load_host)
   end
   helpers.it('(native-refocus-owner) configuration cleanup reopen refuses a synchronously closed page',function()
    fixture(function(m,c)
-    package.loaded['ui.config_cleanup.bridge']=nil
-    local cleanup=require('ui.config_cleanup.bridge')
+    package.loaded['settings.ui.cleanup']=nil
+    local cleanup=require('settings.ui.cleanup')
     helpers.assert_eq(cleanup.open({path='/owned/config.toml'}),true)
     local old=m.current_epoch('config_cleanup')
     c.present=function(owner)helpers.assert_eq(owner.hide('config_cleanup',old),true)end
@@ -139,10 +141,10 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.it('(native-push-admission) asynchronous diagnostics probe cannot push into '..mode,function()
     fixture(function(m,c)
      local completed
-     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
-     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
-     package.loaded['ui.healthcheck.bridge']=nil
-     local diagnostics=require('ui.healthcheck.bridge')
+     package.loaded['diagnostics.ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['diagnostics.ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['diagnostics.ui.healthcheck.bridge']=nil
+     local diagnostics=require('diagnostics.ui.healthcheck.bridge')
      diagnostics.config=function()return{schema={probes={}},redaction={}}end
      diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
      helpers.assert_eq(m.show('healthcheck','en'),true);local old=m.current_epoch('healthcheck')
@@ -175,10 +177,10 @@ local run_contract = function(helpers,load_manager,load_host)
    helpers.it('(native-push-admission) synchronous diagnostics ready preserves only live acquisition: '..tostring(cancelled),function()
     fixture(function(m,c)
      local completed
-     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
-     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
-     package.loaded['ui.healthcheck.bridge']=nil
-     local diagnostics=require('ui.healthcheck.bridge')
+     package.loaded['diagnostics.ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['diagnostics.ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['diagnostics.ui.healthcheck.bridge']=nil
+     local diagnostics=require('diagnostics.ui.healthcheck.bridge')
      diagnostics.config=function()return{schema={probes={}},redaction={}}end
      diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
      local observed={}
@@ -233,6 +235,24 @@ local run_contract = function(helpers,load_manager,load_host)
     local released=c.release_calls;c.views[1].on_web_process_terminated()
     helpers.assert_eq(m.current_epoch('metrics_typing'),current);helpers.assert_eq(c.views[2].alive,true)
     helpers.assert_eq(c.release_calls,released,'A retired renderer callback cannot release a successor')
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
+  -- Arch field report, 2026-11-25: the restart Ergopti asked for logged « WebKit
+  -- process for 'layout_manager' terminated » as an ERROR, systemd having
+  -- stopped the web process with the daemon's whole unit.
+  helpers.it('(webview-own-stop) a renderer ending with our own restart is no error, a crash still is',function()
+   fixture(function(m,c)
+    local own=true
+    package.loaded['modules.updater.restarter']={own_stop_requested=function()return own end}
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    local before=#c.logs;c.views[1].on_web_process_terminated()
+    helpers.assert_eq(#c.logs,before,'Our own restart logs no error for the web process it stops')
+    helpers.assert_eq(m.current_epoch('metrics_typing'),nil,'The page is still retired')
+    own=false
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    c.views[2].on_web_process_terminated()
+    helpers.assert_eq(c.logs[#c.logs],"WebKit process for 'metrics_typing' terminated.",'A renderer crash is still an error')
     helpers.assert_eq(m.shutdown(),true)
    end)
   end)
@@ -590,7 +610,7 @@ local run_contract = function(helpers,load_manager,load_host)
       local received,retired=0,0
       package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
       package.loaded['core.fs.engine.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
-      package.loaded['modules.gestures.manager']={}
+      package.loaded['gestures.engine.manager']={}
       package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
        local closed=false
        return{retire=function()closed=true;retired=retired+1;return true end,receive=function()if closed or options.page_current()~=true then return false end;received=received+1;return true end}
@@ -601,12 +621,12 @@ local run_contract = function(helpers,load_manager,load_host)
       if mode=='destroy'then c.destroy='false'else c.release=false end
       helpers.assert_eq(host.open(options),false);local epoch=m.current_epoch('physical_shortcuts')
       helpers.assert_true(type(epoch)=='number',table.concat(c.logs,' | '));helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.constructor_calls,1)
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),false);helpers.assert_eq(received,0)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=epoch}),false);helpers.assert_eq(received,0)
       c.present=nil;c.destroy=nil;c.release=true
       helpers.assert_eq(host.close(),true);helpers.assert_eq(m.current_epoch('physical_shortcuts'),nil)
       helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.constructor_calls,2)
       host.on_window_closed(epoch)
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
       helpers.assert_eq(received,1);helpers.assert_eq(host.close(),true)
      end)
     end)
@@ -616,12 +636,12 @@ local run_contract = function(helpers,load_manager,load_host)
      local received=0
      package.loaded['shortcuts.engine.physical_slots']={new=function()return{candidates=function()return{}end}end}
      package.loaded['core.fs.engine.paths']={shared=function()return helpers.driver_root() .. '/../_shared/layouts/data/keycodes/physical_keys.json'end}
-     package.loaded['modules.gestures.manager']={}
+     package.loaded['gestures.engine.manager']={}
      package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)return{retire=function()return true end,receive=function()helpers.assert_eq(options.page_current(),true);received=received+1;return true end}end}
      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
      local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
      c.present=function()
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
       helpers.assert_eq(received,0,'Provisional native page does not initialize editor')
      end
      helpers.assert_eq(host.open(options),true);helpers.assert_eq(received,1);helpers.assert_eq(host.close(),true)

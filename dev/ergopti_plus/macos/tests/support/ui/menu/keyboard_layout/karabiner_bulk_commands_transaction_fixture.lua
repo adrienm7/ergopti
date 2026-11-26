@@ -47,19 +47,19 @@ local PICKER_ROUTE_CASES = {
 	},
 	{
 		setter = "set_combo_combo_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_chord",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_hold_tap",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
-		parent_prefix = "key_name.left_shift + key_name.right_shift  :",
+		parent_prefix = "key_name.left_shift + key_name.right_shift:",
 		picker_label = "menu.shortcuts.key_combinations_hold_hold",
 		expected_id = "shift_pair",
 	},
@@ -77,7 +77,7 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 -- backup under the remap file; both boundaries are doubles for the whole
 -- module, restored at its end.
 local SAVED_DIALOGS = package.loaded["core.ui.engine.dialog_util"]
-local SAVED_PATHS = package.loaded["infra.config_paths"]
+local SAVED_PATHS = package.loaded["settings.engine.paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
 package.loaded["core.ui.engine.dialog_util"] = {
 	block_alert = function(_, _, no, yes)
@@ -85,7 +85,7 @@ package.loaded["core.ui.engine.dialog_util"] = {
 		return CONFIRMATION.answer == "yes" and yes or no
 	end,
 }
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get = function(key)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return "/remap/tap_hold.toml"
@@ -251,8 +251,8 @@ local function make_remap(observations, mode)
 		set_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		set_combo_symmetric = function() return true end,
-		get_mod_combos_enabled = function() return true end,
-		set_mod_combos_enabled = function() return true end,
+		get_key_combinations_enabled = function() return true end,
+		set_key_combinations_enabled = function() return true end,
 		get_tap_action = function() return "none" end,
 		set_tap_action = function()
 			observations.calls.set_tap_action = observations.calls.set_tap_action + 1
@@ -367,13 +367,13 @@ local function build_menu(mode, configure)
 	}
 	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_controller = package.loaded["platform.remap.lease_controller"]
-	local saved_manifest = package.loaded["infra.manifest_menu"]
+	local saved_manifest = package.loaded["menu.engine.manifest_menu"]
 	package.loaded["core.logger.engine.logger"] = recording_logger(observations)
 	package.loaded["platform.remap.lease_controller"] = {
 		status = function() return "active", { phase = "active" } end,
 		stop = function() return true end,
 	}
-	package.loaded["infra.manifest_menu"] = nil
+	package.loaded["menu.engine.manifest_menu"] = nil
 	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 	local remap = make_remap(observations, mode)
 	if type(configure) == "function" then configure(remap, observations) end
@@ -391,7 +391,7 @@ local function build_menu(mode, configure)
 	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
 	package.loaded["core.logger.engine.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
-	package.loaded["infra.manifest_menu"] = saved_manifest
+	package.loaded["menu.engine.manifest_menu"] = saved_manifest
 	return built, observations, remap
 end
 
@@ -434,7 +434,7 @@ local function with_guidance_declaration(section, mutate, body)
 					return true
 				end
 			end
-			declaration = require("infra.manifest_menu").get_array(section)
+			declaration = require("menu.engine.manifest_menu").get_array(section)
 			for index, row in ipairs(declaration) do
 				saved[index] = {}
 				for key, value in pairs(row) do saved[index][key] = value end

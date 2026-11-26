@@ -40,7 +40,7 @@ _KLRD_ReadSource(FileName) {
 
 _MetaCheckRolloverForceIngest() {
 	try {
-		Src := _KLRD_ReadSource("keystats.ahk")
+		Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	} catch {
 		; File unreadable — skip rather than fail, test environment issue
 		return
@@ -86,7 +86,7 @@ Test("meta keystats F21: KL_IngestOnce has force parameter and rollover passes t
 
 _MetaCheckRolloverNoBareCall() {
 	try {
-		Src := _KLRD_ReadSource("keystats.ahk")
+		Src := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("KL_MarkSynthetic"), "UTF-8"))
 	} catch {
 		return
 	}

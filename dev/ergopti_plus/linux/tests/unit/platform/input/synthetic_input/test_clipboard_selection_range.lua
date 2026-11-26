@@ -19,7 +19,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 ---   on_settle (called at each wait with the session).
 --- @param body function body(clipboard, session, emit, sleep_ms)
 local function with_session(kind, options, body)
-	local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+	local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local session = { clipboard = "saved", primary = options.primary, writes = {}, combos = {}, pending = nil }
@@ -49,7 +49,7 @@ local function with_session(kind, options, body)
 		is_x11 = function() return kind == "x11" end,
 		kind = function() return kind end,
 	}
-	package.loaded["adapters.clipboard"] = nil
+	package.loaded["clipboard.adapters.clipboard"] = nil
 	local function emit(combo)
 		session.combos[#session.combos + 1] = combo
 		-- The application copies what it has selected.
@@ -61,7 +61,7 @@ local function with_session(kind, options, body)
 		return true
 	end
 	session.selected = options.selected or "source"
-	local ok, err = pcall(body, require("adapters.clipboard"), session, emit, sleep_ms)
+	local ok, err = pcall(body, require("clipboard.adapters.clipboard"), session, emit, sleep_ms)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end
 end

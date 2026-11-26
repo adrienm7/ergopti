@@ -2,7 +2,7 @@
 # Versioned config.toml: the ordered, data-only migration registry.
 #
 # READ AT RUNTIME, ON EVERY BOOT, BY ALL THREE DRIVERS, before anything applies
-# or saves config.toml: Windows through windows/infra/config_migrate.ahk, macOS
+# or saves config.toml: Windows through windows/settings/engine/migration/migrate.ahk, macOS
 # and Linux through _shared/settings/engine/migration/migrate.lua. The decision record is
 # docs/adr/009-config-versioning.md.
 #
@@ -111,7 +111,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 22
+current_version = 24
 unstamped_version = 2
 oldest_version = 20
 
@@ -154,4 +154,56 @@ ops = [
 	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "lone_modifier_tap_max_ms", to_section = "tap_holds" },
 	{ op = "import_companion", file = "tap_hold.toml", section = "tap_hold", key = "sticky_timeout_ms", to_section = "tap_holds" },
 	{ op = "import_companion", file = "tap_hold.toml", section = "mod_combos", to_section = "mod_combos" },
+]
+
+[steps.v22_to_v23]
+from = 22
+to = 23
+drivers = ["ahk", "hs", "linux"]
+reason = "The chevron_greater and chevron_less rolls and the five built-in Windows personal shortcut switches had no reader on any OS; the maintainer removed them on 2026-11-19 (PPT-01, PPT-02), so their saved values leave config.toml."
+# A recommended import or a menu toggle wrote [hotstrings.rolls.chevron_greater]
+# and [hotstrings.rolls.chevron_less] on every OS. The five switches lived in the
+# Windows [shortcuts.personal] namespace; switches a personal_shortcuts.ahk
+# registers under other names stay. Absent values are a no-op.
+ops = [
+	{ op = "delete", section = "hotstrings.rolls.chevron_greater" },
+	{ op = "delete", section = "hotstrings.rolls.chevron_less" },
+	{ op = "delete", section = "shortcuts.personal", key = "laptop_broken_key" },
+	{ op = "delete", section = "shortcuts.personal", key = "mouse_drag_window" },
+	{ op = "delete", section = "shortcuts.personal", key = "mouse_tab_switching" },
+	{ op = "delete", section = "shortcuts.personal", key = "professional_environment" },
+	{ op = "delete", section = "shortcuts.personal", key = "programmable_keyboard" },
+]
+
+[steps.v23_to_v24]
+from = 23
+to = 24
+drivers = ["ahk"]
+reason = "The Windows Microsoft bold remap (microsoft_bold: Ctrl+G in Microsoft apps, Ctrl+B elsewhere) was removed by the maintainer on 2026-11-25, when Ctrl+B became the parentheses wrap; a shipped keyboard slot bound to it is emptied."
+# Only Windows offered the action. A slot bound to it falls back to none, its
+# shipped default, so Ctrl+B no longer types a Ctrl+G; the step is logged once
+# with the upgrade. A binding elsewhere (a gesture, a tap, a slot the user
+# added) is reported by the explicit configuration cleanup, as any action a
+# driver cannot run.
+ops = [
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_star", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_b", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_o", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_a", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_d", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_g", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_h", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_m", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_n", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_o", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_s", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_sc029", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_t", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_u", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_w", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_x", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_capslock", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_quote", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "primary_shift_v", map = [{ from = "microsoft_bold", to = "none" }] },
+	{ op = "map_value", section = "shortcuts.keyboard", key = "meta_space", map = [{ from = "microsoft_bold", to = "none" }] },
 ]

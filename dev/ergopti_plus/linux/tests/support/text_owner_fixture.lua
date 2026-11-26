@@ -21,7 +21,7 @@ function M.with(body)
 		local configuration = assert(policy.configuration_snapshot())
 		configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
-		local state = { bus = ":1.23", path = "/field/original", role = 61, now = 1000, barriers = 0, pumps = 0 }
+		local state = { bus = ":1.23", path = "/field/original", role = 61, now = 1000, barriers = 0, pumps = 0, budgets = {} }
 		local listener
 		local function snapshot()
 			if state.unknown then return nil end
@@ -30,8 +30,9 @@ function M.with(body)
 		local watch = {
 			on_change = function(fn) listener = fn end,
 			pump = function() state.pumps = state.pumps + 1 end,
-			barrier = function()
+			barrier = function(budget_ms)
 				state.barriers = state.barriers + 1
+				state.budgets[#state.budgets + 1] = budget_ms or "input"
 				if state.on_barrier then state.on_barrier() end
 				state.receipt = snapshot()
 				listener(state.receipt)

@@ -89,7 +89,7 @@ local function load_subject(controls)
 		return keyboard.start(candidate)
 	end
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = keyboard
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.actions"] = {
 		resume_after_cleanup = function() return true end,
 		force_cleanup = function() return true end,
 	}

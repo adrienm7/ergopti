@@ -24,6 +24,7 @@
 local helpers = require("tests.helpers")
 package.loaded["tests.support.platform.remap.generator.generator_fixture"] = nil
 local Fixture = require("tests.support.platform.remap.generator.generator_fixture")
+local Sequence = require("tests.support.script_chord_sequence")
 local Generator = Fixture.Generator
 local NONE_ACTION = Fixture.NONE_ACTION
 local TEST_LEASE_TOKEN = Fixture.TEST_LEASE_TOKEN
@@ -374,7 +375,8 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		local rules = build()
 		local on_layer = first_match(rules, "left_command", variables(rules, true))
 		helpers.assert_not_nil(on_layer, "on the layer, left Command must not reach macOS as Command")
-		for _, event in ipairs(on_layer.to or {}) do
+		-- Like every key-down, it ends a script chord sequence.
+		for _, event in ipairs(Sequence.without_sequence(on_layer.to)) do
 			helpers.assert_nil(event.key_code, "it posts no key")
 			helpers.assert_nil(event.set_variable, "nor holds the layer or anything else")
 		end
@@ -391,8 +393,9 @@ helpers.describe("Generator.build_karabiner_json: a layer key on a layer another
 		local rules = build()
 		local on_layer, rule = first_match(rules, "spacebar", variables(rules, true))
 		helpers.assert_not_nil(on_layer, "on the layer, Space matches the layer's mapping")
-		helpers.assert_eq(on_layer.to[1].key_code, "spacebar")
-		helpers.assert_eq(on_layer.to[1].modifiers, { "command" }, "the layer sends Spotlight, not a plain Space")
+		local sent = Sequence.without_sequence(on_layer.to)[1]
+		helpers.assert_eq(sent.key_code, "spacebar")
+		helpers.assert_eq(sent.modifiers, { "command" }, "the layer sends Spotlight, not a plain Space")
 		helpers.assert_true(tostring(rule.description):find("Navigation layer", 1, true) ~= nil,
 			"the layer's rule, not Space's own tap/hold")
 		local alone = first_match(rules, "spacebar", variables(rules, false))

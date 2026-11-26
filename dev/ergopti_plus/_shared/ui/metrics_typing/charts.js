@@ -383,7 +383,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 					? `${ui_thresh_ms / 60000}${NBSP}min`
 					: `${ui_thresh_ms / 1000}${NBSP}s`;
 		const tip = _t('ui_typing.tooltip_precision_formula').replace('{thresh}', thresh_label);
-		info_el.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+		info_el.innerHTML = `${INFO_SVG}<small class="tooltiptext" style="text-align:start;">${tip}</small>`;
 	}
 
 	// Precision formula
@@ -443,7 +443,10 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 					callbacks: {
 						title: tooltipTitleCallback,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -530,7 +533,10 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 					callbacks: {
 						title: tooltipTitleCallback,
 						label: (ctx) =>
-							`Accept\u00E9es\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accepted').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -570,10 +576,27 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 // ====================================================
 
 /**
- * Tooltip title callback for hourly charts: shows "lundi 14/04 à 15h" instead
- * of a full date, since the day is already known when in single-day mode.
+ * Names one time slot of a single-day chart in the interface language: the
+ * weekday, the day and month, and the time. It was French on every locale
+ * (« lundi 14/04 à 15 h »).
+ * @param {string} day_name - Localized weekday name.
+ * @param {Date} date - The slot start.
+ * @param {Object} time_options - Intl.DateTimeFormat options for the time.
+ * @returns {string} The slot title.
+ */
+function chart_slot_title(day_name, date, time_options) {
+	const locale = number_locale();
+	return _t('ui_typing.chart_slot_title')
+		.replace('{day}', day_name)
+		.replace('{date}', date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' }))
+		.replace('{time}', date.toLocaleTimeString(locale, time_options));
+}
+
+/**
+ * Tooltip title callback for hourly charts: shows the weekday, date and hour
+ * instead of a full date, since the day is already known in single-day mode.
  * @param {Array} context - Chart.js tooltip context array.
- * @returns {string} Hour-aware French-formatted label.
+ * @returns {string} Hour-aware label in the interface language.
  */
 const tooltipTitleCallbackHourly = (context) => {
 	const days = [
@@ -587,10 +610,7 @@ const tooltipTitleCallbackHourly = (context) => {
 	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
-	const dd = String(d.getDate()).padStart(2, '0');
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const h = d.getHours();
-	return `${dayName} ${dd}/${mm} \u00E0 ${h}\u202Fh`;
+	return chart_slot_title(dayName, d, { hour: 'numeric' });
 };
 
 /**
@@ -745,7 +765,10 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
 					callbacks: {
 						title: tooltipTitleCallbackHourly,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -776,10 +799,10 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
 // ==================================================================
 
 /**
- * Tooltip title callback for 5-minute charts: shows "lundi 14/04 à 15h05"
- * so the user can read the exact time slot without any ambiguity.
+ * Tooltip title callback for 5-minute charts: shows the weekday, date, hour
+ * and minute so the user can read the exact time slot without any ambiguity.
  * @param {Array} context - Chart.js tooltip context array.
- * @returns {string} Minute-aware French-formatted label.
+ * @returns {string} Minute-aware label in the interface language.
  */
 const tooltipTitleCallbackMinute5 = (context) => {
 	const days = [
@@ -793,11 +816,7 @@ const tooltipTitleCallbackMinute5 = (context) => {
 	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
-	const dd = String(d.getDate()).padStart(2, '0');
-	const mm = String(d.getMonth() + 1).padStart(2, '0');
-	const h = d.getHours();
-	const min = String(d.getMinutes()).padStart(2, '0');
-	return `${dayName} ${dd}/${mm} \u00E0 ${h}h${min}`;
+	return chart_slot_title(dayName, d, { hour: 'numeric', minute: '2-digit' });
 };
 
 /**
@@ -941,7 +960,10 @@ function _render_minute5_precision_chart(pts, color, hourWindow) {
 					callbacks: {
 						title: tooltipTitleCallbackMinute5,
 						label: (ctx) =>
-							`Pr\u00E9cision\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0%`
+							_t('ui_typing.chart_accuracy').replace(
+								'{value}',
+								format_number_plain(Math.round(ctx.parsed.y))
+							)
 					}
 				}
 			},
@@ -1047,6 +1069,7 @@ function _render_activity_calendar() {
 		});
 
 	let cells = '';
+	const tips = [];
 	let month_labels = '';
 	let last_month = -1;
 	const cursor = new Date(start);
@@ -1060,6 +1083,7 @@ function _render_activity_calendar() {
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
 		const tip = `${localized_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
+		tips.push(tip);
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
@@ -1110,17 +1134,19 @@ function _render_activity_calendar() {
 		}
 	});
 
+	// Each day's words, for the keyboard and a screen reader (MET-16).
+	const values = window.ErgoptiChartValues.markup('activity_calendar_values', tips);
 	container.innerHTML =
-		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
-		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</span>` +
-		`</div>` +
-		`<svg width="${svg_w}" height="${svg_h}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
+		`<figcaption id="activity_calendar_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</small></h3>` +
+		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</p>` +
+		`</figcaption>` +
+		`<svg width="${svg_w}" height="${svg_h}" role="img" aria-labelledby="activity_calendar_caption"${values.attribute} xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		weekday_labels +
 		month_labels +
 		cells +
-		`</svg></div>`;
+		`</svg>${values.html}</figure>`;
 }
 
 // ===================================================
@@ -1207,12 +1233,14 @@ function _render_hour_weekday_heatmap() {
 	];
 
 	let cells = '';
+	const tips = [];
 	for (let dow = 0; dow < 7; dow++) {
 		for (let h = 0; h < 24; h++) {
 			const x = PAD_LEFT + h * (CELL_W + GAP);
 			const y = PAD_TOP + dow * (CELL_H + GAP);
 			const n = matrix[dow][h];
 			const tip = `${days_fr[dow]} ${String(h).padStart(2, '0')}h — ${n === 0 ? _t('ui_typing.heatmap_hour_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.heatmap_hour_chars_abbrev')}`;
+			tips.push(tip);
 			cells += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" rx="2" fill="${heat_color(n)}"><title>${tip}</title></rect>`;
 		}
 	}
@@ -1233,15 +1261,17 @@ function _render_hour_weekday_heatmap() {
 	let total_chars = 0;
 	for (let i = 0; i < 7; i++) for (let j = 0; j < 24; j++) total_chars += matrix[i][j];
 
+	// Each hour's words, for the keyboard and a screen reader (MET-16).
+	const values = window.ErgoptiChartValues.markup('hour_weekday_values', tips);
 	container.innerHTML =
-		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
-		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</span>` +
-		`</div>` +
-		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		`<figure style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0;">` +
+		`<figcaption id="hour_weekday_caption" style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <small style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</small></h3>` +
+		`<p style="margin:0;font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</p>` +
+		`</figcaption>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" role="img" aria-labelledby="hour_weekday_caption"${values.attribute} xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		day_labels +
 		hour_labels.join('') +
 		cells +
-		`</svg></div>`;
+		`</svg>${values.html}</figure>`;
 }

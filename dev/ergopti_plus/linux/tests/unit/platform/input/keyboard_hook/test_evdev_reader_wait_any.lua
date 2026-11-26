@@ -148,24 +148,33 @@ helpers.describe("evdev_reader: the wait companion", function()
 		local reader = helpers.load_module("platform.input.evdev_reader")
 		local backend = waiting_backend(false)
 		local seen
-		backend.poll_many = function(_, _, _, extra, extra_count)
-			seen = { extra = extra, count = extra_count }
+		backend.poll_many = function(_, _, _, groups, group_count)
+			seen = { groups = group_count }
+			for index = 1, group_count do seen[index] = { records = groups[index].records, count = groups[index].count } end
 			return false
 		end
 		reader._set_backend(backend)
 		reader.open("/dev/input/event3")
 		local calls = {}
-		local records = { "glib records" }
-		local companion = {
-			begin = function() calls[#calls + 1] = "begin"; return records, 2 end,
-			finish = function() calls[#calls + 1] = "finish" end,
+		local loop_records, glib_records = { "libuv record" }, { "glib records" }
+		local loop_companion = {
+			begin = function() calls[#calls + 1] = "loop begin"; return loop_records, 1 end,
+			finish = function() calls[#calls + 1] = "loop finish" end,
 		}
-		helpers.assert_eq(reader.wait_any_readable(8, companion), false)
-		helpers.assert_eq(calls, { "begin", "finish" })
-		helpers.assert_true(rawequal(seen.extra, records), "the companion's own records are polled")
-		helpers.assert_eq(seen.count, 2)
+		local glib_companion = {
+			begin = function() calls[#calls + 1] = "glib begin"; return glib_records, 2 end,
+			finish = function() calls[#calls + 1] = "glib finish" end,
+		}
+		helpers.assert_eq(reader.wait_any_readable(8, { loop_companion, glib_companion }), false)
+		helpers.assert_eq(calls, { "loop begin", "glib begin", "loop finish", "glib finish" })
+		helpers.assert_eq(seen.groups, 2, "every companion is polled in the same wait")
+		helpers.assert_true(rawequal(seen[1].records, loop_records), "each companion's own records are polled")
+		helpers.assert_eq(seen[1].count, 1)
+		helpers.assert_true(rawequal(seen[2].records, glib_records))
+		helpers.assert_eq(seen[2].count, 2)
 		helpers.assert_eq(reader.wait_any_readable(8), false)
-		helpers.assert_eq(#calls, 2, "a wait without a companion opens none")
+		helpers.assert_eq(#calls, 4, "a wait without a companion opens none")
+		helpers.assert_eq(seen.groups, 0)
 		reader._reset_backend()
 	end)
 
@@ -179,10 +188,13 @@ helpers.describe("evdev_reader: the wait companion", function()
 			begin = function() begins = begins + 1; error("prepare refused") end,
 			finish = function() finishes = finishes + 1 end,
 		}
-		helpers.assert_eq(reader.wait_any_readable(8, companion), true, "the input wait still runs")
-		helpers.assert_eq(reader.wait_any_readable(8, companion), true)
+		local healthy_begins = 0
+		local healthy = { begin = function() healthy_begins = healthy_begins + 1; return {}, 0 end, finish = function() end }
+		helpers.assert_eq(reader.wait_any_readable(8, { companion, healthy }), true, "the input wait still runs")
+		helpers.assert_eq(reader.wait_any_readable(8, { companion, healthy }), true)
 		helpers.assert_eq(begins, 1, "a raising companion is retired after one report")
 		helpers.assert_eq(finishes, 1, "a half-opened begin is still finished")
+		helpers.assert_eq(healthy_begins, 2, "the other companions stay polled")
 		helpers.assert_eq(#waits, 2)
 		reader._reset_backend()
 	end)
@@ -191,7 +203,8 @@ helpers.describe("evdev_reader: the wait companion", function()
 		local reader = helpers.load_module("platform.input.evdev_reader")
 		reader._set_backend(waiting_backend(true))
 		reader.open("/dev/input/event3")
-		helpers.assert_throws(function() reader.wait_any_readable(8, { begin = function() end }) end)
+		helpers.assert_throws(function() reader.wait_any_readable(8, { { begin = function() end } }) end)
+		helpers.assert_throws(function() reader.wait_any_readable(8, { "glib" }) end)
 		helpers.assert_throws(function() reader.wait_any_readable(8, "glib") end)
 		reader._reset_backend()
 	end)
@@ -225,7 +238,7 @@ if package.config:sub(1, 1) == "/" and pcall(require, "ffi") then
 			local companion = { begin = function() return records, 1 end, finish = function() finished = true end }
 			luv.fs_write(glib_fd, "x")
 			local started = luv.hrtime()
-			helpers.assert_eq(reader.wait_any_readable(2000, companion), true,
+			helpers.assert_eq(reader.wait_any_readable(2000, { companion }), true,
 				"the companion's descriptor wakes the wait")
 			helpers.assert_true((luv.hrtime() - started) / 1e6 < 1500, "the wait did not return at once")
 			helpers.assert_true(records[0].revents ~= 0, "the companion gets its descriptor's readiness back")

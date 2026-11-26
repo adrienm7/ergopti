@@ -26,7 +26,7 @@ helpers.describe("tap-hold manager", function()
 		local install = hook.set_remapper
 		hook.set_remapper = function() return false end
 		local opts = { keyboard_hook = hook, execute_action = function() end,
-			action_names = require("modules.gestures.manager").get_executable_action_names,
+			action_names = require("gestures.engine.manager").get_executable_action_names,
 			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path,
 			config_path = require("tests.support.tap_hold_fixture").config_path(user_path) }
 		local first = Manager.init(opts)
@@ -92,10 +92,10 @@ os.remove(user_path)
 	end)
 
 	helpers.it("keeps a delayed copy retry out of a newly focused field", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, field = nil, "first"
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
@@ -135,10 +135,10 @@ os.remove(user_path)
 	end)
 
 	helpers.it("reports an explicit refusal of the delayed copy retry", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, warnings, calls = nil, 0, 0
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
@@ -210,8 +210,8 @@ os.remove(user_path)
 	end)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
-		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
-			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "infra.config_paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
+		local names = { "gestures.engine.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
+			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "gestures.ui.conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local user_path, config_path = os.tmpname(), os.tmpname()
@@ -228,9 +228,9 @@ os.remove(user_path)
 				if not stream then return nil, "absent" end
 				local text = stream:read("*a"); stream:close(); return text, "ok"
 			end }
-			package.loaded["infra.config_paths"] = { config = function() return config_path end }
+			package.loaded["settings.engine.paths"] = { config = function() return config_path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
-			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
+			package.loaded["gestures.ui.conflicts"] = { notify_boot = function() end }
 			package.loaded["adapters.window_switch"] = { new = function(owner_capture)
 				capture = owner_capture
 				return { run = function(binding)
@@ -239,7 +239,7 @@ os.remove(user_path)
 					accepted = accepted + 1; return true
 				end }
 			end }
-			local Gestures = helpers.load_module("modules.gestures.manager")
+			local Gestures = helpers.load_module("gestures.engine.manager")
 			Gestures.init({ persist = true, config_path = config_path, enabled = false })
 			Manager = helpers.load_module("platform.remap.tap_hold_manager")
 			package.loaded["platform.remap.tap_hold_manager"] = Manager
@@ -305,12 +305,12 @@ os.remove(user_path)
 	helpers.it("gives the one-shot Shift the shared results and the magic key's (one-shot-results-shared)", function()
 		local Manager, hook, _, user_path, resets = manager()
 		require("adapters.keyboard_layout")._set_table_for_test(nil)
-		local magic = require("modules.hotstrings.magic_key").get()
+		local magic = require("hotstrings.engine.magic_key").get()
 		helpers.assert_true(magic ~= "", "the shipped magic key")
 		hook.key_text = function(code) return ({ [41] = magic, [57] = " ", [52] = "." })[code] end
-		local saved = package.loaded["modules.hotstrings.injector"]
+		local saved = package.loaded["hotstrings.engine.injector"]
 		local injected = {}
-		package.loaded["modules.hotstrings.injector"] = {
+		package.loaded["hotstrings.engine.injector"] = {
 			inject = function(_, text) injected[#injected + 1] = text; return { ok = true } end,
 		}
 		local ok, err = pcall(function()
@@ -323,7 +323,7 @@ os.remove(user_path)
 				hook.on_tap(tap)
 			end
 		end)
-		package.loaded["modules.hotstrings.injector"] = saved
+		package.loaded["hotstrings.engine.injector"] = saved
 		Manager._reset_for_test()
 		os.remove(user_path)
 		if not ok then error(err, 0) end
@@ -342,14 +342,14 @@ os.remove(user_path)
 	helpers.it("gives the magic key its result before the character's own (one-shot-magic-first)", function()
 		local Manager, hook, _, user_path = manager()
 		hook.key_text = function(code) return code == 51 and "," or nil end
-		local names = { "modules.hotstrings.magic_key", "modules.hotstrings.injector" }
+		local names = { "hotstrings.engine.magic_key", "hotstrings.engine.injector" }
 		local saved = {}
 		for _, name in ipairs(names) do
 			saved[name] = package.loaded[name]
 		end
 		local injected = {}
-		package.loaded["modules.hotstrings.magic_key"] = { get = function() return "," end }
-		package.loaded["modules.hotstrings.injector"] = {
+		package.loaded["hotstrings.engine.magic_key"] = { get = function() return "," end }
+		package.loaded["hotstrings.engine.injector"] = {
 			inject = function(_, text) injected[#injected + 1] = text; return { ok = true } end,
 		}
 		require("adapters.keyboard_layout")._set_table_for_test(nil)
@@ -509,6 +509,29 @@ os.remove(user_path)
 		end)
 	end
 
+	-- Arch field report of 2026-11-25: « Tap-holds loaded: 0 key(s), feature
+	-- off » then « Tap-holds initialised (active) » and « Tap-Holds: on » on
+	-- the diagnostic page, three answers to one question.
+	helpers.it("names one feature state: the file switch and the runtime switch both", function()
+		local Manager, _, _, user_path = manager()
+		local before = Manager.feature_enabled()
+		local applied = Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil,
+			{ tap_holds = { enabled = false } })
+		local file_off, runtime_on = Manager.feature_enabled(), Manager.is_enabled()
+		local switched = Manager.apply_configuration({ tap_hold = { inherit_defaults = true } }, nil,
+			{ tap_holds = { enabled = true } }) and Manager.set_enabled(false)
+		local runtime_off = Manager.feature_enabled()
+		Manager._reset_for_test()
+		local uninitialised = Manager.feature_enabled()
+		os.remove(user_path)
+		helpers.assert_eq(before, true)
+		helpers.assert_true(applied and switched)
+		helpers.assert_eq(runtime_on, true, "the runtime switch stays on")
+		helpers.assert_eq(file_off, false, "a feature config.toml switched off is off, whatever the runtime switch says")
+		helpers.assert_eq(runtime_off, false)
+		helpers.assert_nil(uninitialised, "no state before init")
+	end)
+
 	helpers.it("keeps the current configuration when snapshot restoration is refused (snapshot-apply-refusal)", function()
 		local Manager, hook, _, user_path = manager()
 		local enabled = Manager.configuration_snapshot()
@@ -612,7 +635,7 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 	--- A manager on the real action catalogue, as the daemon wires it, and the
 	--- warnings its configuration load logged.
 	local function catalogue_manager(user_text)
-		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Gestures = helpers.load_module("gestures.engine.manager")
 		local Logger = require("core.logger.engine.shim")
 		local real_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
@@ -655,12 +678,12 @@ helpers.describe("tap-hold manager: taps this driver cannot run", function()
 
 	helpers.it("warns once at configuration load about a tap it cannot run (config-outdated-tap-hold)", function()
 		local Manager, warnings, _, close, user_path = catalogue_manager(
-			'[tap_hold.keys.caps_lock]\ntap_action = "microsoft_bold"\n'
+			'[tap_hold.keys.caps_lock]\ntap_action = "open_window_spy"\n'
 				.. '[tap_hold.keys.left_ctrl]\ntap_action = "select_all"\n')
 		local ok, err = pcall(function()
 			helpers.assert_eq(#warnings, 1, "one warning, for the one tap Linux cannot run")
 			helpers.assert_contains(warnings[1], "tap_hold.keys.caps_lock.tap_action")
-			helpers.assert_contains(warnings[1], "microsoft_bold")
+			helpers.assert_contains(warnings[1], "open_window_spy")
 			helpers.assert_contains(warnings[1], user_path)
 			helpers.assert_true(Manager.reload())
 			helpers.assert_eq(#warnings, 1, "the same stale tap is not named again at every reload")
@@ -693,7 +716,7 @@ helpers.describe("tap-hold manager: the daemon's action executor", function()
 
 	helpers.it("never drops the action catalogue when the touchpad reader fails", function()
 		local src = daemon_source()
-		helpers.assert_true(src:find('local gestures = RuntimeGuard.optional_require("modules.gestures.manager")', 1, true)
+		helpers.assert_true(src:find('local gestures = RuntimeGuard.optional_require("gestures.engine.manager")', 1, true)
 			~= nil, "the scan must find the handle's declaration, or it proves nothing")
 		local offenders = {}
 		for line in src:gmatch("[^\n]+") do
@@ -769,10 +792,10 @@ helpers.describe("native OneShot Manager route", function()
 		s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 220)
 	end
 	helpers.it("permits a copy retry after a configured pair key is released", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
+		local names = { "clipboard.adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local timer
-		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["clipboard.adapters.clipboard"] = { change_counter = function() return 100 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback) timer = callback; return { armed = true } end,
 			cancel = function() return true end,
@@ -1539,7 +1562,7 @@ helpers.describe("native OneShot Manager route", function()
 			options.eof_path = s.paths.b; s.hook.pump(); options.eof_path = nil
 			helpers.assert_eq(s.reader.source_owner_current(original), false)
 			s.held[s.paths.b] = {}
-			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, {} end
+			package.loaded["hotstrings.engine.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, {} end
 			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 			s.pump_at(1400)
 			helpers.assert_eq(#s.actions, 0, "a reconnected source cannot revive the old DOWN")

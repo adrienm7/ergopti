@@ -74,6 +74,8 @@ const app_state = {
 	selected_apps: new Set(),
 	app_selection_mode: APP_SELECTION_MODE.UNINITIALIZED,
 	did_apply_initial_reset: false,
+	// Whether a range read has been received: an empty card then says so.
+	range_data_landed: false,
 	current_tab: 'c',
 	sort_col: 'count',
 	sort_asc: false,
@@ -113,7 +115,7 @@ let auto_refresh_bound = false;
 // =================================
 
 const INFO_SVG =
-	'<svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+	'<svg class="info-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
 
 // ============================================
 // ============================================

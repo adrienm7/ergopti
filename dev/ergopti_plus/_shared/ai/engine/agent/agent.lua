@@ -19,7 +19,7 @@
 --- 3. System 1 has two backends: any chat model with the triage prompt, and
 ---    Jev (TypeSafe's System One model) through its choice question.
 ---
---- The AutoHotkey port is windows/modules/llm/agent.ahk. Both are pinned by
+--- The AutoHotkey port is windows/ai/engine/agent/agent.ahk. Both are pinned by
 --- _shared/tests/corpus/llm/agent_vectors.json.
 --- ==============================================================================
 

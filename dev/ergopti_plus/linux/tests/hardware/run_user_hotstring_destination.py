@@ -18,7 +18,7 @@ import time
 WORKER = r"""
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 local Atspi = require("platform.focus.atspi_focus")
-local Destination = require("adapters.user_hotstring_destination")
+local Destination = require("hotstrings.adapters.user_hotstring_destination")
 local direct, ok = Atspi._get_native_snapshot()
 assert(ok and direct.active_scope == true, "native active GTK field must be conclusive")
 local bounded, admitted = Atspi.get_snapshot()

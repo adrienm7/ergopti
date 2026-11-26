@@ -21,10 +21,10 @@ _LNW_ActiveAppendWrite(State, NestedPath, FailWrite, Handle, Bytes, ByteCount, &
 
 _LNW_ShutdownRefusesActiveAppend(Nested, FailWrite := false) {
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_PATH_DATE
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
 	Saved := [_LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_PENDING,
-		_LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE,
+		_LOGGER_PENDING_ERRORS, _LOGGER_PATH_DATE,
 		_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES]
 	Path := _FSWL_Path()
 	NestedPath := Path . ".nested"
@@ -34,7 +34,6 @@ _LNW_ShutdownRefusesActiveAppend(Nested, FailWrite := false) {
 		_LOGGER_APPEND_DEBT_REPAIRS := Map()
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_FLUSH_ACTIVE := false
 		_LOGGER_FORCE_FLUSH_PENDING := false
@@ -63,11 +62,10 @@ _LNW_ShutdownRefusesActiveAppend(Nested, FailWrite := false) {
 		_LOGGER_APPEND_DEBT_REPAIRS := Saved[2]
 		_LOGGER_PENDING := Saved[3]
 		_LOGGER_PENDING_ERRORS := Saved[4]
-		_LOGGER_SUB_PENDING := Saved[5]
-		_LOGGER_PATH_DATE := Saved[6]
-		_LOGGER_FLUSH_ACTIVE := Saved[7]
-		_LOGGER_FORCE_FLUSH_PENDING := Saved[8]
-		_LOGGER_DROPPED_LINES := Saved[9]
+		_LOGGER_PATH_DATE := Saved[5]
+		_LOGGER_FLUSH_ACTIVE := Saved[6]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[7]
+		_LOGGER_DROPPED_LINES := Saved[8]
 	}
 }
 
@@ -112,9 +110,9 @@ for Existing in [false, true] {
 
 _LNW_QueueRetry(ForceFlush) {
 	global LOGGER_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
-	global _LOGGER_SUB_PENDING, _LOGGER_DROPPED_LINES
+	global _LOGGER_DROPPED_LINES
 	Saved := [LOGGER_LOG_PATH, _LOGGER_PATH_DATE, _LOGGER_PENDING,
-		_LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_DROPPED_LINES]
+		_LOGGER_PENDING_ERRORS, _LOGGER_DROPPED_LINES]
 	Path := _FSWL_Path()
 	Lock := _FSWL_Lock()
 	Line := "native-retry-é😀"
@@ -126,7 +124,6 @@ _LNW_QueueRetry(ForceFlush) {
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_PENDING := [Line]
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		_LOGGER_DROPPED_LINES := 0
 		_LoggerFlush(ForceFlush)
 		AssertEqual(1, _LOGGER_PENDING.Length, "a refused native batch must remain owned by the queue")
@@ -143,8 +140,7 @@ _LNW_QueueRetry(ForceFlush) {
 		_LOGGER_PATH_DATE := Saved[2]
 		_LOGGER_PENDING := Saved[3]
 		_LOGGER_PENDING_ERRORS := Saved[4]
-		_LOGGER_SUB_PENDING := Saved[5]
-		_LOGGER_DROPPED_LINES := Saved[6]
+		_LOGGER_DROPPED_LINES := Saved[5]
 		Lock.Release()
 		if FileExist(Path)
 			FileDelete(Path)
@@ -262,10 +258,10 @@ for WithDebt in [true, false]
 
 _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
-	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_PATH_DATE
 	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
 	Saved := [_LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_PENDING,
-		_LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE,
+		_LOGGER_PENDING_ERRORS, _LOGGER_PATH_DATE,
 		_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING]
 	Path := _FSWL_Path()
 	Lock := 0
@@ -276,7 +272,6 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 		_LOGGER_APPEND_DEBT_REPAIRS := Map()
 		_LOGGER_PENDING := []
 		_LOGGER_PENDING_ERRORS := []
-		_LOGGER_SUB_PENDING := Map()
 		_LOGGER_PATH_DATE := ""
 		_LOGGER_FLUSH_ACTIVE := false
 		_LOGGER_FORCE_FLUSH_PENDING := false
@@ -334,10 +329,9 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 		_LOGGER_APPEND_DEBT_REPAIRS := Saved[2]
 		_LOGGER_PENDING := Saved[3]
 		_LOGGER_PENDING_ERRORS := Saved[4]
-		_LOGGER_SUB_PENDING := Saved[5]
-		_LOGGER_PATH_DATE := Saved[6]
-		_LOGGER_FLUSH_ACTIVE := Saved[7]
-		_LOGGER_FORCE_FLUSH_PENDING := Saved[8]
+		_LOGGER_PATH_DATE := Saved[5]
+		_LOGGER_FLUSH_ACTIVE := Saved[6]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[7]
 		if FileExist(Path)
 			FileDelete(Path)
 	}
@@ -585,6 +579,36 @@ _LNWPrivacyIdentities() {
 	}
 }
 Test("Logger privacy: an email, a URL credential and another account's folder are masked at write time", _LNWPrivacyIdentities)
+
+; boot-log-redaction-prepare-2026-11-22: the redactor resolved its rules and
+; context (the shipped names, every folder spelling) once per record, about a
+; millisecond a line on the main thread, about 300 ms of the boot's first flush.
+; A batch prepares them once and still redacts every record as Redact_Apply does.
+_LNWPrivacyBatchPreparesOnce() {
+	global _SharedDir, _ConfigDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"], _ConfigDir]
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		_ConfigDir := "D:\Private Folder\Ergopti\"
+		Config := _LoggerPrivacyConfig()
+		Records := [], Blob := "", Expected := ""
+		loop 6 {
+			Prefix := "2026-10-10 09:00:0" . A_Index . ":123 [INFO] [logger] "
+			Body := "line " . A_Index . " of privacy-user in C:\Users\privacy-user\x and " . _ConfigDir . "Secret Pack\p.toml"
+			Records.Push(Prefix . Body)
+			Blob .= Prefix . Body . "`r`n"
+			Expected .= Prefix . Redact_Apply(Body, Config["rules"], Config["context"]) . "`r`n"
+		}
+		Before := Redact_PrepareCount()
+		Masked := _LoggerPrivacyBlob(Blob, Config, Records)
+		AssertEqual(Before + 1, Redact_PrepareCount(), "a batch of six records prepares the redactor once")
+		AssertEqual(Expected, Masked, "every record is redacted as Redact_Apply redacts it")
+		AssertFalse(InStr(Masked, "Secret Pack", true), "a name under the configuration directory reached the batch")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2], _ConfigDir := Saved[3]
+	}
+}
+Test("Logger privacy: a batch prepares the redactor once (boot-log-redaction-prepare-2026-11-22)", _LNWPrivacyBatchPreparesOnce)
 
 _LNWPrivacyRegister() {
 	local PrivacyUser

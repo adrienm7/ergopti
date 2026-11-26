@@ -47,7 +47,7 @@ end
 helpers.describe("config_backup (Linux): the remote API entries (backup-api-entries)", function()
 	local function with_entries(text, callback)
 		local dir = scratch()
-		local Entries = require("modules.llm.api_entries")
+		local Entries = require("ai.engine.settings.api_entries")
 		local path = dir .. "/state/api_keys.json"
 		if text then write(path, text) end
 		Entries._set_path_for_test(path)
@@ -77,7 +77,7 @@ helpers.describe("config_backup (Linux): the remote API entries (backup-api-entr
 			"not json",
 		}) do
 			with_entries(text, function(Backup)
-				helpers.assert_eq(Backup._plaintext_api_keys(require("modules.llm.api_entries").path()), 1)
+				helpers.assert_eq(Backup._plaintext_api_keys(require("ai.engine.settings.api_entries").path()), 1)
 				helpers.assert_nil(root_of(assert(Backup._default_roots()), "api_entries"),
 					"a plaintext key never reaches a backup folder")
 			end)

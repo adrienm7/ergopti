@@ -40,6 +40,20 @@
 						"key": "Escape",
 						"modifiers": []
 					}
+				},
+				"compose_keys": {
+					"KeyA": {
+						"text": "a"
+					},
+					"KeyB": {
+						"text": "b"
+					},
+					"KeyS": {
+						"text": "s"
+					},
+					"KeyE": {
+						"dead_key": "acute"
+					}
 				}
 			},
 			{
@@ -53,7 +67,15 @@
 					}
 				],
 				"native": true,
-				"keys": {}
+				"keys": {},
+				"compose_keys": {
+					"KeyA": {
+						"text": "A"
+					},
+					"KeyB": {
+						"text": "B"
+					}
+				}
 			},
 			{
 				"id": "roya",
@@ -80,6 +102,9 @@
 						"modifiers": [
 							"control"
 						]
+					},
+					"KeyE": {
+						"dead_key": "acute"
 					}
 				}
 			},
@@ -294,6 +319,14 @@
 				"threshold_ms": 150
 			},
 			{
+				"key": "Backslash",
+				"tap": {
+					"dead_key": "acute"
+				},
+				"hold_modifier": "control",
+				"threshold_ms": 150
+			},
+			{
 				"key": "Quote",
 				"tap": {
 					"text": "'"
@@ -322,20 +355,12 @@
 				"reason": "physical_key_not_emulated"
 			},
 			{
-				"path": "layers.roya.keys.KeyE",
-				"reason": "dead_key_not_emulated"
-			},
-			{
 				"path": "layers.kana.keys.KeyJ",
 				"reason": "action_not_emulated"
 			},
 			{
 				"path": "layers.right_kana",
 				"reason": "sided_modifier_not_emulated"
-			},
-			{
-				"path": "tap_holds[3].tap",
-				"reason": "dead_key_not_emulated"
 			},
 			{
 				"path": "remap.Pause",
@@ -345,7 +370,18 @@
 				"path": "remap.CapsLock",
 				"reason": "modifier_key_not_emulated"
 			}
-		]
+		],
+		"dead_keys": {
+			"acute": {
+				"terminator": "´",
+				"inputs": {
+					"a": {
+						"text": "á"
+					}
+				},
+				"dead_inputs": {}
+			}
+		}
 	},
 	"linux": {
 		"format": "ergopti-layout-emulation",
@@ -388,6 +424,20 @@
 						"key": "Escape",
 						"modifiers": []
 					}
+				},
+				"compose_keys": {
+					"KeyA": {
+						"text": "a"
+					},
+					"KeyB": {
+						"text": "b"
+					},
+					"KeyS": {
+						"text": "s"
+					},
+					"KeyE": {
+						"dead_key": "acute"
+					}
 				}
 			},
 			{
@@ -401,7 +451,15 @@
 					}
 				],
 				"native": true,
-				"keys": {}
+				"keys": {},
+				"compose_keys": {
+					"KeyA": {
+						"text": "A"
+					},
+					"KeyB": {
+						"text": "B"
+					}
+				}
 			},
 			{
 				"id": "roya",
@@ -428,6 +486,9 @@
 						"modifiers": [
 							"control"
 						]
+					},
+					"KeyE": {
+						"dead_key": "acute"
 					}
 				}
 			},
@@ -642,6 +703,14 @@
 				"threshold_ms": 150
 			},
 			{
+				"key": "Backslash",
+				"tap": {
+					"dead_key": "acute"
+				},
+				"hold_modifier": "control",
+				"threshold_ms": 150
+			},
+			{
 				"key": "Quote",
 				"tap": {
 					"text": "'"
@@ -670,20 +739,12 @@
 				"reason": "physical_key_not_emulated"
 			},
 			{
-				"path": "layers.roya.keys.KeyE",
-				"reason": "dead_key_not_emulated"
-			},
-			{
 				"path": "layers.kana.keys.KeyJ",
 				"reason": "action_not_emulated"
 			},
 			{
 				"path": "layers.right_kana",
 				"reason": "sided_modifier_not_emulated"
-			},
-			{
-				"path": "tap_holds[3].tap",
-				"reason": "dead_key_not_emulated"
 			},
 			{
 				"path": "remap.Pause",
@@ -693,7 +754,18 @@
 				"path": "remap.CapsLock",
 				"reason": "modifier_key_not_emulated"
 			}
-		]
+		],
+		"dead_keys": {
+			"acute": {
+				"terminator": "´",
+				"inputs": {
+					"a": {
+						"text": "á"
+					}
+				},
+				"dead_inputs": {}
+			}
+		}
 	},
 	"windows": {
 		"format": "ergopti-layout-emulation",
@@ -736,6 +808,20 @@
 						"key": "Escape",
 						"modifiers": []
 					}
+				},
+				"compose_keys": {
+					"KeyA": {
+						"text": "a"
+					},
+					"KeyB": {
+						"text": "b"
+					},
+					"KeyS": {
+						"text": "s"
+					},
+					"KeyE": {
+						"dead_key": "acute"
+					}
 				}
 			},
 			{
@@ -749,7 +835,15 @@
 					}
 				],
 				"native": true,
-				"keys": {}
+				"keys": {},
+				"compose_keys": {
+					"KeyA": {
+						"text": "A"
+					},
+					"KeyB": {
+						"text": "B"
+					}
+				}
 			},
 			{
 				"id": "roya",
@@ -776,6 +870,9 @@
 						"modifiers": [
 							"control"
 						]
+					},
+					"KeyE": {
+						"dead_key": "acute"
 					}
 				}
 			},
@@ -990,6 +1087,14 @@
 				"threshold_ms": 150
 			},
 			{
+				"key": "Backslash",
+				"tap": {
+					"dead_key": "acute"
+				},
+				"hold_modifier": "control",
+				"threshold_ms": 150
+			},
+			{
 				"key": "Quote",
 				"tap": {
 					"text": "'"
@@ -1018,20 +1123,12 @@
 				"reason": "physical_key_not_emulated"
 			},
 			{
-				"path": "layers.roya.keys.KeyE",
-				"reason": "dead_key_not_emulated"
-			},
-			{
 				"path": "layers.kana.keys.KeyJ",
 				"reason": "action_not_emulated"
 			},
 			{
 				"path": "layers.right_kana",
 				"reason": "sided_modifier_not_emulated"
-			},
-			{
-				"path": "tap_holds[3].tap",
-				"reason": "dead_key_not_emulated"
 			},
 			{
 				"path": "remap.Pause",
@@ -1041,6 +1138,17 @@
 				"path": "remap.CapsLock",
 				"reason": "modifier_key_not_emulated"
 			}
-		]
+		],
+		"dead_keys": {
+			"acute": {
+				"terminator": "´",
+				"inputs": {
+					"a": {
+						"text": "á"
+					}
+				},
+				"dead_inputs": {}
+			}
+		}
 	}
 }

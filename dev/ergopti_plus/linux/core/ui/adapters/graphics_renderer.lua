@@ -37,6 +37,8 @@ local Logger = require("core.logger.engine.shim")
 local Tint = require("core.ui.engine.tooltip.tint")
 local Layout = require("core.ui.engine.tooltip.layout")
 local LlmLine = require("core.ui.engine.tooltip.llm_line")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
+local CategoryGlyph = require("hotstrings.engine.category_glyph")
 
 local LOG = "core.ui.adapters.graphics_renderer"
 
@@ -53,6 +55,16 @@ local GTK_WINDOW_POPUP = 1
 -- the text that starts at pad_x.
 local ACCENT_BAR_WIDTH = 3
 local ACCENT_BAR_INSET = 4
+
+--- Whether a hotstring row shows a category glyph. The glyph is the row's
+--- first cell, at its far left in a framed badge, so it reads as an annotation
+--- and not as text the expansion types; the trigger label stays alone at the
+--- right.
+--- @param row table { glyph? }
+--- @return boolean
+function M.has_glyph(row)
+	return type(row.glyph) == "string" and row.glyph ~= ""
+end
 
 
 
@@ -95,6 +107,12 @@ local function bind()
 			cairo      = lgi.cairo,
 			Pango      = lgi.require("Pango"),
 			PangoCairo = lgi.require("PangoCairo"),
+			-- The accessibility toolkit names the window for AT-SPI; a
+			-- machine without its introspection data still draws.
+			Atk        = (function()
+				local found, atk = pcall(lgi.require, "Atk")
+				return found and atk or nil
+			end)(),
 		}
 	end)
 	if not ok or type(bound) ~= "table" then
@@ -104,6 +122,9 @@ local function bind()
 
 	_gtk = bound
 	Logger.debug(LOG, "Tooltip renderer bound (lgi + GTK 3).")
+	-- A preview can be drawn: from now on it follows the desktop's high
+	-- contrast and screen reader, read in the background.
+	SystemA11y.ensure_started()
 	return _gtk
 end
 
@@ -230,6 +251,18 @@ function M.measure_rows(rows, style, pango_layout)
 	local metrics = {}
 	local widest, total_height = 0, 0
 
+	-- One badge column for the hotstring rows, as wide as their widest glyph, so
+	-- the outputs stay aligned; zero wide, with no gap, when none shows a glyph.
+	local glyph_w, glyph_h, glyph_widths = 0, 0, {}
+	for i, row in ipairs(rows) do
+		if type(row.segments) ~= "table" and M.has_glyph(row) then
+			local w, h = measure(pango_layout, row.glyph, style.fonts.main, style.sizes.hint)
+			glyph_widths[i] = w
+			glyph_w, glyph_h = math.max(glyph_w, w), math.max(glyph_h, h)
+		end
+	end
+	local badge = CategoryGlyph.badge_geometry(glyph_w, glyph_h, style.layout)
+
 	for i, row in ipairs(rows) do
 		local row_w, row_h
 		if type(row.segments) == "table" then
@@ -244,11 +277,14 @@ function M.measure_rows(rows, style, pango_layout)
 			end
 
 			-- The label is right-aligned on the same line, so the row is as wide as
-			-- both plus the gap between them — not as wide as the wider of the two.
-			row_w = text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
-			row_h = math.max(text_h, label_h)
+			-- the badge column, the text and the label plus the gaps between them —
+			-- not as wide as the wider of them.
+			row_w = badge.zone + text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
+			row_h = math.max(text_h, label_h, glyph_widths[i] and badge.h or 0)
 
-			metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h }
+			metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h,
+				text_x = style.layout.pad_x + badge.zone, badge = glyph_widths[i] and badge or nil,
+				glyph_w = glyph_widths[i] }
 		end
 		widest = math.max(widest, row_w)
 		total_height = total_height + row_h
@@ -398,13 +434,34 @@ local function paint(cr, rows, metrics, style, size, background)
 			cr:fill()
 		end
 
+		-- The category glyph chip first, at the far left: a square fill in the
+		-- chip grey, dimmed with the row like its label, and the glyph centred on
+		-- it in the panel's own colour (knocked out), as on Windows and macOS.
+		local text_y = y + math.floor((m.height - m.text_h) / 2)
+		if m.badge then
+			local badge = m.badge
+			local badge_y = y + math.floor((m.height - badge.h) / 2)
+			local white = style.colors.glyph_badge_white
+			cr:set_source_rgba(white, white, white, alpha)
+			cr:rectangle(style.layout.pad_x, badge_y, badge.w, badge.h)
+			cr:fill()
+			local glyph_description = g.Pango.FontDescription.from_string(style.fonts.main)
+			glyph_description:set_size(style.sizes.hint * PANGO_SCALE)
+			pango_layout:set_font_description(glyph_description)
+			pango_layout:set_text(row.glyph, -1)
+			cr:set_source_rgba(background.red, background.green, background.blue, 1)
+			cr:move_to(style.layout.pad_x + math.floor((badge.w - m.glyph_w) / 2),
+				badge_y + style.layout.glyph_badge_pad_y)
+			g.PangoCairo.show_layout(cr, pango_layout)
+		end
+
 		local description = g.Pango.FontDescription.from_string(style.fonts.main)
 		description:set_size(style.sizes.main * PANGO_SCALE)
 		pango_layout:set_font_description(description)
 		pango_layout:set_text(row.text or "", -1)
 
 		cr:set_source_rgba(1, 1, 1, alpha)
-		cr:move_to(style.layout.pad_x, y)
+		cr:move_to(m.text_x, text_y)
 		g.PangoCairo.show_layout(cr, pango_layout)
 
 		if row.struck then
@@ -412,8 +469,8 @@ local function paint(cr, rows, metrics, style, size, background)
 			-- more useful shown crossed out than absent, because absent looks like
 			-- the driver failing to notice it.
 			cr:set_line_width(1)
-			cr:move_to(style.layout.pad_x, y + m.text_h / 2)
-			cr:line_to(style.layout.pad_x + m.text_w, y + m.text_h / 2)
+			cr:move_to(m.text_x, text_y + m.text_h / 2)
+			cr:line_to(m.text_x + m.text_w, text_y + m.text_h / 2)
 			cr:stroke()
 		end
 
@@ -425,13 +482,101 @@ local function paint(cr, rows, metrics, style, size, background)
 			cr:set_source_rgba(1, 1, 1, alpha * 0.6)
 			-- Right-aligned against the panel's inner edge, which is what makes a
 			-- column of triggers readable down the right-hand side.
-			cr:move_to(size.w - style.layout.pad_x - m.label_w, y)
+			cr:move_to(size.w - style.layout.pad_x - m.label_w, text_y)
 			g.PangoCairo.show_layout(cr, pango_layout)
 		end
 
 		y = y + m.height + style.layout.line_spacing
 		::continue::
 	end
+end
+
+
+
+
+--- The plain text of a preview, for AT-SPI: the rows that will be sent, each
+--- with the category its glyph stands for first, as the badge comes first in
+--- the row, then its trigger, never the struck-through alternatives. The glyph
+--- itself is not read: its name is.
+--- @param rows table Array of { text, label?, glyph?, glyph_name_key?, dimmed?, struck? }.
+--- @return string
+function M.accessible_text(rows)
+	local parts = {}
+	for _, row in ipairs(type(rows) == "table" and rows or {}) do
+		if type(row) == "table" and type(row.text) == "string" and row.text ~= "" and not row.dimmed and not row.struck then
+			local label = type(row.label) == "string" and row.label ~= "" and (" " .. row.label) or ""
+			local category = ""
+			if type(row.glyph) == "string" and row.glyph ~= "" and type(row.glyph_name_key) == "string" then
+				category = require("core.i18n.engine.i18n").get(row.glyph_name_key) .. ", "
+			end
+			parts[#parts + 1] = category .. row.text .. label
+		end
+	end
+	return table.concat(parts, "; ")
+end
+
+-- Whether a running screen reader is told the drawn previews and finished
+-- predictions (hotstrings.preview_announcements, the menu's switch since
+-- 2026-11-21); set through the preview's toggles.
+local _announcements_enabled = true
+
+--- Lets or stops Orca being told the previews and finished predictions.
+--- @param enabled boolean
+function M.set_announcements_enabled(enabled)
+	_announcements_enabled = enabled == true
+end
+
+--- @return boolean
+function M.announcements_enabled()
+	return _announcements_enabled
+end
+
+--- Names the window for AT-SPI. A cairo surface has no text a screen reader
+--- can read: the window carries it as its accessible name. Its role is a
+--- tooltip, or a notification while the desktop's screen reader is on, which
+--- Orca speaks when it appears (decided 2026-11-17). The menu's
+--- hotstrings.preview_announcements switch (2026-11-21) keeps the tooltip role
+--- with the screen reader on, so Orca reads the window only when reached.
+--- @param window userdata|table The GTK window.
+--- @param atk table|nil The Atk namespace; nil leaves the window unnamed.
+--- @param rows table
+--- @param screen_reader boolean
+--- @return boolean described
+function M.describe_window(window, atk, rows, screen_reader)
+	local notify = screen_reader and _announcements_enabled
+	return SystemA11y.name_window(window, atk, notify and "NOTIFICATION" or "TOOL_TIP", M.accessible_text(rows))
+end
+
+--- The panel colour under the desktop's high-contrast setting: opaque, so
+--- the text stands on its own colour, not on whatever lies behind.
+--- @param background table { red, green, blue, alpha }
+--- @param high_contrast boolean
+--- @return table
+function M.contrast_background(background, high_contrast)
+	if not high_contrast or type(background) ~= "table" then return background end
+	return { red = background.red, green = background.green, blue = background.blue, alpha = 1 }
+end
+
+-- The last scaled style, kept so a preview per keystroke builds no table.
+local _scaled = { base = nil, factor = nil, style = nil }
+
+--- The style at the desktop's text scale (GNOME « Large text »,
+--- text-scaling-factor): GTK scales its own widgets by it, but the preview
+--- sets its Pango sizes itself, so every font size is multiplied here, as the
+--- Windows tooltips follow « Make text bigger ». The panel is measured from
+--- its text, so it grows with it; the paddings stay.
+--- @param style table From core/ui/ui/tooltip/config.lua; never mutated.
+--- @param factor number|nil The text-scaling-factor; nil or 1 keeps the style.
+--- @return table
+function M.scaled_style(style, factor)
+	if type(factor) ~= "number" or factor == 1 then return style end
+	if _scaled.base == style and _scaled.factor == factor then return _scaled.style end
+	local scaled = {}
+	for key, value in pairs(style) do scaled[key] = value end
+	scaled.sizes = {}
+	for key, size in pairs(style.sizes) do scaled.sizes[key] = size * factor end
+	_scaled.base, _scaled.factor, _scaled.style = style, factor, scaled
+	return scaled
 end
 
 
@@ -518,7 +663,8 @@ local function show_owned(rows, opts)
 	local window = ensure_window()
 	if not window then return false end
 
-	_style = opts.style
+	local desktop = SystemA11y.settings()
+	_style = M.scaled_style(opts.style, desktop.text_scale)
 	local pango_layout = g.PangoCairo.create_layout(
 		g.cairo.Context.create(g.cairo.ImageSurface.create("ARGB32", 1, 1)))
 
@@ -535,6 +681,8 @@ local function show_owned(rows, opts)
 		},
 	})
 
+	background = M.contrast_background(background, desktop.high_contrast)
+
 	_surface_rows = { rows = rows, metrics = metrics, background = background }
 
 	local position = Layout.compute_position(opts.anchor, size, opts.screen, {
@@ -546,6 +694,7 @@ local function show_owned(rows, opts)
 
 	if window:resize(math.floor(size.w + 0.5), math.floor(size.h + 0.5)) == false then return false end
 	if window:move(math.floor(position.x + 0.5), math.floor(position.y + 0.5)) == false then return false end
+	M.describe_window(window, g.Atk, rows, desktop.screen_reader)
 	if window:show_all() == false then return false end
 	make_click_through(window)
 	if window:queue_draw() == false then return false end
@@ -599,5 +748,9 @@ function M.destroy()
 	_surface_rows = nil
 	return true
 end
+
+--- Test seam: paints rows onto a recording cairo context, so a test reads the
+--- drawn order and geometry without a display.
+M._paint_for_test = paint
 
 return M

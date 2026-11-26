@@ -78,6 +78,10 @@ _MAE_Input(World, Prompt, Title, Options, Default) {
 	}
 	if World.Mode == "score-cancel"
 		return {Result: "Cancel", Value: "2"}
+	; A blank score goes back to the unedited score (maintainer decision of
+	; 2026-11-22, PCK-13 for overrides); it was refused as empty before.
+	if World.Mode == "score-blank"
+		return {Result: "OK", Value: "  "}
 	Score := World.Mode == "edit-lower" ? "-2" : (World.Mode == "edit-upper" ? "2"
 		: (World.Mode == "score-invalid" ? "not-a-number" : (World.Mode == "score-range" ? "2.5"
 		: (World.Mode == "score-low-range" ? "-2.5" : (World.Mode == "score-nonfinite" ? "1e309" : "1.25")))))
@@ -206,7 +210,7 @@ _MAE_QueueAndRun(World) {
 _MAE_CheckResult(World) {
 	Mode := World.Mode
 	Success := Mode == "edit-fraction" || Mode == "edit-lower" || Mode == "edit-upper"
-		|| Mode == "pick" || Mode == "pick-many-cancel"
+		|| Mode == "pick" || Mode == "pick-many-cancel" || Mode == "score-blank"
 	if !Success {
 		ExpectedInputs := Map("category-cancel", 1, "score-cancel", 2, "score-invalid", 2,
 			"score-range", 2, "score-low-range", 2, "score-nonfinite", 2, "locked-write", 2,
@@ -237,7 +241,8 @@ _MAE_CheckResult(World) {
 	AssertEqual(1, Document["version"])
 	AssertEqual("neutral", Document["apps"]["explorer.exe"]["type"])
 	AssertEqual(0, Document["apps"]["explorer.exe"]["score"])
-	ExpectedScore := Mode == "edit-lower" ? -2 : (Mode == "edit-upper" ? 2 : 1.25)
+	ExpectedScore := Mode == "edit-lower" ? -2 : (Mode == "edit-upper" ? 2
+		: (Mode == "score-blank" ? KLAppCatConst.UNEDITED_SCORE : 1.25))
 	ProjectedName := App == "audit.exe" ? "AUDIT.EXE" : App
 	AssertTrue(World.Projection["user_categories"].Has(ProjectedName), "the real manifest casing must receive its explicit override")
 	AssertEqual("Révision 😀", World.Projection["user_categories"][ProjectedName]["type"])
@@ -372,7 +377,7 @@ _MAE_CaseOwned(Mode, PreviousCritical) {
 		throw CleanupError
 }
 
-for _MAE_Mode in ["edit-fraction", "edit-lower", "edit-upper", "pick", "pick-many-cancel",
+for _MAE_Mode in ["edit-fraction", "edit-lower", "edit-upper", "score-blank", "pick", "pick-many-cancel",
 	"category-cancel", "score-cancel", "score-invalid", "score-range", "score-low-range", "score-nonfinite", "locked-write",
 	"stale-epoch", "wrong-sender", "wrong-message-source", "typing-page", "suspended", "malformed-json",
 	"wrong-root", "pick-wrong-root", "navigate-before-run", "getter-superseded", "close-during-input",

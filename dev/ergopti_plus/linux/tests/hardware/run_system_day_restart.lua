@@ -13,7 +13,7 @@ local Json = require("core.text.engine.json")
 local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local K = require("modules.keystats.keystats")
-local Metrics = require("modules.keystats.system_metrics")
+local Metrics = require("modules.keystats.system.system_metrics")
 local W = require("modules.keystats.sqlite_writer")
 -- Metrics flushes are asynchronous owned SQLite batches: a read must wait for
 -- the physical acknowledgement, as every native SQLite fixture does.

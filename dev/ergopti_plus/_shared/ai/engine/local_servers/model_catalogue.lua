@@ -6,7 +6,7 @@
 --- Projects the shared model catalogue into the exact rows consumed by the
 --- shared model selector page. macOS and Linux use this module so parameter,
 --- hardware, URL, runtime-name, and installed-state rules cannot drift; the
---- Windows twin (ui/model_browser/init.ahk) is pinned to the same row fields by
+--- Windows twin (ai/ui/model_browser/init.ahk) is pinned to the same row fields by
 --- tools/test/test-model-selector-page.cjs.
 --- ==============================================================================
 

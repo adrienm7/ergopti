@@ -3,21 +3,16 @@
 #Requires AutoHotkey v2.0
 
 ; Native windows/Show/WM_CLOSE and genuine editor lifecycle execute in an owned
-; child. Only hook construction, physical-state and persistence I/O are passive.
+; child. Only hook construction and persistence I/O are passive.
 _MSUC_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_ReadScalar", "MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
-		"_MagicKeySourceCapturePoll", "_MagicKeySourcePressedScan", "_MagicKeySourceCaptureKeyDown"] {
+	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_FillUnitRun", "_SIHO_ReadScalar", "MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The startup child requires its genuine owner: " . Name)
-		if Name == "MagicKeyEditor" || Name == "MagicKeySourceCapture" {
+		if Name == "MagicKeyEditor" {
 			Definition := StrReplace(Definition, "InputHook(", "_MSUC_CreateHook(", true, &Bindings)
 			AssertEqual(1, Bindings, "Only the native hook factory is bound in " . Name)
-		}
-		if Name == "MagicKeySourceCapture" {
-			Definition := StrReplace(Definition, "_MagicKeySourceCaptureState()", "_MSUC_CreateSourceState()", true, &Bindings)
-			AssertEqual(1, Bindings, "Only physical-state construction is bound in the source editor")
 		}
 		Code .= Definition . "`n"
 	}
@@ -27,14 +22,6 @@ _MSUC_ChildSource() {
 _MSUC_Case(Editor, Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "A preceding unsettled editor child must retire first")
-	SourceState := _MagicKeySourceCaptureState((*) => false)
-	AssertTrue(SourceState.Scans.Length > 0, "The child uses the real manifest's candidate roster")
-	Scan := SourceState.Scans[1]
-	Code := LayoutRegistry_KeyCode(Scan, LayoutRegistry_Keycodes())
-	AssertTrue(MagicKeySourceIsCandidate(Code), "The physical candidate must be admitted by the real manifest")
-	Scans := ""
-	for Candidate in SourceState.Scans
-		Scans .= (Scans == "" ? "" : ",") . Candidate
 	Script := A_Temp . "\ergopti_magic_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".ahk"
 	AssertFalse(FileExist(Script), "The child requires a fresh source")
 	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MSUC_ChildSource()) != 0)
@@ -42,8 +29,7 @@ _MSUC_Case(Editor, Mode) {
 	PreviousCritical := Critical("Off")
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, Editor, Mode, Code, Scan, Scans,
-				String(TimingsGet("ui", "magic_key_capture_poll_ms")), String(TimingsGet("ui", "magic_key_capture_timeout_ms"))],
+			["/ErrorStdOut=UTF-8", Script, Editor, Mode],
 			_MESC_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine editor child must start")
 		Started := A_TickCount
@@ -91,7 +77,6 @@ _MSUC_Case(Editor, Mode) {
 	AssertTrue(Retired, "The exact child must retire before its source is removed")
 }
 
-for _MSUC_Editor in ["character", "source"]
-	for _MSUC_Mode in ["constructor-close", "show-close"]
-		Test("Magic Key startup: " . _MSUC_Editor . " " . _MSUC_Mode . " (magic-key-editor-startup-close)",
-			_MSUC_Case.Bind(_MSUC_Editor, _MSUC_Mode))
+for _MSUC_Mode in ["constructor-close", "show-close"]
+	Test("Magic Key startup: character " . _MSUC_Mode . " (magic-key-editor-startup-close)",
+		_MSUC_Case.Bind("character", _MSUC_Mode))

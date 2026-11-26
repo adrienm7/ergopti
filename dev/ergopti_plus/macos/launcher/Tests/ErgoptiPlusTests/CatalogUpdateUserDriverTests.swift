@@ -18,6 +18,8 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		var prompts: [(prompt: UpdatePrompt, activate: Bool)] = []
 		var choiceHandlers: [(Int?) -> Void] = []
 		var progress: [UpdateProgressText] = []
+		var cancelHandlers: [(() -> Void)?] = []
+		var closeHandlers: [(() -> Void)?] = []
 		var closeAllCount = 0
 		var bringToFrontCount = 0
 
@@ -26,8 +28,11 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			choiceHandlers.append(onChoice)
 		}
 
-		func showProgress(_ text: UpdateProgressText, fraction: Double?, onCancel: (() -> Void)?) {
+		func showProgress(_ text: UpdateProgressText, fraction: Double?,
+						  onCancel: (() -> Void)?, onClose: (() -> Void)?) {
 			progress.append(text)
+			cancelHandlers.append(onCancel)
+			closeHandlers.append(onClose)
 		}
 
 		func bringToFront() {
@@ -194,7 +199,8 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		let cases: [(Int, String)] = [
 			(Int(SUError.downloadError.rawValue), "updater.no_connection"),
 			(Int(SUError.runningTranslocated.rawValue), "updater.move_to_applications"),
-			(Int(SUError.signatureError.rawValue), "updater.install_error"),
+			(Int(SUError.signatureError.rawValue), "updater.install_error_signature"),
+			(Int(SUError.unarchivingError.rawValue), "updater.install_error"),
 		]
 		for (index, entry) in cases.enumerated() {
 			let error = NSError(domain: SUSparkleErrorDomain, code: entry.0,
@@ -216,6 +222,37 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		XCTAssertEqual(presenter.closeAllCount, closesBefore + 1,
 			"the download window and its Cancel button must go once cancelling is over")
 		XCTAssertNil(presenter.progress.last?.cancelTitle, "installing cannot be cancelled")
+	}
+
+	/// UPD-05: closing the download window used to cancel the update, while
+	/// Windows and Linux finish it without its window.
+	func testClosingTheDownloadWindowKeepsTheUpdateGoing() throws {
+		let presenter = RecordingPresenter()
+		let (driver, _) = try makeDriver("en", presenter: presenter)
+		var cancellations = 0
+		driver.showDownloadInitiated { cancellations += 1 }
+		driver.showDownloadDidReceiveExpectedContentLength(100)
+		let close = try XCTUnwrap(presenter.closeHandlers.last ?? nil, "the download window reports its close box")
+		close()
+		XCTAssertEqual(cancellations, 0, "upd-05: closing the download window must not cancel the update")
+		let shownBefore = presenter.progress.count
+		driver.showDownloadDidReceiveData(ofLength: 40)
+		XCTAssertEqual(presenter.progress.count, shownBefore, "a closed download window stays closed while it runs")
+		driver.showUpdateInFocus()
+		XCTAssertEqual(presenter.progress.count, shownBefore + 1, "asking for the update again shows its download")
+		let cancel = try XCTUnwrap(presenter.cancelHandlers.last ?? nil, "the download keeps its Cancel button")
+		cancel()
+		XCTAssertEqual(cancellations, 1, "only Cancel stops the update")
+	}
+
+	func testClosingTheCheckingWindowCancelsTheCheck() throws {
+		let presenter = RecordingPresenter()
+		let (driver, _) = try makeDriver("en", presenter: presenter)
+		var cancellations = 0
+		driver.showUserInitiatedUpdateCheck { cancellations += 1 }
+		let close = try XCTUnwrap(presenter.closeHandlers.last ?? nil)
+		close()
+		XCTAssertEqual(cancellations, 1, "nothing was consented yet: closing the check stops it")
 	}
 
 	func testUnreadableCatalogDismissesInsteadOfShowingEnglish() {
@@ -268,6 +305,31 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		} as? NSPanel, "the updater must create a real native panel")
 	}
 
+	/// The stack of rows the panel's content view holds.
+	private func contentStack(of panel: NSPanel) throws -> NSStackView {
+		return try XCTUnwrap(panel.contentView?.subviews.compactMap { $0 as? NSStackView }.first,
+			"the panel's content view holds its stack of rows")
+	}
+
+	/// Every row ends at least the panel margin before the window's right
+	/// edge: the field report of 2026-11-24 showed the progress bar and the
+	/// French button row touching it.
+	private func assertMargins(of panel: NSPanel, _ label: String) throws {
+		let content = try XCTUnwrap(panel.contentView)
+		content.layoutSubtreeIfNeeded()
+		let margin = UpdatePromptPanel.contentMargin
+		let stack = try contentStack(of: panel)
+		for row in stack.arrangedSubviews {
+			// Auto Layout places a control by its alignment rectangle: a
+			// button's bezel and a progress bar draw a few points beyond it,
+			// so their frames would read as eating into the margin.
+			let frame = stack.convert(row.alignmentRect(forFrame: row.frame), to: content)
+			XCTAssertGreaterThanOrEqual(frame.minX, margin - 0.5, "\(label): a row starts inside the left margin")
+			XCTAssertLessThanOrEqual(frame.maxX, content.bounds.width - margin + 0.5,
+				"\(label): a row ends inside the right margin")
+		}
+	}
+
 	func testEveryLocaleUsesBareUpdaterHeadingsAndSharedNativePanelCaptions() throws {
 		_ = NSApplication.shared
 		let presenter = UpdatePromptPanel()
@@ -283,7 +345,8 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			presenter.present(offer.prompt, activate: false) { answers.append($0) }
 			let offerPanel = try newNativePanel(since: previous)
 			XCTAssertEqual(offerPanel.title, try Self.nativeCaption(bareOffer), "\(code) native offer caption")
-			let stack = try XCTUnwrap(offerPanel.contentView as? NSStackView)
+			let stack = try contentStack(of: offerPanel)
+			try assertMargins(of: offerPanel, "\(code) offer")
 			let heading = try XCTUnwrap(stack.arrangedSubviews.first as? NSTextField)
 			XCTAssertEqual(heading.stringValue, bareOffer, "native chrome branding does not alter the heading")
 			XCTAssertEqual(offerPanel.level, .normal, "an updater window must not be topmost")
@@ -292,9 +355,10 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 			let bareProgress = try XCTUnwrap(catalog.text("updater.window_title"))
 			XCTAssertEqual(progress.title, bareProgress)
 			previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
-			presenter.showProgress(progress, fraction: nil) {}
+			presenter.showProgress(progress, fraction: nil, onCancel: {}, onClose: nil)
 			let progressPanel = try newNativePanel(since: previous)
 			XCTAssertEqual(progressPanel.title, try Self.nativeCaption(bareProgress), "\(code) native progress caption")
+			try assertMargins(of: progressPanel, "\(code) progress")
 			presenter.closeAll()
 		}
 		XCTAssertTrue(answers.isEmpty, "caption updates and programmatic closes never consent to a download")
@@ -307,15 +371,37 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		let previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
 		var cancellations = 0
 		presenter.showProgress(UpdateProgressText(title: "Update", message: "Checking", cancelTitle: "Cancel"),
-			fraction: nil) { cancellations += 1 }
+			fraction: nil, onCancel: { cancellations += 1 }, onClose: nil)
 		let panel = try newNativePanel(since: previous)
 		XCTAssertEqual(panel.title, try Self.nativeCaption("Update"))
+		let stack = try contentStack(of: panel)
+		let bar = try XCTUnwrap(stack.arrangedSubviews.compactMap { $0 as? NSProgressIndicator }.first)
+		XCTAssertEqual(bar.accessibilityLabel(), "Checking", "the bar is named by its step (a11y-update-progress-label)")
 		presenter.showProgress(UpdateProgressText(title: "Mise à jour", message: "Downloading", cancelTitle: "Cancel"),
-			fraction: 0.5) { cancellations += 1 }
+			fraction: 0.5, onCancel: { cancellations += 1 }, onClose: nil)
+		XCTAssertEqual(bar.accessibilityLabel(), "Downloading", "a reused bar follows its new step")
 		XCTAssertTrue(NSApplication.shared.windows.contains { $0 === panel && $0.isVisible },
 			"a progress refresh retains the same visible native panel")
 		XCTAssertEqual(panel.title, try Self.nativeCaption("Mise à jour"), "a reused panel follows its new localized caption")
 		XCTAssertEqual(cancellations, 0, "retitling must not invoke the cancellation action")
+	}
+
+	func testEscapeClosesThePromptAsItsCloseButtonDoes() throws {
+		_ = NSApplication.shared
+		let presenter = UpdatePromptPanel()
+		defer { presenter.closeAll() }
+		var choices: [Int?] = []
+		let previous = Set(NSApplication.shared.windows.map { ObjectIdentifier($0) })
+		presenter.present(UpdatePrompt(title: "t", message: "m", buttons: ["a", "b"]), activate: false) {
+			choices.append($0)
+		}
+		let panel = try newNativePanel(since: previous)
+		let escape = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+			timestamp: 0, windowNumber: panel.windowNumber, context: nil, characters: "\u{1b}",
+			charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: UpdatePromptWindow.escapeKeyCode))
+		panel.keyDown(with: escape)
+		XCTAssertEqual(choices, [nil], "Escape answers once with the close button's « no choice », never a download")
+		XCTAssertFalse(panel.isVisible, "Escape closes the prompt")
 	}
 
 	func testPanelOpensAndClosesWithoutReportingAChoice() {
@@ -325,8 +411,10 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		panel.present(UpdatePrompt(title: "t", message: "m", buttons: ["a", "b"]), activate: false) {
 			choices.append($0)
 		}
-		panel.showProgress(UpdateProgressText(title: "t", message: "p", cancelTitle: "c"), fraction: 0.5) {}
-		panel.showProgress(UpdateProgressText(title: "t", message: "q", cancelTitle: "c"), fraction: nil) {}
+		panel.showProgress(UpdateProgressText(title: "t", message: "p", cancelTitle: "c"), fraction: 0.5,
+			onCancel: {}, onClose: nil)
+		panel.showProgress(UpdateProgressText(title: "t", message: "q", cancelTitle: "c"), fraction: nil,
+			onCancel: {}, onClose: nil)
 		panel.bringToFront()
 		panel.closeAll()
 		panel.closeAll()

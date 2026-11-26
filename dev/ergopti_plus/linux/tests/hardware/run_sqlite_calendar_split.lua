@@ -68,8 +68,20 @@ for i, fixture in ipairs(fixtures) do
 			assert(payload.historical.c.h and payload.historical.c.h.c == 7, "previous calendar day's persisted row omitted")
 			assert(count_today(payload, "a") == 2 and count_today(payload, "h") == 0)
 		end
+		-- The dashboard's live refresh reads today alone and names its day (MET-10).
+		local live = assert(Keystats.get_today_payload())
+		assert(live.historical == nil, "the live refresh must not resend the history")
+		assert(live.today_date == native_date("%Y-%m-%d", instant))
+		assert(count_today(live, "a") == 2 and count_today(live, "h") == 0)
 		assert(Writer.get_revision() == revision)
 		assert(table.concat(assert(Writer.query_rows("SELECT date,app,token,c FROM ngram_chars ORDER BY date,token;")), "\n") == before)
+		-- Its persisted part is kept per revision: unflushed text is layered on a
+		-- copy, and the flush that persists it is neither lost nor counted twice.
+		Keystats.record_synthetic_output("owned-calendar", "a", "other", 1000)
+		assert(count_today(assert(Keystats.get_today_payload()), "a") == 3, "unflushed text reaches the refresh")
+		assert(count_today(assert(Keystats.get_today_payload()), "a") == 3, "the kept rows are never mutated")
+		require("tests.support.sqlite_flush_native").flush(Keystats)
+		assert(count_today(assert(Keystats.get_today_payload()), "a") == 3, "a flush is read once, not added twice")
 	end, debug.traceback)
 	os.date, os.time, Calendar.capture = native_date, native_time, native_capture
 	if ok then print("PASS " .. fixture.name) else

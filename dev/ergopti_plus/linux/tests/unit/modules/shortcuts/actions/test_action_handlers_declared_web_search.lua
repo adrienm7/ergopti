@@ -40,17 +40,17 @@ helpers.describe("linux actions: web search", function()
 
 	--- Supplies the platform PRIMARY reader during the action.
 	local function with_primary(ok, selection, body)
-		local saved = package.loaded["adapters.clipboard"]
-		package.loaded["adapters.clipboard"] = { read_primary = function() return ok, selection end }
+		local saved = package.loaded["clipboard.adapters.clipboard"]
+		package.loaded["clipboard.adapters.clipboard"] = { read_primary = function() return ok, selection end }
 		local ran, err = pcall(body)
-		package.loaded["adapters.clipboard"] = saved
+		package.loaded["clipboard.adapters.clipboard"] = saved
 		if not ran then error(err, 0) end
 	end
 
 	helpers.it("search-web: refuses an empty selection instead of opening a blank search", function()
 		-- Regression: when the PRIMARY reader fails, the gesture opened
 		-- the engine with an empty query ÔÇö a wasted tab that answers nothing.
-		local G = helpers.load_module("modules.gestures.manager")
+		local G = helpers.load_module("gestures.engine.manager")
 		G.init({ enabled = false })
 		helpers.assert_true(
 			G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s"),
@@ -68,7 +68,7 @@ helpers.describe("linux actions: web search", function()
 	helpers.it("search-web: searches the selected text when there is some", function()
 		-- Lock-in against over-correction: refusing everything would also make
 		-- this green, while breaking the action's entire purpose.
-		local G = helpers.load_module("modules.gestures.manager")
+		local G = helpers.load_module("gestures.engine.manager")
 		G.init({ enabled = false })
 		G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s")
 		with_primary(true, "hello world", function()
@@ -82,7 +82,7 @@ helpers.describe("linux actions: web search", function()
 	end)
 
 	helpers.it("search-web reads Wayland PRIMARY through the bounded native adapter", function()
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local read_command
@@ -93,7 +93,7 @@ helpers.describe("linux actions: web search", function()
 		}
 		package.loaded[names[3]] = { is_wayland = function() return true end, is_x11 = function() return false end }
 		local ok, err = pcall(function()
-			local G = helpers.load_module("modules.gestures.manager")
+			local G = helpers.load_module("gestures.engine.manager")
 			G.init({ enabled = false })
 			helpers.assert_true(G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s"))
 			with_recorded_shell(function(commands)

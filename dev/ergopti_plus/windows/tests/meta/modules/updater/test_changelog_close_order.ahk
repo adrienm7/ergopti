@@ -6,7 +6,7 @@
 ; Regression guard for finding F30: both _CLW_OnClose and Changelog_Close()
 ; used to call Gui.Destroy() BEFORE _CLW_Reset() (which closes the WebView2
 ; Controller) -- the reverse of the correctly-implemented order in the
-; sibling ui/model_browser/init.ahk. The WebView2 spec requires the
+; sibling ai/ui/model_browser/init.ahk. The WebView2 spec requires the
 ; Controller to be closed before its host HWND is destroyed.
 ;
 ; SCOPE: source introspection of ui/changelog/init.ahk.
@@ -34,7 +34,7 @@ _CLCO_CheckOrder(FnName) {
 	Assert(DestroyPos > 0, FnName . " must still destroy the Gui")
 
 	Assert(ResetPos < DestroyPos,
-		FnName . " must close the WebView2 Controller (_CLW_Reset()) BEFORE destroying the Gui -- the WebView2 spec requires Controller.Close() before its host HWND is destroyed, matching the sibling ui/model_browser/init.ahk implementation (changelog-close-order)")
+		FnName . " must close the WebView2 Controller (_CLW_Reset()) BEFORE destroying the Gui -- the WebView2 spec requires Controller.Close() before its host HWND is destroyed, matching the sibling ai/ui/model_browser/init.ahk implementation (changelog-close-order)")
 }
 
 Test("changelog: _CLW_OnClose closes the Controller before destroying the Gui (changelog-close-order)",

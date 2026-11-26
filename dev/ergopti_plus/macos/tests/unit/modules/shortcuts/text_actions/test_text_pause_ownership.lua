@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local previous_destination = package.loaded["modules.keymap.utils"]
+local previous_destination = package.loaded["hotstrings.engine.expander.utils"]
 local Destination = require("tests.support.text_destination_receipt")
 
 
@@ -26,9 +26,9 @@ end
 local function fresh_fixture()
 	Destination.install()
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.clipboard",
+		"modules.shortcuts.actions.text", "clipboard.adapters.clipboard",
 		"platform.input.synthetic_input",
-		"adapters.event_provenance",
+		"diagnostics.adapters.event_provenance",
 		"core.events.timer_scheduler",
 		"core.logger.engine.logger",
 		"core.fs.engine.paths",
@@ -731,4 +731,4 @@ helpers.describe("text composite owner: parent isolation", function()
 	end
 end)
 
-package.loaded["modules.keymap.utils"] = previous_destination
+package.loaded["hotstrings.engine.expander.utils"] = previous_destination

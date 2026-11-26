@@ -127,7 +127,7 @@ local function fresh_resolver(bootstrap_content)
 		return real_getenv(name)
 	end
 	local previous_hs = _G.hs
-	local ok, ConfigPaths = pcall(helpers.load_with_stubs, "infra.config_paths", {
+	local ok, ConfigPaths = pcall(helpers.load_with_stubs, "settings.engine.paths", {
 		fs = {
 			attributes = function(path)
 				if type(path) == "string" and path:sub(1, 9) == "/fixture/" then return { mode = "directory" } end
@@ -140,7 +140,7 @@ local function fresh_resolver(bootstrap_content)
 	os.getenv = real_getenv
 	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	package.loaded["core.logger.engine.logger"] = previous_logger
-	package.loaded["infra.config_paths"] = nil
+	package.loaded["settings.engine.paths"] = nil
 	if not ok then error(ConfigPaths, 0) end
 	helpers.assert_true(ConfigPaths.init("/fixture/driver/"), "the resolver must initialise over the fixture")
 	return ConfigPaths, followed

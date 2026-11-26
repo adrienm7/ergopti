@@ -59,7 +59,9 @@ local SECURE_ROLE = "AXSecureTextField"
 -- =================================
 
 -- Cached secure-field verdict for the focused element, populated by refresh().
-local _cached_secure = false
+-- It starts secure: nothing is classified yet, and an unclassified field is
+-- secure on the three drivers (SFC-02, Linux starts on its unknown verdict).
+local _cached_secure = true
 
 
 --- Resolves a process identifier without letting a native application method
@@ -142,12 +144,15 @@ function M.isElementSecure(element, observe)
 end
 
 
---- Shares exact inspection reads while retaining confirmed native refusal for refresh.
+--- Shares the exact inspection reads of refresh() and the public inspections.
+--- A nil verdict means nothing was classified; refresh() publishes it as secure,
+--- except when the application answered that no element has focus.
 --- @param application_or_pid table|userdata|number Application object or PID.
 --- @param observe function|nil Optional callback receiving completeness and inspected PID.
 --- @return boolean|nil secure
 --- @return any error_detail
---- @return boolean|nil focus_refused True only for AXFocusedUIElement nil plus error.
+--- @return userdata|table|nil element The element that was classified.
+--- @return boolean|nil no_focus True only for AXFocusedUIElement nil without an error.
 local function inspect_focused_element(application_or_pid, observe)
 	local pid = resolve_pid(application_or_pid)
 	if pid == nil then return nil, "application PID is unavailable" end
@@ -155,19 +160,19 @@ local function inspect_focused_element(application_or_pid, observe)
 		return nil, "Accessibility element API is unavailable"
 	end
 
-	local ok, result, focus_refused, focused_element = pcall(function()
+	local ok, result, focused_element, no_focus = pcall(function()
 		local app_element = hs.axuielement.applicationElementForPID(pid)
 		if not app_element then return nil end
 		local focused, focused_error = app_element:attributeValue("AXFocusedUIElement")
-		if not focused then return nil, focused == nil and focused_error ~= nil end
+		if not focused then return nil, nil, focused == nil and focused_error == nil end
 		local secure = M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
-		return secure, nil, focused
+		return secure, focused
 	end)
 	if not ok then return nil, result end
 	if type(result) ~= "boolean" then
-		return nil, "focused Accessibility element is unavailable", focus_refused == true
+		return nil, "focused Accessibility element is unavailable", nil, no_focus == true
 	end
-	return result, nil, nil, focused_element
+	return result, nil, focused_element
 end
 
 --- Classifies the focused element for one exact application.
@@ -177,7 +182,6 @@ end
 --- @param observe function|nil Optional callback receiving completeness and inspected PID.
 --- @return boolean|nil secure Nil means the focused element could not be read.
 --- @return any error_detail
---- The private refusal bit never changes this public two-return contract.
 function M.inspectFocusedElement(application_or_pid, observe)
 	local secure, detail = inspect_focused_element(application_or_pid, observe)
 	return secure, detail
@@ -190,7 +194,7 @@ end
 --- @return any error_detail
 --- @return userdata|table|nil element The element that was classified.
 function M.inspectFocusedElementWithReceipt(application_or_pid)
-	local secure, detail, _, element = inspect_focused_element(application_or_pid)
+	local secure, detail, element = inspect_focused_element(application_or_pid)
 	return secure, detail, element
 end
 
@@ -263,19 +267,24 @@ end
 function M.refresh(observe)
 	assert(observe == nil or type(observe) == "function", "Invalid secure classification observer")
 	local complete, inspected_pid = false, nil
-	local function clear_cache()
-		_cached_secure = false
+	-- Every state that classifies nothing (no frontmost application, no PID, no
+	-- Accessibility API, no application element, a refused or raised read) is
+	-- published as secure, as Windows and Linux do (SFC-02): a missed
+	-- expansion is recoverable, a captured password is not. An application
+	-- that answers « nothing has focus » without an error was classified: no
+	-- field receives the keys, so it stays not secure.
+	local function fail_closed()
+		_cached_secure = true
 	end
 
 	local ok, err = pcall(function()
 		local app = hs.application.frontmostApplication()
-		if not app then clear_cache(); return end
-		local secure, _, focus_refused = inspect_focused_element(app, observe and function(known, pid)
+		if not app then fail_closed(); return end
+		local secure, _, _, no_focus = inspect_focused_element(app, observe and function(known, pid)
 			complete, inspected_pid = known, pid
 		end)
 		if secure == nil then
-			-- Native AX errors return nil plus an error; nil alone means no focus.
-			_cached_secure = focus_refused == true
+			if no_focus then _cached_secure = false else fail_closed() end
 			return
 		end
 		_cached_secure = secure
@@ -283,7 +292,7 @@ function M.refresh(observe)
 
 	if not ok then
 		Logger.debug(LOG, "refresh(): axuielement unavailable — %s", tostring(err))
-		clear_cache()
+		fail_closed()
 		complete = false
 	end
 	-- Optional evidence follows the exact existing reads and cache assignment.

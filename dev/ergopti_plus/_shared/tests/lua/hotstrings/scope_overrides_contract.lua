@@ -3,7 +3,7 @@
 --- The Hotstrings scope leaves every bundled section on the manifest's recommended
 --- delay, measured through the shared cascade over the real corpus files.
 return function(helpers)
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local Planner = require("hotstrings.engine.scope_overrides")
 	local Resolver = require("hotstrings.engine.delay_resolver")
 	local Languages = require("hotstrings.engine.languages")
@@ -26,7 +26,7 @@ return function(helpers)
 		return assert(Codec.decode(assert(read(path), path)), path)
 	end
 	local function decode(relative) return decode_path(shared .. "/hotstrings/data/catalogue/" .. relative) end
-	local default_delay = assert(tonumber(require("infra.manifest_reader").default_for("hotstrings.expansion_delay")))
+	local default_delay = assert(tonumber(require("menu.engine.manifest_reader").default_for("hotstrings.expansion_delay")))
 	local index = decode("_index.toml")
 
 	-- The real bundled inventory: the neutral files and every declared language

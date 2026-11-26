@@ -137,6 +137,7 @@ local _engine = nil          -- Built from _loaded; nil when there is nothing to
 local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
 local _enabled = true        -- The runtime feature switch (« Disable all »).
 local _paused = false        -- The daemon's pause.
+local _game = false          -- A game has the focus: its keys skip every tap-hold (« Touches de jeu »).
 local _combinations = nil
 local _installed_engine = nil
 local _generation = 0        -- Revokes queued actions across runtime installations.
@@ -170,7 +171,7 @@ local function _run_tap(action, binding)
 	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
-			return require("modules.hotstrings.injector").inject(0, action.type_text)
+			return require("hotstrings.engine.injector").inject(0, action.type_text)
 		end)
 		if not ok or type(result) ~= "table" or not result.ok then
 			Logger.error(LOG, "The one-shot Shift could not type its result: %s.",
@@ -242,7 +243,7 @@ end
 local function build_tap_copy(execute, capture_destination)
 	return require("platform.remap.tap_copy").new({
 		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
-		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		read_counter = function() return require("clipboard.adapters.clipboard").change_counter() end,
 		capture_destination = function()
 			if type(capture_destination) ~= "function" then return nil end
 			return capture_destination()
@@ -302,7 +303,7 @@ end
 --- @param char string
 --- @return string|nil
 local function _one_shot_result(char)
-	if char == require("modules.hotstrings.magic_key").get() then return _one_shot.magic_key_result end
+	if char == require("hotstrings.engine.magic_key").get() then return _one_shot.magic_key_result end
 	return _one_shot.results[char]
 end
 
@@ -310,7 +311,7 @@ end
 --- @return boolean
 local function _active()
 	return not _paused and not (_combinations and _combinations.configuration_pending()) and _engine ~= nil and _loaded ~= nil
-		and (_enabled and _loaded.enabled or _combinations and _combinations.has_bindings())
+		and ((_enabled and _loaded.enabled and not _game) or (_combinations and _combinations.has_bindings()))
 end
 
 local function _pair_thresholds(loaded)
@@ -559,7 +560,7 @@ local function _apply()
 		if install(nil) ~= true then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
 		if _engine:configure(configured, _buffered_ports(), projection, roll_ports()) ~= true then return false end
-		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
+		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled and not _game) ~= true then return false end
 	end
 	if _active() then
 		local installed = install(_engine, _run_tap)
@@ -795,9 +796,9 @@ function M.init(opts)
 	_on_text_injected = opts.on_text_injected
 	_tap_copy = build_tap_copy(opts.execute_action, opts.capture_copy_owner)
 	-- Wayland's copy check counts the selection changes a watcher sees; it
-	-- lives as long as the copy owner (adapters/wayland_selection_counter.lua).
+	-- lives as long as the copy owner (clipboard/adapters/wayland_selection_counter.lua).
 	if not _dry_run and require("core.ui.engine.display_server").is_wayland() then
-		require("adapters.wayland_selection_counter").start()
+		require("clipboard.adapters.wayland_selection_counter").start()
 	end
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
@@ -812,7 +813,8 @@ function M.init(opts)
 		if _installed_engine == nil then _initialized = false end
 		return false
 	end
-	Logger.success(LOG, "Tap-holds initialised (%s).", M.is_active() and "active" or "inactive")
+	Logger.success(LOG, "Tap-holds initialised (feature %s, engine %s).", M.feature_enabled() and "on" or "off",
+		M.is_active() and "active" or "inactive")
 	return true
 end
 
@@ -975,10 +977,37 @@ function M.set_paused(paused)
 	return _apply()
 end
 
+--- Follows the focused application: a game (an application with its own
+--- « Touches de jeu » choice) skips every tap-hold, so a held key goes out at
+--- once and stays held; the key combinations keep their bindings.
+--- @param game boolean
+--- @return boolean applied
+function M.set_game(game)
+	_require_init()
+	if _game == (game == true) then return true end
+	_game = game == true
+	Logger.info(LOG, "Tap-holds %s: a game %s the focus.", _game and "skipped" or "back", _game and "has" or "left")
+	return _apply()
+end
+
+--- Whether init() ran, for a caller that follows the focus before the remaps start.
+--- @return boolean
+function M.is_initialized() return _initialized end
+
 --- Whether the engine is in the hook right now.
 --- @return boolean
 function M.is_active()
 	return _initialized and _active() and _installed_engine == _engine
+end
+
+--- Whether the tap-hold feature is on: the config.toml switch and the runtime
+--- switch both. The one state the tray row, its check, the diagnostic page and
+--- the start-up lines report. is_active() is not it: the engine also runs for
+--- key combinations alone, with the feature off and no tap-hold key at all.
+--- @return boolean|nil nil before init(): no state to report yet.
+function M.feature_enabled()
+	if not _initialized then return nil end
+	return _enabled == true and _loaded.enabled == true
 end
 
 --- The effective keys, key id → fields, as the engine runs them.
@@ -1224,7 +1253,7 @@ function M._reset_for_test()
 	_on_text_injected = nil
 	if _tap_copy then _tap_copy:stop() end
 	_tap_copy = nil
-	local counter = package.loaded["adapters.wayland_selection_counter"]
+	local counter = package.loaded["clipboard.adapters.wayland_selection_counter"]
 	if counter then counter.stop() end
 	cached_roll_proof = nil
 	_combinations, _installed_engine = nil, nil

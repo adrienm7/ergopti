@@ -113,7 +113,7 @@ _BPF_PathsTomlStripsOnlyUnquotedInlineComments() {
 ; This hotkey is deliberately armed with no #HotIf, which is exactly what makes
 ; it dangerous: it is live from parse time, long before the logger exists.
 _BPF_RescueHotkeyIsGuarded() {
-	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
+	Src := _StripFullLineComments(_DriverDirConcat("ai/ui/menu"))
 	Assert(Src != "", "the LLM menu sources must be readable")
 
 	Start := InStr(Src, "^!+i::")
@@ -122,7 +122,7 @@ _BPF_RescueHotkeyIsGuarded() {
 
 	Assert(RegExMatch(Body, "try\s+LoggerInfo"),
 		"the rescue hotkey's first log call must be try-wrapped. It is armed at parse time with no #HotIf, so it is live during Bundle_Init's message-pumping RunWait — a bare LoggerInfo there reads the logger's severity flags before they exist, throws inside a hotkey thread while the boot phase is still 'starting', and the error net treats that as fatal")
-	Assert(InStr(Body, "try TrayTip") > 0 and InStr(Body, "try LLM_Menu_BootstrapOllama") > 0,
+	Assert(InStr(Body, "try NotifierSend") > 0 and InStr(Body, "try LLM_Menu_BootstrapOllama") > 0,
 		"every other call in the rescue handler must stay guarded too — the whole point of the hotkey is to work when the driver is already in a bad state")
 }
 

@@ -181,16 +181,16 @@ local function with_paths_restart(mode, body)
         .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nprimary_j = \""
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
-    for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
-      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
-    local gestures = require("modules.gestures.manager")
+    for _, name in ipairs({ "gestures.engine.manager", "modules.shortcuts.manager",
+      "modules.shortcuts.keyboard_shortcuts", "hotstrings.engine.catalogue.config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
+    local gestures = require("gestures.engine.manager")
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
     local keyboard = require("modules.shortcuts.keyboard_shortcuts")
     helpers.assert_eq(keyboard.get_action("primary_j"), "copy")
     helpers.assert_true(shortcuts.is_enabled())
-    local hotstrings = require("modules.hotstrings.hotstrings_config")
-    local engine = require("modules.hotstrings.engine").new()
+    local hotstrings = require("hotstrings.engine.catalogue.config")
+    local engine = require("hotstrings.engine.engine").new()
     helpers.assert_true(hotstrings.init(engine, f.dirs.a))
     local _, committed = hotstrings.load_all(nil, true)
     helpers.assert_true(committed, "real initial hotstring catalogue is acknowledged")
@@ -218,7 +218,8 @@ local function with_paths_restart(mode, body)
           options.installation = function()
             state.resolved = state.resolved + 1
             if state.mode == "unavailable" then return { kind = "package", reason = "owned package" } end
-            return { kind = "standalone", wrapper = state.launcher or "/private/owned-launcher" }
+            local launcher = state.launcher or "/private/owned-launcher"
+            return { kind = "standalone", wrapper = launcher, launcher = launcher }
           end
           options.run = state.run or function(command)
             state.commands[#state.commands + 1] = command
@@ -235,7 +236,7 @@ local function with_paths_restart(mode, body)
     local callback = daemon_paths_callback(environment)
     local function save()
       assert(f.host.show("paths_editor"))
-      return require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs.b },
+      return require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs.b },
         { config_paths = f.paths, webview_manager = f.host, on_reload = callback })
     end
     body(f, state, save, keyboard, shortcuts)
@@ -377,7 +378,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local expiry_call = "ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
         "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
-      -- modules/hotstrings/expansion_delay, selected by a declaration unique to it.
+      -- hotstrings/engine/expansion_delay, selected by a declaration unique to it.
       local gate_src = helpers.read_driver_unit("function M.allows(")
       helpers.assert_true(gate_src ~= nil, "expansion delay gate is readable")
       helpers.assert_true(gate_src:find("Engine.within_expansion_delay(result, delay_sec, resolution_ms, factor)", 1, true) ~= nil,
@@ -399,7 +400,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "control keys must reset text and its aligned timing history")
       helpers.assert_true(control_body:find("engine:reset(false)", 1, true) ~= nil,
         "the undo restore must reset text at an unknown word start")
-      helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+      helpers.assert_true(click_body:find("keystats.withdraw_for_pointer(secure_focus_guard.invalidate)", 1, true) ~= nil,
         "pointer clicks must cross the text buffer and privacy state together")
       helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,
         "top-level focus changes must publish a fresh control-level privacy epoch")
@@ -416,7 +417,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local src = fh:read("*a"); fh:close()
       local click_start = assert(src:find("local function on_click(code)", 1, true))
       local click_end = assert(src:find("\n\tend\n", click_start, true))
-      helpers.assert_true(src:sub(click_start, click_end):find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+      helpers.assert_true(src:sub(click_start, click_end):find("keystats.withdraw_for_pointer(secure_focus_guard.invalidate)", 1, true) ~= nil,
         "a pointer press must invalidate the privacy verdict")
       helpers.assert_true(src:find("onClick = on_click,", click_end, true) ~= nil,
         "the keyboard hook must report pointer presses to on_click")
@@ -540,6 +541,33 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "gesture pump failure must be diagnosed and stop its reader")
     end)
 
+    helpers.it("restarts a stopped keyboard hook before it ends the daemon", function()
+      -- Regression: the idle tick requested a run-time failure the moment the
+      -- hook was not running, so any retired capture ended the daemon (four
+      -- field exits on 2026-11-25, « Shutdown quiescence started (keyboard hook
+      -- stopped) »), and nothing restarted an AppImage launch.
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = assert(io.open(driver_root .. "/ergopti_hotstrings.lua", "r"))
+      local src = fh:read("*a"); fh:close()
+      local periodic_start = assert(src:find("local on_periodic = function()", 1, true))
+      local loop_start = assert(src:find("event_loop.run({", periodic_start, true))
+      local stopped_at = assert(src:find("not keyboard_hook.isRunning() and not keyboard_hook.isRecovering()", loop_start, true))
+      local branch = src:sub(stopped_at, assert(src:find("\n\t\t\tend\n", stopped_at, true)))
+      local poll_at = branch:find("privacy_owners.hook_supervisor.poll()", 1, true)
+      local gate_at = branch:find('if state == "exhausted" or state == "stopped" then', 1, true)
+      local failure_at = branch:find('shutdown.request_failure("keyboard hook stopped")', 1, true)
+      helpers.assert_true(poll_at ~= nil, "the stopped hook goes to its supervisor first")
+      helpers.assert_true(gate_at ~= nil and gate_at > poll_at and failure_at ~= nil and failure_at > gate_at,
+        "only a spent restart budget keeps the run-time failure exit")
+      local tray_at = assert(src:find("if tray_menu then", stopped_at, true))
+      local pump_at = assert(src:find("keyboard_hook.pump, stop_input_loop", stopped_at, true))
+      helpers.assert_true(src:find("if hook_down then return end", tray_at, true) < pump_at,
+        "the tray keeps pumping while a restart waits; only the keyboard pump is skipped")
+      helpers.assert_true(src:find('require("platform.input.hook_supervisor").new({', 1, true) ~= nil,
+        "the daemon constructs the supervisor with its restart port")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL
@@ -598,7 +626,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("dependency modules", function()
     helpers.it("engine can be required", function()
-      local ok, engine = pcall(require, "modules.hotstrings.engine")
+      local ok, engine = pcall(require, "hotstrings.engine.engine")
       helpers.assert_true(ok, "engine module loads")
       if ok then
         helpers.assert_true(type(engine.new) == "function", "engine.new is a function")
@@ -606,7 +634,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("loader can be required", function()
-      local ok, loader = pcall(require, "modules.hotstrings.loader")
+      local ok, loader = pcall(require, "hotstrings.engine.loader")
       helpers.assert_true(ok, "loader module loads")
       if ok then
         helpers.assert_true(type(loader.find_toml_files) == "function" or
@@ -616,7 +644,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("injector can be required", function()
-      local ok, inj = pcall(require, "modules.hotstrings.injector")
+      local ok, inj = pcall(require, "hotstrings.engine.injector")
       helpers.assert_true(ok, "injector module loads")
       if ok then
         helpers.assert_true(type(inj.inject) == "function", "injector.inject is a function")
@@ -624,7 +652,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("input_reader can be required", function()
-      local ok, ir = pcall(require, "modules.hotstrings.input_reader")
+      local ok, ir = pcall(require, "hotstrings.engine.input_reader")
       helpers.assert_true(ok, "input_reader module loads")
       if ok then
         -- resolve_char, not new(). The reader instance this used to name had no
@@ -644,7 +672,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("device_finder can be required", function()
-      local ok, df = pcall(require, "modules.hotstrings.device_finder")
+      local ok, df = pcall(require, "hotstrings.engine.device_finder")
       helpers.assert_true(ok, "device_finder module loads")
       if ok then
         helpers.assert_true(type(df.find_keyboard) == "function",
@@ -693,7 +721,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
   helpers.describe("adapter modules", function()
     local adapters = {
       "core.network.adapters.http_client",
-      "adapters.tray_menu",
+      "tray.adapters.menu",
     }
     for _, name in ipairs(adapters) do
       helpers.it(name .. " loads", function()
@@ -720,7 +748,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       "core.text.engine.json",
       "tray.protocol",
       "ai.engine.prediction.prompt_builder_core",
-      "infra.llm_bridge",
+      "ai.engine.bridge",
       "updater.engine.version_core",
     }
     for _, name in ipairs(shared_mods) do

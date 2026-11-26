@@ -28,14 +28,14 @@ local MODULE_NAMES = {
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.timing.engine.timings",
-	"modules.gestures",
-	"modules.gestures.actions",
-	"modules.gestures.conflicts",
-	"modules.gestures.engine",
-	"modules.gestures.init",
+	"gestures.engine",
+	"gestures.engine.actions",
+	"gestures.engine.conflicts",
+	"gestures.engine.engine",
+	"gestures.engine.init",
 	"tests.stubs.hs",
 }
 
@@ -97,7 +97,7 @@ function M.with_fixture(options, scenario)
 		end,
 	}, { __index = function() return noop end })
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
@@ -109,7 +109,7 @@ function M.with_fixture(options, scenario)
 			return 5
 		end,
 	}
-	package.loaded["modules.gestures.actions"] = setmetatable({
+	package.loaded["gestures.engine.actions"] = setmetatable({
 		AX_NAMES = {},
 		SG_NAMES = {},
 		init = noop,
@@ -122,7 +122,7 @@ function M.with_fixture(options, scenario)
 			return true
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["modules.gestures.engine"] = setmetatable({
+	package.loaded["gestures.engine.engine"] = setmetatable({
 		init = function() return true end,
 		process_frame = function(_, frame_stamp)
 			runtime.engine_process_calls = runtime.engine_process_calls + 1
@@ -135,7 +135,7 @@ function M.with_fixture(options, scenario)
 		cancel_current_gesture = function() return true end,
 		emergency_reset = noop,
 	}, { __index = function() return noop end })
-	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
+	package.loaded["gestures.engine.conflicts"] = setmetatable({}, {
 		__index = function() return noop end,
 	})
 
@@ -265,7 +265,7 @@ function M.with_fixture(options, scenario)
 		end,
 	}
 
-	gestures = require("modules.gestures.init")
+	gestures = require("gestures.engine.init")
 	local ok, err = xpcall(function()
 		scenario(gestures, runtime, watcher, device)
 	end, debug.traceback)

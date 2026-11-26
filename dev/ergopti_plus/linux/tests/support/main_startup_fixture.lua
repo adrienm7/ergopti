@@ -26,7 +26,7 @@ function M.run(options)
 		loops = 0, loop_stops = 0, service_stops = 0, callbacks = {}, services = false,
 		preparing = false, ui_entered = false, ui_returned = false, signals_active = false, signal_stops = 0,
 		application_loops = 0, owner_after_request = false, automation = 0, loop_after_complete = false,
-		foreign_loops = 0, layout_refreshes = 0 }
+		foreign_loops = 0, layout_refreshes = 0, warnings = {} }
 	local env = setmetatable({}, { __index = _G })
 	local function record(name) observed.events[#observed.events + 1] = name end
 	local function native_callback(boundary)
@@ -61,8 +61,16 @@ function M.run(options)
 		end,
 		isRunning = function() return observed.grabbed end,
 		isRecovering = function() return false end,
-		stop = function() record("hook.stop"); observed.grabbed = false; return true end,
-		emergency_stop = function() record("hook.emergency"); observed.grabbed = false; return true end,
+		stop = function()
+			record("hook.stop"); observed.grabbed = false
+			observed.hook_stop = { deliberate = true, reason = "owner_stop", detail = "stopped by its owner" }; return true
+		end,
+		emergency_stop = function(reason)
+			record("hook.emergency"); observed.grabbed = false
+			observed.hook_stop = { deliberate = false, reason = "emergency_stop", detail = tostring(reason) }; return true
+		end,
+		-- The daemon's hook supervisor tells a quit from a failure by this.
+		last_stop = function() return observed.hook_stop end,
 		get_mode = function() return observed.grabbed and "intercept" or "observe" end,
 		pump = function()
 			record("hook.pump"); observed.pumps = observed.pumps + 1
@@ -124,6 +132,8 @@ function M.run(options)
 		-- The pre-grab resolve: the same boundary, proven or dumped again.
 		refresh_unless_current = layout_refresh,
 		is_ready = function() return true end,
+		-- The Daemon ready line names the layout the session loaded.
+		layout_name = function() return "Controlled (US)" end,
 		publish_current_capture = function()
 			observed.preparing = true
 			record("layout.publish"); native_callback("layout.publish")
@@ -142,15 +152,23 @@ function M.run(options)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
 	end, error = function(_, message)
 		if tostring(message):find("Diagnostic snapshot", 1, true) then observed.snapshot_errors = (observed.snapshot_errors or 0) + 1 end
-	end, warn = noop, debug = noop, success = function(_, message)
+	end, warn = function(_, message)
+		observed.warnings[#observed.warnings + 1] = tostring(message)
+	end, debug = noop, success = function(_, message)
 		if tostring(message):find("Daemon ready (", 1, true) then record("daemon.ready"); native_callback("daemon.ready") end
 	end, flush_repeats = noop }
 	if options.terminal_logger_throws then env.Logger.error = function() error("controlled terminal logger failure", 0) end end
-	env.tray_menu = { setIcon = function() ui("tray") end,
+	env.tray_menu = { start = function() ui("tray"); return true end,
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
-	env.TapHold = { is_active = function() return true end }
+	-- The start-up line reads the feature switch before the engine state.
+	env.TapHold = { feature_enabled = function() return true end, is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
-	env.keystats = { hold_accounting_token = noop, pump_flush = noop, bind_pointer_position = noop,
+	-- The typing path's settings and catalogues are read before the hook starts.
+	env.RepeatKey = { is_enabled = function() record("typing.repeat_key"); return false end }
+	env.tap_keys = { keys = function() record("typing.tap_keys"); return {} end }
+	env.keystats = { hold_accounting_token = noop, pump_flush = noop,
+		bind_pointer_position = function() record("metrics.pointer_bound") end,
+		load_media_policy = function() record("typing.media_policy") end,
 		get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
 	env.capture_owned_scancodes = {}
@@ -194,6 +212,16 @@ function M.run(options)
 			-- The desktop toolkit is present: its refusal has its own cases
 			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }
+		elseif name == "tray.host_check" then
+			-- The tray host check is only scheduled at startup (its own cases:
+			-- tests/unit/platform/system/test_tray_host_check.lua).
+			return { schedule = function(deps)
+				record("tray.host_check"); observed.tray_host_check = deps; return true
+			end }
+		elseif name == "tray.adapters.status_notifier_host" then
+			return { probe = function() return nil, "controlled session" end }
+		elseif name == "core.timing.engine.timings" or name == "platform.input.hook_supervisor" then
+			return require(name)
 		elseif name == "core.lifecycle.engine.driver_control" then
 			-- The local reload control starts once the daemon is ready.
 			return { start = function(control_options)
@@ -211,24 +239,29 @@ function M.run(options)
 			-- The floating WPM widget pumps its own window, tray or not.
 			return { pump = function() record("wpm.pump"); return 0 end }
 		elseif name == "infra.typed_input_withheld" then
-			-- The session's withheld-input summary is logged as the daemon exits.
-			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
+			-- The session's withheld-input summary is logged as the daemon exits; each
+			-- withheld character is told as it happens from ready until that exit.
+			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end,
+				set_observer = function(observer)
+					observed.withheld_observer = observer
+					record(observer and "withheld.observe" or "withheld.unobserve")
+				end }
 		elseif name == "core.timing.engine.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
-		elseif name == "infra.field_run" then
+		elseif name == "diagnostics.engine.field_run.field_run" then
 			-- The collector's no-click field run starts beside the reload control.
 			return { start = function(field_options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
-		elseif name == "modules.keystats.topology_metrics" then
+		elseif name == "modules.keystats.system.topology_metrics" then
 			-- Window topology binds its X11 source at startup and closes its capture interval at stop.
 			return { bind_topology_source = noop, daemon_tick = noop, daemon_stop = noop }
 		elseif name == "infra.personal_shortcuts" then
 			-- The user's personal source runs once, at the end of the services.
 			return { load = function() record("personal_shortcuts"); return true end }
-		elseif name == "modules.gestures.workspace_switcher" then
+		elseif name == "gestures.adapters.workspace_switcher" then
 			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
 			-- and this session has none (its own cases: test_workspace_switcher).
 			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }
@@ -241,7 +274,7 @@ function M.run(options)
 		elseif name == "platform.input.access" then
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "core.i18n.engine.i18n" then
-			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
+			return { init = noop, set_display_provider = noop, get = function(key) return key end }
 		elseif name == "core.logger.engine.perf_counters" then
 			-- The real counters: the exit path flushes their last interval.
 			return require(name)
@@ -249,8 +282,15 @@ function M.run(options)
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
-		elseif name == "infra.config_paths" then
+		elseif name == "core.ui.engine.display_server" then
+			-- A Wayland session unless the case asks for X11.
+			return { is_wayland = function() return options.display ~= "x11" end }
+		elseif name == "settings.engine.paths" then
 			return { config = function() return "/controlled/config.toml" end }
+		elseif name == "hotstrings.engine.word_reset" then
+			-- The typing path's settings are read once before the hook starts,
+			-- not on the first key (its own case: tests/e2e first-key reads).
+			return { current = function() record("typing.settings"); return {} end }
 		elseif name == "ui.onboarding.startup" then
 			return { run = function(opts)
 				opts.open = function() return nil, "controlled missing config", 2 end

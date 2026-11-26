@@ -30,7 +30,7 @@ function M.install(driver, shared, runtime, mode)
 		{ shared, ".lua" }, { shared, "/init.lua" },
 	}
 	local daemon = {
-		{ driver, ".lua" }, { driver .. "/modules/hotstrings", ".lua" },
+		{ driver, ".lua" }, { driver .. "/hotstrings/engine", ".lua" },
 		{ shared, ".lua" }, { shared, "/init.lua" },
 	}
 	local lua_roots = {}

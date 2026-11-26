@@ -60,7 +60,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
-		local routes = require("infra.config_paths")
+		local routes = require("settings.engine.paths")
 		local original_route = routes.config
 		routes.config = function(name)
 			if name == "config.toml" then return config_path end
@@ -100,12 +100,12 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
 				local layout = require("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
-				injector = require("modules.hotstrings.injector")
+				injector = require("hotstrings.engine.injector")
 				injector._set_nanosleep_for_test(function() end)
 				injector._set_uinput(session.writer)
 				local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 				environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
-				environment.gestures = require("modules.gestures.manager")
+				environment.gestures = require("gestures.engine.manager")
 				environment.shortcuts = require("modules.shortcuts.manager")
 				environment.ActionHandlers = require("modules.shortcuts.action_handlers")
 				environment.secure_focus_guard = guard
@@ -114,7 +114,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				manager = helpers.load_module("platform.remap.tap_hold_manager")
 				environment.TapHold, environment.keyboard_hook = manager, session.hook
 				environment.action_catalogue = environment.gestures
-				environment.WordReset = require("modules.hotstrings.word_reset")
+				environment.WordReset = require("hotstrings.engine.word_reset")
 				environment.engine = { reset = function() world.resets = world.resets + 1 end }
 				evaluate(assert(source:match("return (TapHold%.init%b())")), environment)
 

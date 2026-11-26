@@ -239,11 +239,17 @@ local function parse_entry(line, hotstring)
 		end
 	end
 
-	if not result.output then return nil end
+	-- An entry that runs an action may type nothing (hotstrings/engine/matcher/action_entry.lua)
+	if not result.output and result.action == nil then return nil end
 
 	return {
 		trigger           = trigger,
-		output            = result.output,
+		output            = result.output or "",
+		-- The action entry's fields, checked by action_entry.fields where loaded:
+		-- carried as written, since this record is a fixed field set.
+		action            = result.action,
+		workflow          = result.workflow,
+		erase_trigger     = result.erase_trigger,
 		is_word           = result.is_word           or false,
 		auto_expand       = result.auto_expand       or false,
 		is_case_sensitive = result.is_case_sensitive or false,
@@ -633,6 +639,10 @@ local function parse_lines(lines)
 						result.meta.show_tooltip = val
 					elseif key == "priority" and type(val) == "number" then
 						result.meta.priority = val
+					elseif key == "glyph" or key == "glyph_name_key" then
+						-- Kept whatever its type: category_glyph.lua refuses a value
+						-- that is not one symbol, and the driver logs the refusal.
+						result.meta[key] = val
 					end
 				end
 

@@ -531,8 +531,10 @@ ErgoptiLayout_Init(RegistryDir) {
 	LoggerStart("ErgoptiLayout", "Reading the Ergopti layout tables from {1}…", RegistryDir)
 	Started := A_TickCount
 	try {
-		Ergopti := LayoutRegistry_ReadBundled(ERGOPTI_LAYOUT_ID, RegistryDir)
-		Plus := LayoutRegistry_ReadBundled(ERGOPTI_PLUS_LAYOUT_ID, RegistryDir)
+		; One decode of the index serves both layouts.
+		Index := LayoutRegistry_ReadBundledIndex(RegistryDir)
+		Ergopti := LayoutRegistry_ReadBundled(ERGOPTI_LAYOUT_ID, RegistryDir, Index)
+		Plus := LayoutRegistry_ReadBundled(ERGOPTI_PLUS_LAYOUT_ID, RegistryDir, Index)
 		Convention := Ergopti["Entry"]["keycode_convention"]
 		if (Plus["Entry"]["keycode_convention"] !== Convention)
 			throw Error("Ergopti and Ergopti+ number their keys differently in the registry.")
@@ -610,6 +612,7 @@ _ErgoptiScanCodeNumber(Sc) => Integer("0x" . SubStr(Sc, 3))
  * @returns {Map}
  */
 ErgoptiBaseMapping() {
+	PerfCount("ergopti_layout.base_mapping_build")
 	Out := Map()
 	for Sc, Descriptor in ErgoptiLayout_Spec()["levels"]["base"] {
 		if !Descriptor.Has("text")
@@ -628,6 +631,7 @@ ErgoptiBaseMapping() {
  *   sequence, "table", its published dead-key table).
  */
 ErgoptiBaseDeadKeys() {
+	PerfCount("ergopti_layout.base_dead_keys_build")
 	Spec := ErgoptiLayout_Spec()
 	Out := Map()
 	for Sc, Descriptor in Spec["levels"]["base"] {
@@ -670,6 +674,28 @@ ErgoptiLayout_BuiltinVariant(FeaturesSource := unset) {
 		return ""
 	Variant := Layout.Get(ConfigLeaf.ERGOPTI_VARIANT, "none")
 	return (Variant is String) && (StrCompare(Variant, "none", true) == 0 || StrCompare(Variant, "ergopti", true) == 0 || StrCompare(Variant, "ergopti_plus", true) == 0) ? Variant : ""
+}
+
+/**
+ * Whether a layout is selected for emulation: a registry layout, or the
+ * Ergopti or Ergopti➕ variant. « None » selects nothing, and the layer
+ * switches (base and Shift, AltGr and Shift+AltGr) then do nothing: the
+ * selection is the only gate (maintainer decision of 2026-11-23), as the
+ * shared layouts/engine/emulation/settings.lua reads it on macOS and Linux.
+ * @param {Map} FeaturesSource Features to read; the live map when omitted.
+ * @returns {Boolean}
+ */
+ErgoptiLayout_LayoutIsSelected(FeaturesSource := unset) {
+	global Features
+	if !IsSet(FeaturesSource) {
+		if !IsSet(Features)
+			return false
+		FeaturesSource := Features
+	}
+	if KeylayoutEmulation_SelectedId(FeaturesSource) != ""
+		return true
+	Variant := ErgoptiLayout_BuiltinVariant(FeaturesSource)
+	return Variant != "" && StrCompare(Variant, "none", true) != 0
 }
 
 /**

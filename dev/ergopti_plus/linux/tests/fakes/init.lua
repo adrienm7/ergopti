@@ -109,7 +109,8 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason?,
+---   abs?, mt_slots? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -183,9 +184,34 @@ function M.evdev_reader(opts)
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
+	function fake.grabbed_paths()
+		local paths = {}
+		for slot in pairs(fake.grabbed) do
+			if fake.open_slots[slot] ~= nil then paths[#paths + 1] = fake.open_slots[slot] end
+		end
+		table.sort(paths)
+		return paths
+	end
 	function fake.pressed_keys(slot, max_code)
 		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
 		return opts.pressed_keys or {}
+	end
+	-- Multitouch registers: opts.abs = { [code] = absinfo table }, opts.mt_slots =
+	-- { [code] = { [slot] = value } }. A scripted reader without them answers as
+	-- a device whose query is refused.
+	function fake.abs_info(slot, code)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local info = (opts.abs or {})[code]
+		if info == nil then return nil, "no scripted absinfo" end
+		return info
+	end
+	function fake.mt_slot_values(slot, code, count)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local values = (opts.mt_slots or {})[code]
+		if values == nil then return nil, "no scripted slot values" end
+		local out = {}
+		for index = 0, count - 1 do out[index] = values[index] or 0 end
+		return out
 	end
 	function fake.active_leds(slot, max_code)
 		if type(opts.active_leds) == "function" then return opts.active_leds(slot, max_code) end
@@ -541,6 +567,14 @@ function M.clipboard(opts)
 	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
 	fake.counter = 0
 	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	-- The transient hint: armed once, as the daemon's boot does.
+	function fake.arm_transient_hint()
+		if fake.transient_armed then error("the transient clipboard hint is already armed", 2) end
+		fake.transient_armed = true
+	end
+	function fake.transient_targets(text)
+		return { { name = "text/plain;charset=utf-8", data = text }, { name = "x-kde-passwordManagerHint", data = "secret" } }
+	end
 	function fake.change_counter()
 		if opts.available == false then return nil, "unsupported" end
 		return fake.counter
@@ -559,6 +593,8 @@ function M.clipboard(opts)
 		fake.contents = previous
 		return true
 	end
+	-- The fake always puts the previous contents back: no restore is ever lost.
+	function fake.restore_failures() return 0 end
 	-- The copy probe: the selection, the clipboard left as it was.
 	function fake.read_selection(emit_combo, sleep_ms)
 		if opts.available == false then return false, "", "clipboard unavailable" end

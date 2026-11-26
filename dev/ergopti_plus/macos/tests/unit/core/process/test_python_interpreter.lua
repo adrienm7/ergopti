@@ -43,8 +43,8 @@ end
 --- @return table resolver, table reads
 local function load(files, options)
 	options = options or {}
-	package.loaded["adapters.python_interpreter"] = nil
-	local resolver = helpers.load_with_stubs("adapters.python_interpreter")
+	package.loaded["ai.adapters.python_interpreter"] = nil
+	local resolver = helpers.load_with_stubs("ai.adapters.python_interpreter")
 	local reads = {}
 	resolver._set_deps({
 		read_head = function(path)

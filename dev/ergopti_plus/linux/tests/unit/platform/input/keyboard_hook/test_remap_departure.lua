@@ -9,7 +9,7 @@ local Fixture = require("tests.support.input_owner_fixture")
 local function select_sources(s, ids)
 	local paths = {}
 	for _, id in ipairs(ids) do paths[#paths + 1] = s.paths[id] end
-	package.loaded["modules.hotstrings.device_finder"].find_devices = function() return paths, {} end
+	package.loaded["hotstrings.engine.device_finder"].find_devices = function() return paths, {} end
 	for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
 end
 

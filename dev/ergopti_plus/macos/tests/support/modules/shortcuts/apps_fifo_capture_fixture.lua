@@ -5,9 +5,9 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 require("core.logger.engine.logger")
 local M = {}
 local OWNED = {
-	"modules.shortcuts.actions.apps", "platform.input.synthetic_input", "adapters.event_provenance",
-	"core.events.timer_scheduler", "core.fs.adapters.storage", "adapters.clipboard", "core.logger.engine.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
-	"platform.focus.window_info", "platform.focus.window_manager", "adapters.app_launcher", "core.process.adapters.shell_runner",
+	"modules.shortcuts.actions.apps", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance",
+	"core.events.timer_scheduler", "core.fs.adapters.storage", "clipboard.adapters.clipboard", "core.logger.engine.logger", "core.logger.engine.shim", "tests.stubs.hs", "hs",
+	"platform.focus.window_info", "platform.focus.window_manager", "apps.adapters.launcher", "core.process.adapters.shell_runner",
 	"core.ui.engine.notifications", "core.i18n.engine.i18n", "core.text.engine.utils",
 	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
@@ -73,11 +73,11 @@ function M.with_world(options, callback)
 		hs.http = { encodeForQuery = function(value) return value end }
 		package.loaded['platform.focus.window_info'] = { getFocused = function() return {appId=options.finder and 'Finder' or 'TextEdit'} end }
 		package.loaded['platform.focus.window_manager'] = {}
-		package.loaded['adapters.app_launcher'] = {}
+		package.loaded['apps.adapters.launcher'] = {}
 		package.loaded['core.process.adapters.shell_runner'] = {}
 		package.loaded['core.ui.engine.notifications'] = { notify=function() end }
 		package.loaded['core.i18n.engine.i18n'] = {get=function(key) return key end}
-		package.loaded['adapters.clipboard'] = nil
+		package.loaded['clipboard.adapters.clipboard'] = nil
 		local apps = require('modules.shortcuts.actions.apps')
 		local head_completed = not backlog
 		if backlog then

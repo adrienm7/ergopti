@@ -58,7 +58,10 @@ _IANS_InlineCompletionCommitsOnlySuccessfulOutput() {
 			SourceControl: 1001,
 			Slots: ["vous remercier"],
 			ActiveIdx: 1,
-			SourceHwnd: 100
+			SourceHwnd: 100,
+			; As _LLM_Bridge_NewInjectionTransaction builds it: the journal
+			; commit sets it, and this test runs the RAM commit alone (MET-02).
+			MetricsRecorded: false
 		}
 		PreviousCritical := Critical("On")
 		try

@@ -22,7 +22,7 @@
 ; that pump re-enters the teardown while the controller globals are still set and
 ; runs the release + Close sequence a second time against a controller that is
 ; already going away — the uncatchable SEH class documented at
-; ui/personal_toml_editor_webview.ahk, where it was an observed production crash.
+; hotstrings/ui/personal_toml_editor_webview.ahk, where it was an observed production crash.
 ;
 ; SCOPE: source-level. The crash is a hard access violation and the headless
 ; harness has no live WebView2 runtime, so behaviour cannot be exercised.

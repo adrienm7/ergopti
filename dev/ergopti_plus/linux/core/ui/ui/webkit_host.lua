@@ -46,11 +46,12 @@ M.APP_BRIDGES = {
 	physical_shortcuts       = "physical_shortcuts_bridge",
 	changelog                = "changelog_bridge",
 	download_window          = "dl_bridge",
+	emulation_picker         = "emulation_picker_bridge",
 	error_dialog             = "error_dialog",
+	field_report             = "field_report", -- config-key-literal-ok: a bridge name
 	healthcheck              = "healthcheck",
 	hotstring_editor         = "hsEditor",
 	hotstrings_config_window = "hotstrings_config_bridge",
-	layer_editor             = "layer_editor_bridge",
 	metrics_apps             = "metrics_apps_bridge",
 	metrics_typing           = "metrics_typing_bridge",
 	model_browser            = "model_browser_bridge",
@@ -61,8 +62,9 @@ M.APP_BRIDGES = {
 	paths_editor             = "hsPaths",
 	personal_info_editor     = "hsPersonalInfo",
 	prompt_editor            = "prompt_bridge",
-	token_prompt             = "token_bridge",
 	update_check             = "update_check_bridge",
+	user_workflows           = "hsWorkflows",
+	keep_awake_library       = "hsKeepAwake",
 }
 
 --- The canonical bridge-name catalogue, derived from page ownership above.
@@ -391,6 +393,17 @@ function M.build_app_html(driver_root, app_name, active_locale, strings)
 	local locales_dir = M.resolve_locales_dir(driver_root)
 	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	html = M.inject_i18n_boot(html, i18n_script)
+	-- The reader's font and spacing (Configuration menu), seeded for
+	-- a11y_prefs.js; the page has no base URL, so the chosen font comes inline.
+	local Reading = require("core.ui.engine.webview.reading_preferences")
+	local reading = Reading.current()
+	local function read_bytes(path) return require("core.fs.engine.regular_file_reader").read_source(path) end
+	local reading_head, reading_err = Reading.head_fragment(reading, ui_root .. "/fonts", read_bytes)
+	if reading_head == nil then
+		Logger.error(LOG, "%s is built in the default font: %s.", app_name, tostring(reading_err))
+		reading_head = Reading.head_fragment({ font = "default", spacing = reading.spacing }, ui_root .. "/fonts", read_bytes)
+	end
+	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. reading_head end, 1)
 	html = html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. '<script>window.__ergopti_host_capabilities={"document_bridge":true};</script>'
 	end, 1)

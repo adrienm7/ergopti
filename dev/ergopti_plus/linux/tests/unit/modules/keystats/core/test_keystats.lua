@@ -501,7 +501,7 @@ helpers.describe("keystats", function()
 
     it("linux-unmeasured-kpis: the dashboard payload names each unmeasured KPI with its reason", function()
       keystats.init({ sqlite_path = fresh_db() })
-      local SystemMetrics = require("modules.keystats.system_metrics")
+      local SystemMetrics = require("modules.keystats.system.system_metrics")
       local availability = SystemMetrics.space_change_availability()
       local unmeasured = keystats.get_dashboard_payload({ include_prefetch = false }).driver_meta.unmeasured
       helpers.assert_true(type(unmeasured) == "table", "the payload carries the unmeasured map")
@@ -797,6 +797,43 @@ helpers.describe("physical-backspace-corrections", function()
     helpers.assert_eq(live_wpm(corrected), expected,
       "a held Backspace must not read as a burst of fast typing")
   end)
+  -- MET-17 (decided by the maintainer on 2026-11-21): the live speed counts the
+  -- produced text, as macOS does; Linux added the whole output and kept the
+  -- erased trigger, so a hotstring read faster than the text on the page.
+  it("(met-17-2026-11-21) the live speed replays the shared produced-text vectors", function()
+    local path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/live_wpm_produced_text_vectors.json"
+    local file = assert(io.open(path, "r"), "live WPM produced-text vectors not found")
+    local data = assert(require("core.text.engine.json").decode(file:read("*a")))
+    file:close()
+    local base = 1000
+    local producers = {
+      hotstring = function(at, count, deletes)
+        keystats.record_hotstring("owned-produced", string.rep("t", deletes), string.rep("x", count),
+          at, "test", deletes)
+      end,
+      llm = function(at, count, deletes)
+        keystats.record_synthetic_output("owned-produced", string.rep("x", count), "llm", at, deletes, 0)
+      end,
+    }
+    for name, produce in pairs(producers) do
+      for _, case in ipairs(data.cases) do
+        require("modules.keystats.sqlite_writer").close_db()
+        keystats = helpers.load_module("modules.keystats.keystats")
+        keystats.init({ sqlite_path = fresh_db() })
+        require("tests.support.metrics_consent_fixture").enable(keystats)
+        keystats.reset_session()
+        for _, step in ipairs(case.steps) do
+          if step.typed then
+            keystats.on_keydown("a", base + step.at, "owned-produced")
+          else
+            produce(base + step.at, step.produced, step.deletes)
+          end
+        end
+        helpers.assert_eq(keystats.get_live_stats(base + case.read_at).wpm, case.wpm,
+          name .. " " .. case.id .. ": the readout counts the produced text")
+      end
+    end
+  end)
   it("physical-backspace-corrections: corrections leave the session speed and n-grams unchanged", function()
     keystats.init({ sqlite_path = fresh_db() })
     require("tests.support.metrics_consent_fixture").enable(keystats)
@@ -1030,7 +1067,7 @@ end)
 -- the logical replacement used for hotstring counters and its event row.
 local function with_replayed_hotstring(options, callback)
   local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
-    "modules.hotstrings.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
+    "hotstrings.engine.injector", "platform.input.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
   local Monotonic = require("core.logger.engine.monotonic")
   local previous_now, now = Monotonic.now_ms, 10000
@@ -1070,7 +1107,7 @@ local function with_replayed_hotstring(options, callback)
     local keys, text_of = {}, { [28] = "\n", [15] = "\t" }
     for char, code in pairs(codes) do keys[char] = { keycode = code, mods = {} }; text_of[code] = char end
     layout._set_table_for_test(keys)
-    injector = helpers.load_module("modules.hotstrings.injector")
+    injector = helpers.load_module("hotstrings.engine.injector")
     injector._set_nanosleep_for_test(function() end)
     injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
       world.wire[#world.wire + 1] = { code, value }
@@ -1091,8 +1128,10 @@ local function with_replayed_hotstring(options, callback)
       script_actions = { is_paused = function() return false end },
       secure_focus_guard = { capture_text_owner = function() return destination end,
       current_context = function() return { app_id = "tail-editor", title = "Document", native_identity = "fixture:tail" } end,
-        blocks_text = function() return false end, invalidate = function() world.invalidated = true end },
-      WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+        blocks_text = function() return false end, invalidate = function() world.invalidated = true end,
+        text_automation = function() return true, "field", "field_admitted" end },
+      WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
+      CommitFollowup = require("hotstrings.engine.commit_followup"),
       RepeatKey = { is_enabled = function() return false end },
       -- Main sizes the expansion delay from the physically held modifiers.
       keyboard_hook = { held_modifiers = function() return {} end },

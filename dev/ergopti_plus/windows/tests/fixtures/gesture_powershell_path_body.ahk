@@ -80,7 +80,7 @@ _GPSE_Main() {
 		; WG-003: elevated HKCU is the UAC account's hive, so no worker writes it.
 		_GPSE_Require(!InStr(FileRead(Job["script"], "UTF-8"), "HKCU"),
 			"The elevated worker must not write a per-user registry value.")
-		_GPSE_Require(InStr(_GPSE_Command, '*RunAs powershell.exe ')
+		_GPSE_Require(InStr(_GPSE_Command, '*RunAs "' . A_WinDir . '\System32\WindowsPowerShell\v1.0\powershell.exe" ') == 1
 			&& InStr(_GPSE_Command, '-File "' . Job["script"] . '"'),
 			"The observed real launch must reference its own written artifact.")
 		FileAppend(Job["script"] . "`n" . Job["result"] . "`n", A_Args[2] . "\producer.receipt", "UTF-8-RAW")

@@ -113,12 +113,13 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["modules.llm"] = core
+	package.loaded["ai.engine"] = core
 	-- The pipeline test controls the focused-window classification boundary. A
 	-- newly loaded real keymap cache is deliberately unknown until its async AX
 	-- prewarm commits, which would make this fixture stop before backend dispatch.
-	package.loaded["modules.keymap.utils"] = {
+	package.loaded["hotstrings.engine.expander.utils"] = {
 		is_ignored_window = function() return false end,
+		window_mode_admits = function() return false end,
 	}
 
 	local tooltip = {
@@ -140,6 +141,7 @@ local function load_fixture(options)
 		reset_llm_timer = function() return true end,
 		mark_chain_complete = function() return true end,
 		tint = function() return {} end,
+		glyph = function() return nil, nil end,
 		hide = function()
 			fixture.hides = fixture.hides + 1
 			return true
@@ -163,19 +165,19 @@ local function load_fixture(options)
 	-- These internal modules must be real: the regression guards their transitive
 	-- callback contract, not a test-local reproduction of either half.
 	for _, module_name in ipairs({
-		"modules.llm.parser",
-		"modules.llm.prompt_builder",
-		"modules.llm.streaming_handler",
-		"modules.llm.warmup_controller",
-		"modules.llm.app_filter",
-		"modules.llm.api_common",
-		"modules.llm.prediction_engine",
+		"ai.engine.api.parser",
+		"ai.engine.prediction.prompt_builder",
+		"ai.engine.api.streaming_handler",
+		"ai.engine.local_servers.warmup_controller",
+		"ai.engine.prediction.app_filter",
+		"ai.engine.api.common",
+		"ai.engine.prediction.engine",
 	}) do
 		package.loaded[module_name] = nil
 	end
 
-	local StreamingHandler = require("modules.llm.streaming_handler")
-	local Engine = require("modules.llm.prediction_engine")
+	local StreamingHandler = require("ai.engine.api.streaming_handler")
+	local Engine = require("ai.engine.prediction.engine")
 	fixture.handler = StreamingHandler
 	fixture.engine = Engine
 	-- The typed buffer the engine reads at every check: a test changes it to

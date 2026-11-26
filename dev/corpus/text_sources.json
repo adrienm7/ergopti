@@ -1,0 +1,382 @@
+{
+	"_description": "The Project Gutenberg ebooks and Wikisource works of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>. wikisource_texts: each French Wikisource work's page revisions, in reading order; the importer reads each revision's parse output (https://fr.wikisource.org/w/api.php?action=parse&oldid=<revid>, or <revid>.json from --archive-dir), keeps its paragraphs by one extraction rule and writes output only if the SHA-256 of the text is sha256 (the parser's HTML carries render ids, so the text is pinned, not the download). Its register entry is under the work's page URL https://fr.wikisource.org/wiki/<work>, licensed CC BY-SA 4.0, crediting « Wikisource contributors » and naming each page read as « <title> (revision <revid>) » in its note. public_domain gives the author's death year and the first publication year, gutenberg_absent when (checked_on) and how (evidence) Project Gutenberg was found to lack the work; the importer refuses a work published 95 years or less, or whose author died 70 years or less, before the year of checked_on (wikisourceRefusal).",
+	"schema_version": 1,
+	"texts": [
+		{
+			"output": "original/en/austen_pride_and_prejudice.txt",
+			"gutenberg_id": 1342,
+			"sha256": "3f6bb9d6f78e0293b56acd4714dd68cb7d6d1d293402031ce9d5a216bcaf9d75"
+		},
+		{
+			"output": "original/fr/hugo_les_miserables_1.txt",
+			"gutenberg_id": 17489,
+			"sha256": "a5de514ba7b9f2e1790e7e259c4e8b7a35ae1d29e4bf9a5f8767039c58b80503"
+		},
+		{
+			"output": "original/fr/verne_tour_du_monde.txt",
+			"gutenberg_id": 800,
+			"sha256": "bd89ef4c406ae063a1eeba2ec0689532e8c83ecfb1fce742cdd22bc47cb888da"
+		},
+		{
+			"output": "original/fr/zola_germinal.txt",
+			"gutenberg_id": 5711,
+			"sha256": "7bbd0d116a119b0626b88d7f8e7e5196831e348395249df6d0ec61abc30e583b"
+		},
+		{
+			"output": "original/de/fontane_effi_briest.txt",
+			"gutenberg_id": 5323,
+			"sha256": "fc2cc841038004b845426452f808e6537045604d66d2878c7007a8909e9240df"
+		},
+		{
+			"output": "original/de/kafka_die_verwandlung.txt",
+			"gutenberg_id": 22367,
+			"sha256": "359d3f5983c812393f4bd7ee49a350ffffc7d476015e58d6b84b6c848dd2b0e9"
+		},
+		{
+			"output": "original/es/cervantes_don_quijote.txt",
+			"gutenberg_id": 2000,
+			"sha256": "8a3738c61aa507f2319fad526a886c2de74c17c7ba1d64726c53d3591fa62321"
+		},
+		{
+			"output": "original/es/galdos_marianela.txt",
+			"gutenberg_id": 17340,
+			"sha256": "ec6e5dbd4260583360ab7bd29738505ad5f0dfdf58db3dcbbc401c5ce4fea03f"
+		},
+		{
+			"output": "original/it/collodi_pinocchio.txt",
+			"gutenberg_id": 52484,
+			"sha256": "b51a398da257709bfd2c0007e42980935751276cdca4178d738fa4c92f799ae6"
+		},
+		{
+			"output": "original/it/de_amicis_ricordi_d_infanzia.txt",
+			"gutenberg_id": 61885,
+			"sha256": "5f4ca693f86b641891ce4dfc89636f9428ffb7434056f17ed59c1ab0f98be446"
+		},
+		{
+			"output": "original/en/carroll_alice_in_wonderland.txt",
+			"gutenberg_id": 11,
+			"sha256": "01b38ea4c710a84bc18d0bd41271a5a1a92b94e97b2812f4dece97d4a694725e"
+		},
+		{
+			"output": "original/en/doyle_adventures_of_sherlock_holmes.txt",
+			"gutenberg_id": 1661,
+			"sha256": "922e2a12ccb43a4c9544c260b2166c6ad2097aeb5957faeee113f173bb857cd0"
+		},
+		{
+			"output": "original/fr/flaubert_madame_bovary.txt",
+			"gutenberg_id": 14155,
+			"sha256": "93f0a2259dbaf5fde6e7b96adc22346d52f80eb1e9319336c8381a045efe40cd"
+		}
+	],
+	"wikisource_texts": [
+		{
+			"output": "original/fr/hemon_maria_chapdelaine.txt",
+			"work": "Maria Chapdelaine",
+			"public_domain": {
+				"author_died": 1913,
+				"published": 1914
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the edition or the work (Q59688419, Q1369094); not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
+			"pages": [
+				{
+					"title": "Maria Chapdelaine/1",
+					"revid": 6316809
+				},
+				{
+					"title": "Maria Chapdelaine/2",
+					"revid": 6316810
+				},
+				{
+					"title": "Maria Chapdelaine/3",
+					"revid": 6316811
+				},
+				{
+					"title": "Maria Chapdelaine/4",
+					"revid": 6316813
+				},
+				{
+					"title": "Maria Chapdelaine/5",
+					"revid": 6316814
+				},
+				{
+					"title": "Maria Chapdelaine/6",
+					"revid": 6316815
+				},
+				{
+					"title": "Maria Chapdelaine/7",
+					"revid": 6316820
+				},
+				{
+					"title": "Maria Chapdelaine/8",
+					"revid": 6316821
+				},
+				{
+					"title": "Maria Chapdelaine/9",
+					"revid": 6316822
+				},
+				{
+					"title": "Maria Chapdelaine/10",
+					"revid": 6316825
+				},
+				{
+					"title": "Maria Chapdelaine/11",
+					"revid": 6316826
+				},
+				{
+					"title": "Maria Chapdelaine/12",
+					"revid": 6316827
+				},
+				{
+					"title": "Maria Chapdelaine/13",
+					"revid": 6316829
+				},
+				{
+					"title": "Maria Chapdelaine/14",
+					"revid": 6316830
+				},
+				{
+					"title": "Maria Chapdelaine/15",
+					"revid": 6316831
+				},
+				{
+					"title": "Maria Chapdelaine/16",
+					"revid": 6316835
+				}
+			],
+			"sha256": "35723e4d27a1b11dbd72f3c170a59d9044d68b7e3f323c71bf0ef464e1c96892"
+		},
+		{
+			"output": "original/fr/renard_poil_de_carotte.txt",
+			"work": "Poil de Carotte",
+			"public_domain": {
+				"author_died": 1910,
+				"published": 1894
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the edition or the work (Q131840645, Q128918); not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
+			"pages": [
+				{
+					"title": "Poil de Carotte/01",
+					"revid": 14865048
+				},
+				{
+					"title": "Poil de Carotte/02",
+					"revid": 14865049
+				},
+				{
+					"title": "Poil de Carotte/03",
+					"revid": 5672369
+				},
+				{
+					"title": "Poil de Carotte/04",
+					"revid": 5672370
+				},
+				{
+					"title": "Poil de Carotte/05",
+					"revid": 5672371
+				},
+				{
+					"title": "Poil de Carotte/06",
+					"revid": 5672372
+				},
+				{
+					"title": "Poil de Carotte/07",
+					"revid": 12002345
+				},
+				{
+					"title": "Poil de Carotte/08",
+					"revid": 5672374
+				},
+				{
+					"title": "Poil de Carotte/09",
+					"revid": 5672375
+				},
+				{
+					"title": "Poil de Carotte/10",
+					"revid": 5672376
+				},
+				{
+					"title": "Poil de Carotte/11",
+					"revid": 5672377
+				},
+				{
+					"title": "Poil de Carotte/12",
+					"revid": 5672378
+				},
+				{
+					"title": "Poil de Carotte/13",
+					"revid": 5672379
+				},
+				{
+					"title": "Poil de Carotte/14",
+					"revid": 5672380
+				},
+				{
+					"title": "Poil de Carotte/15",
+					"revid": 5672381
+				},
+				{
+					"title": "Poil de Carotte/16",
+					"revid": 5672382
+				},
+				{
+					"title": "Poil de Carotte/17",
+					"revid": 5672383
+				},
+				{
+					"title": "Poil de Carotte/18",
+					"revid": 5672384
+				},
+				{
+					"title": "Poil de Carotte/19",
+					"revid": 5672385
+				},
+				{
+					"title": "Poil de Carotte/20",
+					"revid": 5672386
+				},
+				{
+					"title": "Poil de Carotte/21",
+					"revid": 5672387
+				},
+				{
+					"title": "Poil de Carotte/22",
+					"revid": 5672388
+				},
+				{
+					"title": "Poil de Carotte/23",
+					"revid": 5672389
+				},
+				{
+					"title": "Poil de Carotte/24",
+					"revid": 5672390
+				},
+				{
+					"title": "Poil de Carotte/25",
+					"revid": 5672391
+				},
+				{
+					"title": "Poil de Carotte/26",
+					"revid": 5672392
+				},
+				{
+					"title": "Poil de Carotte/27",
+					"revid": 10886799
+				},
+				{
+					"title": "Poil de Carotte/28",
+					"revid": 5672394
+				},
+				{
+					"title": "Poil de Carotte/29",
+					"revid": 5672395
+				},
+				{
+					"title": "Poil de Carotte/30",
+					"revid": 5672396
+				},
+				{
+					"title": "Poil de Carotte/31",
+					"revid": 5672397
+				},
+				{
+					"title": "Poil de Carotte/32",
+					"revid": 5672398
+				},
+				{
+					"title": "Poil de Carotte/33",
+					"revid": 14621499
+				},
+				{
+					"title": "Poil de Carotte/34",
+					"revid": 5672400
+				},
+				{
+					"title": "Poil de Carotte/35",
+					"revid": 5672401
+				},
+				{
+					"title": "Poil de Carotte/36",
+					"revid": 5672402
+				},
+				{
+					"title": "Poil de Carotte/37",
+					"revid": 5672403
+				},
+				{
+					"title": "Poil de Carotte/38",
+					"revid": 5672404
+				},
+				{
+					"title": "Poil de Carotte/39",
+					"revid": 5672405
+				},
+				{
+					"title": "Poil de Carotte/40",
+					"revid": 5672406
+				},
+				{
+					"title": "Poil de Carotte/41",
+					"revid": 5672407
+				},
+				{
+					"title": "Poil de Carotte/42",
+					"revid": 5672408
+				},
+				{
+					"title": "Poil de Carotte/43",
+					"revid": 5672409
+				},
+				{
+					"title": "Poil de Carotte/44",
+					"revid": 5672410
+				},
+				{
+					"title": "Poil de Carotte/45",
+					"revid": 5672411
+				},
+				{
+					"title": "Poil de Carotte/46",
+					"revid": 5672412
+				},
+				{
+					"title": "Poil de Carotte/47",
+					"revid": 5672413
+				},
+				{
+					"title": "Poil de Carotte/48",
+					"revid": 10019839
+				},
+				{
+					"title": "Poil de Carotte/49",
+					"revid": 5672415
+				}
+			],
+			"sha256": "32ed85f37d5893f87192c422c7d898b8c22ba03bbae282ff050578d276b36e8b"
+		},
+		{
+			"output": "original/fr/philippe_bubu_de_montparnasse.txt",
+			"work": "Bubu de Montparnasse",
+			"public_domain": {
+				"author_died": 1909,
+				"published": 1901
+			},
+			"gutenberg_absent": {
+				"checked_on": "2026-11-21",
+				"evidence": "Wikidata records no Project Gutenberg ebook ID (P2034) for the work; not among the Project Gutenberg corpora; gutenberg.org answered HTTP 503"
+			},
+			"pages": [
+				{
+					"title": "Bubu de Montparnasse/Texte entier",
+					"revid": 14177577
+				}
+			],
+			"sha256": "385ecce868eca7835620bb9feff2117ea6b127c69596b0c79c9629b857b4fab4"
+		}
+	]
+}

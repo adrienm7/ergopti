@@ -18,8 +18,8 @@ local M = {}
 
 local hs         = hs
 local pasteboard = hs.pasteboard
-local Clipboard  = require("adapters.clipboard")
-local ClipboardBorrowers = require("infra.clipboard_borrowers")
+local Clipboard  = require("clipboard.adapters.clipboard")
+local ClipboardBorrowers = require("clipboard.borrowers")
 local JsonCodec  = require("core.fs.adapters.json_codec")
 local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
@@ -278,6 +278,16 @@ end
 --- @param ... any Native arguments, preserving the void clear arity.
 --- @return boolean ok
 --- @return any result
+--- Writes a payload this owner restores after its paste, marked transient so
+--- clipboard managers leave it out of their history.
+--- @param text string Payload.
+--- @return boolean written The native setContents result.
+local function set_transient_contents(text)
+	local written = pasteboard.setContents(text)
+	if written == true then Clipboard.mark_transient() end
+	return written
+end
+
 local function mutate_owned_clipboard(owner, mutation, ...)
 	local ok, result = pcall(mutation, ...)
 	owner.clipboard_count = text_clipboard_count()
@@ -1128,7 +1138,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty, conti
 			-- The earlier asynchronous Cmd+C has no observable writer identity.
 			-- This receipt starts only with the payload mutation made by this owner.
 			owner.clipboard_guarded = true
-			local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, transformed)
+			local ok, result = mutate_owned_clipboard(owner, set_transient_contents, transformed)
 			if not ok then error(result, 0) end
 			return result
 		end)
@@ -1388,7 +1398,7 @@ function M.paste_as_plain_text(parent)
 		-- Snapshot or timer acquisition alone does not own a clipboard mutation.
 		admit_initial_clipboard_mutation(owner, initial_count)
 		owner.clipboard_owned = true
-		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, plain or "")
+		local ok, result = mutate_owned_clipboard(owner, set_transient_contents, plain or "")
 		if not ok then error(result, 0) end
 		return result
 	end)
@@ -2291,7 +2301,7 @@ function M.wrap_selection(sel, left, right, parent)
 		transaction.mutated = true
 		owner.clipboard_owned = true
 		owner.clipboard_guarded = true
-		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, left .. sel .. right)
+		local ok, result = mutate_owned_clipboard(owner, set_transient_contents, left .. sel .. right)
 		if not ok then error(result, 0) end
 		return result
 	end)

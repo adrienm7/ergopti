@@ -1,0 +1,46 @@
+{
+	"_comment": "Expired-winner vectors (maintainer decision HCD-1, 2026-11-21): the matcher picks its winner first, by length then priority, and only then asks that winner's expansion delay. An expired winner fires nothing: no shorter or lower rule whose delay still allows it fires in its place, on the three OS (only the magic key's repeat fallback remains). Each mapping carries its own delay in seconds; `typed` gives each key-down in milliseconds on one clock, the last key being the expander (the end character, or the trigger's own last character for an auto mapping); the reference is the key before it, as in time_gate_vectors.json. `expected.winner` is the trigger the matcher picks and `expected.fires` the trigger that fires, null for none. Replayed by the shared engine (linux/tests/unit/hotstrings/engine/engine/test_shared_hotstring_engine.lua), Windows (tests/unit/hotstrings/engine/engine/test_expired_winner_vectors.ahk) and macOS (tests/unit/hotstrings/engine/expander/test_expired_winner_vectors.lua).",
+	"vectors": [
+		{
+			"id": "expired_end_winner_masks_a_shorter_rule",
+			"mappings": [
+				{ "trigger": "xab", "replacement": "LONG", "delay_s": 0.2 },
+				{ "trigger": "ab", "replacement": "SHORT", "delay_s": 2.0 }
+			],
+			"typed": [
+				{ "char": "x", "down_ms": 0 },
+				{ "char": "a", "down_ms": 50 },
+				{ "char": "b", "down_ms": 100 },
+				{ "char": " ", "down_ms": 600 }
+			],
+			"expected": { "winner": "xab", "fires": null }
+		},
+		{
+			"id": "end_winner_within_its_delay_fires",
+			"mappings": [
+				{ "trigger": "xab", "replacement": "LONG", "delay_s": 0.2 },
+				{ "trigger": "ab", "replacement": "SHORT", "delay_s": 2.0 }
+			],
+			"typed": [
+				{ "char": "x", "down_ms": 0 },
+				{ "char": "a", "down_ms": 50 },
+				{ "char": "b", "down_ms": 100 },
+				{ "char": " ", "down_ms": 200 }
+			],
+			"expected": { "winner": "xab", "fires": "xab" }
+		},
+		{
+			"id": "expired_auto_winner_masks_a_shorter_rule",
+			"mappings": [
+				{ "trigger": "xyz", "replacement": "LONG", "delay_s": 0.2, "auto_expand": true },
+				{ "trigger": "yz", "replacement": "SHORT", "delay_s": 2.0, "auto_expand": true }
+			],
+			"typed": [
+				{ "char": "x", "down_ms": 0 },
+				{ "char": "y", "down_ms": 50 },
+				{ "char": "z", "down_ms": 700 }
+			],
+			"expected": { "winner": "xyz", "fires": null }
+		}
+	]
+}

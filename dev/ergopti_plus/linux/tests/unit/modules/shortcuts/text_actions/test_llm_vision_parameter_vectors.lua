@@ -50,9 +50,9 @@ local function deep_equal(a, b, where)
 	return true
 end
 
-local Gestures = helpers.load_module("modules.gestures.manager")
+local Gestures = helpers.load_module("gestures.engine.manager")
 local Vision = require("ai.engine.prediction.vision")
-local VisionRequest = require("modules.llm.vision_request")
+local VisionRequest = require("ai.engine.prediction.vision_request")
 
 helpers.describe("llm_vision parameter replays the shared vision corpus", function()
 	local corpus = read_json("tests/corpus/llm/vision_vectors.json")

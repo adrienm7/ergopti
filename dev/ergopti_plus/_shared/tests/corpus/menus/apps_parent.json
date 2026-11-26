@@ -6,7 +6,7 @@
 		"id": "apps",
 		"i18n": "menu.apps.title",
 		"rows": [],
-		"greyed_when_paused": true,
+		"boot_deferred": true,
 		"platforms": ["ahk", "hs", "linux"]
 	},
 	"platform_presence": {

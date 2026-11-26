@@ -11,8 +11,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local function with_geometry(callback)
-	helpers.with_stub_scope({ "platform.input.keyboard_geometry", "modules.shortcuts.tap_keys",
-		"modules.keymap.magic_key_source" }, function()
+	helpers.with_stub_scope({ "platform.input.keyboard_geometry", "modules.shortcuts.tap_keys" }, function()
 		local getenv = os.getenv
 		os.getenv = function(key)
 			if key ~= "ERGOPTI_KEYBOARD_GEOMETRY_V1" then return getenv(key) end
@@ -74,27 +73,6 @@ helpers.describe("per-event physical keyboard geometry (ansi-iso-position)", fun
 			helpers.assert_eq(TapKeys.decide(10, 41), "screen_capture", "bare ISO keyboard")
 			helpers.assert_eq(TapKeys.decide(50, 40), "screen_capture", "bare ANSI keyboard")
 			helpers.assert_nil(TapKeys.decide(50, 41), "bare ISO keyboard: extra key")
-		end)
-	end)
-
-	helpers.it("Backquote and IntlBackslash remap only their own physical key", function()
-		with_geometry(function()
-			local Source = require("modules.keymap.magic_key_source")
-			local on = function() return true end
-			for _, case in ipairs({
-				{ "Backquote", 41, 50, false }, { "Backquote", 41, 10, true },
-				{ "Backquote", 40, 50, true }, { "Backquote", 40, 10, false },
-				{ "IntlBackslash", 41, 10, false }, { "IntlBackslash", 41, 50, true },
-				{ "IntlBackslash", 40, 10, true }, { "IntlBackslash", 40, 50, false },
-			}) do
-				Source.set(case[1])
-				helpers.assert_eq(Source.remaps(case[3], {}, on, case[2]), case[4],
-					case[1] .. ", keyboard model " .. case[2] .. ", virtual code " .. case[3])
-			end
-			Source.set("Backquote")
-			helpers.assert_eq(Source.remaps(50, {}, on), false, "missing geometry")
-			Source.set("KeyJ")
-			helpers.assert_true(Source.remaps(38, {}, on), "unambiguous keys need no geometry")
 		end)
 	end)
 end)

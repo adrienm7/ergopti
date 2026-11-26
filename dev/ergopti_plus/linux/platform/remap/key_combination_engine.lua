@@ -291,10 +291,12 @@ local function revoke_event(code, source)
 			configured.generation = generation
 			policy = Policy.new(configured)
 		end
+		-- A first key held on another keyboard is available (KCD-7): only a key
+		-- no source holds, or one still undecided, is not.
 		local unavailable = {}
 		for id, first_code in pairs(Engine.KEY_CODES) do
 			local state = base.held[first_code]
-			unavailable[id] = presses[first_code] ~= source or state and state.undecided == true
+			unavailable[id] = presses[first_code] == nil or state and state.undecided == true
 		end
 		local result = policy.process({ key = ids[code] or tostring(code), value = value, at_ms = at_ms,
 			physical = true, source = source, generation = generation, revision = options.revision, blocked_first = unavailable })
@@ -564,7 +566,9 @@ local function revoke_event(code, source)
 			if not physical(receipt) or receipt.generation~=first.receipt.generation or not pending_current(first,false) then
 				return withdraw(code,type(receipt)=="table" and receipt.source or "")
 			end
-			local selection = value==1 and receipt.source==first.receipt.source and receiver_current(first.token,true)
+			-- The second key may come from another keyboard (KCD-7); each key keeps
+			-- its own source receipt, and the frame runs on the first key's.
+			local selection = value==1 and receiver_current(first.token,true)
 				and choose(ids[first.code],ids[code],at_ms-first.at_ms) or nil
 			if selection then
 				local second=capture_original(code,at_ms)
@@ -572,7 +576,7 @@ local function revoke_event(code, source)
 				if second and guard and guard()==true and pending_current(first,true) and receiver_current(second,true) then
 					waiting=nil
 					local state={first=first,second=second,down={[first.code]=true,[code]=true}}
-					chords[receipt.source.."\0"..first.code],chords[receipt.source.."\0"..code]=state,state
+					chords[first.receipt.source.."\0"..first.code],chords[receipt.source.."\0"..code]=state,state
 					local owned_guard=function()
 						return guard()==true and pending_current(first,false) and receiver_current(second,false)
 					end

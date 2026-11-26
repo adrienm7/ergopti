@@ -40,11 +40,11 @@ local function scoped_remap(fixture)
 		disk.expected[#disk.expected + 1] = expected or false
 		return save(state, path, overwrite, expected)
 	end
-	package.loaded["infra.config_paths"].get = function(key)
+	package.loaded["settings.engine.paths"].get = function(key)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return "/remap/tap_hold.toml"
 	end
-	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
+	package.loaded["settings.engine.paths"].get_config_dir = function() return CONFIG_DIR end
 	local files = require("core.fs.adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil
@@ -123,9 +123,9 @@ local function assert_layer_removal(disk)
 end
 
 local function with_wheel_owner(body)
-	helpers.with_fresh_modules({ "modules.shortcuts.bindings" }, function()
+	helpers.with_fresh_modules({ "modules.shortcuts.layer_wheel" }, function()
 		local owner = { reconciles = 0 }
-		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()
+		package.loaded["modules.shortcuts.layer_wheel"] = { reconcile = function()
 			owner.reconciles = owner.reconciles + 1
 			return true
 		end }
@@ -181,7 +181,7 @@ local function global_cohort(remap, refuse)
 	local observed = { deferred = {}, refreshes = {} }
 	local late = { apply = function() return not refuse end, revert = function() return true end,
 		release = function() end, pending = function() return false end, retry_restore = function() return true end }
-	local global = require("ui.menu.global_scope").new({
+	local global = require("menu.ui.transactions.global_scope").new({
 		owners = { llm = function() return late end }, remap = remap,
 		backup_path = function(scope) return "/remap/global-cohort-" .. scope end,
 		defer = function(fn) observed.deferred[#observed.deferred + 1] = fn; return true end,

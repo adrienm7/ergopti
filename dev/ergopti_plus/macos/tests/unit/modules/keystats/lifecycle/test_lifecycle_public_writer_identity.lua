@@ -4,11 +4,11 @@
 local helpers=require("tests.helpers")
 local Fixture=require("tests.support.keystats_provenance_fixture")
 local OWNERS = {
-	"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "infra.manifest_reader", "infra.config_paths",
+	"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "menu.engine.manifest_reader", "settings.engine.paths",
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
+	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "diagnostics.adapters.event_provenance", "core.process.adapters.lifecycle",
 	"platform.input.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",

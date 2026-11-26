@@ -71,7 +71,7 @@ KeymapLayers_LoadContext(SharedDir) {
 	RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
 	; FileRead throws on a missing or locked file, which is the answer we want
 	; for shipped data.
-	Registry := JsonParse(FSReadStrict(RegistryPath))
+	Registry := JsonParseShared(RegistryPath, FSReadStrict(RegistryPath))
 	return KeymapLayers_NewContext(Registry, _KL_ReadVocabulary(Root))
 }
 

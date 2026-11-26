@@ -135,7 +135,7 @@ local function load_karabiner(paused)
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function() return true end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 
 	package.loaded["platform.remap"] = nil
 	-- load_with_stubs replaces hs.keycodes wholesale, so the override must carry its

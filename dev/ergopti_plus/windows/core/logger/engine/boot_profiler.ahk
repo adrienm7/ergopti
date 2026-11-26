@@ -21,6 +21,7 @@
 
 global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
 global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
+global _BOOT_PROFILE_BEGUN  := false  ; True once BootProfile_Begin ran: the boot has a single owner
 
 
 
@@ -31,10 +32,15 @@ global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
 ; ============================================
 ; ============================================
 
-; Start (or restart) the boot timer. Call once, as early as the logger is
-; ready, so subsequent marks measure deltas from a known origin.
+; Start the boot timer. Call once, as early as the logger is ready, so
+; subsequent marks measure deltas from a known origin. A second call throws, as
+; on macOS and Linux: restarting the clock would silently drop every phase
+; measured so far and misreport the boot total.
 BootProfile_Begin() {
-	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START, _BOOT_PROFILE_BEGUN
+	if _BOOT_PROFILE_BEGUN
+		throw Error("BootProfile_Begin() called twice — boot has a single owner.")
+	_BOOT_PROFILE_BEGUN := true
 	_BOOT_PROFILE_START := A_TickCount
 	_BOOT_PROFILE_LAST  := _BOOT_PROFILE_START
 	try LoggerInfo("BootProfile", "Boot timing started.")
@@ -49,6 +55,17 @@ BootProfile_Begin() {
 				"Pre-logger initialization (including script parse + load): ~{1} ms.", Uptime)
 		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
 	}
+}
+
+; Forget the boot origin and completion so a test can begin and complete the
+; boot again. Test seam
+; only: the driver itself never resets its single boot owner.
+_BootProfileResetForTest() {
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START, _BOOT_PROFILE_BEGUN
+	_BOOT_PROFILE_BEGUN := false
+	_BOOT_PROFILE_START := 0
+	_BOOT_PROFILE_LAST  := 0
+	_BootProfileCompletedStore("reset")
 }
 
 ; Record a phase boundary that happens BEFORE the logger is usable.
@@ -203,13 +220,27 @@ BootProfile_TotalBootMs() {
 }
 
 ; The boot total frozen when the boot ended: TotalBootMs keeps growing with the
-; process, so a check run later must read this one. -1 until the boot ended.
+; process, so a check run later must read this one. -1 until the boot ended. A
+; second recording throws, as macOS and Linux refuse a second complete(): the
+; boot completes once, and a later total would replace the one already logged.
 ; @param {Integer} Completed The total to record, or -1 to only read it.
 ; @returns {Integer}
 BootProfile_CompletedBootMs(Completed := -1) {
+	return _BootProfileCompletedStore(Completed >= 0 ? "record" : "read", Completed)
+}
+
+; Storage for the completed boot total, a function static like the stamp store.
+; @param {String} Op "record", "read" or "reset" (the test seam).
+; @param {Integer} Completed The total, for "record".
+; @returns {Integer} The recorded total, -1 when none.
+_BootProfileCompletedStore(Op, Completed := -1) {
 	static Recorded := -1
-	if Completed >= 0
+	if (Op == "record") {
+		if (Recorded >= 0)
+			throw Error("BootProfile_CompletedBootMs() recorded twice — boot completes once.")
 		Recorded := Completed
+	} else if (Op == "reset")
+		Recorded := -1
 	return Recorded
 }
 

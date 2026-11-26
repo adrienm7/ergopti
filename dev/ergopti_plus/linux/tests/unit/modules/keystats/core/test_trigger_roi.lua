@@ -105,7 +105,7 @@ Home.it("Linux trigger ROI: native candidates respect context, edits, privacy an
 end)
 
 helpers.it("Linux trigger ROI: the real engine excludes strict Unicode triggers only after catalogue admission", function()
-	local engine = require("modules.hotstrings.engine").new()
+	local engine = require("hotstrings.engine.engine").new()
 	helpers.assert_nil(engine:is_known_trigger("école"))
 	helpers.assert_true(engine:load_mappings({ { trigger = "ÉCOLE", replacement = "class", is_case_sensitive_strict = true } }))
 	helpers.assert_true(engine:is_known_trigger("école"))
@@ -210,7 +210,7 @@ end)
 Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and interrupted physical fragments", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local engine = require("modules.hotstrings.engine").new()
+		local engine = require("hotstrings.engine.engine").new()
 		assert(engine:load_mappings({ { trigger = "KNOWN", replacement = "expansion", is_case_sensitive_strict = true } }))
 		local stop, matched = {}, 0
 		engine.on_char = function() matched = matched + 1; error(stop) end
@@ -220,13 +220,17 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return paused end },
 			secure_focus_guard = { blocks_text = function() return not admitted end,
+				text_automation = function()
+					if admitted then return true, "field", "field_admitted" end
+					return false, "closed", "password_field"
+				end,
 				capture_text_owner = function() return {} end, current_context = context,
 				invalidate = collector.discard_roi },
 			TapHold = { observe_copy_activity = function() end },
 			wrap_on_type = { on_pointer_down = function() end }, Logger = { debug = function() end },
 			keyboard_hook = { held_modifiers = function() return {} end },
 			Monotonic = require("core.logger.engine.monotonic"),
-			WordReset = { observe_key = function() return false end, cascade_max_arrows = function() return 0 end,
+			WordReset = { observe_key = function() return false end, backspace_restore_enabled = function() return false end, cascade_max_arrows = function() return 0 end,
 				click_resets_word = function() return false end },
 			terminators_mod = { is_terminator = function() return false end },
 		}, { __index = _G })
@@ -558,7 +562,7 @@ end)
 
 helpers.it("Linux trigger ROI: real canonical file transitions reject malformed encryption without input reparsing", function()
 	Home.run(function()
-		local path = require("infra.config_paths").config("config.toml")
+		local path = require("settings.engine.paths").config("config.toml")
 		local shell = require("core.process.adapters.shell_runner")
 		assert(shell.run("mkdir -p " .. shell.quote(path:match("^(.*)/[^/]+$"))))
 		local function write(source)

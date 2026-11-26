@@ -266,6 +266,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				Content := SubStr(Content, 2)
 		if (Content = "")
 				return Sections
+		_TOML_ParseRepeatNote("flat", Content)
 
 		Section     := ""
 		PendingKey  := ""   ; key whose value spans multiple lines

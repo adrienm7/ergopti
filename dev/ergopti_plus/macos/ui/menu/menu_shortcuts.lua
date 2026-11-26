@@ -14,7 +14,7 @@
 
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 local hs = hs
 local Logger        = require("core.logger.engine.logger")
 local PhaseStats    = require("infra.phase_stats")
@@ -24,26 +24,20 @@ local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
-local MenuUtils     = require("ui.menu.menu_utils")
-local ManifestMenu  = require("infra.manifest_menu")
+local MenuUtils     = require("menu.ui.builder.utils")
+local ManifestMenu  = require("menu.engine.manifest_menu")
 local WrapMutation  = require("menu.engine.wrap_mutation")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ActionPicker  = require("ui.action_picker")
 local TapKeysMenu   = require("ui.menu.menu_tap_keys")
-local ManifestReader = require("infra.manifest_reader")
 local TextUtils = require("core.text.engine.utils_core")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("core.lifecycle.engine.compat.utf8")
 local LOG           = "menu_shortcuts"
--- The label of each script chord slot: this driver's AltGr is the right
--- Option key.
-local SCRIPT_CHORD_LABELS = {
-	script_altgr_enter     = "sg_labels.script_ropt_return",
-	script_altgr_backspace = "sg_labels.script_ropt_backspace",
-	script_altgr_delete    = "sg_labels.script_ropt_delete",
-	script_altgr_escape    = "sg_labels.script_ropt_escape",
-}
+-- The label of each script chord slot (this driver's AltGr is the right
+-- Option key), the same one the tray shows beside Suspend, Reload and Quit.
+local ScriptChordLabels = require("menu.ui.script_chord_labels")
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}
@@ -97,7 +91,6 @@ local function pretty_key(id, state)
 	if #parts == 0 then return id end
 
 	local key = parts[#parts]
-	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR) end
 	if key == "period"   then key = "." end
 	if key == "quote"    then key = "'" end
 	if key == "capslock" then key = "CapsLock" end
@@ -574,7 +567,6 @@ function M.build(ctx)
 	-- (Tap-Holds › Edit the layer) and never listed here.
 	local wrap_item = nil
 	local ctrl_items = {}
-	local cmd_items  = {}
 
 	if type(shortcuts.list_shortcuts) == "function" then
 		local ok, list = pcall(shortcuts.list_shortcuts)
@@ -584,8 +576,6 @@ function M.build(ctx)
 					local mi = make_shortcut_item(s, shortcuts, ctx)
 					if s.id == require("settings.engine.keys").LEAF.WRAP_TEXT_IF_SELECTED then
 						wrap_item = mi
-					elseif s.id:sub(1, 4) == "cmd_" then
-						table.insert(cmd_items, mi)
 					end
 				end
 			end
@@ -739,7 +729,7 @@ function M.build(ctx)
 				local rows = {}
 				for _, slot in ipairs(script_control.script_chord_slots()) do
 					local current = state.script_control_shortcuts[slot.id] or "none"
-					local slot_label = i18n.get(SCRIPT_CHORD_LABELS[slot.id])
+					local slot_label = ScriptChordLabels.label(slot.id)
 					-- A setting: it runs while paused and takes effect on resume, so the
 					-- chord that resumes stays the one active at pause time (EDD-1, the
 					-- maintainer's decision of 2026-11-14; script_control defers it).
@@ -900,14 +890,13 @@ function M.build(ctx)
 			return rows
 		end,
 		keyboard_slots = function(_ctx)
-			-- The built-in Ctrl and Cmd shortcuts open the group of their own
-			-- modifier: as groups of their own they drew a second "Ctrl" and
-			-- "Cmd" submenu beside the configurable one.
+			-- The ChatGPT URL editor opens the Ctrl group: as a group of its own it
+			-- drew a second "Ctrl" submenu beside the configurable one. No named
+			-- Cmd shortcut remains since Cmd+★ → Cmd+S left (2026-11-21).
 			-- Editable while paused: the slots are unbound during a pause and an
 			-- edit is bound when resume starts them again (EDD-1).
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or nil, {
 				secondary_ = ctrl_items,
-				primary_   = cmd_items,
 			})
 		end,
 		-- The number-row tap keys, named by what each types under the current
@@ -929,6 +918,18 @@ function M.build(ctx)
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUTS_TOGGLE] = toggle_shortcuts
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_SHORTCUTS] = cmd_edit_shortcuts
+	-- The scope's restore and clear: the shortcut preferences and the key
+	-- combinations Karabiner applies, as one composition. A pause does not
+	-- refuse them: a pause stops typing, not configuration (EDD-1).
+	for command, mode in pairs({
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = "recommended",
+		[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = "clear",
+	}) do
+		sc_ctx.commands[command] = function()
+			if type(ctx.apply_shortcuts_scope) ~= "function" then return false end
+			return ctx.apply_shortcuts_scope(mode) == true
+		end
+	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.engine.physical_editor_menu").new({
@@ -943,6 +944,10 @@ function M.build(ctx)
 		end,
 	})
 	sc_ctx.commands[require("settings.engine.keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
+	-- The user's workflows open in their shared window (ui/menu/menu_user_workflows).
+	sc_ctx.commands[require("settings.engine.keys").COMMAND.USER_WORKFLOWS_EDITOR] = function()
+		return require("ui.menu.menu_user_workflows").open()
+	end
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	-- The editor's honest cause while physical delivery is unqualified.
 	sc_ctx.state_getters["physical_shortcuts_delivery_unqualified"] = function()
@@ -956,8 +961,8 @@ function M.build(ctx)
 	-- Ticks the « Combinaisons de touches » title while its own switch is on.
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
 		local karabiner = ctx.karabiner
-		return type(karabiner) == "table" and type(karabiner.get_mod_combos_enabled) == "function"
-			and karabiner.get_mod_combos_enabled() == true
+		return type(karabiner) == "table" and type(karabiner.get_key_combinations_enabled) == "function"
+			and karabiner.get_key_combinations_enabled() == true
 	end
 
 	-- Each stage is a named phase, as the keyboard layout row's are: one rebuild

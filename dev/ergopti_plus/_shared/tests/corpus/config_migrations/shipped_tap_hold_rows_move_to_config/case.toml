@@ -5,4 +5,4 @@ description = "macOS and Linux kept the tap-hold switch, the one-shot and lone-t
 drivers = ["hs", "linux"]
 outcome = "migrated"
 from_version = 21
-to_version = 22
+to_version = 24

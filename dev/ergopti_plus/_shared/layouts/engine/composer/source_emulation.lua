@@ -4,9 +4,10 @@
 --- MODULE: Layout Source Emulation (Shared)
 --- DESCRIPTION:
 --- Performs the records of an Ergopti layout source that no .keylayout holds:
---- custom modifiers (held or locked) and the layers they select, key-chord
---- mappings, shortcuts sending another key, tap-holds and remaps of system
---- keys. It reads the emulation table the one source compiler writes
+--- custom modifiers (held or locked, Caps Lock and AltGr included) and the
+--- layers they select, key-chord mappings, shortcuts sending another key,
+--- tap-holds, remaps of system keys and the dead keys of an emulated layer.
+--- It reads the emulation table the one source compiler writes
 --- (_shared/ui/layout_composer/source_compiler.js, compileEmulation) and runs
 --- on top of the keylayout emulation (layouts/engine/composer/keylayout_emulation.lua): a press
 --- it leaves alone goes on to that engine or to the OS. macOS and Linux run it;
@@ -28,6 +29,11 @@
 ---    keystroke is held back or reordered.
 --- 4. Fail fast: a table of another format or version, or one naming an
 ---    undeclared layer or modifier, raises at compile time, never on a key.
+--- 5. A dead key of an emulated layer composes with the next key, native layers
+---    included (the table's compose_keys), as TN2056 does: a rule's text or
+---    next dead key, else the terminator before the key. Its auto-repeat and
+---    release type nothing. While AltGr holds a custom modifier, the AltGr the
+---    driver reports (alt_right) is that key's, never a level of its own.
 --- ==============================================================================
 
 local TableUtil = require("core.text.engine.table_util")
@@ -40,6 +46,9 @@ M.VERSION = 1
 M.REPORTED = { "shift", "control", "alt", "alt_right", "meta", "caps_lock" }
 local REPORTED = {}
 for _, id in ipairs(M.REPORTED) do REPORTED[id] = true end
+
+-- The key whose AltGr the driver reports as alt_right.
+local ALTGR_KEY = "AltRight"
 
 
 
@@ -105,10 +114,23 @@ end
 -- ===============================
 -- ===============================
 
---- Checks one mapping of the table and copies it.
-local function mapping_of(value, where)
+--- Checks one mapping of the table and copies it. A dead key must be one of the
+--- table's; a text's compose identity, when it differs from the text, is kept.
+--- A repeat key reaches one or two characters back; a magic key names one of
+--- the table's magic tables (none given: no magic key is admitted).
+local function mapping_of(value, where, dead_keys, magic)
 	if type(value) ~= "table" then error("The emulation table holds a malformed mapping at " .. where .. ".") end
-	if type(value.text) == "string" then return { text = value.text } end
+	if value["repeat"] == 1 or value["repeat"] == 2 then return { ["repeat"] = value["repeat"] } end
+	if type(value.magic) == "string" and magic ~= nil and magic[value.magic] ~= nil then
+		return { magic = value.magic }
+	end
+	if type(value.text) == "string" then
+		if value.compose == nil then return { text = value.text } end
+		if type(value.compose) ~= "string" then
+			error("The emulation table holds a malformed mapping at " .. where .. ".")
+		end
+		return { text = value.text, compose = value.compose }
+	end
 	if type(value.key) == "string" then
 		local modifiers = {}
 		for _, id in ipairs(type(value.modifiers) == "table" and value.modifiers or {}) do
@@ -117,7 +139,98 @@ local function mapping_of(value, where)
 		return { key = value.key, modifiers = modifiers }
 	end
 	if value.disabled == true then return { disabled = true } end
+	if type(value.dead_key) == "string" and dead_keys[value.dead_key] ~= nil then
+		return { dead_key = value.dead_key }
+	end
 	error("The emulation table holds a malformed mapping at " .. where .. ".")
+end
+
+--- What a native layer's key answers a pending dead key with: a text, or a
+--- dead key of the .keylayout, named whether the table emulates it or not.
+local function compose_key_of(value, where, dead_keys)
+	if type(value) == "table" and type(value.dead_key) == "string" then return { dead_key = value.dead_key } end
+	local mapping = mapping_of(value, where, dead_keys)
+	if mapping.text == nil then error("The emulation table holds a malformed mapping at " .. where .. ".") end
+	return mapping
+end
+
+--- Checks the table's magic keys' tables: each rule types one text after its
+--- context; the fallback when no rule's context ends the text typed.
+local function magic_of(source)
+	if source == nil then return {} end
+	if type(source) ~= "table" then error("The emulation table holds malformed magic keys.") end
+	local out = {}
+	for id, entry in pairs(source) do
+		if type(entry) ~= "table" or type(entry.rules) ~= "table" or type(entry.fallback) ~= "string" then
+			error("The emulation table holds a malformed magic key at magic." .. tostring(id) .. ".")
+		end
+		local rules = {}
+		for index, rule in ipairs(entry.rules) do
+			if type(rule) ~= "table" or type(rule.after) ~= "string" or rule.after == "" or type(rule.types) ~= "string" then
+				error("The emulation table holds a malformed rule at magic." .. tostring(id) .. ".rules[" .. index .. "].")
+			end
+			rules[#rules + 1] = { after = rule.after, types = rule.types }
+		end
+		out[id] = { rules = rules, fallback = entry.fallback }
+	end
+	return out
+end
+
+-- One UTF-8 code point (the text the drivers pass is valid UTF-8).
+local CODE_POINT = "[%z\1-\127\194-\244][\128-\191]*"
+
+--- What a repeat or magic key types after a text: the character `repeat`
+--- places back, or the rule whose context is the longest end of the text,
+--- else the table's fallback; "" when it types nothing. The definition of
+--- _shared/tests/corpus/layouts/magic_vectors.json, as the web engine and the
+--- Studio's analysis.
+--- @param magic table Magic table id -> { rules = { { after, types } }, fallback }.
+--- @param mapping table { repeat = 1|2 } or { magic = id }.
+--- @param before string The text typed so far (UTF-8).
+--- @return string
+function M.context_text(magic, mapping, before)
+	if mapping["repeat"] ~= nil then
+		local points = {}
+		for point in before:sub(-4 * mapping["repeat"]):gmatch(CODE_POINT) do points[#points + 1] = point end
+		return points[#points - mapping["repeat"] + 1] or ""
+	end
+	local table_ = magic[mapping.magic]
+	local best = nil
+	for _, rule in ipairs(table_.rules) do
+		if before:sub(-#rule.after) == rule.after and (best == nil or #rule.after > #best.after) then best = rule end
+	end
+	if best ~= nil then return best.types end
+	return table_.fallback
+end
+
+--- Checks the table's dead keys: each rule types a text, leads to a dead key, or both.
+local function dead_keys_of(source)
+	if source == nil then return {} end
+	if type(source) ~= "table" then error("The emulation table holds malformed dead keys.") end
+	local function outcomes(rules, where)
+		if type(rules) ~= "table" then error("The emulation table holds a malformed dead key at " .. where .. ".") end
+		local out = {}
+		for input, rule in pairs(rules) do
+			local valid = type(rule) == "table" and (rule.text == nil or type(rule.text) == "string")
+				and (rule.next == nil or (type(rule.next) == "string" and type(source[rule.next]) == "table"))
+				and (rule.text ~= nil or rule.next ~= nil)
+			if not valid then
+				error("The emulation table holds a malformed dead key at " .. where .. "." .. tostring(input) .. ".")
+			end
+			out[input] = { text = rule.text, next = rule.next }
+		end
+		return out
+	end
+	local dead_keys = {}
+	for id, dead in pairs(source) do
+		local where = "dead_keys." .. tostring(id)
+		if type(id) ~= "string" or type(dead) ~= "table" or type(dead.terminator) ~= "string" then
+			error("The emulation table holds a malformed dead key at " .. where .. ".")
+		end
+		dead_keys[id] = { terminator = dead.terminator, inputs = outcomes(dead.inputs, where .. ".inputs"),
+			dead_inputs = outcomes(dead.dead_inputs, where .. ".dead_inputs") }
+	end
+	return dead_keys
 end
 
 --- Copies an array of modifier ids, refusing an undeclared one.
@@ -141,7 +254,8 @@ function M.compile(table_)
 		error("The layout emulation table is not an " .. M.FORMAT .. " version " .. M.VERSION .. " table.")
 	end
 	local model = { layout = table_.layout, modifier_keys = {}, custom = {}, layers = {}, layer_by_id = {},
-		shortcuts = {}, tap_holds = {}, remaps = {} }
+		shortcuts = {}, tap_holds = {}, remaps = {}, dead_keys = dead_keys_of(table_.dead_keys),
+		magic = magic_of(table_.magic) }
 	for _, modifier in ipairs(table_.modifiers or {}) do
 		if type(modifier.id) ~= "string" or (modifier.mode ~= "held" and modifier.mode ~= "locked") then
 			error("The emulation table holds a malformed custom modifier.")
@@ -168,9 +282,18 @@ function M.compile(table_)
 				optional = ids_of(selector.optional, known, where) }
 		end
 		local keys = {}
-		for code, value in pairs(layer.keys) do keys[code] = mapping_of(value, "layers." .. layer.id .. "." .. code) end
+		for code, value in pairs(layer.keys) do
+			keys[code] = mapping_of(value, "layers." .. layer.id .. "." .. code, model.dead_keys, model.magic)
+		end
+		if layer.compose_keys ~= nil and type(layer.compose_keys) ~= "table" then
+			error("The emulation table holds malformed compose keys at layers." .. layer.id .. ".")
+		end
+		local compose_keys = {}
+		for code, value in pairs(layer.compose_keys or {}) do
+			compose_keys[code] = compose_key_of(value, "layers." .. layer.id .. ".compose_keys." .. code, model.dead_keys)
+		end
 		local compiled = { id = layer.id, native = layer.native == true, selectable = layer.selectable ~= false,
-			selectors = selectors, keys = keys }
+			selectors = selectors, keys = keys, compose_keys = compose_keys }
 		model.layers[#model.layers + 1] = compiled
 		model.layer_by_id[layer.id] = compiled
 	end
@@ -207,7 +330,10 @@ function M.compile(table_)
 		if model.tap_holds[entry.key] ~= nil or model.modifier_keys[entry.key] ~= nil then
 			error("The key " .. entry.key .. " has two roles in the emulation table.")
 		end
-		model.tap_holds[entry.key] = { key = entry.key, tap = mapping_of(entry.tap, where .. ".tap"),
+		-- A tap's text is chosen at its release, with no text typed before it to read.
+		local tap = mapping_of(entry.tap, where .. ".tap", model.dead_keys)
+		if tap["repeat"] ~= nil then error("The emulation table holds a malformed mapping at " .. where .. ".tap.") end
+		model.tap_holds[entry.key] = { key = entry.key, tap = tap,
 			hold_layer = entry.hold_layer, hold_modifier = entry.hold_modifier, threshold_ms = threshold }
 	end
 	for _, remap in ipairs(table_.remaps or {}) do
@@ -231,6 +357,15 @@ function M.has_records(model)
 	return false
 end
 
+--- Whether the table holds a custom modifier on a key, so the driver's hook
+--- takes that key (Caps Lock, AltGr) as a plain key instead of its own role.
+--- @param model table
+--- @param code string KeyboardEvent.code.
+--- @return boolean
+function M.holds_modifier_key(model, code)
+	return model.modifier_keys[code] ~= nil
+end
+
 
 
 
@@ -246,31 +381,72 @@ end
 --- @return table session
 function M.new_session(model)
 	if type(model) ~= "table" or type(model.layers) ~= "table" then error("A session needs a compiled table.") end
-	return { model = model, active = {}, held_keys = {}, pending = nil, hold = nil }
+	return { model = model, active = {}, held_keys = {}, pending = nil, hold = nil, dead = nil }
+end
+
+--- Whether the driver reports a built-in modifier held, the AltGr a custom
+--- modifier holds left out.
+local function reports(session, held, id)
+	if type(held) ~= "table" or held[id] ~= true then return false end
+	return id ~= "alt_right" or session.held_keys[ALTGR_KEY] ~= "modifier"
 end
 
 --- The modifier ids held now: the driver's built-ins, then the active customs.
 local function pressed_ids(session, held)
 	local pressed = {}
 	for _, id in ipairs(M.REPORTED) do
-		if type(held) == "table" and held[id] == true then pressed[#pressed + 1] = id end
+		if reports(session, held, id) then pressed[#pressed + 1] = id end
 	end
 	for _, id in ipairs(TableUtil.sorted_keys(session.active)) do pressed[#pressed + 1] = id end
 	return pressed
 end
 
 --- The built-in modifiers a key action keeps from the hand (Caps Lock is a lock).
-local function held_modifiers(held)
+local function held_modifiers(session, held)
 	local out = {}
 	for _, id in ipairs(M.REPORTED) do
-		if id ~= "caps_lock" and type(held) == "table" and held[id] == true then out[#out + 1] = id end
+		if id ~= "caps_lock" and reports(session, held, id) then out[#out + 1] = id end
 	end
 	return out
 end
 
---- The actions of one mapping.
-local function perform(mapping, actions)
-	if mapping.text ~= nil then
+--- The rule of the pending dead key a mapping answers, nil when none.
+local function dead_rule(session, mapping)
+	local dead = session.model.dead_keys[session.dead]
+	if mapping.dead_key ~= nil then return dead.dead_inputs[mapping.dead_key] end
+	if mapping.text == nil then return nil end
+	local identity = mapping.compose or mapping.text
+	if identity == "" then return nil end
+	return dead.inputs[identity]
+end
+
+--- Follows a dead-key rule: its text, then the dead key it leads to.
+local function follow(session, rule, actions)
+	session.dead = rule.next
+	if rule.text ~= nil then actions[#actions + 1] = { type = "text", text = rule.text } end
+end
+
+--- Ends a pending dead key with its terminator.
+local function terminate(session, actions)
+	if session.dead == nil then return end
+	local terminator = session.model.dead_keys[session.dead].terminator
+	session.dead = nil
+	if terminator ~= "" then actions[#actions + 1] = { type = "text", text = terminator } end
+end
+
+--- The actions of one mapping, composing with a pending dead key.
+local function perform(session, mapping, actions)
+	if session.dead ~= nil then
+		local rule = dead_rule(session, mapping)
+		if rule ~= nil then
+			follow(session, rule, actions)
+			return
+		end
+		terminate(session, actions)
+	end
+	if mapping.dead_key ~= nil then
+		session.dead = mapping.dead_key
+	elseif mapping.text ~= nil then
 		actions[#actions + 1] = { type = "text", text = mapping.text }
 	elseif mapping.key ~= nil then
 		local modifiers = {}
@@ -313,7 +489,7 @@ local function settle(session, now, actions)
 	if pending == nil then return end
 	if now - pending.at < pending.entry.threshold_ms then
 		session.pending = nil
-		perform(pending.entry.tap, actions)
+		perform(session, pending.entry.tap, actions)
 	else
 		start_hold(session, actions)
 	end
@@ -356,11 +532,13 @@ end
 --- @param held table Set of the built-in modifier ids the driver reports held
 ---   (shift, control, alt, alt_right, meta) and caps_lock when it is on.
 --- @param now number Milliseconds of the press, on any monotonic clock.
+--- @param before string|nil The text typed so far (the driver's last typed
+---   text), which a repeat or magic key reads; required for such a key.
 --- @return boolean consumed True when the key itself must not reach the OS or
 ---   the keylayout emulation.
 --- @return table actions Ordered { type = "text", text } | { type = "key", key,
 ---   modifiers } | { type = "modifier", id, down }.
-function M.press(session, code, held, now)
+function M.press(session, code, held, now, before)
 	local model = session.model
 	local actions = {}
 	if session.held_keys[code] ~= nil then return true, actions end
@@ -386,6 +564,7 @@ function M.press(session, code, held, now)
 	local pressed = pressed_ids(session, held)
 	local shortcut = shortcut_for(session, code, pressed)
 	if shortcut ~= nil then
+		terminate(session, actions)
 		local modifiers = {}
 		for _, id in ipairs(shortcut.send_modifiers) do modifiers[#modifiers + 1] = id end
 		actions[#actions + 1] = { type = "key", key = shortcut.send_key, modifiers = modifiers }
@@ -393,15 +572,42 @@ function M.press(session, code, held, now)
 	end
 	local remap = model.remaps[code]
 	if remap ~= nil then
-		if remap ~= "" then actions[#actions + 1] = { type = "key", key = remap, modifiers = held_modifiers(held) } end
+		terminate(session, actions)
+		if remap ~= "" then
+			actions[#actions + 1] = { type = "key", key = remap, modifiers = held_modifiers(session, held) }
+		end
 		return true, actions
 	end
 	local layer = selected_layer(session, pressed)
-	if layer == nil then return false, actions end
+	if layer == nil then
+		terminate(session, actions)
+		return false, actions
+	end
 	local mapping = layer.keys[code]
-	if mapping ~= nil then
-		perform(mapping, actions)
+	if mapping ~= nil and (mapping["repeat"] ~= nil or mapping.magic ~= nil) then
+		if type(before) ~= "string" then error("A repeat or magic key needs the text typed before it.") end
+		-- Its text types as a text key would; typing nothing leaves a dead key pending.
+		local text = M.context_text(model.magic, mapping, before)
+		if text ~= "" then perform(session, { text = text }, actions) end
 		return true, actions
+	end
+	if mapping ~= nil then
+		perform(session, mapping, actions)
+		-- A dead key's auto-repeat and release are its own: they type nothing.
+		if mapping.dead_key ~= nil then session.held_keys[code] = "dead" end
+		return true, actions
+	end
+	-- A pending dead key composes with a native layer's key, else ends with its
+	-- terminator and lets the key type as the .keylayout does.
+	if session.dead ~= nil then
+		local native = layer.compose_keys[code]
+		local rule = native ~= nil and dead_rule(session, native) or nil
+		if rule ~= nil then
+			follow(session, rule, actions)
+			if native.dead_key ~= nil then session.held_keys[code] = "dead" end
+			return true, actions
+		end
+		terminate(session, actions)
 	end
 	-- An emulated layer has no keyMap for the OS to fall back on.
 	if not layer.native then return true, actions end
@@ -409,7 +615,7 @@ function M.press(session, code, held, now)
 	-- key goes out with the modifiers of the layer's first selector.
 	if session.hold ~= nil and session.hold.entry.hold_layer == layer.id then
 		local sent, modifiers = {}, {}
-		for _, id in ipairs(held_modifiers(held)) do sent[id] = true end
+		for _, id in ipairs(held_modifiers(session, held)) do sent[id] = true end
 		for _, id in ipairs(layer.selectors[1].required) do sent[id] = true end
 		for _, id in ipairs(M.REPORTED) do
 			if sent[id] then modifiers[#modifiers + 1] = id; sent[id] = nil end
@@ -442,7 +648,7 @@ function M.release(session, code, now)
 	if session.pending ~= nil and session.pending.code == code then
 		local pending = session.pending
 		session.pending = nil
-		if now - pending.at < pending.entry.threshold_ms then perform(pending.entry.tap, actions) end
+		if now - pending.at < pending.entry.threshold_ms then perform(session, pending.entry.tap, actions) end
 		return true, actions
 	end
 	if session.hold ~= nil and session.hold.code == code then end_hold(session, actions) end
@@ -468,7 +674,7 @@ end
 function M.reset(session)
 	local actions = {}
 	if session.hold ~= nil then end_hold(session, actions) end
-	session.pending, session.hold, session.held_keys, session.active = nil, nil, {}, {}
+	session.pending, session.hold, session.held_keys, session.active, session.dead = nil, nil, {}, {}, nil
 	return actions
 end
 

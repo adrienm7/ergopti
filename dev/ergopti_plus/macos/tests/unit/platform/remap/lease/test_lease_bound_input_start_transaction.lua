@@ -235,7 +235,7 @@ local function load_remap(options)
 		end
 	end
 	package.loaded["modules.keystats.kc_bridge"] = classifier
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	local shortcuts_paused = options.shortcuts_paused == true
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function() return shortcuts_paused end,
@@ -243,7 +243,7 @@ local function load_remap(options)
 	}
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "tests/unit/platform/remap/activation.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}

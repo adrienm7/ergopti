@@ -132,7 +132,7 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 			-- Either shared entry point satisfies the invariant, and the formatter is
 			-- the stronger of the two: applescript_escape is opt-in per VALUE, so a
 			-- site can escape one of its two interpolated values and leave the other
-			-- raw — which is precisely how ui/menu/menu_paths.lua shipped a folder
+			-- raw — which is precisely how settings/ui/menu/paths.lua shipped a folder
 			-- picker with an escaped path and a raw prompt. applescript_format
 			-- escapes every string argument, so the choice no longer exists.
 			--
@@ -191,7 +191,7 @@ end)
 
 -- applescript_escape is opt-in PER VALUE, and that is what kept regressing: a
 -- call site would escape one of its two interpolated values and leave the other
--- raw. ui/menu/menu_paths.lua shipped exactly that — an escaped default path and
+-- raw. settings/ui/menu/paths.lua shipped exactly that — an escaped default path and
 -- a raw prompt, inside one string.format. No shape-based check can see a missing
 -- escape in an argument list, so the formatter removes the choice instead.
 

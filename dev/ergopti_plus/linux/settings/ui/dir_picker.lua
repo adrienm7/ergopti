@@ -1,0 +1,65 @@
+--- settings/ui/dir_picker.lua
+
+--- ==============================================================================
+--- MODULE: Native Configuration Directory Picker
+--- DESCRIPTION:
+--- Owns the Linux folder selection policy shared by onboarding and the paths
+--- editor, through Ergopti's own dialog (core/ui/ui/native_dialog.lua). Returns one normalized absolute directory or a precise refusal.
+--- ==============================================================================
+
+local M = {}
+local WindowTitles = require("core.ui.engine.window_titles")
+
+--- Normalizes a configuration directory through the canonical XDG default.
+--- @param config_paths table Configuration-path authority.
+--- @param value any Candidate directory.
+--- @return string|nil normalized
+function M.normalize(config_paths, value)
+	if type(config_paths) ~= "table" or type(config_paths.default_config_dir) ~= "function" then
+		return nil
+	end
+	if value == nil or value == "" then return config_paths.default_config_dir() end
+	if type(value) ~= "string" then return nil end
+	-- A native chooser already returns a filename; whitespace belongs to it.
+	local normalized = value
+	if normalized:match("^/+$") then return "/" end
+	normalized = normalized:gsub("/+$", "")
+	if normalized == "" then return config_paths.default_config_dir() end
+	if normalized:sub(1, 1) ~= "/" then return nil end
+	return normalized
+end
+
+--- Opens the first available native directory picker.
+--- @param shell table Shell-runner authority.
+--- @param config_paths table Configuration-path authority.
+--- @param i18n table|nil Translation authority.
+--- @param current any Current directory shown by the caller.
+--- @return string|nil selected
+--- @return string|nil error_message
+function M.pick(shell, config_paths, i18n, current)
+	if type(shell) ~= "table" or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
+		return nil, "shell runner is unavailable"
+	end
+	local seed = M.normalize(config_paths, current)
+	if seed == nil and type(config_paths) == "table"
+		and type(config_paths.get_config_dir) == "function" then
+		seed = config_paths.get_config_dir()
+	end
+	if seed == nil then return nil, "configuration directory is unavailable" end
+	local title = type(i18n) == "table" and type(i18n.get) == "function"
+		and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
+	title = WindowTitles.compose(title)
+	local command = require("core.ui.ui.native_dialog").command() .. " --file-selection --directory --title="
+		.. shell.quote(title) .. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null"
+	local completed, output = require("core.ui.ui.modal").run(function() return shell.exec_checked(command) end)
+	-- Partial stdout cannot turn native cancellation or command failure into a selection.
+	if completed ~= true or type(output) ~= "string" then return nil, "folder selection was cancelled or refused" end
+	-- The dialog appends one LF to the raw filename. A CR or another LF
+	-- before that delimiter belongs to the selected directory itself.
+	local chosen = output:gsub("\n$", "")
+	local normalized = chosen ~= "" and M.normalize(config_paths, chosen) or nil
+	if not normalized then return nil, "folder selection was cancelled" end
+	return normalized
+end
+
+return M

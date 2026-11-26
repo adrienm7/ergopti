@@ -49,13 +49,34 @@ M.REASON = {
 	unknown_release = "changelog_window.install_error_unknown_release",
 	-- The armed replacement waited for a quit that never came, so nothing was replaced.
 	restart_expired = "changelog_window.install_error_restart_expired",
-	-- A feed-only list: no driver verifies a download without the API's digest
-	-- or checksum asset. The macOS window hands the channel's newest release to
-	-- Sparkle instead (ui/changelog/init.lua); Windows and Linux have no updater
-	-- that verifies a release on its own (the Windows exe is not signed on every
-	-- channel, and the Linux tarball has no signed update metadata).
+	-- A feed-only list names no files and no digests. The macOS window hands the
+	-- channel's newest release to Sparkle instead (ui/changelog/init.lua);
+	-- Windows and Linux install that release only once its downloaded asset
+	-- matches a detached signature of the pinned key (asset_signing.json), so
+	-- without a provisioned key every feed row keeps this refusal.
 	no_details = "changelog_window.install_error_no_details",
+	-- A feed-only list with a key: an older row has no signed path, only the
+	-- channel's newest release, as on macOS.
+	feed_not_newest = "changelog_window.install_error_feed_not_newest",
+	-- The newest feed release whose downloaded asset, signature or key did not
+	-- verify: nothing is installed, as when a digest from the API mismatches.
+	feed_signature = "changelog_window.install_error_feed_signature",
+	-- A release whose detached or code signature was refused (UPD-10): named
+	-- as a signature, not as an integrity check or an unexpected error.
+	signature = "changelog_window.install_error_signature",
 }
+
+--- The page's reason for a download that stopped at one of its stages.
+--- @param stage string|nil "download", "verify" (size, digest, bundle) or
+---   "signature" (a detached or code signature refused).
+--- @param feed boolean|nil A release read from the public feed: its signature
+---   is its only authentication, so any refused check names it.
+--- @return string reason_key One of M.REASON.
+function M.download_reason(stage, feed)
+	if stage == "signature" then return feed == true and M.REASON.feed_signature or M.REASON.signature end
+	if stage == "verify" then return feed == true and M.REASON.feed_signature or M.REASON.verify end
+	return M.REASON.download
+end
 
 local KNOWN_REASON = {}
 for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
@@ -325,6 +346,9 @@ function M.new(ports)
 				-- when to retry, so no error window opens over it (#99)
 				Logger.warn(LOG, "Refused to install %s: the window's list came from the Atom feed, "
 					.. "which names no files or digests to verify.", tag)
+			elseif missing == M.REASON.feed_not_newest then
+				Logger.warn(LOG, "Refused to install %s: from the Atom feed only the channel's newest "
+					.. "release installs, through its detached signature.", tag)
 			else
 				Logger.error(LOG, "Refused to install %s: it is not in the release list the window loaded.", tag)
 			end
@@ -407,7 +431,11 @@ function M.new(ports)
 			settled = true
 			if not path then
 				Logger.error(LOG, "Install of %s stopped before installing: %s.", tag, ErrorDescription.describe(detail or reason))
-				fail(tag, reason == M.REASON.verify and M.REASON.verify or M.REASON.download, backup, failure_receipt, current)
+				-- A verification failure keeps its own wording: a digest mismatch, a
+				-- refused signature, or the required signature of a feed release.
+				local verified = reason == M.REASON.verify or reason == M.REASON.feed_signature
+					or reason == M.REASON.signature
+				fail(tag, verified and reason or M.REASON.download, backup, failure_receipt, current)
 				return
 			end
 			report({ tag = tag, phase = "installing", backup_path = backup.path }, current)

@@ -43,7 +43,7 @@ LAYER_LINE = '"MouseMiddle" = "escape"\n'
 PREPARE = (
     "local LINE = %s\n" % repr(LAYER_LINE)
     + r"""
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local path = Paths.config("layers.toml")
 local fh = assert(io.open(path, "rb")); local text = fh:read("*a"); fh:close()
 local section = "[layers.nav.linux]\n"

@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
---- the macOS resolution cascade (modules.hotstrings.hotstrings_config's
+--- the macOS resolution cascade (hotstrings.engine.catalogue.config's
 --- M.resolve) against it — proving delay/color/show_tooltip/priority precedence
 --- (user_section > user_category > toml_section > toml_category) matches the
 --- AHK driver bit for bit. The base expansion delay the overrides are offsets of
@@ -91,8 +91,8 @@ local function fresh_module_for_vector(vector)
 	write_toml_meta(toml_path, vector.toml_category, vector.section, vector.toml_section)
 
 	package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
-	package.loaded["modules.hotstrings.hotstrings_config"] = nil
-	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+	package.loaded["hotstrings.engine.catalogue.config"] = nil
+	local mod = helpers.load_with_stubs("hotstrings.engine.catalogue.config")
 	mod.init({ override_path = override_path, toml_resolver = function() return toml_path end })
 
 	local user_category = vector.user_category
@@ -177,8 +177,8 @@ helpers.describe("hotstrings base delay corpus (macOS): every vector stores and 
 			local override_path = temp_path("base_" .. vector.id)
 			os.remove(override_path)
 			package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
-			package.loaded["modules.hotstrings.hotstrings_config"] = nil
-			local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+			package.loaded["hotstrings.engine.catalogue.config"] = nil
+			local mod = helpers.load_with_stubs("hotstrings.engine.catalogue.config")
 			local base = 0.75
 			helpers.assert_eq(mod.init({
 				override_path = override_path,

@@ -1,0 +1,277 @@
+{
+	"schema_version": 1,
+	"_comment": "OLL-04 and OLL-05 of the 2026-11-20 managed Ollama campaign (docs/audits/platform-parity/2026-11-20-managed-ollama/report.md). `cases`: one install failure's evidence line, as the driver named in `os` writes it, and the class _shared/ai/data/ollama_install_errors.json gives it; every driver replays every case, since the rule is one. `free_space`: the pinned asset's bytes, its unpacked bytes, the registry margin and the free bytes of the install volume, and whether the download may start. `pull_cases`: a failed model pull's class (ollama_pull_errors.json) and the install class whose pull message it shows; a case without `class` keeps the generic pull failure (OLL-14). Replayed by windows/tests/unit/ai/servers/test_ollama_install_errors.ahk, linux/tests/unit/ai/engine/ollama/test_install_errors.lua and macos/tests/unit/ai/engine/ollama/test_install_errors.lua, the macOS free-space rule by tools/test/macos_managed_ollama_install_errors_test.py.",
+	"cases": [
+		{
+			"id": "windows_disk_full_write",
+			"os": "windows",
+			"evidence": "stage=file_write reason=download System.IO.IOException hresult=0x80070070 Il n'y a pas assez d'espace sur le disque.",
+			"class": "disk_full"
+		},
+		{
+			"id": "windows_disk_full_precheck",
+			"os": "windows",
+			"evidence": "stage=file_create reason=download System.IO.IOException hresult=0x80070070 The pinned archive does not fit its private target volume.",
+			"class": "disk_full"
+		},
+		{
+			"id": "windows_disk_full_native",
+			"os": "windows",
+			"evidence": "stage=file_write reason=download System.ComponentModel.Win32Exception hresult=0x80004005 win32=112 There is not enough space on the disk.",
+			"class": "disk_full"
+		},
+		{
+			"id": "windows_permission",
+			"os": "windows",
+			"evidence": "stage=file_create reason=download System.UnauthorizedAccessException hresult=0x80070005 Access to the path is denied.",
+			"class": "permission"
+		},
+		{
+			"id": "windows_permission_native",
+			"os": "windows",
+			"evidence": "stage=file_create reason=download System.ComponentModel.Win32Exception hresult=0x80004005 win32=5 Accès refusé.",
+			"class": "permission"
+		},
+		{
+			"id": "windows_cancelled",
+			"os": "windows",
+			"evidence": "stage=connect reason=download System.OperationCanceledException hresult=0x8013153b The operation was canceled.",
+			"class": "cancelled"
+		},
+		{
+			"id": "windows_checksum",
+			"os": "windows",
+			"evidence": "stage=file_read reason=verify System.Management.Automation.RuntimeException hresult=0x80131501 The complete acquired archive differs from its original identity or pin.",
+			"class": "checksum"
+		},
+		{
+			"id": "windows_network_unreachable",
+			"os": "windows",
+			"evidence": "stage=connect reason=download System.InvalidOperationException hresult=0x80131509 All artifact routes were refused.",
+			"class": "network"
+		},
+		{
+			"id": "windows_network_proxy",
+			"os": "windows",
+			"evidence": "stage=proxy_resolve reason=download System.InvalidOperationException hresult=0x80131509 Canonical artifact routing was refused.",
+			"class": "network"
+		},
+		{
+			"id": "windows_network_http",
+			"os": "windows",
+			"evidence": "stage=http reason=download System.InvalidOperationException hresult=0x80131509 Artifact HTTP response was refused.",
+			"class": "network"
+		},
+		{
+			"id": "windows_network_deadline",
+			"os": "windows",
+			"evidence": "stage=file_write reason=deadline System.TimeoutException hresult=0x80131505 Updater download deadline expired.",
+			"class": "network"
+		},
+		{
+			"id": "windows_unknown",
+			"os": "windows",
+			"evidence": "stage=file_create reason=download System.Management.Automation.RuntimeException hresult=0x80131501 Captured acquisition source changed.",
+			"class": "unknown"
+		},
+		{
+			"id": "windows_extraction_disk_full",
+			"os": "windows",
+			"evidence": "stage=prepare reason=install System.IO.IOException hresult=0x80070070 The complete portable archive will not fit on the target volume.",
+			"class": "disk_full"
+		},
+		{
+			"id": "macos_disk_full_precheck",
+			"os": "macos",
+			"evidence": "phase=install reason=install_disk_full",
+			"class": "disk_full"
+		},
+		{
+			"id": "macos_disk_full_write",
+			"os": "macos",
+			"evidence": "phase=download reason=oserror errno=ENOSPC",
+			"class": "disk_full"
+		},
+		{
+			"id": "macos_permission",
+			"os": "macos",
+			"evidence": "phase=install reason=oserror errno=EACCES",
+			"class": "permission"
+		},
+		{
+			"id": "macos_cancelled",
+			"os": "macos",
+			"evidence": "phase=download reason=cancelled",
+			"class": "cancelled"
+		},
+		{
+			"id": "macos_checksum_download",
+			"os": "macos",
+			"evidence": "phase=download reason=integrity",
+			"class": "checksum"
+		},
+		{
+			"id": "macos_checksum_local",
+			"os": "macos",
+			"evidence": "phase=install reason=checksum",
+			"class": "checksum"
+		},
+		{
+			"id": "macos_network_connect",
+			"os": "macos",
+			"evidence": "phase=download reason=connect",
+			"class": "network"
+		},
+		{
+			"id": "macos_network_http",
+			"os": "macos",
+			"evidence": "phase=download reason=http",
+			"class": "network"
+		},
+		{
+			"id": "macos_network_deadline",
+			"os": "macos",
+			"evidence": "phase=download reason=deadline",
+			"class": "network"
+		},
+		{
+			"id": "macos_unknown_signature",
+			"os": "macos",
+			"evidence": "phase=install reason=signature",
+			"class": "unknown"
+		},
+		{
+			"id": "linux_disk_full_precheck",
+			"os": "linux",
+			"evidence": "install_disk_full",
+			"class": "disk_full"
+		},
+		{
+			"id": "linux_disk_full_curl",
+			"os": "linux",
+			"evidence": "archive_download_failed curl: (23) Failure writing output to destination",
+			"class": "disk_full"
+		},
+		{
+			"id": "linux_disk_full_curl_proxy",
+			"os": "linux",
+			"evidence": "archive_download_failed curl exited with code 23 curl_exit=23",
+			"class": "disk_full"
+		},
+		{
+			"id": "linux_disk_full_extraction",
+			"os": "linux",
+			"evidence": "archive_extraction_refused tar: bin/ollama: Cannot write: No space left on device",
+			"class": "disk_full"
+		},
+		{
+			"id": "linux_permission",
+			"os": "linux",
+			"evidence": "install_parent_create_refused",
+			"class": "permission"
+		},
+		{
+			"id": "linux_cancelled",
+			"os": "linux",
+			"evidence": "cancelled",
+			"class": "cancelled"
+		},
+		{
+			"id": "linux_checksum",
+			"os": "linux",
+			"evidence": "archive_checksum_mismatch",
+			"class": "checksum"
+		},
+		{
+			"id": "linux_network_dns",
+			"os": "linux",
+			"evidence": "archive_download_failed curl: (6) Could not resolve host: github.com",
+			"class": "network"
+		},
+		{
+			"id": "linux_network_proxy",
+			"os": "linux",
+			"evidence": "archive_download_failed curl exited with code 7 curl_exit=7",
+			"class": "network"
+		},
+		{
+			"id": "linux_unknown",
+			"os": "linux",
+			"evidence": "install_prerequisite_unavailable",
+			"class": "unknown"
+		}
+	],
+	"free_space": [
+		{
+			"id": "fits_with_margin",
+			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
+			"margin_bytes": 1073741824,
+			"free_bytes": 8000000000,
+			"fits": true
+		},
+		{
+			"id": "exactly_enough",
+			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
+			"margin_bytes": 1073741824,
+			"free_bytes": 6958399776,
+			"fits": true
+		},
+		{
+			"id": "one_byte_short",
+			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
+			"margin_bytes": 1073741824,
+			"free_bytes": 6958399775,
+			"fits": false
+		},
+		{
+			"id": "archive_and_margin_fit_unpacked_does_not",
+			"asset_bytes": 1471164488,
+			"unpacked_bytes": 4413493464,
+			"margin_bytes": 1073741824,
+			"free_bytes": 2544906312,
+			"fits": false
+		},
+		{
+			"id": "archive_fits_margin_does_not",
+			"asset_bytes": 174459907,
+			"unpacked_bytes": 523379721,
+			"margin_bytes": 1073741824,
+			"free_bytes": 1000000000,
+			"fits": false
+		},
+		{
+			"id": "disk_full",
+			"asset_bytes": 1438364593,
+			"unpacked_bytes": 4315093779,
+			"margin_bytes": 1073741824,
+			"free_bytes": 0,
+			"fits": false
+		}
+	],
+	"pull_cases": [
+		{
+			"id": "pull_no_space",
+			"pull_class": "no_space",
+			"class": "disk_full"
+		},
+		{
+			"id": "pull_connection",
+			"pull_class": "connection"
+		},
+		{
+			"id": "pull_permission",
+			"pull_class": "permission_denied"
+		},
+		{
+			"id": "pull_digest_mismatch",
+			"pull_class": "digest_mismatch"
+		},
+		{
+			"id": "pull_other",
+			"pull_class": "other"
+		}
+	]
+}

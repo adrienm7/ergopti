@@ -131,6 +131,12 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
 	Code .= "#Include " . Owner . "`n"
+	; LayoutRowIsEmulated asks the game keys first and LayerDispatch holds its
+	; letters through them: the genuine module, whose unregistered release
+	; hotkeys leave every row to the emulation and every letter to its text.
+	GameKeysOwner := _DriverProductionFileForSymbol("GameKeys_PassThrough")
+	AssertTrue(GameKeysOwner != "", "the genuine game keys must have one production owner")
+	Code .= "#Include " . GameKeysOwner . "`n"
 	for Name in ["LayoutEmulationRows", "LayoutRowOf", "LayoutRowSwitches",
 		"LayoutRowsAllEmulated", "LayoutRowIsEmulated"] {
 		Definition := _DriverFuncBody(Name)
@@ -220,12 +226,14 @@ _LRPW_ChildSource() {
 	Definition := _DriverFuncBody("RemapKey")
 	AssertTrue(Definition != "", "the real built-in registrar must be exercised")
 	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
-		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition . "`n"
+		"#Include " . _DriverDir . "\infra\star_slot.ahk`n" . Definition . "`n"
+		. _DriverFuncBody("_RemapWinCriterion") . "`n"
+		. _DriverFuncBody("_RemapHeldEmit") . "`n"
 		. _DriverFuncBody("_RemapChordEmit") . "`nKeyboardShortcutRunLayoutChord(*) => false`n")
 }
 
 for _LRPW_Row in ["number", "top", "home", "bottom"]
-	for _LRPW_Mode in ["off", "on", "magic-source", "magic-other", "ordinary", "legacy"]
+	for _LRPW_Mode in ["off", "on", "ordinary", "legacy"]
 		Test("layout Win fallback: " . _LRPW_Row . " row " . _LRPW_Mode . " (layout-row-win-fallback)",
 			_LRPS_LevelCustody.Bind(0, false, _LRPW_ChildSource, [_LRPW_Row, _LRPW_Mode], "PASS row-win-fallback"))
 
@@ -304,27 +312,18 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
 
 
-_LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSource := "") {
+; The remap registrar and the Win broker the built-in row producers share.
+_LRPN_RemapSource(BodyName, AdditionalSource := "") {
 	global _DriverDir
-	Source := _NRP_LayoutSource()
-	Start := InStr(Source, "_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(")
-	Finish := InStr(Source, "`nRegisterShiftLayer()", , Start)
-	AssertTrue(Start > 0 && Finish > Start, "the genuine magic producer must be bounded before Shift registration")
-	Extra := "#Include " . _DriverDir . "\infra\magic_editor.ahk`n"
-	for Name in ["RemapKey", "_RemapChordEmit", "LayoutRegistry_MagicKeyHotkeys"] {
+	Extra := "#Include " . _DriverDir . "\infra\star_slot.ahk`n"
+	for Name in ["RemapKey", "_RemapWinCriterion", "_RemapHeldEmit", "_RemapChordEmit"] {
 		Definition := _DriverFuncBody(Name)
-		AssertTrue(Definition != "", "the genuine magic dependency must exist: " . Name)
+		AssertTrue(Definition != "", "the genuine remap dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
 	Extra .= "KeyboardShortcutRunLayoutChord(*) => false`n"
-	Extra .= "_LRPCM_RegisterMagic() {`n global ScriptInformation, Features`n"
-		. SubStr(Source, Start, Finish - Start) . "`n}`n"
 	return _LRPS_ChildSource(BodyName, Extra . AdditionalSource)
 }
-
-for _LRPCM_Row in ["number", "top", "home", "bottom"]
-	Test("layout rows: chosen magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-chosen-magic-scope)",
-		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-chosen-magic"))
 
 
 _LRPN_ChildSource() {
@@ -350,23 +349,23 @@ _LRPN_ChildSource() {
 	; The extracted digit emitters share their real native/recorder selector.
 	; Only its final SendEvent boundary is the child's passive output port.
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
-		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition",
+		"KeylayoutEmulation_NumberRowLevels", "GetCapsLockCondition",
 		"NumberRowSendEvent", "_DigitShiftSend"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the actual built-in row dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
-	return _LRPCM_ChildSource("builtin_number_row_magic_body.ahk", Extra)
+	return _LRPN_RemapSource("builtin_number_row_owner_body.ahk", Extra)
 }
 
 for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
 	for _LRPN_Emulated in [false, true]
 		for _LRPN_Caps in [false, true]
 			Test("built-in number row: " . _LRPN_Scan . " " . (_LRPN_Emulated ? "emulated" : "native")
-				. " row caps " . (_LRPN_Caps ? "on" : "off") . " retains chosen magic and releases (builtin-number-row-magic-owner)",
+				. " row caps " . (_LRPN_Caps ? "on" : "off") . " types its own row, never the magic key (builtin-number-row-owner)",
 				_LRPS_LevelCustody.Bind(0, false, _LRPN_ChildSource,
 					[_LRPN_Scan, _LRPN_Emulated ? "on" : "off", _LRPN_Caps ? "on" : "off", _StaticDir, _DriverDir],
-					"PASS builtin-number-row-magic-owner"))
+					"PASS builtin-number-row-owner"))
 
 
 _LRCC_ChildSource(BodyName := "layout_row_control_body.ahk", AdditionalSource := "") {

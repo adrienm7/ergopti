@@ -107,7 +107,7 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 				return true
 			end,
 		}
-		package.loaded["modules.gestures.actions"] = {
+		package.loaded["gestures.engine.actions"] = {
 			force_cleanup = function(parent)
 				calls.actions_pause = calls.actions_pause + 1
 				calls.action_parents[#calls.action_parents + 1] = parent
@@ -129,7 +129,7 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 		package.loaded["modules.shortcuts.bindings"]           = nil
 		package.loaded["modules.shortcuts.script_control"]     = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
-		package.loaded["modules.gestures.actions"]             = nil
+		package.loaded["gestures.engine.actions"]             = nil
 		package.loaded["modules.shortcuts"]                    = nil
 	end
 
@@ -331,17 +331,17 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,
 		}
-		package.loaded["ui.menu.menu_utils"] = {}
+		package.loaded["menu.ui.builder.utils"] = {}
 		-- The switch is the command registered for the manifest's shortcuts_toggle
 		-- row, captured where the menu hands it to the renderer.
 		local render_ctx = nil
-		package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx)
+		package.loaded["menu.engine.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx)
 			render_ctx = ctx
 			return {}
 		end)
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
-		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
+		package.loaded["menu.engine.manifest_reader"] = { default_for = function() return "★" end }
 		package.loaded["ui.menu.menu_shortcuts"] = nil
 		local MenuShortcuts = require("ui.menu.menu_shortcuts")
 		local state = {

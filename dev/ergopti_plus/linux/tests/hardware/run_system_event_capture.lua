@@ -17,7 +17,7 @@ local Consent = require("tests.support.metrics_consent_fixture")
 local Shell = require("core.process.adapters.shell_runner")
 local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
-local System = require("modules.keystats.system_metrics")
+local System = require("modules.keystats.system.system_metrics")
 local original_has, original_line = Shell.has_command, Shell.exec_line
 local original_capture, original_now = Calendar.capture, Clock.now_ms
 -- Keep the actual Calendar coordinate contract: raw clock fractions can lose a

@@ -88,7 +88,7 @@ end
 --- @param vector table
 --- @return table module
 local function module_for(vector)
-	local mod = helpers.load_module("modules.hotstrings.hotstrings_config")
+	local mod = helpers.load_module("hotstrings.engine.catalogue.config")
 	mod.init({ load_mappings = function() return true end }, nil)
 
 	-- The shape the loader produces: the category's own values at the top level,

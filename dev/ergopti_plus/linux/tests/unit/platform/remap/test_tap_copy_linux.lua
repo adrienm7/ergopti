@@ -288,7 +288,7 @@ end)
 helpers.describe("X11 clipboard change counter (tap-copy-verified)", function()
 	--- Loads the clipboard adapter over a fake shell and display.
 	local function with_adapter(display, reply, body)
-		local names = { clipboard = "adapters.clipboard", shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server" }
+		local names = { clipboard = "clipboard.adapters.clipboard", shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {} }
@@ -334,7 +334,7 @@ helpers.describe("X11 clipboard change counter (tap-copy-verified)", function()
 
 	--- Runs body with a fresh Wayland counter module, restored afterwards.
 	local function with_counter(body)
-		local name = "adapters.wayland_selection_counter"
+		local name = "clipboard.adapters.wayland_selection_counter"
 		local previous = package.loaded[name]
 		package.loaded[name] = nil
 		local Counter = require(name)
@@ -406,7 +406,7 @@ helpers.describe("X11 clipboard change counter (tap-copy-verified)", function()
 	end)
 
 	helpers.it("X11 without xclip reads the owner's TIMESTAMP through libX11 (x11-native-copy-counter)", function()
-		local name = "adapters.x11_selection_stamp"
+		local name = "clipboard.adapters.x11_selection_stamp"
 		local previous = package.loaded[name]
 		local asked = nil
 		package.loaded[name] = { read = function(timeout_s) asked = timeout_s return 4242 end }

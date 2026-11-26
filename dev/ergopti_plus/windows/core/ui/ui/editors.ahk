@@ -22,12 +22,11 @@ global _MagicKeyEditorStopDebt := false
 global _MagicKeyEditorGui := ""
 
 MagicKeyEditor(*) {
-		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
-		; Tray callbacks remain reachable while native Suspend is active. Refuse a
-		; fresh capture before creating UI, then re-check atomically at publication
-		; because a suspend callback can still interrupt between ordinary lines.
-		if A_IsSuspended
-				return
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui, ScriptInformation
+		; A pause stops typing, not configuration (EDD-1): the capture runs while
+		; paused and saves the character at once, inert until the resume. The pause state the capture belongs to
+		; is re-checked at publication: a pause or a resume ends it.
+		StartedSuspended := A_IsSuspended
 		if IsObject(_MagicKeyEditorInputHook) {
 				; An active editor keeps its owner. Only a terminal Stop debt from an
 				; earlier rollback may be retried before opening a successor.
@@ -50,7 +49,9 @@ MagicKeyEditor(*) {
 		GuiToShow := 0, IH := 0
 		try {
 				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
-				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
+				; The default is the layout's (feature_state.ahk), shown as « ★ (ù) ».
+				GuiToShow.Add("Text", "w300", Format(t("dialog.magic_key.prompt"),
+					MagicKeyShown(ScriptInformation["MagicKeyDefault"])))
 				GuiToShow.Add("Text", "w300", t("button.cancel") . " → " . t("layer_editor.key.escape"))
 				; Construct while hidden: native Close otherwise hides an unowned Gui
 				; before the later factory returns and starts an invisible capture.
@@ -58,18 +59,18 @@ MagicKeyEditor(*) {
 				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
-						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+						if A_IsSuspended != StartedSuspended or IsObject(_MagicKeyEditorInputHook)
 								return
 						_MagicKeyEditorInputHook := IH
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 						; Show pumps messages. Its Close handler must already own the
 						; started hook, with no later Start able to revive that capture.
 						GuiToShow.Show("Center")
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 				} finally {
 						; Wait must never inherit a Critical menu caller.
@@ -95,7 +96,7 @@ MagicKeyEditor(*) {
 		; Close or a complete pause/resume may retire this exact owner while a
 		; completed native hook still retains its reason and captured units. Only the
 		; terminal path which actually retires that owner may persist its result.
-		if !CaptureSettled || A_IsSuspended
+		if !CaptureSettled || A_IsSuspended != StartedSuspended
 				return
 		Capture := _SIHO_ReadScalar(IH, "{Escape}")
 		if Capture.Reason != ""
@@ -252,316 +253,6 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	return true
 }
 
-; The physical magic key captured by pressing it: the next key pressed while this
-; dialog shows becomes [hotstrings] magic_key_source. Escape, closing the dialog
-; or the shared capture timeout changes nothing. It shares the magic-key editor's
-; owner (one suppressive capture at a time, stopped by Close and by a pause or a
-; resume). It runs while paused (EDD-1, decided by the coordinator on
-; 2026-11-14): the key is saved at once and stays inert until resume, since the
-; suspended driver remaps nothing.
-;
-; The key is read from the keyboard hook's PHYSICAL key state, never from the
-; scan code the InputHook reports: a remap hotkey suppresses the key it fires on,
-; and the hook only sees what that hotkey sends (HookDispatcherConst), at level 2
-; — with the Ergopti emulation on, the key typing "j" reported the scan code of
-; "j" on the OS layout, and the magic key its own {Text}★, scan code 0. A key
-; press, whatever reaches the hook, and a short poll, for a hotkey that sends
-; nothing the hook sees (a dead key, a tap-hold), both ask which candidate key is
-; physically down. GetKeyState "P" is exact only while the keyboard hook is
-; installed, which it always is in this driver.
-MagicKeySourceCapture(*) {
-		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
-		; The pause state the capture belongs to: a pause or resume ends it.
-		StartedSuspended := A_IsSuspended
-		if IsObject(_MagicKeyEditorInputHook) {
-				; A live capture keeps its owner and comes back to the front: its
-				; hook swallows the next key typed anywhere.
-				if !_MagicKeyEditorStopDebt {
-						if IsObject(_MagicKeyEditorGui)
-								WMPresentWindow(_MagicKeyEditorGui)
-						return
-				}
-				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
-						return
-		}
-		_InheritedCritical := A_IsCritical
-		GuiToShow := 0, IH := 0, MagicKeyCapturePoll := 0
-		try {
-				GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
-				GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
-				State := _MagicKeySourceCaptureState()
-				; Prepare the whole capture before showing an actionable dialog.
-				; L0 collects no text. NS reports and suppresses every physical key.
-				IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
-				IH.KeyOpt("{All}", "NS")
-				IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
-				MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
-				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
-				Critical("On")
-				try {
-						if A_IsSuspended != StartedSuspended or IsObject(_MagicKeyEditorInputHook)
-								return
-						_MagicKeyEditorInputHook := IH
-						_MagicKeyEditorGui := GuiToShow
-						_MagicKeyEditorStopDebt := false
-						IH.Start()
-						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
-								return
-						GuiToShow.Show("Center")
-						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
-								return
-				} finally {
-						Critical("Off")
-				}
-				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
-				IH.Wait()
-		} finally {
-				try {
-						if HasMethod(MagicKeyCapturePoll, "Call")
-								SetTimer(MagicKeyCapturePoll, 0)
-				} finally {
-						CaptureSettled := false
-						try {
-								if IsObject(IH)
-										CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
-						} finally {
-								if IsObject(GuiToShow) {
-										if (_MagicKeyEditorGui == GuiToShow)
-												_MagicKeyEditorGui := ""
-										try GuiToShow.Destroy()
-								}
-								Critical(_InheritedCritical)
-						}
-				}
-		}
-
-		; A completed candidate can outlive external Close or pause/resume. Its
-		; retained Scan/Stopped result is valid only for the terminal owner.
-		if !CaptureSettled || A_IsSuspended != StartedSuspended
-				return
-		; Escape, Close and the timeout all end without an answer.
-		if (IH.EndReason != "Stopped")
-				return
-		if State.Refused {
-				Ui_MsgBox(t("dialog.magic_key_source.not_a_candidate"), t("dialog.magic_key_source.title"), "Icon!")
-				return
-		}
-		if (State.Scan == "")
-				return
-		ModifyMagicKeySource(LayoutRegistry_KeyCode(State.Scan, LayoutRegistry_Keycodes()))
-}
-
-; The state of one capture: the scan codes of the candidate keys, how a key's
-; physical state is read, the candidates already down when it opened (an answer
-; only once released), and the answer: a scan code, or Refused for a key that is
-; no candidate.
-; @param IsDown {Func} (KeyName) → whether the key is physically down.
-; @returns {Object} Scans, IsDown, Held, Scan and Refused.
-_MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
-		Scans := []
-		Keycodes := LayoutRegistry_Keycodes()
-		for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
-				if MagicKeySourceIsCandidate(Code)
-						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
-		}
-		Held := Map()
-		for Scan in Scans {
-				if IsDown.Call(Scan)
-						Held[Scan] := true
-		}
-		return { Scans: Scans, IsDown: IsDown, Held: Held, Scan: "", Refused: false }
-}
-
-_MagicKeySourceIsDown(KeyName) {
-		return GetKeyState(KeyName, "P")
-}
-
-; The candidate key physically down, "" when none. A key held since the capture
-; opened stops being ignored once it was released.
-_MagicKeySourcePressedScan(State) {
-		; Collected first: a Map must not lose keys while it is enumerated.
-		Released := []
-		for Scan in State.Held {
-				if !State.IsDown.Call(Scan)
-						Released.Push(Scan)
-		}
-		for Scan in Released
-				State.Held.Delete(Scan)
-		for Scan in State.Scans {
-				if !State.Held.Has(Scan) && State.IsDown.Call(Scan)
-						return Scan
-		}
-		return ""
-}
-
-; Poll of the capture, for a key whose hotkey sends nothing the InputHook sees.
-_MagicKeySourceCapturePoll(State, IH) {
-		if !IH.InProgress
-				return
-		if State.IsDown.Call("Escape") {
-				IH.Stop()
-				return
-		}
-		Scan := _MagicKeySourcePressedScan(State)
-		if (Scan == "")
-				return
-		State.Scan := Scan
-		IH.Stop()
-}
-
-; List provider of the Layout menu's `magic_key_source` row (ui/menu/menu_init.ahk).
-; One row naming the key in effect; its submenu captures the next key pressed,
-; restores the automatic key or lists every candidate with the key in effect
-; ticked — the rows the Lua drivers build (_shared/layouts/engine/layers/magic_key_source.lua).
-MagicKeySourceMenuRows() {
-	global ScriptInformation
-	Current := ScriptInformation["MagicKeySource"]
-	Automatic := ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	Keycodes := LayoutRegistry_Keycodes()
-	Hkl := KS_ResolveKeyboardLayout()
-	Items := []
-	for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
-		if (Code == Automatic)
-			continue
-		Reason := MagicKeySourceChoiceReason(Code)
-		Label := _MagicKeySourceLabel(Code, Keycodes, Hkl)
-		if Reason != ""
-			Label .= " — " . t(Reason)
-		Items.Push(Map("label", Label, "checked", Current == Code, "disabled", Reason != "",
-			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
-	}
-	Commands := Map(MenuCommand.MAGIC_KEY_SOURCE_CAPTURE, MagicKeySourceCapture,
-		MenuCommand.MAGIC_KEY_SOURCE_AUTOMATIC, (*) => ModifyMagicKeySource(Automatic))
-	Getters := Map("magic_key_source_capture_ready", (*) => true,
-		"magic_key_source_is_automatic", (*) => Current == Automatic)
-	Children := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
-		Map("magic_key_source_candidates", (*) => Items))
-	if !(Children is Array) || Children.Length != ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"].Length + 3
-		return []
-	Rows := MenuRenderer_TemplateRows("magic_key_source_menu", Commands, Getters,
-		Map("magic_key_source_heading", Children))
-	if !(Rows is Array) || Rows.Length != 1 || !(Rows[1]["items"] is Array)
-		return []
-	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
-		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
-	Rows[1]["label"] := LabelValue(Rows[1]["label"], Shown)
-	return Rows
-}
-
-; The refusal reason of a candidate already owned by a configured tap action.
-; @param {String} Value Candidate or automatic source.
-; @returns {String} Locale reason key, or empty when there is no conflict.
-MagicKeySourceChoiceReason(Value) {
-	if Value == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-		return ""
-	Scan := LayoutRegistry_KeyScan(Value, LayoutRegistry_Keycodes())
-	if TapKeyAssignedToScan(Integer("0x" . SubStr(Scan, 3))) != ""
-		return "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
-	return ""
-}
-
-; What the OS layout types on a candidate key, then its KeyboardEvent.code, which
-; names the same key on every keyboard; the code alone when the layout cannot say.
-_MagicKeySourceLabel(Code, Keycodes, Hkl) {
-	Scan := Integer("0x" . SubStr(LayoutRegistry_KeyScan(Code, Keycodes), 3))
-	Text := (Hkl == 0) ? "" : KS_KeyTextNoStateChange(KS_ScancodeToVk(Scan, Hkl), Scan, Hkl).Text
-	return (Trim(Text) == "") ? Code : Text . "   (" . Code . ")"
-}
-
-; OnKeyDown of the capture: a modifier alone chooses nothing, Escape cancels, and
-; any other key answers with the candidate physically down — VK and SC describe
-; what reached the hook, a remap's output rather than the key pressed. With no
-; candidate down, the key pressed is none (Space, Enter, F5…) and is refused; a
-; candidate held since the capture opened only repeats and is no answer yet.
-_MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
-		global HOTKEY_MODIFIER_VKS
-		if HOTKEY_MODIFIER_VKS.Has(VK)
-				return
-		if (VK == GetKeyVK("Escape")) {
-				IH.Stop()
-				return
-		}
-		Scan := _MagicKeySourcePressedScan(State)
-		if (Scan == "") {
-				if (State.Held.Count > 0)
-						return
-				State.Refused := true
-		}
-		State.Scan := Scan
-		IH.Stop()
-}
-
-; Whether a value names a candidate key of [hotstrings] magic_key_source: one of
-; the manifest's enum values, spelled as it spells them, other than the
-; automatic default.
-MagicKeySourceIsCandidate(Code) {
-		if !(Code is String) || Code == ""
-				return false
-		if (Code == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE))
-				return false
-		for Allowed in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
-				if (Allowed == Code)
-						return true
-		}
-		return false
-}
-
-_EditorBuildMagicKeySourcePlan(Value) {
-	global Features
-	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE, Value, "")
-		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
-		return Plan
-	}
-	return {
-		updates: [{ Section: "hotstrings", Key: ConfigLeaf.MAGIC_KEY_SOURCE, Value: Value }],
-		publish: _EditorPublishMagicKeySource.Bind(Value),
-	}
-}
-
-_EditorPublishDesiredMagicKeySource(PublishFn, Value) {
-	PublishFn.Call()
-	_EditorPublishMagicKeySource(Value)
-}
-
-_EditorPublishMagicKeySource(Value) {
-	global ScriptInformation, Features
-	ScriptInformation["MagicKeySource"] := Value
-	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"][ConfigLeaf.MAGIC_KEY_SOURCE] := Value
-}
-
-; Persists the physical magic key ([hotstrings] magic_key_source) and reloads:
-; the remap hotkeys register on its scan code at load.
-; @param Value {String} A candidate code or the automatic value.
-; @returns {Boolean} Whether the choice was written and the reload accepted.
-ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
-	global ConfigurationFile
-	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE) {
-		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
-		return false
-	}
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return ModifyMagicKeySource(Value, WriterFn, NotifyFn, ReloadFn)
-		finally Critical(InheritedCritical)
-	}
-	Reason := MagicKeySourceChoiceReason(Value)
-	if Reason != "" {
-		if HasMethod(NotifyFn, "Call")
-			NotifyFn.Call(Reason)
-		else
-			Ui_MsgBox(t(Reason), t("dialog.magic_key_source.title"), "Icon!")
-		return false
-	}
-	if !_EditorWriteToml(ConfigurationFile, "the physical magic key",
-			_EditorBuildMagicKeySourcePlan.Bind(Value), WriterFn, NotifyFn)
-		return false
-	return _EditorReloadAfterCommit(ReloadFn)
-}
-
 _EditorBuildRepeatKeyPlan() {
 	global HSE_RepeatEnabled, Features
 	if _FeatureUsesDesiredState(Features) {
@@ -623,8 +314,13 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 _EditorWordResetGlobal(Key, Value) {
 	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+	global HSE_BackspaceRestoreEnabled, HSE_BackspaceRestoreWindowMs
 	if (Key == ConfigLeaf.IDLE_RESET_SECONDS)
 		HSE_IdleResetSeconds := Value
+	else if (Key == ConfigLeaf.BACKSPACE_RESTORE_ENABLED)
+		HSE_BackspaceRestoreEnabled := Value
+	else if (Key == ConfigLeaf.BACKSPACE_RESTORE_WINDOW_MS)
+		HSE_BackspaceRestoreWindowMs := Value
 	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
 		HSE_CascadeMaxArrows := Value
 	else if (Key == ConfigLeaf.CLICK_RESETS_WORD)
@@ -738,7 +434,9 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 	if !(Answer is Object) || Answer.Result != "OK"
 		return false
 	; The shared value schema owns the accepted range and its localized refusal.
-	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Answer.Value)
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Answer.Value,
+		ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS))
 	if !Typed["ok"] {
 		if HasMethod(NotifyFn, "Call") {
 			try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
@@ -750,6 +448,65 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 	}
 	Seconds := Typed["value"]
 	return SetHotstringsIdleResetSeconds(Seconds, WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips whether a Backspace right after an expansion undoes it.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsBackspaceRestore(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset(ConfigLeaf.BACKSPACE_RESTORE_ENABLED, !HSE_BackspaceRestoreEnabledCurrent(),
+		"the Backspace undo toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Sets how long after an expansion a Backspace still undoes it.
+ * @param {Integer} Milliseconds A whole number within the value schema's range.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsBackspaceRestoreWindowMs(Milliseconds, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidBackspaceRestoreWindowMs(Milliseconds)
+			|| !ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS), Milliseconds)["ok"] {
+		try LoggerError("Editors", "Refused Backspace undo window: not a whole number of milliseconds within its declared range.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.BACKSPACE_RESTORE_WINDOW_MS, Milliseconds,
+		"the Backspace undo window", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Asks for a free Backspace undo window, prefilled with the current one.
+ * @param {Func} PromptFn Optional seam with Ui_InputBox's signature.
+ * @param {Func} NotifyFn Optional seam called with the invalid-value message.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+PromptHotstringsBackspaceRestoreWindowMs(PromptFn := 0, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return PromptHotstringsBackspaceRestoreWindowMs(PromptFn, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Entry := ValueCheckEntryFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS)
+	Prefill := _MR_FormatFreeNumber(HSE_BackspaceRestoreWindowMsCurrent())
+	Prompt := t("menu.hotstrings.backspace_restore_window_prompt")
+	Title := t("menu.hotstrings.backspace_restore_window_title")
+	Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w380 h170", Prefill)
+		: Ui_InputBox(Prompt, Title, "w380 h170", Prefill)
+	if !(Answer is Object) || Answer.Result != "OK"
+		return false
+	; The shared value schema owns the accepted range and its localized refusal.
+	; A blank answer resets the setting to its default (PCK-13).
+	Typed := ValueCheckParseEntry(Entry, Answer.Value, ManifestDefaultFor(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS))
+	if !Typed["ok"] {
+		if HasMethod(NotifyFn, "Call") {
+			try LoggerWarn("Editors", "Invalid Backspace undo window typed — ignored.")
+			NotifyFn.Call(ValueCheckRenderMessage(ValueCheckMessageParts(Entry, Typed), (K) => t(K)), "Icon!")
+		} else
+			ValueCheckShowRefusal(ConfigKey.HOTSTRINGS_BACKSPACE_RESTORE_WINDOW_MS, Typed, Answer.Value)
+		return false
+	}
+	return SetHotstringsBackspaceRestoreWindowMs(Typed["value"], WriterFn, NotifyFn, RebuildFn)
 }
 
 /**
@@ -775,7 +532,8 @@ ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 
 /**
  * Flips one preview-bubble switch (hotstrings.preview_star_enabled,
- * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips).
+ * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips,
+ * preview_category_glyphs, preview_announcements).
  * The engine and the prediction path read the switches live, so there is no
  * reload; the bubble on screen is retired because it was promised under the old
  * value (macOS and Linux revoke it the same way).
@@ -798,7 +556,9 @@ ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 	static NoticeKeys := Map(ConfigLeaf.PREVIEW_STAR_ENABLED, "menu.hotstrings.notify_bubble_star",
 		ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED, "menu.hotstrings.notify_bubble_autocorrect",
 		ConfigLeaf.PREVIEW_AI_ENABLED, "menu.hotstrings.notify_bubble_ai",
-		ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, "menu.hotstrings.notify_bubble_colored")
+		ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, "menu.hotstrings.notify_bubble_colored",
+		ConfigLeaf.PREVIEW_CATEGORY_GLYPHS, "menu.hotstrings.notify_bubble_glyphs",
+		ConfigLeaf.PREVIEW_ANNOUNCEMENTS, "menu.hotstrings.notify_bubble_announcements")
 	if NoticeKeys.Has(Key)
 		NotifyFeature(t(NoticeKeys[Key]), Candidate)
 	return true
@@ -844,6 +604,8 @@ GPTLinkEditor(*) {
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
 		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
+		; A screen reader names an Edit by the text just before it.
+		GuiToShow.Add("Text", "w300", t("dialog.gpt_link.label"))
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

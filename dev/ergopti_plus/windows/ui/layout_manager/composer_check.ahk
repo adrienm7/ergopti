@@ -24,6 +24,12 @@
 ; 4. Every collaborator is injectable, so the unit suite replays a fresh run,
 ;    an existing composition and each failure without a window or the real
 ;    configuration folder. The window is a thin shell over ComposerCheck_Text.
+; 5. A finding is a WARNING, never an ERROR: what the check observes about the
+;    layout under test (a copy that fails its record, an install the composer
+;    refused, a layout the emulation would refuse) is a failed step of the
+;    evidence record, which is the verdict. An ERROR line opens the error
+;    window. ERROR is kept for the check's own faults: shipped files missing,
+;    a host that raised, its own composition left behind.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -163,9 +169,62 @@ ComposerCheck_Text(Report, TranslateFn) {
 	for Step in Report["steps"] {
 		Line := Marks.Get(Step["state"], "[-]") . " " . TranslateFn.Call("field_check.step." . Step["id"])
 		if Step["value"] != ""
-			Line := LabelValue(Line, Step["value"], TranslateFn)
+			Line := LabelValue(Line, ComposerCheck_DisplayValue(Step["value"], TranslateFn), TranslateFn)
 		Text .= "`n" . Line
 	}
+	return Text
+}
+
+/**
+ * One token of a step value in the user's language, as
+ * _shared/diagnostics/engine/field_check/report.lua display_token spells it.
+ * @param {string} Token
+ * @param {Func} TranslateFn - Locale key -> text.
+ * @returns {string}
+ */
+ComposerCheck_DisplayToken(Token, TranslateFn) {
+	static Prefix := "field_check.value."
+	if RegExMatch(Token, "^-?\d[\d.]*$")
+		return Token
+	Key := Prefix . Token
+	Text := TranslateFn.Call(Key)
+	if Text != Key
+		return Text
+	for Family in [["^http_(\d+)_direct$", "http_n_direct"], ["^http_(\d+)$", "http_n"], ["^required_(\w+)$", "required_scheme"]] {
+		if RegExMatch(Token, Family[1], &Found) {
+			Key := Prefix . Family[2]
+			Template := TranslateFn.Call(Key)
+			if Template != Key
+				return StrReplace(Template, "{1}", Found[1])
+		}
+	}
+	Key := Prefix . "other"
+	Template := TranslateFn.Call(Key)
+	return Template != Key ? StrReplace(Template, "{1}", Token) : Token
+}
+
+/**
+ * A step value in the user's language: "+" joins alternatives and ":" pairs a
+ * name with its detail, as the shared Lua report renders it.
+ * @param {string} Value
+ * @param {Func} TranslateFn - Locale key -> text.
+ * @returns {string}
+ */
+ComposerCheck_DisplayValue(Value, TranslateFn) {
+	Parts := []
+	for Part in StrSplit(Value, "+") {
+		if Part = ""
+			continue
+		Colon := InStr(Part, ":")
+		if Colon > 1 && Colon < StrLen(Part)
+			Parts.Push(LabelValue(ComposerCheck_DisplayToken(SubStr(Part, 1, Colon - 1), TranslateFn),
+				ComposerCheck_DisplayValue(SubStr(Part, Colon + 1), TranslateFn), TranslateFn))
+		else
+			Parts.Push(ComposerCheck_DisplayToken(RTrim(Part, ":"), TranslateFn))
+	}
+	Text := ""
+	for Index, Part in Parts
+		Text .= (Index > 1 ? ", " : "") . Part
 	return Text
 }
 
@@ -274,7 +333,7 @@ _ComposerCheck_Begin(Run) {
 		Existing := Installed.Has(Id) || Deps["selected"].Call() == Id
 			|| Deps["exists"].Call(LayoutComposer_DeclarationPath(Deps["config_dir"])) != ""
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The installed layouts cannot be read: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The installed layouts cannot be read: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_mode", "fail", "record_unreadable")
 		_ComposerCheck_Finish(Run)
 		return
@@ -310,7 +369,7 @@ _ComposerCheck_OnSaved(Run, Result) {
 	if Run.Settled
 		return
 	if !Result["ok"] {
-		LoggerError(COMPOSER_CHECK_TAG, "The check composition was not installed ({1}).", Result["code"])
+		LoggerWarn(COMPOSER_CHECK_TAG, "The check composition was not installed ({1}).", Result["code"])
 		_ComposerCheck_Record(Run, "composer_install", "fail", Result["code"])
 		_ComposerCheck_Cleanup(Run)
 		return
@@ -327,7 +386,7 @@ _ComposerCheck_Verify(Run) {
 	try {
 		Copy := Deps["read_local"].Call(Id, Deps["local_dir"])
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The installed composition fails its record: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The installed composition fails its record: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_copy", "fail", "unreadable")
 		_ComposerCheck_Record(Run, "composer_ready", "skip", "no_copy")
 		_ComposerCheck_Cleanup(Run)
@@ -337,7 +396,7 @@ _ComposerCheck_Verify(Run) {
 	try {
 		Keys := Deps["ready"].Call(Copy)
 	} catch as Err {
-		LoggerError(COMPOSER_CHECK_TAG, "The emulation would refuse the installed composition: {1}", Err.Message)
+		LoggerWarn(COMPOSER_CHECK_TAG, "The emulation would refuse the installed composition: {1}", Err.Message)
 		_ComposerCheck_Record(Run, "composer_ready", "fail", "refused")
 		_ComposerCheck_Cleanup(Run)
 		return
@@ -422,7 +481,17 @@ ComposerCheck_Command(*) {
  *   default (the network check shows its report through the same window).
  */
 ComposerCheck_ShowReport(Report, ShowFn := 0, TitleKey := "menu.debug.composer_check") {
-	Text := ComposerCheck_Text(Report, t)
+	ComposerCheck_ShowText(ComposerCheck_Text(Report, t), ShowFn, TitleKey)
+}
+
+/**
+ * Shows a finished report's text in the one-click checks' window, with a
+ * « Copy report » button; the in-app field report shows its report here.
+ * @param {string} Text - The report text.
+ * @param {Func} ShowFn - Opens the window; tests replace it.
+ * @param {string} TitleKey - Locale key of the window title.
+ */
+ComposerCheck_ShowText(Text, ShowFn := 0, TitleKey := "menu.debug.composer_check") {
 	if !HasMethod(ShowFn, "Call")
 		ShowFn := (Title, Body) => _ComposerCheck_ShowWindow(Title, Body, TitleKey)
 	ShowFn.Call(t(TitleKey), Text)
@@ -455,7 +524,7 @@ ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0, TitleKey := "menu.de
 	if !HasMethod(WriteFn, "Call")
 		WriteFn := CB_Write
 	if !HasMethod(NoticeFn, "Call")
-		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t(TitleKey)))
+		NoticeFn := (Notice) => NotifierSend(Notice, Map("title", t(TitleKey), "sound", true))
 	; The clipboard takes Windows line breaks, as the window's own text has.
 	if WriteFn.Call(StrReplace(Text, "`n", "`r`n")) != true {
 		LoggerWarn(COMPOSER_CHECK_TAG, "Report not copied: the clipboard refused the write.")

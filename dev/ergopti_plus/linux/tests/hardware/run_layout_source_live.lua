@@ -205,7 +205,7 @@ check(saved[1] == true, "the source is installed as the composed layout: " .. to
 	.. tostring(saved[3]))
 
 local settings = assert(Registry.composer_settings())
-local folder = require("infra.config_paths").get_config_dir() .. "/" .. settings.folder .. "/"
+local folder = require("settings.engine.paths").get_config_dir() .. "/" .. settings.folder .. "/"
 check(read(folder .. settings.source_file) == payload.source, "the TOML source is stored as sent")
 local table_ = Registry.composer_emulation()
 check(type(table_) == "table" and table_.platform == "linux" and table_.layout == "ergopti",

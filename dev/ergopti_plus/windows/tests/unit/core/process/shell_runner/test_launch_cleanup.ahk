@@ -40,7 +40,7 @@ _SRTLC_CloseStream(State, Handle) {
 }
 
 _SRTLC_DeleteCapture(Path) {
-	global SRTOW_EXIT_SIGNAL_SETTLE_MS, SRTOW_PID_POLL_MS
+	global TEST_NATIVE_SETTLE_TIMEOUT_MS, SRTOW_PID_POLL_MS
 	Started := A_TickCount
 	loop {
 		try {
@@ -50,7 +50,7 @@ _SRTLC_DeleteCapture(Path) {
 		} catch as Err {
 			; The healthy job control can report zero before its capture unlocks.
 			; This bounded fixture cleanup does not alter the prior exit assertions.
-			if TickElapsed(Started) >= SRTOW_EXIT_SIGNAL_SETTLE_MS
+			if TickElapsed(Started) >= TEST_NATIVE_SETTLE_TIMEOUT_MS
 				throw Err
 		}
 		Sleep(SRTOW_PID_POLL_MS)

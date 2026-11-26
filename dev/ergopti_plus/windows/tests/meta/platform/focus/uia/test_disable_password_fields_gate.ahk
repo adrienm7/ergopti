@@ -24,7 +24,7 @@
 ;   (b) SFD_IsSecureField body checks control class (Edit/RichEdit) before
 ;       testing the style bit.
 ;
-; SCOPE: source introspection of modules/llm/prediction_engine.ahk
+; SCOPE: source introspection of ai/engine/prediction/engine.ahk
 ;        and platform/focus/secure_field_detector.ahk.
 ; ==============================================================================
 
@@ -102,8 +102,8 @@ _DPFG_CheckSfdUnknownFailsClosed() {
 	Assert(InStr(WorkerBody, "UIA.GetFocusedElement()") > 0
 		and InStr(WorkerBody, "UIA.Property.IsPassword") > 0,
 		"the disposable worker must inspect the focused element IsPassword property")
-	Assert(InStr(UiaBody, "if A_IsSuspended") > 0,
-		"deferred secure-field UIA work must be inert while the driver is suspended")
+	; The paused probe runs under a real Suspend in
+	; tests/unit/platform/focus/uia/test_secure_field_worker_context.ahk.
 }
 
 _DPFG_CallerFailureFailsClosed() {

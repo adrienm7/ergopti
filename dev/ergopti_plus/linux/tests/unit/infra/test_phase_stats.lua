@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.support.logger_fixture").helpers({
-	"infra.phase_stats", "core.process.adapters.shell_runner", "ui.menu.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
+	"infra.phase_stats", "core.process.adapters.shell_runner", "menu.ui.builder.timed_build", "core.text.engine.toml.reader", "core.logger.engine.boot_profiler",
 	"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 })
 
@@ -112,14 +112,14 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 	helpers.it("times a tray menu rebuild as menu.rebuild, and the daemon's rebuild owner uses it", function()
 		local stats = fixture(20)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
-		local items = require("ui.menu.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
+		package.loaded["menu.ui.builder.timed_build"] = nil
+		local items = require("menu.ui.builder.timed_build").run(function(ctx) return { ctx.title } end, { title = "Ergopti" })
 		helpers.assert_eq(items, { "Ergopti" })
 		helpers.assert_eq(stats.figures("menu.rebuild").n, 1)
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = file:read("*a")
 		file:close()
-		helpers.assert_not_nil(source:find('require("ui.menu.timed_build").run(build, ctx)', 1, true),
+		helpers.assert_not_nil(source:find('require("menu.ui.builder.timed_build").run(build, ctx)', 1, true),
 			"the daemon's tray rebuild goes through the timed build")
 	end)
 
@@ -128,7 +128,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		local clock = 0
 		stats.use_clock(function() return clock end)
 		package.loaded["infra.phase_stats"] = stats
-		package.loaded["ui.menu.timed_build"] = nil
+		package.loaded["menu.ui.builder.timed_build"] = nil
 		local Timings = require("core.timing.engine.timings")
 		local held_ms = Timings.ms
 		Timings.ms = function(section, key)
@@ -136,7 +136,7 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 			return held_ms(section, key)
 		end
 		local ok, failure = pcall(function()
-			local TimedBuild = require("ui.menu.timed_build")
+			local TimedBuild = require("menu.ui.builder.timed_build")
 			TimedBuild.run(function() clock = clock + 120 * MS; return { 1, 2, 3 } end, {})
 			TimedBuild.run(function() clock = clock + 300 * MS; return { 1 } end, {})
 		end)
@@ -179,6 +179,29 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 		helpers.assert_eq(document, expected_document, "the same document as the shared reader")
 		helpers.assert_eq(committed, expected_committed)
 		helpers.assert_eq(stats.figures("toml.parse").n, 1)
+	end)
+
+	-- The tooltip constants, the timing registry and the two hotstring windows
+	-- parsed through the shared reader itself, so the phase summary missed
+	-- them; macOS reads each through its timed reader (parity TXT-01).
+	helpers.it("every production module parses TOML through the timed reader (txt-01)", function()
+		local root = (helpers.driver_root():gsub("[/\\]$", ""))
+		local paths = assert(require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true }))
+		local shim, bypassing = 0, {}
+		for _, path in ipairs(paths) do
+			local handle = assert(io.open(path, "rb"))
+			local body = assert(handle:read("*a"))
+			handle:close()
+			if body:find("MODULE: Timed TOML Reader (Linux)", 1, true) then
+				shim = shim + 1
+			elseif body:find("core.text.engine.toml_codec.reader", 1, true) then
+				bypassing[#bypassing + 1] = path:sub(#root + 2)
+			end
+		end
+		helpers.assert_eq(shim, 1, "the timed reader is found by its banner")
+		helpers.assert_eq(table.concat(bypassing, ", "), "", "modules reading the shared reader untimed")
 	end)
 
 	helpers.it("records every closed boot stage as boot.stage with its CPU time as boot.stage_cpu", function()

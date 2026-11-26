@@ -39,6 +39,7 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger        = require("core.logger.engine.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
+local SqliteChild   = require("modules.keystats.sqlite_child")
 local TextCipher    = require("modules.keystats.text_cipher")
 local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
 local EventIdPolicy = require("core.fs.engine.sqlite.event_id_policy")
@@ -90,6 +91,11 @@ local _raw_sql = {}
 local _flush_owner = nil
 local unpack_values = table.unpack or unpack
 
+-- Whether the synchronous statements go to the persistent sqlite3 child
+-- (modules/keystats/sqlite_child.lua) rather than one process each. Chosen by
+-- open_db's owner; false on stock Lua, which has no FFI to start the child.
+local _persistent_child = false
+
 
 -- =========================================
 -- =========================================
@@ -101,9 +107,9 @@ local unpack_values = table.unpack or unpack
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	-- The private runtime's sqlite3 (infra/owned_programs.lua): every package
+	-- The private runtime's sqlite3 (settings/engine/preferences/owned_programs.lua): every package
 	-- carries it, so its absence is a broken install, not a missing host package.
-	local Owned = require("infra.owned_programs")
+	local Owned = require("settings.engine.preferences.owned_programs")
 	_available = Owned.available("sqlite3")
 	if not _available then
 		Logger.error(LOG, "sqlite3 (%s) is not available — SQLite persistence disabled.", Owned.path("sqlite3"))
@@ -132,9 +138,53 @@ end
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
+--- Runs one script on the persistent child (see _exec for the contract).
+--- @return boolean True on success.
+local function _exec_child(sql, media_owned, strict_terminal)
+	local result = SqliteChild.run(require("settings.engine.preferences.owned_programs").path("sqlite3"), _db_path,
+		".output /dev/null\n" .. sql, require("core.timing.engine.timings").ms("keystats", "sqlite_child_deadline_ms"))
+	if result.status == "unavailable" then
+		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
+		return false
+	end
+	if result.status == "lost" then
+		-- Killed before its acknowledgement: whether COMMIT ran is unknown.
+		if media_owned then
+			_media_terminal_debt = { child = result.detail, close_acknowledged = true }
+			_db_path = nil
+			Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+		elseif strict_terminal then
+			Logger.error(LOG, "SQLite backup process was not completely observed and closed.")
+		else
+			Logger.error(LOG, "SQLite write refused: %s.", Errors.SQLITE_EXIT_RECEIPT_MISSING)
+		end
+		return false
+	end
+	if result.status == "refused" then
+		if result.stderr ~= "" then
+			Logger.error(LOG, "SQLite error: %s", SqliteCommand.sanitise_error(result.stderr))
+		else
+			Logger.error(LOG, "SQLite write refused: SQLite CLI exited with status %s.", tostring(result.exit_code))
+		end
+		return false
+	end
+	-- Results go to /dev/null, so any output at all means the script failed.
+	local err_out = result.output .. result.stderr
+	if err_out ~= "" then
+		if media_owned then
+			_media_terminal_debt = { child = "output", close_acknowledged = true }
+			_db_path = nil
+		end
+		Logger.error(LOG, "SQLite error: %s", SqliteCommand.sanitise_error(err_out))
+		return false
+	end
+	return true
+end
+
 local function _exec(sql, media_owned, strict_terminal)
 	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if not _db_path or not _available then return false end
+	if _persistent_child then return _exec_child(sql, media_owned, strict_terminal) end
 
 	-- The script carries the characters the user typed, so it travels on stdin.
 	-- Staging it in /tmp is what turned this module into a keystroke leak.
@@ -207,6 +257,18 @@ end
 --- @return string|nil Complete output, or nil when the query fails.
 local function _query_output(sql)
 	if not _db_path or not _available then return nil end
+	if _persistent_child then
+		local result = SqliteChild.run(require("settings.engine.preferences.owned_programs").path("sqlite3"), _db_path,
+			sql, require("core.timing.engine.timings").ms("keystats", "sqlite_child_deadline_ms"))
+		if result.status == "ok" then return result.output end
+		if result.status == "refused" then
+			Logger.warn(LOG, "SQLite read refused: %s.", result.stderr ~= "" and SqliteCommand.sanitise_error(result.stderr)
+				or ("SQLite CLI exited with status " .. tostring(result.exit_code)))
+		else
+			Logger.warn(LOG, "SQLite query could not be completely read and closed.")
+		end
+		return nil
+	end
 	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" }, capture_exit = true })
 	if not cmd then return nil end
 	local pipe = io.popen(cmd, "r")
@@ -649,9 +711,11 @@ end
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
+--- @param opts table|nil `{ persistent_child = boolean }`: run the synchronous
+---   statements on one long-lived sqlite3 (LuaJIT only; the daemon asks for it).
 --- @return boolean True on success.
 --- @return string|nil failure "sqlite_unavailable" or "store_refused".
-function M.open_db(db_path)
+local function _open_db(db_path, opts)
 	if M.has_private_file_debt() then
 		Logger.error(LOG, "Private SQLite file cleanup remains unresolved; reopening is refused.")
 		return false, "store_refused"
@@ -675,6 +739,15 @@ function M.open_db(db_path)
 
 	if not _check_sqlite3() then return false, "sqlite_unavailable" end
 
+	if opts ~= nil and type(opts) ~= "table" then
+		Logger.error(LOG, "open_db(): opts must be a table.")
+		return false, "store_refused"
+	end
+	local wants_child = opts ~= nil and opts.persistent_child == true
+	if wants_child and not SqliteChild.available() then
+		Logger.info(LOG, "No LuaJIT FFI: SQLite runs one sqlite3 process per statement.")
+	end
+	_persistent_child = wants_child and SqliteChild.available()
 	_db_path = db_path
 
 	-- Ensure the parent directory exists. The metadata probe runs in process;
@@ -767,6 +840,13 @@ function M.open_db(db_path)
 	return true
 end
 
+function M.open_db(db_path, opts)
+	local opened, failure = _open_db(db_path, opts)
+	-- A refused open leaves no store, so no child may keep one open.
+	if not opened and _db_path == nil then SqliteChild.close() end
+	return opened, failure
+end
+
 --- Closes the database connection (no-op for CLI-based backend, but cleans up state).
 function M.close_db()
 	if M.has_private_file_debt() then
@@ -781,6 +861,9 @@ function M.close_db()
 	_media_policy = nil
 	_db_path = nil
 	_bootstrapped = false
+	_persistent_child = false
+	-- The child holds the store open: end it and wait for it.
+	SqliteChild.close(require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms"))
 	Logger.debug(LOG, "SQLite database closed.")
 end
 

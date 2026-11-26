@@ -42,7 +42,10 @@
 --- 7. A chosen release: the Versions window installs any release of the list it
 ---    shows through the same download, checksum and install path
 ---    (release_record, download_release, install_release_archive); only a
----    click there reaches them, never the schedule.
+---    click there reaches them, never the schedule. When the window could only
+---    read the public feed, feed_release_record names the channel's newest
+---    release under its conventional asset names and the transfer installs it
+---    only once its detached signature verifies (signature_required).
 --- ==============================================================================
 
 local M = {}
@@ -179,7 +182,7 @@ local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes"
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20
 local _release_fetch_cancel = nil
-local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+local MAX_DOWNLOAD_BYTES = Timings.count("limits", "update_asset_download_bytes")
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
 --- Resolves the automatic-check timing (presets, backoff, jitter). No fallback:
@@ -272,7 +275,7 @@ M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 -- Path for the ETag cache (one per channel), in the driver's cache folder
 -- that the legacy folder migration creates at boot.
 local function etag_cache_path(channel)
-	return require("infra.config_paths").cache("updater_etag_" .. channel .. ".txt")
+	return require("settings.engine.paths").cache("updater_etag_" .. channel .. ".txt")
 end
 
 -- =========================================
@@ -633,8 +636,10 @@ local function _fetch_releases(channel, callback)
 	local active_key, active_page
 	local cancelled = false
 	local cancel, publish_page
-	-- reason: the updater.check_result reason a failure is shown with
-	local function finish(body, status, err, reason)
+	-- reason: the updater.check_result reason a failure is shown with;
+	-- evidence: what the failed page proved (an exhausted rate limit, its
+	-- native receipt), which the check names (UPD-06)
+	local function finish(body, status, err, reason, evidence)
 		if terminal or _release_fetch_cancel ~= cancel then return end
 		terminal = true
 		-- Native etag_save can advance its file before transport/JSON acceptance.
@@ -643,7 +648,7 @@ local function _fetch_releases(channel, callback)
 		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
 		_persist_list_cache()
-		callback(body, status, err, reason)
+		callback(body, status, err, reason, evidence)
 	end
 	local function page_current(work)
 		return not terminal and _release_fetch_cancel == cancel and rawequal(active_page, work)
@@ -763,7 +768,9 @@ local function _fetch_releases(channel, callback)
 				elseif status == 403 then
 					Logger.warn(LOG, "GitHub refused the releases request (HTTP 403) for channel %s page %d.", channel, page)
 				end
-				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection")
+				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection",
+					{ rate_limited = limited ~= nil,
+						receipt = result and type(result.failure_receipt) == "table" and result.failure_receipt or nil })
 				return
 			else
 				all_unchanged = false
@@ -1007,6 +1014,39 @@ end
 
 M._select_signature_asset = _select_signature_asset
 
+--- Whether a release read from the public feed can be authenticated: the
+--- signing policy names a verification key (docs/tooling/update-signing.md).
+--- @return boolean
+function M.feed_install_available()
+	return get_signature_gate().has_key() == true
+end
+
+--- The installable record of a release the public feed names, which lists no
+--- assets and no digests: the canonical bundle, its checksum and its signature
+--- under their conventional names in this repository's release path, with the
+--- signature required whatever the policy's enforcement. The checksum binds the
+--- downloaded bytes to a digest and the signature binds that digest and the size
+--- to the pinned key, so nothing the feed or the checksum asset says is trusted
+--- on its own.
+--- @param tag string Release tag the feed names.
+--- @return table|nil record nil when the tag is unusable or no key is provisioned.
+function M.feed_release_record(tag)
+	if type(tag) ~= "string" or not tag:match("^[A-Za-z0-9._+-]+$") then return nil end
+	local signature_name = get_signature_gate().signature_name()
+	if not signature_name or not M.feed_install_available() then return nil end
+	local base = M.releases_page_url() .. "/download/" .. tag .. "/"
+	return {
+		tag                = tag,
+		notes              = "",
+		download_url       = base .. LINUX_ASSET_NAME,
+		checksum_url       = base .. LINUX_CHECKSUM_ASSET_NAME,
+		signature_url      = base .. signature_name,
+		signature_required = true,
+		published_at       = "",
+		prerelease         = false,
+	}
+end
+
 --- The installable record of one release object of the release list: its tag
 --- and the canonical Linux bundle with its checksum, or nil when the release
 --- lacks either (it cannot be installed on this system).
@@ -1127,6 +1167,8 @@ local function _process_release_response(body, channel, check_only)
 		signature_url = signature_url ~= "" and signature_url or nil,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
+		-- Declared by GitHub, for the download's progress only (UPD-07)
+		size         = Parser.parse_asset_size(body, LINUX_ASSET_NAME),
 	}
 
 	_state = "available"
@@ -1147,6 +1189,30 @@ local function publish_check(callback, available, release, err, result)
 	if type(callback) ~= "function" then return end
 	local ok, callback_error = pcall(callback, available, release, err, result)
 	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
+end
+
+local _network_contract = nil
+
+--- The evidence a failed check names (updater.check_result failure_key): the
+--- API's exhausted rate limit, and the managed-network cause the shared
+--- contract classifies from the fetch's native receipt. No receipt, no cause.
+--- @param evidence table|nil { rate_limited = boolean, receipt = table|nil }
+--- @return table|nil { rate_limited, report }
+function M._check_evidence(evidence)
+	if type(evidence) ~= "table" then return nil end
+	local report = nil
+	if type(evidence.receipt) == "table" and next(evidence.receipt) ~= nil then
+		if not _network_contract then
+			local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
+			local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
+			assert(status == "ok", "managed network policy read or close refused")
+			_network_contract = require("core.network.engine.failure").new(Json.decode(source))
+		end
+		local classified, value = pcall(_network_contract.classify, evidence.receipt, {})
+		if classified then report = value
+		else Logger.error(LOG, "The check's failure receipt could not be classified: %s.", tostring(value)) end
+	end
+	return { rate_limited = evidence.rate_limited == true, report = report }
 end
 
 --- Checks the GitHub API for a newer release without blocking the event loop.
@@ -1173,7 +1239,8 @@ function M.check_for_updates(channel, callback)
 	_state = "checking"
 	local published = false
 	--- Publishes a check that gave no list.
-	local function publish_failure(status, fetch_error, reason)
+	--- @param evidence table|nil The API attempt's { rate_limited, receipt }.
+	local function publish_failure(status, fetch_error, reason, evidence)
 		_cached_release = known
 		_state = known and "available" or "idle"
 		Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
@@ -1183,7 +1250,7 @@ function M.check_for_updates(channel, callback)
 			Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
 		end
 		publish_check(callback, known ~= nil, known, fetch_error or "empty body",
-			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
+			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body", M._check_evidence(evidence)))
 	end
 	--- Publishes a list: the API's, or the public feed's when check_only.
 	local function publish_list(body, check_only)
@@ -1204,14 +1271,14 @@ function M.check_for_updates(channel, callback)
 		publish_check(callback, available, _cached_release, nil, result)
 	end
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
-		function(body, status, fetch_error, reason)
+		function(body, status, fetch_error, reason, evidence)
 			published = true
 			if body then
 				publish_list(body, false)
 				return
 			end
 			if reason ~= "no_connection" then
-				publish_failure(status, fetch_error, reason)
+				publish_failure(status, fetch_error, reason, evidence)
 				return
 			end
 			-- api.github.com gave no list (blocked, throttled, rate-limited): the
@@ -1226,12 +1293,12 @@ function M.check_for_updates(channel, callback)
 				if list then
 					publish_list(list, true)
 				else
-					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason)
+					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason, evidence)
 				end
 			end)
 			if not started and not feed_published then
 				feed_published = true
-				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason)
+				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason, evidence)
 			end
 		end)
 	if not ok then
@@ -1427,11 +1494,19 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		Logger.debug(LOG, "Local source — background checks disabled.")
 		return true
 	end
-	-- A system package owns its own update path: install_archive() refuses to
-	-- replace it, so a background check would only offer what cannot be installed.
-	if M.installation_kind() == "package" then
-		Logger.info(LOG, "Package installation: no automatic update check, the package manager updates it.")
+	-- A system package or a Flatpak owns its own update path, which also
+	-- announces a new release: install_archive() refuses to replace it, so a
+	-- background check would only offer what cannot be installed. An AppImage
+	-- has no such announcer: its checks run and only announce (install_origin).
+	local kind = M.installation_kind()
+	local InstallOrigin = require("modules.updater.install_origin")
+	if not InstallOrigin.checks_for_releases(kind) then
+		Logger.info(LOG, "No automatic update check for this %s installation: its own updater replaces it.", kind)
 		return true
+	end
+	if InstallOrigin.update_blocked_key(kind) then
+		Logger.info(LOG, "This %s installation never replaces itself; its background checks only announce "
+			.. "a new release.", kind)
 	end
 
 	_schedule_active = true
@@ -1495,11 +1570,13 @@ end
 --- @param callback function|nil
 --- @param path string|nil
 --- @param err string|nil
---- @param stage string|nil "download" or "verify": where a failure happened.
+--- @param stage string|nil "download", "verify" or "signature": where a failure happened.
 --- @param release table|nil The release the archive belongs to.
 --- @param failure_state string The updater state a failure returns to.
 --- @param failure_receipt table|nil Structured native evidence, never inferred from err.
 local function publish_download(callback, path, err, stage, release, failure_state, failure_receipt)
+	-- An offer survives its failed download only while it is still the cached one
+	if not path and failure_state == "available" and _cached_release == nil then failure_state = "idle" end
 	_state = path and "available" or failure_state
 	_verified_archive = path
 	_verified_release = path and release or nil
@@ -1536,6 +1613,7 @@ local function release_snapshot(release)
  if type(signature_url) == "string" and signature_url ~= "" and not signature_url:find("\0", 1, true) then
   copy.signature_url = signature_url
  end
+ if rawget(release, "signature_required") == true then copy.signature_required = true end
  return copy
 end
 local function retire_verified_artifact()
@@ -1575,7 +1653,7 @@ local function capture_operation(operation)
  if type(methods.is_settled) ~= "function" or type(methods.on_settled) ~= "function" or type(methods.cancel) ~= "function" then return nil end
  return methods
 end
-local function start_native_download(release, download_url, callback, failure_state, execution)
+local function start_native_download(release, download_url, callback, failure_state, execution, on_progress)
  if native_transfer or native_install or native_channel_intent then return false end
  local selected = release_snapshot(release)
  if not selected or selected.download_url ~= download_url or (execution ~= nil and type(execution) ~= "function") then return false end
@@ -1694,7 +1772,7 @@ local function start_native_download(release, download_url, callback, failure_st
    end,
    parse_checksum = parse_checksum, owner = REQUEST_OWNER, headers = { ["User-Agent"] = USER_AGENT },
    max_download_bytes = MAX_DOWNLOAD_BYTES, max_checksum_bytes = MAX_CHECKSUM_BODY_BYTES,
-   signature = get_signature_gate() })
+   signature = get_signature_gate(), on_progress = on_progress })
  end)
  local started, operation
  if initialized and type(flow) == "table" and type(rawget(flow, "start")) == "function" then
@@ -1726,15 +1804,17 @@ local function start_native_download(release, download_url, callback, failure_st
  return record.operation ~= nil and not record.unknown -- Exact owned transaction admission, not HTTP success.
 end
 
-local function start_download(release, download_url, callback, failure_state, execution)
- return start_native_download(release, download_url, callback, failure_state, execution)
+local function start_download(release, download_url, callback, failure_state, execution, on_progress)
+ if on_progress ~= nil and type(on_progress) ~= "function" then return false end
+ return start_native_download(release, download_url, callback, failure_state, execution, on_progress)
 end
 
 --- Downloads and verifies the canonical update archive asynchronously.
 --- @param url string|nil Must match the cached release URL when provided.
 --- @param callback function|nil Receives verified path, error, failing stage, native failure receipt.
+--- @param on_progress function|nil Told the archive bytes received so far (UPD-07).
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_update(url, callback)
+function M.download_update(url, callback, on_progress)
  if native_channel_intent then return false end
 	local release = _cached_release
 	local download_url = url or (release and release.download_url)
@@ -1749,7 +1829,9 @@ function M.download_update(url, callback)
 		if type(callback) == "function" then callback(nil, "updater is not ready to download", "download") end
 		return false
 	end
-	return start_download(release, download_url, callback, "idle")
+	-- A failed or cancelled download keeps the offer, so the menu still says
+	-- « Update now », as a Versions download does (UPD-08)
+	return start_download(release, download_url, callback, "available", nil, on_progress)
 end
 
 --- Downloads and verifies the archive of a release the user chose in the
@@ -1758,7 +1840,7 @@ end
 --- @param release table M.release_record() result.
 --- @param callback function|nil Receives verified path, error, failing stage.
 --- @return boolean Whether the checksum request was dispatched.
-function M.download_release(release, callback, native_execution)
+function M.download_release(release, callback, native_execution, on_progress)
  if native_channel_intent then return false end
 	if type(release) ~= "table" or type(release.tag) ~= "string" or release.tag == ""
 		or type(release.download_url) ~= "string" or release.download_url == ""
@@ -1773,7 +1855,7 @@ function M.download_release(release, callback, native_execution)
 		return false
 	end
 	Logger.info(LOG, "Downloading the chosen release %s.", release.tag)
-	return start_download(release, release.download_url, callback, _state, native_execution)
+	return start_download(release, release.download_url, callback, _state, native_execution, on_progress)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.
@@ -1966,7 +2048,7 @@ end
 
 --- Whether this installation can replace itself (a standalone install), and
 --- why not otherwise.
---- @return string kind "standalone", "package" or "unmanaged"
+--- @return string kind "standalone", "package", "appimage", "flatpak" or "unmanaged"
 --- @return string|nil reason
 function M.installation_kind()
 	local ok, context = pcall(M._resolve_installation)
@@ -2164,7 +2246,7 @@ function M.init(opts)
 	_is_paused = opts.is_paused
 	_on_available = opts.on_available
 
-	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_config_path = opts.config_path or require("settings.engine.paths").config("config.toml")
 	_load_persisted()
 
 	if opts.channel then

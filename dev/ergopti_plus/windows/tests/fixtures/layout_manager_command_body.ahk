@@ -18,6 +18,16 @@ _LMCS_Require(Condition, Message) {
 
 t(Key) => Key
 WindowTitle(Label := "") => Label
+; The interface language I18nInit sets in the driver.
+global _I18nLocale := "en"
+
+; The paused notice is a presentation port: the child records each one instead
+; of showing a balloon (paused-refusal-notice).
+NotifyPausedRefusal(What, *) {
+	global _LMCS
+	_LMCS.Notices += 1
+	return true
+}
 
 Gui_Create(Options := "", Title := "") {
 	global _LMCS
@@ -68,11 +78,18 @@ class _LMCS_Subscription {
 class _LMCS_View {
 	__New() {
 		this.Settings := {}, this.Callbacks := Map(), this.Active := 0
-		this.Scripts := [], this.Init := [], this.States := [], this.Navigations := 0
+		this.Scripts := [], this.Init := [], this.States := [], this.Navigations := 0, this.Seeds := 0
 	}
 	WebMessageReceived(Callback) => _LMCS_Subscription(this, "message", Callback)
 	NavigationCompleted(Callback) => _LMCS_Subscription(this, "navigation", Callback)
 	SetVirtualHostNameToFolderMapping(*) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMCS_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMCS_Require(this.Navigations == 0, "The seed precedes the navigation.")
+		this.Seeds += 1
+	}
 	Navigate(Url) {
 		this.Navigations += 1
 	}
@@ -101,6 +118,8 @@ class _LMCS_Controller {
 	Close() {
 		this.Closed += 1
 		this.ActiveAtClose := this.CoreWebView2.Active
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -278,7 +297,7 @@ _LMCS_Report(Command) {
 	Snapshot := _LMCS_Snapshot()
 	FileAppend("RECEIPT layout-manager-command mode=" . _LMCS.Mode . " delivery=" . Command.Calls
 		. " settled=" . Command.Settled . " paused=" . Command.Paused . " cancel=" . Command.Cancels
-		. " ready_while_paused=" . _LMCS.ReadyWhilePaused
+		. " ready_while_paused=" . _LMCS.ReadyWhilePaused . " paused_notices=" . _LMCS.Notices
 		. " before_resume_exists=" . (HasProp(_LMCS, "BeforeResume") ? _LMCS.BeforeResume.Exists : -1)
 		. " before_resume_installed=" . (HasProp(_LMCS, "BeforeResume") ? _LMCS.BeforeResume.Installed : -1)
 		. " arms=" . Command.Arms . " resumes=" . _LMCS.Resumes . " file_exists=" . Snapshot.Exists
@@ -298,7 +317,7 @@ _LMCS_Main() {
 		ExitApp(2)
 	Persistent(true)
 	_LMCS := {Mode: A_Args[1], Windows: [], Controllers: [], Records: [], Timers: Map(), Phase: "setup",
-		Failure: 0, Environments: 0, Resumes: 0, ReadyWhilePaused: false, Id: "ergol"}
+		Failure: 0, Environments: 0, Resumes: 0, ReadyWhilePaused: false, Notices: 0, Id: "ergol"}
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_LMCS_OnError)
 	LoggerSetTestSink(_LMCS_Log)
@@ -357,12 +376,14 @@ _LMCS_Main() {
 		_LMCS_Pump(Command)
 		PausedSnapshot := _LMCS_Snapshot()
 		_LMCS.BeforeResume := PausedSnapshot
+		; A pause stops typing, not configuration (EDD-1): the queued command
+		; settles under the pause, and one arriving already paused is admitted.
 		if _LMCS.Mode == "queued-pause" {
-			_LMCS_Require(Command.Cancels > 0 || Command.Paused,
-				"The command must actually settle under pause or have an observed SUT cancellation.")
+			_LMCS_Require(Command.Cancels == 0 && Command.Paused,
+				"The queued command must actually settle under the pause.")
 			Count := _LMCS.Timers.Count
 			_LMCS_Send(Record, "uninstall")
-			_LMCS_Require(_LMCS.Timers.Count == Count, "A command arriving already paused must be terminally refused at the real producer.")
+			_LMCS_Require(_LMCS.Timers.Count == Count + 1, "A command arriving already paused must reach the real producer.")
 			_LMCS_Resume()
 			_LMCS_Opportunity()
 		}
@@ -372,16 +393,20 @@ _LMCS_Main() {
 		if IsObject(_LMCS.Failure)
 			throw _LMCS.Failure
 		After := _LMCS_Snapshot()
-		if _LMCS.Mode == "current-uninstall" {
-			_LMCS_Require(Command.Calls == 1 && Command.Settled == 1 && !Command.Paused
+		if _LMCS.Mode == "current-uninstall" || _LMCS.Mode == "queued-pause" {
+			Paused := _LMCS.Mode == "queued-pause"
+			_LMCS_Require(Command.Calls == 1 && Command.Settled == 1 && Command.Paused == Paused
 				&& !After.Exists && !After.Installed && _LayMgrWeb_RuntimeRefresh == 0
 				&& _LayMgrWeb_Result is Map && _LayMgrWeb_Result["ok"] == 1,
-				"The actual current command must delete the private file and record through the genuine no-reload completion.")
+				"The actual command must delete the private file and record through the genuine no-reload completion, paused or not.")
+			if Paused
+				_LMCS_Require(!PausedSnapshot.Exists && !PausedSnapshot.Installed && _LMCS.Notices == 0,
+					"The paused command must apply under the pause itself and refuse nothing.")
 		} else {
 			_LMCS_Require(PausedSnapshot.Exists && PausedSnapshot.Installed
 				&& PausedSnapshot.Layout == _LMCS.Before.Layout && PausedSnapshot.Record == _LMCS.Before.Record
 				&& After.Exists && After.Installed && After.Layout == _LMCS.Before.Layout && After.Record == _LMCS.Before.Record,
-				"A queued suspended or retired command must not delete, rewrite or later replay against the private layout owner.")
+				"A retired command must not delete, rewrite or later replay against the private layout owner.")
 			if _LMCS.Mode == "retired-epoch"
 				_LMCS_Require(_LayMgrWeb_Gui == Successor.Window && _LayMgrWeb_Controller == Successor.Controller
 					&& _LayMgrWeb_WebView == Successor.View && _LayMgrWeb_SessionEpoch == Successor.Epoch

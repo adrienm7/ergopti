@@ -142,6 +142,25 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 		cleanup(Shell)
 	end)
 
+	-- The field log of 2026-11-25 read « Layout resolved: 97 typable character(s) »
+	-- and « layout=qwerty »: nothing said which layout the session had loaded.
+	helpers.it("names the layout the session loaded, in the active group (layout-name)", function()
+		local named = plausible_keymap():gsub('xkb_symbols "%(unnamed%)" {\n',
+			'xkb_symbols "pc+us+fr(ergopti):2" {\n\tname[Group1]="English (US)";\n\tname[Group2]="French (Ergopti)";\n', 1)
+		local layout, _, Shell = load_with("wayland", { { "dump-keymap-wayland", named } }, nil, 2)
+		with_env({ DISPLAY = ":0" }, function()
+			helpers.assert_true(layout.refresh(nil), "a Wayland dump must load")
+		end)
+		helpers.assert_eq(layout.layout_name(), "French (Ergopti)", "the active group's name, not group 1's")
+		cleanup(Shell)
+		local unnamed, _, unnamed_shell = load_with("wayland", { { "dump-keymap-wayland", plausible_keymap() } })
+		with_env({ DISPLAY = ":0" }, function()
+			helpers.assert_true(unnamed.refresh(nil), "a Wayland dump must load")
+		end)
+		helpers.assert_eq(unnamed.layout_name(), nil, "a dump naming no group names no layout")
+		cleanup(unnamed_shell)
+	end)
+
 	helpers.it("bounds the Wayland dump, which waits forever on a seat with no keyboard", function()
 		local layout, commands, Shell = load_with("wayland", {
 			{ "dump-keymap-wayland", plausible_keymap() },

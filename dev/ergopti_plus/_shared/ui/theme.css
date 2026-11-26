@@ -38,7 +38,6 @@
 
 	/* Apple system greys and label colours. */
 	--theme-label: #1d1d1f;
-	--theme-secondary-label: #6e6e73;
 	--theme-gray4: #d1d1d6;
 	--theme-gray5: #e5e5ea;
 	--theme-gray6: #f2f2f7;
@@ -52,6 +51,7 @@
 	   appearance only writes it in the matching rule. Added because no Apple
 	   system colour holds these exact values. */
 	--theme-white: #ffffff;
+	--theme-black: #000000;
 	--theme-grey-333: #333333;
 	--theme-grey-555: #555555;
 	--theme-grey-888: #888888;
@@ -99,8 +99,6 @@
 	--theme-grey-1e1e1e: #1e1e1e;
 	--theme-grey-242424: #242424;
 	--theme-grey-2d2d2d: #2d2d2d;
-	--theme-grey-777: #777777;
-	--theme-grey-a2a2a2: #a2a2a2;
 	--theme-grey-b0b0b0: #b0b0b0;
 	--theme-grey-bbb: #bbbbbb;
 	--theme-grey-bdbdbd: #bdbdbd;
@@ -112,29 +110,26 @@
 	--theme-grey-f3f3f3: #f3f3f3;
 	--theme-grey-f5f5f5: #f5f5f5;
 	--theme-grey-f9f9f9: #f9f9f9;
-	--theme-hue-005cc5: #005cc5;
-	--theme-hue-008000: #008000;
-	--theme-hue-06243f: #06243f;
+	/* The accessible accent: 8.6:1 under white text, 7.7:1 as text on the light
+	   grey background, where the Apple blue gives 4.0:1 and 3.6:1 (WCAG 1.4.6
+	   enhanced contrast, AAA). */
+	--theme-hue-004a99: #004a99;
 	--theme-hue-094771: #094771;
-	--theme-hue-0969da: #0969da;
 	--theme-hue-0a3a6e: #0a3a6e;
-	--theme-hue-0b4ea2: #0b4ea2;
 	--theme-hue-0f172a: #0f172a;
 	--theme-hue-111113: #111113;
 	--theme-hue-12121e: #12121e;
+	--theme-hue-154218: #154218;
 	--theme-hue-183060: #183060;
 	--theme-hue-1a1a1c: #1a1a1c;
 	--theme-hue-1a1a2e: #1a1a2e;
 	--theme-hue-1a2e1a: #1a2e1a;
 	--theme-hue-1a4bbf: #1a4bbf;
-	--theme-hue-1a8c3a: #1a8c3a;
 	--theme-hue-1b1b1d: #1b1b1d;
 	--theme-hue-1e1608: #1e1608;
 	--theme-hue-1e1e20: #1e1e20;
 	--theme-hue-1e2a38: #1e2a38;
 	--theme-hue-1e2e1e: #1e2e1e;
-	--theme-hue-1e5e22: #1e5e22;
-	--theme-hue-1e96ff: #1e96ff;
 	--theme-hue-1f6feb: #1f6feb;
 	--theme-hue-22c55e: #22c55e;
 	--theme-hue-262629: #262629;
@@ -143,23 +138,22 @@
 	--theme-hue-2a4a7a: #2a4a7a;
 	--theme-hue-2d2d30: #2d2d30;
 	--theme-hue-2d4a63: #2d4a63;
-	--theme-hue-2e9d4f: #2e9d4f;
 	--theme-hue-2f3137: #2f3137;
 	--theme-hue-333335: #333335;
 	--theme-hue-333336: #333336;
 	--theme-hue-343436: #343436;
 	--theme-hue-3a1f1f: #3a1f1f;
 	--theme-hue-3a3a3d: #3a3a3d;
-	--theme-hue-3a6bd0: #3a6bd0;
 	--theme-hue-3b82f6: #3b82f6;
 	--theme-hue-3d3d41: #3d3d41;
 	--theme-hue-3fb950: #3fb950;
-	--theme-hue-4478e0: #4478e0;
 	--theme-hue-46464a: #46464a;
 	--theme-hue-48484a: #48484a;
+	/* The muted text of every look in light: 7.1:1 or more on the white, grey and
+	   tinted surfaces it is read on (WCAG 1.4.6, AAA). */
+	--theme-hue-48484c: #48484c;
 	--theme-hue-4a1c1a: #4a1c1a;
 	--theme-hue-4a3a2d: #4a3a2d;
-	--theme-hue-4a9eff: #4a9eff;
 	--theme-hue-4cd964: #4cd964;
 	--theme-hue-4da6ff: #4da6ff;
 	--theme-hue-4db6ff: #4db6ff;
@@ -167,30 +161,22 @@
 	--theme-hue-5856d6: #5856d6;
 	--theme-hue-5a5a5c: #5a5a5c;
 	--theme-hue-5a8dee: #5a8dee;
+	--theme-hue-5c3800: #5c3800;
 	--theme-hue-5e5f60: #5e5f60;
 	--theme-hue-5eb1ff: #5eb1ff;
-	--theme-hue-636366: #636366;
-	--theme-hue-64b5f6: #64b5f6;
 	--theme-hue-73d98c: #73d98c;
 	--theme-hue-77dd77: #77dd77;
-	--theme-hue-7a4b00: #7a4b00;
-	--theme-hue-7a5500: #7a5500;
-	--theme-hue-7a7a80: #7a7a80;
-	--theme-hue-86868b: #86868b;
-	--theme-hue-8a8a90: #8a8a90;
-	--theme-hue-93b8f8: #93b8f8;
+	--theme-hue-8a1a14: #8a1a14;
 	--theme-hue-9973f2: #9973f2;
-	--theme-hue-9a6700: #9a6700;
+	--theme-hue-9ae6ac: #9ae6ac;
+	--theme-hue-9ccaff: #9ccaff;
 	--theme-hue-9cdcfe: #9cdcfe;
-	--theme-hue-a0a0a6: #a0a0a6;
 	--theme-hue-a0bfff: #a0bfff;
 	--theme-hue-a8d8ff: #a8d8ff;
 	--theme-hue-aec6cf: #aec6cf;
 	--theme-hue-af52de: #af52de;
-	--theme-hue-b3261e: #b3261e;
-	--theme-hue-bf7af0: #bf7af0;
+	--theme-hue-c4c4ca: #c4c4ca;
 	--theme-hue-c6d8f5: #c6d8f5;
-	--theme-hue-c77700: #c77700;
 	--theme-hue-c8c8cc: #c8c8cc;
 	--theme-hue-cb99c9: #cb99c9;
 	--theme-hue-cc55ff: #cc55ff;
@@ -198,15 +184,13 @@
 	--theme-hue-cfe0ff: #cfe0ff;
 	--theme-hue-cfe3f5: #cfe3f5;
 	--theme-hue-d0d0d4: #d0d0d4;
-	--theme-hue-d0d0d5: #d0d0d5;
-	--theme-hue-d29922: #d29922;
 	--theme-hue-d4d4d6: #d4d4d6;
+	--theme-hue-d9b3f7: #d9b3f7;
 	--theme-hue-d70015: #d70015;
 	--theme-hue-dceaff: #dceaff;
 	--theme-hue-dd1111: #dd1111;
 	--theme-hue-ddeeff: #ddeeff;
 	--theme-hue-e3f1e4: #e3f1e4;
-	--theme-hue-e65100: #e65100;
 	--theme-hue-e8e8ed: #e8e8ed;
 	--theme-hue-e8f0ff: #e8f0ff;
 	--theme-hue-e8f4ff: #e8f4ff;
@@ -221,12 +205,10 @@
 	--theme-hue-f5f8ff: #f5f8ff;
 	--theme-hue-fbeceb: #fbeceb;
 	--theme-hue-ff2d55: #ff2d55;
-	--theme-hue-ff3333: #ff3333;
 	--theme-hue-ff6961: #ff6961;
 	--theme-hue-ff6b00: #ff6b00;
 	--theme-hue-ff6b5f: #ff6b5f;
-	--theme-hue-ff6b61: #ff6b61;
-	--theme-hue-ff8e85: #ff8e85;
+	--theme-hue-ffc4bf: #ffc4bf;
 	--theme-hue-ff9d9d: #ff9d9d;
 	--theme-hue-ffe5e3: #ffe5e3;
 	--theme-hue-fff1d6: #fff1d6;
@@ -247,24 +229,42 @@
 	--theme-surface-2: #f6f6f9;
 	--theme-separator: var(--theme-gray4);
 	--theme-text: var(--theme-label);
-	--theme-sub: var(--theme-secondary-label);
-	--theme-accent: var(--theme-blue);
+	--theme-sub: var(--theme-hue-48484c);
+	--theme-accent: var(--theme-hue-004a99);
 	--theme-accent-soft: rgba(0, 122, 255, 0.12);
+	/* Behind white text (filled buttons, chips): no appearance's accent holds
+	   4.5:1 there, the dark one being made to be read on dark surfaces. */
+	--theme-accent-fill: var(--theme-hue-004a99);
 	--theme-danger: var(--theme-red);
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-bg: var(--theme-gray6-dark);
 		--theme-surface: var(--theme-gray5-dark);
 		--theme-surface-2: #242426;
 		--theme-separator: var(--theme-gray4-dark);
 		--theme-text: #fff;
-		--theme-sub: rgba(235, 235, 245, 0.6);
-		--theme-accent: var(--theme-blue-dark);
+		--theme-sub: rgba(235, 235, 245, 0.8);
+		/* Read as text on the dark surfaces: 8.2:1 on the surface and 9.1:1 on
+		   the second one, where the Apple blue gives 3.8:1 and 4.3:1 (WCAG 1.4.6). */
+		--theme-accent: var(--theme-hue-9ccaff);
 		--theme-accent-soft: rgba(10, 132, 255, 0.22);
 		--theme-danger: var(--theme-red-dark);
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-bg: var(--theme-gray6-dark);
+	--theme-surface: var(--theme-gray5-dark);
+	--theme-surface-2: #242426;
+	--theme-separator: var(--theme-gray4-dark);
+	--theme-text: #fff;
+	--theme-sub: rgba(235, 235, 245, 0.8);
+	/* The dark accent of the system appearance above, chosen in the settings. */
+	--theme-accent: var(--theme-hue-9ccaff);
+	--theme-accent-soft: rgba(10, 132, 255, 0.22);
+	--theme-danger: var(--theme-red-dark);
 }
 
 /* ===================================================== */
@@ -275,29 +275,40 @@
 
 :root {
 	--theme-dialog-text: #1a1a1a;
-	--theme-dialog-muted: #666;
+	--theme-dialog-muted: var(--theme-hue-48484c);
 	--theme-dialog-background: #fff;
 	--theme-dialog-panel: #f6f6f6;
 	--theme-dialog-border: #e0e0e0;
 	--theme-dialog-code-background: #1e1e1e;
 	--theme-dialog-code-text: #d4d4d4;
-	--theme-dialog-accent: #0a66c2;
+	--theme-dialog-accent: var(--theme-hue-004a99);
 	--theme-dialog-accent-text: #fff;
-	--theme-dialog-ok: #1a7f37;
-	--theme-dialog-fail: #cf222e;
+	--theme-dialog-ok: #0f5f27;
+	--theme-dialog-fail: #951a13;
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-dialog-text: #e6e6e6;
-		--theme-dialog-muted: #9a9a9a;
+		--theme-dialog-muted: #c8c8c8;
 		--theme-dialog-background: #1f1f1f;
 		--theme-dialog-panel: #2a2a2a;
 		--theme-dialog-border: #3a3a3a;
 		--theme-dialog-code-background: #111;
-		--theme-dialog-ok: #3fb950;
-		--theme-dialog-fail: #ff7b72;
+		--theme-dialog-ok: #5fd37a;
+		--theme-dialog-fail: #ffb3ae;
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-dialog-text: #e6e6e6;
+	--theme-dialog-muted: #c8c8c8;
+	--theme-dialog-background: #1f1f1f;
+	--theme-dialog-panel: #2a2a2a;
+	--theme-dialog-border: #3a3a3a;
+	--theme-dialog-code-background: #111;
+	--theme-dialog-ok: #5fd37a;
+	--theme-dialog-fail: #ffb3ae;
 }
 
 /* =========================================== */
@@ -310,7 +321,10 @@
 	--theme-metrics-bg: var(--theme-page-background);
 	--theme-metrics-panel: #ffffff;
 	--theme-metrics-text: var(--theme-label);
-	--theme-metrics-text-muted: #86868b;
+	/* 8.7:1 on the page, 7.3:1 on the red-tinted split boxes of the typing
+	   dashboard, where #48484c read 6.99:1 (WCAG 1.4.6); the system tertiary
+	   grey was 3.3:1 and 3.6:1. */
+	--theme-metrics-text-muted: var(--theme-hue-46464a);
 	--theme-metrics-strong: var(--theme-label);
 	--theme-metrics-border: #d2d2d7;
 	--theme-metrics-th-bg: var(--theme-gray5);
@@ -319,15 +333,489 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-metrics-bg: #1e1e1e;
 		--theme-metrics-panel: #2d2d2d;
 		--theme-metrics-text: #f0f0f0;
-		--theme-metrics-text-muted: #aaaaaa;
+		--theme-metrics-text-muted: #c8c8c8;
 		--theme-metrics-strong: #ffffff;
 		--theme-metrics-border: #444444;
 		--theme-metrics-th-bg: #333333;
 		--theme-metrics-th-hover: #444444;
 		--theme-metrics-td-hover: #3d3d3d;
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-metrics-bg: #1e1e1e;
+	--theme-metrics-panel: #2d2d2d;
+	--theme-metrics-text: #f0f0f0;
+	--theme-metrics-text-muted: #c8c8c8;
+	--theme-metrics-strong: #ffffff;
+	--theme-metrics-border: #444444;
+	--theme-metrics-th-bg: #333333;
+	--theme-metrics-th-hover: #444444;
+	--theme-metrics-td-hover: #3d3d3d;
+}
+
+/* ========================================= */
+/* ========================================= */
+/* ======= 5/ Chart look (analyses) ======== */
+/* ========================================= */
+/* ========================================= */
+
+/* Checked with the dataviz palette validator on the light and dark surfaces
+   (lightness band, colour-blind separation, contrast): gain and loss are a
+   diverging blue / orange pair, the ramp one blue hue from low to high.
+   The ramp's light end is 1.16:1 (light) and 1.11:1 (dark) against the
+   surface, so a key worth zero would vanish: every key wears a 1 px edge of
+   the same hue, 3.7:1 and 4.2:1 against the surface and 3.2:1 and 3.8:1
+   against the light end (WCAG 1.4.11 non-text contrast). The four
+   categorical hues are the validator's first six slots (the fingers take
+   four; the Comparer's stacked figures, its trigram classes, all six), in
+   their fixed order: every adjacent pair passes the colour-blind and
+   normal-vision floors in both modes (worst adjacent CVD ΔE 9.1 light, 8.4
+   dark on #2c2c2e); aqua, yellow and magenta are 2.8:1, 2.2:1 and 2.7:1 on
+   white, so each mark also prints its name or has its table (the relief
+   rule). */
+:root {
+	--theme-chart-gain: #2a78d6;
+	--theme-chart-loss: #eb6834;
+	--theme-chart-ramp-low: #e6effb;
+	--theme-chart-ramp-high: #104281;
+	--theme-chart-ramp-edge: #5f86bf;
+	--theme-chart-ramp-ink-strong: #ffffff;
+	--theme-chart-cat-1: #2a78d6;
+	--theme-chart-cat-2: #eb6834;
+	--theme-chart-cat-3: #1baf7a;
+	--theme-chart-cat-4: #eda100;
+	--theme-chart-cat-5: #e87ba4;
+	--theme-chart-cat-6: #008300;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--theme-chart-gain: #3987e5;
+		--theme-chart-loss: #d95926;
+		--theme-chart-ramp-low: #2a3442;
+		--theme-chart-ramp-high: #9ec5f4;
+		--theme-chart-ramp-edge: #6d8fbd;
+		--theme-chart-ramp-ink-strong: #0d1a2b;
+		--theme-chart-cat-1: #3987e5;
+		--theme-chart-cat-2: #d95926;
+		--theme-chart-cat-3: #199e70;
+		--theme-chart-cat-4: #c98500;
+		--theme-chart-cat-5: #d55181;
+		--theme-chart-cat-6: #0ca30c;
+	}
+}
+
+:root[data-theme='dark'] {
+	--theme-chart-gain: #3987e5;
+	--theme-chart-loss: #d95926;
+	--theme-chart-ramp-low: #2a3442;
+	--theme-chart-ramp-high: #9ec5f4;
+	--theme-chart-ramp-edge: #6d8fbd;
+	--theme-chart-ramp-ink-strong: #0d1a2b;
+	--theme-chart-cat-1: #3987e5;
+	--theme-chart-cat-2: #d95926;
+	--theme-chart-cat-3: #199e70;
+	--theme-chart-cat-4: #c98500;
+	--theme-chart-cat-5: #d55181;
+	--theme-chart-cat-6: #0ca30c;
+}
+
+/* The Ergopti Studio mark's own colours (static/img/logo/studio.svg), the same
+   in every appearance, as a logo keeps them. */
+:root {
+	--theme-logo-ink: #343048;
+	--theme-logo-paper: #edebf0;
+	--theme-logo-red: #e83030;
+	--theme-logo-yellow: #f4c025;
+}
+
+/* Marks: the six chart hues as a tab's or a section's icon and edge, darkened
+   in light so each holds 3:1 on the surfaces (3.9:1 at worst on
+   --theme-surface-2, 3.5:1 on the dark one); high contrast draws them white. */
+:root {
+	--theme-mark-1: #2a78d6;
+	--theme-mark-2: #c4501f;
+	--theme-mark-3: #0b8a5c;
+	--theme-mark-4: #9a6700;
+	--theme-mark-5: #c2457a;
+	--theme-mark-6: #008300;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--theme-mark-1: #3987e5;
+		--theme-mark-2: #d95926;
+		--theme-mark-3: #199e70;
+		--theme-mark-4: #c98500;
+		--theme-mark-5: #d55181;
+		--theme-mark-6: #0ca30c;
+	}
+}
+
+:root[data-theme='dark'] {
+	--theme-mark-1: #3987e5;
+	--theme-mark-2: #d95926;
+	--theme-mark-3: #199e70;
+	--theme-mark-4: #c98500;
+	--theme-mark-5: #d55181;
+	--theme-mark-6: #0ca30c;
+}
+
+:root[data-a11y-contrast='high'] {
+	--theme-mark-1: var(--theme-white);
+	--theme-mark-2: var(--theme-white);
+	--theme-mark-3: var(--theme-white);
+	--theme-mark-4: var(--theme-white);
+	--theme-mark-5: var(--theme-white);
+	--theme-mark-6: var(--theme-white);
+}
+
+/* The heat scale of every count figure (the Studio's heat maps, their tables,
+   the bigram matrix, the editor's key colours): blue for the least, through
+   green, yellow and orange, to red for the most (maintainer, 2026-11-18). Each
+   stop is light enough for the dark heat ink at 4.5:1 or more wherever the
+   scale is read, in both themes, so the stops are the same in both; the keys
+   keep their 1 px edge against the surface, and every figure keeps its legend
+   (0 to its largest value), its tooltips and its table, so no value is told
+   by colour alone (tools/test/test-heat-scale.cjs). */
+:root {
+	--theme-chart-heat-1: #7fb2e5;
+	--theme-chart-heat-2: #6cc77a;
+	--theme-chart-heat-3: #f7dc5c;
+	--theme-chart-heat-4: #f5953a;
+	--theme-chart-heat-5: #f0605e;
+	--theme-chart-heat-ink: #1d1d1f;
+	--theme-chart-heat-scale: linear-gradient(
+		to right,
+		var(--theme-chart-heat-1),
+		var(--theme-chart-heat-2),
+		var(--theme-chart-heat-3),
+		var(--theme-chart-heat-4),
+		var(--theme-chart-heat-5)
+	);
+}
+
+/* Status text (a better value, an error message): the system green and red
+   are 2.2:1 and 3.6:1 on white, below the 4.5:1 of text (WCAG 1.4.3); these
+   reach it on the light and dark surfaces. A status also says itself in words
+   or with a mark, never by its colour alone (WCAG 1.4.1). */
+:root {
+	--theme-good-text: #0f5f27;
+	--theme-bad-text: #951a13;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--theme-good-text: #5fd37a;
+		--theme-bad-text: #ffb3ae;
+	}
+}
+
+:root[data-theme='dark'] {
+	--theme-good-text: #5fd37a;
+	--theme-bad-text: #ffb3ae;
+}
+
+/* The colour-blind setting of the site (a11y_prefs.js): green and red merge
+   under protanopia and deuteranopia, blue and orange stay apart. 5.8:1 and
+   5.5:1 on white, 5.7:1 and 6.8:1 on the dark surface (#2c2c2e). The charts'
+   own palettes were already chosen for colour-blind readers. */
+:root[data-a11y-colors='cvd'] {
+	--theme-good-text: var(--theme-hue-004a99);
+	--theme-bad-text: #8a3700;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-a11y-colors='cvd']:not([data-theme='light']) {
+		--theme-good-text: #9ccaff;
+		--theme-bad-text: #ffb877;
+	}
+}
+
+:root[data-a11y-colors='cvd'][data-theme='dark'] {
+	--theme-good-text: #9ccaff;
+	--theme-bad-text: #ffb877;
+}
+
+/* Windows high contrast (forced colours) drops background colours, which
+   would erase the bars and the heatmap's shades: the figures keep their
+   validated colours, and their numbers stay in text beside them. */
+@media (forced-colors: active) {
+	.la-bar,
+	.la-target,
+	.la-swatch,
+	.la-heat-ramp,
+	.la-heatmap .la-key,
+	.la-panel-bar,
+	.la-panel-target {
+		forced-color-adjust: none;
+	}
+}
+
+/* ======================================== */
+/* ======================================== */
+/* ======= 6/ Chosen theme (framed) ======== */
+/* ======================================== */
+/* ======================================== */
+
+/* A page framed by the site follows the theme the visitor chose there
+   (theme_choice.js sets data-theme): each dark block above has a twin under
+   :root[data-theme='dark'], and the system's dark appearance yields to a
+   chosen light one. Form controls follow the same choice. */
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+}
+
+/* ============================================ */
+/* ============================================ */
+/* ======= 7/ Accessibility (every page) ====== */
+/* ============================================ */
+/* ============================================ */
+
+/* A keyboard focus ring every page shows, under the page's own rules (zero
+   specificity), so a page that draws its own ring keeps it (WCAG 2.4.7). */
+:where(:focus-visible) {
+	outline: 2px solid var(--theme-accent);
+	outline-offset: 2px;
+}
+
+/* At 200 % text in a 320 px window one word can be wider than its box
+   (« dispositions », « Changements », « téléchargements ») and scroll the
+   page sideways (WCAG 1.4.10): it breaks inside its box instead. A heading,
+   a legend or a label may break anywhere, which also lets its box shrink
+   in a flex row; a button only breaks a word that would pass its edge, so
+   the tools' tables keep their column widths. Zero specificity: a page's
+   own rule wins. */
+:where(h1, h2, h3, h4, h5, h6, legend, label) {
+	overflow-wrap: anywhere;
+}
+
+:where(button) {
+	overflow-wrap: break-word;
+}
+
+/* The smallest side of a pointer target, 44 px (WCAG 2.5.5). */
+:root {
+	--theme-target-min: 44px;
+}
+
+/* Every pointer target is at least 44 by 44 px (WCAG 2.5.5, the maintainer's
+   decision of 2026-11-25): the controls tools/test/lib/target-size.cjs
+   measures. A minimum size wins over a page's own height or width, so a
+   page sizes a control down only by writing its own minimum, as the
+   visually hidden classes do to keep their 1 px. An inline link
+   inside a sentence keeps the size of its line (the criterion's inline
+   exception): a minimum size does not apply to an inline box. Zero
+   specificity, border box: the minimum is the whole target, padding
+   included. */
+:where(
+	a[href],
+	button,
+	input:not([type='hidden'], [type='checkbox'], [type='radio']),
+	select,
+	textarea,
+	summary,
+	[role='button'],
+	[role='link'],
+	[role='checkbox'],
+	[role='radio'],
+	[role='switch'],
+	[role='tab'],
+	[role='menuitem'],
+	[role='option'],
+	[role='slider'],
+	[tabindex]:not([tabindex='-1'])
+) {
+	box-sizing: border-box;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
+}
+
+/* A native box or button drawn at 44 px is a giant mark: it keeps its size,
+   and its label, around it or right after it, which a click hands to it,
+   takes the 44 px instead (the criterion's « equivalent » target). */
+:where(
+	label:has(input[type='checkbox'], input[type='radio']),
+	input[type='checkbox'] + label,
+	input[type='radio'] + label
+) {
+	align-items: center;
+	box-sizing: border-box;
+	display: inline-flex;
+	min-block-size: var(--theme-target-min);
+	min-inline-size: var(--theme-target-min);
+}
+
+/* Text a screen reader reads and the eye does not see: the h1 of a window
+   whose title is its title bar, so its outline starts at the top level. */
+.theme-sr-only {
+	clip-path: inset(50%);
+	height: 1px;
+	min-block-size: 0;
+	min-inline-size: 0;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+/* A metrics chart's values for the keyboard (metrics_chart_values.js): out
+   of sight until the focus enters it, then a panel over the window's corner
+   so the dashboard's layout never moves. */
+.theme-chart-values:not([open]):not(:focus-within) {
+	clip-path: inset(50%);
+	height: 1px;
+	overflow: hidden;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.theme-chart-values:is([open], :focus-within) {
+	background: var(--theme-surface);
+	border: 1px solid var(--theme-separator);
+	border-radius: 8px;
+	bottom: 16px;
+	color: var(--theme-text);
+	inset-inline-start: 16px;
+	max-height: 50vh;
+	max-width: calc(100vw - 32px);
+	overflow: auto;
+	padding: 6px 12px;
+	position: fixed;
+	z-index: 1000;
+}
+
+/* The system's reduced motion setting, and the website's own setting carried
+   into the Studio frames by a11y_prefs.js: no animation, no smooth scrolling,
+   instant transitions (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+:root[data-a11y-motion='reduce'] *,
+:root[data-a11y-motion='reduce'] *::before,
+:root[data-a11y-motion='reduce'] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	scroll-behavior: auto !important;
+	transition-duration: 0.01ms !important;
+}
+
+/* The website's reading settings (a11y_prefs.js). The pages size their text
+   in pixels, so a larger text zooms the page, as the browser's own zoom does. */
+:root[data-a11y-font='hyperlegible'] :is(body, body *) {
+	font-family: 'Atkinson Hyperlegible', system-ui, sans-serif !important;
+}
+
+:root[data-a11y-font='dyslexic'] :is(body, body *) {
+	font-family: 'OpenDyslexic', system-ui, sans-serif !important;
+}
+
+/* OpenDyslexic draws its glyphs with side bearings about 0.1 em wider than
+   the system font's and a space about twice as wide: set as is, a title reads
+   « M é t r i q u e s » and the toolbars wrap (field report, macOS,
+   2026-11-24). The default spacing gives back the page's own rhythm; the wide
+   spacing below adds the WCAG 1.4.12 increments on top of that same base. */
+:root[data-a11y-font='dyslexic'] :is(body, body *) {
+	letter-spacing: -0.1em !important;
+	word-spacing: -0.25em !important;
+}
+
+/* Shorter lines and text aligned to the start, as on the site
+   (src/lib/css/accessibility.css): running text only, not the tools' grids,
+   tables and buttons. */
+:root[data-a11y-measure='short'] :is(p, li, dd, dt, blockquote, figcaption, caption, summary) {
+	max-width: 50ch !important;
+}
+
+:root[data-a11y-align='start']
+	:is(
+		p,
+		li,
+		dd,
+		dt,
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		blockquote,
+		figcaption,
+		caption,
+		summary,
+		legend,
+		label
+	):not(table *, button *) {
+	text-align: start !important;
+}
+
+:root[data-a11y-text='125'] body {
+	zoom: 1.25;
+}
+
+:root[data-a11y-text='150'] body {
+	zoom: 1.5;
+}
+
+:root[data-a11y-text='200'] body {
+	zoom: 2;
+}
+
+/* The WCAG 1.4.12 text spacing: line height 1.5, paragraph spacing 2 em,
+   letter spacing 0.12 em and word spacing 0.16 em more than the font's own. */
+:root[data-a11y-spacing='wide'] :is(body, body *) {
+	letter-spacing: 0.12em !important;
+	line-height: 1.5 !important;
+	word-spacing: 0.16em !important;
+}
+
+:root[data-a11y-font='dyslexic'][data-a11y-spacing='wide'] :is(body, body *) {
+	letter-spacing: 0.02em !important;
+	word-spacing: -0.09em !important;
+}
+
+:root[data-a11y-spacing='wide'] p {
+	margin-bottom: 2em !important;
+}
+
+/* High contrast: black surfaces, white text and separators, yellow accent. */
+:root[data-a11y-contrast='high'] {
+	--theme-bg: var(--theme-black);
+	--theme-surface: var(--theme-black);
+	--theme-surface-2: var(--theme-black);
+	--theme-separator: var(--theme-white);
+	--theme-text: var(--theme-white);
+	--theme-sub: var(--theme-white);
+	--theme-accent: var(--theme-yellow-dark);
+	--theme-dialog-text: var(--theme-white);
+	--theme-dialog-muted: var(--theme-white);
+	--theme-dialog-background: var(--theme-black);
+	--theme-dialog-panel: var(--theme-black);
+	--theme-dialog-border: var(--theme-white);
+	--theme-metrics-bg: var(--theme-black);
+	--theme-metrics-panel: var(--theme-black);
+	--theme-metrics-text: var(--theme-white);
+	--theme-metrics-text-muted: var(--theme-white);
+	--theme-metrics-border: var(--theme-white);
+	--theme-good-text: #30d158;
+	--theme-bad-text: #ff6961;
+	color-scheme: dark;
 }

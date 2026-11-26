@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Json = require("core.text.engine.json")
 require("core.logger.engine")
 
 local with_host = require("tests.support.physical_shortcuts_fade_fixture")
@@ -55,7 +56,7 @@ helpers.describe("physical shortcut public fade retains its exact native owner",
 			helpers.assert_eq(h.open(), false)
 			helpers.assert_eq(#h.windows, 1)
 			helpers.assert_eq(view.native.deletes, 1)
-			h.script_refs[h.bridges[1]]({ body = { action = "ready" } })
+			h.script_refs[h.bridges[1]]({ body = Json.encode({ action = "ready" }) })
 			helpers.assert_eq(h.received, 0)
 			h.drain()
 			helpers.assert_true(h.open())
@@ -149,7 +150,7 @@ helpers.describe("physical shortcut public fade retains its exact native owner",
 			old("closing")
 			helpers.assert_true(h.retained[successor.native])
 			helpers.assert_eq(successor.native.deletes, 0)
-			h.script_refs[h.bridges[2]]({ body = { action = "ready" } })
+			h.script_refs[h.bridges[2]]({ body = Json.encode({ action = "ready" }) })
 			helpers.assert_eq(h.received, 1)
 			helpers.assert_eq(host.close(), false)
 			h.drain(); helpers.assert_true(host.close())

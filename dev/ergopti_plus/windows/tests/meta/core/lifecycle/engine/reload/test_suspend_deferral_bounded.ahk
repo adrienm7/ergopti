@@ -118,7 +118,7 @@ Test("meta suspend: the deferred suspend has a named, enforced deadline",
 _SDB_TimerAdmissionPrecedesPendingPublication() {
 	Body := _DriverFuncBody("ToggleSuspend")
 	Assert(Body != "", "ToggleSuspend() must remain source-visible")
-	TimerPos := InStr(Body, "SetTimer(_SuspendPendingPoll, 25)")
+	TimerPos := InStr(Body, 'SetTimer(_SuspendPendingPoll, TimingsGet("ui", "suspend_pending_poll_ms"))')
 	PublishPos := InStr(Body, "_SuspendPending := true")
 	Assert(TimerPos > 0 && PublishPos > 0,
 		"the held-prefix branch must retain both timer admission and pending publication")

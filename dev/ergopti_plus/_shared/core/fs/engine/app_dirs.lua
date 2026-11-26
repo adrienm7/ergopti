@@ -21,9 +21,10 @@ return {
 	files = {
 		unified_prefix = "ErgoptiPlus_",
 		errors_prefix = "ErgoptiPlus_errors_",
-		topical_prefix = "ErgoptiPlus_",
 		extension = ".log",
 		bootstrap_log = "bootstrap.log",
+		-- Exact names the retention sweep deletes: the retired topical sub-files.
+		retired_topical_logs = { "ErgoptiPlus_gestures.log", "ErgoptiPlus_ollama.log", "ErgoptiPlus_llm.log", "ErgoptiPlus_hotstrings.log", "ErgoptiPlus_keystats.log", "ErgoptiPlus_menu.log", "ErgoptiPlus_notify.log", "ErgoptiPlus_boot.log", "ErgoptiPlus_layout.log", "ErgoptiPlus_dispatch.log", "ErgoptiPlus_tray.log", "ErgoptiPlus_mlx.log", "ErgoptiPlus_karabiner.log" },
 	},
 	macos = {
 		folder_name = "Ergopti",
@@ -32,6 +33,7 @@ return {
 		support_relative = "Library/Application Support/Ergopti",
 		cache_relative = "Library/Caches/Ergopti",
 		launcher_log = "launcher.log",
+		boot_journal = "boot_journal.log",
 		fatal_report = "hammerspoon-fatal.txt",
 		reload_breadcrumb = "reload_breadcrumb.txt",
 	},

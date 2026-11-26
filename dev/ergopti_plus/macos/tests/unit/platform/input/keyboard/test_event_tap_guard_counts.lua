@@ -34,16 +34,16 @@ local function load_healthcheck(runtime_version)
 		"collect_paths", "collect_versions", "collect_hardware", "collect_system", "collect_input",
 		"collect_features", "collect_ai", "collect_permissions", "collect_peripherals",
 	}) do collectors[name] = function() return {} end end
-	package.loaded["ui.healthcheck.helpers"] = collectors
+	package.loaded["diagnostics.ui.healthcheck.helpers"] = collectors
 	package.loaded["platform.system.info"] = {
 		runtime_version = function() return runtime_version or CONTRACT_VERSION end,
 	}
-	package.loaded["ui.healthcheck.core"] = nil
-	return require("ui.healthcheck.core")
+	package.loaded["diagnostics.ui.healthcheck.core"] = nil
+	return require("diagnostics.ui.healthcheck.core")
 end
 
 -- The modules each case replaces, restored after it
-local FIXTURE_MODULES = { "core.logger.engine.logger", "ui.healthcheck.helpers", "platform.system.info", "ui.healthcheck.core" }
+local FIXTURE_MODULES = { "core.logger.engine.logger", "diagnostics.ui.healthcheck.helpers", "platform.system.info", "diagnostics.ui.healthcheck.core" }
 
 --- Runs body with the healthcheck core over empty collectors and a runtime.
 --- @param runtime_version string|nil

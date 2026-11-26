@@ -30,15 +30,16 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-		"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
-		"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+		"gestures.engine", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+		"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
 		"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
-		"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
-		"modules.keymap.terminator_replay", "platform.input.text_sender", "adapters.clipboard",
+		"core.timing.engine.deferred_work", "core.fs.engine.dir", "hotstrings.engine.expander.utils",
+		"hotstrings.engine.expander.terminator_replay", "platform.input.text_sender", "clipboard.adapters.clipboard",
+		"core.ui.adapters.system_accessibility", "modules.shortcuts.actions.system_mouse",
 	}, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.gestures"] = {}
+		package.loaded["gestures.engine"] = {}
 		return callback()
 	end)
 end
@@ -172,7 +173,7 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.input.synthetic_input"] = nil
-	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["diagnostics.adapters.event_provenance"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
@@ -335,7 +336,7 @@ local function load_h01_system(options)
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
-	package.loaded["modules.gestures"] = options.gestures or {}
+	package.loaded["gestures.engine"] = options.gestures or {}
 	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil

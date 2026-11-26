@@ -20,11 +20,11 @@ local RESET_MODULES = {
 	"modules.keystats.timestamp",
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
 	"modules.keystats.watchers", "core.process.adapters.lifecycle",
-	"platform.input.keyboard_hook", "adapters.event_provenance",
+	"platform.input.keyboard_hook", "diagnostics.adapters.event_provenance",
 	"platform.input.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
-	"infra.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
-	"metrics.engine.metrics", "modules.keymap",
+	"menu.engine.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+	"metrics.engine.metrics", "hotstrings.engine.expander",
 }
 
 
@@ -213,7 +213,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		end,
 	}
 	package.loaded["platform.input.synthetic_input"] = synthetic_stub
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
@@ -252,7 +252,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return "none" end }
 	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
@@ -268,12 +268,12 @@ package.loaded["core.fs.adapters.file_system"] = {
 		end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_timer_failure" end,
 		metrics_dir = function() return "/tmp/ergopti_timer_failure/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_timer_failure/cache" end,
 	}
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 
@@ -354,7 +354,7 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["platform.input.synthetic_input"] = synthetic_stub
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
@@ -420,7 +420,7 @@ local function load_fixture()
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return "none" end }
 	package.loaded["core.logger.engine.logger"] = api({
 		pcall = function(_module_name, fn, ...)
 			return pcall(fn, ...)
@@ -441,7 +441,7 @@ local function load_fixture()
 		end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 	package.loaded["metrics.engine.metrics"] = {

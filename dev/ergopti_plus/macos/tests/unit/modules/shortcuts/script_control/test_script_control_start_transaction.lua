@@ -28,13 +28,13 @@ local function install_dependency_stubs()
 		RETURN = 0x24,
 		ESCAPE = 0x35,
 	}
-	package.loaded["modules.gestures.engine"] = { init = function() end }
-	package.loaded["modules.gestures.actions"] = {
+	package.loaded["gestures.engine.engine"] = { init = function() end }
+	package.loaded["gestures.engine.actions"] = {
 		SG_NAMES = { "none", "script_pause_toggle" },
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "hardware", nil end,
 	}

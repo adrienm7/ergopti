@@ -24,7 +24,7 @@
 ; 2. The repetition counter is mutated only through SetNumberOfRepetitions /
 ;    ResetNumberOfRepetitions in infra/nav_layer_helpers.ahk.
 ; 3. last_sent_key_time tracking (write + size-bounded pruning) lives only in
-;    AppState_TouchLastSentKey in infra/hotstrings/hotstring_send.ahk, called by
+;    AppState_TouchLastSentKey in hotstrings/engine/matcher/send.ahk, called by
 ;    the layout emulation (UpdateLastSentCharacter, modules/keymap/layout.ahk)
 ;    and by the prefix watcher for every character it observes.
 ;

@@ -26,7 +26,7 @@ local Timings = require("core.timing.engine.timings")
 -- The exact (section, key) -> value pairs each wired module is now sourced from.
 -- Mirror these against constants.toml; a change there must be deliberate.
 local WIRED_MS = {
-	-- modules/keymap/expander.lua: safely above one 60 Hz render turn.
+	-- hotstrings/engine/expander/expander.lua: safely above one 60 Hz render turn.
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
 	-- modules/keymap/input_sources.lua: hard deadline for mutation subprocesses.
 	{ "ui", "input_source_operation_timeout_ms", 10000 },

@@ -6,7 +6,7 @@
 --- Turns what a file manager reports about its selection into absolute paths,
 --- for the file-selection actions (remove_quarantine_selection,
 --- make_executable_selection) of the macOS and Linux drivers. Windows reads
---- Explorer's SelectedItems through COM (modules/gestures/system_actions.ahk).
+--- Explorer's SelectedItems through COM (gestures/engine/system_actions.ahk).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure: the caller runs the native query and passes its text, so both
@@ -102,6 +102,10 @@ end
 --- @return string|nil reason Why the list was refused.
 function M.parse_uri_list(text)
 	if type(text) ~= "string" then return nil, "not_text" end
+	-- PCManFM (libfm) publishes the list with its C string terminator: a final
+	-- NUL is the end of the data, not part of the last path. One inside a line
+	-- still refuses the report (is_absolute_path).
+	while text:sub(-1) == "\0" do text = text:sub(1, -2) end
 	local paths = {}
 	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
 		line = line:gsub("\r$", "")

@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dead_rolls_and_personal_switches_removed/case.toml
+
+[case]
+description = "v23 removes the chevron_greater and chevron_less rolls and the five built-in Windows personal shortcut switches no driver read (PPT-01, PPT-02); every other roll and a switch a personal file registers under its own name stay."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 22
+to_version = 24

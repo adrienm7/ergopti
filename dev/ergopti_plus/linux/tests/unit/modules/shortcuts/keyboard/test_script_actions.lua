@@ -98,18 +98,18 @@ helpers.describe("script lifecycle actions", function()
 	helpers.it("holds every keyboard slot back while paused, a script action included (scd1-slot-paused)", function()
 		local storage_before = package.loaded["core.fs.adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-		local gestures_before = package.loaded["modules.gestures.manager"]
-		local paths_before = package.loaded["infra.config_paths"]
+		local gestures_before = package.loaded["gestures.engine.manager"]
+		local paths_before = package.loaded["settings.engine.paths"]
 		local path = os.tmpname()
 		require("tests.lua.settings.unused_keys_contract").sandbox.write_bytes(path,
 			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
-		package.loaded["infra.config_paths"] = { config = function() return path end }
+		package.loaded["settings.engine.paths"] = { config = function() return path end }
 		local executed = {}
 		package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 			["shortcuts.keyboard.primary_j"] = "select_line",
 			["shortcuts.keyboard.primary_k"] = "script_pause_toggle",
 		} })
-		package.loaded["modules.gestures.manager"] = {
+		package.loaded["gestures.engine.manager"] = {
 			-- The loader keeps only the ids the catalogue offers; both stored ones are.
 			is_assignable = function(action)
 				return action == "select_line" or action == "script_pause_toggle"
@@ -125,8 +125,8 @@ helpers.describe("script lifecycle actions", function()
 		local chatgpt = shortcuts.dispatch({ key = "g", mods = { ctrl = true } }, { only_script = true })
 		package.loaded["core.fs.adapters.storage"] = storage_before
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = module_before
-		package.loaded["modules.gestures.manager"] = gestures_before
-		package.loaded["infra.config_paths"] = paths_before
+		package.loaded["gestures.engine.manager"] = gestures_before
+		package.loaded["settings.engine.paths"] = paths_before
 		os.remove(path)
 		helpers.assert_true(not held_back, "Ctrl+J fired select_line while the script was paused")
 		helpers.assert_true(not resumed,
@@ -137,7 +137,7 @@ helpers.describe("script lifecycle actions", function()
 	end)
 
 	helpers.it("holds a gesture back while paused but still resumes", function()
-		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Gestures = helpers.load_module("gestures.engine.manager")
 		local paused = true
 		local toggles = 0
 		Gestures.init({

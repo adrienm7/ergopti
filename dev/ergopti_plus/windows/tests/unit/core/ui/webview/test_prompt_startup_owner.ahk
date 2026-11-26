@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The public profile editor uses a genuinely boot-admitted private config in an
 ; owned child. Native GUI/WM_CLOSE and shipped Promise scheduling remain real;
-; only browser construction, translation/theming and fallback input are passive.
+; only browser construction and translation/theming are passive.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -42,7 +42,7 @@ _PRST_ChildSource() {
 		Code .= Line . "`n"
 	}
 	Owners := Map()
-	for Symbol in ["LLM_Menu_PromptEditProfile", "_PromptEdWeb_TryOpen", "_LLM_MenuApiJsonEscape", "Ui_InputBox"] {
+	for Symbol in ["LLM_Menu_PromptEditProfile", "_PromptEdWeb_TryOpen", "_LLM_MenuApiJsonEscape", "Ui_MsgBox"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The prompt child requires its whole genuine owner: " . Symbol)
 		if !Owners.Has(Owner) {

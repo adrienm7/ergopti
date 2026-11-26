@@ -158,7 +158,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("a metrics page cannot invoke or read a foreign privileged bridge", function()
       wm.set_daemon_state(build_mock_state())
-      local prompt_handler = require("ui.prompt_editor.bridge")
+      local prompt_handler = require("ai.ui.prompt_editor.bridge")
       local original = prompt_handler.on_message
       local foreign_calls = 0
       prompt_handler.on_message = function()
@@ -451,7 +451,7 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("prompt_editor_bridge", function()
     local function with_prompt_session(fn)
       local previous_manager = package.loaded["core.ui.ui.webview_manager"]
-      local previous_handler = package.loaded["ui.prompt_editor.bridge"]
+      local previous_handler = package.loaded["ai.ui.prompt_editor.bridge"]
       local pushed = {}
       local manager = {
         show = function(app) return app == "prompt_editor" end,
@@ -464,11 +464,11 @@ helpers.describe("ui.bridge_handlers", function()
         end,
       }
       package.loaded["core.ui.ui.webview_manager"] = manager
-      package.loaded["ui.prompt_editor.bridge"] = nil
-      local handler = require("ui.prompt_editor.bridge")
+      package.loaded["ai.ui.prompt_editor.bridge"] = nil
+      local handler = require("ai.ui.prompt_editor.bridge")
       handler._reset()
       local ok, err = pcall(fn, handler, manager, pushed)
-      package.loaded["ui.prompt_editor.bridge"] = previous_handler
+      package.loaded["ai.ui.prompt_editor.bridge"] = previous_handler
       package.loaded["core.ui.ui.webview_manager"] = previous_manager
       if not ok then error(err, 0) end
     end
@@ -505,7 +505,8 @@ helpers.describe("ui.bridge_handlers", function()
         helpers.assert_eq(result.saved, true)
         helpers.assert_eq(result.closed, true)
         helpers.assert_eq(saved.label, "Linux profile")
-        helpers.assert_eq(saved.system_single, "Continue {context}")
+        -- The prompt is kept byte for byte, as on Windows and macOS (PCK-20).
+        helpers.assert_eq(saved.system_single, "  Continue {context}  ")
         helpers.assert_eq(saved.batch, true)
         helpers.assert_true(saved.id:match("^user_") ~= nil)
         helpers.assert_eq(closes, 1)
@@ -683,6 +684,12 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
 			helpers.assert_eq(result.range_request_id, 41,
 				"range replies must preserve the UI request owner across the native bridge")
+			-- The page replaces its driver metadata with this reply's (MET-19).
+			helpers.assert_eq(result.driver_meta.heatmap_id, "sc_kb",
+				"a range reply names the scan-code heatmap the dashboard payload names")
+			helpers.assert_eq(result.driver_meta.unmeasured.space_switches,
+				"linux.space_switches_unmeasured",
+				"a range reply keeps the unmeasured KPIs of the dashboard payload")
 		end)
   end)
 

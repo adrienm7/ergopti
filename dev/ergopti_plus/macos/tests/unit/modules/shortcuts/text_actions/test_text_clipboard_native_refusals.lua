@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local previous_destination = package.loaded["modules.keymap.utils"]
+local previous_destination = package.loaded["hotstrings.engine.expander.utils"]
 local Destination = require("tests.support.text_destination_receipt")
 
 
@@ -17,7 +17,7 @@ local function load_fixture(options)
 	Destination.install()
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
+		"modules.shortcuts.actions.text", "clipboard.adapters.clipboard", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
@@ -227,4 +227,4 @@ helpers.describe("text actions: clipboard refusals fail closed", function()
 	end)
 end)
 
-package.loaded["modules.keymap.utils"] = previous_destination
+package.loaded["hotstrings.engine.expander.utils"] = previous_destination

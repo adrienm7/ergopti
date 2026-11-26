@@ -19,6 +19,14 @@ export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 # the AI phase sees its accepting digit typed instead.
 export LUA_PATH="${LUA_PATH};/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
 export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+# Run as root under sudo, the runner user's XDG_RUNTIME_DIR is inherited, and a
+# dconf client there creates its dconf folder owned by root: every later
+# gsettings of that user is then refused (desktop-webview, 2026-11-25). Root
+# keeps its session files in a runtime folder of its own.
+if [ "$(id -u)" = 0 ]; then
+	XDG_RUNTIME_DIR="$(mktemp -d)" || exit 2
+	export XDG_RUNTIME_DIR
+fi
 BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break
@@ -43,7 +51,7 @@ PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
 # The daemon moves the fixture's plaintext API key to the secret service in
 # the background. A locked keyring once held the boot before its output
 # keyboard opened: secret-tool store waited on a prompt nobody here can
-# dismiss (cbbf7766). The daemon below runs with a secret-tool that blocks the
+# dismiss (5bf79358). The daemon below runs with a secret-tool that blocks the
 # same way (decided by the maintainer on 2026-11-11: that must never delay
 # input readiness); run_daemon_live.lua checks the daemon is ready meanwhile.
 SECRET_TOOL_SHIM="$(mktemp -d)"
@@ -142,7 +150,10 @@ for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
-python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
+# The host stays the session's watcher until the daemon has exited, as a panel
+# does: the daemon checks 15 s after its icon that something hosts it (TRAY-03),
+# and a host gone by then makes it open a « no tray » window over the editor.
+python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 --hold \
 	--expect-icon-file --min-labels 5 --forbid-raw-keys --expect-label "Tap-Holds" > "${REPORT}" &
 HOST=$!
 for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done
@@ -157,6 +168,7 @@ if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
 fi
 PATH="${SECRET_TOOL_SHIM}:${PATH}" luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
+kill -TERM "${HOST}" 2>/dev/null
 wait "${HOST}"
 TRAY=$?
 echo "--- the tray the daemon showed ---"

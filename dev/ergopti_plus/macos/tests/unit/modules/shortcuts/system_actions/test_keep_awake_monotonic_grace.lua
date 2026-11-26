@@ -17,7 +17,7 @@ local OWNED_MODULES = {
 	"modules.shortcuts.actions.system_mouse",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.text",
-	"modules.gestures",
+	"gestures.engine",
 	"modules.keystats.log_manager",
 	"core.ui.engine.notifications",
 	"core.logger.engine.key_event_health",
@@ -26,11 +26,11 @@ local OWNED_MODULES = {
 	"core.timing.engine.timings",
 	"core.i18n.engine.i18n",
 	"platform.input.keycodes",
-	"modules.keymap.control_sentinels",
+	"hotstrings.engine.expander.control_sentinels",
 	"platform.input.key_state",
 	"platform.input.keyboard_geometry",
 	"platform.input.synthetic_input",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.events.clock",
 	"core.events.timer_scheduler",
 	"core.fs.adapters.storage",
@@ -41,7 +41,8 @@ local OWNED_MODULES = {
 
 --- Runs one system owner against coherent real timing and provenance consumers.
 --- @param callback function Receives the system owner and native observations.
-local function with_awake(callback)
+--- @param log_manager table|nil The keystats log manager the session credits.
+local function with_awake(callback, log_manager)
 	local saved_random, saved_randomseed = math.random, math.randomseed
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope(OWNED_MODULES, function()
@@ -53,7 +54,8 @@ local function with_awake(callback)
 				assert(low == 0 and high == 1, "unexpected jitter random bounds")
 				return 1
 			end
-			local world = { awake = 10000, civil = 1700000000, taps = {}, timers = {}, closed = {}, errors = {} }
+			local world = { awake = 10000, civil = 1700000000, taps = {}, timers = {}, closed = {}, errors = {},
+				infos = {} }
 			local native = require("tests.stubs.hs")
 			_G.hs = native
 
@@ -107,12 +109,18 @@ local function with_awake(callback)
 
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
+			logger.info = function(_, format, ...) world.infos[#world.infos + 1] = string.format(format, ...) end
 			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.timing.engine.timings"] = {
 				sec = function(group, key)
 					local seconds = { tick_min_ms = 1, tick_max_ms = 5, return_delay_ms = 0.2 }
 					assert(group == "keep_awake" and seconds[key] ~= nil, "unexpected keep-awake timing")
 					return seconds[key]
+				end,
+				-- Not the shipped 80: a radius only the registry can give (snu-13).
+				count = function(group, key)
+					assert(group == "keep_awake" and key == "jitter_px", "unexpected keep-awake count")
+					return 7
 				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -127,10 +135,11 @@ local function with_awake(callback)
 			for _, name in ipairs({
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-				"modules.gestures", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
-				"core.text.engine.utils", "modules.keymap.control_sentinels", "platform.input.key_state",
+				"gestures.engine", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
+				"core.text.engine.utils", "hotstrings.engine.expander.control_sentinels", "platform.input.key_state",
 				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
+			if log_manager then package.loaded["modules.keystats.log_manager"] = log_manager end
 			local System = require("modules.shortcuts.actions.system")
 			local Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_eq(System.toggle_awake(), true, "a healthy native watcher and tick must activate")
@@ -238,4 +247,107 @@ helpers.describe("keep-awake activation grace measures awake duration", function
 			observe_activity(kind, 0.1, 60, false)
 		end)
 	end
+end)
+
+
+--- Moves the mouse OffsetPx right of the jitter origin after the activation
+--- grace and answers whether the move queued the auto-off.
+--- @param offset number Horizontal distance from the origin, in pixels.
+--- @return boolean disabled
+local function mouse_move_disables(offset)
+	local disabled = nil
+	with_awake(function(System, world, native)
+		world.awake = world.awake + 2
+		world.civil = world.civil + 2
+		local event_type = native.eventtap.event.types.mouseMoved
+		local event = {
+			getProperty = function() return 0 end,
+			getType = function() return event_type end,
+			getKeyCode = function() return 0 end,
+			getFlags = function() return {} end,
+			location = function() return { x = 100 + offset, y = 200 } end,
+			timestamp = function() return math.floor(world.awake * 1e9) end,
+		}
+		helpers.assert_eq(world.watcher.fn(event), false, "a mouse move always passes through")
+		local dispatcher = nil
+		for _, timer in ipairs(world.timers) do
+			if timer.active and timer.delay == 0 then dispatcher = timer end
+		end
+		disabled = dispatcher ~= nil
+		if dispatcher then dispatcher:fire() end
+	end)
+	return disabled
+end
+
+-- SNU-13: the jitter radius was an 80 px copy of the Windows one; it is the
+-- shared [keep_awake] jitter_px, read by both drivers.
+helpers.describe("keep-awake's jitter radius is the shared registry's (snu-13)", function()
+	helpers.it("a move beyond the registry's jitter_px stops the session", function()
+		helpers.assert_eq(mouse_move_disables(10), true)
+	end)
+	helpers.it("a move within it keeps the session", function()
+		helpers.assert_eq(mouse_move_disables(5), false)
+	end)
+end)
+
+
+--- A keystats log manager double that records the credited sessions.
+--- @return table log_manager
+--- @return table credited { kind, duration_ms } per call
+local function recording_log_manager()
+	local credited = {}
+	return {
+		log_passive_period = function(kind, duration_ms)
+			credited[#credited + 1] = { kind = kind, duration_ms = duration_ms }
+		end,
+	}, credited
+end
+
+--- Counts the lines that contain the needle.
+--- @param lines table
+--- @param needle string
+--- @return number
+local function matching(lines, needle)
+	local found = 0
+	for _, line in ipairs(lines) do
+		if line:find(needle, 1, true) then found = found + 1 end
+	end
+	return found
+end
+
+-- SNU-04: a pause or a shutdown ended the session without crediting the day's
+-- awake_ms or logging it, where Windows and Linux credit every finished session.
+helpers.describe("keep-awake credits a session the driver stops (snu-04)", function()
+	helpers.it("a pause credits the running session once and logs it", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 30
+			helpers.assert_eq(System.pause_awake(), true)
+			helpers.assert_eq(System.is_awake_active(), false)
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 30000 } },
+				"the paused session is the day's awake_ms")
+			helpers.assert_eq(matching(world.infos, "Keep-awake stopped by the driver's pause or shutdown."), 1)
+		end, log_manager)
+		helpers.assert_eq(#credited, 1, "the teardown after the pause credits nothing more")
+	end)
+
+	helpers.it("a shutdown credits the running session once", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 12
+			helpers.assert_eq(System.stop_awake(), true)
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 12000 } })
+		end, log_manager)
+		helpers.assert_eq(#credited, 1)
+	end)
+
+	helpers.it("the user's stop still credits once", function()
+		local log_manager, credited = recording_log_manager()
+		with_awake(function(System, world)
+			world.civil = world.civil + 5
+			System.toggle_awake()
+			helpers.assert_eq(credited, { { kind = "awake", duration_ms = 5000 } })
+		end, log_manager)
+		helpers.assert_eq(#credited, 1)
+	end)
 end)

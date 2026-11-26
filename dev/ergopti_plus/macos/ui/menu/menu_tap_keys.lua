@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local M = {}
-local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.actions.parameter_label")
 
 local i18n              = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")

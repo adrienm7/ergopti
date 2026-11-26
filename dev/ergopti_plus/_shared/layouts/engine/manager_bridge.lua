@@ -43,8 +43,9 @@
 ---    deps.read_keystats answers with the character, bigram and trigram counts
 ---    of the local keystats store (_shared/metrics/engine/view/studio_ngrams.lua),
 ---    read only and pushed to this page alone (keystatsNgrams {ok, ngrams} or
----    {ok = false, code}). Only the editor window offers it, and only when the
----    user asks: the page posts it from its « Analyse my typing » button.
+---    {ok = false, code}). Only the editor window offers it: the page posts it
+---    once when the window opens (« My typing » is the app's default corpus) and
+---    from its « Analyse my typing » button.
 --- 9. The Studio's analysis panels open their « i » links in the system browser
 ---    (open_link {url}): only an https URL, and only from the editor window.
 --- 10. Ergopti Studio keeps the user's personal layouts for its comparison
@@ -59,7 +60,16 @@
 ---    studio_profile_load and studio_profile_save {request, text | reset} keep the
 ---    user's fingering profile (the Comparer's « Doigté ») as the JSON text the
 ---    page sent; the page receives studioProfile and studioProfileResult.
---- 11. PURE Lua: the driver injects the layout registry client, the push to the
+---    studio_workspace_load and studio_workspace_save {request, text} keep the
+---    editor's tabs and their unsaved edits the same way (initData
+---    studio_workspace); the page receives studioWorkspace {request, ok,
+---    workspace} and studioWorkspaceResult.
+--- 11. The editor window's XKB and KLC downloads run the shared export adapter
+---    with the driver's own Lua (lua_export {request, step, input}, through
+---    registry.source_export_step, composer/export_step.lua): the window's
+---    content policy refuses the page's fengari VM. The page receives
+---    luaExportResult {request, ok, output} or {request, ok = false, code, detail}.
+--- 12. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -92,6 +102,9 @@ M.ACTIONS = {
 	studio_corpus = true,
 	studio_profile_load = true,
 	studio_profile_save = true,
+	studio_workspace_load = true,
+	studio_workspace_save = true,
+	lua_export = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -173,10 +186,14 @@ local function carries_extension(snapshot, id)
 	return (type(entry) == "table" and entry.extension ~= nil)
 		or (type(installed) == "table" and installed.extension ~= nil)
 end
+-- The Linux tray's window-less Ergopti rows decide their reload the same way
+-- (linux/ui/layout_manager/tray_actions.lua).
+M.carries_extension = carries_extension
 
---- Asks the host to reload the driver after a layout's extension changed: the
---- extension catalogue is read once per boot, so only a reload loads or drops
---- its hotstrings, and the reload also restarts the emulation (LMH-004).
+--- Asks the host to load or drop a changed layout's extension packs, in place
+--- of the emulation reload (LMH-004). Linux reloads its hotstring catalogue in
+--- process; macOS reloads the driver only when the pack catalogue changed
+--- (maintainer decision, 2026-11-25: a layout install keeps the window open).
 --- @param deps table
 --- @param id string
 local function reload_extensions(deps, id)
@@ -358,10 +375,27 @@ local function offers_studio(registry)
 		and type(registry.studio_profile_save) == "function"
 end
 
+--- Whether the registry keeps the editor's workspace (its tabs and unsaved edits).
+--- @param registry table
+--- @return boolean
+local function offers_workspace(registry)
+	return type(registry.studio_workspace_load) == "function" and type(registry.studio_workspace_save) == "function"
+end
+
+-- The Studio's JSON documents the host keeps as given: each load and save
+-- action, the registry operation, the page function it answers and, for a
+-- load, the answer field that carries the text.
+local DOCUMENTS = {
+	studio_profile_load = { operation = "studio_profile_load", answer = "studioProfile", field = "profile" },
+	studio_profile_save = { operation = "studio_profile_save", answer = "studioProfileResult" },
+	studio_workspace_load = { operation = "studio_workspace_load", answer = "studioWorkspace", field = "workspace" },
+	studio_workspace_save = { operation = "studio_workspace_save", answer = "studioWorkspaceResult" },
+}
+
 --- Answers one of the Studio's personal-layout messages.
 --- @param deps table The controller's deps.
 --- @param action string studio_layouts, studio_layout_save, studio_layout_remove, studio_corpus,
----   studio_profile_load or studio_profile_save.
+---   studio_profile_load, studio_profile_save, studio_workspace_load or studio_workspace_save.
 --- @param payload table The message; request is the page's request number.
 --- @return boolean handled
 function M.handle_studio(deps, action, payload)
@@ -386,20 +420,21 @@ function M.handle_studio(deps, action, payload)
 		end)
 		return true
 	end
-	if action == "studio_profile_load" then
-		deps.registry.studio_profile_load(function(ok, text_or_code, detail)
+	local document = DOCUMENTS[action]
+	if document and document.field then
+		deps.registry[document.operation](function(ok, text_or_code, detail)
 			if ok then
-				deps.push("studioProfile", { request = request, ok = true, profile = text_or_code })
+				deps.push(document.answer, { request = request, ok = true, [document.field] = text_or_code })
 			else
-				deps.push("studioProfile", { request = request, ok = false, code = tostring(text_or_code),
+				deps.push(document.answer, { request = request, ok = false, code = tostring(text_or_code),
 					detail = detail ~= nil and tostring(detail) or nil })
 			end
 		end)
 		return true
 	end
-	if action == "studio_profile_save" then
-		deps.registry.studio_profile_save({ text = payload.text, reset = payload.reset == true }, function(ok, code, detail)
-			deps.push("studioProfileResult", { request = request, ok = ok == true,
+	if document then
+		deps.registry[document.operation]({ text = payload.text, reset = payload.reset == true }, function(ok, code, detail)
+			deps.push(document.answer, { request = request, ok = ok == true,
 				code = (not ok and code ~= nil) and tostring(code) or nil,
 				detail = detail ~= nil and tostring(detail) or nil })
 		end)
@@ -457,14 +492,23 @@ end
 ---   layout is the emulated one and refreshes its menu (LMH-001, LMH-002). A
 ---   stored emulated layout stays chosen when it is uninstalled (maintainer
 ---   decision, 2026-11-12): the reload stops it, a reinstall resumes it.
---- deps.reload_extensions(id) reloads the driver after a layout that ships a
----   hotstring extension was installed, updated or uninstalled, in place of
----   deps.layout_changed (LMH-004); it returns true when the reload started.
+--- deps.reload_extensions(id) loads or drops the packs of a layout that ships a
+---   hotstring extension after it was installed, updated or uninstalled, in
+---   place of deps.layout_changed, whose emulation reload it includes (LMH-004);
+---   it returns true when the packs were reloaded or their reload started.
 --- deps.open_editor_window() opens (or focuses) the layout editor window; without
 ---   it open_editor is refused.
 --- deps.editor_window is true for the controller of the layout editor window.
+--- deps.take_nav() returns, once, the { text, hold } the drivers' « Navigation
+---   layer » entries asked that window to show (nil when none is pending); the
+---   page receives it as studioNav once it is ready.
+--- deps.take_tab() returns, once, the Studio tab an entry asked that window to
+---   show (« edit » for « Create or edit a layout… » and the manager's « Layout
+---   editor »; nil when none is pending); the page receives it as studioTab once
+---   it is ready, so an open Studio left on another tab comes back to the editor.
 --- deps.read_keystats(on_done) optionally reads the user's keystats n-grams for
----   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
+---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }), once
+---   or twice: the saved read at once, then the fresh one when the store changed.
 ---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.run_script(text) optionally runs a built-in corpus's generated tables in
@@ -529,9 +573,15 @@ function M.new(deps)
 				nav_apply = type(deps.apply_nav) == "function",
 				emulate = offers_emulate(deps),
 				keystats = editor_window and type(deps.read_keystats) == "function",
-				studio_store = editor_window and offers_studio(deps.registry) })
+				studio_store = editor_window and offers_studio(deps.registry),
+				studio_workspace = editor_window and offers_workspace(deps.registry),
+				lua_export = editor_window and type(deps.registry.source_export_step) == "function" })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
+			if editor_window then
+				controller.show_tab()
+				controller.show_nav()
+			end
 			if editor_wanted then
 				editor_wanted = false
 				M.handle_source(deps, "source_open", {})
@@ -562,6 +612,23 @@ function M.new(deps)
 		if action == "source_export" then
 			return M.handle_export(deps, payload)
 		end
+		if action == "lua_export" then
+			local request = payload.request
+			if not editor_window or type(deps.registry.source_export_step) ~= "function"
+				or type(request) ~= "number" or request < 1 or request % 1 ~= 0 then
+				deps.log("warn", "Refused an export step: only the editor window of a host that runs them offers it, with a request number.")
+				return false
+			end
+			deps.registry.source_export_step({ step = payload.step, input = payload.input }, function(ok, output_or_code, detail)
+				if ok then
+					deps.push("luaExportResult", { request = request, ok = true, output = output_or_code })
+				else
+					deps.push("luaExportResult", { request = request, ok = false, code = tostring(output_or_code),
+						detail = detail ~= nil and tostring(detail) or nil })
+				end
+			end)
+			return true
+		end
 		if action == "studio_corpus" then
 			if not editor_window or type(deps.registry.studio_corpus) ~= "function" or type(deps.run_script) ~= "function" then
 				deps.log("warn", "Refused an Ergopti Studio corpus request: only the Studio window of a host that runs corpus tables offers it.")
@@ -573,6 +640,13 @@ function M.new(deps)
 			or action == "studio_profile_load" or action == "studio_profile_save" then
 			if not editor_window or not offers_studio(deps.registry) then
 				deps.log("warn", "Refused an Ergopti Studio layout message: only the Studio window of a host that keeps them offers it.")
+				return false
+			end
+			return M.handle_studio(deps, action, payload)
+		end
+		if action == "studio_workspace_load" or action == "studio_workspace_save" then
+			if not editor_window or not offers_workspace(deps.registry) then
+				deps.log("warn", "Refused an Ergopti Studio workspace message: only the Studio window of a host that keeps it offers it.")
 				return false
 			end
 			return M.handle_studio(deps, action, payload)
@@ -674,6 +748,26 @@ function M.new(deps)
 		if page_ready then return M.handle_source(deps, "source_open", {}) end
 		editor_wanted = true
 		return true
+	end
+
+	--- Shows the Studio tab an entry asked for, now when the page is ready, else
+	--- on its ready.
+	--- @return boolean pushed
+	function controller.show_tab()
+		if not editor_window or not page_ready or type(deps.take_tab) ~= "function" then return false end
+		local tab = deps.take_tab()
+		if tab == nil then return false end
+		return deps.push("studioTab", tab) ~= false
+	end
+
+	--- Shows the navigation layer a « Navigation layer » entry asked for, now
+	--- when the page is ready, else on its ready.
+	--- @return boolean pushed
+	function controller.show_nav()
+		if not editor_window or not page_ready or type(deps.take_nav) ~= "function" then return false end
+		local nav = deps.take_nav()
+		if nav == nil then return false end
+		return deps.push("studioNav", nav) ~= false
 	end
 
 	return controller

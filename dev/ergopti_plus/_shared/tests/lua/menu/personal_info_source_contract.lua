@@ -34,10 +34,10 @@ end
 local function with_registered(body)
 	local renderer, root, source, declaration = plain_renderer()
 	local modules = package.loaded
-	local previous = modules["infra.manifest_menu"]
-	modules["infra.manifest_menu"] = renderer
+	local previous = modules["menu.engine.manifest_menu"]
+	modules["menu.engine.manifest_menu"] = renderer
 	local ok, err = pcall(body, renderer, root, source, declaration)
-	modules["infra.manifest_menu"] = previous
+	modules["menu.engine.manifest_menu"] = previous
 	if not ok then error(err, 0) end
 end
 
@@ -55,9 +55,9 @@ function M.register(helpers)
 			end)
 		end)
 
-		helpers.it("refuses a renderer that is not the registered infra.manifest_menu", function()
+		helpers.it("refuses a renderer that is not the registered menu.engine.manifest_menu", function()
 			with_registered(function(renderer)
-				package.loaded["infra.manifest_menu"] = {}
+				package.loaded["menu.engine.manifest_menu"] = {}
 				helpers.assert_nil((PersonalInfoSource.read(renderer)))
 				helpers.assert_nil((PersonalInfoSource.read(nil)))
 			end)
@@ -119,7 +119,7 @@ function M.register(helpers)
 			helpers.assert_eq(changed(function(renderer) renderer.template_rows = function() end end), false)
 			helpers.assert_eq(changed(function(renderer) renderer.get_root = function() return {} end end), false)
 			helpers.assert_eq(changed(function(renderer) setmetatable(renderer, {}) end), false)
-			helpers.assert_eq(changed(function() package.loaded["infra.manifest_menu"] = {} end), false)
+			helpers.assert_eq(changed(function() package.loaded["menu.engine.manifest_menu"] = {} end), false)
 		end)
 	end)
 end

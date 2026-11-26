@@ -89,7 +89,7 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		package.loaded["platform.remap.watchers"] = nil
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
-	package.loaded["modules.keymap.control_sentinels"] = nil
+	package.loaded["hotstrings.engine.expander.control_sentinels"] = nil
 	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}

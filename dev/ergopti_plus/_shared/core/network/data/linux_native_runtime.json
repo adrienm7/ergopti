@@ -66,6 +66,7 @@
 	"package_requirements": {
 		"deb": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify-bin",
 			"libxkbcommon0",
 			"libxkbcommon-tools",
@@ -86,6 +87,7 @@
 		],
 		"rpm": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify",
 			"libxkbcommon",
 			"libxkbcommon-utils",
@@ -97,10 +99,14 @@
 			"shadow-utils",
 			"util-linux",
 			"xdg-utils",
-			"libsecret"
+			"libsecret",
+			"glib-networking",
+			"gsettings-desktop-schemas",
+			"webkit2gtk4.1"
 		],
 		"arch": [
 			"xclip",
+			"wl-clipboard",
 			"libnotify",
 			"libxkbcommon",
 			"at-spi2-core",
@@ -114,8 +120,20 @@
 			"libayatana-appindicator",
 			"lua51-lgi",
 			"webkit2gtk-4.1",
-			"libsecret"
+			"libsecret",
+			"glib-networking",
+			"gsettings-desktop-schemas"
 		],
+		"rpm_suse_alternatives": {
+			"description": "The one .rpm installs on Fedora and openSUSE. Where openSUSE names a requirement differently, the spec requires (openSUSE name or Fedora name): no openSUSE name below exists on Fedora, and the Fedora name is not the right package on openSUSE (libsecret there is the library without secret-tool, polkit lacks pkexec). An alternative that is a path is required alone: an or would be met on openSUSE by the library or polkit another package already pulls in, never installing the command, while the path resolves to polkit or libsecret on Fedora and to pkexec or secret-tool on openSUSE. Checked by a dry-run install on Fedora 44, Fedora 45, Tumbleweed and Leap 15.6 on 2026-11-25; the native libraries pair their dnf and zypper names the same way.",
+			"libxkbcommon-utils": "libxkbcommon-tools",
+			"polkit": "/usr/bin/pkexec",
+			"systemd-udev": "udev",
+			"libayatana-appindicator-gtk3": "libayatana-appindicator3-1",
+			"shadow-utils": "shadow",
+			"libsecret": "/usr/bin/secret-tool",
+			"webkit2gtk4.1": "typelib-1_0-WebKit2-4_1"
+		},
 		"nix_library_path": [
 			"libayatana-appindicator",
 			"gtk3",
@@ -175,7 +193,6 @@
 			"apk": null
 		},
 		"portable": {
-			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
 			"system_ca_files": [
 				"/etc/ssl/certs/ca-certificates.crt",
 				"/etc/pki/tls/certs/ca-bundle.crt",
@@ -238,7 +255,7 @@
 					"commit": "ea9eb7edb5eac4a9d175d74523db34fac0fa5180"
 				}
 			},
-			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc, certificate trust and GIO stack: no GIO module, GSettings backend or schema is bundled, because one loads into the recipient GLib and GTK of the daemon (a bundled Ubuntu 22.04 libdconfsettings.so crashed luajit on Arch). Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
 		}
 	},
 	"managed_python": {

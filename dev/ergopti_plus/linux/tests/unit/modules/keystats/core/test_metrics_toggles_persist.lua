@@ -167,7 +167,7 @@ helpers.describe("metrics toggles: what gets read", function()
 
 	helpers.it("falls back to the manifest default when nothing is stored", function()
 		local keystats = load_over_storage()
-		local Manifest = helpers.load_module("infra.manifest_reader")
+		local Manifest = helpers.load_module("menu.engine.manifest_reader")
 		local shipped = Manifest.default_for("metrics.enabled")
 		local enabled = keystats.is_enabled()
 		drop_storage()

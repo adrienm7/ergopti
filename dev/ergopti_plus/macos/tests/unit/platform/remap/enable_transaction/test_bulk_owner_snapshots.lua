@@ -172,7 +172,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 					local options = { real_user_config_path = config, initially_enabled = false, real_user_config_writes = real_writes == true }
 					if catalogue ~= false then options.real_action_catalogue_path = helpers.driver_root() .. "platform/remap/data/actions.json" end
 					local remap, calls = fixture.load_enabled_remap(options)
-					local paths = package.loaded["infra.config_paths"]
+					local paths = package.loaded["settings.engine.paths"]
 					paths.get = function() return config end
 					paths.get_config_dir = function() return directory end
 					calls.nav_regenerate = function()

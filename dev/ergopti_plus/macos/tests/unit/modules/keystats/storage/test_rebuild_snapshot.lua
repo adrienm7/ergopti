@@ -1,6 +1,6 @@
 --- tests/unit/modules/keystats/storage/test_rebuild_snapshot.lua
 
---- Exercises source witnesses, native-owner cleanup and publication on real SQLite.
+--- Exercises source witnesses, native-owner cleanup and day-by-day publication on real SQLite.
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver = root .. '/static/ergopti_plus/macos'
@@ -13,12 +13,12 @@ local function child()
  local sqlite = require('tests.support.keystats.rebuild_sqlite_bridge').new(request)
  local Snapshot = require('modules.keystats.rebuild_snapshot')
  local path = temporary .. '/owner.sqlite'; local owner = assert(sqlite.open(path)); local other = assert(sqlite.open(path))
- assert(owner:exec("CREATE TABLE d(device_id TEXT PRIMARY KEY,n INTEGER); INSERT INTO d VALUES('d',9);") == sqlite.OK)
+ assert(owner:exec("CREATE TABLE d(device_id TEXT,date TEXT,n INTEGER,PRIMARY KEY(device_id,date)); INSERT INTO d VALUES('d','2026-11-01',9),('d','2026-11-02',9);") == sqlite.OK)
  local case = assert(os.getenv('ERGOPTI_SNAPSHOT_CASE')); local current = owner
  local leases = 0; local lease = { acquire = function(db) if db ~= current or leases ~= 0 then return false end; leases = 1; return true end,
   release = function(db) if db ~= owner or leases ~= 1 then return false end; leases = 0; return true end }
  local clock_calls = 0
- local function clock() clock_calls = clock_calls + 1; return case == 'budget' and clock_calls > 1 and 300000001 or 0 end
+ local function clock() clock_calls = clock_calls + 1; return case == 'slowcopy' and clock_calls * 300000001 or 0 end
  if case == 'quarantinelease' then
   local helpers = require('tests.helpers'); package.loaded['core.logger.engine.logger'] = helpers.make_logger_stub()
   local writer = helpers.load_with_stubs('modules.keystats.sqlite_writer', { sqlite3 = sqlite })
@@ -29,11 +29,11 @@ local function child()
   local result = Snapshot.open(owner, sqlite, {'d'}, writer.get_db, function()
    invoked = true; assert(writer.quarantine_db(owner) == false and writer.get_db() == nil)
    assert(writer.apply_typing_updates('d', {}) == false)
-   local live; for row in owner:nrows("SELECT n FROM d WHERE device_id='d'") do live = row.n end
+   local live; for row in owner:nrows("SELECT n FROM d WHERE device_id='d' AND date='2026-11-01'") do live = row.n end
    assert(live == 9, 'source must remain open until backup finish')
   end, clock, nil, { acquire=writer.acquire_backup_source, release=writer.release_backup_source })
   assert(invoked and result == nil and writer.get_db() == nil)
-  local value; for row in other:nrows("SELECT n FROM d WHERE device_id='d'") do value = row.n end
+  local value; for row in other:nrows("SELECT n FROM d WHERE device_id='d' AND date='2026-11-01'") do value = row.n end
   assert(value == 9 and other:close() == sqlite.OK)
   print(json.encode({kind='done', leaseguard=true})); return
  end
@@ -42,8 +42,7 @@ local function child()
  end
  if case == 'finish' then assert(request({ op='inject', operation='finish', codes={10} }).ok) end
  if case == 'cancel' then assert(request({ op='configure', backup_pages=300 }).ok) end
- local stage, refused
- refused = false
+ local stage, refused, paces, stage_published, first_visible = nil, false, 0, false, nil
  if case == 'cancel' then
   local cleanup
   local co = coroutine.create(function() stage = open(function() coroutine.yield() end, function(fn) cleanup = fn end) end)
@@ -52,43 +51,48 @@ local function child()
   refused = stage == nil and leases == 0
   stage = assert(open())
  else
-  stage = open()
+  stage = open(case:match('^paced') and function()
+   -- Between two days: nothing is open on the canonical handle, the first day is
+   -- committed for every reader, and a change made here must refuse the rest.
+   if not stage_published then return end
+   paces = paces + 1
+   if paces == 1 then
+    assert(owner:exec('BEGIN IMMEDIATE;') == sqlite.OK and owner:exec('ROLLBACK;') == sqlite.OK, 'a transaction stayed open across the pause')
+    for row in other:nrows("SELECT n FROM d WHERE device_id='d' AND date='2026-11-01'") do first_visible = row.n end
+    if case == 'pacedchange' then assert(other:exec("INSERT INTO d VALUES('other','2026-11-01',2);") == sqlite.OK) end
+   end
+  end or nil)
   if case == 'finish' then
    refused = stage == nil and leases == 0
    stage = assert(open())
   end
  end
- assert(stage and stage.db:exec("INSERT INTO temp.d VALUES('d',1);") == sqlite.OK)
- if case == 'targetfinish' then assert(request({ op='inject', operation='finish', codes={10} }).ok) end
- if case == 'budget' then assert(request({ op='configure', backup_pages=300 }).ok) end
- if case == 'same' then assert(owner:exec("INSERT INTO d VALUES('other',2);") == sqlite.OK) end
- if case == 'external' then assert(other:exec("INSERT INTO d VALUES('other',2);") == sqlite.OK) end
+ assert(stage and stage.db:exec("INSERT INTO temp.d VALUES('d','2026-11-01',1),('d','2026-11-02',1);") == sqlite.OK)
+ stage_published = true
+ if case == 'slowcopy' then assert(request({ op='configure', backup_pages=300 }).ok) end
+ if case == 'same' then assert(owner:exec("INSERT INTO d VALUES('other','2026-11-01',2);") == sqlite.OK) end
+ if case == 'external' then assert(other:exec("INSERT INTO d VALUES('other','2026-11-01',2);") == sqlite.OK) end
  if case == 'switched' then current = other end
  if case == 'commit' then
   local original = owner.exec; local injected = false
   function owner:exec(sql) if sql == 'COMMIT;' and not injected then injected = true; return 5 end; return original(self,sql) end
  end
- local accepted = Snapshot.publish(stage, "'d'")
- local old
- for row in owner:nrows("SELECT n FROM d WHERE device_id='d'") do old = row.n end
+ local accepted, _, _, detail = Snapshot.publish(stage, "'d'")
+ local old, second
+ for row in owner:nrows("SELECT n FROM d WHERE device_id='d' AND date='2026-11-01'") do old = row.n end
+ for row in owner:nrows("SELECT n FROM d WHERE device_id='d' AND date='2026-11-02'") do second = row.n end
  assert(Snapshot.close(stage))
- local retry
- if case == 'targetfinish' or case == 'budget' then
-  assert(request({ op='configure', backup_pages=1 }).ok)
-  case = 'retry'; clock_calls = 0
-  stage = assert(open()); assert(stage.db:exec("INSERT INTO temp.d VALUES('d',1);") == sqlite.OK)
-  retry = Snapshot.publish(stage, "'d'"); assert(Snapshot.close(stage))
- end
  assert(other:close() == sqlite.OK); assert(owner:close() == sqlite.OK)
- print(json.encode({kind='done', accepted=accepted, value=old, refused=refused, leases=leases, retry=retry}))
+ print(json.encode({kind='done', accepted=accepted, value=old, second=second, refused=refused, leases=leases,
+  paces=paces, first_visible=first_visible, detail=type(detail) == 'string' and detail or json.encode(detail)}))
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_snapshot%.lua$') then child(); return end
 local helpers = require('tests.helpers')
 local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('SQLite rebuild snapshot', function()
- for _, case in ipairs({ 'normal', 'finish', 'cancel', 'same', 'external', 'switched', 'commit', 'targetfinish', 'budget', 'quarantinelease' }) do
-  helpers.it('handles ' .. case .. ' without false publication', function()
+ for _, case in ipairs({ 'normal', 'finish', 'cancel', 'same', 'external', 'switched', 'commit', 'slowcopy', 'paced', 'pacedchange', 'quarantinelease' }) do
+  helpers.it('handles ' .. case .. ' without false publication (recovery-publication-paced)', function()
    local script = [[
 import importlib.util,os,sys,tempfile
 from pathlib import Path
@@ -100,12 +104,15 @@ os.environ['ERGOPTI_SNAPSHOT_CASE']=sys.argv[4]
 with tempfile.TemporaryDirectory(prefix='ergopti-staged-snapshot-') as tmp:
  result=bridge.run_fixture(sys.argv[2],Path(sys.argv[3]).resolve(),root,tmp)
  if sys.argv[4]=='quarantinelease': assert result['leaseguard'] is True,result
- elif sys.argv[4] in ('normal','finish','cancel'):
-  assert result['accepted'] is True and result['value']==1 and result['leases']==0,result
-  if sys.argv[4]!='normal': assert result['refused'] is True,result
+ elif sys.argv[4] in ('normal','finish','cancel','slowcopy','paced'):
+  assert result['accepted'] is True and result['value']==1 and result['second']==1 and result['leases']==0,result
+  if sys.argv[4] in ('finish','cancel'): assert result['refused'] is True,result
+  if sys.argv[4]=='paced': assert result['paces']==2 and result['first_visible']==1,result
+ elif sys.argv[4]=='pacedchange':
+  assert result['accepted'] is False and result['value']==1 and result['second']==9,result
+  assert result['detail'].startswith('source changed after 1 published day(s)'),result
  else:
-  assert result['accepted'] is False and result['value']==9 and result['leases']==0,result
-  if sys.argv[4] in ('targetfinish','budget'): assert result['retry'] is True,result
+  assert result['accepted'] is False and result['value']==9 and result['second']==9 and result['leases']==0,result
 print('PASS: snapshot ownership')
 ]]
    local lua = os.getenv('LUA') or arg[-1]

@@ -176,6 +176,8 @@ SIHO_HasActive() {
 ; EndChars stops synchronously before buffering: every ordinary unit and low
 ; surrogate ends capture, while a high is retained for its matching low.
 ; Boot warms this immutable table before configured capture hotkeys can fire.
+; The table is every unit from 1 to 0xFFFF but the high surrogates, with "{"
+; and "}" written as the {{} and {}} key names, in ascending order.
 _SIHO_ScalarEndKeys() {
 	static Cached := 0
 	if Cached is String
@@ -183,18 +185,14 @@ _SIHO_ScalarEndKeys() {
 	Units := 0xFFFF - 0x400 + 4
 	Bytes := Buffer((Units + 1) * 2, 0)
 	Offset := 0
-	loop 0xFFFF {
-		Unit := A_Index
-		if Unit >= 0xD800 && Unit <= 0xDBFF
-			continue
-		if Unit == 0x7B || Unit == 0x7D {
-			NumPut("UShort", 0x7B, "UShort", Unit, "UShort", 0x7D, Bytes, Offset)
-			Offset += 6
-		} else {
-			NumPut("UShort", Unit, Bytes, Offset)
-			Offset += 2
-		}
-	}
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x01, 0x7A)
+	NumPut("UShort", 0x7B, "UShort", 0x7B, "UShort", 0x7D, Bytes, Offset)
+	Offset += 6
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x7C, 0x7C)
+	NumPut("UShort", 0x7B, "UShort", 0x7D, "UShort", 0x7D, Bytes, Offset)
+	Offset += 6
+	_SIHO_FillUnitRun(Bytes, &Offset, 0x7E, 0xD7FF)
+	_SIHO_FillUnitRun(Bytes, &Offset, 0xDC00, 0xFFFF)
 	if Offset != Units * 2
 		throw Error("The scalar capture table did not fill its exact buffer.")
 	Candidate := StrGet(Bytes, Units, "UTF-16")
@@ -204,6 +202,29 @@ _SIHO_ScalarEndKeys() {
 	; No registry globals are available at the earlier boot prewarm position.
 	Cached := Candidate
 	return Cached
+}
+
+; Writes the code units First..Last in ascending order at Offset. Four units go
+; in one Int64 store whose lanes each grow by four per step and never carry, as
+; no unit exceeds 0xFFFF: one store per unit made the boot warm-up of the table
+; above cost 140-290 ms on a loaded PC, about ten times this.
+_SIHO_FillUnitRun(Bytes, &Offset, First, Last) {
+	Unit := First
+	Groups := (Last - First + 1) // 4
+	if Groups > 0 {
+		Word := Unit | (Unit + 1) << 16 | (Unit + 2) << 32 | (Unit + 3) << 48
+		loop Groups {
+			NumPut("Int64", Word, Bytes, Offset)
+			Word += 0x0004000400040004
+			Offset += 8
+		}
+		Unit += Groups * 4
+	}
+	while Unit <= Last {
+		NumPut("UShort", Unit, Bytes, Offset)
+		Offset += 2
+		Unit++
+	}
 }
 
 ; Named controls are explicit native EndKeys, never literal text. The only

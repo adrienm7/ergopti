@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- One phase per process, so the second is a restart of the first:
 --- * add: with the login keyring of a real gnome-keyring-daemon locked,
----   modules/llm/api_entries.lua add() stores a key through the real
+---   ai/engine/settings/api_entries.lua add() stores a key through the real
 ---   secret-tool. GNOME's unlock prompt (gcr-prompter) must open while the
 ---   store runs inside core/ui/ui/modal.lua, i.e. inside keyboard_hook.while_released,
 ---   the call that hands the grabbed keyboard to the desktop; a watcher types
@@ -14,7 +14,7 @@
 --- * migrate: the launcher locks the keyring again, this phase appends an
 ---   entry an earlier build wrote in plaintext; migrate_plaintext(), the
 ---   synchronous move a save runs (the daemon's boot moves it in the background
----   instead, modules/llm/api_key_migration.lua), must open the prompt again,
+---   instead, ai/engine/settings/api_key_migration.lua), must open the prompt again,
 ---   move that key to the service and rewrite the file without it, while the
 ---   first entry's key still loads.
 ---
@@ -90,8 +90,8 @@ local function prompt_seen(report)
 	return title, released == "yes"
 end
 
-local Entries = require("modules.llm.api_entries")
-local TokenStore = require("modules.llm.api_token_store")
+local Entries = require("ai.engine.settings.api_entries")
+local TokenStore = require("ai.engine.settings.api_token_store")
 local marker, report = scratch .. "/released", scratch .. "/prompt"
 observe_release(marker)
 

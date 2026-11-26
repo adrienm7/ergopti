@@ -47,7 +47,7 @@ end
 --- @param backend string
 --- @return table Rows, table state, function restore
 local function setup(backend)
-	local names = { "modules.llm.api_remote", "modules.llm.api_entries" }
+	local names = { "ai.engine.api.api_remote", "ai.engine.settings.api_entries" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local state = { backend = backend, entries = {}, active = nil, prompts = {}, infos = {}, errors = {}, tests = {} }
@@ -57,7 +57,7 @@ local function setup(backend)
 	local jev = { id = "typesafe", label = "TypeSafe (Jev)", base_url = "https://api.typesafe.ai/v1/systemone",
 		default_model = "jev-latest" }
 	local by_id = { cerebras = cerebras, typesafe = jev }
-	package.loaded["modules.llm.api_remote"] = {
+	package.loaded["ai.engine.api.api_remote"] = {
 		providers = function() return { cerebras, jev } end,
 		provider = function(id) return by_id[id] end,
 		serves = function(id, use) return use ~= "chat" or id ~= "typesafe" end,
@@ -68,7 +68,7 @@ local function setup(backend)
 			return true
 		end,
 	}
-	package.loaded["modules.llm.api_entries"] = {
+	package.loaded["ai.engine.settings.api_entries"] = {
 		list = function() return state.entries end,
 		active = function() return state.active end,
 		set_active = function(id)
@@ -128,7 +128,7 @@ local function setup(backend)
 			return state.confirm
 		end,
 	}
-	local Rows = helpers.load_module("ui.menu.llm_backend_rows")
+	local Rows = helpers.load_module("ai.ui.menu.backend_rows")
 	local function build()
 		return require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs,
 			function()
@@ -138,7 +138,7 @@ local function setup(backend)
 	end
 	return build, state, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
-		package.loaded["ui.menu.llm_backend_rows"] = nil
+		package.loaded["ai.ui.menu.backend_rows"] = nil
 	end
 end
 
@@ -174,7 +174,7 @@ end
 --- @param scenario string
 --- @param body function
 local function with_real_api_add(provider_id, scenario, body)
-	local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows", "core.network.adapters.http_client" }
+	local names = { "ai.engine.settings.api_entries", "ai.engine.api.api_remote", "ai.ui.menu.backend_rows", "core.network.adapters.http_client" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local path, rename = assert(os.tmpname()), os.rename
@@ -191,9 +191,9 @@ local function with_real_api_add(provider_id, scenario, body)
 			end,
 			cancel = function() return true end,
 		}
-		local remote = helpers.load_module("modules.llm.api_remote")
+		local remote = helpers.load_module("ai.engine.api.api_remote")
 		local provider = assert(remote.provider(provider_id), "the actual shipped provider must exist")
-		local entries = helpers.load_module("modules.llm.api_entries"); entries._set_path_for_test(path)
+		local entries = helpers.load_module("ai.engine.settings.api_entries"); entries._set_path_for_test(path)
 		os.rename = function(from, to)
 			if to == path then
 				state.stages = state.stages + 1
@@ -222,7 +222,7 @@ local function with_real_api_add(provider_id, scenario, body)
 		local llm = { get_backend = function() return "api" end,
 			set_backend = function(kind) state.backends = state.backends + 1; return kind == "api" end }
 		add_admission_port(llm, state)
-		local Rows = helpers.load_module("ui.menu.llm_backend_rows")
+		local Rows = helpers.load_module("ai.ui.menu.backend_rows")
 		local function changed() state.changes = state.changes + 1 end
 		local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(Rows, llm, dialogs, changed)
 		assert(exact(rows, "➕ " .. provider.label), "the actual Add action must be present").action()

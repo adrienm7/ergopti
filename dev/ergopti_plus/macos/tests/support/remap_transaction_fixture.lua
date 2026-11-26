@@ -19,9 +19,9 @@ local OWNED_MODULES = {
 	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"platform.remap.onboarding",
 	"platform.remap",
@@ -32,12 +32,12 @@ local OWNED_MODULES = {
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
 	"platform.input.keycodes",
-	"modules.gestures.actions",
+	"gestures.engine.actions",
 	"platform.input.key_state",
-	"modules.llm.warmup_controller",
-	"modules.llm.api_mlx",
-	"modules.llm.api_ollama",
-	"modules.llm.api_remote",
+	"ai.engine.local_servers.warmup_controller",
+	"ai.engine.api.mlx",
+	"ai.engine.api.ollama",
+	"ai.engine.api.remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"core.ui.ui.tooltip",
@@ -52,7 +52,7 @@ local OWNED_MODULES = {
 	"modules.keymap.layout",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
-	"adapters.event_provenance",
+	"diagnostics.adapters.event_provenance",
 	"core.fs.adapters.storage",
 	"platform.remap.managed_rule_removal",
 }
@@ -275,6 +275,10 @@ return function(run, dependencies)
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.
 				key_combinations_enabled = function(state)
+					if type(state.key_combinations_enabled) == "boolean" then return state.key_combinations_enabled end
+					return true
+				end,
+				chords_enabled = function(state)
 					if type(state.mod_combos_enabled) == "boolean" then return state.mod_combos_enabled end
 					return true
 				end,
@@ -492,7 +496,7 @@ return function(run, dependencies)
 			-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 			-- at start. The folder exists, as the product's does, so choosing the
 			-- layer hold imports the recommended layer the way a Mac would.
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				get = function() return "missing-config.toml" end,
 				get_config_dir = function() return config_dir end,
 			}
@@ -507,7 +511,7 @@ return function(run, dependencies)
 					return true
 				end,
 			}
-			package.loaded["modules.gestures.engine"] = {}
+			package.loaded["gestures.engine.engine"] = {}
 			package.loaded["modules.shortcuts"] = {
 				is_paused = function() return paused_now end,
 			}
@@ -789,8 +793,8 @@ return function(run, dependencies)
 				RETURN = 0x24,
 				ESCAPE = 0x35,
 			}
-			package.loaded["modules.gestures.engine"] = {}
-			package.loaded["modules.gestures.actions"] = {
+			package.loaded["gestures.engine.engine"] = {}
+			package.loaded["gestures.engine.actions"] = {
 				get_label = function(name) return name end,
 				execute_single = function() return true end,
 				SG_NAMES = { "none", "script_pause_toggle" },
@@ -800,16 +804,16 @@ return function(run, dependencies)
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
-			package.loaded["modules.llm.warmup_controller"] = {
+			package.loaded["ai.engine.local_servers.warmup_controller"] = {
 				stop = record("warmup_stop"),
 				schedule_warmup_with_retry = record("warmup_resume"),
 			}
-			package.loaded["modules.llm.api_mlx"] = {
+			package.loaded["ai.engine.api.mlx"] = {
 				stop_warmup = record("mlx_stop"),
 				resume_warmup = record("mlx_resume"),
 			}
-			package.loaded["modules.llm.api_ollama"] = { stop_warmup = record("ollama_stop") }
-			package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+			package.loaded["ai.engine.api.ollama"] = { stop_warmup = record("ollama_stop") }
+			package.loaded["ai.engine.api.remote"] = { stop_warmup = function() return true end }
 			package.loaded["ui.wpm.wpm_menubar"] = {
 				is_running = function() return false end,
 			}

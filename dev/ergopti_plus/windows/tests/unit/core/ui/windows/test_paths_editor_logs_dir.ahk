@@ -104,18 +104,6 @@ Test("paths editor: a logs folder that cannot be created is refused (paths-edito
 
 ; A native modal's completion belongs to the session that opened it, even when
 ; the process remains alive and now holds another WebView in the same globals.
-class _FPB_NativeWindow {
-	Id := 3001
-	Live := true
-	Hwnd {
-		get {
-			if !this.Live
-				throw Error("Controlled native editor destruction")
-			return this.Id
-		}
-	}
-}
-
 _FPB_Pick(World, RootDir, Options, Prompt, Title, OwnerHwnd) {
 	global _PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch
 	World.Picks += 1
@@ -125,12 +113,8 @@ _FPB_Pick(World, RootDir, Options, Prompt, Title, OwnerHwnd) {
 		Advance := World.Mode == "closed" ? 1 : 2
 		if World.Host == "paths"
 			_PathsEdWeb_SessionEpoch += Advance
-		else if World.Host == "onboarding"
-			_OnbWeb_SessionEpoch += Advance
-		else if World.Mode == "closed"
-			World.Window.Live := false
 		else
-			World.Window.Id += 1
+			_OnbWeb_SessionEpoch += Advance
 	} else if World.Mode == "pause"
 		Suspend(true)
 	return World.Mode == "cancel" ? "" : "D:\Picked folder"
@@ -139,7 +123,7 @@ _FPB_Pick(World, RootDir, Options, Prompt, Title, OwnerHwnd) {
 _FPB_ResultOwnsSession(Host, Target, Mode) {
 	global _PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch, _ConfigDir
 	Saved := [_PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch, _ConfigDir, A_IsSuspended]
-	World := { Host: Host, Mode: Mode, Picks: 0, Scripts: [], Window: _FPB_NativeWindow(), Edit: {Value: "C:/Private configuration"} }
+	World := { Host: Host, Mode: Mode, Picks: 0, Scripts: [] }
 	try {
 		_PathsEdWeb_SessionEpoch := 1001
 		_OnbWeb_SessionEpoch := 2001
@@ -149,18 +133,17 @@ _FPB_ResultOwnsSession(Host, Target, Mode) {
 		Eval := (Js) => World.Scripts.Push(Js)
 		if Host == "paths"
 			_PathsEdWeb_Browse(Target, Pick, Eval)
-		else if Host == "onboarding"
-			_OnbWeb_PickConfigDir("C:\Private configuration", Pick, Eval)
 		else
-			_PathsEdNative_Browse(World.Window, World.Edit, Pick,
-				(Hwnd) => World.Window.Live && World.Window.Hwnd == Hwnd)
-		AssertEqual(Mode == "already-paused" ? 0 : 1, World.Picks)
-		AssertEqual(Mode == "live" && Host != "native" ? 1 : 0, World.Scripts.Length,
-			"only a still-current unpaused session may receive the picked folder")
-		if Host == "native"
-			AssertEqual(Mode == "live" ? "D:/Picked folder" : "C:/Private configuration", World.Edit.Value,
-				"the original native field changes only while its window is current")
-		else if Mode == "live" {
+			_OnbWeb_PickConfigDir("C:\Private configuration", Pick, Eval)
+		; A pause stops typing, not configuration (EDD-1): the paths editor picks
+		; a folder while paused, so a pause delivers as a live session does. The
+		; onboarding keeps its pause guard.
+		Paused := Mode == "pause" || Mode == "already-paused"
+		Delivered := Mode == "live" || (Paused && Host != "onboarding")
+		AssertEqual(Mode == "already-paused" && Host == "onboarding" ? 0 : 1, World.Picks)
+		AssertEqual(Delivered ? 1 : 0, World.Scripts.Length,
+			"only a still-current session may receive the picked folder, paused or not")
+		if Delivered {
 			if Host == "paths" {
 				AssertContains(World.Scripts[1], '"D:/Picked folder/"')
 				AssertContains(World.Scripts[1], '"' . Target . '"')
@@ -181,99 +164,4 @@ for Mode in ["live", "closed", "reopened", "pause", "cancel", "already-paused"] 
 		_FPB_ResultOwnsSession.Bind("paths", "logs", Mode))
 	Test("folder picker: onboarding completion respects " . Mode . " (webview-folder-picker-session)",
 		_FPB_ResultOwnsSession.Bind("onboarding", "config", Mode))
-	Test("folder picker: native field completion respects " . Mode . " (webview-folder-picker-session)",
-		_FPB_ResultOwnsSession.Bind("native", "config", Mode))
 }
-
-; Default Close hides a Gui without retiring its HWND. These private hidden
-; windows receive targeted messages only; no desktop input is injected.
-_PNC_RecordDefaultClose(Receipt, *) {
-	Receipt.Closed := true
-	return false
-}
-
-_PNC_PostClose(Hwnd) {
-	AssertTrue(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
-		"the private native window must receive its close request")
-}
-
-_PNC_DefaultCloseRetainsHiddenHandle() {
-	Window := Gui()
-	Edit := Window.Add("Edit", , "retained value")
-	Receipt := {Closed: false}
-	Window.OnEvent("Close", _PNC_RecordDefaultClose.Bind(Receipt))
-	Window.Show("Hide w220 h100")
-	Hwnd := Window.Hwnd
-	try {
-		_PNC_PostClose(Hwnd)
-		Started := A_TickCount
-		while !Receipt.Closed && A_TickCount - Started < 2000
-			Sleep(1)
-		AssertTrue(Receipt.Closed, "the native Close event must actually run")
-		AssertTrue(WMHandleExists(Hwnd), "default Close preserves the native handle")
-		AssertFalse(DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"))
-		AssertEqual("retained value", Edit.Value, "a hidden closed editor still owns writable controls")
-	} finally Window.Destroy()
-}
-
-_PNC_CloseDuringPicker(Window, *) {
-	Hwnd := Window.Hwnd
-	_PNC_PostClose(Hwnd)
-	Started := A_TickCount
-	while WMHandleExists(Hwnd) && A_TickCount - Started < 2000
-		Sleep(1)
-	AssertFalse(WMHandleExists(Hwnd), "owned Close must destroy rather than hide the editor")
-	return "D:\obsolete selection"
-}
-
-_PNC_OwnedCloseRejectsPickerResult() {
-	Window := Gui()
-	Edit := Window.Add("Edit", , "C:\original")
-	_PathsEdNative_BindCancellation(Window)
-	Window.Show("Hide w220 h100")
-	Hwnd := Window.Hwnd
-	try {
-		AssertTrue(WMHandleExists(Hwnd))
-		AssertFalse(DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"))
-		AssertFalse(_PathsEdNative_Browse(Window, Edit, _PNC_CloseDuringPicker.Bind(Window)),
-			"a cancelled native editor cannot accept a late selection or access its dead edit control")
-	} finally {
-		if WMHandleExists(Hwnd)
-			Window.Destroy()
-	}
-}
-
-class _PNC_EventRegistrar {
-	__New(Window) {
-		this.Window := Window
-		this.Handlers := Map()
-	}
-	OnEvent(Name, Callback) {
-		this.Handlers[Name] := Callback
-		this.Window.OnEvent(Name, Callback)
-	}
-}
-
-_PNC_EscapeRetiresSameWindow() {
-	Window := Gui()
-	Window.Add("Edit", , "C:\original")
-	Window.Show("Hide w220 h100")
-	Hwnd := Window.Hwnd
-	try {
-		Registrar := _PNC_EventRegistrar(Window)
-		_PathsEdNative_BindCancellation(Registrar)
-		AssertTrue(Registrar.Handlers["Close"] == Registrar.Handlers["Escape"],
-			"Close and Escape must share the same definitive cancellation")
-		AssertTrue(Registrar.Handlers["Escape"].Call(Window))
-		AssertFalse(WMHandleExists(Hwnd), "the registered Escape action retires the hidden HWND too")
-	} finally {
-		if WMHandleExists(Hwnd)
-			Window.Destroy()
-	}
-}
-Test("native paths editor: default Close retains the hidden HWND (native-paths-close-cancellation)",
-	_PNC_DefaultCloseRetainsHiddenHandle)
-Test("native paths editor: owned Close retires a picker callback's HWND (native-paths-close-cancellation)",
-	_PNC_OwnedCloseRejectsPickerResult)
-Test("native paths editor: registered Escape destroys the same hidden window (native-paths-close-cancellation)",
-	_PNC_EscapeRetiresSameWindow)

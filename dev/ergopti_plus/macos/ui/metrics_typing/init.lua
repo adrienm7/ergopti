@@ -25,6 +25,10 @@
 ---    page still gets the counts that were read, flagged so it says the
 ---    history is incomplete; the snapshot is not saved and the projection
 ---    cache is left as it was, so the next open retries a full read.
+--- 6. A missing store is an incomplete read, not an empty history: nothing
+---    certifies that no rows exist, so the page says so and nothing is saved,
+---    as Linux does (MET-11). An empty manifest published as complete and
+---    fresh hid the notice and became the next open's snapshot.
 --- ==============================================================================
 
 local M = {}
@@ -212,6 +216,10 @@ local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
 	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
+	-- Ergopti Studio's saved « My typing » read is derived from the same store.
+	if removed then
+		removed = require("modules.keystats.studio_snapshot").retire(_get_log_manager().get_sqlite_path())
+	end
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
 		Projection.reset()
@@ -492,6 +500,8 @@ local function compute_full(pacer)
 	if sqlite_path then
 		session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path, today, pacer)
 		manifest, manifest_json, manifest_complete = session.manifest()
+	else
+		manifest_complete, range_complete = false, false
 	end
 
 	-- App icons + apps list + first_date computed from manifest. The apps list
@@ -558,7 +568,7 @@ end
 --- @return table result { payload = publication object text, complete = boolean }.
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
+	if not sqlite_path then return { payload = '{"manifest":{},"manifest_incomplete":true}', complete = false } end
 	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local _, manifest_json, manifest_complete = session.manifest()
@@ -575,7 +585,9 @@ end
 --- @return table result { payload = encoded range data, complete = boolean }.
 local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
+	if not sqlite_path then
+		return { payload = '{"historical":[],"today":[],"incomplete":true}', complete = false }
+	end
 	local apps = type(query.apps) == "table" and query.apps or nil
 	-- The page names the history it holds, so an unchanged one is not resent
 	local held = math.tointeger(query.historical_serial)

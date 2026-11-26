@@ -25,6 +25,11 @@
 ;    threshold passing (tick), starts the hold.
 ; 4. Fail fast: a table of another format or version, or one naming an
 ;    undeclared layer or modifier, throws at compile time, never on a key.
+; 5. A dead key of an emulated layer composes with the next key, native layers
+;    included (the table's compose_keys), as TN2056 does: a rule's text or next
+;    dead key, else the terminator before the key. Its auto-repeat and release
+;    type nothing. While AltGr holds a custom modifier, the AltGr the driver
+;    reports (alt_right) is that key's, never a level of its own.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -72,6 +77,9 @@ _SrcEmu_Sided() {
 	static Sided := Map("shift", true, "control", true, "alt", true, "meta", true)
 	return Sided
 }
+
+; The key whose AltGr the driver reports as alt_right.
+_SrcEmu_AltGrKey() => "AltRight"
 
 
 
@@ -141,11 +149,24 @@ SourceEmulation_SelectorMatches(Selector, Pressed) {
 ; ==============================
 ; ==============================
 
-; Checks one mapping of the table and copies it.
-_SrcEmu_MappingOf(Value, Where) {
+; Checks one mapping of the table and copies it. A dead key must be one of the
+; table's; a text's compose identity, when it differs from the text, is kept.
+; A repeat key reaches one or two characters back; a magic key names one of
+; the table's magic tables (an empty Map admits none).
+_SrcEmu_MappingOf(Value, Where, DeadKeys, MagicTables) {
 	if Value is Map {
-		if Value.Get("text", 0) is String
-			return Map("text", Value["text"])
+		Depth := Value.Get("repeat", 0)
+		if (Depth is Integer) && (Depth == 1 || Depth == 2)
+			return Map("repeat", Depth)
+		if (Value.Get("magic", 0) is String) && MagicTables.Has(Value["magic"])
+			return Map("magic", Value["magic"])
+		if Value.Get("text", 0) is String {
+			if !Value.Has("compose")
+				return Map("text", Value["text"])
+			if Value["compose"] is String
+				return Map("text", Value["text"], "compose", Value["compose"])
+			throw Error("The emulation table holds a malformed mapping at " . Where . ".")
+		}
 		if Value.Get("key", 0) is String {
 			Modifiers := []
 			if Value.Get("modifiers", 0) is Array
@@ -155,8 +176,120 @@ _SrcEmu_MappingOf(Value, Where) {
 		}
 		if Value.Get("disabled", "") == 1
 			return Map("disabled", true)
+		if (Value.Get("dead_key", 0) is String) && DeadKeys.Has(Value["dead_key"])
+			return Map("dead_key", Value["dead_key"])
 	}
 	throw Error("The emulation table holds a malformed mapping at " . Where . ".")
+}
+
+; What a native layer's key answers a pending dead key with: a text, or a dead
+; key of the .keylayout, named whether the table emulates it or not.
+_SrcEmu_ComposeKeyOf(Value, Where, DeadKeys) {
+	if (Value is Map) && (Value.Get("dead_key", 0) is String)
+		return Map("dead_key", Value["dead_key"])
+	Mapping := _SrcEmu_MappingOf(Value, Where, DeadKeys, Map())
+	if !Mapping.Has("text")
+		throw Error("The emulation table holds a malformed mapping at " . Where . ".")
+	return Mapping
+}
+
+; Checks one rule table of a dead key: input -> its text, its next dead key, or both.
+_SrcEmu_DeadOutcomes(Rules, Where, Source) {
+	if !(Rules is Map)
+		throw Error("The emulation table holds a malformed dead key at " . Where . ".")
+	Out := Map()
+	for Input, Rule in Rules {
+		Valid := (Rule is Map) && (!Rule.Has("text") || Rule["text"] is String)
+			&& (!Rule.Has("next") || ((Rule["next"] is String) && Source.Has(Rule["next"])))
+			&& (Rule.Has("text") || Rule.Has("next"))
+		if !Valid
+			throw Error("The emulation table holds a malformed dead key at " . Where . "." . Input . ".")
+		Out[Input] := Map("text", Rule.Get("text", 0), "next", Rule.Get("next", ""))
+	}
+	return Out
+}
+
+; Checks the table's magic keys' tables: each rule types one text after its
+; context; the fallback when no rule's context ends the text typed.
+_SrcEmu_MagicOf(Table) {
+	Out := Map()
+	if !Table.Has("magic")
+		return Out
+	Source := Table["magic"]
+	if !(Source is Map)
+		throw Error("The emulation table holds malformed magic keys.")
+	for Id, Entry in Source {
+		if !(Entry is Map) || !(Entry.Get("rules", 0) is Array) || !(Entry.Get("fallback", 0) is String)
+			throw Error("The emulation table holds a malformed magic key at magic." . Id . ".")
+		Rules := []
+		for Index, Rule in Entry["rules"] {
+			if !(Rule is Map) || !(Rule.Get("after", 0) is String) || Rule["after"] == ""
+					|| !(Rule.Get("types", 0) is String)
+				throw Error("The emulation table holds a malformed rule at magic." . Id . ".rules[" . Index . "].")
+			Rules.Push(Map("after", Rule["after"], "types", Rule["types"]))
+		}
+		Out[Id] := Map("rules", Rules, "fallback", Entry["fallback"])
+	}
+	return Out
+}
+
+/**
+ * What a repeat or magic key types after a text: the character "repeat"
+ * places back (a surrogate pair is one character), or the rule whose context
+ * is the longest end of the text, else the table's fallback; "" when it types
+ * nothing. The definition of _shared/tests/corpus/layouts/magic_vectors.json,
+ * as the web and Lua engines and the Studio's analysis.
+ * @param {Map} MagicTables - Id -> Map("rules", [Map("after", "types")], "fallback").
+ * @param {Map} Mapping - Map("repeat", 1|2) or Map("magic", Id).
+ * @param {String} Before - The text typed so far.
+ * @returns {String}
+ */
+SourceEmulation_ContextText(MagicTables, Mapping, Before) {
+	if Mapping.Has("repeat") {
+		At := StrLen(Before) + 1, Width := 0
+		Loop Mapping["repeat"] {
+			At -= 1
+			if At < 1
+				return ""
+			Width := 1
+			Unit := Ord(SubStr(Before, At, 1))
+			; Ord reads a whole pair at its high half: a low half steps back onto it.
+			if At > 1 && Unit >= 0xDC00 && Unit <= 0xDFFF {
+				High := NumGet(StrPtr(Before), (At - 2) * 2, "UShort")
+				if High >= 0xD800 && High <= 0xDBFF
+					At -= 1, Width := 2
+			}
+		}
+		return SubStr(Before, At, Width)
+	}
+	Table := MagicTables[Mapping["magic"]]
+	Best := 0
+	for Rule in Table["rules"] {
+		Length := StrLen(Rule["after"])
+		if StrLen(Before) >= Length && SubStr(Before, -Length) == Rule["after"]
+				&& (!(Best is Map) || Length > StrLen(Best["after"]))
+			Best := Rule
+	}
+	return (Best is Map) ? Best["types"] : Table["fallback"]
+}
+
+; Checks the table's dead keys: each rule types a text, leads to a dead key, or both.
+_SrcEmu_DeadKeysOf(Table) {
+	DeadKeys := Map()
+	if !Table.Has("dead_keys")
+		return DeadKeys
+	Source := Table["dead_keys"]
+	if !(Source is Map)
+		throw Error("The emulation table holds malformed dead keys.")
+	for Id, Dead in Source {
+		Where := "dead_keys." . Id
+		if !(Dead is Map) || !(Dead.Get("terminator", 0) is String)
+			throw Error("The emulation table holds a malformed dead key at " . Where . ".")
+		DeadKeys[Id] := Map("terminator", Dead["terminator"],
+			"inputs", _SrcEmu_DeadOutcomes(Dead.Get("inputs", 0), Where . ".inputs", Source),
+			"dead_inputs", _SrcEmu_DeadOutcomes(Dead.Get("dead_inputs", 0), Where . ".dead_inputs", Source))
+	}
+	return DeadKeys
 }
 
 ; Copies an array of modifier ids, refusing an undeclared one.
@@ -191,7 +324,8 @@ SourceEmulation_Compile(Table) {
 		throw Error("The layout emulation table is not an " . SourceEmulation_Contract("format") . " version "
 			. SourceEmulation_Contract("version") . " table.")
 	Model := Map("layout", Table.Get("layout", ""), "modifier_keys", Map(), "custom", Map(), "layers", [],
-		"layer_by_id", Map(), "shortcuts", [], _SrcEmu_TapHoldsField(), Map(), "remaps", Map())
+		"layer_by_id", Map(), "shortcuts", [], _SrcEmu_TapHoldsField(), Map(), "remaps", Map(),
+		"dead_keys", _SrcEmu_DeadKeysOf(Table), "magic", _SrcEmu_MagicOf(Table))
 	for Modifier in _SrcEmu_List(Table, "modifiers") {
 		if !(Modifier is Map) || !(Modifier.Get("id", 0) is String)
 				|| (Modifier.Get("mode", "") != "held" && Modifier.Get("mode", "") != "locked")
@@ -225,11 +359,21 @@ SourceEmulation_Compile(Table) {
 		}
 		Keys := Map()
 		for Code, Value in Layer["keys"]
-			Keys[Code] := _SrcEmu_MappingOf(Value, "layers." . Layer["id"] . "." . Code)
+			Keys[Code] := _SrcEmu_MappingOf(Value, "layers." . Layer["id"] . "." . Code, Model["dead_keys"],
+				Model["magic"])
+		ComposeKeys := Map()
+		if Layer.Has("compose_keys") {
+			if !(Layer["compose_keys"] is Map)
+				throw Error("The emulation table holds malformed compose keys at layers." . Layer["id"] . ".")
+			for Code, Value in Layer["compose_keys"]
+				ComposeKeys[Code] := _SrcEmu_ComposeKeyOf(Value, "layers." . Layer["id"] . ".compose_keys." . Code,
+					Model["dead_keys"])
+		}
 		Native := Layer.Get("native", 0)
 		Selectable := Layer.Get("selectable", 1)
 		Compiled := Map("id", Layer["id"], "native", (Native is Integer) && Native == 1,
-			"selectable", !((Selectable is Integer) && Selectable == 0), "selectors", Selectors, "keys", Keys)
+			"selectable", !((Selectable is Integer) && Selectable == 0), "selectors", Selectors, "keys", Keys,
+			"compose_keys", ComposeKeys)
 		Model["layers"].Push(Compiled)
 		Model["layer_by_id"][Layer["id"]] := Compiled
 	}
@@ -255,8 +399,12 @@ SourceEmulation_Compile(Table) {
 			throw Error("A tap-hold holds the unknown modifier '" . String(Entry["hold_modifier"]) . "'.")
 		if Model[_SrcEmu_TapHoldsField()].Has(Entry["key"]) || Model["modifier_keys"].Has(Entry["key"])
 			throw Error("The key " . Entry["key"] . " has two roles in the emulation table.")
+		; A tap's text is chosen at its release, with no text typed before it to read.
+		Tap := _SrcEmu_MappingOf(Entry.Get("tap", 0), Where . ".tap", Model["dead_keys"], Map())
+		if Tap.Has("repeat")
+			throw Error("The emulation table holds a malformed mapping at " . Where . ".tap.")
 		Model[_SrcEmu_TapHoldsField()][Entry["key"]] := Map("key", Entry["key"],
-			"tap", _SrcEmu_MappingOf(Entry.Get("tap", 0), Where . ".tap"),
+			"tap", Tap,
 			"hold_layer", Entry.Get("hold_layer", ""), "hold_modifier", Entry.Get("hold_modifier", ""),
 			"threshold_ms", Threshold)
 	}
@@ -306,6 +454,15 @@ SourceEmulation_Keys(Model) {
 }
 
 /**
+ * Whether the table holds a custom modifier on a key, so the host takes that key
+ * (Caps Lock, AltGr) as a plain key instead of its own role.
+ * @param {Map} Model - From SourceEmulation_Compile.
+ * @param {String} Code - KeyboardEvent.code.
+ * @returns {Boolean}
+ */
+SourceEmulation_HoldsModifierKey(Model, Code) => Model["modifier_keys"].Has(Code)
+
+/**
  * Whether one of the layers is emulated (no keyMap of the OS behind it): such a
  * layer types nothing on the keys it does not map, so the host takes every key.
  * @param {Map} Model - From SourceEmulation_Compile.
@@ -336,14 +493,22 @@ SourceEmulation_HasEmulatedLayer(Model) {
 SourceEmulation_NewSession(Model) {
 	if !(Model is Map) || !(Model.Get("layers", 0) is Array)
 		throw Error("A session needs a compiled table.")
-	return Map("model", Model, "active", Map(), "held_keys", Map(), "pending", 0, "hold", 0)
+	return Map("model", Model, "active", Map(), "held_keys", Map(), "pending", 0, "hold", 0, "dead", "")
+}
+
+; Whether the driver reports a built-in modifier held, the AltGr a custom
+; modifier holds left out.
+_SrcEmu_Reports(Session, Held, Id) {
+	if !Held.Get(Id, false)
+		return false
+	return Id != "alt_right" || Session["held_keys"].Get(_SrcEmu_AltGrKey(), "") != "modifier"
 }
 
 ; The modifier ids held now: the driver's built-ins, then the active customs.
 _SrcEmu_PressedIds(Session, Held) {
 	Pressed := []
 	for Id in SourceEmulation_Reported()
-		if Held.Get(Id, false)
+		if _SrcEmu_Reports(Session, Held, Id)
 			Pressed.Push(Id)
 	for Id in Session["active"]
 		Pressed.Push(Id)
@@ -351,16 +516,55 @@ _SrcEmu_PressedIds(Session, Held) {
 }
 
 ; The built-in modifiers a key action keeps from the hand (Caps Lock is a lock).
-_SrcEmu_HeldModifiers(Held) {
+_SrcEmu_HeldModifiers(Session, Held) {
 	Out := []
 	for Id in SourceEmulation_Reported()
-		if Id != "caps_lock" && Held.Get(Id, false)
+		if Id != "caps_lock" && _SrcEmu_Reports(Session, Held, Id)
 			Out.Push(Id)
 	return Out
 }
 
-_SrcEmu_Perform(Mapping, Actions) {
-	if Mapping.Has("text")
+; The rule of the pending dead key a mapping answers, 0 when none.
+_SrcEmu_DeadRule(Session, Mapping) {
+	Dead := Session["model"]["dead_keys"][Session["dead"]]
+	if Mapping.Has("dead_key")
+		return Dead["dead_inputs"].Get(Mapping["dead_key"], 0)
+	if !Mapping.Has("text")
+		return 0
+	Identity := Mapping.Has("compose") ? Mapping["compose"] : Mapping["text"]
+	return Identity == "" ? 0 : Dead["inputs"].Get(Identity, 0)
+}
+
+; Follows a dead-key rule: its text, then the dead key it leads to.
+_SrcEmu_Follow(Session, Rule, Actions) {
+	Session["dead"] := Rule["next"]
+	if Rule["text"] is String
+		Actions.Push(Map("type", "text", "text", Rule["text"]))
+}
+
+; Ends a pending dead key with its terminator.
+_SrcEmu_Terminate(Session, Actions) {
+	if Session["dead"] == ""
+		return
+	Terminator := Session["model"]["dead_keys"][Session["dead"]]["terminator"]
+	Session["dead"] := ""
+	if Terminator != ""
+		Actions.Push(Map("type", "text", "text", Terminator))
+}
+
+; The actions of one mapping, composing with a pending dead key.
+_SrcEmu_Perform(Session, Mapping, Actions) {
+	if Session["dead"] != "" {
+		Rule := _SrcEmu_DeadRule(Session, Mapping)
+		if Rule is Map {
+			_SrcEmu_Follow(Session, Rule, Actions)
+			return
+		}
+		_SrcEmu_Terminate(Session, Actions)
+	}
+	if Mapping.Has("dead_key")
+		Session["dead"] := Mapping["dead_key"]
+	else if Mapping.Has("text")
 		Actions.Push(Map("type", "text", "text", Mapping["text"]))
 	else if Mapping.Has("key")
 		Actions.Push(Map("type", "key", "key", Mapping["key"], "modifiers", Mapping["modifiers"].Clone()))
@@ -397,7 +601,7 @@ _SrcEmu_Settle(Session, Now, Actions) {
 		return
 	if Now - Pending["at"] < Pending["entry"]["threshold_ms"] {
 		Session["pending"] := 0
-		_SrcEmu_Perform(Pending["entry"]["tap"], Actions)
+		_SrcEmu_Perform(Session, Pending["entry"]["tap"], Actions)
 	} else {
 		_SrcEmu_StartHold(Session, Actions)
 	}
@@ -445,11 +649,14 @@ _SrcEmu_Result(Consumed, Actions) => Map("consumed", Consumed ? true : false, "a
  * @param {Map} Held - Built-in modifier id -> true for those the driver reports
  *   held (shift, control, alt, alt_right, meta) and caps_lock when it is on.
  * @param {Integer} Now - Milliseconds of the press, on any monotonic clock.
+ * @param {String} [Before] - The text typed so far (the driver's last typed
+ *   text), which a repeat or magic key reads; required for such a key.
  * @returns {Map} "consumed" (the key itself must not reach the OS or the
  *   keylayout emulation) and "actions", ordered Maps of type text (text), key
  *   (key, modifiers) or modifier (id, down).
+ * @throws {Error} When a repeat or magic key is pressed without the text before.
  */
-SourceEmulation_Press(Session, Code, Held, Now) {
+SourceEmulation_Press(Session, Code, Held, Now, Before := 0) {
 	Model := Session["model"]
 	Actions := []
 	if Session["held_keys"].Has(Code)
@@ -480,21 +687,51 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 	Pressed := _SrcEmu_PressedIds(Session, Held)
 	Shortcut := _SrcEmu_ShortcutFor(Session, Code, Pressed)
 	if Shortcut is Map {
+		_SrcEmu_Terminate(Session, Actions)
 		Actions.Push(Map("type", "key", "key", Shortcut["send_key"], "modifiers", Shortcut["send_modifiers"].Clone()))
 		return _SrcEmu_Result(true, Actions)
 	}
 	if Model["remaps"].Has(Code) {
 		Remap := Model["remaps"][Code]
+		_SrcEmu_Terminate(Session, Actions)
 		if Remap != ""
-			Actions.Push(Map("type", "key", "key", Remap, "modifiers", _SrcEmu_HeldModifiers(Held)))
+			Actions.Push(Map("type", "key", "key", Remap, "modifiers", _SrcEmu_HeldModifiers(Session, Held)))
 		return _SrcEmu_Result(true, Actions)
 	}
 	Layer := _SrcEmu_SelectedLayer(Session, Pressed)
-	if !(Layer is Map)
+	if !(Layer is Map) {
+		_SrcEmu_Terminate(Session, Actions)
 		return _SrcEmu_Result(false, Actions)
+	}
 	if Layer["keys"].Has(Code) {
-		_SrcEmu_Perform(Layer["keys"][Code], Actions)
+		Mapping := Layer["keys"][Code]
+		if Mapping.Has("repeat") || Mapping.Has("magic") {
+			if !(Before is String)
+				throw Error("A repeat or magic key needs the text typed before it.")
+			; Its text types as a text key would; typing nothing leaves a dead key pending.
+			Text := SourceEmulation_ContextText(Model["magic"], Mapping, Before)
+			if Text != ""
+				_SrcEmu_Perform(Session, Map("text", Text), Actions)
+			return _SrcEmu_Result(true, Actions)
+		}
+		_SrcEmu_Perform(Session, Mapping, Actions)
+		; A dead key's auto-repeat and release are its own: they type nothing.
+		if Mapping.Has("dead_key")
+			Session["held_keys"][Code] := "dead"
 		return _SrcEmu_Result(true, Actions)
+	}
+	; A pending dead key composes with a native layer's key, else ends with its
+	; terminator and lets the key type as the .keylayout does.
+	if Session["dead"] != "" {
+		NativeKey := Layer["compose_keys"].Get(Code, 0)
+		Rule := (NativeKey is Map) ? _SrcEmu_DeadRule(Session, NativeKey) : 0
+		if Rule is Map {
+			_SrcEmu_Follow(Session, Rule, Actions)
+			if NativeKey.Has("dead_key")
+				Session["held_keys"][Code] := "dead"
+			return _SrcEmu_Result(true, Actions)
+		}
+		_SrcEmu_Terminate(Session, Actions)
 	}
 	; An emulated layer has no keyMap for the OS to fall back on.
 	if !Layer["native"]
@@ -505,7 +742,7 @@ SourceEmulation_Press(Session, Code, Held, Now) {
 	if (Hold is Map) && Hold["entry"]["hold_layer"] == Layer["id"] {
 		Required := Layer["selectors"].Length ? Layer["selectors"][1]["required"] : []
 		Sent := Map()
-		for Id in _SrcEmu_HeldModifiers(Held)
+		for Id in _SrcEmu_HeldModifiers(Session, Held)
 			Sent[Id] := true
 		for Id in Required
 			Sent[Id] := true
@@ -545,7 +782,7 @@ SourceEmulation_Release(Session, Code, Now) {
 	if (Pending is Map) && Pending["code"] == Code {
 		Session["pending"] := 0
 		if Now - Pending["at"] < Pending["entry"]["threshold_ms"]
-			_SrcEmu_Perform(Pending["entry"]["tap"], Actions)
+			_SrcEmu_Perform(Session, Pending["entry"]["tap"], Actions)
 		return _SrcEmu_Result(true, Actions)
 	}
 	Hold := Session["hold"]
@@ -580,7 +817,7 @@ SourceEmulation_Reset(Session) {
 	if Session["hold"] is Map
 		_SrcEmu_EndHold(Session, Actions)
 	Session["pending"] := 0, Session["hold"] := 0
-	Session["held_keys"] := Map(), Session["active"] := Map()
+	Session["held_keys"] := Map(), Session["active"] := Map(), Session["dead"] := ""
 	return Actions
 }
 

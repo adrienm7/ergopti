@@ -9,7 +9,7 @@
 --- the folder and file names under the configuration directory and e-mail
 --- addresses. The rules are data in
 --- _shared/diagnostics/data/redaction.json; the AHK port
---- (windows/infra/redact.ahk) replays the same vectors
+--- (windows/diagnostics/engine/reports/redact.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/redaction_vectors.json).
 ---
 --- FEATURES & RATIONALE:
@@ -109,6 +109,18 @@ end
 -- ======================================
 -- ======================================
 
+-- The last text folded and its folded form, kept for one M.apply call. One
+-- redaction runs a dozen case-insensitive passes over a text most of them leave
+-- unchanged; folding it once instead of once per pass, and returning an
+-- unmatched text unbuilt, is what makes a log line cheap. Strings are values,
+-- so an equal text always has this folded form.
+local folded_text, folded_lower = nil, nil
+
+-- The work redaction did since the module loaded: texts folded to lower case
+-- and texts rebuilt around a match, so a test can prove an unmatched text
+-- costs one fold and no rebuild.
+local work = { folds = 0, rebuilds = 0 }
+
 --- Replaces every accepted occurrence of `needle`, scanning left to right.
 --- @param text string
 --- @param needle string Non-empty literal.
@@ -118,13 +130,22 @@ end
 ---   (never before the end of the previous replacement).
 --- @return string
 local function replace_occurrences(text, needle, case_insensitive, accept)
-	local haystack = case_insensitive and text:lower() or text
+	local haystack = text
+	if case_insensitive then
+		if text ~= folded_text then
+			folded_text, folded_lower = text, text:lower()
+			work.folds = work.folds + 1
+		end
+		haystack = folded_lower
+	end
 	local target = case_insensitive and needle:lower() or needle
+	local first, last = haystack:find(target, 1, true)
+	-- Most passes find nothing: the text comes back as it is, unbuilt.
+	if not first then return text end
+	work.rebuilds = work.rebuilds + 1
 	local out = {}
 	local pos = 1
-	while true do
-		local first, last = haystack:find(target, pos, true)
-		if not first then break end
+	while first do
 		local replacement, consumed_last, start = accept(text, first, last)
 		if replacement then
 			out[#out + 1] = text:sub(pos, math.max(pos, start or first) - 1)
@@ -134,6 +155,7 @@ local function replace_occurrences(text, needle, case_insensitive, accept)
 			out[#out + 1] = text:sub(pos, first)
 			pos = first + 1
 		end
+		first, last = haystack:find(target, pos, true)
 	end
 	out[#out + 1] = text:sub(pos)
 	return table.concat(out)
@@ -203,7 +225,8 @@ local function redact_url_credentials(text, rules)
 end
 
 --- Replaces e-mail addresses: a local part, an @, and a dotted domain ending in
---- a top-level label of at least two letters.
+--- a top-level label of at least two letters, unless a colon and a digit
+--- follow it: that is a source location such as File.swift:62.
 --- @param text string
 --- @param rules table
 --- @return string
@@ -218,6 +241,8 @@ local function redact_emails(text, rules)
 		local dot = domain:match("^.*()%.")
 		if not dot or dot < 2 then return nil end
 		if not domain:sub(dot + 1):match("^[A-Za-z][A-Za-z]+$") then return nil end
+		-- A colon and a digit right after it make a source location (File.swift:62)
+		if source:sub(stop + 1, stop + 2):match("^:%d$") then return nil end
 		return rules.email_placeholder, stop, start
 	end)
 end
@@ -353,8 +378,8 @@ local function mask_config_dir(text, rules, dir, case_insensitive)
 	if type(dir) ~= "string" then return text end
 	local trimmed = dir:gsub("[/\\]+$", "")
 	if trimmed == "" then return text end
-	local known = {}
-	for _, name in ipairs(rules.config_known_names) do known[name:lower()] = true end
+	-- Built at the first name to judge: most texts never hold the directory.
+	local known = nil
 	local spellings, seen = {}, {}
 	for _, spelling in ipairs({ trimmed, (trimmed:gsub("\\", "/")), (trimmed:gsub("/", "\\")) }) do
 		if not seen[spelling] then
@@ -386,6 +411,10 @@ local function mask_config_dir(text, rules, dir, case_insensitive)
 					out[#out + 1] = source:sub(i, i)
 					i = start
 				else
+					if not known then
+						known = {}
+						for _, shipped in ipairs(rules.config_known_names) do known[shipped:lower()] = true end
+					end
 					local kept = known[name:lower()] and name or rules.config_name_placeholder
 					out[#out + 1] = source:sub(i, i) .. kept
 					i = stop + 1
@@ -425,6 +454,11 @@ end
 -- =============================
 -- =============================
 
+-- The configuration directory as the home pass leaves it, with the values it
+-- was resolved from. They come from the context every caller keeps for its
+-- whole life (the logger captures them once), never from a redacted text.
+local home_config_dir_memo = {}
+
 --- Redacts diagnostic text before it leaves the machine.
 --- @param text string
 --- @param rules table Decoded _shared/diagnostics/data/redaction.json.
@@ -442,6 +476,20 @@ function M.apply(text, rules, context)
 	end
 	context = type(context) == "table" and context or {}
 	local folded = context.case_insensitive == true
+	-- The directory as the home pass leaves it, resolved before the text is
+	-- folded. It depends on these four values alone, and a logger passes the
+	-- same ones for every line, so it is resolved again only when one changes.
+	local home_config_dir = nil
+	if type(context.config_dir) == "string" then
+		local memo = home_config_dir_memo
+		if memo.config_dir ~= context.config_dir or memo.home ~= context.home or memo.folded ~= folded
+			or memo.placeholder ~= rules.home_placeholder then
+			memo.value = redact_home(context.config_dir, rules, context.home, folded)
+			memo.config_dir, memo.home, memo.folded = context.config_dir, context.home, folded
+			memo.placeholder = rules.home_placeholder
+		end
+		home_config_dir = memo.value
+	end
 	text = redact_tokens(text, rules)
 	text = redact_url_credentials(text, rules)
 	text = redact_bearer(text, rules)
@@ -450,13 +498,21 @@ function M.apply(text, rules, context)
 	-- (a log written earlier already holds "~" for the home folder)
 	text = mask_config_dir(text, rules, context.config_dir, folded)
 	text = redact_home(text, rules, context.home, folded)
-	if type(context.config_dir) == "string" then
-		text = mask_config_dir(text, rules, redact_home(context.config_dir, rules, context.home, folded), folded)
+	if home_config_dir then
+		text = mask_config_dir(text, rules, home_config_dir, folded)
 	end
 	text = redact_foreign_homes(text, rules)
 	text = redact_emails(text, rules)
 	text = redact_account(text, rules, context.user, folded)
+	-- The memo holds a text that may not be redacted; it never outlives the call.
+	folded_text, folded_lower = nil, nil
 	return text
+end
+
+--- The work redaction did since the module loaded.
+--- @return table { folds = number, rebuilds = number }
+function M.work_counts()
+	return { folds = work.folds, rebuilds = work.rebuilds }
 end
 
 return M

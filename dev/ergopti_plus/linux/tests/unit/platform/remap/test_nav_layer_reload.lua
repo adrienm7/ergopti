@@ -403,7 +403,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			made_directory = true
 			-- The switch is a config.toml row: every scenario runs with it on.
 			write_source(dir .. "/config.toml", "[tap_holds]\nenabled = true\n" .. (config_text or ""))
-			package.loaded["infra.config_paths"] = { config = function(name) return dir .. "/" .. name end }
+			package.loaded["settings.engine.paths"] = { config = function(name) return dir .. "/" .. name end }
 			package.loaded["platform.remap.nav_layer"] = nil
 			package.loaded["platform.remap.tap_hold_manager"] = nil
 			package.loaded["modules.shortcuts.key_combinations"] = nil
@@ -415,7 +415,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			local function start()
 				return Manager.init({ keyboard_hook = hook,
 					execute_action = function() hook.actions = hook.actions + 1 end,
-					action_names = require("modules.gestures.manager").get_executable_action_names,
+					action_names = require("gestures.engine.manager").get_executable_action_names,
 					on_text_injected = function() hook.typed = hook.typed + 1 end,
 					defaults_path = opts.shared_root .. "/tap_hold/data/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 			end
@@ -625,6 +625,20 @@ helpers.describe("original configured Navigation source reservations", function(
 			helpers.assert_true(rawequal(s.hook.engine, saved.engine)); helpers.assert_eq(successor.current(), false)
 			helpers.assert_true(has_nav(assert(s.manager.capture_collision_inventory())))
 			helpers.assert_eq(first.current(), false, "inverse publication does not revive an old Manager generation")
+		end)
+	end)
+
+	-- « Touches de jeu » (maintainer decision of 2026-11-26): a held key in a game
+	-- waited for its tap-hold decision before it reached the game.
+	helpers.it("(game-keys-tap-holds) a game takes the tap-holds out of the hook and gives them back", function()
+		owned(NAV_NONE, nil, function(s)
+			helpers.assert_true(s.start())
+			helpers.assert_true(s.hook.engine ~= nil, "the tap-holds run")
+			helpers.assert_true(s.manager.set_game(true))
+			helpers.assert_nil(s.hook.engine, "a game's keys skip every tap-hold")
+			helpers.assert_true(s.manager.set_game(true), "the same focus changes nothing")
+			helpers.assert_true(s.manager.set_game(false))
+			helpers.assert_true(s.hook.engine ~= nil, "another application gets them back")
 		end)
 	end)
 

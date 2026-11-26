@@ -28,9 +28,35 @@ end
 --- 4. Text is plain unless the caller omits --no-markup, in which case it is
 ---    Pango markup, as zenity read it.
 --- 5. Importing the module (tests) parses only; it never opens a display.
+--- 6. Run as a script, the host puts its own tree on the search path, then the
+---    shared tree core/fs/engine/paths.lua resolves: the daemon exports no
+---    LUA_PATH from a checkout, and the names below come from the shared tree
+---    (_shared/core/text/data/identifiers.json).
 --- ==============================================================================
 
+-- Whether this file is the program the interpreter runs, not a required module.
+local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
+local RUN_AS_SCRIPT = type(arg) == "table" and arg[0] == invoked_source
+if RUN_AS_SCRIPT and not (literal_driver and literal_driver ~= "") then
+	-- The literal loader already resolves both trees; a plain run puts its own
+	-- driver tree on package.path, then asks the path owner where the shared tree
+	-- is (beside the driver in a checkout and a release tarball, inside it in a
+	-- system package) rather than counting directory steps itself.
+	local root = ("/" .. invoked_source):match("^/(.*)/core/ui/ui/dialog_host%.lua$")
+		or (("/" .. invoked_source):match("^/core/ui/ui/dialog_host%.lua$") and ".")
+	assert(root, "the dialog host runs from its driver tree")
+	assert(not root:find("[;?]"), "a driver root with template bytes needs the literal loader")
+	package.path = root .. "/?.lua;" .. package.path
+	local Paths = require("core.fs.engine.paths")
+	-- The non-logging seam: the logger itself lives in the shared tree.
+	local shared = assert(Paths.shared_root_from(Paths.driver_root()), "the dialog host finds no shared tree")
+	package.path = shared .. "/?.lua;" .. package.path
+end
+
 local M = {}
+
+-- The test guard's variable names (_shared/core/text/data/identifiers.json).
+local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
 
 --- Exit statuses the callers read.
 M.EXIT_ACCEPTED = 0
@@ -210,6 +236,7 @@ local DECLARATIONS = [[
 	void       gtk_label_set_markup(GtkWidget *label, const char *markup);
 	void       gtk_label_set_line_wrap(GtkWidget *label, gboolean wrap);
 	void       gtk_label_set_xalign(GtkWidget *label, float xalign);
+	void       gtk_label_set_mnemonic_widget(GtkWidget *label, GtkWidget *widget);
 	GtkWidget* gtk_entry_new(void);
 	void       gtk_entry_set_text(GtkWidget *entry, const char *text);
 	const char* gtk_entry_get_text(GtkWidget *entry);
@@ -274,6 +301,25 @@ local function bind()
 	return { ffi = ffi, gtk = gtk, glib = glib, gobject = gobject }
 end
 
+--- The default GTK binding, public so that the live keyboard profile
+--- (tests/hardware/run_dialog_keyboard_walk.lua) drives the real dialogs
+--- through M.main's binder seam instead of a copy of the declarations.
+M.bind = bind
+
+--- The window title: the caller's, else the product name. A window with no
+--- title is announced nameless by a screen reader and is a blank row in the
+--- window list (Alt+Tab). A title the caller gives empty stays empty: that is
+--- the unbranded-titles choice (test-linux-native-dialog-titles.py).
+--- @param request table
+--- @return string
+function M.window_title(request)
+	local title = request.options.title
+	if type(title) == "string" then return title end
+	-- The product's name, a brand spelled the same in every locale (this
+	-- child loads no catalogue), as the tray's own title.
+	return "Ergopti+"
+end
+
 --- A button label: the caller's, else GTK's own translated stock word.
 --- @param lib table
 --- @param given string|nil
@@ -289,7 +335,7 @@ end
 --- @param window userdata
 --- @param request table
 local function frame(lib, window, request)
-	lib.gtk.gtk_window_set_title(window, request.options.title or "")
+	lib.gtk.gtk_window_set_title(window, M.window_title(request))
 	lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
 	-- Focused when it opens (gtk_dialog_run presents it), never kept on top:
 	-- tools/test/test-ui-focus-fix.cjs holds every window to that rule.
@@ -303,19 +349,30 @@ end
 --- @param dialog userdata
 --- @param request table
 --- @return userdata content The dialog's content box.
+--- @return userdata|nil caption The text's label, to bind to the field it names.
 local function content_with_text(lib, dialog, request)
 	local content = lib.gtk.gtk_dialog_get_content_area(dialog)
 	lib.gtk.gtk_container_set_border_width(content, 12)
 	lib.gtk.gtk_box_set_spacing(content, 8)
 	local text = request.options.text
+	local caption
 	if text ~= nil and text ~= "" then
-		local caption = lib.gtk.gtk_label_new(request.options["no-markup"] and text or nil)
+		caption = lib.gtk.gtk_label_new(request.options["no-markup"] and text or nil)
 		if not request.options["no-markup"] then lib.gtk.gtk_label_set_markup(caption, text) end
 		lib.gtk.gtk_label_set_line_wrap(caption, 1)
 		lib.gtk.gtk_label_set_xalign(caption, 0)
 		lib.gtk.gtk_box_pack_start(content, caption, 0, 0, 0)
 	end
-	return content
+	return content, caption
+end
+
+--- Makes the caption the accessible name of the field it introduces (ATK
+--- « labelled by »): Orca otherwise reads an unnamed text field or table.
+--- @param lib table
+--- @param caption userdata|nil
+--- @param field userdata
+local function bind_caption(lib, caption, field)
+	if caption ~= nil then lib.gtk.gtk_label_set_mnemonic_widget(caption, field) end
 end
 
 --- Adds Cancel and OK to a dialog, OK the default.
@@ -362,7 +419,7 @@ end
 local function run_entry(lib, request)
 	local dialog = lib.gtk.gtk_dialog_new()
 	frame(lib, dialog, request)
-	local content = content_with_text(lib, dialog, request)
+	local content, caption = content_with_text(lib, dialog, request)
 	local field, entry
 	if #request.values > 0 then
 		field = lib.gtk.gtk_combo_box_text_new_with_entry()
@@ -375,6 +432,7 @@ local function run_entry(lib, request)
 	lib.gtk.gtk_entry_set_text(entry, request.options["entry-text"] or "")
 	if request.options["hide-text"] then lib.gtk.gtk_entry_set_visibility(entry, 0) end
 	lib.gtk.gtk_entry_set_activates_default(entry, 1)
+	bind_caption(lib, caption, entry)
 	lib.gtk.gtk_box_pack_start(content, field, 0, 0, 0)
 	add_answer_buttons(lib, dialog, request)
 	lib.gtk.gtk_widget_show_all(dialog)
@@ -408,8 +466,9 @@ local function run_list(lib, request)
 	if not (request.options.width or request.options.height) then
 		gtk.gtk_window_set_default_size(dialog, LIST_DEFAULT_WIDTH, LIST_DEFAULT_HEIGHT)
 	end
-	local content = content_with_text(lib, dialog, request)
+	local content, caption = content_with_text(lib, dialog, request)
 	local view = gtk.gtk_tree_view_new_with_model(store)
+	bind_caption(lib, caption, view)
 	gtk.gtk_tree_view_set_headers_visible(view, request.options["hide-header"] and 0 or 1)
 	for column = 1, count do
 		local renderer = gtk.gtk_cell_renderer_text_new()
@@ -453,7 +512,7 @@ end
 local function run_file(lib, request)
 	local ffi, gtk = lib.ffi, lib.gtk
 	local folder = request.options.directory == true
-	local dialog = gtk.gtk_file_chooser_dialog_new(request.options.title or "", nil,
+	local dialog = gtk.gtk_file_chooser_dialog_new(M.window_title(request), nil,
 		folder and GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER or GTK_FILE_CHOOSER_ACTION_OPEN,
 		label(lib, request.options["cancel-label"], "_Cancel"), ffi.cast("int", GTK_RESPONSE_CANCEL),
 		label(lib, request.options["ok-label"], folder and "_Select" or "_Open"), ffi.cast("int", GTK_RESPONSE_OK),
@@ -536,11 +595,47 @@ function M.main(argv, io_out, io_err, binder)
 	return status
 end
 
+--- The environment variable naming the record of a guarded run. The Linux test
+--- runner exports it (tests/support/dialog_host_guard.lua) so that no test can
+--- open a window: one forgotten stub used to leave a modal error dialog waiting
+--- for a click and hold the whole unit run for sixteen minutes.
+M.GUARD_VARIABLE = LinuxDesktop.dialog_host_guard_env
+
+--- The environment variable naming the test case of a guarded run.
+M.GUARD_CASE_VARIABLE = LinuxDesktop.dialog_host_guard_case_env
+
+--- Refuses a dialog under the test runner: the request is recorded, never shown.
+--- @param argv table The arguments, without the program name.
+--- @param record string Path of the record the runner reads back.
+--- @param case string|nil The test case that asked.
+--- @param io_err table|nil io.stderr by default; where the refusal is written.
+--- @return number status EXIT_USAGE for refused arguments, EXIT_UNAVAILABLE otherwise.
+function M.refuse_guarded(argv, record, case, io_err)
+	local err = io_err or io.stderr
+	local request, refusal = M.parse(argv)
+	if not request then
+		err:write("ergopti dialog: ", refusal, "\n")
+		return M.EXIT_USAGE
+	end
+	local line = string.format("%s\t--%s %s\n", (case ~= nil and case ~= "") and case or "outside any test case",
+		request.kind, tostring(request.options.title or ""))
+	local file = io.open(record, "ab")
+	local written = file ~= nil and file:write(line) ~= nil
+	local closed = file ~= nil and file:close() == true
+	if not written or not closed then
+		err:write("ergopti dialog: the test runner's dialog record cannot be written: ", record, "\n")
+		return M.EXIT_IO_ERROR
+	end
+	err:write("ergopti dialog: refused under the test runner\n")
+	return M.EXIT_UNAVAILABLE
+end
+
 -- Importing the module parses nothing and opens no display.
-local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
-if type(arg) == "table" and arg[0] == invoked_source then
+if RUN_AS_SCRIPT then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
+	local guard = os.getenv(M.GUARD_VARIABLE)
+	if guard ~= nil and guard ~= "" then os.exit(M.refuse_guarded(argv, guard, os.getenv(M.GUARD_CASE_VARIABLE))) end
 	os.exit(M.main(argv))
 end
 

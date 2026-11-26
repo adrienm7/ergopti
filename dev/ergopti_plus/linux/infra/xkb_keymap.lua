@@ -337,6 +337,24 @@ function M.parse_symbols(text)
 	return keys
 end
 
+--- The name each group of the symbols block declares (`name[Group1]="French";`,
+--- or `name[1]=`), for the diagnostics: the count of typable characters alone
+--- does not say which layout the session loaded.
+--- @param text string Whole keymap dump.
+--- @return table group index → layout name; empty when the dump names none.
+function M.group_names(text)
+	local names = {}
+	local body = M.block(text, "xkb_symbols")
+	if not body then return names end
+	for index, name in body:gmatch('name%s*%[%s*[Gg][Rr][Oo][Uu][Pp](%d+)%s*%]%s*=%s*"([^"]*)"') do
+		names[tonumber(index)] = name
+	end
+	for index, name in body:gmatch('name%s*%[%s*(%d+)%s*%]%s*=%s*"([^"]*)"') do
+		names[tonumber(index)] = name
+	end
+	return names
+end
+
 --- Parses a whole keymap dump into the entries injection resolves against.
 --- @param text string Output of `xkbcli dump-keymap-{x11,wayland}`.
 --- @param group integer|nil 1-based active group (the X11/Wayland layout index

@@ -78,14 +78,14 @@ print("=== webview app names resolve to real pages ===")
 -- quietly stop covering a file that gets renamed.
 local CALLER_FILES = {
 	"ergopti_hotstrings.lua",
-	"ui.menu.builder",
+	"menu.ui.builder.builder",
 }
 
 local seen = {}
 local call_count = 0
 for _, relative in ipairs(CALLER_FILES) do
 	-- The tray root is read with the section modules it binds.
-	local source = relative == "ui.menu.builder" and helpers.read_menu_source() or read_driver_file(relative)
+	local source = relative == "menu.ui.builder.builder" and helpers.read_menu_source() or read_driver_file(relative)
 	-- Matches `show("name")` on either receiver spelling the driver uses
 	-- (ctx.webview.show / webview_manager.show); both end in `.show("`.
 	for app_name in source:gmatch('%.show%("([%a_][%w_]*)"%)') do

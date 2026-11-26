@@ -211,7 +211,7 @@ end)
 helpers.describe("foreign sync database ownership", function()
 	for _, outcome in ipairs({ "refuse", "accept", "raise" }) do
 		helpers.it("stops before the next device when the callback retires its database: " .. outcome, function()
-			helpers.with_stub_scope({ "core.fs.engine.dir", "adapters.foreign_ledger_snapshot", "modules.keystats.export" }, function()
+			helpers.with_stub_scope({ "core.fs.engine.dir", "diagnostics.adapters.foreign_ledger_snapshot", "modules.keystats.export" }, function()
 				package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "first", "second" }, true end }
 				local closes = 0
 				local snapshot_stub = {

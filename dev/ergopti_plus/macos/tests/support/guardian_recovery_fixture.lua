@@ -24,7 +24,7 @@ local STUB_MODULES = {
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
 	"core.logger.engine.logger",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.timing.engine.timings",
 	"platform.remap.defaults",
 	"platform.remap.config",
@@ -41,7 +41,7 @@ local STUB_MODULES = {
 	"platform.remap.deploy_pacing",
 	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
-	"modules.gestures.engine",
+	"gestures.engine.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
 	"hs",
@@ -194,7 +194,7 @@ local function with_remap(options, body)
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- at start. The folder exists, as the product's does, so choosing the
 	-- layer hold imports the recommended layer the way a Mac would.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "tests/unit/platform/remap/guardian-recovery.toml" end,
 		get_config_dir = function() return config_dir end,
 	}
@@ -632,7 +632,7 @@ local function with_remap(options, body)
 			return true
 		end,
 	}
-	package.loaded["modules.gestures.engine"] = {}
+	package.loaded["gestures.engine.engine"] = {}
 	local shortcuts_stub = {
 		is_paused = function()
 			if calls.pause_query_failures_remaining > 0 then

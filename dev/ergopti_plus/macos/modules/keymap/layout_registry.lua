@@ -26,7 +26,7 @@
 
 local Logger       = require("core.logger.engine.logger")
 local Paths        = require("core.fs.engine.paths")
-local ConfigPaths  = require("infra.config_paths")
+local ConfigPaths  = require("settings.engine.paths")
 local FileSystem   = require("core.fs.adapters.file_system")
 local HttpClient   = require("core.network.adapters.http_client")
 local Crypto       = require("core.crypto.crypto")
@@ -1332,24 +1332,15 @@ function M.studio_corpus(payload, on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
---- Reads the user's Ergopti Studio fingering profile (nil for the defaults).
---- @param on_done function on_done(ok, text_or_code, detail)
---- @param deps table|nil
---- @return boolean dispatched
-function M.studio_profile_load(on_done, deps)
-	return with_studio(deps, function(operations) operations.profile_load(on_done) end,
-		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
-end
+--- The layout editor's XKB and KLC export step, built once for both Lua drivers
+--- (layouts/engine/composer/export_step.lua), with this driver's Lua.
+require("layouts.engine.composer.export_step").registry_entry(M,
+	function() return read_shared_json("layouts/data/defaults.json") end, Logger, LOG, M.FAILURE_INVALID)
 
---- Stores the user's Ergopti Studio fingering profile, or restores the defaults.
---- @param payload table { text = JSON text } or { reset = true }
---- @param on_done function on_done(ok, code, detail)
---- @param deps table|nil
---- @return boolean dispatched
-function M.studio_profile_save(payload, on_done, deps)
-	return with_studio(deps, function(operations) operations.profile_save(payload, on_done) end,
-		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
-end
+-- The Studio's documents the page keeps as given: studio_profile_load and
+-- studio_profile_save (the fingering profile), studio_workspace_load and
+-- studio_workspace_save (the editor's tabs), built once for both Lua drivers.
+require("layouts.engine.composer.studio_store").document_entries(M, with_studio, M.FAILURE_WRITE)
 
 --- The text and index entry of a layout the app ships (the field run's source of
 --- the number-row build), read from the shipped registry the offline install uses.

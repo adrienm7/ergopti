@@ -309,7 +309,7 @@ end)
 
 helpers.describe("wrap on type (linux): the probe never types into the window", function()
 	helpers.it("reads PRIMARY with no key sent and no clipboard write", function()
-		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "adapters.clipboard" }
+		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "clipboard.adapters.clipboard" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {}, writes = 0 }
@@ -347,7 +347,7 @@ helpers.describe("wrap on type (linux): the tray row", function()
 	helpers.it("draws the wrap-on-type toggle in the shortcuts submenu", function()
 		local shortcuts = helpers.load_module("modules.shortcuts.manager")
 		shortcuts.init({ enabled = true, persist = false })
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local items = mb.build({ _version = "0.0.0-dev.12", shortcuts = shortcuts, on_quit = function() end })
 		local i18n = require("core.i18n.engine.i18n")
 		local title = i18n.get("menu.shortcuts.title")
@@ -381,7 +381,7 @@ end)
 --- Exercises the real preference owner and shared feature row on a private file.
 --- @param body function Receives manager, row finder, and external observations.
 local function with_wrap_feature(body)
-	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.builder"
+	local manager_name, builder_name = "modules.shortcuts.manager", "menu.ui.builder.builder"
 	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
 	local writer = require("core.text.engine.toml_codec.writer")
 	local original_batch = writer.batch_write
@@ -581,7 +581,7 @@ end)
 local function with_wrap_inventory(body, options)
 	options = options or {}
 	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
-	local Routes, Paths = require("infra.config_paths"), require("core.fs.engine.paths")
+	local Routes, Paths = require("settings.engine.paths"), require("core.fs.engine.paths")
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()
@@ -758,7 +758,7 @@ local function with_daemon_wrap(body, options)
 		end
 		return chunk()
 	end
-	local manager_name, clipboard_name = "modules.shortcuts.manager", "adapters.clipboard"
+	local manager_name, clipboard_name = "modules.shortcuts.manager", "clipboard.adapters.clipboard"
 	local previous_manager, previous_clipboard = package.loaded[manager_name], package.loaded[clipboard_name]
 	local ok, err = pcall(function()
 		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0,
@@ -773,15 +773,13 @@ local function with_daemon_wrap(body, options)
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("platform.input.capture_gate"),
-			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
+			keystats = { cancel_hold_intervals = noop, set_private_window = noop, end_typing_burst = noop,
 				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
+				withdraw_for_pointer = function(withdraw) withdraw() end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end
 				end },
-			MagicKeySource = { cancel_capture = noop, on_key = function()
-				state.automation = state.automation + 1; return false
-			end },
 			TapHold = { set_paused = noop, observe_copy_activity = noop }, shutdown = { request = noop }, perform_reload = noop,
 			engine = { reset = function()
 				if state.on_reset then state.on_reset() end
@@ -792,7 +790,8 @@ local function with_daemon_wrap(body, options)
 			-- The span installs the CapsWord output observer; no CapsWord runs here.
 			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end,
 				set_output_observer = function() return true end },
-			script_chords = { on_key = function() return false end },
+			-- The first automated consumer the consumption callback reaches.
+			script_chords = { on_key = function() state.automation = state.automation + 1; return false end },
 			tap_keys = { on_key = function() return false end }, consume_bound_chord = function() return false end,
 		}
 		env.script_actions = evaluate(span("local script_actions = ScriptActions.new({", "\n\t-- A control can change")
@@ -800,7 +799,9 @@ local function with_daemon_wrap(body, options)
 		local reset = assert(source:match("reset_text = function(.-)\n\t\tend,"))
 		local reset_text = evaluate("return function" .. reset .. "\nend", env)
 		state.reset_text = reset_text
+		env._polled_window = {}
 		env.secure_focus_guard = { blocks_text = function() return false end, prime = reset_text,
+			text_automation = function() return true, "field", "field_admitted" end, window_changed = function() end,
 			capture_text_owner = function() return { current = function() return true end, cached = function() return true end } end,
 			invalidate = function() state.invalidations = state.invalidations + 1; reset_text() end }
 		evaluate(span("input_capture_gate = InputCaptureGate.new({", "\n\tlocal on_char"), env)

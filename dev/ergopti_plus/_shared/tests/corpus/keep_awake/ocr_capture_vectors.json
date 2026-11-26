@@ -1,0 +1,140 @@
+{
+	"_comment": "Runs of the « Capture → texte » action (_shared/shortcuts/engine/ocr_capture.lua and its Windows twin). A vector gives what the region selection answers (a path, or a reason: cancelled when the user pressed Escape), what the OCR answers (words with their line id, or a reason) and whether the clipboard write succeeds. It pins the outcome, its reason, the clipboard text (null: the clipboard is untouched), the notification key (null: none) and whether the capture file was removed.",
+	"vectors": [
+		{
+			"id": "two_lines_keep_their_break",
+			"select": { "path": "capture.png" },
+			"recognize": {
+				"words": [
+					{ "text": "Hello", "line": "1.1.1" },
+					{ "text": "world", "line": "1.1.1" },
+					{ "text": "Second", "line": "1.1.2" },
+					{ "text": "line.", "line": "1.1.2" }
+				]
+			},
+			"expect": {
+				"outcome": "copied",
+				"reason": null,
+				"clipboard": "Hello world\nSecond line.",
+				"notice": "ocr_capture.copied",
+				"lines": 2,
+				"removed": true
+			}
+		},
+		{
+			"id": "lines_follow_the_reading_order",
+			"select": { "path": "capture.png" },
+			"recognize": {
+				"words": [
+					{ "text": "Titre", "line": "2" },
+					{ "text": "Corps", "line": "1" },
+					{ "text": "suite", "line": "2" }
+				]
+			},
+			"expect": {
+				"outcome": "copied",
+				"reason": null,
+				"clipboard": "Titre suite\nCorps",
+				"notice": "ocr_capture.copied",
+				"lines": 2,
+				"removed": true
+			}
+		},
+		{
+			"id": "blank_words_are_dropped",
+			"select": { "path": "capture.png" },
+			"recognize": {
+				"words": [
+					{ "text": "  ", "line": "1" },
+					{ "text": " Allow ", "line": "2" },
+					{ "text": "once", "line": "2" }
+				]
+			},
+			"expect": {
+				"outcome": "copied",
+				"reason": null,
+				"clipboard": "Allow once",
+				"notice": "ocr_capture.copied",
+				"lines": 1,
+				"removed": true
+			}
+		},
+		{
+			"id": "nothing_recognised_leaves_the_clipboard",
+			"select": { "path": "capture.png" },
+			"recognize": { "words": [{ "text": " ", "line": "1" }] },
+			"expect": {
+				"outcome": "nothing_recognised",
+				"reason": null,
+				"clipboard": null,
+				"notice": "ocr_capture.nothing_recognised",
+				"lines": null,
+				"removed": true
+			}
+		},
+		{
+			"id": "no_words_at_all",
+			"select": { "path": "capture.png" },
+			"recognize": { "words": [] },
+			"expect": {
+				"outcome": "nothing_recognised",
+				"reason": null,
+				"clipboard": null,
+				"notice": "ocr_capture.nothing_recognised",
+				"lines": null,
+				"removed": true
+			}
+		},
+		{
+			"id": "escape_cancels_quietly",
+			"select": { "reason": "cancelled" },
+			"expect": {
+				"outcome": "cancelled",
+				"reason": "cancelled",
+				"clipboard": null,
+				"notice": null,
+				"lines": null,
+				"removed": false
+			}
+		},
+		{
+			"id": "capture_refused",
+			"select": { "reason": "capture_permission_missing" },
+			"expect": {
+				"outcome": "failed",
+				"reason": "capture_permission_missing",
+				"clipboard": null,
+				"notice": "ocr_capture.failed",
+				"lines": null,
+				"removed": false
+			}
+		},
+		{
+			"id": "ocr_engine_missing",
+			"select": { "path": "capture.png" },
+			"recognize": { "reason": "ocr_engine_missing" },
+			"expect": {
+				"outcome": "failed",
+				"reason": "ocr_engine_missing",
+				"clipboard": null,
+				"notice": "ocr_capture.failed",
+				"lines": null,
+				"removed": true
+			}
+		},
+		{
+			"id": "clipboard_write_failed",
+			"select": { "path": "capture.png" },
+			"recognize": { "words": [{ "text": "x", "line": "1" }] },
+			"clipboard_ok": false,
+			"expect": {
+				"outcome": "failed",
+				"reason": "clipboard_write_failed",
+				"clipboard": "x",
+				"notice": "ocr_capture.failed",
+				"lines": null,
+				"removed": true
+			}
+		}
+	]
+}

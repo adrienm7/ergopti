@@ -27,12 +27,12 @@ local MODULE_NAMES = {
 	"core.text.engine.utils",
 	"core.text.engine.toml.codec",
 	"core.text.engine.toml.writer",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"platform.remap",
 	"platform.remap.defaults",
 	"platform.remap.nav_layer",
-	"ui.menu.menu_paths",
+	"settings.ui.menu.paths",
 	"ui.onboarding",
 	"onboarding.engine.publication",
 	"settings.engine.migration.file_inverse",
@@ -245,7 +245,7 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key)
 			assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 			return M.KARABINER_CONFIG_PATH
@@ -255,7 +255,7 @@ function M.with_finish(opts, scenario)
 			return M.CONFIG_DIR
 		end,
 	}
-	if opts.menu_paths then package.loaded["ui.menu.menu_paths"] = opts.menu_paths end
+	if opts.menu_paths then package.loaded["settings.ui.menu.paths"] = opts.menu_paths end
 	state.active_locale = opts.active_locale or "en"
 	state.persisted_locales, state.switched_locales = {}, {}
 	package.loaded["core.i18n.engine.i18n"] = {

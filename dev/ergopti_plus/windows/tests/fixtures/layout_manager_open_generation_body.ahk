@@ -33,7 +33,15 @@ class _LMOC_Core {
 	WebMessageReceived(Callback) => {Callback: Callback}
 	NavigationCompleted(Callback) => {Callback: Callback}
 	SetVirtualHostNameToFolderMapping(*) => 0
-	Navigate(Url) => 0
+	; The boot script the page runs first: its locale and reading seed (LTP-01).
+	AddScriptToExecuteOnDocumentCreated(Js) {
+		_LMOC_Require(InStr(Js, "window._i18n_locale=") == 1 && InStr(Js, "window.__ergopti_reading="),
+			"The layout manager seeds its page's locale and reading choices before navigating.")
+		_LMOC_Require(!HasProp(this, "Navigated"), "The seed precedes the navigation.")
+	}
+	Navigate(Url) {
+		this.Navigated := true
+	}
 }
 class _LMOC_Controller {
 	__New(Hwnd) {
@@ -42,6 +50,8 @@ class _LMOC_Controller {
 	}
 	Close() {
 		this.Closed += 1
+	}
+	MoveFocus(Reason) {
 	}
 	Fill() {
 		this.Fills += 1
@@ -94,7 +104,7 @@ _LMOC_OpenGeneration(Mode) {
 	Environment := _LMOC_Environment(Mode)
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
-		_LMOC_Require(_LayMgrWeb_Available(), "the genuine vendored SDK loader must be present")
+		_LMOC_Require((WebView_UnavailableReason() == ""), "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		Started := LayoutManager_Open()
 		if Mode == "cold-success" {

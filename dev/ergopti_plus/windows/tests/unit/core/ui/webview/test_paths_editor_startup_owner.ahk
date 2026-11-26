@@ -18,7 +18,8 @@ _PWST_Complete(State, Code, Output, ErrorText) {
 _PWST_ChildSource() {
 	global _DriverDir
 	Owners := Map(), Includes := ""
-	for Symbol in ["JsonStringLiteral", "_PathsEdWeb_TryOpen", "FilePathsEditor", "WMHandleExists"] {
+	for Symbol in ["JsonStringLiteral", "_PathsEdWeb_TryOpen", "FilePathsEditor", "WMHandleExists",
+		"ReadingPrefs_SeedScript"] {
 		Root := _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, Root)
 		AssertTrue(Owner != "", "The child requires the unique genuine owner: " . Symbol)
@@ -27,7 +28,8 @@ _PWST_ChildSource() {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(4, Owners.Count, "Each selected public/lifecycle/codec/window owner is independently included")
+	; The page seed's owner too (LTP-09).
+	AssertEqual(5, Owners.Count, "Each selected public/lifecycle/codec/window/page seed owner is independently included")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\paths_editor_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))

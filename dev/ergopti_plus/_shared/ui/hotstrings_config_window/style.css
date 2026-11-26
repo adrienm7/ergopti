@@ -82,7 +82,13 @@ body {
 .topbar .actions {
 	display: flex;
 	gap: 8px;
+	list-style: none;
 	-webkit-app-region: no-drag;
+}
+
+/* Each button fills its list item's height, as when they stood alone. */
+.topbar .actions li {
+	display: flex;
 }
 
 .btn {
@@ -97,8 +103,15 @@ body {
 .btn:hover {
 	border-color: var(--accent);
 }
+/* The system reds are too light for text on the window (WCAG 1.4.3). */
 .btn-danger {
-	color: var(--danger);
+	color: var(--theme-hue-8a1a14);
+}
+
+@media (prefers-color-scheme: dark) {
+	.btn-danger {
+		color: var(--theme-hue-ffc4bf);
+	}
 }
 
 .group-bar {
@@ -149,7 +162,7 @@ main {
 	align-items: center;
 	display: grid;
 	gap: 10px;
-	grid-template-columns: 24px 1fr auto;
+	grid-template-columns: 1fr auto;
 	padding: 10px 14px;
 }
 
@@ -159,17 +172,32 @@ main {
 	font-weight: 600;
 }
 
+/* One button: the caret, drawn, then the category's name. */
 .caret {
+	align-items: center;
 	background: transparent;
 	border: 0;
-	color: var(--sub);
+	color: inherit;
+	column-gap: 10px;
 	cursor: pointer;
-	font-size: 13px;
+	display: grid;
+	font: inherit;
+	grid-template-columns: 24px 1fr;
 	padding: 0;
-	transition: transform 0.15s ease;
-	width: 24px;
+	text-align: start;
+	width: 100%;
 }
-.caret.open {
+
+.caret::before {
+	color: var(--sub);
+	content: '▸';
+	content: '▸' / '';
+	font-size: 13px;
+	font-weight: 400;
+	text-align: center;
+	transition: transform 0.15s ease;
+}
+.caret.open::before {
 	transform: rotate(90deg);
 }
 
@@ -177,6 +205,7 @@ main {
 	align-items: center;
 	display: flex;
 	gap: 16px;
+	list-style: none;
 }
 
 .field {
@@ -202,6 +231,8 @@ main {
 	padding: 2px 4px 2px 8px;
 }
 
+/* The fields give the 44 px reset button (theme.css) the width it gained, so
+   the row keeps its width and the section titles their column. */
 .ctrl input,
 .ctrl select {
 	background: transparent;
@@ -209,21 +240,16 @@ main {
 	color: var(--text);
 	font: inherit;
 	padding: 4px 0;
-	width: 90px;
+	width: 68px;
 }
 .ctrl select {
-	width: 130px;
+	width: 108px;
 }
 /* Priority is a small 0-100 integer — a narrow field keeps the four-control row
    (delay / priority / color / tooltip) from overflowing the 720 px panel. */
 .field-priority .ctrl input {
 	width: 48px;
 }
-.ctrl input:focus,
-.ctrl select:focus {
-	outline: 0;
-}
-
 .field.overridden .ctrl {
 	background: var(--override);
 	border-color: var(--accent);
@@ -265,6 +291,7 @@ main {
 	border-top: 1px solid var(--border);
 	display: flex;
 	flex-direction: column;
+	list-style: none;
 }
 
 .sec {
@@ -282,4 +309,5 @@ main {
 .sec-title {
 	color: var(--sub);
 	font-size: 12px;
+	font-weight: 400;
 }

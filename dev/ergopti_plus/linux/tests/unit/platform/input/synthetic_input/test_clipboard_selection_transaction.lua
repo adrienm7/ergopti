@@ -18,7 +18,7 @@ local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboa
 --- @param body function
 local function with_session(kind, selection, body)
 	local names = {
-		clipboard = "adapters.clipboard",
+		clipboard = "clipboard.adapters.clipboard",
 		shell = "core.process.adapters.shell_runner",
 		display = "core.ui.engine.display_server",
 	}
@@ -198,6 +198,34 @@ helpers.describe("clipboard selection transaction", function()
 			helpers.assert_eq(shell.current, "saved")
 		end)
 	end)
+
+	-- run_shortcut_transforms_live.lua: the focus moved to another GTK field
+	-- while the copy settled; the original field had already copied its
+	-- selection, which matched neither the probe nor the saved text, so the
+	-- refusal left the user's clipboard holding the copied selection.
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		for _, moment in ipairs({ "after the chord", "after the settle" }) do
+			helpers.it("(linux-transform-own-copy) restores the clipboard when the destination changes "
+				.. moment .. " (" .. kind .. ")", function()
+				with_session(kind, "selected", function(clipboard, shell, combos, _, emit, sleep_ms)
+					local live = true
+					local publication = { current = function() return live end }
+					local ok, reason = clipboard.transform_selection(string.upper, function(combo)
+						local emitted = emit(combo)
+						if moment == "after the chord" then live = false end
+						return emitted
+					end, function(ms)
+						if moment == "after the settle" then live = false end
+						return sleep_ms(ms)
+					end, publication)
+					helpers.assert_eq(ok, false)
+					helpers.assert_eq(reason, "destination_changed")
+					helpers.assert_eq(combos, { "ctrl+c" }, "nothing is pasted into another field")
+					helpers.assert_eq(shell.current, "saved", "the selection the chord copied gives way to the saved text")
+				end)
+			end)
+		end
+	end
 
 	helpers.it("uses wl-clipboard under Wayland", function()
 		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
@@ -411,7 +439,7 @@ end)
 --- Exercises the production asynchronous range owner with native ACK boundaries.
 --- @param body function
 local function with_native_selection(body)
-	local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "core.logger.engine.monotonic" }
+	local names = { "clipboard.adapters.selection_transaction", "platform.focus.atspi_focus", "core.logger.engine.monotonic" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { now = 0, focus = "atspi::1.2:/field", allowed = true, starts = 0,
@@ -446,8 +474,8 @@ local function with_native_selection(body)
 		return operation
 	end
 	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return world.now end }
-	package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = adapter, nil
-	local owner = require("adapters.selection_transaction").new({
+	package.loaded["platform.focus.atspi_focus"], package.loaded["clipboard.adapters.selection_transaction"] = adapter, nil
+	local owner = require("clipboard.adapters.selection_transaction").new({
 		focus_id = function()
 			if world.during_focus then local fn = world.during_focus; world.during_focus = nil; fn() end
 			return world.focus

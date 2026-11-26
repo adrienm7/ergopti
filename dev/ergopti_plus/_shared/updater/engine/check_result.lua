@@ -17,6 +17,12 @@
 ---    driver passes the list body, its registry and its versions.
 --- 3. The result carries ids, versions and locale keys only; the page composes
 ---    the sentences in the menu language.
+--- 4. A check that reached no list names its cause when the evidence proves
+---    one (UPD-06): an exhausted GitHub rate limit, or a network cause the
+---    shared managed-network contract classified from a native receipt (proxy,
+---    offline, certificate, a blocked host). The Windows host applies the same
+---    rule (ui/update_check/init.ahk UpdateCheck_FailureKey), both replaying
+---    _shared/tests/corpus/updater/check_session_vectors.json failure_reasons.
 --- ==============================================================================
 
 local Parser = require("updater.engine.release_parser")
@@ -32,7 +38,47 @@ M.REASONS = {
 	parse_failed  = "updater.parse_failed",
 	unexpected    = "update_check.error_unexpected",
 	no_asset      = "update_check.error_no_asset",
+	rate_limited  = "update_check.error_rate_limited",
 }
+
+-- The reason keys a failed answer may carry besides a classified network cause
+local REASON_KEYS = {}
+for _, key in pairs(M.REASONS) do REASON_KEYS[key] = true end
+
+--- Whether a key is a network cause's message of the managed-network contract.
+--- @param key any
+--- @return boolean
+local function network_message_key(key)
+	return type(key) == "string" and key:match("^network%.failure%.[a-z][a-z_]*$") ~= nil
+end
+
+--- Whether a failed answer's reason key is one the page may show: a reason of
+--- M.REASONS or a network cause's message.
+--- @param key any
+--- @return boolean
+function M.admits_reason_key(key)
+	return REASON_KEYS[key] == true or (network_message_key(key) and key ~= "network.failure.unknown")
+end
+
+--- The reason key of a failed check, from its reason and its evidence.
+--- @param reason string One of the M.REASONS names.
+--- @param evidence table|nil { rate_limited = boolean, report = { cause, message_key }|nil }:
+---   the API's exhausted rate limit, and the managed-network report the driver
+---   classified from the fetch's native receipt.
+--- @return string key
+function M.failure_key(reason, evidence)
+	local key = M.REASONS[reason]
+	if not key then error("unknown update-check failure reason: " .. tostring(reason), 2) end
+	if reason ~= "no_connection" or type(evidence) ~= "table" then return key end
+	if evidence.rate_limited == true then return M.REASONS.rate_limited end
+	local report = evidence.report
+	-- An unknown cause proves nothing: « Could not reach GitHub » stays
+	if type(report) == "table" and type(report.cause) == "string" and report.cause ~= "unknown"
+		and network_message_key(report.message_key) and report.message_key == "network.failure." .. report.cause then
+		return report.message_key
+	end
+	return key
+end
 
 --- Classifies one release list for a manual check of one channel.
 --- @param body string Raw GitHub releases array JSON.
@@ -76,10 +122,11 @@ end
 ---   a reason is about (no_asset).
 --- @param reason string One of the M.REASONS names.
 --- @param detail any The English cause, for the log and the report.
+--- @param evidence table|nil What the failed fetch proved (M.failure_key).
 --- @return table result { state = "error", channel, current, latest?, others, reason_key, detail }
-function M.failure(opts, reason, detail)
-	local key = M.REASONS[reason]
-	if not key then error("unknown update-check failure reason: " .. tostring(reason), 2) end
+function M.failure(opts, reason, detail, evidence)
+	if not M.REASONS[reason] then error("unknown update-check failure reason: " .. tostring(reason), 2) end
+	local key = M.failure_key(reason, evidence)
 	return {
 		state      = "error",
 		channel    = opts.channel,

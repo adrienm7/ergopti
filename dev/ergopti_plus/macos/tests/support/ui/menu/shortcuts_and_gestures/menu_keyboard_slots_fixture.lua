@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 local MODULES = {
-	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "infra.config_paths",
-	"infra.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
+	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.paths",
+	"settings.engine.preferences.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
-	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
+	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "gestures.engine.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
-	"tests.support.keyboard_config_fixture", "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
-	"ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction",
+	"tests.support.keyboard_config_fixture", "menu.engine.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
+	"settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction",
 }
 
 --- Owns the real facade and its canonical persistence boundary for one UI case.
@@ -53,26 +53,22 @@ local function make_ctx()
 	return ctx, updates
 end
 
---- Separates physical Add flows from the fixed contextual editor row.
+--- The modifier groups, each with its physical Add flow.
 --- @param shortcuts table Real shortcut facade.
 --- @return table groups
 local function physical_groups(shortcuts)
 	local groups = {}
-	for _, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
-		if not group.fixed then groups[#groups + 1] = group end
-	end
+	for _, group in ipairs(shortcuts.get_keyboard_slot_groups()) do groups[#groups + 1] = group end
 	return groups
 end
 
---- Finds the corresponding physical rows without depending on contextual placement.
+--- The rows of every modifier group, in group order.
 --- @param rows table Complete group rows.
 --- @param shortcuts table Real shortcut facade.
 --- @return table physical
 local function physical_rows(rows, shortcuts)
 	local physical = {}
-	for index, group in ipairs(shortcuts.get_keyboard_slot_groups()) do
-		if not group.fixed then physical[#physical + 1] = rows[index] end
-	end
+	for index in ipairs(shortcuts.get_keyboard_slot_groups()) do physical[#physical + 1] = rows[index] end
 	return physical
 end
 

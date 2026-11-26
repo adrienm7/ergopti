@@ -244,7 +244,6 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 		"_Onboarding_TryWeb", "WMPresentWindow(_ob_gui)",
 		"_HCWWeb_TryOpen", "WMPresentWindow(_HCWWeb_Gui)",
 		"_HsEdWeb_TryOpen", "WMPresentWindow(Window)",
-		"OpenHotstringsConfigWindow", "WMPresentWindow(_HCWGui)",
 		"KLWV_Focus", 'WMPresentWindow(KLWV.windows[which]["gui"])'
 	)
 	CapturedGlobals := Map("_LLM_ModelBrowser_ShowWeb", "_LLM_MBW_Gui",
@@ -278,7 +277,9 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 	}
 	; Class methods are not top-level functions; pin them in the whole source.
 	Source := _DriverSourceNoComments()
-	Assert(RegExMatch(Source, "WMPresentWindow\(Existing\.Gui\)\R\s*return Existing\b"),
+	; The presented page then takes the keyboard back (PCK-16).
+	Assert(RegExMatch(Source, 'WMPresentWindow\(Existing\.Gui\)\R\s*if Existing\.HasOwnProp\("Controller"\)[^\r\n]*\R'
+		. '\s*WebView_TakeFocus\(Existing\.Controller\)\R\s*\}\R\s*return Existing\b'),
 		"WebViewHost.TryOpen must present the existing singleton through WMPresentWindow")
 	Assert(InStr(Source, "return WMPresentWindow(Existing.Gui)") > 0,
 		"ConfigCleanupWindow.Open must present the open cleanup window through WMPresentWindow")
@@ -456,14 +457,30 @@ _WVT_EachLocale(Check, Args*) {
 }
 
 ; Captures the captions Body builds while the native show step is replaced.
+; The suite has no WebView2: the admission is admitted here and the controller
+; factory refuses, so the host is built up to its caption and then refused,
+; as on a machine whose runtime fails (no native substitute opens).
 _WVT_WithCapturedCaptions(Body) {
 	global _WVT_Captions
 	_WVT_Captions := []
 	PreviousShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
+	PreviousCreate := WebViewHost.Prototype.GetOwnPropDesc("_CreateController")
 	WebViewHost.Prototype.DefineProp("_ShowWindow", {Call: _WVT_CaptureCaption})
+	WebViewHost.Prototype.DefineProp("_CreateController", {Call: _WVT_RefuseController})
+	WebView_UnavailableReason.DefineProp("Call", {Call: (*) => ""})
+	TestMsgBoxResponder((*) => "")
 	try Body.Call()
-	finally WebViewHost.Prototype.DefineProp("_ShowWindow", PreviousShow)
+	finally {
+		TestMsgBoxResponder("")
+		WebView_UnavailableReason.DeleteProp("Call")
+		WebViewHost.Prototype.DefineProp("_CreateController", PreviousCreate)
+		WebViewHost.Prototype.DefineProp("_ShowWindow", PreviousShow)
+	}
 	return _WVT_Captions
+}
+
+_WVT_RefuseController(*) {
+	throw Error("controlled title-test controller refusal")
 }
 
 ; The caption names the product once, then the window's translated name.

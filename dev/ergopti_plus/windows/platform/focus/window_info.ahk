@@ -541,6 +541,14 @@ WIGetForegroundHwnd() {
 	return 0
 }
 
+; Returns the executable name of a window's process.
+; @param Hwnd {Integer} Window handle.
+; @return {String} The name, "" when the window is gone or unreadable.
+WIGetProcessName(Hwnd) {
+	try return WinGetProcessName("ahk_id " . Hwnd)
+	return ""
+}
+
 ; Installs an out-of-context WinEvent hook for one event, delivered on this thread.
 ; @param {Integer} Event - EVENT_* constant.
 ; @param {Integer} Callback - CallbackCreate address with the WinEventProc signature.

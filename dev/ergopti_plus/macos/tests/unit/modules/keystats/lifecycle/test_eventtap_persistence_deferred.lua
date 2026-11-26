@@ -34,18 +34,18 @@ local KEYCODE_LEFT_COMMAND = 55
 local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
-	"adapters.event_provenance", "core.fs.adapters.file_system",
+	"diagnostics.adapters.event_provenance", "core.fs.adapters.file_system",
 	"adapters.input_source_broker", "platform.input.keyboard_hook",
 	"core.process.adapters.lifecycle", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
-	"hs.timer", "infra.config_paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
-	"core.logger.engine.logger", "infra.manifest_reader", "core.timing.engine.timings",
+	"hs.timer", "settings.engine.paths", "core.ui.engine.dialog_util", "core.i18n.engine.i18n",
+	"core.logger.engine.logger", "menu.engine.manifest_reader", "core.timing.engine.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
-	"modules.keystats.watchers", "modules.keymap", "tests.stubs.hs",
+	"modules.keystats.watchers", "hotstrings.engine.expander", "tests.stubs.hs",
 	"ui.metrics_typing",
 }
 
@@ -232,15 +232,15 @@ local function load_fixture(options)
 		register_action_listener = function() return true end,
 		unregister_action_listener = function() return true end,
 	}
-	package.loaded["adapters.event_provenance"] = {
+	package.loaded["diagnostics.adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["modules.keymap"] = { get_shift_side = function() return options.shift_side or "none" end }
-	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = {
+	package.loaded["hotstrings.engine.expander"] = { get_shift_side = function() return options.shift_side or "none" end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return true end }
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_eventtap_deferred" end,
 		metrics_dir = function() return "/tmp/ergopti_eventtap_deferred/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_eventtap_deferred/cache" end,

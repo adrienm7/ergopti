@@ -17,11 +17,11 @@ local helpers =
 --- Runs the real resolver with one fresh owner, restoring the caller's exact cache.
 --- @param body function Receives the freshly reloaded configuration paths module.
 local function with_real_config_paths(body)
-	local previous = package.loaded["infra.config_paths"]
+	local previous = package.loaded["settings.engine.paths"]
 	local ok, detail = pcall(function()
-		body(helpers.load_module("infra.config_paths"))
+		body(helpers.load_module("settings.engine.paths"))
 	end)
-	package.loaded["infra.config_paths"] = previous
+	package.loaded["settings.engine.paths"] = previous
 	if not ok then error(detail, 0) end
 end
 
@@ -79,7 +79,7 @@ helpers.describe("ui.bridge_handlers", function()
 				restarts = {}, notices = 0, errors = {} }
 			local state = {
 				layout = "qwerty",
-				manifest = helpers.load_module("infra.manifest_reader"),
+				manifest = helpers.load_module("menu.engine.manifest_reader"),
 				i18n = {
 					get_locale = function() return values.locale end,
 					list_locales = function() return { "en", "fr" } end,
@@ -142,7 +142,7 @@ helpers.describe("ui.bridge_handlers", function()
 			state.webview_manager.current_epoch = function() return epoch end
 			state.webview_manager.page_current = function(_, value) return value == epoch end
 			state.shell = { quote = function(value) return value end, exec_checked = function() return true, "/tmp/ignored" end }
-			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			local picker, original = require("settings.ui.dir_picker"), require("settings.ui.dir_picker").pick
 			picker.pick = function() epoch = 2; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "pickConfigDir" }, state,
 				{ app_name = "onboarding", epoch = 1 })
@@ -209,7 +209,8 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(type(result.data.capabilities.number_row_live), "string",
 				"outside an X11 session the page is told why the number-row order cannot be applied")
 			helpers.assert_eq(result.data.locale, "en")
-			helpers.assert_eq(result.data.system_layout, "qwerty")
+			helpers.assert_eq(result.data.magic_key_default, require("hotstrings.engine.magic_key").default(),
+				"the wizard proposes the default the session layout gave")
 			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")
 			helpers.assert_eq(result.data.current, {}, "an absent config.toml leaves every page neutral")
 			helpers.assert_true(#result.data.locales >= 21)
@@ -345,6 +346,49 @@ helpers.describe("ui.bridge_handlers", function()
 				"a fresh page starts in the running language")
 		end)
 
+		helpers.it("(reading-preferences-wizard) saves a reading choice as the menu does", function()
+			local state = onboarding_state()
+			local saved, pushes, rebuilds = {}, 0, 0
+			state.webview_manager.push_reading_preferences = function() pushes = pushes + 1 end
+			state.on_config_changed = function() rebuilds = rebuilds + 1 end
+			local owners = {
+				["core.ui.engine.webview.reading_font"] = true,
+				["core.ui.engine.webview.reading_spacing"] = true,
+			}
+			local previous = {}
+			for name in pairs(owners) do
+				previous[name] = package.loaded[name]
+				package.loaded[name] = {
+					set = function(value)
+						saved[#saved + 1] = { owner = name, value = value }
+						return value ~= "comic"
+					end,
+				}
+			end
+			local ok, err = pcall(function()
+				helpers.assert_true(handler.on_message({
+					action = "setReadingPreference", name = "font", value = "dyslexic",
+				}, state).accepted)
+				helpers.assert_true(handler.on_message({
+					action = "setReadingPreference", name = "spacing", value = "wide",
+				}, state).accepted)
+				helpers.assert_eq(handler.on_message({
+					action = "setReadingPreference", name = "font", value = "comic",
+				}, state).accepted, false, "a refused value is reported")
+				helpers.assert_eq(handler.on_message({
+					action = "setReadingPreference", name = "colors", value = "cvd",
+				}, state).accepted, false, "an unknown choice is refused")
+			end)
+			for name in pairs(owners) do package.loaded[name] = previous[name] end
+			assert(ok, err)
+			helpers.assert_eq(#saved, 3, "an unknown choice reaches no writer")
+			helpers.assert_eq(saved[1].owner, "core.ui.engine.webview.reading_font")
+			helpers.assert_eq(saved[1].value, "dyslexic")
+			helpers.assert_eq(saved[2].owner, "core.ui.engine.webview.reading_spacing")
+			helpers.assert_eq(pushes, 2, "each saved choice reaches the open windows, a refused one none")
+			helpers.assert_eq(rebuilds, 2, "the menu is rebuilt after each saved choice")
+		end)
+
 		helpers.it("(onboarding-window-title) retitles the window in the previewed locale", function()
 			local state, _, captured = onboarding_state()
 			local result = handler.on_message({ action = "previewLocale", locale = "fr" }, state)
@@ -394,15 +438,15 @@ helpers.describe("ui.bridge_handlers", function()
 		end)
 
 		helpers.it("(onboarding-metrics-path) the real resolver names the keystats store", function()
-			local previous = package.loaded["infra.config_paths"]
+			local previous = package.loaded["settings.engine.paths"]
 			with_real_config_paths(function(ConfigPaths)
 				helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
 			end)
-			helpers.assert_true(rawequal(package.loaded["infra.config_paths"], previous), "the real resolver retains the original path owner")
+			helpers.assert_true(rawequal(package.loaded["settings.engine.paths"], previous), "the real resolver retains the original path owner")
 		end)
 
 		helpers.it("(onboarding-metrics-path) restores a warm preference path owner after a resolver failure", function()
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local preferences = require("infra.metrics_preferences")
 			local failure, visited = {}, 0
 			local ok, detail = pcall(with_real_config_paths, function(fresh)
@@ -414,7 +458,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(ok, false)
 			helpers.assert_true(rawequal(detail, failure), "preserve the resolver's original failure")
 			helpers.assert_eq(visited, 1)
-			helpers.assert_true(rawequal(require("infra.config_paths"), paths), "a failed resolver cannot replace the warm preference path owner")
+			helpers.assert_true(rawequal(require("settings.engine.paths"), paths), "a failed resolver cannot replace the warm preference path owner")
 			helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
 		end)
 
@@ -689,21 +733,30 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.writes[1].path, target .. "/config.toml")
 		end)
 
-		-- The page exposes Linux trigger selection, but forged common characters
-		-- must not turn an ordinary word into a destructive hotstring trigger.
-		-- Keep the malformed bytes in the subject, with readable labels in the
-		-- human output and structured UTF-8 timing frames.
+		-- Any one character is a trigger (maintainer's decision of 2026-11-21):
+		-- the AZERTY and QWERTY layout defaults are written as answered.
+		helpers.it("(onboarding-linux-trigger) accepts the layout defaults and any one character", function()
+			for _, char in ipairs({ "ù", ";", "e" }) do
+				local state, _, captured = onboarding_state()
+				local result = finish(state, { locale = "en", config_dir = "", operations = {
+					{ path = "hotstrings.trigger_char", value = char },
+				} })
+				helpers.assert_true(result.done, char)
+				helpers.assert_eq(captured.errors, {})
+				helpers.assert_eq(captured.writes[1].updates, { { section = "hotstrings", key = "trigger_char", value = char } })
+			end
+		end)
+
+		-- A malformed answer is refused with its translated reason. Keep the
+		-- malformed bytes in the subject, with readable labels in the human
+		-- output and structured UTF-8 timing frames.
 		for _, case in ipairs({
-			{ ";", "dialog.magic_key.error_common", "semicolon" },
-			{ "ù", "dialog.magic_key.error_common", "accented letter" },
-			{ "e", "dialog.magic_key.error_common", "ASCII letter" },
-			{ "א", "dialog.magic_key.error_common", "Hebrew letter" },
 			{ "ab", "dialog.magic_key.error_length", "multiple characters" },
 			{ "\255", "dialog.magic_key.error_length", "invalid leading byte" },
 			{ "\192\175", "dialog.magic_key.error_length", "overlong sequence" },
 			{ "", "dialog.magic_key.error_empty", "empty input" },
 		}) do
-			helpers.it("(onboarding-linux-trigger) refuses unsafe answer " .. case[2] .. " " .. case[3], function()
+			helpers.it("(onboarding-linux-trigger) refuses malformed answer " .. case[2] .. " " .. case[3], function()
 				local state, values, captured = onboarding_state()
 				local previous = values.config_dir
 				local changes = 0
@@ -876,8 +929,8 @@ helpers.describe("ui.bridge_handlers", function()
 				local path = target .. "/config.toml"
 				local stored = nil
 				if candidate ~= "★" then stored = candidate end
-				local saved_preferences = package.loaded["infra.hotstring_preferences"]
-				local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+				local saved_preferences = package.loaded["hotstrings.engine.matcher.preferences"]
+				local saved_magic = package.loaded["hotstrings.engine.magic_key"]
 				local ok, err = pcall(function()
 					helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
 					write_file(path, '[_meta]\nschema_version = 7\n[future]\nkeep = "independent"\n')
@@ -892,17 +945,17 @@ helpers.describe("ui.bridge_handlers", function()
 					helpers.assert_eq(decoded.future.keep, "independent", "a future neighbor is preserved")
 					helpers.assert_eq(decoded._meta.schema_version, 7)
 					helpers.assert_eq((decoded.hotstrings or {}).trigger_char, stored)
-					local preferences = helpers.load_module("infra.hotstring_preferences")
+					local preferences = helpers.load_module("hotstrings.engine.matcher.preferences")
 					preferences._set_file_for_test(path)
 					helpers.assert_true(preferences.refresh())
-					local magic = helpers.load_module("modules.hotstrings.magic_key")
+					local magic = helpers.load_module("hotstrings.engine.magic_key")
 					helpers.assert_eq(magic.get(), candidate, "a fresh runtime owner reads the wizard's choice")
 					local ready = handler.on_message({ action = "ready" }, state)
 					helpers.assert_eq(ready.data.current["hotstrings.trigger_char"], stored,
 						"a re-run shows the persisted custom value and leaves the default sparse")
 				end)
-				package.loaded["infra.hotstring_preferences"] = saved_preferences
-				package.loaded["modules.hotstrings.magic_key"] = saved_magic
+				package.loaded["hotstrings.engine.matcher.preferences"] = saved_preferences
+				package.loaded["hotstrings.engine.magic_key"] = saved_magic
 				os.remove(path); os.remove(helpers.stage_path(path)); os.remove(target)
 				if not ok then error(err, 0) end
 			end)

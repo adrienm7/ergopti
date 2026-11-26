@@ -15,7 +15,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "platform.focus.window_info",
-		"platform.input.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "clipboard.adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",

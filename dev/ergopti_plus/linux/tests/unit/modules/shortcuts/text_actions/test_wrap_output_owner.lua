@@ -37,9 +37,9 @@ local function with_wrap(options, body)
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
-		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
-			"modules.gestures.user_actions", "core.logger.engine.shim" }
+		local names = { "clipboard.adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+			"hotstrings.engine.injector", "platform.input.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
+			"gestures.engine.user_actions", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
@@ -106,9 +106,9 @@ local function with_wrap(options, body)
 			layout._set_table_for_test({}) -- This wrap must use the real clipboard path.
 			local key_v = layout.shortcut_keycode
 			layout.shortcut_keycode = function(...) transition("paste-lookup"); return key_v(...) end
-			helpers.load_module("adapters.clipboard")
+			helpers.load_module("clipboard.adapters.clipboard")
 			helpers.load_module("modules.shortcuts.wrap_on_type")
-			injector = helpers.load_module("modules.hotstrings.injector")
+			injector = helpers.load_module("hotstrings.engine.injector")
 			injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
 				state.wire[#state.wire + 1] = code .. ":" .. value
 				if code == 29 and value == 1 then transition("ctrl-down") end
@@ -163,8 +163,8 @@ end
 helpers.describe("wrap output publication ownership", function()
 	helpers.it("does not log text inserted from a command result (wrap-output-owner)", function()
 		with_wrap({}, function(state)
-			package.loaded["modules.gestures.user_actions"] = nil
-			require("modules.gestures.user_actions").deliver_output("privatecommandoutput", "type", 100,
+			package.loaded["gestures.engine.user_actions"] = nil
+			require("gestures.engine.user_actions").deliver_output("privatecommandoutput", "type", 100,
 				assert(state.guard.capture_text_owner()))
 			helpers.assert_true(not table.concat(state.logs, "\n"):find("privatecommandoutput", 1, true),
 				"command output must not enter trace logs")
@@ -249,13 +249,13 @@ helpers.describe("wrap output publication ownership", function()
 	end)
 
 	for _, failure in ipairs({ "false", "throw" }) do
-		helpers.it("keeps clipboard restoration " .. failure .. " observable and fatal", function()
+		helpers.it("keeps clipboard restoration " .. failure .. " observable but never fatal", function()
 			with_wrap({ restore_failure = failure }, function(state)
 				helpers.assert_eq(state.consumed, true, "the paste was already attempted")
 				helpers.assert_true(state.result.payload_attempted)
 				helpers.assert_eq(state.resets, 1, "attempted output invalidates the buffered caret")
-				helpers.assert_eq(state.result.ok, false)
-				helpers.assert_eq(state.stops, 1)
+				helpers.assert_eq(state.result.ok, true, "the wrapped text was delivered")
+				helpers.assert_eq(state.stops, 0, "a clipboard restoration never stops the keyboard")
 				helpers.assert_true(state.errors > 0, "restoration failures must retain the real error observer")
 				helpers.assert_true(not table.concat(state.logs, "\n"):find("selected", 1, true),
 					"the error path must not log the selection")

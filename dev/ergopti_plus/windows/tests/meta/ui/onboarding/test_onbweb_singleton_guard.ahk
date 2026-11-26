@@ -14,7 +14,7 @@
 ;
 ; SCOPE: source introspection only — exercising a real double-open needs a live
 ; WebView2 runtime unavailable in the headless test harness (same rationale as
-; tests/meta/modules/hotstrings/catalogue/test_hsedweb_reset_idempotent.ahk and
+; tests/meta/hotstrings/engine/catalogue/test_hsedweb_reset_idempotent.ahk and
 ; tests/meta/core/ui/webview/test_reset_idempotent_siblings.ahk).
 ; ==============================================================================
 

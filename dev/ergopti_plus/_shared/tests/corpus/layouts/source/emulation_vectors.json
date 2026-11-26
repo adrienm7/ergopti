@@ -93,7 +93,12 @@
 					"held": [],
 					"at": 0,
 					"consumed": true,
-					"actions": []
+					"actions": [
+						{
+							"type": "text",
+							"text": "´"
+						}
+					]
 				},
 				{
 					"release": "IntlBackslash",
@@ -779,13 +784,6 @@
 			"name": "records the emulation cannot perform are left alone",
 			"steps": [
 				{
-					"press": "Backslash",
-					"held": [],
-					"at": 0,
-					"consumed": false,
-					"actions": []
-				},
-				{
 					"press": "ScrollLock",
 					"held": [],
 					"at": 0,
@@ -923,6 +921,250 @@
 					"press": "KeyW",
 					"held": ["control", "alt"],
 					"at": 0,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a dead key of an emulated layer composes with a key of a native layer",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "KeyE",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "á"
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 50,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a dead key of an emulated layer ignores its own auto-repeat",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 50,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "´"
+						},
+						{
+							"type": "text",
+							"text": "α"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "an unanswered dead key types its terminator and leaves the key to the keylayout",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyB",
+					"held": [],
+					"at": 30,
+					"consumed": false,
+					"actions": [
+						{
+							"type": "text",
+							"text": "´"
+						}
+					]
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 40,
+					"consumed": false,
+					"actions": []
+				}
+			]
+		},
+		{
+			"name": "a held modifier does not end a pending dead key",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "IntlBackslash",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 30,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyB",
+					"held": [],
+					"at": 40,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "´"
+						},
+						{
+							"type": "text",
+							"text": "βeta"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a dead tap composes with the next key",
+			"steps": [
+				{
+					"press": "Backslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"release": "Backslash",
+					"at": 20,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 30,
+					"consumed": true,
+					"actions": [
+						{
+							"type": "text",
+							"text": "á"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "a reset drops a pending dead key",
+			"steps": [
+				{
+					"press": "IntlBackslash",
+					"held": [],
+					"at": 0,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"press": "KeyE",
+					"held": [],
+					"at": 10,
+					"consumed": true,
+					"actions": []
+				},
+				{
+					"reset": true,
+					"actions": []
+				},
+				{
+					"press": "KeyA",
+					"held": [],
+					"at": 40,
 					"consumed": false,
 					"actions": []
 				}

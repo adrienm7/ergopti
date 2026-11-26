@@ -34,41 +34,40 @@ global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
-#Include ..\..\_generated\logger_sub_files.ahk
 #Include ..\..\_generated\app_dirs.ahk
-#Include ..\..\infra\app_folders.ahk
-#Include ..\..\infra\legacy_folder_migration.ahk
+#Include ..\..\apps\engine\folders.ahk
+#Include ..\..\settings\engine\migration\legacy_folder_migration.ahk
 #Include ..\..\core\logger\engine\tick_count.ahk
 #Include ..\..\core\logger\engine\wall_clock.ahk
 #Include ..\..\core\logger\engine\logger.ahk
 #Include ..\..\infra\hotpath_profiler.ahk
-#Include ..\..\infra\redact.ahk
+#Include ..\..\diagnostics\engine\reports\redact.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\platform\input\key_state.ahk
 #Include ..\..\core\text\engine\toml\helpers.ahk
-#Include ..\..\infra\manifest_reader.ahk
+#Include ..\..\menu\engine\manifest_reader.ahk
 ; The getter consumes the actual configuration-owner binding policy.
 #Include ..\..\core\text\engine\toml\config_loader.ahk
-#Include ..\..\infra\feature_state.ahk
+#Include ..\..\settings\engine\preferences\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\tap_keys.ahk
-#Include ..\..\infra\config_io.ahk
-#Include ..\..\infra\config_scope.ahk
+#Include ..\..\settings\engine\io.ahk
+#Include ..\..\settings\engine\scope\scope.ahk
 ; Real journal dependencies; no test-only native issuer or READY metadata.
-#Include ..\..\infra\config_transition.ahk
-#Include ..\..\infra\config_transition_runtime.ahk
-#Include ..\..\infra\config_migrate.ahk
+#Include ..\..\settings\engine\migration\transition.ahk
+#Include ..\..\settings\engine\migration\transition_runtime.ahk
+#Include ..\..\settings\engine\migration\migrate.ahk
 #Include ..\..\infra\first_boot.ahk
-#Include ..\..\modules\gestures\config.ahk
+#Include ..\..\gestures\engine\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.
 #Include ..\..\core\text\engine\json.ahk
 ; Canonical classification also consults the real language/category ownership
 ; registry, even when the authored file contains only script preferences.
 #Include ..\..\core\text\engine\toml\loader.ahk
 #Include ..\..\core\lifecycle\engine\master_gates.ahk
-#Include ..\..\infra\hotstrings\hotstrings_cache.ahk
+#Include ..\..\hotstrings\engine\catalogue\cache.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
@@ -169,12 +168,6 @@ try {
 		case "logger_generation_replaced_debug", "logger_generation_replaced_error",
 				"logger_generation_unchanged_debug", "logger_generation_unchanged_error":
 			_FeatureStateSmokeLoggerGeneration(A_Args[1])
-		case "outdated_source_key":
-			_FeatureStateSmokeOutdatedSourceKey()
-		case "retired_source_scan":
-			_FeatureStateSmokeRetiredSourceScan()
-		case "invalid_source_char":
-			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_char", "two")
 		case "invalid_category_string":
 			_FeatureStateSmokeInvalidCategory("true")
 		case "invalid_category_number":
@@ -193,7 +186,7 @@ _FeatureStateSmokeParsedConfig() {
     TempConfig := A_Temp . "\ergopti_feature_state_boot_" . DllCall("GetCurrentProcessId") . ".toml"
     try {
         try FileDelete(TempConfig)
-        FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
+        FileAppend('[hotstrings]`ntrigger_char = "@"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
         _FeatureStateSmokePrepareReadonlySource(TempConfig)
 		Cache := ParseConfigTomlFile(TempConfig)
         ReadScriptConfig(Cache)
@@ -202,9 +195,6 @@ _FeatureStateSmokeParsedConfig() {
         try FileDelete(TempConfig)
     }
     _FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "trigger_char")
-    _FeatureStateSmokeAssert("KeyN", ScriptInformation["MagicKeySource"], "magic_key_source")
-    _FeatureStateSmokeAssert(true, ScriptInformation["MagicKeySourceChosen"], "a named source key is a choice")
-    _FeatureStateSmokeAssert("n", ScriptInformation["MagicKeySourceChar"], "magic_key_source_char")
     _FeatureStateSmokeAssert(true, ScriptInformation["AltGrIsKanaRemap"], "alt_gr_is_kana_remap")
     _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "repeat_key_enabled")
     _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "category_enabled.hotstrings")
@@ -212,10 +202,9 @@ _FeatureStateSmokeParsedConfig() {
 
 _FeatureStateSmokeMissingSections() {
     global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
-    DefaultMagicKey := ScriptInformation["MagicKey"]
     ReadScriptConfig(Map())
     ReadCategoryEnabled(Map())
-    _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "missing hotstrings default")
+    _FeatureStateSmokeAssert(ScriptInformation["MagicKeyDefault"], ScriptInformation["MagicKey"], "missing hotstrings default")
     _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "missing repeat_key_enabled default")
     _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "missing category default")
 }
@@ -250,21 +239,21 @@ _FeatureStateSmokeNeutral() {
 		AssertedScriptSlots += 1
 	}
 	_FeatureStateSmokeAssert(4, AssertedScriptSlots, "the four script shortcut slots")
-	; The contextual editor is an ordinary declared default behind the closed
+	; The ★ key's editor slot is an ordinary declared default behind the closed
 	; Shortcuts master. Its presence does not authorize a native binding at boot.
 	_FeatureStateSmokeAssert(false, CategoryEnabled["Shortcuts"], "empty shortcut master remains closed")
 	AssertedContextual := 0
 	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS {
-		if Slot == "magic_editor" {
-			_FeatureStateSmokeAssert("open_hotstrings_editor", Action, "the declared contextual editor default")
-			_FeatureStateSmokeAssert(ManifestDefaultFor("shortcuts.keyboard.magic_editor"), Action,
-				"the contextual default comes from its actual manifest owner")
+		if Slot == "meta_star" {
+			_FeatureStateSmokeAssert("open_hotstrings_editor", Action, "the declared ★ key editor default")
+			_FeatureStateSmokeAssert(ManifestDefaultFor("shortcuts.keyboard.meta_star"), Action,
+				"the ★ key default comes from its actual manifest owner")
 			AssertedContextual += 1
 		} else {
 			_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
 		}
 	}
-	_FeatureStateSmokeAssert(1, AssertedContextual, "exactly one contextual default remains inert behind its master")
+	_FeatureStateSmokeAssert(1, AssertedContextual, "exactly one ★ key default remains inert behind its master")
 	; Not an activation: "auto" lets the layout's own probe name the AltGr key.
 	; A neutral false forced the standard family on every Kana-style layout.
 	_FeatureStateSmokeAssert("auto", ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
@@ -312,33 +301,23 @@ _FeatureStateSmokeManifestDefaults() {
 	_FeatureStateSmokeAssert(
 		_FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
 		ScriptInformation["MagicKey"], "manifest trigger default")
-	_FeatureStateSmokeAssert(
-		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source"),
-		ScriptInformation["MagicKeySource"], "manifest source key default")
-	_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"],
-		"the manifest default leaves the source key to the layout")
-	_FeatureStateSmokeAssert(
-		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_char"),
-		ScriptInformation["MagicKeySourceChar"], "manifest source character default")
 }
 
 _FeatureStateSmokeMalformedCache() {
     global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
-    DefaultMagicKey := ScriptInformation["MagicKey"]
     Cache := Map("hotstrings", true, "script", 1, "category_enabled", false)
     ReadScriptConfig(Cache)
     ReadCategoryEnabled(Cache)
-    _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "malformed hotstrings default")
+    _FeatureStateSmokeAssert(ScriptInformation["MagicKeyDefault"], ScriptInformation["MagicKey"], "malformed hotstrings default")
     _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "malformed repeat_key_enabled default")
     _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "malformed category default")
 }
 
 _FeatureStateSmokeNonMapCache() {
     global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
-    DefaultMagicKey := ScriptInformation["MagicKey"]
     ReadScriptConfig("not-a-cache")
     ReadCategoryEnabled("not-a-cache")
-    _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "non-Map hotstrings default")
+    _FeatureStateSmokeAssert(ScriptInformation["MagicKeyDefault"], ScriptInformation["MagicKey"], "non-Map hotstrings default")
     _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "non-Map repeat_key_enabled default")
     _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "non-Map category default")
 }
@@ -360,40 +339,6 @@ _FeatureStateSmokeInvalidValue(Section, Key, Value) {
 	ReadScriptConfig(Map(Section, Map(Key, Value)))
 }
 
-; An outdated source key is reported by the loader and offered by the cleanup:
-; here it reads as the automatic key, it never aborts the boot. The loader's
-; case-insensitive enum rule is followed, in the manifest's spelling.
-_FeatureStateSmokeOutdatedSourceKey() {
-	global ScriptInformation
-	; Each refused value is reported once, by its own line (value-validation).
-	Reports := []
-	LoggerSetTestSink((Line) => InStr(Line, "hotstrings.magic_key_source '") ? Reports.Push(Line) : 0)
-	for Value in ["SC03B", "not-a-key", 46, ""] {
-		ReadScriptConfig(Map("hotstrings", Map("magic_key_source", Value)))
-		_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "outdated source key")
-		_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "outdated source key choice")
-		_FeatureStateSmokeAssert(A_Index, Reports.Length, "outdated source key report")
-	}
-	if !InStr(Reports[2], "'not-a-key'")
-		throw Error("the report must name the refused value: " . Reports[2])
-	ReadScriptConfig(Map("hotstrings", Map("magic_key_source", "keyj")))
-	_FeatureStateSmokeAssert(4, Reports.Length, "an accepted source key is not reported")
-	LoggerClearTestSink()
-	; _FeatureStateSmokeAssert compares with the case-insensitive !=.
-	if (ScriptInformation["MagicKeySource"] !== "KeyJ")
-		throw Error("loader-accepted spelling: expected KeyJ, got " . ScriptInformation["MagicKeySource"])
-	_FeatureStateSmokeAssert(true, ScriptInformation["MagicKeySourceChosen"], "loader-accepted choice")
-}
-
-; The Windows-only scan code was renamed by config schema v5: the reader drops
-; the old spelling at once, so a file the migration did not reach chooses nothing.
-_FeatureStateSmokeRetiredSourceScan() {
-	global ScriptInformation
-	ReadScriptConfig(Map("hotstrings", Map("magic_key_source_scan", "SC031")))
-	_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "retired scan code")
-	_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "retired scan code choice")
-}
-
 _FeatureStateSmokeInvalidCategory(Value) {
 	ReadCategoryEnabled(Map("category_enabled", Map("hotstrings", Value)))
 }
@@ -408,10 +353,10 @@ _FeatureStateSmokeSemanticConfig(Root) {
 	global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
 	TempConfig := A_Temp . "\ergopti_feature_state_semantic_" . DllCall("GetCurrentProcessId") . ".toml"
 	Source := Root
-		? 'hotstrings.trigger_char = "@"`nhotstrings.magic_key_source = "KeyN"`nhotstrings.magic_key_source_char = "n"`nhotstrings.repeat_key_enabled = true`nscript.alt_gr_is_kana_remap = true`ncategory_enabled.hotstrings = true`n'
-		: '[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = true`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = true`n'
+		? 'hotstrings.trigger_char = "@"`nhotstrings.repeat_key_enabled = true`nscript.alt_gr_is_kana_remap = true`ncategory_enabled.hotstrings = true`n'
+		: '[hotstrings]`ntrigger_char = "@"`nrepeat_key_enabled = true`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = true`n'
 	if Root == "inline"
-		Source := 'hotstrings = { trigger_char = "@", magic_key_source = "KeyN", magic_key_source_char = "n", repeat_key_enabled = true }`nscript = { alt_gr_is_kana_remap = true }`ncategory_enabled = { hotstrings = true }`n'
+		Source := 'hotstrings = { trigger_char = "@", repeat_key_enabled = true }`nscript = { alt_gr_is_kana_remap = true }`ncategory_enabled = { hotstrings = true }`n'
 	try {
 		FileAppend(Source, TempConfig, "UTF-8")
 		_FeatureStateSmokePrepareReadonlySource(TempConfig)
@@ -419,8 +364,6 @@ _FeatureStateSmokeSemanticConfig(Root) {
 		ReadScriptConfig(Cache)
 		ReadCategoryEnabled(Cache)
 		_FeatureStateSmokeAssert("@", ScriptInformation["MagicKey"], "semantic trigger_char")
-		_FeatureStateSmokeAssert("KeyN", ScriptInformation["MagicKeySource"], "semantic source key")
-		_FeatureStateSmokeAssert("n", ScriptInformation["MagicKeySourceChar"], "semantic source character")
 		_FeatureStateSmokeAssert(true, ScriptInformation["AltGrIsKanaRemap"], "semantic Kana override")
 		_FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "semantic repeat key")
 		_FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "semantic master gate")

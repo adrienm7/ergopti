@@ -67,7 +67,7 @@ helpers.describe("daemon restart", function()
 	end)
 
 	helpers.it("relays the standalone launcher with the daemon's own arguments", function()
-		local opts, record = fixture(SESSION_CGROUP, { kind = "standalone", wrapper = LAUNCHER })
+		local opts, record = fixture(SESSION_CGROUP, { kind = "standalone", wrapper = LAUNCHER, launcher = LAUNCHER })
 		helpers.assert_eq(DaemonRestart.restart(opts), "relay")
 		helpers.assert_eq(#record.commands, 1)
 		helpers.assert_contains(record.commands[1], LAUNCHER)
@@ -78,7 +78,7 @@ helpers.describe("daemon restart", function()
 	helpers.it("(linux-cgroup-unit-owner) relays a daemon in a different unit sharing the service prefix", function()
 		for _, suffix in ipairs({ "-backup.service", ".scope", "2", "-helper.slice" }) do
 			local cgroup = "0::/user.slice/app.slice/" .. Restarter.UNIT .. suffix .. "\n"
-			local opts, record = fixture(cgroup, { kind = "standalone", wrapper = LAUNCHER })
+			local opts, record = fixture(cgroup, { kind = "standalone", wrapper = LAUNCHER, launcher = LAUNCHER })
 			helpers.assert_eq(DaemonRestart.restart(opts), "relay",
 				"a similarly named cgroup cannot restart this process through Ergopti's service")
 			helpers.assert_eq(record.resolved, 1, "the actual standalone installation must be resolved")
@@ -326,7 +326,7 @@ helpers.describe("Main early pause restoration", function()
 						set_script_paused = function() end,
 						on_app_focus = function() end,
 					}, engine = { reset = function() end },
-					MagicKeySource = { cancel_capture = function() end }, perform_reload = function() end,
+					perform_reload = function() end,
 					shutdown = { request = function() end },
 					TapHold = { set_paused = function(paused)
 						helpers.assert_eq(pause_steps, { "roi" }, "pause retires ROI before native remapping")

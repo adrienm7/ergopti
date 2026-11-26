@@ -39,7 +39,7 @@ local function with_caps_word(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local context = { now = 1000, deferred = {}, resolution = 0 }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.logger.engine.monotonic"] = {
 				now_ms = function() return context.now end,
 				now_sec = function() return context.now / 1000 end,
@@ -104,7 +104,7 @@ helpers.describe("caps word auto-off: the settings", function()
 
 	helpers.it("caps word auto-off, declares exactly the manifest's pointer kinds", function()
 		with_caps_word(nil, function(c)
-			local Manifest = require("infra.manifest_reader")
+			local Manifest = require("menu.engine.manifest_reader")
 			local expected = {}
 			for _, entry in ipairs(Manifest.features()) do
 				if entry.section == "shortcuts.caps_word.pointer" then expected[#expected + 1] = entry.id end
@@ -447,7 +447,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("caps word auto-off, the session presses the CapsLock key on the daemon's device", function()
 		with_caps_word(nil, function(c)
-			local Emitter = require("modules.gestures.combo_emitter")
+			local Emitter = require("gestures.engine.combo_emitter")
 			local original, pressed = Emitter.press_codes, nil
 			Emitter.press_codes = function(mods, keys) pressed = { mods = mods, keys = keys }; return true end
 			local called, result = pcall(function()
@@ -463,7 +463,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("(linux-caps-word-unlock-debt) retains the native output outcome through the manager emitter", function()
 		with_caps_word(nil, function(c)
-			local Emitter = require("modules.gestures.combo_emitter")
+			local Emitter = require("gestures.engine.combo_emitter")
 			local original = Emitter.press_codes
 			local called, failure = pcall(function()
 				helpers.assert_true(c.manager.toggle_caps_word())

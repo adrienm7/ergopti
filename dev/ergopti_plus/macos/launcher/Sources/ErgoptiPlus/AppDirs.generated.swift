@@ -20,11 +20,25 @@ let kLogUnifiedPrefix = "ErgoptiPlus_"
 /// Daily WARNING and ERROR mirror: <prefix>yyyy-MM-dd<extension>.
 let kLogErrorsPrefix = "ErgoptiPlus_errors_"
 
-/// Topical sub-files: <prefix><name><extension>.
-let kLogTopicalPrefix = "ErgoptiPlus_"
-
 /// Extension of every log file.
 let kLogFileExtension = ".log"
+
+/// Exact names the retention sweep deletes: the retired topical sub-files.
+let kRetiredTopicalLogNames: Set<String> = [
+	"ErgoptiPlus_gestures.log",
+	"ErgoptiPlus_ollama.log",
+	"ErgoptiPlus_llm.log",
+	"ErgoptiPlus_hotstrings.log",
+	"ErgoptiPlus_keystats.log",
+	"ErgoptiPlus_menu.log",
+	"ErgoptiPlus_notify.log",
+	"ErgoptiPlus_boot.log",
+	"ErgoptiPlus_layout.log",
+	"ErgoptiPlus_dispatch.log",
+	"ErgoptiPlus_tray.log",
+	"ErgoptiPlus_mlx.log",
+	"ErgoptiPlus_karabiner.log",
+]
 
 /// Default logs folder, relative to the home folder.
 let kMacOSLogsHomeRelativePath = "Library/Logs/Ergopti"

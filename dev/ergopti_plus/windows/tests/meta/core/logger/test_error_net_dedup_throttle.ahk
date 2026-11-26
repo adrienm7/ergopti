@@ -33,7 +33,7 @@
 
 _ENDT_HandlerHasDedupCache() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in diagnostics/engine/reports/error_net.ahk")
 	Assert(InStr(Body, "static") > 0 and InStr(Body, "Map()") > 0,
 		"ErgoptiGlobalErrorHandler must declare a static per-signature dedup cache (Map()), mirroring HookDispatcher.Dispatch's _err_cache pattern (error-handler-no-dedup-throttle)")
 }
@@ -41,7 +41,7 @@ Test("meta error-net: ErgoptiGlobalErrorHandler declares a static dedup cache (e
 
 _ENDT_DedupGuardsTheCrashReport() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in diagnostics/engine/reports/error_net.ahk")
 
 	CacheCheckIdx := InStr(Body, "_geh_dedup_map.Has(")
 	Assert(CacheCheckIdx > 0,
@@ -66,7 +66,7 @@ Test("meta error-net: dedup cache check gates the deferred crash report (error-h
 ; (kana-altgr-hold-2026-09-25).
 _ENDT_StuckSweepKnowsTheLayoutAltGr() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in diagnostics/engine/reports/error_net.ahk")
 	AltGrPos := InStr(Body, "StuckCandidates.Push(KS_AltGrKeyName())")
 	SweepPos := InStr(Body, "for _, ModKey in StuckCandidates")
 	Assert(AltGrPos > 0,

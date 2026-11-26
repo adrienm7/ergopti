@@ -65,7 +65,7 @@ local VALUE_REPEAT = 2
 local XKB_KEY_UP = 0
 local XKB_KEY_DOWN = 1
 
--- The two modifier keys the injector presses (modules/hotstrings/injector.lua
+-- The two modifier keys the injector presses (hotstrings/engine/injector.lua
 -- MODIFIER_CODES), in XKB numbering, so the inverse table is probed with the
 -- very chords that will be emitted.
 local XKB_LEFTSHIFT = EvdevCodes.KEY_LEFTSHIFT + EVDEV_TO_XKB_OFFSET
@@ -129,6 +129,9 @@ local _capture_group, _capture_generation = nil, 0
 local _inverse_receipts = setmetatable({}, { __mode = "k" })
 -- A reset keeps the loaded map owner; a load or backend replacement retires it.
 local _inverse_map_owner = 0
+-- The 0-based group the desktop reported as active for the loaded keymap
+-- (select_group), nil when none was selected: a state reset keeps it.
+local _selected_group = nil
 
 --- Tracks source changes without treating an ordinary key-up as a rebind.
 local function source_identity()
@@ -184,6 +187,7 @@ function M._set_backend(backend)
 	_backend = backend
 	_session = nil
 	_keymap_text = nil
+	_selected_group = nil
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
@@ -393,6 +397,14 @@ local function bind_ffi_backend()
 
 	function backend.capture_group(session)
 		return tonumber(lib.xkb_state_serialize_layout(session.state, XKB_STATE_LAYOUT_EFFECTIVE))
+	end
+
+	--- Moves the state to `group`, keeping its modifiers.
+	function backend.set_group(session, group)
+		lib.xkb_state_update_mask(session.state,
+			lib.xkb_state_serialize_mods(session.state, 1), lib.xkb_state_serialize_mods(session.state, 2),
+			lib.xkb_state_serialize_mods(session.state, 4), 0, 0, group)
+		return backend.capture_group(session) == group
 	end
 
 	function backend.source_group(session, allow_seed)
@@ -675,6 +687,7 @@ function M.load(text, locale)
 	local previous = _session
 	_session = next_session
 	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
+	_selected_group = nil
 	_keymap_text = text
 	_locale = selected_locale
 	_source_group, _source_native_generation = nil, nil
@@ -694,6 +707,10 @@ function M.reset_state()
 	local previous = _session
 	_session = next_session
 	if _backend.desktop_proof then pcall(_backend.source_group, _session, true) end
+	-- The fresh state starts in group 1: the group the desktop reported stays.
+	if _selected_group ~= nil and type(_backend.set_group) == "function" then
+		pcall(_backend.set_group, _session, _selected_group)
+	end
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
 	_source_generation = _source_generation + 1
@@ -712,6 +729,27 @@ function M.clear()
 	_capture_group, _capture_generation = nil, _capture_generation + 1
 	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
+end
+
+--- Moves the capture to the group the desktop reports as active. A dumped
+--- keymap carries every layout of the session as one group each, and its
+--- fresh state sits in group 1: on KDE Plasma, where KWin switches the group
+--- itself, the second layout of « us, fr » was read as the first one, and
+--- every character resolved on the wrong layout (a↔q, m↔, on AZERTY).
+--- @param group integer 0-based layout index.
+--- @return boolean ok
+--- @return string|nil error
+function M.select_group(group)
+	if not _session then return false, "no XKB keymap is loaded" end
+	if type(group) ~= "number" or group < 0 or group % 1 ~= 0
+		or type(_session.groups) == "number" and group >= _session.groups then
+		return false, "the keymap has no layout " .. tostring(group)
+	end
+	if type(_backend.set_group) ~= "function" then return false, "the capture backend cannot select a layout" end
+	local ok, moved = pcall(_backend.set_group, _session, group)
+	if not ok or moved ~= true then return false, "the XKB state refused layout " .. tostring(group) end
+	_selected_group = group
+	return true, nil
 end
 
 --- @return boolean True when process() has a validated live state.

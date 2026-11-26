@@ -30,7 +30,7 @@ helpers.describe("ui.bridge_handlers", function()
     end
 
     helpers.it("the healthcheck window opens in the persisted locale, not a hardcoded 'fr'", function()
-      local hc = helpers.load_module("ui.healthcheck.bridge")
+      local hc = helpers.load_module("diagnostics.ui.healthcheck.bridge")
       local previous = package.loaded["core.ui.ui.webview_manager"]
       local shown = nil
       package.loaded["core.ui.ui.webview_manager"] = {
@@ -57,7 +57,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("hotstrings_config_bridge", function()
-    local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
+    local handler = helpers.load_module("hotstrings.ui.hotstrings_config_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -556,6 +556,42 @@ helpers.describe("ui.bridge_handlers", function()
       package.loaded["core.ui.ui.webview_manager"] = previous_manager
       handler._reset()
     end)
+
+    -- UPD-02: a cancelled app update read « Ollama download cancelled »
+    helpers.it("upd-02: a cancel leaves the line of the download's own kind", function()
+      local previous_manager = package.loaded["core.ui.ui.webview_manager"]
+      local I18n = require("core.i18n.engine.i18n")
+      local cases = {
+        { kind = "app_update", key = "updater.download_cancelled" },
+        { kind = "ollama_model", key = "ollama.download_cancelled" },
+      }
+      for _, case in ipairs(cases) do
+        local evaluated = {}
+        local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+        native_document.on_effect = function(code) evaluated[#evaluated + 1] = code end
+        local original_handler = handler
+        handler = native_document.proxy()
+        local ok, err = xpcall(function()
+          handler._reset()
+          local session_id = handler.show({ kind = case.kind, label = "Cancel fixture",
+            on_cancel = function() return true end })
+          helpers.assert_true(handler.on_message("ready").pushed)
+          helpers.assert_true(handler.on_message({ action = "cancel", session = session_id }).cancelled)
+          local expected = I18n.get(case.key)
+          helpers.assert_true(type(expected) == "string" and expected ~= case.key, "the locale has " .. case.key)
+          helpers.assert_true(evaluated[#evaluated]:find(expected, 1, true) ~= nil,
+            case.kind .. " cancel reads: " .. tostring(evaluated[#evaluated]))
+          if case.kind == "app_update" then
+            helpers.assert_true(evaluated[#evaluated]:find(I18n.get("ollama.download_cancelled"), 1, true) == nil,
+              "an app update never reads as an Ollama download")
+          end
+        end, debug.traceback)
+        handler._reset()
+        native_document.close(); handler = original_handler
+        package.loaded["core.ui.ui.webview_manager"] = previous_manager
+        if not ok then error(err) end
+      end
+    end)
   end)
 
   -- ==========================================================================
@@ -568,7 +604,7 @@ end)
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("hotstring_editor_bridge", function()
-    local handler = helpers.load_module("ui.hotstring_editor.bridge")
+    local handler = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
 		helpers.it("(hotstring-save-alert-owner) does not send a stale save error to the replacement page", function()
@@ -755,25 +791,25 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("(hotstring-pref-invalid) falls back for mistyped stored preferences", function()
       local previous_storage = package.loaded["core.fs.adapters.storage"]
-      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local previous_handler = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
       local values = { ["hotstring_editor.compact_view"] = "false",
         ["hotstring_editor.auto_close"] = 1, ["hotstring_editor.default_section"] = { "foreign" } }
       package.loaded["core.fs.adapters.storage"] = { get = function(key) return values[key] end }
-      package.loaded["ui.hotstring_editor.bridge"] = nil
-      local bridge = require("ui.hotstring_editor.bridge")
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+      local bridge = require("hotstrings.ui.hotstring_editor.bridge")
       local observed = { bridge.get_pref("compact_view"), bridge.get_pref("auto_close"), bridge.get_pref("default_section") }
-      package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
+      package.loaded["core.fs.adapters.storage"], package.loaded["hotstrings.ui.hotstring_editor.bridge"] = previous_storage, previous_handler
       helpers.assert_eq(observed, { false, false, "" })
     end)
     helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
       local previous_storage = package.loaded["core.fs.adapters.storage"]
-      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      local previous_handler = package.loaded["hotstrings.ui.hotstring_editor.bridge"]
       package.loaded["core.fs.adapters.storage"] = {
         get = function(_key, default_value) return default_value end,
         set = function() return false end,
       }
-      package.loaded["ui.hotstring_editor.bridge"] = nil
-      local failing = require("ui.hotstring_editor.bridge")
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
+      local failing = require("hotstrings.ui.hotstring_editor.bridge")
 
       local failed = failing.on_message(
         { action = "save_pref", data = { key = "compact_view", value = true } }, state)
@@ -781,7 +817,7 @@ helpers.describe("ui.bridge_handlers", function()
         { action = "save_pref", data = { key = "compact_view", value = "true" } }, state)
 
       package.loaded["core.fs.adapters.storage"] = previous_storage
-      package.loaded["ui.hotstring_editor.bridge"] = previous_handler
+      package.loaded["hotstrings.ui.hotstring_editor.bridge"] = previous_handler
       helpers.assert_eq(failed.saved, false,
         "the page must not receive saved=true when the durable write failed")
       helpers.assert_eq(mistyped.saved, false,

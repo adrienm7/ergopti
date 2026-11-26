@@ -23,13 +23,13 @@ helpers.describe("i18n persistence", function()
       helpers.assert_true(type(i18n.set_locale)  == "function", "set_locale")
       helpers.assert_true(type(i18n.list_locales)== "function", "list_locales")
       helpers.assert_true(type(i18n.display_name)== "function", "display_name")
-      helpers.assert_true(type(i18n.set_trigger_provider) == "function", "set_trigger_provider")
+      helpers.assert_true(type(i18n.set_display_provider) == "function", "set_display_provider")
       helpers.assert_true(type(i18n.init)        == "function", "init")
     end)
 
-    helpers.it("locale module exports set_trigger_provider", function()
+    helpers.it("locale module exports set_display_provider", function()
       local loc = helpers.load_module("core.i18n.engine.locale")
-      helpers.assert_true(type(loc.set_trigger_provider) == "function", "locale.set_trigger_provider")
+      helpers.assert_true(type(loc.set_display_provider) == "function", "locale.set_display_provider")
     end)
   end)
 
@@ -124,8 +124,8 @@ helpers.describe("i18n persistence", function()
       -- An in-memory store that acknowledges every write: the round trip must
       -- not depend on whichever storage adapter an earlier test file left loaded.
       local saved_storage = package.loaded["core.fs.adapters.storage"]
-      local saved_scope = package.loaded["infra.script_scope"]
-      package.loaded["infra.script_scope"] = stub_scope_for_store()
+      local saved_scope = package.loaded["settings.engine.scope.script_scope"]
+      package.loaded["settings.engine.scope.script_scope"] = stub_scope_for_store()
       local stored = {}
       package.loaded["core.fs.adapters.storage"] = {
         get = function(key) return stored[key] end,
@@ -147,15 +147,15 @@ helpers.describe("i18n persistence", function()
         helpers.assert_eq(i18n.get_locale(), before, "locale restored")
       end)
       package.loaded["core.fs.adapters.storage"] = saved_storage
-      package.loaded["infra.script_scope"] = saved_scope
+      package.loaded["settings.engine.scope.script_scope"] = saved_scope
       package.loaded["core.i18n.engine.i18n"] = nil
       if not ok then error(err, 0) end
     end)
 
 		helpers.it("does not publish a locale whose durable write failed", function()
 			local saved_storage = package.loaded["core.fs.adapters.storage"]
-			local saved_scope = package.loaded["infra.script_scope"]
-			package.loaded["infra.script_scope"] = stub_scope_for_store()
+			local saved_scope = package.loaded["settings.engine.scope.script_scope"]
+			package.loaded["settings.engine.scope.script_scope"] = stub_scope_for_store()
 			package.loaded["core.fs.adapters.storage"] = {
 				get = function() return "fr" end,
 				set = function() return false end,
@@ -170,7 +170,7 @@ helpers.describe("i18n persistence", function()
 					"the active locale must remain aligned with durable storage")
 			end)
 			package.loaded["core.fs.adapters.storage"] = saved_storage
-			package.loaded["infra.script_scope"] = saved_scope
+			package.loaded["settings.engine.scope.script_scope"] = saved_scope
 			package.loaded["core.i18n.engine.i18n"] = nil
 			if not ok then error(err, 0) end
 		end)
@@ -193,9 +193,9 @@ helpers.describe("i18n persistence", function()
 
 		helpers.it("(lcy-002-system-locale) a first run and an unknown saved code follow the session language", function()
 			local saved_storage = package.loaded["core.fs.adapters.storage"]
-			local saved_scope = package.loaded["infra.script_scope"]
+			local saved_scope = package.loaded["settings.engine.scope.script_scope"]
 			local saved_getenv = os.getenv
-			package.loaded["infra.script_scope"] = stub_scope_for_store()
+			package.loaded["settings.engine.scope.script_scope"] = stub_scope_for_store()
 			local ok, err = pcall(function()
 				os.getenv = function(name) if name == "LANG" then return "de_DE.UTF-8" end return nil end
 				for _, saved in ipairs({ false, "xx" }) do
@@ -212,7 +212,7 @@ helpers.describe("i18n persistence", function()
 			end)
 			os.getenv = saved_getenv
 			package.loaded["core.fs.adapters.storage"] = saved_storage
-			package.loaded["infra.script_scope"] = saved_scope
+			package.loaded["settings.engine.scope.script_scope"] = saved_scope
 			package.loaded["core.i18n.engine.i18n"] = nil
 			if not ok then error(err, 0) end
 		end)
@@ -249,22 +249,22 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("trigger provider", function()
-    helpers.it("set_trigger_provider does not crash", function()
+    helpers.it("set_display_provider does not crash", function()
       local i18n = helpers.load_module("core.i18n.engine.i18n")
       -- Called directly. A setter that accepted the provider and then failed to
       -- use it would satisfy "does not crash" and leave every label showing the
       -- default trigger character.
-      i18n.set_trigger_provider(function() return "\\" end)
-      helpers.assert_eq(type(i18n.set_trigger_provider), "function",
+      i18n.set_display_provider(function(text) return text end)
+      helpers.assert_eq(type(i18n.set_display_provider), "function",
         "and the setter must remain callable for the next provider")
     end)
 
-    helpers.it("set_trigger_provider with nil is safe", function()
+    helpers.it("set_display_provider with nil is safe", function()
       local loc = helpers.load_module("core.i18n.engine.locale")
       -- nil means "go back to the default", not "break". The module must still be
       -- usable afterwards or the next real provider never lands.
-      loc.set_trigger_provider(nil)
-      helpers.assert_eq(type(loc.set_trigger_provider), "function",
+      loc.set_display_provider(nil)
+      helpers.assert_eq(type(loc.set_display_provider), "function",
         "clearing the provider must leave the setter callable")
     end)
   end)
@@ -275,7 +275,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("menu language submenu", function()
     helpers.it("language submenu items have callbacks and valid shape", function()
-      local mb = helpers.load_module("ui.menu.builder")
+      local mb = helpers.load_module("menu.ui.builder.builder")
       local items = mb.build({ _version = "test", on_quit = function() end })
 
       local lang_section = nil
@@ -304,7 +304,7 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.fs.adapters.storage", "infra.config_paths", "infra.script_settings", "ui.error_dialog.bridge" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.fs.adapters.storage", "settings.engine.paths", "settings.engine.scope.script_settings", "diagnostics.ui.error_dialog" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -312,13 +312,15 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/" .. FOLDER))
 		helpers.assert_true(made == true or made == 0)
 		local config = root .. "/config/config.toml"
-		if options.config then
+		if options.config or options.config_dir then
 			local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
 			assert(created == true or created == 0)
+		end
+		if options.config then
 			local cf = assert(io.open(config, "wb")); assert(cf:write(options.config)); assert(cf:close())
 		end
 		local path = root .. "/" .. FOLDER .. "/storage.json"
-		local seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
+		local seed = options.seed or '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local fh = assert(io.open(path, "wb"))
 		assert(fh:write(seed)); assert(fh:close())
 		local original_rename = os.rename
@@ -329,13 +331,20 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local ok, err = xpcall(function()
 			-- config() is where the locale owner rewrites a held [script] locale.
 			-- default_config_dir() is where the storage adapter keeps storage.json.
-			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+			package.loaded["settings.engine.paths"] = { config_home = function() return root end,
 				default_config_dir = function() return root .. "/" .. FOLDER end,
-				config = function(name) return root .. "/config/" .. name end }
+				config = function(name) return root .. "/config/" .. name end,
+				-- The folder of config.toml stands for the default one, unless the
+				-- case makes it a custom folder, which is never created.
+				prepare_default_config_dir = function()
+					if options.custom_config_dir then return true end
+					local created = os.execute("mkdir -p " .. string.format("%q", root .. "/config"))
+					return created == true or created == 0
+				end }
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
-			package.loaded["infra.script_settings"] = nil
-			package.loaded["ui.error_dialog.bridge"] = nil
+			package.loaded["settings.engine.scope.script_settings"] = nil
+			package.loaded["diagnostics.ui.error_dialog"] = nil
 			package.loaded["core.i18n.engine.i18n"] = nil
 			local i18n = require("core.i18n.engine.i18n")
 			i18n.init()
@@ -358,7 +367,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		os.remove(helpers.stage_path(path)); os.remove(path)
 		os.remove(config); os.execute("rm -f " .. string.format("%q", root .. "/config") .. "/*.bak")
 		os.execute("rm -f " .. string.format("%q", root .. "/" .. FOLDER) .. "/*.bak")
-		if options.config then os.execute("rmdir " .. string.format("%q", root .. "/config")) end
+		os.execute("rmdir " .. string.format("%q", root .. "/config") .. " 2>/dev/null")
 		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end
@@ -374,18 +383,36 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(error-dialog-atomic) keeps source and state on storage refusal", function()
 		local initial = '[script]\nshow_error_dialog = true\n'
 		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local before = dialog.is_enabled()
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, before = before, active = dialog.is_enabled(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
 		end)
 		helpers.assert_eq(observed, { accepted = false, before = true, active = true, config = initial })
 	end)
 
+	-- The row was written only when the file held it, so the next start, which
+	-- clears the saved value of an absent row, would have ticked the window
+	-- again (configuration follow-up, script-config-absent-row-resets).
+	helpers.it("(error-dialog-atomic) writes an absent row so the next start keeps the choice (script-config-absent-row-resets)", function()
+		local initial = '[hotstrings]\nenabled = true\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local dialog = require("diagnostics.ui.error_dialog")
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, active = dialog.is_enabled(),
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed.accepted, true)
+		helpers.assert_eq(observed.stored, false)
+		helpers.assert_true(observed.config:find("[hotstrings]", 1, true) ~= nil, "the rest of the file stays")
+		helpers.assert_true(observed.config:find("show_error_dialog = false", 1, true) ~= nil,
+			"the choice is in config.toml: " .. observed.config)
+	end)
+
 	helpers.it("(error-dialog-atomic) disables an already scheduled report", function()
-		local observed = with_owned_store({}, function()
-			local dialog = require("ui.error_dialog.bridge")
+		local observed = with_owned_store({ config = "" }, function()
+			local dialog = require("diagnostics.ui.error_dialog")
 			local scheduled
 			dialog.defer = function(fn) scheduled = fn; return true end
 			assert(dialog.init())
@@ -408,14 +435,14 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local cf = assert(io.open(config, "wb")); assert(cf:write(initial .. "# concurrent\n")); assert(cf:close())
 			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.show_error_dialog":true}')); assert(sf:close())
 		end }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local accepted = dialog.set_enabled(false)
-			local pending = require("infra.scope_registry").pending()
-			local config = read(require("infra.config_paths").config("config.toml"))
+			local pending = require("settings.engine.scope.registry").pending()
+			local config = read(require("settings.engine.paths").config("config.toml"))
 			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
 			local recovered = dialog.set_enabled(false)
 			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
-				still_pending = require("infra.scope_registry").pending() }
+				still_pending = require("settings.engine.scope.registry").pending() }
 		end)
 		helpers.assert_eq(observed, { accepted = false, pending = true, config = initial .. "# concurrent\n",
 			recovered = true, still_pending = false })
@@ -424,10 +451,10 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(error-dialog-atomic) publishes configured and stored state together", function()
 		local initial = '[script]\nshow_error_dialog = true\n'
 		local observed = with_owned_store({ config = initial }, function(_, path)
-			local dialog = require("ui.error_dialog.bridge")
+			local dialog = require("diagnostics.ui.error_dialog")
 			local accepted = dialog.set_enabled(false)
 			return { accepted = accepted, active = dialog.is_enabled(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.show_error_dialog"] }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = false, config = '[script]\nshow_error_dialog = false\n', stored = false })
 	end)
@@ -435,11 +462,11 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(log-level-atomic) leaves the source and logger unchanged on storage refusal", function()
 		local initial = '[script]\nlog_level = "INFO"\n'
 		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
-			local settings = require("infra.script_settings")
+			local settings = require("settings.engine.scope.script_settings")
 			local before = settings.current()
 			local accepted = settings.set("ERROR")
 			return { accepted = accepted, before = before, active = settings.current(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
 		end)
 		helpers.assert_eq(observed, { accepted = false, before = "INFO", active = "INFO", config = initial })
 	end)
@@ -454,14 +481,14 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local cf = assert(io.open(config, "wb")); assert(cf:write('[script]\nlog_level = "DEBUG"\n')); assert(cf:close())
 			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.log_level":"WARNING"}')); assert(sf:close())
 		end }, function(_, path)
-			local settings = require("infra.script_settings")
+			local settings = require("settings.engine.scope.script_settings")
 			local accepted = settings.set("ERROR")
-			local pending = require("infra.scope_registry").pending()
-			local config = read(require("infra.config_paths").config("config.toml"))
+			local pending = require("settings.engine.scope.registry").pending()
+			local config = read(require("settings.engine.paths").config("config.toml"))
 			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
 			local recovered = settings.set("ERROR")
 			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
-				still_pending = require("infra.scope_registry").pending() }
+				still_pending = require("settings.engine.scope.registry").pending() }
 		end)
 		helpers.assert_eq(observed, { accepted = false, pending = true, config = '[script]\nlog_level = "DEBUG"\n',
 			recovered = true, still_pending = false })
@@ -470,10 +497,10 @@ helpers.describe("i18n explicit wizard persistence", function()
 	helpers.it("(log-level-atomic) publishes configured and stored levels together", function()
 		local initial = '[script]\nlog_level = "INFO"\n'
 		local observed = with_owned_store({ config = initial }, function(_, path)
-			local settings = require("infra.script_settings")
+			local settings = require("settings.engine.scope.script_settings")
 			local accepted = settings.set("ERROR")
 			return { accepted = accepted, active = settings.current(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path))["script.log_level"] }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = "ERROR", config = '[script]\nlog_level = "ERROR"\n', stored = "ERROR" })
 	end)
@@ -482,7 +509,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local initial = '[script]\nlocale = "fr"\n'
 		local observed = with_owned_store({ config = initial, rename = "false" }, function(i18n)
 			local accepted = i18n.persist_locale("en")
-			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")) }
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("settings.engine.paths").config("config.toml")) }
 		end)
 		helpers.assert_eq(observed, { accepted = false, active = "fr", config = initial })
 	end)
@@ -492,28 +519,49 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local observed = with_owned_store({ config = initial }, function(i18n, path)
 			local accepted = i18n.persist_locale("en")
 			return { accepted = accepted, active = i18n.get_locale(),
-				config = read(require("infra.config_paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path)).locale }
+				config = read(require("settings.engine.paths").config("config.toml")), stored = require("core.text.engine.json").decode(read(path)).locale }
 		end)
 		helpers.assert_eq(observed, { accepted = true, active = "en", config = '[script]\nlocale = "en"\n', stored = "en" })
 	end)
 
-	helpers.it("(locale-atomic) never creates an absent source", function()
-		local observed = with_owned_store({}, function(i18n)
+	-- A chosen locale is always written (maintainer decision of 2026-11-21, the
+	-- locale's neutral value is the absent row): an absent config.toml is
+	-- created with its default folder (maintainer decision of 2026-11-22), and
+	-- a missing custom folder refuses the choice rather than keeping a locale
+	-- the next start would clear.
+	helpers.it("(locale-neutral-2026-11-21) writes a chosen locale into an absent source", function()
+		local observed = with_owned_store({ config_dir = true }, function(i18n)
 			local accepted = i18n.persist_locale("en")
-			local file = io.open(require("infra.config_paths").config("config.toml"), "rb")
-			if file then file:close() end
-			return { accepted = accepted, absent = file == nil, active = i18n.get_locale() }
+			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
 		end)
-		helpers.assert_eq(observed, { accepted = true, absent = true, active = "en" })
+		helpers.assert_eq(observed, { accepted = true, config = '\n[script]\nlocale = "en"\n', active = "en" })
 	end)
 
-	helpers.it("(locale-atomic) leaves an existing source without a locale row unchanged", function()
+	helpers.it("(locale-creates-config-2026-11-22) creates the missing default folder and config.toml", function()
+		local observed = with_owned_store({}, function(i18n)
+			local accepted = i18n.persist_locale("en")
+			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
+		end)
+		helpers.assert_eq(observed, { accepted = true, config = '\n[script]\nlocale = "en"\n', active = "en" })
+	end)
+
+	helpers.it("(locale-creates-config-2026-11-22) refuses a choice whose custom configuration folder is missing", function()
+		local observed = with_owned_store({ custom_config_dir = true }, function(i18n, path, seed)
+			local accepted = i18n.persist_locale("en")
+			local file = io.open(require("settings.engine.paths").config("config.toml"), "rb")
+			if file then file:close() end
+			return { accepted = accepted, absent = file == nil, active = i18n.get_locale(), unchanged = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = false, absent = true, active = "fr", unchanged = true })
+	end)
+
+	helpers.it("(locale-neutral-2026-11-21) writes the chosen locale into a source without a locale row", function()
 		local initial = '[script]\nlog_level = "INFO"\n'
 		local observed = with_owned_store({ config = initial }, function(i18n)
 			local accepted = i18n.persist_locale("en")
-			return { accepted = accepted, config = read(require("infra.config_paths").config("config.toml")), active = i18n.get_locale() }
+			return { accepted = accepted, config = read(require("settings.engine.paths").config("config.toml")), active = i18n.get_locale() }
 		end)
-		helpers.assert_eq(observed, { accepted = true, config = initial, active = "en" })
+		helpers.assert_eq(observed, { accepted = true, config = '[script]\nlocale = "en"\nlog_level = "INFO"\n', active = "en" })
 	end)
 
 	helpers.it("(locale-atomic) preserves a concurrent edit and compensates storage", function()
@@ -522,7 +570,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local file = assert(io.open(path, "wb")); assert(file:write(concurrent)); assert(file:close())
 		end }, function(i18n, path, seed)
 			local accepted = i18n.persist_locale("en")
-			return { accepted = accepted, active = i18n.get_locale(), config = read(require("infra.config_paths").config("config.toml")), storage = read(path) == seed }
+			return { accepted = accepted, active = i18n.get_locale(), config = read(require("settings.engine.paths").config("config.toml")), storage = read(path) == seed }
 		end)
 		helpers.assert_eq(observed, { accepted = false, active = "fr", config = concurrent, storage = true })
 	end)
@@ -538,11 +586,11 @@ helpers.describe("i18n explicit wizard persistence", function()
 			local sf = assert(io.open(path, "wb")); assert(sf:write('{"locale":"es"}')); assert(sf:close())
 		end }, function(i18n, path)
 			local rejected = i18n.persist_locale("en")
-			local pending = require("infra.scope_registry").pending()
+			local pending = require("settings.engine.scope.registry").pending()
 			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
 			local recovered = i18n.persist_locale("en")
 			return { rejected = rejected, pending = pending, recovered = recovered,
-				still_pending = require("infra.scope_registry").pending() }
+				still_pending = require("settings.engine.scope.registry").pending() }
 		end)
 		helpers.assert_eq(observed, { rejected = false, pending = true, recovered = true, still_pending = false })
 	end)
@@ -564,14 +612,16 @@ helpers.describe("i18n explicit wizard persistence", function()
 
 	for _, code in ipairs({ "fr", "en" }) do
 		helpers.it("(wizard-locale-ack) reads back the acknowledged " .. code .. " selection", function()
-			local observed, attempts = with_owned_store({}, function(i18n, path)
+			local observed, attempts = with_owned_store({ config_dir = true }, function(i18n, path)
 				local accepted = i18n.persist_locale(code)
 				return { accepted = accepted, locale = i18n.get_locale(),
-					stored = require("core.text.engine.json").decode(read(path)) }
+					stored = require("core.text.engine.json").decode(read(path)),
+					config = read(require("settings.engine.paths").config("config.toml")) }
 			end)
 			helpers.assert_true(observed.accepted)
 			helpers.assert_eq(observed.locale, code)
 			helpers.assert_eq(observed.stored, { locale = code, future = { retained = true } })
+			helpers.assert_eq(observed.config, '\n[script]\nlocale = "' .. code .. '"\n')
 			helpers.assert_eq(attempts, 1)
 		end)
 	end
@@ -587,10 +637,21 @@ helpers.describe("i18n explicit wizard persistence", function()
 	end)
 
 	helpers.it("(wizard-locale-ack) leaves the ordinary same-locale menu setter unchanged", function()
-		local observed, attempts = with_owned_store({ rename = "false" }, function(i18n, path, seed)
+		local saved = '{"locale":"fr","future":{"retained":true}}\n'
+		local observed, attempts = with_owned_store({ rename = "false", seed = saved }, function(i18n, path, seed)
 			return { accepted = i18n.set_locale("fr"), unchanged = read(path) == seed }
 		end)
 		helpers.assert_eq(observed, { accepted = true, unchanged = true })
 		helpers.assert_eq(attempts, 0)
+	end)
+
+	-- The language shown while nothing is saved becomes a written choice
+	-- (locale-neutral-2026-11-21), so the same-locale setter reaches storage.
+	helpers.it("(locale-neutral-2026-11-21) writes the shown locale chosen while nothing is saved", function()
+		local observed, attempts = with_owned_store({ rename = "false" }, function(i18n, path, seed)
+			return { accepted = i18n.set_locale("fr"), locale = i18n.get_locale(), unchanged = read(path) == seed }
+		end)
+		helpers.assert_eq(observed, { accepted = false, locale = "fr", unchanged = true })
+		helpers.assert_eq(attempts, 1, "an unsaved shown locale is persisted, not skipped")
 	end)
 end)

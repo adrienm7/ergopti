@@ -71,6 +71,7 @@ local function with_owner(run)
 					set = function(key, value) env.writes = env.writes + 1; env.values[key] = value; return true end,
 				},
 				http = { get = get }, manual_http = { get = get },
+				failure_contract = { classify = function() error("this test carries no failure receipt") end },
 				now = function() return env.now end,
 				current_version = function() return "0.0.0-dev.140" end,
 				installed_channel = function() return "dev" end,

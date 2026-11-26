@@ -36,7 +36,7 @@ local function with_editor(write, body)
 		eval_js = function() return true end,
 	}
 	local ok, err = pcall(function()
-		local handler = helpers.load_module("ui.hotstring_editor.bridge")
+		local handler = helpers.load_module("hotstrings.ui.hotstring_editor.bridge")
 		local state = { config = {
 			get_config_dir = function() return "/virtual/ergopti/hotstrings" end,
 			reload = function() return 1, true end,
@@ -51,7 +51,7 @@ local function with_editor(write, body)
 	end)
 	package.loaded["core.text.engine.toml_codec.writer"] = saved_writer
 	package.loaded["core.ui.ui.webview_manager"] = saved_manager
-	package.loaded["ui.hotstring_editor.bridge"] = nil
+	package.loaded["hotstrings.ui.hotstring_editor.bridge"] = nil
 	if not ok then error(err, 0) end
 end
 

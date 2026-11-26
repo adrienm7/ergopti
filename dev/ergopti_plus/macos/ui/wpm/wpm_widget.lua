@@ -12,6 +12,9 @@
 --- 2. Autonomous Polling: Manages its own lifecycle and history array.
 --- 3. Dynamic Styling: Visual feedback changes color based on the typing source.
 --- 4. Effective WPM: Displays the net typing speed, visualizing productivity spikes.
+--- 5. VoiceOver: a canvas cannot carry the accessible name the Windows widget
+---    gets, so a running VoiceOver hears the burst's last speed once, when the
+---    widget hides; never per refresh, and nothing without VoiceOver.
 --- ==============================================================================
 
 local M = {}
@@ -23,6 +26,7 @@ local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local GraphicsRenderer = require("core.ui.adapters.graphics_renderer")
 local Storage = require("core.fs.adapters.storage")
+local SystemA11y = require("core.ui.adapters.system_accessibility")
 local TimerScheduler = require("core.events.timer_scheduler")
 local Timings = require("core.timing.engine.timings")
 local TomlCodec = require("core.text.engine.toml_codec")
@@ -148,6 +152,10 @@ local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
 local _last_mouse_sec    = 0    -- wall clock of the last mouse/touchpad event
+-- The speed the visible canvas last drew ("72 WPM"), nil while it is hidden.
+-- A canvas has no accessibility element VoiceOver could read, and the speed
+-- changes every refresh: the burst's last speed is said once, when it hides.
+local _shown_readout     = nil
 
 -- Current-cycle canvas geometry, shared with the mouseCallback closure below.
 -- The closure is created ONCE, the first time update_widget_body() creates
@@ -252,7 +260,8 @@ update_widget_body = function(generation)
 	local show
 	show = WPMModel.widget_visible({
 		wpm = display_wpm, source = active_source, tooltip_visible = tooltip_visible, now_s = now,
-		last_input_s = stats.last_input_time, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
+		last_input_s = stats.last_input_time, last_break_s = stats.last_break_time,
+		last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
 	})
 
 	-- The pointer belongs to the canvas while its drag is in progress.
@@ -415,8 +424,14 @@ update_widget_body = function(generation)
 		canvas:replaceElements(elements)
 		if not is_current(generation) or _canvas ~= canvas then return false end
 		canvas:show()
+		_shown_readout = math.floor(display_wpm) > 0 and WPMModel.readout_label(display_wpm, frame_opts.unit) or nil
 	else
 		if _canvas then _canvas:hide() end
+		-- The burst ended: its speed is said once, never on a refresh that
+		-- keeps the widget hidden.
+		local readout = _shown_readout
+		_shown_readout = nil
+		if readout then SystemA11y.announce_event(readout) end
 	end
 end
 
@@ -494,6 +509,17 @@ end
 -- =====================================
 -- =====================================
 
+--- Whether an event was posted by this process.
+--- @param event any The eventtap event.
+--- @return boolean
+local function is_own_event(event)
+	local properties = hs.eventtap.event.properties
+	local key = type(properties) == "table" and properties.eventSourceUnixProcessID or nil
+	if key == nil or event == nil or type(hs.processInfo) ~= "table" then return false end
+	local ok, pid = pcall(function() return event:getProperty(key) end)
+	return ok and pid ~= nil and pid == hs.processInfo.processID
+end
+
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
 --- @return boolean committed True only when both polling capabilities are active.
@@ -545,15 +571,19 @@ function M.start(show_graph)
 		return false
 	end
 
-	-- Watch all mouse/touchpad events to know when to hide the widget.
+	-- Watch all mouse/touchpad events to know when to hide the widget: any move,
+	-- a single pixel included, a drag, a click or a wheel or touchpad scroll ends
+	-- the typing burst (TWD-2, decided by the maintainer on 2026-11-16).
+	local types = hs.eventtap.event.types
 	local tap_ok, tap_candidate = xpcall(function()
 		return hs.eventtap.new({
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.scrollWheel,
-		}, function()
+			types.mouseMoved, types.leftMouseDragged, types.rightMouseDragged, types.otherMouseDragged,
+			types.leftMouseDown, types.rightMouseDown, types.otherMouseDown, types.scrollWheel,
+		}, function(event)
 			if not _running or generation ~= _generation then return false end
+			-- A move this process posted (a cursor restore, a pointer action) is no
+			-- user input.
+			if is_own_event(event) then return false end
 			-- Even a single move immediately after a key must hide the widget.
 			_last_mouse_sec = hs.timer.absoluteTime() / 1000000000
 			return false  -- do not consume the event
@@ -601,6 +631,8 @@ function M.stop()
 		return true
 	end
 	_running = false
+	-- A stop or a pause is no burst ending: nothing is said.
+	_shown_readout = nil
 	_generation = _generation + 1
 	local generation = _generation
 	local runtime_stopped = release_runtime()

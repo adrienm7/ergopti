@@ -1,73 +1,117 @@
 {
-	"_comment": "How many backend calls one prediction request takes, replayed through _shared/ai/engine/request_plan/batching.lua by the macOS and Linux runners. A batch profile asks once for every variant when more than one is requested; every other case asks once per variant. This is the rule of ai/engine/settings/profile_selector.lua (a batch prompt is a batch only above one prediction). per_call is the number of variants one call returns, which also scales that call's token budget. expect_error is a substring of the message the plan must raise.",
+	"_comment": "How many backend calls one prediction request takes, replayed through _shared/ai/engine/request_plan/batching.lua by the macOS and Linux runners and through LLM_RequestPlanBatching by the Windows runner. A batch profile asks once for every variant when more than one is requested; every other case asks once per variant. This is the rule of ai/engine/settings/profile_selector.lua (a batch prompt is a batch only above one prediction). per_call is the number of variants one call returns, which also scales that call's token budget. expect_error is a substring of the message the plan must raise. sequential_mode is llm.generation.sequential_mode (PPT-03): concurrent says whether the calls of one request may overlap, false when it is on, for a single call and for a batch.",
 	"vectors": [
 		{
 			"id": "a-batch-profile-asks-once-for-every-variant",
 			"batch_profile": true,
 			"requested": 3,
+			"sequential_mode": false,
 			"expect": {
 				"mode": "batch",
 				"calls": 1,
-				"per_call": 3
+				"per_call": 3,
+				"concurrent": false
+			}
+		},
+		{
+			"id": "sequential-mode-leaves-a-batch-one-call",
+			"batch_profile": true,
+			"requested": 3,
+			"sequential_mode": true,
+			"expect": {
+				"mode": "batch",
+				"calls": 1,
+				"per_call": 3,
+				"concurrent": false
 			}
 		},
 		{
 			"id": "a-batch-profile-with-one-prediction-is-a-single-call",
 			"batch_profile": true,
 			"requested": 1,
+			"sequential_mode": false,
 			"expect": {
 				"mode": "sequential",
 				"calls": 1,
-				"per_call": 1
+				"per_call": 1,
+				"concurrent": false
 			}
 		},
 		{
 			"id": "a-plain-profile-asks-once-per-variant",
 			"batch_profile": false,
 			"requested": 3,
+			"sequential_mode": false,
 			"expect": {
 				"mode": "sequential",
 				"calls": 3,
-				"per_call": 1
+				"per_call": 1,
+				"concurrent": true
+			}
+		},
+		{
+			"id": "sequential-mode-keeps-the-variants-of-a-plain-profile-apart",
+			"batch_profile": false,
+			"requested": 3,
+			"sequential_mode": true,
+			"expect": {
+				"mode": "sequential",
+				"calls": 3,
+				"per_call": 1,
+				"concurrent": false
 			}
 		},
 		{
 			"id": "a-plain-profile-with-one-prediction",
 			"batch_profile": false,
 			"requested": 1,
+			"sequential_mode": false,
 			"expect": {
 				"mode": "sequential",
 				"calls": 1,
-				"per_call": 1
+				"per_call": 1,
+				"concurrent": false
 			}
 		},
 		{
 			"id": "a-batch-profile-with-two-predictions",
 			"batch_profile": true,
 			"requested": 2,
+			"sequential_mode": false,
 			"expect": {
 				"mode": "batch",
 				"calls": 1,
-				"per_call": 2
+				"per_call": 2,
+				"concurrent": false
 			}
 		},
 		{
 			"id": "a-non-boolean-flag-is-refused",
 			"batch_profile": "yes",
 			"requested": 1,
+			"sequential_mode": false,
 			"expect_error": "batch_profile"
 		},
 		{
 			"id": "zero-predictions-are-refused",
 			"batch_profile": false,
 			"requested": 0,
+			"sequential_mode": false,
 			"expect_error": "requested"
 		},
 		{
 			"id": "a-fractional-count-is-refused",
 			"batch_profile": false,
 			"requested": 1.5,
+			"sequential_mode": false,
 			"expect_error": "requested"
+		},
+		{
+			"id": "a-non-boolean-sequential-mode-is-refused",
+			"batch_profile": false,
+			"requested": 2,
+			"sequential_mode": "no",
+			"expect_error": "sequential_mode"
 		}
 	]
 }

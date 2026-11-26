@@ -97,6 +97,18 @@ h.describe("chord copy actual fresh source producer", function()
    end
   end)
  end)
+ -- macOS copied the one-shot Shift into a chord, which no chord runs on any OS
+ -- (maintainer decision of 2026-11-06); Windows and Linux keep that chord.
+ h.it("(kcl-copy-skips-chordless-tap) a one-shot Shift tap keeps its pair's chord", function()
+  scoped(function(Config, _, path)
+   local source = '[mod_combos.config.escape_then_tab]\ntap = "sticky_shift"\ncombo = "caps_word"\n'
+   seed(path, source)
+   local with_shift = { { id = "none" }, { id = "sticky_shift" }, { id = "caps_word" } }
+   local plan = Config.prepare_copy_taps_to_chords(entries, with_shift, path)
+   h.assert_eq(plan.changes, 0); h.assert_eq(plan.skipped, { { id = PAIR, action = "sticky_shift" } })
+   h.assert_eq(read(path), source)
+  end)
+ end)
  h.it("a native lock refusal cannot acknowledge a copied candidate", function()
   scoped(function(Config, _, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
@@ -136,7 +148,7 @@ h.describe("chord copy actual fresh source producer", function()
      return Config.prepare_copy_taps_to_chords(actual_entries, actions, actual_path)
     end
     port.publish_copy_taps_to_chords = Config.publish_copy_taps_to_chords
-    package.loaded["infra.config_paths"].get = function() return path end
+    package.loaded["settings.engine.paths"].get = function() return path end
     local completed, result, changed, pending = 0, nil, nil, nil
     remap.regenerate = function(done) pending = done; return true end
     h.assert_eq(remap.get_combo_tap_action(entries[1].id), "none")
@@ -254,7 +266,7 @@ h.describe("chord copy final logical admission", function()
     end
     port.publish_copy_taps_to_chords = Config.publish_copy_taps_to_chords
     local route = path
-    package.loaded["infra.config_paths"].get = function() return route end
+    package.loaded["settings.engine.paths"].get = function() return route end
     local prepared_reads, read_native = 0, adapter.read_with_status
     local final_phase = false
     adapter.read_with_status = function(...)

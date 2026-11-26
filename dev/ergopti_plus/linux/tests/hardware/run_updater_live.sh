@@ -9,8 +9,9 @@
 # every step and that the daemon it restarts reports the new version.
 #
 # Needs network access to GitHub, luajit, lua-luv, tar, sha256sum and curl.
-# Run from anywhere. Exit 0 = updated and restarted; 1 = a failure;
-# 2 = no environment.
+# Run from anywhere. Exit 0 = updated and restarted, or, while the newest
+# release predates the structure move, its designed refusal proved
+# (phase=transition); 1 = a failure; 2 = no environment.
 
 set -u
 WORK=""
@@ -98,13 +99,18 @@ CAUSE_STATUS=${STATUS}
 exec 3>&- 4>&-
 wait "${STDOUT_PID}" || echo "Updater stdout evidence could not be copied." >&2
 wait "${STDERR_PID}" || echo "Updater stderr evidence could not be copied." >&2
+if [ "${STATUS}" -eq 3 ]; then
+	PHASE=transition
+	echo "  ok   the newest release predates the structure move: its refusal is proved, not an install"
+	exit 0
+fi
 [ "${STATUS}" -eq 0 ] || exit 1
 
 # The restarted daemon: started by the relay once the updater's process exited,
 # from the installed launcher, it must report the version just installed.
 PHASE=restart
 NEW="$(sed -n 's/^version=//p' "${LIB}/_shared/build_stamp.txt")"
-# Where that daemon writes its logs: state, not data (infra/config_paths.lua),
+# Where that daemon writes its logs: state, not data (settings/engine/paths.lua),
 # in the folder its own installed registry names. It is the newest published
 # release, which may predate this checkout's folder name, so the name is read
 # from the installed _shared/core/fs/engine/app_dirs.lua (LUA_PATH above), not spelled.

@@ -14,7 +14,7 @@
 --- 2. Locale discovery: list_locales() scans _shared/core/i18n/data/locales/ for
 ---    available .json files so the language menu is always up-to-date.
 --- 3. Same surface as macOS: get(), get_locale(), set_locale().
---- 4. Trigger provider passthrough: delegates to locale.set_trigger_provider().
+--- 4. Display provider passthrough: delegates to locale.set_display_provider().
 --- ==============================================================================
 
 local M = {}
@@ -246,7 +246,7 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True only after storage confirms the explicit selection.
 function M.persist_locale(code)
-	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
+	if not require("settings.engine.scope.script_scope").retry_locale() or not _scope.admit_change() then return false end
 	if type(code) ~= "string" or code == "" then return false end
 
 	-- Verify the locale is available.
@@ -260,7 +260,7 @@ function M.persist_locale(code)
 	end
 
 	-- The alias, runtime and an existing config row commit under one owner.
-	if not require("infra.script_scope").edit_locale(code) then
+	if not require("settings.engine.scope.script_scope").edit_locale(code) then
 		Logger.error(LOG, "Locale '%s' was not committed.", code)
 		return false
 	end
@@ -273,8 +273,10 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
-	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
-	if code == _locale then return true end
+	if not require("settings.engine.scope.script_scope").retry_locale() or not _scope.admit_change() then return false end
+	-- Only a choice already saved is a no-op: the system language shown while
+	-- nothing is saved becomes an explicit, written choice (2026-11-21).
+	if code == _locale and _load_persisted_locale() == code then return true end
 	return M.persist_locale(code)
 end
 
@@ -288,11 +290,11 @@ function M.list_locales()
 	return _available
 end
 
---- Sets the trigger-character provider used for ★ substitution in locale strings.
---- Delegates to infra/locale.set_trigger_provider.
---- @param fn function Zero-argument function returning the trigger character string.
-function M.set_trigger_provider(fn)
-	locale_mod.set_trigger_provider(fn)
+--- Sets the provider that shows the magic key in locale strings (« ★ (ù) »).
+--- Delegates to core/i18n/engine/locale.set_display_provider.
+--- @param fn function (text, key) -> string.
+function M.set_display_provider(fn)
+	locale_mod.set_display_provider(fn)
 end
 
 --- Returns a human-readable display name for a locale code.
@@ -388,6 +390,8 @@ _scope.install({
 	published = { "locale", "backend" },
 	ready = scope_ready,
 	accept = function(value)
+		-- "" is the locale's neutral value: the system language, else English.
+		if value == "" then value = M.detect_system_locale(M.list_locales()) end
 		if type(value) ~= "string" or not scope_known(value) then return nil end
 		return { locale = value, backend = value }
 	end,

@@ -60,8 +60,8 @@ helpers.describe("registry: loading a mapping file that yields nothing is not a 
 
 	helpers.it("warns instead of pairing its start with a success", function()
 		local captured = capture_logger()
-		package.loaded["modules.keymap.registry_groups"] = nil
-		local Groups = helpers.load_with_stubs("modules.keymap.registry_groups")
+		package.loaded["hotstrings.engine.expander.registry_groups"] = nil
+		local Groups = helpers.load_with_stubs("hotstrings.engine.expander.registry_groups")
 
 		local state = {
 			mappings = {}, mappings_lookup = {}, groups = {},
@@ -98,8 +98,8 @@ end)
 
 helpers.describe("registry: injected dependencies fail initialization atomically", function()
 	helpers.it("publishes no usable state when any required callback is missing", function()
-		package.loaded["modules.keymap.registry_groups"] = nil
-		local Groups = helpers.load_with_stubs("modules.keymap.registry_groups")
+		package.loaded["hotstrings.engine.expander.registry_groups"] = nil
+		local Groups = helpers.load_with_stubs("hotstrings.engine.expander.registry_groups")
 		local state = {
 			mappings = {}, mappings_lookup = {}, groups = {},
 			mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
@@ -131,8 +131,8 @@ helpers.describe("registry: the repeat-engine toggle logs its new value", functi
 
 	helpers.it("logs on both transitions", function()
 		local captured = capture_logger()
-		package.loaded["modules.keymap.registry_index"] = nil
-		local RI = helpers.load_with_stubs("modules.keymap.registry_index")
+		package.loaded["hotstrings.engine.expander.registry_index"] = nil
+		local RI = helpers.load_with_stubs("hotstrings.engine.expander.registry_index")
 
 		RI.set_repeat_feature_enabled(false)
 		RI.set_repeat_feature_enabled(true)

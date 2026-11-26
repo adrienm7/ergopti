@@ -52,7 +52,7 @@ _EDOT_Source(Root, LogOpeners := false) {
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included vendor " . Vendor) . ")`n"
 	}
-	for Symbol in ["AppDirsFolderName", "WindowTitle", "LoggerSubFilesData", "UpdateChannelRegistryData", "UpdateScheduleData"] {
+	for Symbol in ["AppDirsFolderName", "WindowTitle", "UpdateChannelRegistryData", "UpdateScheduleData"] {
 		Source .= "#Include " . _EDOT_Generated(Symbol) . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included generated " . Symbol) . ")`n"
 	}
@@ -82,6 +82,10 @@ _EDOT_Source(Root, LogOpeners := false) {
 		Owner := _DriverProductionFileForSymbol("LogOpeners_OpenTodayErrors", _DriverDir)
 		AssertTrue(Owner != "", "The log reader child must use the real UI action owner")
 		Source .= "#Include " . Owner . "`n"
+		; The actions name Notepad and Explorer by their absolute path; the
+		; process adapter that owns that spelling is too wide for this child.
+		for Name in ["ShellRunner_SystemProgramCommand", "ShellRunner_SystemProgramPath", "ShellRunner_WinPsPath"]
+			Source .= _DriverFuncBody(Name) . "`n"
 	}
 	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\"
 		. (LogOpeners ? "log_openers_buffered_owner_body.ahk" : "error_dialog_startup_owner_body.ahk") . "`n"
@@ -110,7 +114,10 @@ _EDOT_Assets(Root) {
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
 	Inputs := ["diagnostics\data\schema.json", "diagnostics\data\redaction.json", "diagnostics\data\issue_templates.json",
 		"diagnostics\data\error_policy.json", "diagnostics\data\recent_issues.json", "diagnostics\data\day_log.json",
-		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json"]
+		"updater\data\defaults.json", "core\i18n\data\locales\en.json", "core\i18n\data\locales\fr.json",
+		; The locale cache shows the magic key through the shared display rule,
+		; and the wizard proposes its layout default.
+		"hotstrings\data\magic_key.json", "layouts\data\keycodes\physical_keys.json"]
 	_EDOT_CreateParents(Root . "\shared", Inputs)
 	for Relative in Inputs {
 		Original := _SharedDir . "\" . Relative, Copy := Root . "\shared\" . Relative

@@ -232,7 +232,7 @@ helpers.describe("core.fs.adapters.file_system: write() is atomic (F-MED-16)", f
 				end
 				return renamed, rename_err, rename_code
 			end
-			local Commands = require("adapters.metadata_command_stats")
+			local Commands = require("diagnostics.adapters.metadata_command_stats")
 			local commands_before = Commands.snapshot()
 			local call_ok, write_ok = xpcall(function()
 				return adapter.write(path, "private new bytes")

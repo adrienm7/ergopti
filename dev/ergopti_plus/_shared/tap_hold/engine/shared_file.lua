@@ -56,6 +56,11 @@ M.META = "_meta"
 local MODEL_TAP_HOLDS = LEAF.TAP_HOLDS
 local MODEL_COMBOS = LEAF.MOD_COMBOS
 local MODEL_KARABINER = "karabiner"
+-- The key-combinations master switch, `[category_enabled] key_combinations` in
+-- config.toml as on Windows and Linux (maintainer decision KCD-6 of
+-- 2026-11-21); [mod_combos] enabled covers only the chords.
+local MODEL_CATEGORIES = LEAF.CATEGORY_ENABLED
+local MASTER_LEAF = LEAF.KEY_COMBINATIONS
 
 -- The section leaves whose name and value are the same in the file and in the model.
 local SAME_TAP_HOLD_LEAVES = { "enabled", LEAF.STICKY_TIMEOUT_MS, LEAF.LONE_MODIFIER_TAP_MAX_MS }
@@ -660,7 +665,8 @@ end
 local function new_document(model, ctx, is_table, with_config)
 	local document = {}
 	for key, value in pairs(model) do
-		if key ~= MODEL_TAP_HOLDS and key ~= MODEL_COMBOS and key ~= MODEL_KARABINER then document[key] = value end
+		if key ~= MODEL_TAP_HOLDS and key ~= MODEL_COMBOS and key ~= MODEL_KARABINER
+			and key ~= MODEL_CATEGORIES then document[key] = value end
 	end
 	M.apply_karabiner(document, {}, model, ctx, is_table, with_config)
 	return document
@@ -697,7 +703,8 @@ end
 
 --- The config-owned part of the Karabiner model, from a decoded config.toml:
 --- `tap_holds` holds the switch and the two timings, `mod_combos` the whole
---- key combinations section with each pair under its macOS combination id.
+--- key combinations section with each pair under its macOS combination id,
+--- `category_enabled` the key-combinations master switch alone.
 --- Values are handed on as they are: a malformed one is the model's to report.
 --- @param document table Decoded config.toml (an absent file is {}).
 --- @param ctx table See M.hs_context.
@@ -706,6 +713,12 @@ end
 --- @return table notes `{ path, detail }` for each leaf macOS cannot run.
 function M.config_to_karabiner(document, ctx, is_table)
 	local part, notes = {}, {}
+	local categories = document[MODEL_CATEGORIES]
+	if categories ~= nil and not is_table(categories) then
+		notes[#notes + 1] = { path = MODEL_CATEGORIES, detail = "it must be a table; the neutral settings are used" }
+	elseif categories ~= nil and categories[MASTER_LEAF] ~= nil then
+		part[MODEL_CATEGORIES] = { [MASTER_LEAF] = categories[MASTER_LEAF] }
+	end
 	local section = document[MODEL_TAP_HOLDS]
 	if section ~= nil and not is_table(section) then
 		notes[#notes + 1] = { path = MODEL_TAP_HOLDS, detail = "it must be a table; the neutral settings are used" }
@@ -760,6 +773,8 @@ local function config_leaves(model, ctx, is_table)
 	local function put(section, key, value)
 		if value ~= nil then leaves[section .. LEAF_SEPARATOR .. key] = { section = section, key = key, value = value } end
 	end
+	local categories = model[MODEL_CATEGORIES]
+	if is_table(categories) then put(MODEL_CATEGORIES, MASTER_LEAF, categories[MASTER_LEAF]) end
 	local tap_holds = model[MODEL_TAP_HOLDS]
 	if is_table(tap_holds) then
 		for _, leaf in ipairs(SAME_TAP_HOLD_LEAVES) do put(MODEL_TAP_HOLDS, leaf, tap_holds[leaf]) end

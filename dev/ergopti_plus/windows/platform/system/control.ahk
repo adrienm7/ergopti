@@ -4,7 +4,7 @@
 ; MODULE: SystemControl Adapter (AutoHotkey)
 ; DESCRIPTION:
 ; The Win32, COM, registry and shell primitives the system actions
-; (modules/gestures/system_actions.ahk) are built from: start a program, post
+; (gestures/engine/system_actions.ahk) are built from: start a program, post
 ; a window message, broadcast a setting change, read and write a registry
 ; value, probe a registry key, name the script's session (the virtual desktop
 ; actions and the touchpad registry owner use these two), mute the default
@@ -52,6 +52,7 @@ global SYSTEM_CONTROL_FILE_ATTRIBUTE_NORMAL := 0x80
 global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND := 2
 global SYSTEM_CONTROL_ERROR_PATH_NOT_FOUND := 3
 global SYSTEM_CONTROL_ERROR_FILE_EXISTS := 80
+global SYSTEM_CONTROL_ERROR_INVALID_NAME := 123
 ; RegOpenKeyExW: the predefined HKEY_CURRENT_USER handle and the least right
 ; that proves a key exists.
 global SYSTEM_CONTROL_HKEY_CURRENT_USER := 0x80000001
@@ -429,6 +430,25 @@ class SystemControl {
 		return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
 	}
 
+	; The security zone a file's Zone.Identifier stream (its Mark of the Web)
+	; records: 3 for the internet and 4 for an untrusted site are the zones
+	; whose unsigned scripts the RemoteSigned execution policy refuses.
+	; @returns {Integer} The ZoneId, or 0 when the file carries no zone (a
+	;   file system without streams, such as FAT, reports an invalid name).
+	ZoneId(Path) {
+		global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND, SYSTEM_CONTROL_ERROR_INVALID_NAME
+		try Stream := FileOpen(Path . ":Zone.Identifier", "r", "UTF-8")
+		catch OSError as Err {
+			if (Err.Number = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND
+					|| Err.Number = SYSTEM_CONTROL_ERROR_INVALID_NAME)
+				return 0
+			throw
+		}
+		try Text := Stream.Read(4096)
+		finally Stream.Close()
+		return RegExMatch(Text, "im)^ZoneId=(\d+)\s*$", &Match) ? Integer(Match[1]) : 0
+	}
+
 	; Creates an empty file only when no file has that name.
 	; @returns {String} "created", "exists" or "failed".
 	CreateNewFile(Path) {
@@ -631,7 +651,7 @@ class SystemControl {
 		MouseMove(X, Y, 0)
 	}
 
-	; Empties the clipboard through the clipboard owner (adapters/clipboard.ahk),
+	; Empties the clipboard through the clipboard owner (clipboard/adapters/clipboard.ahk),
 	; which records the change as the driver's own: the keystats then retires
 	; the last copy's provenance instead of logging a user copy.
 	; @returns {Boolean} False when the clipboard could not be written.
@@ -647,7 +667,7 @@ class SystemControl {
 
 	; Shows a short notice.
 	Notify(Text) {
-		TrayTip(Text, "ErgoptiPlus", "Iconi Mute")
+		NotifierSend(Text, 0)
 	}
 
 	; Asks OK/Cancel with Cancel as the default button.

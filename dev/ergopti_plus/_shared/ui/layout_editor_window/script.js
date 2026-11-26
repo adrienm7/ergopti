@@ -15,7 +15,12 @@
 // Ergopti Studio reads the user's own typing with keystats_ngrams: the host
 // answers keystatsNgrams with the counts of the local keystats store
 // (_shared/metrics/engine/view/studio_ngrams.lua), read only and never sent
-// anywhere; the page asks only when the user clicks « Analyse my typing ».
+// anywhere; the page reads it once when the window opens (« My typing » is the
+// app's default corpus) and again on « Analyse my typing ».
+// The drivers' « Navigation layer » entries open this window on the source's
+// navigation layer: the host calls studioNav({text, hold}) with the user's
+// layers.toml and the key whose hold enters the layer, before or after the
+// editor is mounted.
 // The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
 // bundle) are built here, offline, with the export data the app ships
 // (layout_editor/_generated/export_assets.js); source_export hands their bytes
@@ -47,16 +52,31 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'studio_layout_remove',
 	'studio_corpus',
 	'studio_profile_load',
-	'studio_profile_save'
+	'studio_profile_save',
+	'studio_workspace_load',
+	'studio_workspace_save',
+	'lua_export'
 ]);
 
 // Locale strings: the catalogue macOS and Linux seed as window._i18n_strings,
 // overlaid by the strings the host pushes with initData.
 let _strings = {};
+// The start source the editor copies when the host has no saved source (the
+// registry id of Ergopti, from the host's composer sources).
+const ERGOPTI_START = 'ergopti';
 // Last state pushed by the host (the editor reads its platform).
 let _state = null;
 
 const _post = makeHostBridge('layout_editor_window_bridge');
+
+// The Studio speaks the interface language: a screen reader picks its voice
+// from the root lang (WCAG 3.1.1), which index.html declares as fr, and the
+// Comparer's numbers fall back on it. Every host seeds window._i18n_locale
+// before this script runs (LTP-02).
+if (typeof window._i18n_locale === 'string' && window._i18n_locale !== '')
+	window.setPageLocale(window._i18n_locale);
+else
+	console.error('layout editor window: no window._i18n_locale seeded; the page language stays fr');
 
 /**
  * Whether a locale key has a translation.
@@ -68,6 +88,20 @@ function hasString(key) {
 }
 
 /**
+ * Writes a translated label, keeping the element's decorative icon: the
+ * Studio's name and its tabs carry their svg mark beside their text, with no
+ * wrapper element around the text alone.
+ * @param {Element} el
+ * @param {string} text
+ */
+function setLabel(el, text) {
+	const icon = el.firstElementChild;
+	if (icon && icon.tagName.toLowerCase() === 'svg' && icon.getAttribute('aria-hidden') === 'true')
+		el.replaceChildren(icon, text);
+	else el.textContent = text;
+}
+
+/**
  * Applies translations to every element carrying data-i18n, and to the
  * placeholders and options the Comparer's markup names (as i18n.js does).
  */
@@ -76,7 +110,7 @@ function applyDomStrings() {
 		const key = el.getAttribute('data-i18n');
 		if (!hasString(key)) return;
 		if (el.tagName === 'TITLE') document.title = _strings[key];
-		else el.textContent = _strings[key];
+		else setLabel(el, _strings[key]);
 	});
 	document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
 		const key = el.getAttribute('data-i18n-placeholder');
@@ -118,8 +152,12 @@ let _hostAppliesNav = false;
 let _hostPicks = false;
 // Whether the host emulates a source without installing it (composer_emulate), from initData.
 let _hostEmulates = false;
+// Whether the host runs the downloads' export adapter with its own Lua (lua_export), from initData.
+let _hostLuaExport = false;
 // Whether the host writes the editor's downloads to the Downloads folder (source_export), from initData.
 let _hostExports = false;
+// Whether the host keeps the editor's tabs in the user's data folder (studio_workspace_*), from initData.
+let _hostWorkspace = false;
 
 /**
  * Called by the host once the page is ready: strings, capabilities and state.
@@ -139,7 +177,15 @@ window.initData = function (data) {
 	_hostAppliesNav = data.nav_apply === true;
 	_hostEmulates = data.emulate === true;
 	_hostExports = data.source_export === true;
-	showKeystatsSource(data.keystats === true);
+	_hostLuaExport = data.lua_export === true;
+	_hostWorkspace = data.studio_workspace === true;
+	// « My typing » is the app's default corpus (maintainer, 2026-11-14): the
+	// window reads the local store once when it opens, as the button does; the
+	// counts stay in this window, as the bar's privacy line says.
+	if (data.keystats === true && !_keystatsOpened) {
+		_keystatsOpened = true;
+		loadKeystats(true);
+	}
 	settleStudioStore(data.studio_store === true);
 	window.updateState(data.state);
 };
@@ -336,11 +382,41 @@ window.exportResult = function (result) {
 		});
 };
 
-/** What the XKB and KLC downloads run, built once from the data this page loads. */
+/**
+ * What the XKB and KLC downloads run, built once from the data this page loads.
+ * The macOS and Linux windows refuse the page's fengari VM (no 'unsafe-eval'):
+ * their host runs the shared export adapter with its own Lua (lua_export,
+ * answered by luaExportResult), and so does Windows once its build ships the export
+ * step executable; a Windows build without it keeps fengari.
+ */
 function hostExportAssets() {
-	_exportAssets =
-		_exportAssets || LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator);
+	if (_exportAssets) return _exportAssets;
+	_exportAssets = _hostLuaExport
+		? {
+				lua: { call: hostLuaStep },
+				keysyms: LayoutExportAssetData.keysyms,
+				template: LayoutExportAssetData.template,
+				types: LayoutExportAssetData.types,
+				generator: LayoutKlcGenerator
+			}
+		: LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator);
 	return _exportAssets;
+}
+
+/**
+ * Runs one step of the export adapter in the host, as LayoutLuaRunner's call
+ * does in the page: the input crosses as JSON text, the result comes back as
+ * the shared json module's encoding.
+ * @param {'read'|'xkb'} step
+ * @param {object} input
+ * @returns {Promise<object>}
+ */
+function hostLuaStep(step, input) {
+	return studioRequest('lua_export', { step: step, input: JSON.stringify(input) }).then(
+		function (result) {
+			return JSON.parse(result.output);
+		}
+	);
 }
 
 /** Opens a file in the host's native panel; settles on sourcePicked. */
@@ -374,6 +450,32 @@ window.sourcePicked = function (data) {
  * The first one mounts the editor; a later one (the menu asked again) opens it.
  * @param {Object} data
  */
+// The navigation layer the host asked to show before the editor was mounted.
+let _pendingNavShow = null;
+
+/**
+ * Called by the host to show the navigation layer: { text, hold }, where text
+ * is the user's layers.toml (or the shipped one) and hold the registry code
+ * of the key whose hold enters the layer, null when unknown.
+ * @param {Object} nav
+ */
+window.studioNav = function (nav) {
+	if (!nav || typeof nav !== 'object') return;
+	// The layer is shown in the editor: a Studio left on another tab comes back.
+	showTab('edit');
+	if (_editor) _editor.showNav(nav);
+	else _pendingNavShow = nav;
+};
+
+/**
+ * Called by the host to show one tab: « Create or edit a layout… » and the
+ * layout manager's « Layout editor » bring an open Studio back to « edit ».
+ * @param {string} tab 'edit', 'compare' or 'optimize'.
+ */
+window.studioTab = function (tab) {
+	if (tab === 'edit' || tab === 'compare' || tab === 'optimize') showTab(tab);
+};
+
 window.sourceData = function (data) {
 	const initial = data && typeof data.text === 'string' ? data.text : null;
 	// A host that does not seed window._i18n_strings (Windows) sends the editor's strings here.
@@ -392,11 +494,24 @@ window.sourceData = function (data) {
 		applyNav: _hostAppliesNav ? hostApplyNav : null,
 		saveBinary: _hostExports ? hostSaveBinary : null,
 		exportAssets: _hostExports ? hostExportAssets : null,
+		workspace: _hostWorkspace ? hostWorkspace : null,
+		startNav: _pendingNavShow,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
-		// The editor is the whole window: leaving it closes the window.
+		// No saved source yet: the Studio opens on a copy of Ergopti rather than an
+		// empty keyboard (maintainer, 2026-11-15); the user's own layout, once saved,
+		// is what the host sends next time.
+		startFrom: initial === null ? ERGOPTI_START : null,
+		// « Compare with other layouts »: the Comparer ranks the edited layout
+		// against the layouts ticked there, on its chosen corpus.
+		compare: compareEdited,
+		// « Optimize this layout »: the Optimiser starts from the edited layout.
+		optimize: optimizeEdited,
+		// The editor is the whole window: leaving it closes the window, after the
+		// tabs' last edits (the host answers the messages in order).
 		onClose: function () {
+			_editor.flushAutosave();
 			send('close');
 		}
 	});
@@ -428,6 +543,10 @@ window.sourceResult = function (result) {
 // trigrams, total}); the Studio analysis reads them from here.
 let _keystatsNgrams = null;
 let _keystatsPending = false;
+// Whether the pending read is the one the window makes when it opens.
+let _keystatsAutomatic = false;
+// Whether that read was made: initData may come again (a reload).
+let _keystatsOpened = false;
 
 // The message of each refusal code the hosts send (metrics/engine/view/studio_ngrams.lua
 // CODES); an unknown code reads as unreadable, never as an empty success.
@@ -452,30 +571,26 @@ function tr(key) {
 }
 
 /**
- * Shows the « My typing » bar when the host reads keystats.
- * @param {boolean} offered
+ * Tells the Comparer how the read of « My typing » stands: it lists the corpus
+ * first at once, greyed while the read runs or when it cannot be made.
+ * @param {string} state 'loading', 'failed' or 'absent' (no keystats store yet).
+ * @param {string} [reason] The translated refusal, shown on the greyed corpus.
  */
-function showKeystatsSource(offered) {
-	document.getElementById('studio-keystats').hidden = !offered;
+function announceKeystats(state, reason) {
+	document.dispatchEvent(
+		new CustomEvent('studio-ngrams-state', { detail: { state: state, reason: reason || '' } })
+	);
 }
 
 /**
- * Writes the bar's status line.
- * @param {string} text
- * @param {boolean} [error]
+ * Asks the host for the user's n-grams, once at a time.
+ * @param {boolean} [automatic] - The read the window makes when it opens.
  */
-function setKeystatsStatus(text, error) {
-	const status = document.getElementById('studio-keystats-status');
-	status.textContent = text;
-	status.classList.toggle('error', error === true);
-}
-
-/** Asks the host for the user's n-grams, once at a time. */
-function loadKeystats() {
+function loadKeystats(automatic) {
 	if (_keystatsPending) return;
 	_keystatsPending = true;
-	document.getElementById('studio-keystats-load').disabled = true;
-	setKeystatsStatus(tr('layout_editor.studio.keystats.loading'));
+	_keystatsAutomatic = automatic === true;
+	announceKeystats('loading');
 	send('keystats_ngrams');
 }
 
@@ -486,24 +601,40 @@ function loadKeystats() {
  */
 window.keystatsNgrams = function (result) {
 	_keystatsPending = false;
-	document.getElementById('studio-keystats-load').disabled = false;
 	const ngrams = result && result.ok === true ? result.ngrams : null;
 	if (!ngrams || typeof ngrams !== 'object' || typeof ngrams.chars !== 'object') {
 		const code = result && typeof result.code === 'string' ? result.code : '';
 		const key = Object.prototype.hasOwnProperty.call(KEYSTATS_REFUSALS, code)
 			? KEYSTATS_REFUSALS[code]
 			: KEYSTATS_REFUSALS.keystats_unreadable;
-		setKeystatsStatus(tr(key), true);
+		// No store yet is not a failure of the read the window makes by itself:
+		// the built-in corpus stays chosen and « My typing » is not offered.
+		announceKeystats(
+			_keystatsAutomatic && code === 'keystats_absent' ? 'absent' : 'failed',
+			tr(key)
+		);
 		return;
 	}
-	_keystatsNgrams = ngrams;
-	setKeystatsStatus(
-		tr('layout_editor.studio.keystats.loaded', Math.round(ngrams.total || 0).toLocaleString())
-	);
-	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
+	// The store keeps keys, not text: [BS], the arrows and Escape are left out
+	// here, once, and the tables are checked before any tab reads them, so a
+	// table the engine refuses never reaches a panel that mounts on it (the
+	// editor's panel did, and « Éditer » stayed empty).
+	let tables;
+	try {
+		tables = LAYOUT_ANALYSIS.ngramsFromKeystats(ngrams, key_tokens);
+		LAYOUT_ANALYSIS.prepareNgrams(tables);
+		if (tables.final !== undefined) LAYOUT_ANALYSIS.prepareNgrams(tables.final);
+	} catch (error) {
+		// Refused like an unreadable store: the tables already shown stay.
+		announceKeystats(
+			'failed',
+			tr(KEYSTATS_REFUSALS.keystats_unreadable) + ' (' + error.message + ')'
+		);
+		return;
+	}
+	_keystatsNgrams = tables;
+	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: tables }));
 };
-
-document.getElementById('studio-keystats-load').addEventListener('click', loadKeystats);
 
 // The analysis panels (_shared/ui/layout_analysis) open their « i » links
 // through the host, in the system browser, instead of a WebView tab. The
@@ -511,6 +642,23 @@ document.getElementById('studio-keystats-load').addEventListener('click', loadKe
 window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 	openLink: function (url) {
 		send('open_link', { url: String(url) });
+	},
+	// The Comparer's score settings export: the editor's download path
+	// (source_export, the Downloads folder on Windows, macOS and Linux), since
+	// a WebView keeps no browser download. Settles on the file's path.
+	saveFile: function (filename, text) {
+		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
+		return hostSaveBinary(filename, new TextEncoder().encode(text));
+	},
+	// The keyboard and heatmap images (board_image.js), PNG or SVG bytes: the
+	// same download path. Settles on the file's path.
+	saveBinary: function (filename, bytes) {
+		if (!_hostExports) return Promise.reject({ code: 'host_save_failed', path: filename });
+		return hostSaveBinary(filename, bytes);
+	},
+	// « Edit » on a ranking row: a copy of the layout in a new tab of « Éditer ».
+	openEditor: function (layout) {
+		editOptimized(layout);
 	}
 });
 
@@ -558,6 +706,12 @@ window.studioLayouts = settleStudio;
 window.studioLayoutResult = settleStudio;
 /** Called by the host once a built-in corpus's tables ran in the page: { request, ok, code, detail }. */
 window.studioCorpus = settleStudio;
+/** Called by the host with one export step's result: { request, ok, output | code, detail }. */
+window.luaExportResult = settleStudio;
+/** Called by the host with the editor's tabs: { request, ok, workspace: json text | absent }. */
+window.studioWorkspace = settleStudio;
+/** Called by the host once the editor's tabs are saved: { request, ok, code, detail }. */
+window.studioWorkspaceResult = settleStudio;
 /** Called by the host with the fingering profile: { request, ok, profile: json text | absent }. */
 window.studioProfile = settleStudio;
 /** Called by the host once the fingering profile is saved or reset: { request, ok, code, detail }. */
@@ -635,6 +789,20 @@ Object.assign(window.LAYOUT_ANALYSIS_HOST, {
 	}
 });
 
+// The editor's tabs and their unsaved edits, kept in the user's data folder
+// (studio_store.lua, StudioStore_Workspace*) so a reload or a crash restores
+// them; LayoutEditorWorkspace owns the text.
+const hostWorkspace = Object.freeze({
+	load: function () {
+		return studioRequest('studio_workspace_load').then(function (result) {
+			return typeof result.workspace === 'string' ? result.workspace : null;
+		});
+	},
+	save: function (text) {
+		return studioRequest('studio_workspace_save', { text: text }).then(function () {});
+	}
+});
+
 // ========================================
 // ========================================
 // ======= 6/ Tabs ========================
@@ -645,18 +813,54 @@ Object.assign(window.LAYOUT_ANALYSIS_HOST, {
 // costs no analysis; « My typing » loaded before then waits for the mount
 // (comparer_page.js).
 let _comparerMounted = false;
+// The optimizer mounts the same way; it runs its search on the page, in short
+// slices, where the host inlines the scripts (no URL to start a worker from).
+let _optimizerMounted = false;
+// The mounted optimizer (LAYOUT_OPTIMIZER_PAGE.mount), once its tab has opened.
+let _optimizer = null;
+// The Studio's tabs in their order on the menu bar.
+const STUDIO_TABS = ['edit', 'compare', 'optimize'];
 
 /**
- * Shows one of the two tabs.
- * @param {'edit'|'compare'} tab
+ * Shows one of the three tabs.
+ * @param {'edit'|'compare'|'optimize'} tab
  */
 function showTab(tab) {
 	const compare = tab === 'compare';
+	const optimize = tab === 'optimize';
 	const comparer = document.getElementById('studio-comparer');
-	document.getElementById('studio-tab-edit').setAttribute('aria-selected', String(!compare));
-	document.getElementById('studio-tab-compare').setAttribute('aria-selected', String(compare));
-	document.getElementById('layout-editor').hidden = compare;
+	const optimizer = document.getElementById('studio-optimizer');
+	// One tab in the Tab order, the chosen one (the ARIA tabs pattern).
+	for (const id of STUDIO_TABS) {
+		const button = document.getElementById('studio-tab-' + id);
+		button.setAttribute('aria-selected', String(id === tab));
+		button.tabIndex = id === tab ? 0 : -1;
+	}
+	document.getElementById('layout-editor').hidden = tab !== 'edit';
 	comparer.hidden = !compare;
+	optimizer.hidden = !optimize;
+	if (optimize) {
+		// One keyboard format for every tab: the optimizer reads the shared one.
+		if (_editor) window.LAYOUT_ANALYSIS_FILES.saveFormat(_editor.format());
+		if (!_optimizerMounted) {
+			_optimizerMounted = true;
+			_optimizer = window.LAYOUT_OPTIMIZER_PAGE.mount(optimizer, {
+				host: {
+					openEditor: editOptimized,
+					openComparer: compareEdited,
+					openScoreSettings: showScoreSettings,
+					// « Get it »: « Éditer » downloads, installs or emulates the
+					// optimized layout through this window's own host actions.
+					exportLayout: editOptimized,
+					// Read when the result is drawn: initData may come after the mount.
+					emulates: function () {
+						return _hostEmulates;
+					}
+				}
+			});
+		}
+		return;
+	}
 	if (!compare) return;
 	if (!_comparerMounted) {
 		_comparerMounted = true;
@@ -665,14 +869,83 @@ function showTab(tab) {
 		// Its charts lay out again once visible.
 		window.dispatchEvent(new Event('resize'));
 	}
+	// One keyboard format for both tabs: the editor's « Format » is the Comparer's.
+	if (_editor) window.LAYOUT_ANALYSIS_COMPARER.setFormat(_editor.format());
+}
+
+/**
+ * Shows the edited layout in « Comparer », ticked beside the layouts already
+ * chosen there; it is not stored with the personal layouts.
+ * @param {Object} layout - The analysis panel's layout (library shape).
+ */
+function compareEdited(layout) {
+	showTab('compare');
+	window.LAYOUT_ANALYSIS_COMPARER.compare([layout]);
+}
+
+/**
+ * Opens « Optimiser » on the edited layout as its start: the editor's
+ * « Optimize this layout ».
+ * @param {Object} layout - The editor's published layout (its editor_… id).
+ */
+function optimizeEdited(layout) {
+	showTab('optimize');
+	_optimizer.setStart(layout.id);
+}
+
+/**
+ * Shows the Comparer's « Réglages du score » unfolded: the optimizer's
+ * « Edit in Compare » (one set of score settings for every Studio score).
+ */
+function showScoreSettings() {
+	showTab('compare');
+	const settings = document.getElementById('la-settings');
+	if (!settings) throw new Error('layout_editor_window: the Comparer has no score settings');
+	// They sit in the Comparer's « Home » tab, which its button opens.
+	const home = document.getElementById('la-tab-home');
+	if (!home) throw new Error('layout_editor_window: the Comparer has no « Home » tab');
+	if (home.getAttribute('aria-selected') !== 'true') home.click();
+	settings.open = true;
+	settings.scrollIntoView({ block: 'start' });
 }
 
 document.getElementById('studio-tab-edit').addEventListener('click', function () {
 	showTab('edit');
 });
+/**
+ * Opens the optimizer's layout in « Éditer », in a new tab of the editor and,
+ * given an intent (the optimizer's « get it »), downloads, installs or
+ * emulates it from the editor's « Export » tool (LayoutEditorPage openLayout).
+ * @param {Object} layout - Library shape.
+ * @param {Object} [intent] - {action: 'download'|'install'|'emulate', format?}.
+ */
+function editOptimized(layout, intent) {
+	showTab('edit');
+	if (!_editor) throw new Error('layout_editor_window: the editor is not mounted');
+	_editor.openLayout(layout, intent);
+}
+
 document.getElementById('studio-tab-compare').addEventListener('click', function () {
 	showTab('compare');
 });
+document.getElementById('studio-tab-optimize').addEventListener('click', function () {
+	showTab('optimize');
+});
+// Arrows, Home and End move between the Studio's tabs (the ARIA tabs pattern).
+for (const id of STUDIO_TABS)
+	document.getElementById('studio-tab-' + id).addEventListener('keydown', function (event) {
+		const at = STUDIO_TABS.indexOf(id);
+		const next = {
+			ArrowRight: STUDIO_TABS[(at + 1) % STUDIO_TABS.length],
+			ArrowLeft: STUDIO_TABS[(at - 1 + STUDIO_TABS.length) % STUDIO_TABS.length],
+			Home: STUDIO_TABS[0],
+			End: STUDIO_TABS[STUDIO_TABS.length - 1]
+		}[event.key];
+		if (!next) return;
+		event.preventDefault();
+		showTab(next);
+		document.getElementById('studio-tab-' + next).focus();
+	});
 
 // ========================================
 // ========================================

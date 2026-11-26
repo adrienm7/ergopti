@@ -170,6 +170,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_path" })
 	Items.Push({ Kind: "action", Id: "run_program" })
 	Items.Push({ Kind: "action", Id: "run_command" })
+	Items.Push({ Kind: "action", Id: "run_workflow" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -197,7 +198,6 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
 	Items.Push({ Kind: "action", Id: "toggle_capslock" })
-	Items.Push({ Kind: "action", Id: "microsoft_bold" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.tapholds" })
 	Items.Push({ Kind: "action", Id: "one_shot_shift" })
 	Items.Push({ Kind: "action", Id: "caps_word" })
@@ -327,7 +327,6 @@ GestureActionCatalogueData() {
 	Actions["lock_screen"] := { Family: "sg", LabelKey: "sg_actions.lock_screen", Parameter: "", Confirm: false }
 	Actions["maximize"] := { Family: "sg", LabelKey: "sg_actions.maximize", Parameter: "", Confirm: false }
 	Actions["mic_mute_toggle"] := { Family: "sg", LabelKey: "sg_actions.mic_mute_toggle", Parameter: "", Confirm: false }
-	Actions["microsoft_bold"] := { Family: "sg", LabelKey: "sg_actions.microsoft_bold", Parameter: "", Confirm: false }
 	Actions["minimize_all"] := { Family: "sg", LabelKey: "sg_actions.minimize_all", Parameter: "", Confirm: false }
 	Actions["mute"] := { Family: "sg", LabelKey: "sg_actions.mute", Parameter: "", Confirm: false }
 	Actions["nav_back"] := { Family: "sg", LabelKey: "sg_actions.nav_back", Parameter: "", Confirm: false }
@@ -379,6 +378,7 @@ GestureActionCatalogueData() {
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
 	Actions["run_command"] := { Family: "sg", LabelKey: "sg_actions.run_command", Parameter: "command", Confirm: false }
 	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
+	Actions["run_workflow"] := { Family: "sg", LabelKey: "sg_actions.run_workflow", Parameter: "workflow", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
 	Actions["screen_record"] := { Family: "sg", LabelKey: "sg_actions.screen_record", Parameter: "", Confirm: false }

@@ -24,6 +24,7 @@ local OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	"wpm_menubar",
 	"wpm_widget",
 	"remap_onboarding",
@@ -46,6 +47,7 @@ local REVERSIBLE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
+	"local_discovery",
 	"wpm_menubar",
 	"wpm_widget",
 }
@@ -140,8 +142,8 @@ local function load_inventory_context(options)
 		RETURN = 36,
 		ESCAPE = 53,
 	}
-	package.loaded["modules.gestures.engine"] = options.gesture_engine or {}
-	package.loaded["modules.gestures.actions"] = options.gesture_actions or {
+	package.loaded["gestures.engine.engine"] = options.gesture_engine or {}
+	package.loaded["gestures.engine.actions"] = options.gesture_actions or {
 		get_label = function(name) return name end,
 		execute_single = function() return true end,
 		SG_NAMES = { "none", "script_pause_toggle" },
@@ -174,22 +176,24 @@ local function load_inventory_context(options)
 		every = function() return { kind = "watchdog" }, true end,
 		cancel = function() return true end,
 	}
-	package.loaded["modules.llm.api_mlx"] = {
+	package.loaded["ai.engine.api.mlx"] = {
 		pause_warmup = invoke("mlx_warmup", "pause"),
 		stop_warmup = invoke("mlx_warmup", "pause"),
 		resume_warmup = invoke("mlx_warmup", "resume"),
 	}
-	package.loaded["modules.llm.warmup_controller"] = {
+	package.loaded["ai.engine.local_servers.warmup_controller"] = {
 		pause_warmup = invoke("warmup_controller", "pause"),
 		resume_warmup = invoke("warmup_controller", "resume"),
 	}
-	package.loaded["modules.llm.api_ollama"] = options.ollama or {
+	package.loaded["ai.engine.api.ollama"] = options.ollama or {
 		pause_warmup = invoke("ollama_warmup", "pause"),
 		resume_warmup = invoke("ollama_warmup", "resume"),
 	}
-	package.loaded["modules.llm.api_remote"] = options.remote or {
+	package.loaded["ai.engine.api.remote"] = options.remote or {
 		pause_warmup = invoke("remote_warmup", "pause"),
 		resume_warmup = invoke("remote_warmup", "resume"),
+		pause_local_discovery = invoke("local_discovery", "pause"),
+		resume_local_discovery = invoke("local_discovery", "resume"),
 	}
 	package.loaded["ui.wpm.wpm_menubar"] = {
 		is_running = function() return ctx.active.wpm_menubar end,

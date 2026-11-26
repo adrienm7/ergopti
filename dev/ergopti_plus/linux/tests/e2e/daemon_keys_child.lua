@@ -28,9 +28,6 @@
 --- ==============================================================================
 
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
-local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
-local TAP_COLLISION = MAGIC_REPEAT:match("^tap%-") ~= nil
-if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/hotstrings/data/catalogue/magickey.toml" end
 -- The autocorrection scenarios type against the shipped common sections.
 if (os.getenv("ERGOPTI_E2E_AUTOCORRECT") or "none") ~= "none" then
 	CONFIG = "../_shared/hotstrings/data/catalogue"
@@ -106,11 +103,11 @@ local function with_cascade(content)
 	end
 	return content
 end
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none"
+if TAP_WRAP ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none"
 	or AUTOCORRECT ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local original = Paths.config
 	-- Named config.toml in a folder of its own: the tap-hold import checks the
 	-- file it reads [mod_combos] from is the driver's config.toml by name.
@@ -169,8 +166,6 @@ end
 -- Controlled character codes stay inside the actual Writer's evdev range.
 -- Control keys used by this fixture are below 256; these slots are disjoint.
 local screen, code_of, char_of, next_code = {}, {}, {}, 256
-local repeat_state = { reads = 0, attempts = 0, dispatched = 0, origins = 0, decisions = 0,
-	raw = 0, group = 0, origin_name = "fixture keyboard", compose_failed = false }
 local function code_for(c)
 	if not code_of[c] then
 		assert(next_code <= 767, "controlled character fixture exhausted its evdev slots")
@@ -186,7 +181,7 @@ package.preload["adapters.keyboard_layout"] = function()
 	return require("tests.support.layout_cohort_fixture").layout(code_for)
 end
 
-local scripted_writer, injected_refusal = nil, false
+local scripted_writer = nil
 local callbacks = {}
 local queued_during_output = false
 local ai_characters = {}
@@ -194,10 +189,6 @@ package.preload["platform.input.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
 		on_emit = function(code, value)
-			if MAGIC_REPEAT ~= "none" and value == 1 and char_of[code] == "★" then
-				repeat_state.attempts = repeat_state.attempts + 1
-				if MAGIC_REPEAT == "injection" and repeat_state.attempts == 2 then injected_refusal = true; return false end
-			end
 			if value == 1 then
 				if code == Codes.KEY_BACKSPACE then table.remove(screen)
 				elseif code == Codes.KEY_ENTER then screen[#screen + 1] = "\n"
@@ -218,11 +209,33 @@ package.preload["platform.input.uinput_writer"] = function()
 	return scripted_writer
 end
 
+-- ERGOPTI_E2E_FIRST_KEY_READS=1: name every source file read while the first
+-- scripted character is handled (its consumption check, then the character).
+-- The typing path's settings and catalogues are read before the first key;
+-- one read there is a decode inside the first keystroke of a slow machine.
+local FIRST_KEY_READS = os.getenv("ERGOPTI_E2E_FIRST_KEY_READS") == "1"
+local first_key_reads = nil
+--- Handles the first character with both file readers observed, then restores
+--- them; installed after start-up, whose config owners verify the readers.
+--- @param handle function The first character's callbacks.
+local function observe_first_key(handle)
+	local Writer = require("core.text.engine.toml_codec.writer")
+	local Files = require("core.fs.adapters.file_system")
+	local read_classified, read_with_status = Writer.read_classified, Files.read_with_status
+	first_key_reads = {}
+	local function note(path) first_key_reads[tostring(path):match("[^/]+$")] = true end
+	Writer.read_classified = function(path, ...) note(path); return read_classified(path, ...) end
+	Files.read_with_status = function(path, ...) note(path); return read_with_status(path, ...) end
+	local ok, failure = pcall(handle)
+	Writer.read_classified, Files.read_with_status = read_classified, read_with_status
+	assert(ok, failure)
+end
+
 local hook = require("platform.input.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
 	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
-		local prediction = require("modules.llm.prediction_engine")
+		local prediction = require("ai.engine.prediction.engine")
 		local original = prediction.on_char
 		prediction.on_char = function(ch, ...)
 			ai_characters[#ai_characters + 1] = ch
@@ -230,12 +243,12 @@ hook.start = function(options)
 		end
 	end
 	if CONFIG:match("[/\\]daemon_keys%.toml$") then
-		local config = require("modules.hotstrings.hotstrings_config")
+		local config = require("hotstrings.engine.catalogue.config")
 		assert(config.set_all_sections("daemon_keys", true), "the scripted catalogue must be explicitly selected")
 	end
 end
 hook.isRunning = function() return true end
-hook.get_mode = function() return MAGIC_REPEAT ~= "none" and "intercept" or "scripted" end
+hook.get_mode = function() return "scripted" end
 hook.held_text_modifier_codes = function() return {} end
 hook.emergency_stop = function(why) print("EMERGENCY STOP: " .. tostring(why)) end
 -- The script is the keyboard: an idle tick of the loop has no device to read.
@@ -272,7 +285,7 @@ end
 
 if MENU_ROWS_FILE then
 	arg[#arg + 1] = "--tray"
-	package.preload["platform.tray.appindicator"] = function()
+	package.preload["tray.adapters.appindicator"] = function()
 		local function count(items)
 			local n = 0
 			for _, item in ipairs(items or {}) do
@@ -306,15 +319,15 @@ end
 -- engine, which the demo configuration loads: its cancel path runs on every
 -- Backspace and once wiped the hotstring buffer.
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
-for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
-	"ui.menu.builder", "modules.updater.manager",
-	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
+for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "tray.adapters.menu",
+	"menu.ui.builder.builder", "modules.updater.manager",
+	"gestures.engine.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
 	"core.ui.ui.webview_manager",
-	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "platform.system.notifier" }) do
+	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system.system_metrics", "platform.system.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE and not WITH_LLM then
-	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
+	package.preload["ai.engine.prediction.engine"] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE then
 	-- All scripted key scenarios declare an ordinary owned application/window.
@@ -345,7 +358,7 @@ end
 -- Keep the actual empty helper owners: scripted action effects cannot claim
 -- native cleanup by omitting the manager's stop and settled protocols.
 local function scripted_gestures(ports)
-	local owner = dofile("modules/gestures/manager.lua")
+	local owner = dofile("gestures/engine/manager.lua")
 	for name, value in pairs(ports) do owner[name] = value end
 	return owner
 end
@@ -356,7 +369,7 @@ end
 -- daemon's loop guard once dropped the whole module when the pump failed, and
 -- every tap action died with the reader (gesture-pump-keeps-actions).
 if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
-	package.preload["modules.gestures.manager"] = function()
+	package.preload["gestures.engine.manager"] = function()
 		return scripted_gestures({
 			init = function() return true end,
 			is_enabled = function() return true end,
@@ -370,13 +383,13 @@ if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
 	end
 end
 
-if TAP_WRAP ~= "none" or TAP_COLLISION then
-	local Clipboard = require("adapters.clipboard")
+if TAP_WRAP ~= "none" then
+	local Clipboard = require("clipboard.adapters.clipboard")
 	Clipboard.read_primary = function()
 		selection.reads = selection.reads + 1
 		return true, selection.primary
 	end
-	package.preload["modules.gestures.manager"] = function()
+	package.preload["gestures.engine.manager"] = function()
 		return scripted_gestures({
 			init = function() return true end,
 			is_assignable = function(id) return id == "send_text" end,
@@ -415,40 +428,6 @@ local real_tap_hold_init = TapHold.init
 TapHold.init = function(options)
 	tap_executor = options.execute_action
 	return real_tap_hold_init(options)
-end
-
--- Keep the actual pause and inhibition owners; observe their construction and
--- vary only desktop boundaries while the native reader delivers a held press.
-local repeat_controller, repeat_gate
-if MAGIC_REPEAT ~= "none" then
-	local Actions = require("modules.shortcuts.script_actions")
-	local make_actions = Actions.new
-	Actions.new = function(options)
-		repeat_controller = make_actions(options)
-		return repeat_controller
-	end
-	local Gate = require("platform.input.capture_gate")
-	local make_gate = Gate.new
-	Gate.new = function(options)
-		repeat_gate = make_gate(options)
-		return repeat_gate
-	end
-	local Source = require("modules.hotstrings.magic_key_source")
-	local initialize = Source.init
-	Source.init = function(options)
-		local dispatch = options.dispatch_char
-		options.dispatch_char = function(...)
-			repeat_state.dispatched = repeat_state.dispatched + 1
-			return dispatch(...)
-		end
-		return initialize(options)
-	end
-	local Finder = require("modules.hotstrings.device_finder")
-	Finder.physical_sources = function(paths)
-		repeat_state.origins = repeat_state.origins + 1
-		return { { path = paths[1], physical = MAGIC_REPEAT ~= "untrusted",
-			sysfs = "/fixture/native-keyboard", name = repeat_state.origin_name } }
-	end
 end
 
 -- A focused ordinary text field, conclusively.
@@ -494,118 +473,6 @@ package.preload["core.events.loop"] = function()
 	local function play(loop)
 		-- A settled async observation is published by the next actual daemon tick.
 		loop.onPeriodic()
-		if MAGIC_REPEAT ~= "none" then
-			local Source = require("modules.hotstrings.magic_key_source")
-			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
-				"the real magic-key category must acknowledge activation")
-			local Config = require("modules.hotstrings.hotstrings_config")
-			if not Config.is_section_checked("magickey", "replace") then
-				assert(Config.toggle_section("magickey", "replace"),
-					"the real virtual replacement setting must acknowledge activation")
-			end
-			assert(Config.is_section_enabled("magickey", "replace"),
-				"the real magic replacement must be enabled before source selection")
-			assert(Source.set("KeyJ"), "the real source owner must acknowledge the key")
-			local choice_ok, choice_reason, before_bytes, native = nil, nil, nil, 36
-			if TAP_COLLISION then
-				local Keys = require("modules.shortcuts.tap_keys")
-				local Master = require("modules.shortcuts.manager")
-				assert(Master.set_enabled(MAGIC_REPEAT ~= "tap-off"))
-				assert(Keys.set_action("number_row_left", MAGIC_REPEAT == "tap-none" and "none" or "send_text"))
-				for _, key in ipairs(Keys.keys()) do if key.id == "number_row_left" then native = key.linux end end
-				local file = assert(io.open(selection_config, "rb")); before_bytes = file:read("*a"); file:close()
-				choice_ok, choice_reason = Source.set("Backquote")
-				if MAGIC_REPEAT ~= "tap-choice" and MAGIC_REPEAT ~= "tap-none" then
-					-- Model previously stored/hand-edited conflicting intent through the
-					-- actual preference publication owner, never a guessed live flag.
-					assert(require("infra.hotstring_preferences").set("hotstrings.magic_key_source", "Backquote"))
-				end
-				if MAGIC_REPEAT == "tap-paused" then repeat_controller.toggle_pause() end
-			end
-			local Capture = require("adapters.xkb_capture")
-			local primed, chosen = false, 0
-			-- Count origin publications during this press, excluding boot probes.
-			repeat_state.origins = 0
-			Capture._set_backend({
-				create = function() return {} end,
-				destroy = function() end,
-				source_group = function() return repeat_state.group, 1 end,
-				key_sym = function(_, code) return TAP_COLLISION and code == 37 and 0xffe3 or 0x6a end,
-				key_utf8 = function()
-					if not primed then
-						primed = true
-						hook.physical_source_receipt()
-					end
-					repeat_state.reads = repeat_state.reads + 1
-					if repeat_state.reads == 1 and MAGIC_REPEAT == "compose-first" then
-						repeat_state.compose_failed = true
-					elseif repeat_state.reads == 2 then
-						if MAGIC_REPEAT == "compose-first" then repeat_state.compose_failed = false
-						elseif MAGIC_REPEAT == "paused" then repeat_controller.toggle_pause()
-						elseif MAGIC_REPEAT == "group" then repeat_state.group = 1
-						elseif MAGIC_REPEAT == "source" then assert(Source.set("KeyQ"))
-						elseif MAGIC_REPEAT == "inhibited" then assert(repeat_gate.acquire("repeat-fixture", 1))
-						elseif MAGIC_REPEAT == "origin" then
-							repeat_state.origin_name = "replacement keyboard"
-							hook.physical_source_receipt()
-						elseif MAGIC_REPEAT == "compose" then repeat_state.compose_failed = true end
-					elseif repeat_state.reads == 3 then
-						if MAGIC_REPEAT == "paused" then repeat_controller.toggle_pause()
-						elseif MAGIC_REPEAT == "group" then repeat_state.group = 0
-						elseif MAGIC_REPEAT == "inhibited" then assert(repeat_gate.release("repeat-fixture", 1)) end
-						repeat_state.compose_failed = false
-					end
-					return "j"
-				end,
-				sym_utf8 = function(_, sym) return sym end,
-				update_key = function() end,
-				compose_feed = function() end,
-				compose_status = function() return "nothing" end,
-				compose_reset = function()
-					if repeat_state.compose_failed then error("fixture compose retirement refused") end
-				end,
-			})
-			assert(Capture.load("fixture keymap"))
-			local refused = {}
-			if MAGIC_REPEAT == "capture" or MAGIC_REPEAT == "tap-choice" then
-				assert(Source.capture({ on_chosen = function() chosen = chosen + 1 end,
-					on_refused = function(reason) refused[#refused + 1] = reason end }))
-			end
-			local stream = { { type = 1, code = native, value = 1 }, { type = 1, code = native, value = 2 },
-				{ type = 1, code = native, value = 2 }, { type = 1, code = native, value = 0 } }
-			if MAGIC_REPEAT == "tap-modified" then
-				table.insert(stream, 1, { type = 1, code = 29, value = 1 })
-				stream[#stream + 1] = { type = 1, code = 29, value = 0 }
-			end
-			hook._test_drive(stream, {
-				liveXkb = true,
-				onChar = callbacks.onChar, onKey = callbacks.onKey,
-				onPhysical = callbacks.onPhysical, onHold = callbacks.onHold,
-				onConsume = function(detail)
-					repeat_state.decisions = repeat_state.decisions + 1
-					return callbacks.onConsume(detail)
-				end,
-				onEmitRaw = function()
-					repeat_state.raw = repeat_state.raw + 1
-					return true
-				end,
-			}, true)
-			adapter._run_idle_tick()
-			print(string.format("MAGIC_REPEAT decisions=%d dispatched=%d attempts=%d origins=%d raw=%d chosen=%d",
-				repeat_state.decisions, repeat_state.dispatched, repeat_state.attempts,
-				repeat_state.origins, repeat_state.raw, chosen))
-			if TAP_COLLISION then
-				local file = assert(io.open(selection_config, "rb")); local after_bytes = file:read("*a"); file:close()
-				local Keys = require("modules.shortcuts.tap_keys")
-				print(string.format("TAP_COLLISION choice=%s reason=%s source=%s tap=%s queued=%d executed=%d bytes=%s captured=%s",
-					tostring(choice_ok), tostring(choice_reason), Source.get(), Keys.get_action("number_row_left"),
-					selection.queued, selection.executed, tostring(before_bytes == after_bytes), tostring(refused[1])))
-			end
-			assert(MAGIC_REPEAT == "tap-choice" or #refused == 0, "an unrelated capture must not be refused")
-			final_screen = string.format("SCREEN %q", table.concat(screen))
-			Capture._reset_backend()
-			return
-		end
 		if TAP_WRAP ~= "none" then
 			local Shortcuts = require("modules.shortcuts.manager")
 			assert(Shortcuts.set_enabled(true), "the real shortcut owner must acknowledge activation")
@@ -621,7 +488,7 @@ package.preload["core.events.loop"] = function()
 			local token = SCRIPT:match("^{(%u+)}", i)
 			if token == "ARROWRESETOFF" or token == "ARROWRESETON" then
 				i = i + #token + 2
-				assert(require("modules.hotstrings.word_reset").set_arrow_resets_word(token == "ARROWRESETON"),
+				assert(require("hotstrings.engine.word_reset").set_arrow_resets_word(token == "ARROWRESETON"),
 					"the real word-reset owner must acknowledge the arrow policy")
 			elseif token == "SELECT" then
 				i = i + #token + 2
@@ -679,8 +546,21 @@ package.preload["core.events.loop"] = function()
 				local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)
 				i = i + #c
 				screen[#screen + 1] = c
-				callbacks.onChar(c, 30)
+				if FIRST_KEY_READS and first_key_reads == nil then
+					observe_first_key(function()
+						callbacks.onConsume({ code = 30, char = c, mods = {} })
+						callbacks.onChar(c, 30)
+					end)
+				else
+					callbacks.onChar(c, 30)
+				end
 			end
+		end
+		if FIRST_KEY_READS then
+			local names = {}
+			for name in pairs(first_key_reads or {}) do names[#names + 1] = name end
+			table.sort(names)
+			print(string.format("FIRST_KEY_READS %d %s", #names, #names > 0 and table.concat(names, ",") or "none"))
 		end
 		if TAP_WRAP ~= "none" then
 			print(string.format("TAP_WRAP attempts=%d queued=%d executed=%d reads=%d action=%s binding=%s",
@@ -723,30 +603,7 @@ package.preload["core.events.loop"] = function()
 	return adapter
 end
 
--- Observe an intentional fatal write without swallowing its nonzero exit or
--- claiming that an inconclusive SYN was cleaned up. All ordinary failures escape.
-local system_exit, failure_published = os.exit, false
-local function publish_expected_failure()
-	if MAGIC_REPEAT ~= "injection" or not injected_refusal or not scripted_writer
-		or scripted_writer.has_output_debt() ~= true then return false end
-	assert(repeat_state.attempts == 2 and repeat_state.dispatched == 1, "unexpected injected failure phase")
-	assert(type(final_screen) == "string", "missing physical screen observation")
-	if not failure_published then
-		failure_published = true
-		print(final_screen)
-		print("E2E_EXPECTED_FAILURE injection output_debt=true signals_settled="
-			.. tostring(require("core.lifecycle.engine.shutdown.signal_handlers").is_settled()))
-		io.stdout:flush()
-	end
-	return true
-end
-os.exit = function(code, ...)
-	if code == 1 then pcall(publish_expected_failure) end
-	return system_exit(code, ...)
-end
 local main_ok, main_error = pcall(dofile, "ergopti_hotstrings.lua")
-os.exit = system_exit
-if not main_ok and publish_expected_failure() then system_exit(1) end
 assert(main_ok, main_error)
 
 

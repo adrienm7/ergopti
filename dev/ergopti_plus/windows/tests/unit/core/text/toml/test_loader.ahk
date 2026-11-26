@@ -479,6 +479,61 @@ TestTL_LoadHotstringsMultipleEntries() {
 Test("LoadHotstringsSection: registers all three entries from a three-entry section",
 	TestTL_LoadHotstringsMultipleEntries)
 
+; perf-hotstring-section-index-2026-11-17: each section load scanned its whole
+; file again. The sections of one text are indexed once and the index follows
+; the text: an edited text is indexed again.
+TestTL_SectionIndexFollowsItsText() {
+	Path := "section-index-test-" . A_TickCount
+	Entry := '"{1}" = {{} output = "{2}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false {}}'
+	Text := "[[first]]`r`n" . Format(Entry, "aa", "alpha") . "`r`n"
+		. "[[second]] # a trailing comment still opens the section`r`n"
+		. Format(Entry, "bb", "beta") . "`r`n# " . Format(Entry, "zz", "commented") . "`r`n"
+		. Format(Entry, "cc", "gamma") . "`r`n"
+	First := HotstringsSectionEntries(Path, Text, "first")
+	Second := HotstringsSectionEntries(Path, Text, "second")
+	AssertEqual(1, First.Length, "the first section keeps its own entry")
+	AssertEqual(2, Second.Length, "the second section keeps both live entries in file order")
+	AssertEqual("bb", Second[1].Match[1])
+	AssertEqual("cc", Second[2].Match[1])
+	AssertEqual(0, HotstringsSectionEntries(Path, Text, "absent").Length, "an absent section has no entry")
+	AssertTrue(ObjPtr(Second) == ObjPtr(HotstringsSectionEntries(Path, Text, "second")),
+		"an unchanged text must reuse its index instead of scanning the file again")
+	Edited := StrReplace(Text, '"cc"', '"dd"')
+	Again := HotstringsSectionEntries(Path, Edited, "second")
+	AssertEqual("dd", Again[2].Match[1], "an edited text must be indexed again")
+	AssertEqual("cc", Second[2].Match[1], "an earlier index is never rewritten")
+}
+Test("LoadHotstringsSection: a file's sections are indexed once per text (hotstring-section-index)",
+	TestTL_SectionIndexFollowsItsText)
+
+TestTL_LoadHotstringsSectionsShareOneFile() {
+	TmpPath := A_ScriptDir . "\test_hstr_two_sections.toml"
+	if FileExist(TmpPath)
+		FileDelete(TmpPath)
+	Entry := '"{1}" = {{} output = "{2}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false {}}'
+	FileAppend("[[first]]`r`n" . Format(Entry, "aa", "alpha") . "`r`n" . Format(Entry, "ab", "alef") . "`r`n"
+		. "[[second]]`r`n" . Format(Entry, "bb", "beta") . "`r`n", TmpPath, "UTF-8")
+	global ScriptInformation
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+	try {
+		ResetHotstringRecorders()
+		LoadHotstringsSection("personal", "second", { TimeActivationSeconds: 0 })
+		AssertEqual(1, _Stub_HotstringRegistrations.Length, "the second section alone registers")
+		AssertContains(_Stub_HotstringRegistrations[1].spec, "bb")
+		ResetHotstringRecorders()
+		LoadHotstringsSection("personal", "first", { TimeActivationSeconds: 0 })
+		AssertEqual(2, _Stub_HotstringRegistrations.Length, "the first section of the same file registers after it")
+		AssertContains(_Stub_HotstringRegistrations[1].spec, "aa")
+		AssertContains(_Stub_HotstringRegistrations[2].spec, "ab")
+	} finally {
+		FileDelete(TmpPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+	}
+}
+Test("LoadHotstringsSection: two sections of one file each register their own entries",
+	TestTL_LoadHotstringsSectionsShareOneFile)
+
 TestTL_LoadExtTomlFileUsesCurrentSection() {
 	TmpPath := A_ScriptDir . "\test_ext_loader.toml"
 	if FileExist(TmpPath) {
@@ -1230,15 +1285,19 @@ Test("toml shared parse: malformed input keeps throwing and is not remembered (s
 	_SHP_MalformedSourceThrowsAndIsNotRemembered)
 
 _SHP_MemoIsBounded() {
+	Kept := TOML_SHARED_PARSE_ENTRIES
+	Assert(Kept is Integer && Kept >= 1, "the memo keeps at least one source")
+	Probe := "[shared_probe_d]`nvalue = "
 	Before := _TOML_DocumentParses
-	loop 6
-		TOML_ParseDocumentShared("[shared_probe_d]`nvalue = " A_Index "`n")
-	AssertEqual(Before + 6, _TOML_DocumentParses)
-	; The newest four are remembered, the oldest was dropped.
-	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 6`n")
-	AssertEqual(Before + 6, _TOML_DocumentParses, "the newest source is still remembered")
-	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 1`n")
-	AssertEqual(Before + 7, _TOML_DocumentParses, "the oldest source was evicted")
+	loop Kept + 1
+		TOML_ParseDocumentShared(Probe A_Index "`n")
+	AssertEqual(Before + Kept + 1, _TOML_DocumentParses, "each distinct source is parsed once")
+	; The newest TOML_SHARED_PARSE_ENTRIES are remembered, the oldest was dropped.
+	loop Kept
+		TOML_ParseDocumentShared(Probe (A_Index + 1) "`n")
+	AssertEqual(Before + Kept + 1, _TOML_DocumentParses, "every newest source is still remembered")
+	TOML_ParseDocumentShared(Probe 1 "`n")
+	AssertEqual(Before + Kept + 2, _TOML_DocumentParses, "the oldest source was evicted")
 }
 Test("toml shared parse: the memo keeps a bounded number of sources (shared-source-parse)", _SHP_MemoIsBounded)
 
@@ -1256,3 +1315,34 @@ _SHP_DecodeSnapshotSharesOnlyEqualText() {
 }
 Test("toml shared parse: the shared snapshot decode is keyed by text and leaves the private decode alone (shared-source-parse)",
 	_SHP_DecodeSnapshotSharesOnlyEqualText)
+
+; boot-parse-repeats-2026-11-18: a reader of the unchanged config.toml is served
+; the document the boot admitted instead of parsing that text again; any other
+; text, or a retired generation, is parsed as before.
+_SHP_AdmittedConfigDocumentIsReused() {
+	global ConfigurationFile, _ConfigTomlSnapshots, _ParseTomlCache
+	FileWasSet := IsSet(ConfigurationFile), SavedFile := FileWasSet ? ConfigurationFile : ""
+	Path := A_Temp . "\ergopti_shared_probe_admitted_" . A_ScriptHwnd . ".toml"
+	Source := "[shared_probe_f]`nvalue = " . A_TickCount . "`n"
+	Admitted := ConfigTomlDecodeSnapshot(Source)
+	try {
+		ConfigurationFile := Path
+		_ConfigTomlSnapshots[Path] := Admitted
+		_ParseTomlCache[Path] := Admitted.Cache
+		Assert(ConfigTomlSourceDocument(Source . "") == Admitted.Document,
+			"the unchanged text reads the admitted document")
+		Other := ConfigTomlSourceDocument("[shared_probe_f]`nvalue = -1`n")
+		Assert(Other != Admitted.Document, "a changed text is parsed afresh")
+		AssertEqual(-1, Other["shared_probe_f"]["value"])
+		_ParseTomlCache[Path] := Map()
+		Assert(ConfigTomlSourceDocument(Source) != Admitted.Document,
+			"a retired generation no longer serves its document")
+	} finally {
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache]
+			if Store.Has(Path)
+				Store.Delete(Path)
+		ConfigurationFile := FileWasSet ? SavedFile : unset
+	}
+}
+Test("toml shared parse: the admitted config.toml document serves its unchanged text (shared-source-parse)",
+	_SHP_AdmittedConfigDocumentIsReused)

@@ -6,7 +6,7 @@
 --- The rule the macOS and Linux drivers apply to the four script-management
 --- chords of _shared/shortcuts/data/actions/script_chords.json (AltGr, or the right
 --- Option key on macOS, with Enter, Backspace, Delete or Escape). Windows
---- applies the same rule in infra/config_io.ahk (ScriptShortcutSlotRunsAction);
+--- applies the same rule in settings/engine/io.ahk (ScriptShortcutSlotRunsAction);
 --- tools/test/test-script-chords-three-os.cjs pins the three drivers together.
 ---
 --- FEATURES & RATIONALE:
@@ -17,6 +17,11 @@
 ---    (paused_actions), so a paused driver never fires anything else.
 --- 3. Pure: the caller decodes the JSON and hands its table over; nothing here
 ---    touches a file, a clock or the OS.
+--- 4. The tray shows, beside « Suspendre », « Recharger » and « Quitter », the
+---    chord of the first slot (catalogue order, the Shortcuts submenu's order)
+---    whose chord runs that action (M.hint_slot). Windows mirrors it in
+---    _shared/keyboard/engine/layers/script_chord_hint.ahk; both replay
+---    _shared/tests/corpus/shortcuts/script_chord_hint_vectors.json.
 --- ==============================================================================
 
 local M = {}
@@ -93,6 +98,25 @@ function M.plan(catalogue, assignments, chords_on)
 		if M.runs(catalogue, action, chords_on, true) then plan.paused[slot.id] = true end
 	end
 	return plan
+end
+
+--- The slot whose chord the tray shows beside an action's row: the first slot,
+--- in catalogue order, that holds the action and whose chord runs it. Two slots
+--- holding the same action show the first; none shows no hint.
+--- @param catalogue table From M.catalogue.
+--- @param assignments table Slot id -> action id, the chords a press runs now.
+--- @param chords_on boolean The submenu's switch.
+--- @param action string The action id of the tray row.
+--- @return string|nil slot_id
+function M.hint_slot(catalogue, assignments, chords_on, action)
+	assert(type(assignments) == "table", "script chords: the hint needs the slot assignments")
+	assert(type(action) == "string" and action ~= "" and action ~= "none",
+		"script chords: the hint needs an action id")
+	for _, slot in ipairs(catalogue.slots) do
+		local bound = assignments[slot.id]
+		if bound == action and M.runs(catalogue, bound, chords_on, false) then return slot.id end
+	end
+	return nil
 end
 
 return M

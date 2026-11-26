@@ -5,18 +5,22 @@
 --- DESCRIPTION:
 --- After an update, the first launch printed the Accessibility instructions as
 --- one long single-line banner along the Dock. The wait now shows a native
---- window when another copy of the app signed differently can hold the switch:
---- the localized title, numbered steps naming those copies, "Hammerspoon" and
---- this copy's path, "Open Settings" reopening the exact pane and "Later". It
---- must close itself when the grant poll succeeds, never stack a second copy,
---- and never block or break the boot.
+--- window: the localized title, numbered steps naming ErgoptiPlus and the path
+--- of ErgoptiPlus.app to add with + (never the runtime nested in it, whose
+--- "Hammerspoon" entry alone left a first install untrusted, field report
+--- 2026-11-23), the other copies signed differently when there are some,
+--- "Open Settings" reopening the exact pane and "Later". It must close itself
+--- when the grant poll succeeds, never stack a second copy, and never block or
+--- break the boot.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local ACCESSIBILITY_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
+-- The runtime the process reports, and the app the steps name and quote.
+local RUNTIME_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
+local BUNDLE_PATH = "/Applications/ErgoptiPlus.app"
 local COPIES = { "/Users/me/ergopti/build/macos/ErgoptiPlus.app" }
 
 local MODULES = {
@@ -82,13 +86,19 @@ local function with_dialog(body)
 				h.bridge_name = name
 				return { setCallback = function(self, fn) h.post = fn; return self end }
 			end } },
-			image = { imageFromName = function()
-				return { encodeAsURLString = function() return "data:image/png;base64,AAAA" end }
-			end },
+			image = {
+				imageFromName = function()
+					return { encodeAsURLString = function() return "data:image/png;base64,AAAA" end }
+				end,
+				iconForFile = function(path)
+					h.icon_path = path
+					return { encodeAsURLString = function() return "data:image/png;base64,AAAA" end }
+				end,
+			},
 			screen = { mainScreen = function()
 				return { frame = function() return { x = 0, y = 25, w = 1440, h = 875 } end }
 			end },
-			processInfo = { bundlePath = BUNDLE_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
+			processInfo = { bundlePath = RUNTIME_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
 		})
 		-- load_with_stubs installs its key-echo i18n baseline; the dialog captures
 		-- i18n at require time, so the French fake goes in and the dialog reloads.
@@ -178,7 +188,7 @@ local function with_untrusted_factory(body)
 			screen = { mainScreen = function()
 				return { frame = function() return { x = 0, y = 25, w = 1280, h = 775 } end }
 			end },
-			processInfo = { bundlePath = BUNDLE_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
+			processInfo = { bundlePath = RUNTIME_PATH, bundleID = "com.ergoptiplus.app.hammerspoon" },
 		})
 		h.dialog = require("ui.permission_dialog")
 		h.permission = require("adapters.accessibility_permission")
@@ -197,10 +207,10 @@ end
 helpers.describe("permission dialog (permission-dialog-native)", function()
 	helpers.it("stays at the floating level and never takes focus while untrusted", function()
 		with_untrusted_factory(function(h)
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(h.dialog.is_open("accessibility_copies"), true)
 			h.drain()
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			h.drain()
 			helpers.assert_eq(h.shows, 2, "shown once, then raised within its level")
 			for _, above_all in ipairs(h.fronts) do
@@ -215,7 +225,7 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 
 	helpers.it("shows a native window with the localized title, steps and buttons", function()
 		with_dialog(function(h)
-			local close = h.dialog.name_other_copies(h.permission, COPIES)
+			local close = h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(type(close), "function")
 			helpers.assert_eq(#h.windows, 1, "one window, not a banner")
 			local opts = h.windows[1].opts
@@ -239,9 +249,9 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 				"Later must say how to get the steps back")
 			-- The switch can be the other copy's: the dialog names every one of them.
 			helpers.assert_contains(html, "Quittez ces autres copies et placez-les dans la corbeille : " .. COPIES[1])
-			helpers.assert_contains(html, "Activez « Hammerspoon » dans la liste.")
+			helpers.assert_contains(html, "Activez « ErgoptiPlus » dans la liste.")
 			local _, items = html:gsub("<li>", "")
-			helpers.assert_eq(items, 4, "opened, other copies, toggle, then this copy's path")
+			helpers.assert_eq(items, 4, "opened, other copies, this copy's path, then the toggle")
 			helpers.assert_contains(html, '<html lang="fr" dir="auto">')
 			helpers.assert_contains(html, '<code dir="ltr">' .. BUNDLE_PATH .. "</code>")
 			helpers.assert_contains(html, ">Ouvrir les Réglages</button>")
@@ -252,9 +262,87 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 		end)
 	end)
 
+	-- A first install: macOS's prompt added a "Hammerspoon" entry, turning it on
+	-- did not start the driver, and nothing said to add ErgoptiPlus.app with +
+	-- (field report 2026-11-23, accessibility-steps-name-the-app).
+	helpers.it("walks a lone copy through adding and turning on ErgoptiPlus.app", function()
+		with_dialog(function(h)
+			local close = h.dialog.guide_accessibility(h.permission, {})
+			helpers.assert_eq(type(close), "function")
+			helpers.assert_eq(h.dialog.is_open("accessibility"), true)
+			local opts = h.windows[1].opts
+			helpers.assert_eq(opts.focus, false, "the dialog never takes focus from System Settings")
+			helpers.assert_eq(opts.chrome, "permission_dialog", "shown before the grant, so floating")
+			local html = opts.html_string
+			helpers.assert_contains(html, "<h1>Autoriser ErgoptiPlus à lire le clavier</h1>")
+			helpers.assert_contains(html, "rien à redémarrer ni à recharger",
+				"the user must not look for a reload they do not know about")
+			helpers.assert_contains(html, "(sinon, cliquez sur « Ouvrir les Réglages »)")
+			helpers.assert_contains(html, "Si ErgoptiPlus n’est pas dans la liste, cliquez sur le bouton + sous "
+				.. "la liste, appuyez sur ⌘⇧G, collez <code dir=\"ltr\">" .. BUNDLE_PATH .. "</code>, appuyez sur "
+				.. "Entrée, puis cliquez sur Ouvrir.", "the + step quotes the app the user installed")
+			helpers.assert_contains(html, "Activez l’interrupteur à côté de ErgoptiPlus.")
+			helpers.assert_true(html:find(RUNTIME_PATH, 1, true) == nil,
+				"the runtime nested in the app is not what the user adds")
+			local _, items = html:gsub("<li>", "")
+			helpers.assert_eq(items, 3, "opened, add with +, then the toggle")
+			local add_at = html:find("cliquez sur le bouton +", 1, true)
+			local toggle_at = html:find("Activez l’interrupteur", 1, true)
+			helpers.assert_true(add_at ~= nil and toggle_at ~= nil and add_at < toggle_at,
+				"the app is added before its switch is turned on")
+			helpers.assert_eq(h.icon_path, BUNDLE_PATH, "the icon is the one beside the ErgoptiPlus switch")
+			close()
+			helpers.assert_eq(h.dialog.is_open(), false, "the wait's closer closes the steps")
+		end)
+	end)
+
+	helpers.it("names the app and its path, never the runtime, in every locale", function()
+		local handle = assert(io.popen('ls "' .. helpers.shared("core/i18n/data/locales") .. '"'))
+		local codes = {}
+		for name in handle:lines() do
+			local code = name:match("^(%a%a)%.json$")
+			if code ~= nil then codes[#codes + 1] = code end
+		end
+		handle:close()
+		helpers.assert_eq(#codes, 21, "every shipped locale is checked")
+		for _, code in ipairs(codes) do
+			with_dialog(function(h)
+				h.use_locale(code)
+				for _, kind in ipairs({ "accessibility", "accessibility_copies" }) do
+					local content = h.dialog.content(kind, BUNDLE_PATH, COPIES)
+					local add, toggle = content.steps[#content.steps - 1], content.steps[#content.steps]
+					helpers.assert_contains(add, BUNDLE_PATH, code .. " " .. kind .. ": the + step quotes the app")
+					helpers.assert_contains(add, "ErgoptiPlus", code .. " " .. kind .. ": the + step names the app")
+					helpers.assert_true(add:find("Hammerspoon", 1, true) == nil,
+						code .. " " .. kind .. ": the + step must not send the user to the runtime entry")
+					helpers.assert_true(add:find("+", 1, true) ~= nil and add:find("⌘⇧G", 1, true) ~= nil,
+						code .. " " .. kind .. ": the + step says how to reach the path")
+					helpers.assert_contains(toggle, "ErgoptiPlus", code .. " " .. kind .. ": the switch is ErgoptiPlus's")
+					helpers.assert_true(content.body:find("Hammerspoon", 1, true) == nil,
+						code .. " " .. kind .. ": the body names no runtime the user did not install")
+					helpers.assert_true(not (add .. toggle .. content.body):find("{%d}"),
+						code .. " " .. kind .. ": every placeholder is filled")
+				end
+			end)
+		end
+	end)
+
+	helpers.it("resolves the app to add from the running runtime", function()
+		with_dialog(function(h)
+			helpers.assert_eq(h.permission.grant_app_path(), BUNDLE_PATH,
+				"the launcher bundle, not the Hammerspoon.app nested in it")
+			helpers.assert_eq(h.dialog.app_name(BUNDLE_PATH), "ErgoptiPlus")
+			helpers.assert_eq(require("clipboard.adapters.accessibility_copies").app_path("/Applications/Hammerspoon.app"),
+				"/Applications/Hammerspoon.app", "a runtime that is its own app is named as itself")
+			local ok = pcall(h.dialog.show, { kind = "accessibility", bundle_path = "relative/ErgoptiPlus",
+				open_settings = function() return true end })
+			helpers.assert_eq(ok, false, "a path that names no app bundle is refused")
+		end)
+	end)
+
 	helpers.it("reopens the exact Accessibility pane from Open Settings", function()
 		with_dialog(function(h)
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			h.click("open_settings")
 			helpers.assert_eq(#h.urls, 1)
 			helpers.assert_eq(h.urls[1], ACCESSIBILITY_URL)
@@ -264,7 +352,7 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 
 	helpers.it("closes on Later without stopping anything else", function()
 		with_dialog(function(h)
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			h.click("later")
 			helpers.assert_eq(h.open_count(), 0)
 			helpers.assert_eq(h.dialog.is_open("accessibility_copies"), false)
@@ -274,8 +362,8 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 
 	helpers.it("raises the open dialog instead of stacking a duplicate", function()
 		with_dialog(function(h)
-			h.dialog.name_other_copies(h.permission, COPIES)
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(h.dialog.show({
 				kind = "accessibility_copies", open_settings = h.permission.open_settings, bundle_path = BUNDLE_PATH,
 				copies = COPIES,
@@ -284,7 +372,7 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_eq(h.windows[1].raised, 2, "each repeat raises the existing window")
 			h.windows[1]:delete()
 			helpers.assert_eq(h.dialog.is_open(), false, "the user's close button releases the owner")
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(#h.windows, 2, "a closed dialog can be shown again")
 		end)
 	end)
@@ -292,16 +380,16 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 	helpers.it("never raises into the boot when the window cannot be built", function()
 		with_dialog(function(h)
 			h.factory_error = "WebKit unavailable"
-			local close = h.dialog.name_other_copies(h.permission, COPIES)
+			local close = h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(type(close), "function", "the wait still gets a closer")
 			helpers.assert_eq(h.dialog.is_open(), false, "a failed window leaves no owner behind")
 			close()
-			local no_path = setmetatable({ bundle_path = function() return nil, "absent" end },
+			local no_path = setmetatable({ grant_app_path = function() return nil, "absent" end },
 				{ __index = h.permission })
 			h.factory_error = nil
-			helpers.assert_eq(type(h.dialog.name_other_copies(no_path, COPIES)), "function")
+			helpers.assert_eq(type(h.dialog.guide_accessibility(no_path, COPIES)), "function")
 			helpers.assert_eq(#h.windows, 0, "a dialog that cannot name the app is not shown")
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(#h.windows, 1, "a later request still opens the dialog")
 		end)
 	end)
@@ -320,12 +408,13 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 	helpers.it("escapes translated text and the path in the page", function()
 		with_dialog(function(h)
 			local html = h.dialog.render({
-				locale = "fr", title = "<b>&", body = "\"x\"", steps = { "a", "b", "c /p<q" },
+				locale = "fr", title = "<b>&", body = "\"x\"", steps = { "a /p<q", "b", "c /p<q" }, path_step = 3,
 				open_label = "O", later_label = "L",
 			}, "/p<q", nil)
 			helpers.assert_contains(html, "&lt;b&gt;&amp;")
 			helpers.assert_contains(html, "&quot;x&quot;")
-			helpers.assert_contains(html, "<code dir=\"ltr\">/p&lt;q</code>")
+			helpers.assert_contains(html, "<li>c <code dir=\"ltr\">/p&lt;q</code></li>")
+			helpers.assert_contains(html, "<li>a /p&lt;q</li>", "only the + step sets the path apart")
 			helpers.assert_true(html:find("<b>&", 1, true) == nil)
 		end)
 	end)
@@ -397,7 +486,7 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 			helpers.assert_eq(h.dialog.close("login_items"), true)
 			helpers.assert_eq(closes, 3, "the owner's own close")
 			show()
-			h.dialog.name_other_copies(h.permission, COPIES)
+			h.dialog.guide_accessibility(h.permission, COPIES)
 			helpers.assert_eq(closes, 4, "another permission taking the dialog")
 			helpers.assert_eq(h.dialog.close("accessibility_copies"), true)
 			helpers.assert_eq(closes, 4, "each close is reported once")
@@ -408,11 +497,14 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 		for _, code in ipairs({ "he", "ar" }) do
 			with_dialog(function(h)
 				h.use_locale(code)
-				h.dialog.name_other_copies(h.permission, COPIES)
+				h.dialog.guide_accessibility(h.permission, COPIES)
 				local html = h.windows[1].opts.html_string
 				helpers.assert_contains(html, '<html lang="' .. code .. '" dir="auto">',
 					"the page direction follows the translated text")
 				local title = h.dialog.content("accessibility_copies", BUNDLE_PATH, COPIES).title
+				local lone_lead = h.dialog.content("accessibility", BUNDLE_PATH).title:byte(1)
+				helpers.assert_true(lone_lead >= 0xD6 and lone_lead <= 0xDB,
+					"the " .. code .. " Accessibility title must open with a right-to-left letter too")
 				helpers.assert_contains(html, "<h1>" .. title)
 				-- dir="auto" takes the first strong letter of the page, the title's:
 				-- U+0590..U+06FF (Hebrew, Arabic) start with UTF-8 bytes 0xD6..0xDB.
