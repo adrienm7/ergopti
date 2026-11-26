@@ -144,8 +144,8 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 	end)
 
 	helpers.it("explains every block the owner names, above the consent row, and no other state", function()
-		-- An owned boot with the runtime missing, a user Karabiner left running or a
-		-- failed download had the tap-holds off with no row saying why.
+		-- An owned boot with the runtime missing, a user Karabiner left running, a
+		-- failed download or a refused capture had the tap-holds off with no row saying why.
 		local CONSENT = "menu.tapholds.close_other_karabiner"
 		local function rows_for(status)
 			return tap_hold_rows(true, {
@@ -168,6 +168,8 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 			{ "failed", "close_other_failed", "menu.tapholds.owned_close_failed" },
 			{ "unavailable", "other_karabiner_still_running", "menu.tapholds.owned_close_failed" },
 			{ "unavailable", "artifact_fetch_failed", "menu.tapholds.owned_fetch_failed" },
+			-- v1.0.10 shipped without the capture module: red with no row (capture-refused-row-2026-11-26).
+			{ "failed", "capture_start_refused", "menu.tapholds.owned_capture_refused" },
 		}
 		for _, case in ipairs(expected) do
 			local rows = rows_for({ state = case[1], reason = case[2] })

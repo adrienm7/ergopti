@@ -1967,6 +1967,17 @@
 			"unavailable": "hide"
 		}
 	],
+	"tap_hold_owned_capture_refused_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_capture_refused",
+			"i18n": "menu.tapholds.owned_capture_refused",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"tap_hold_key_rows": [
 		{
 			"type": "include",

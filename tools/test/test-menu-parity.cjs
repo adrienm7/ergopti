@@ -750,6 +750,12 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_owned_capture_refused_rows',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.

@@ -3160,6 +3160,7 @@
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds כבויים: Karabiner אחר פועל; סמנו את השורה שלמטה או סגרו אותו",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds כבויים: לא ניתן היה לסגור את Karabiner-Elements שלכם; סגרו אותו מהסמל שלו בשורת התפריטים",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds כבויים: לא ניתן היה להוריד את מנוע מיפוי המקשים של Ergopti; בדקו את החיבור וטענו מחדש את Ergopti",
+	"menu.tapholds.owned_capture_refused": "⚠️ Tap-holds כבויים: בגרסה זו של Ergopti חסר מודול לכידת המקלדת, או שלא ניתן היה להפעיל אותו; עדכנו את Ergopti או התקינו אותו מחדש",
 	"menu.tapholds.open_login_items": "פתיחת הגדרות פריטי התחברות…",
 	"menu.tapholds.show_login_items_steps": "הצגת השלבים לאישור ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 הגדרות המקלדת נשמרו: הן יחולו ברגע ש-ErgoptiPlus יאושר בפריטי התחברות (לחצו לפתיחת ההגדרות).",

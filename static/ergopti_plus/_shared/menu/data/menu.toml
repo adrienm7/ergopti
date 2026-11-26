@@ -1797,6 +1797,13 @@ i18n = "menu.tapholds.owned_fetch_failed"
 platforms = ["hs"]
 unavailable = "hide"
 
+[[menu.tap_hold_owned_capture_refused_rows]]
+type = "label"
+id = "tap_hold_owned_capture_refused"
+i18n = "menu.tapholds.owned_capture_refused"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.tap_hold_key_rows]]
 type = "include"
 section = "tap_hold_key_head"

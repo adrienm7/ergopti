@@ -3160,6 +3160,7 @@
 	"menu.tapholds.owned_other_running": "⚠️ 点按-按住已关闭：另一个 Karabiner 正在运行；请勾选下方一行或退出它",
 	"menu.tapholds.owned_close_failed": "⚠️ 点按-按住已关闭：无法关闭你的 Karabiner-Elements；请从其菜单栏图标退出",
 	"menu.tapholds.owned_fetch_failed": "⚠️ 点按-按住已关闭：无法下载 Ergopti 的按键重映射引擎；请检查网络连接，然后重新载入 Ergopti",
+	"menu.tapholds.owned_capture_refused": "⚠️ 点按-按住已关闭：此版本的 Ergopti 缺少键盘捕获模块，或该模块无法启动；请更新或重新安装 Ergopti",
 	"menu.tapholds.open_login_items": "打开登录项设置…",
 	"menu.tapholds.show_login_items_steps": "显示允许 ErgoptiPlus 的步骤…",
 	"menu.tapholds.saved_until_guardian": "💾 已保存键盘设置：在登录项中允许 ErgoptiPlus 后即会生效（点击打开设置）。",

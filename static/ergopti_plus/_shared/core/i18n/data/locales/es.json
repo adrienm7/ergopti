@@ -3160,6 +3160,7 @@
 	"menu.tapholds.owned_other_running": "⚠️ Tap-holds desactivados: hay otro Karabiner en ejecución; marca la fila de abajo o ciérralo",
 	"menu.tapholds.owned_close_failed": "⚠️ Tap-holds desactivados: no se pudo cerrar tu Karabiner-Elements; ciérralo desde su icono de la barra de menús",
 	"menu.tapholds.owned_fetch_failed": "⚠️ Tap-holds desactivados: no se pudo descargar el motor de reasignación de Ergopti; comprueba la conexión y recarga Ergopti",
+	"menu.tapholds.owned_capture_refused": "⚠️ Tap-holds desactivados: a esta versión de Ergopti le falta su módulo de captura del teclado o no pudo iniciarse; actualiza o reinstala Ergopti",
 	"menu.tapholds.open_login_items": "Abrir los ajustes de Ítems de inicio…",
 	"menu.tapholds.show_login_items_steps": "Mostrar los pasos para permitir ErgoptiPlus…",
 	"menu.tapholds.saved_until_guardian": "💾 Ajustes del teclado guardados: se aplicarán en cuanto ErgoptiPlus esté permitido en Ítems de inicio (haz clic para abrir los ajustes).",

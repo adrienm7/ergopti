@@ -3160,6 +3160,7 @@
 	"menu.tapholds.owned_other_running": "⚠️ टैप-होल्ड बंद हैं: कोई दूसरा Karabiner चल रहा है; नीचे की पंक्ति चुनें या उसे बंद करें",
 	"menu.tapholds.owned_close_failed": "⚠️ टैप-होल्ड बंद हैं: आपका Karabiner-Elements बंद नहीं हो सका; मेनू बार में उसके आइकन से उसे बंद करें",
 	"menu.tapholds.owned_fetch_failed": "⚠️ टैप-होल्ड बंद हैं: Ergopti का की-रीमैपिंग इंजन डाउनलोड नहीं हो सका; कनेक्शन जाँचें, फिर Ergopti को फिर से लोड करें",
+	"menu.tapholds.owned_capture_refused": "⚠️ टैप-होल्ड बंद हैं: Ergopti के इस संस्करण में कीबोर्ड कैप्चर मॉड्यूल नहीं है या वह शुरू नहीं हो सका; Ergopti को अपडेट करें या फिर से इंस्टॉल करें",
 	"menu.tapholds.open_login_items": "लॉगिन आइटम सेटिंग्स खोलें…",
 	"menu.tapholds.show_login_items_steps": "ErgoptiPlus को अनुमति देने के चरण दिखाएँ…",
 	"menu.tapholds.saved_until_guardian": "💾 कीबोर्ड सेटिंग्स सहेजी गईं: लॉगिन आइटम में ErgoptiPlus को अनुमति मिलते ही वे लागू होंगी (सेटिंग्स खोलने के लिए क्लिक करें)।",
