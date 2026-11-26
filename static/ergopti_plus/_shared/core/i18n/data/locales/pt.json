@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Este corpus é um único texto: as tabelas de n-gramas de um livro não contêm teclas premidas, e os hotstrings não podem ser desfeitos ao nível dos n-gramas. Só «A minha digitação» distingue as teclas premidas do texto final.",
 	"layout_analysis.text_mode.plus_title": "Classificar também {layout}: este layout a digitar as teclas premidas com os hotstrings do Ergopti+",
 	"layout_analysis.plus_typing.label": "Digitado com os atalhos do Ergopti+",
-	"layout_analysis.plus_typing.help": "Cada layout digita as teclas que um usuário do Ergopti+ digita para este texto: o que um dos seus hotstrings escreve é substituído pelo seu gatilho (« c’est » por « c★ »), o resto é digitado como está. A tecla mágica é digitada com o caractere que cada layout lhe dá.",
+	"layout_analysis.plus_typing.help": "Cada layout digita as teclas que um usuário do Ergopti+ digita para este texto. O que um dos seus hotstrings escreve é substituído pelo seu gatilho (« c’est » por « c★ »), o resto é digitado como está. A tecla mágica é digitada com o caractere que cada layout lhe dá.",
 	"layout_analysis.plus_typing.source_host": "Seus hotstrings ativados: {sections} seções e {personal} hotstrings pessoais.",
 	"layout_analysis.plus_typing.source_choice": "Seus hotstrings não podem ser lidos aqui: marque as seções com que digitar.",
 	"layout_analysis.plus_typing.sections": "Seções de hotstrings",

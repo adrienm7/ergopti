@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Ten korpus to jeden tekst: tabele n-gramów książki nie zawierają naciśniętych klawiszy, a hotstringów nie da się cofnąć na poziomie n-gramów. Tylko „Moje pisanie” odróżnia naciśnięte klawisze od tekstu końcowego.",
 	"layout_analysis.text_mode.plus_title": "Klasyfikuj też {layout}: ten układ piszący klawisze naciśnięte z hotstringami Ergopti+",
 	"layout_analysis.plus_typing.label": "Pisane ze skrótami Ergopti+",
-	"layout_analysis.plus_typing.help": "Każdy układ pisze klawisze, które użytkownik Ergopti+ pisze dla tego tekstu: to, co pisze jeden z Twoich hotstringów, jest zastępowane jego wyzwalaczem (« c’est » przez « c★ »), reszta jest pisana bez zmian. Klawisz magiczny jest pisany znakiem, który nadaje mu każdy układ.",
+	"layout_analysis.plus_typing.help": "Każdy układ pisze klawisze, które użytkownik Ergopti+ pisze dla tego tekstu. To, co pisze jeden z Twoich hotstringów, jest zastępowane jego wyzwalaczem (« c’est » przez « c★ »), reszta jest pisana bez zmian. Klawisz magiczny jest pisany znakiem, który nadaje mu każdy układ.",
 	"layout_analysis.plus_typing.source_host": "Twoje włączone hotstringi: sekcje: {sections}, osobiste hotstringi: {personal}.",
 	"layout_analysis.plus_typing.source_choice": "Twoich hotstringów nie można tu odczytać: zaznacz sekcje, którymi pisać.",
 	"layout_analysis.plus_typing.sections": "Sekcje hotstringów",

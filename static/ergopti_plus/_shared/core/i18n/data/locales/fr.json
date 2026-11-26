@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Ce corpus est un seul texte : les tables de n-grammes d’un livre ne contiennent aucune touche frappée, et les hotstrings ne peuvent pas être défaites au niveau des n-grammes. Seule « Ma frappe » distingue les touches frappées du texte final.",
 	"layout_analysis.text_mode.plus_title": "Classer aussi {layout} : cette disposition tapant les touches frappées avec les hotstrings d’Ergopti+",
 	"layout_analysis.plus_typing.label": "Frappe avec les raccourcis Ergopti+",
-	"layout_analysis.plus_typing.help": "Chaque disposition tape les touches qu’un utilisateur d’Ergopti+ tape pour ce texte : ce qu’un de vos hotstrings écrit est remplacé par son déclencheur (« c’est » par « c★ »), le reste est tapé tel quel. La touche ★ est tapée avec le caractère que lui donne chaque disposition.",
+	"layout_analysis.plus_typing.help": "Chaque disposition tape les touches qu’un utilisateur d’Ergopti+ tape pour ce texte. Ce qu’un de vos hotstrings écrit est remplacé par son déclencheur (« c’est » par « c★ »), le reste est tapé tel quel. La touche ★ est tapée avec le caractère que lui donne chaque disposition.",
 	"layout_analysis.plus_typing.source_host": "Vos hotstrings activés : {sections} sections et {personal} hotstrings personnels.",
 	"layout_analysis.plus_typing.source_choice": "Vos hotstrings ne peuvent pas être lus ici : cochez les sections avec lesquelles taper.",
 	"layout_analysis.plus_typing.sections": "Sections de hotstrings",

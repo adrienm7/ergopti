@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Dieser Korpus ist ein einziger Text: Die N-Gramm-Tabellen eines Buches enthalten keine getippten Tasten, und Hotstrings lassen sich auf N-Gramm-Ebene nicht rückgängig machen. Nur „Mein Tippen“ unterscheidet die getippten Tasten vom Endtext.",
 	"layout_analysis.text_mode.plus_title": "Auch {layout} einstufen: dieses Layout mit den Tasten, die Sie mit den Hotstrings von Ergopti+ getippt haben",
 	"layout_analysis.plus_typing.label": "Mit den Ergopti+-Kürzeln getippt",
-	"layout_analysis.plus_typing.help": "Jedes Layout tippt die Tasten, die ein Ergopti+-Nutzer für diesen Text tippt: Was einer Ihrer Hotstrings schreibt, wird durch seinen Auslöser ersetzt (« c’est » durch « c★ »), der Rest wird so getippt, wie er steht. Die Magic-Taste wird mit dem Zeichen getippt, das jedes Layout ihr gibt.",
+	"layout_analysis.plus_typing.help": "Jedes Layout tippt die Tasten, die ein Ergopti+-Nutzer für diesen Text tippt. Was einer Ihrer Hotstrings schreibt, wird durch seinen Auslöser ersetzt (« c’est » durch « c★ »), der Rest wird so getippt, wie er steht. Die Magic-Taste wird mit dem Zeichen getippt, das jedes Layout ihr gibt.",
 	"layout_analysis.plus_typing.source_host": "Ihre aktivierten Hotstrings: {sections} Abschnitte und {personal} persönliche Hotstrings.",
 	"layout_analysis.plus_typing.source_choice": "Ihre Hotstrings können hier nicht gelesen werden: Kreuzen Sie die Abschnitte an, mit denen getippt werden soll.",
 	"layout_analysis.plus_typing.sections": "Hotstring-Abschnitte",

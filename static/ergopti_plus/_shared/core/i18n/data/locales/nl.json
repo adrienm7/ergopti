@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Dit corpus is één tekst: de n-gramtabellen van een boek bevatten geen getypte toetsen, en hotstrings kunnen op n-gramniveau niet ongedaan worden gemaakt. Alleen ‘Mijn typen’ onderscheidt de getypte toetsen van de eindtekst.",
 	"layout_analysis.text_mode.plus_title": "Ook {layout} rangschikken: deze indeling met de toetsen die u met de hotstrings van Ergopti+ typte",
 	"layout_analysis.plus_typing.label": "Getypt met de Ergopti+-snelkoppelingen",
-	"layout_analysis.plus_typing.help": "Elke indeling typt de toetsen die een Ergopti+-gebruiker voor deze tekst typt: wat een van uw hotstrings schrijft, wordt vervangen door zijn trigger (« c’est » door « c★ »), de rest wordt getypt zoals het staat. De magische toets wordt getypt met het teken dat elke indeling hem geeft.",
+	"layout_analysis.plus_typing.help": "Elke indeling typt de toetsen die een Ergopti+-gebruiker voor deze tekst typt. Wat een van uw hotstrings schrijft, wordt vervangen door zijn trigger (« c’est » door « c★ »), de rest wordt getypt zoals het staat. De magische toets wordt getypt met het teken dat elke indeling hem geeft.",
 	"layout_analysis.plus_typing.source_host": "Uw ingeschakelde hotstrings: {sections} secties en {personal} persoonlijke hotstrings.",
 	"layout_analysis.plus_typing.source_choice": "Uw hotstrings kunnen hier niet worden gelezen: vink de secties aan om mee te typen.",
 	"layout_analysis.plus_typing.sections": "Hotstring-secties",

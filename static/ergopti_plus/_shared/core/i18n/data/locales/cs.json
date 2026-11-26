@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Tento korpus je jediný text: tabulky n-gramů knihy neobsahují žádné stisknuté klávesy a hotstrings nelze na úrovni n-gramů vrátit. Stisknuté klávesy od výsledného textu odliší jen „Moje psaní“.",
 	"layout_analysis.text_mode.plus_title": "Zařadit také {layout}: toto rozložení píšící klávesy stisknuté s hotstrings Ergopti+",
 	"layout_analysis.plus_typing.label": "Psáno se zkratkami Ergopti+",
-	"layout_analysis.plus_typing.help": "Každé rozložení píše klávesy, které uživatel Ergopti+ píše pro tento text: co napíše některý z vašich hotstringů, je nahrazeno jeho spouštěčem (« c’est » za « c★ »), zbytek se píše tak, jak je. Magická klávesa se píše znakem, který jí dává každé rozložení.",
+	"layout_analysis.plus_typing.help": "Každé rozložení píše klávesy, které uživatel Ergopti+ píše pro tento text. Co napíše některý z vašich hotstringů, je nahrazeno jeho spouštěčem (« c’est » za « c★ »), zbytek se píše tak, jak je. Magická klávesa se píše znakem, který jí dává každé rozložení.",
 	"layout_analysis.plus_typing.source_host": "Vaše zapnuté hotstringy: oddíly: {sections}, osobní hotstringy: {personal}.",
 	"layout_analysis.plus_typing.source_choice": "Vaše hotstringy zde nelze přečíst: zaškrtněte oddíly, se kterými psát.",
 	"layout_analysis.plus_typing.sections": "Oddíly hotstringů",

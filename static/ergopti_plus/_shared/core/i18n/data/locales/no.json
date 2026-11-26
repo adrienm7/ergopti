@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Dette korpuset er én tekst: en boks n-gram-tabeller inneholder ingen tastede taster, og hotstrings kan ikke angres på n-gram-nivå. Bare «Min skriving» skiller de tastede tastene fra den endelige teksten.",
 	"layout_analysis.text_mode.plus_title": "Ranger også {layout}: dette oppsettet som skriver tastene du tastet med Ergopti+ sine hotstrings",
 	"layout_analysis.plus_typing.label": "Skrevet med Ergopti+-snarveiene",
-	"layout_analysis.plus_typing.help": "Hvert oppsett skriver tastene en Ergopti+-bruker skriver for denne teksten: det en av dine hotstrings skriver, erstattes av utløseren (« c’est » med « c★ »), resten skrives som det står. Den magiske tasten skrives med tegnet hvert oppsett gir den.",
+	"layout_analysis.plus_typing.help": "Hvert oppsett skriver tastene en Ergopti+-bruker skriver for denne teksten. Det en av dine hotstrings skriver, erstattes av utløseren (« c’est » med « c★ »), resten skrives som det står. Den magiske tasten skrives med tegnet hvert oppsett gir den.",
 	"layout_analysis.plus_typing.source_host": "Dine aktiverte hotstrings: {sections} seksjoner og {personal} personlige hotstrings.",
 	"layout_analysis.plus_typing.source_choice": "Dine hotstrings kan ikke leses her: kryss av seksjonene du vil skrive med.",
 	"layout_analysis.plus_typing.sections": "Hotstring-seksjoner",

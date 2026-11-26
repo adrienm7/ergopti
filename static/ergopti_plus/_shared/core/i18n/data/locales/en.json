@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "This corpus is one text: a book's n-gram tables hold no keys typed, and hotstrings cannot be undone at n-gram level. Only « My typing » tells the keys typed from the final text.",
 	"layout_analysis.text_mode.plus_title": "Also rank {layout}: this layout typing the keys you typed with the Ergopti+ hotstrings",
 	"layout_analysis.plus_typing.label": "Typed with the Ergopti+ shortcuts",
-	"layout_analysis.plus_typing.help": "Every layout types the keys an Ergopti+ user types for this text: what one of your hotstrings writes is replaced by its trigger (« c’est » by « c★ »), the rest is typed as written. The magic key is typed with the character each layout gives it.",
+	"layout_analysis.plus_typing.help": "Every layout types the keys an Ergopti+ user types for this text. What one of your hotstrings writes is replaced by its trigger (« c’est » by « c★ »), and the rest is typed as written. The magic key is typed with the character each layout gives it.",
 	"layout_analysis.plus_typing.source_host": "Your enabled hotstrings: {sections} sections and {personal} personal hotstrings.",
 	"layout_analysis.plus_typing.source_choice": "Your hotstrings cannot be read here: tick the sections to type with.",
 	"layout_analysis.plus_typing.sections": "Hotstring sections",

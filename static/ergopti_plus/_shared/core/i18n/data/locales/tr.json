@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Bu derlem tek bir metindir: bir kitabın n-gram tablolarında basılan tuş yoktur ve hotstring'ler n-gram düzeyinde geri alınamaz. Basılan tuşları son metinden yalnızca « Benim yazımım » ayırır.",
 	"layout_analysis.text_mode.plus_title": "{layout} da sıralansın: bu düzen, Ergopti+ hotstring'leriyle bastığınız tuşları yazarken",
 	"layout_analysis.plus_typing.label": "Ergopti+ kısayollarıyla yazılmış",
-	"layout_analysis.plus_typing.help": "Her düzen, bir Ergopti+ kullanıcısının bu metin için yazdığı tuşları yazar: hotstring’lerinizden birinin yazdığı şey tetikleyicisiyle değiştirilir (« c’est » yerine « c★ »), geri kalanı olduğu gibi yazılır. Sihirli tuş, her düzenin ona verdiği karakterle yazılır.",
+	"layout_analysis.plus_typing.help": "Her düzen, bir Ergopti+ kullanıcısının bu metin için yazdığı tuşları yazar. Hotstring’lerinizden birinin yazdığı şey tetikleyicisiyle değiştirilir (« c’est » yerine « c★ »), geri kalanı olduğu gibi yazılır. Sihirli tuş, her düzenin ona verdiği karakterle yazılır.",
 	"layout_analysis.plus_typing.source_host": "Etkin hotstring’leriniz: {sections} bölüm ve {personal} kişisel hotstring.",
 	"layout_analysis.plus_typing.source_choice": "Hotstring’leriniz burada okunamıyor: yazmak için kullanılacak bölümleri işaretleyin.",
 	"layout_analysis.plus_typing.sections": "Hotstring bölümleri",

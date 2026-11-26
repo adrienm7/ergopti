@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "هذه المدونة نص واحد: جداول n-gram لكتاب لا تحتوي على مفاتيح مكتوبة، ولا يمكن التراجع عن الـ hotstrings على مستوى n-gram. وحدها « كتابتي » تميّز المفاتيح المكتوبة من النص النهائي.",
 	"layout_analysis.text_mode.plus_title": "رتّب أيضًا {layout}: هذا التخطيط يكتب المفاتيح التي كتبتها مع hotstrings ‏Ergopti+‎",
 	"layout_analysis.plus_typing.label": "مكتوب باختصارات Ergopti+",
-	"layout_analysis.plus_typing.help": "يكتب كل تخطيط المفاتيح التي يكتبها مستخدم Ergopti+ لهذا النص: ما يكتبه أحد اختصاراتك النصية يُستبدل بمشغّله (« c’est » بـ « c★ »)، ويُكتب الباقي كما هو. يُكتب المفتاح السحري بالحرف الذي يمنحه إياه كل تخطيط.",
+	"layout_analysis.plus_typing.help": "يكتب كل تخطيط المفاتيح التي يكتبها مستخدم Ergopti+ لهذا النص. ما يكتبه أحد اختصاراتك النصية يُستبدل بمشغّله (« c’est » بـ « c★ »)، ويُكتب الباقي كما هو. يُكتب المفتاح السحري بالحرف الذي يمنحه إياه كل تخطيط.",
 	"layout_analysis.plus_typing.source_host": "اختصاراتك النصية المفعّلة: {sections} أقسام و{personal} اختصارات شخصية.",
 	"layout_analysis.plus_typing.source_choice": "لا يمكن قراءة اختصاراتك النصية هنا: حدّد الأقسام التي تكتب بها.",
 	"layout_analysis.plus_typing.sections": "أقسام الاختصارات النصية",

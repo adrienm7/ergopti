@@ -5928,7 +5928,7 @@
 	"layout_analysis.text_mode.one_text": "Este corpus es un solo texto: las tablas de n-gramas de un libro no contienen teclas pulsadas, y los hotstrings no se pueden deshacer a nivel de n-gramas. Solo «Mi escritura» distingue las teclas pulsadas del texto final.",
 	"layout_analysis.text_mode.plus_title": "Clasificar también {layout}: esta distribución escribiendo las teclas pulsadas con los hotstrings de Ergopti+",
 	"layout_analysis.plus_typing.label": "Tecleado con los atajos de Ergopti+",
-	"layout_analysis.plus_typing.help": "Cada distribución teclea las teclas que un usuario de Ergopti+ teclea para este texto: lo que escribe uno de sus hotstrings se sustituye por su disparador (« c’est » por « c★ »), el resto se teclea tal cual. La tecla mágica se teclea con el carácter que le da cada distribución.",
+	"layout_analysis.plus_typing.help": "Cada distribución teclea las teclas que un usuario de Ergopti+ teclea para este texto. Lo que escribe uno de sus hotstrings se sustituye por su disparador (« c’est » por « c★ »), el resto se teclea tal cual. La tecla mágica se teclea con el carácter que le da cada distribución.",
 	"layout_analysis.plus_typing.source_host": "Sus hotstrings activados: {sections} secciones y {personal} hotstrings personales.",
 	"layout_analysis.plus_typing.source_choice": "Sus hotstrings no se pueden leer aquí: marque las secciones con las que teclear.",
 	"layout_analysis.plus_typing.sections": "Secciones de hotstrings",
