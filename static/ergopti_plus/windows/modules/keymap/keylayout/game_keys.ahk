@@ -306,8 +306,10 @@ global _GK_Foreground := Map("hwnd", -1, "app", "")
 global _GK_Switched := Map("active", false, "previous", "")
 ; The foreground window GameKeys_PassThrough last decided, and its answer.
 global _GK_Pass := Map("hwnd", -1, "passing", false)
-; The foreground window GameKeys_ForegroundIsGame last decided, and its answer.
-global _GK_Game := Map("hwnd", -1, "game", false)
+; The foreground window GameKeys_ForegroundIsGame last decided, its answer,
+; and the settings it decides by (GameKeys_Invalidate publishes them; 0 until
+; then): a tap-hold #HotIf criterion asks it, so it reads no manifest itself.
+global _GK_Game := Map("hwnd", -1, "game", false, "settings", 0)
 ; The KLID of the installed Ergopti layout, read again when the foreground
 ; window changes (GameKeys_PassThrough), so a keystroke reads no registry.
 global _GK_InstalledKlid := ""
@@ -333,37 +335,44 @@ _GameKeys_Send(Keys) {
 
 /**
  * The executable in front, lower case: read again only when the foreground
- * window changes, so a keystroke costs one GetForegroundWindow.
- * @returns {String} "" when it cannot be read.
+ * window changes, so a keystroke costs one foreground-window read. Both reads
+ * go through the window_info adapter.
+ * @returns {String} "" when it cannot be read, or before this module's
+ *   globals exist (a key pressed while the boot pumps messages).
  */
 GameKeys_ForegroundApp() {
 	global _GK_Foreground
-	Hwnd := DllCall("GetForegroundWindow", "Ptr")
+	if !IsSet(_GK_Foreground)
+		return ""
+	Hwnd := WIGetForegroundHwnd()
 	if Hwnd == _GK_Foreground["hwnd"]
 		return _GK_Foreground["app"]
-	App := ""
-	if Hwnd {
-		try App := StrLower(WinGetProcessName("ahk_id " . Hwnd))
-		catch as Err
-			try LoggerDebug("Layout", "The foreground executable is unreadable ({1}): it follows the global game keys.", Err.Message)
-	}
+	App := Hwnd ? StrLower(WIGetProcessName(Hwnd)) : ""
+	if Hwnd && App == ""
+		try LoggerDebug("Layout", "The foreground executable is unreadable: it follows the global game keys.")
 	_GK_Foreground["hwnd"] := Hwnd, _GK_Foreground["app"] := App
 	return App
 }
 
 /**
  * Whether the application in front is a game: it has its own choice. Read on
- * every tap-hold criterion, so the answer is kept per foreground window and
- * read again after a choice changes (GameKeys_Invalidate).
+ * every tap-hold criterion, parse-time #HotIf included, so the answer is kept
+ * per foreground window and decided by the settings GameKeys_Invalidate
+ * published: no manifest read here. Before this module's globals exist or its
+ * settings are published (a key pressed while the boot pumps messages), no
+ * application is a game yet.
  * @returns {Boolean}
  */
 GameKeys_ForegroundIsGame() {
-	global Features, _GK_Game
-	Hwnd := DllCall("GetForegroundWindow", "Ptr")
+	global _GK_Game
+	if !IsSet(_GK_Game)
+		return false
+	Hwnd := WIGetForegroundHwnd()
 	if Hwnd == _GK_Game["hwnd"]
 		return _GK_Game["game"]
-	Game := GameKeys_IsGame(GameKeys_Resolve(IsSet(Features) && Features is Map ? Features : Map()),
-		"windows", GameKeys_ForegroundApp())
+	if !(_GK_Game["settings"] is Map)
+		return false
+	Game := GameKeys_IsGame(_GK_Game["settings"], "windows", GameKeys_ForegroundApp())
 	_GK_Game["hwnd"] := Hwnd, _GK_Game["game"] := Game
 	return Game
 }
@@ -436,7 +445,7 @@ GameKeys_EmulatesErgopti() {
 GameKeys_WindowsStep(Char, Hkl) {
 	if !(Char is String) || Char == "" || Ord(Char) > 0xFFFF || !Hkl
 		return 0
-	Result := DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
+	Result := KS_KeyScanForChar(Hkl, Char)
 	if Result == -1
 		return 0
 	State := (Result >> 8) & 0xFF
@@ -570,6 +579,7 @@ GameKeys_RegisterReleases(HotkeyFn := Hotkey, HotIfFn := HotIf) {
 	} finally {
 		HotIfFn.Call()
 	}
+	GameKeys_Invalidate()
 	try LoggerInfo("Layout", "Game-key release hotkeys registered ({1} keys).", _GK_ReleaseScans.Count)
 	return _GK_ReleaseScans.Count
 }
@@ -603,7 +613,7 @@ GameKeys_PassThrough(Ports := 0) {
 		return false
 	if !(Ports is Map)
 		Ports := Map()
-	Hwnd := Ports.Has("hwnd") ? Ports["hwnd"].Call() : DllCall("GetForegroundWindow", "Ptr")
+	Hwnd := Ports.Has("hwnd") ? Ports["hwnd"].Call() : WIGetForegroundHwnd()
 	if Hwnd == _GK_Pass["hwnd"]
 		return _GK_Pass["passing"]
 	_GK_Pass["hwnd"] := Hwnd
@@ -628,10 +638,16 @@ GameKeys_PassThrough(Ports := 0) {
 	return Passing
 }
 
-/** Decides the application in front again on its next press: a choice changed. */
+/**
+ * Publishes the game-key settings of Features and decides the application in
+ * front again on its next press: called at registration and after a choice
+ * changes.
+ */
 GameKeys_Invalidate() {
-	global _GK_Pass, _GK_Game
-	_GK_Pass["hwnd"] := -1, _GK_Game["hwnd"] := -1
+	global _GK_Pass, _GK_Game, Features
+	_GK_Pass["hwnd"] := -1
+	_GK_Game := Map("hwnd", -1, "game", false,
+		"settings", GameKeys_Resolve(IsSet(Features) && Features is Map ? Features : Map()))
 }
 
 /** Forgets the held keys, the registration and the foreground (test seam). */

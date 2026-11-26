@@ -252,3 +252,28 @@ _GKT_TapHoldsSkipped() {
 	}
 }
 Test("game keys: a game skips every tap-hold delay (game-keys-tap-holds)", _GKT_TapHoldsSkipped)
+
+; The tap-hold #HotIf criteria ask GameKeys_ForegroundIsGame, live before the
+; boot has published anything: it decides by the settings GameKeys_Invalidate
+; publishes, never by reading the manifest itself, and before that no
+; application is a game.
+_GKT_ForegroundGameSnapshot() {
+	global Features, _GK_Game
+	HadFeatures := IsSet(Features)
+	SavedFeatures := HadFeatures ? Features : 0
+	try {
+		_GK_Game := Map("hwnd", -1, "game", false, "settings", 0)
+		AssertFalse(GameKeys_ForegroundIsGame(), "unpublished settings make no application a game")
+		AssertEqual(-1, _GK_Game["hwnd"], "an unpublished answer is not kept for the window")
+		App := GameKeys_ForegroundApp()
+		Features := Map("layout", Map(ConfigLeaf.GAME_KEYS, "physical",
+			ConfigLeaf.GAME_KEYS_APPS, App == "" ? Map() : Map(App, "letters")))
+		GameKeys_Invalidate()
+		AssertTrue(_GK_Game["settings"] is Map, "the registration and a choice change publish the settings")
+		AssertEqual(App != "", GameKeys_ForegroundIsGame(), "the application in front is a game when it has its own choice")
+	} finally {
+		Features := HadFeatures ? SavedFeatures : unset
+		GameKeys_Invalidate()
+	}
+}
+Test("game keys: the foreground game reads the published settings (game-keys-foreground-snapshot)", _GKT_ForegroundGameSnapshot)

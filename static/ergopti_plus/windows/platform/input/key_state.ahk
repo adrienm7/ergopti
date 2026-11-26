@@ -595,6 +595,15 @@ KS_ScanScancodeForChar(Hkl, TargetChar) {
 	return Map("scan", foundScan, "vk", foundVK)
 }
 
+; Returns VkKeyScanExW's answer for one character in Hkl: the virtual key in the
+; low byte, the shift state (1 Shift, 2 Ctrl, 4 Alt) in the high byte.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @param Char {String} One character of the Basic Multilingual Plane.
+; @return {Integer} The keystroke, or -1 when the layout has no key for it.
+KS_KeyScanForChar(Hkl, Char) {
+	return DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
+}
+
 ; Returns the scancode of the key that types Char with no Shift, Ctrl or Alt in
 ; Hkl (VkKeyScanExW high byte 0), or 0 when the character needs a modifier or is
 ; absent from the layout.
