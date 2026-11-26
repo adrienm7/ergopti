@@ -136,7 +136,9 @@ end
 --- the front application's own choice, which makes it a game.
 --- @param opts table { t, settings = game_keys.lua resolve result, route = function(choice, game) ->
 ---   game_keys.lua route, app = the front application's identity or nil,
----   app_choice = its own choice or nil, choose = function(choice), choose_app = function(choice|nil) }
+---   app_name = the name the row shows for it (default `app`; an identity such as a bundle id or an
+---   executable file name is no name a person reads), app_choice = its own choice or nil,
+---   choose = function(choice), choose_app = function(choice|nil) }
 --- @return table rows One row holding the choices.
 function M.game_keys_rows(opts)
 	if type(opts.choose) ~= "function" or type(opts.choose_app) ~= "function" or type(opts.route) ~= "function" then
@@ -165,7 +167,8 @@ function M.game_keys_rows(opts)
 		for _, choice in ipairs(GameKeys.CHOICES) do
 			own[#own + 1] = (choice_row(choice, choice == opts.app_choice, true, function() opts.choose_app(choice) end))
 		end
-		local title = t("menu.layout.game_keys_app"):gsub("{1}", function() return opts.app end)
+		local app_name = opts.app_name or opts.app
+		local title = t("menu.layout.game_keys_app"):gsub("{1}", function() return app_name end)
 		local shown = opts.app_choice ~= nil and t("menu.layout.game_keys." .. opts.app_choice)
 			or t("menu.layout.game_keys_app_default")
 		items[#items + 1] = { label = LabelValue.compose(t, title, shown), items = own }

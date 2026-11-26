@@ -127,6 +127,13 @@ function M.register(helpers, shared)
 			local none = Rows.game_keys_rows({ t = function(key) return key end, settings = { choice = "letters", apps = {} },
 				route = function(choice) return GameKeys.route("windows", "emulation", choice, {}) end,
 				choose = function() end, choose_app = function() end })
+			local named = Rows.game_keys_rows({ t = function(key) return key == "menu.layout.game_keys_app" and "For {1}" or key end,
+				settings = { choice = "letters", apps = {} }, app = "com.example.Game", app_name = "Game",
+				route = function(choice) return GameKeys.route("macos", "emulation", choice, {}) end,
+				choose = function() end, choose_app = function() end })
+			local app_row = named[1].items[#named[1].items]
+			helpers.assert_true(app_row.label:find("For Game", 1, true) == 1, "the row shows the name, not the bundle id")
+			helpers.assert_true(not app_row.label:find("com.example", 1, true), "no identity in the row")
 			local last = none[1].items[#none[1].items]
 			helpers.assert_eq(last.label, "menu.layout.game_keys_no_app", "no application in front")
 			helpers.assert_true(last.disabled)

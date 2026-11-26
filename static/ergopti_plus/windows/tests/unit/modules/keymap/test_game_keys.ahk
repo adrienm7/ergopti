@@ -215,6 +215,9 @@ _GKT_MenuRows() {
 	AssertEqual(t("platform_reason.game_keys_vk_games_follow_letters"), Items[3]["label"],
 		"the checked choice's limit is a greyed row beneath")
 	AssertTrue(Items[3]["disabled"])
+	AssertTrue(InStr(Items[4]["label"], Format(t("menu.layout.game_keys_app"), "game")) == 1,
+		"the row names the application, not its .exe file")
+	AssertFalse(InStr(Items[4]["label"], "game.exe"), "no executable file name in a row")
 	Own := Items[4]["items"]
 	AssertEqual(3, Own.Length, "the application follows the global choice, or has its own")
 	AssertTrue(Own[1]["checked"], "no own choice yet")

@@ -563,7 +563,10 @@ _LAY_GameKeysRows(FeaturesSource := unset, WriteFn := 0, App := unset, Mode := u
 			AppItems.Push(Row)
 		}
 		Shown := Labels[Own]
-		Items.Push(Map("label", LabelValue(Format(t("menu.layout.game_keys_app"), App), Shown), "items", AppItems))
+		; The row names the application, not its executable file: « windowsterminal »
+		; reads as a name, « windowsterminal.exe » as a file.
+		AppName := RegExReplace(App, "i)\.exe$")
+		Items.Push(Map("label", LabelValue(Format(t("menu.layout.game_keys_app"), AppName), Shown), "items", AppItems))
 	}
 	return [Map("label", LabelValue(t("menu.layout.game_keys"), Labels[Settings["choice"]]),
 		"items", Items)]

@@ -100,7 +100,7 @@ end
 --- driver takes the front. Read from NSWorkspace, never through the
 --- accessibility API, so an application that does not answer (a beachball)
 --- or has no window is still read, and the read never waits on it.
---- @return table|nil application { pid, bundle_id }; nil when unreadable, or
+--- @return table|nil application { pid, bundle_id, name (nil when unnamed) }; nil when unreadable, or
 --- when the application has no bundle identifier.
 function M.frontmost_application()
 	local ok, result = pcall(function()
@@ -109,7 +109,8 @@ function M.frontmost_application()
 		if not app then return nil end
 		local pid, bundle_id = app:pid(), app:bundleID()
 		if type(pid) ~= "number" or type(bundle_id) ~= "string" or bundle_id == "" then return nil end
-		return { pid = pid, bundle_id = bundle_id }
+		local name = app:name()
+		return { pid = pid, bundle_id = bundle_id, name = type(name) == "string" and name ~= "" and name or nil }
 	end)
 	if not ok then
 		Logger.error(LOG, "frontmost_application(): unexpected error — %s", tostring(result))
