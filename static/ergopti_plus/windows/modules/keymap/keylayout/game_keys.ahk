@@ -407,9 +407,9 @@ GameKeys_InstalledKlid() {
 GameKeys_EmulationRoute(App, InstalledKlid) {
 	global Features
 	Settings := GameKeys_Resolve(IsSet(Features) && Features is Map ? Features : Map())
-	For := GameKeys_ChoiceFor(Settings, "windows", App)
-	return GameKeys_Route("windows", GameKeysName.Mode.EMULATION, For["choice"],
-		Map("installed_layout", InstalledKlid != "" && GameKeys_EmulatesErgopti(), "game", For["overridden"]))
+	Chosen := GameKeys_ChoiceFor(Settings, "windows", App)
+	return GameKeys_Route("windows", GameKeysName.Mode.EMULATION, Chosen["choice"],
+		Map("installed_layout", InstalledKlid != "" && GameKeys_EmulatesErgopti(), "game", Chosen["overridden"]))
 }
 
 /**

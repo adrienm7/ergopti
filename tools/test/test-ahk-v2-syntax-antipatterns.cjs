@@ -162,6 +162,11 @@ for (const [line, rejected] of [
 const RESERVED_LOWER = new Set(
 	[
 		'Case',
+		'For',
+		'If',
+		'While',
+		'Try',
+		'Else',
 		'Loop',
 		'Until',
 		'Catch',

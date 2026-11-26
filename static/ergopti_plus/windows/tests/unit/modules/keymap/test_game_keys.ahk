@@ -47,9 +47,9 @@ _GKT_ReplaysVectors() {
 		AssertEqual(_GKT_Render(Vector["expected"]["apps"]), _GKT_Render(Settings["apps"]), Vector["name"])
 	}
 	for Vector in Vectors["choice_for"] {
-		For := GameKeys_ChoiceFor(Vector["settings"], Vector["platform"], _GKT_Value(Vector["app"]))
-		AssertEqual(Vector["expected"]["choice"], For["choice"], Vector["name"])
-		AssertEqual(Vector["expected"]["overridden"] ? true : false, For["overridden"], Vector["name"])
+		Chosen := GameKeys_ChoiceFor(Vector["settings"], Vector["platform"], _GKT_Value(Vector["app"]))
+		AssertEqual(Vector["expected"]["choice"], Chosen["choice"], Vector["name"])
+		AssertEqual(Vector["expected"]["overridden"] ? true : false, Chosen["overridden"], Vector["name"])
 	}
 	for Vector in Vectors["apps_with"]
 		AssertEqual(_GKT_Render(Vector["expected"]), _GKT_Render(GameKeys_AppsWith(Vector["settings"], Vector["platform"],

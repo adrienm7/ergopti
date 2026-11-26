@@ -552,8 +552,8 @@ _LAY_GameKeysRows(FeaturesSource := unset, WriteFn := 0, App := unset, Mode := u
 		NoApp := t("menu.layout.game_keys_no_app")
 		Items.Push(Map("label", NoApp, "disabled", true))
 	} else {
-		For := GameKeys_ChoiceFor(Settings, "windows", App)
-		Own := For["overridden"] ? For["choice"] : ""
+		Chosen := GameKeys_ChoiceFor(Settings, "windows", App)
+		Own := Chosen["overridden"] ? Chosen["choice"] : ""
 		AppItems := [Map("label", Labels[""], "checked", Own == "",
 			"action", Choose(ConfigKey.LAYOUT_GAME_KEYS_APPS, GameKeys_AppsWith(Settings, "windows", App, "")))]
 		for Choice in GameKeys_Choices() {
