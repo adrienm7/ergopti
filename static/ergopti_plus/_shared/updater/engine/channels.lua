@@ -306,37 +306,50 @@ function M.load(decoded)
 		return owner ~= nil and by_id[owner].rank <= view.rank
 	end
 
-	--- Decides whether an update check offers a candidate. A deliberate switch
-	--- to another channel offers that channel's latest release even when semver
-	--- orders it below the installed build; within one channel only a strictly
-	--- newer release is offered.
+	--- Decides whether an update check offers a candidate from the selected
+	--- channel's view (its own releases and every more stable channel's). A
+	--- deliberate switch to another channel offers that channel's own latest
+	--- release even when semver orders it below the installed build; any other
+	--- candidate, a more stable channel's release included, is offered only
+	--- when strictly newer, so a stable release never downgrades a dev build.
 	--- @return boolean
 	function R.should_offer(latest, current, selected, installed)
-		if not R.matches(selected, latest) then return false end
+		if not R.visible_in(selected, latest) then return false end
 		if selected ~= installed then
-			return type(installed) == "string" and by_id[installed] ~= nil
+			if not (type(installed) == "string" and by_id[installed] ~= nil) then return false end
+			if R.matches(selected, latest) then return true end
 		end
 		return Version.compare_versions(latest, current) > 0
 	end
 
-	--- Returns the position of a channel's latest tag in a list (semver order,
-	--- first occurrence on a tie), or nil.
-	--- @param tags table Array of tags.
-	--- @param id string Channel id.
-	--- @return number|nil index
-	function R.pick_latest(tags, id)
-		if type(tags) ~= "table" or not (type(id) == "string" and by_id[id]) then return nil end
+	--- Returns the position of the semver-highest tag that admit() accepts,
+	--- first occurrence on a tie, or nil.
+	local function pick_highest(tags, admit)
 		local best = nil
 		for index, tag in ipairs(tags) do
-			if R.matches(id, tag) and (best == nil or Version.compare_versions(tag, tags[best]) > 0) then
+			if admit(tag) and (best == nil or Version.compare_versions(tag, tags[best]) > 0) then
 				best = index
 			end
 		end
 		return best
 	end
 
+	--- Returns the position of a channel's latest tag in a list, or nil: the
+	--- semver-highest release its view lists (first occurrence on a tie), so a
+	--- stable release outranks every prerelease of its version (1.0.10 >
+	--- 1.0.10-dev.179) and the dev channel offers whichever is newer.
+	--- @param tags table Array of tags.
+	--- @param id string Channel id.
+	--- @return number|nil index
+	function R.pick_latest(tags, id)
+		if type(tags) ~= "table" or not (type(id) == "string" and by_id[id]) then return nil end
+		return pick_highest(tags, function(tag) return R.visible_in(id, tag) end)
+	end
+
 	--- Lists, in registry order, every channel other than the checked one whose
-	--- latest release was published strictly after the installed build. The
+	--- own latest release was published strictly after the installed build. A
+	--- more stable channel is never listed: the checked view already offers its
+	--- releases. The
 	--- installed build's time is that of the first listed release of the same
 	--- version; a build that is not listed (older than the list, or a source
 	--- checkout), or listed without a valid time, predates the list.
@@ -366,9 +379,11 @@ function M.load(decoded)
 				end
 			end
 		end
+		local view_rank = by_id[selected].rank
 		for _, record in ipairs(order) do
-			if record.id ~= selected then
-				local index = R.pick_latest(tags, record.id)
+			if record.rank > view_rank then
+				local id = record.id
+				local index = pick_highest(tags, function(tag) return R.matches(id, tag) end)
 				local at = index and releases[index].published_at or nil
 				if index and valid_time(at) and (installed_at == nil or at > installed_at) then
 					found[#found + 1] = { channel = record.id, tag = tags[index] }

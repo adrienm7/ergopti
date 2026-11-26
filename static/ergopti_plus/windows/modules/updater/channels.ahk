@@ -185,31 +185,48 @@ UpdateChannels_VisibleIn(ViewId, Tag) {
 	return ById[Owner]["rank"] <= ById[ViewId]["rank"]
 }
 
-; Decides whether an update check offers a candidate. A deliberate switch to
-; another channel is an artifact-family migration: it offers that channel's
-; latest release even when semver orders the CI dev family below the installed
-; stable version. Within one channel only a strictly newer release is offered.
+; Decides whether an update check offers a candidate from the selected
+; channel's view (its own releases and every more stable channel's). A
+; deliberate switch to another channel is an artifact-family migration: it
+; offers that channel's own latest release even when semver orders the CI dev
+; family below the installed stable version. Any other candidate, a more stable
+; channel's release included, is offered only when strictly newer, so a stable
+; release never downgrades a dev build.
 UpdateChannels_ShouldOffer(Latest, Current, Selected, Installed) {
-	if !UpdateChannels_Matches(Selected, Latest)
+	if !UpdateChannels_VisibleIn(Selected, Latest)
 		return false
-	if (Selected !== Installed)
-		return UpdateChannels_IsKnown(Installed)
+	if (Selected !== Installed) {
+		if !UpdateChannels_IsKnown(Installed)
+			return false
+		if UpdateChannels_Matches(Selected, Latest)
+			return true
+	}
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
 
-; Returns the position (1-based) of a channel's latest tag in an Array, by
-; semver order with the first occurrence kept on a tie, or 0.
-UpdateChannels_PickLatest(Tags, Id) {
-	if !(Tags is Array) || !UpdateChannels_IsKnown(Id)
-		return 0
+; Returns the position (1-based) of the semver-highest tag of an Array that the
+; view of channel ViewId lists (OwnOnly: that channel's own tags only), with
+; the first occurrence kept on a tie, or 0.
+_UpdateChannels_PickHighest(Tags, ViewId, OwnOnly) {
 	Best := 0
 	for Index, Tag in Tags {
-		if !UpdateChannels_Matches(Id, Tag)
+		Admitted := OwnOnly ? UpdateChannels_Matches(ViewId, Tag) : UpdateChannels_VisibleIn(ViewId, Tag)
+		if !Admitted
 			continue
 		if (Best == 0 or _Updater_CompareVersions(Tag, Tags[Best]) > 0)
 			Best := Index
 	}
 	return Best
+}
+
+; Returns the position (1-based) of a channel's latest tag in an Array, or 0:
+; the semver-highest release its view lists (first occurrence on a tie), so a
+; stable release outranks every prerelease of its version (1.0.10 >
+; 1.0.10-dev.179) and the dev channel offers whichever is newer.
+UpdateChannels_PickLatest(Tags, Id) {
+	if !(Tags is Array) || !UpdateChannels_IsKnown(Id)
+		return 0
+	return _UpdateChannels_PickHighest(Tags, Id, false)
 }
 
 ; Reports whether a publish time is exactly as GitHub writes it (UTC, whole
@@ -218,9 +235,10 @@ _UpdateChannels_IsPublishTime(Value) {
 	return (Value is String) && RegExMatch(Value, "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\z") ? true : false
 }
 
-; Lists, in registry order, every channel other than the checked one whose
+; Lists, in registry order, every channel other than the checked one whose own
 ; latest release was published strictly after the installed build, as an Array
-; of Map("channel", Id, "tag", Tag). Releases is the release list in its order,
+; of Map("channel", Id, "tag", Tag). A more stable channel is never listed: the
+; checked view already offers its releases. Releases is the release list in its order,
 ; an Array of Map("tag", Tag, "published_at", Time). The installed build's time
 ; is that of the first listed release of the same version; a build that is not
 ; listed (older than the list, or a source checkout), or listed without a valid
@@ -244,11 +262,12 @@ UpdateChannels_NewerElsewhere(Releases, Selected, Installed) {
 			break
 		}
 	}
+	ViewRank := _UpdateChannels_Registry().ById[Selected]["rank"]
 	for _, Channel in _UpdateChannels_Registry().Order {
 		Id := Channel["id"]
-		if (Id == Selected)
+		if (Channel["rank"] <= ViewRank)
 			continue
-		Index := UpdateChannels_PickLatest(Tags, Id)
+		Index := _UpdateChannels_PickHighest(Tags, Id, true)
 		if !Index
 			continue
 		At := Releases[Index].Get("published_at", "")

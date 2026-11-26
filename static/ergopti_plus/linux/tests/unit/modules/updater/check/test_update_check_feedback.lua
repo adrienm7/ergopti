@@ -53,25 +53,41 @@ local function check(list, channel, current, fetch_error, reason)
 end
 
 helpers.describe("updater: a manual check answers the update-check window (Linux)", function()
-	helpers.it("offers a newer release with its bundle, and lists a newer other channel", function()
-		local list = "[" .. release("v1.0.0", "2026-09-03T00:00:00Z", true) .. ","
-			.. release("v0.0.0-dev.150", "2026-09-02T00:00:00Z", true) .. ","
-			.. release("v0.0.0-dev.140", "2026-08-01T00:00:00Z", true) .. "]"
-		local told = check(list, "dev", "0.0.0-dev.140")
+	-- Field report 2026-11-26: on dev, v1.0.10-dev.179 was offered and v1.0.10
+	-- only as a switch to the main channel.
+	helpers.it("offers on dev the stable release over its prereleases, without a switch", function()
+		local list = "[" .. release("v1.0.10", "2026-11-26T16:23:00Z", true) .. ","
+			.. release("v1.0.10-dev.179", "2026-11-26T14:54:00Z", true) .. ","
+			.. release("v1.0.10-dev.170", "2026-11-01T00:00:00Z", true) .. "]"
+		local told = check(list, "dev", "1.0.10-dev.170")
 		local result = told[4]
 		helpers.assert_eq(told[1], true, "the release is available")
 		helpers.assert_eq(result.state, "available")
-		helpers.assert_eq(result.latest, "v0.0.0-dev.150")
-		helpers.assert_eq(result.current, "0.0.0-dev.140")
+		helpers.assert_eq(result.latest, "v1.0.10")
+		helpers.assert_eq(result.current, "1.0.10-dev.170")
 		helpers.assert_eq(result.channel, "dev")
-		helpers.assert_eq(result.others, { { channel = "main", tag = "v1.0.0" } })
+		helpers.assert_eq(result.others, {}, "the dev view already offers main's release")
+	end)
+
+	helpers.it("offers a newer release with its bundle, and lists a newer other channel", function()
+		local list = "[" .. release("v1.0.11-dev.180", "2026-11-27T00:00:00Z", true) .. ","
+			.. release("v1.0.10", "2026-11-26T16:23:00Z", true) .. ","
+			.. release("v1.0.9", "2026-11-01T00:00:00Z", true) .. "]"
+		local told = check(list, "main", "1.0.9")
+		local result = told[4]
+		helpers.assert_eq(told[1], true, "the release is available")
+		helpers.assert_eq(result.state, "available")
+		helpers.assert_eq(result.latest, "v1.0.10")
+		helpers.assert_eq(result.channel, "main")
+		helpers.assert_eq(result.others, { { channel = "dev", tag = "v1.0.11-dev.180" } })
 	end)
 
 	helpers.it("says up to date, and a stable release older than the build is not listed", function()
-		local list = "[" .. release("v0.0.0-dev.140", "2026-08-01T00:00:00Z", true) .. ","
-			.. release("v1.0.0", "2026-07-03T00:00:00Z", true) .. "]"
-		local result = check(list, "dev", "0.0.0-dev.140")[4]
+		local list = "[" .. release("v1.0.11-dev.180", "2026-11-27T00:00:00Z", true) .. ","
+			.. release("v1.0.10", "2026-11-26T16:23:00Z", true) .. "]"
+		local result = check(list, "dev", "1.0.11-dev.180")[4]
 		helpers.assert_eq(result.state, "up_to_date")
+		helpers.assert_eq(result.latest, "v1.0.11-dev.180")
 		helpers.assert_eq(result.others, {})
 	end)
 

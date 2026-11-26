@@ -220,13 +220,16 @@ helpers.describe("modules.updater.manager", function()
 
 	helpers.it("keeps each channel's latest release from the publish-ordered list", function()
 		local list = "[" .. table.concat({
-			release("v0.0.0-dev.134", true), release("v1.2.0", false),
-			release("v1.3.0-beta.1", true), release("v0.0.0-dev.133", true), release("v1.1.0", false),
+			release("v1.2.1-dev.134", true), release("v1.2.0", false),
+			release("v1.3.0-beta.1", true), release("v1.2.1-dev.133", true), release("v1.1.0", false),
 		}, ",") .. "]"
 		local Parser = require("updater.engine.release_parser")
 		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "main")), "v1.2.0",
 			"the stable channel keeps its latest stable release, not the newest publication")
-		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "dev")), "v0.0.0-dev.134")
+		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(list, "dev")), "v1.2.1-dev.134")
+		helpers.assert_eq(Parser.parse_tag(M._select_channel_release(
+			"[" .. release("v1.2.0", false) .. "," .. release("v1.2.0-dev.130", true) .. "]", "dev")), "v1.2.0",
+			"the dev channel lists the stable release, which outranks every prerelease of its version")
 		helpers.assert_nil(M._select_channel_release("[" .. release("v0.0.0-dev.134", true) .. "]", "main"),
 			"a list without a stable release has no stable candidate")
 		helpers.assert_nil(M._select_channel_release('{"message":"rate limited"}', "main"),
@@ -238,13 +241,13 @@ helpers.describe("modules.updater.manager", function()
 		M.current_version = function() return "1.2.0" end
 		M.clear_cached_release()
 		local ok, available = pcall(M._process_release_response,
-			"[" .. release("v0.0.0-dev.10", true) .. "," .. release("v1.2.0", false) .. "]", "dev")
+			"[" .. release("v1.2.1-dev.10", true) .. "," .. release("v1.2.0", false) .. "]", "dev")
 		local cached = M.get_cached_release()
 		M.current_version = real_current_version
 		helpers.assert_true(ok, tostring(available))
 		helpers.assert_eq(available, true,
 			"an explicit channel change migrates to that channel's family (same rule as Windows)")
-		helpers.assert_eq(cached and cached.tag, "v0.0.0-dev.10")
+		helpers.assert_eq(cached and cached.tag, "v1.2.1-dev.10")
 		M.clear_cached_release()
 	end)
 

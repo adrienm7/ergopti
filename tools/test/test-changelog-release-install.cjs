@@ -54,16 +54,16 @@ const LEAST_STABLE = REGISTRY.channels[REGISTRY.channels.length - 1].id;
 
 // The dev view lists every dev build and the stable releases, newest first.
 const RELEASES = [
-	{ tag_name: 'v0.0.0-dev.142', published_at: '2026-09-30T10:00:00Z', prerelease: true },
-	{ tag_name: 'v0.0.0-dev.141', published_at: '2026-09-29T10:00:00Z', prerelease: true },
-	{ tag_name: 'v0.0.0-dev.140', published_at: '2026-09-28T10:00:00Z', prerelease: true },
-	{ tag_name: 'v0.0.0-dev.139', published_at: '2026-09-27T10:00:00Z', prerelease: true }
+	{ tag_name: 'v1.4.1-dev.142', published_at: '2026-09-30T10:00:00Z', prerelease: true },
+	{ tag_name: 'v1.4.1-dev.141', published_at: '2026-09-29T10:00:00Z', prerelease: true },
+	{ tag_name: 'v1.4.1-dev.140', published_at: '2026-09-28T10:00:00Z', prerelease: true },
+	{ tag_name: 'v1.4.1-dev.139', published_at: '2026-09-27T10:00:00Z', prerelease: true }
 ].map((release) => ({
 	...release,
 	body: 'Notes',
 	html_url: `https://github.com/adrienm7/ergopti/releases/tag/${release.tag_name}`
 }));
-const INSTALLED = '0.0.0-dev.140';
+const INSTALLED = '1.4.1-dev.140';
 
 const failures = [];
 let checks = 0;
@@ -142,7 +142,7 @@ function checkEveryOtherReleaseCarriesTheButton() {
 			);
 			continue;
 		}
-		const older = release.tag_name === 'v0.0.0-dev.139';
+		const older = release.tag_name === 'v1.4.1-dev.139';
 		expect(
 			page.el('btn-install').textContent ===
 				EN[older ? 'changelog_window.rollback_release' : 'changelog_window.install_release'],
@@ -150,7 +150,7 @@ function checkEveryOtherReleaseCarriesTheButton() {
 		);
 		expect(page.el('btn-install').disabled === false, `${release.tag_name}: the button is usable`);
 	}
-	const marked = page.row('v0.0.0-dev.140');
+	const marked = page.row('v1.4.1-dev.140');
 	expect(
 		marked && marked.className.split(' ').includes('installed'),
 		'the installed release row must be marked'
@@ -161,14 +161,14 @@ function checkEveryOtherReleaseCarriesTheButton() {
 		'the installed release row must carry the installed badge'
 	);
 	expect(
-		!page.row('v0.0.0-dev.141').className.split(' ').includes('installed'),
+		!page.row('v1.4.1-dev.141').className.split(' ').includes('installed'),
 		'no other row is marked installed'
 	);
 }
 
 function checkOneClickPostsTheRequest() {
 	const page = openPage({ __installed_version: INSTALLED });
-	page.select('v0.0.0-dev.139');
+	page.select('v1.4.1-dev.139');
 	expect(
 		page.posted.length === 0 || page.payloads('install_release').length === 0,
 		'nothing is posted before the click'
@@ -177,7 +177,7 @@ function checkOneClickPostsTheRequest() {
 	const requests = page.payloads('install_release');
 	expect(
 		requests.length === 1 &&
-			requests[0].tag === 'v0.0.0-dev.139' &&
+			requests[0].tag === 'v1.4.1-dev.139' &&
 			requests[0].channel === LEAST_STABLE &&
 			Object.keys(requests[0]).sort().join(',') === 'action,channel,tag',
 		`one click must post exactly install_release with the tag and the channel (got ${JSON.stringify(requests)})`
@@ -186,36 +186,36 @@ function checkOneClickPostsTheRequest() {
 	expect(
 		page.shown('install-panel') &&
 			page.el('install-text').textContent ===
-				fill('changelog_window.install_backing_up', { tag: 'v0.0.0-dev.139' }),
+				fill('changelog_window.install_backing_up', { tag: 'v1.4.1-dev.139' }),
 		'the window must say the configuration is being backed up first'
 	);
 	page.el('btn-install').dispatch('click');
-	page.select('v0.0.0-dev.142');
+	page.select('v1.4.1-dev.142');
 	page.el('btn-install').dispatch('click');
 	expect(page.payloads('install_release').length === 1, 'no second install while one runs');
 }
 
 function checkProgressFailureAndRetry() {
 	const page = openPage({ __installed_version: INSTALLED });
-	page.select('v0.0.0-dev.139');
+	page.select('v1.4.1-dev.139');
 	page.el('btn-install').dispatch('click');
-	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'downloading' });
+	page.sandbox.setInstallProgress({ tag: 'v1.4.1-dev.139', phase: 'downloading' });
 	expect(
 		page.el('install-text').textContent ===
-			fill('changelog_window.install_downloading', { tag: 'v0.0.0-dev.139' }),
+			fill('changelog_window.install_downloading', { tag: 'v1.4.1-dev.139' }),
 		'the host phase must be shown'
 	);
 	expect(!page.shown('btn-install-retry'), 'no Retry while the install runs');
 
 	page.sandbox.setInstallProgress({
-		tag: 'v0.0.0-dev.139',
+		tag: 'v1.4.1-dev.139',
 		phase: 'failed',
 		reason_key: 'changelog_window.install_error_no_asset',
 		backup_path: '~/Library/Application Support/Ergopti/config/backups/pre-install-x'
 	});
 	const text = page.el('install-text').textContent;
 	expect(
-		text.includes(fill('changelog_window.install_error_no_asset', { tag: 'v0.0.0-dev.139' })) &&
+		text.includes(fill('changelog_window.install_error_no_asset', { tag: 'v1.4.1-dev.139' })) &&
 			text.includes('~/Library/Application Support/Ergopti/config/backups/pre-install-x'),
 		`a refusal must name its reason and the backup it kept (got ${text})`
 	);
@@ -226,13 +226,13 @@ function checkProgressFailureAndRetry() {
 	const requests = page.payloads('install_release');
 	expect(
 		requests.length === 2 &&
-			requests[1].tag === 'v0.0.0-dev.139' &&
+			requests[1].tag === 'v1.4.1-dev.139' &&
 			requests[1].channel === LEAST_STABLE,
 		'Retry must post the same install request again'
 	);
 
 	page.sandbox.setInstallProgress({
-		tag: 'v0.0.0-dev.139',
+		tag: 'v1.4.1-dev.139',
 		phase: 'failed',
 		reason_key: 'menu.global.uninstall'
 	});
@@ -240,7 +240,7 @@ function checkProgressFailureAndRetry() {
 		page.el('install-text').textContent === EN['changelog_window.install_error_unexpected'],
 		'a reason key outside the install family must show the generic failure'
 	);
-	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'exploded' });
+	page.sandbox.setInstallProgress({ tag: 'v1.4.1-dev.139', phase: 'exploded' });
 	expect(
 		page.el('install-text').textContent === EN['changelog_window.install_error_unexpected'],
 		'an unknown phase must be ignored'
@@ -250,17 +250,17 @@ function checkProgressFailureAndRetry() {
 /** A refused restart showed a failure with Retry over an armed install (MUR-001). */
 function checkRestartPendingOffersTheRestart() {
 	const page = openPage({ __installed_version: INSTALLED });
-	page.select('v0.0.0-dev.139');
+	page.select('v1.4.1-dev.139');
 	page.el('btn-install').dispatch('click');
 	page.sandbox.setInstallProgress({
-		tag: 'v0.0.0-dev.139',
+		tag: 'v1.4.1-dev.139',
 		phase: 'restart_pending',
 		backup_path: '/cfg/backups/pre-install-x'
 	});
 	expect(
 		page.el('install-text').textContent ===
 			fill('changelog_window.install_restart_pending', {
-				tag: 'v0.0.0-dev.139',
+				tag: 'v1.4.1-dev.139',
 				path: '/cfg/backups/pre-install-x'
 			}),
 		`a waiting release names itself and its backup (got ${page.el('install-text').textContent})`
@@ -272,26 +272,26 @@ function checkRestartPendingOffersTheRestart() {
 		page.el('btn-install-restart').textContent === EN['changelog_window.install_restart_now'],
 		'the restart button is translated'
 	);
-	page.select('v0.0.0-dev.141');
+	page.select('v1.4.1-dev.141');
 	expect(page.el('btn-install').disabled === true, 'no other release installs over a waiting one');
 	page.el('btn-install-restart').dispatch('click');
 	page.el('btn-install-restart').dispatch('click');
 	expect(
 		page.payloads('complete_install_restart').length === 1 &&
-			page.payloads('complete_install_restart')[0].tag === 'v0.0.0-dev.139',
+			page.payloads('complete_install_restart')[0].tag === 'v1.4.1-dev.139',
 		'one click posts complete_install_restart once until the host answers'
 	);
 	expect(page.el('btn-install-restart').disabled === true, 'the button waits for the host');
-	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'restart_pending' });
+	page.sandbox.setInstallProgress({ tag: 'v1.4.1-dev.139', phase: 'restart_pending' });
 	expect(page.el('btn-install-restart').disabled === false, 'a refused restart can be asked again');
-	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.139', phase: 'restarting' });
+	page.sandbox.setInstallProgress({ tag: 'v1.4.1-dev.139', phase: 'restarting' });
 	expect(!page.shown('btn-install-restart'), 'an accepted restart hides the button');
 
 	const seeded = openPage({
 		__installed_version: INSTALLED,
-		__install_pending: { tag: 'v0.0.0-dev.141', backup_path: '/cfg/b' }
+		__install_pending: { tag: 'v1.4.1-dev.141', backup_path: '/cfg/b' }
 	});
-	seeded.select('v0.0.0-dev.139');
+	seeded.select('v1.4.1-dev.139');
 	expect(seeded.shown('install-panel'), 'a window opened later shows the waiting release');
 	expect(seeded.shown('btn-install-restart'), 'and offers to restart on it');
 	expect(seeded.el('btn-install').disabled === true, 'and keeps the install buttons greyed');
@@ -302,9 +302,9 @@ function checkRestartPendingOffersTheRestart() {
 		channel: LEAST_STABLE,
 		releases: [],
 		cache_miss: true,
-		install: { installed: INSTALLED, blocked_key: '', pending: { tag: 'v0.0.0-dev.141' } }
+		install: { installed: INSTALLED, blocked_key: '', pending: { tag: 'v1.4.1-dev.141' } }
 	});
-	linux.select('v0.0.0-dev.139');
+	linux.select('v1.4.1-dev.139');
 	expect(linux.shown('btn-install-restart'), 'the Linux context names the waiting release too');
 }
 
@@ -338,7 +338,7 @@ function checkSourceRunGreysEveryButton() {
 
 function checkNoAnnouncedBuildShowsNoButton() {
 	const page = openPage({});
-	page.select('v0.0.0-dev.139');
+	page.select('v1.4.1-dev.139');
 	expect(!page.shown('btn-install'), 'a host that names no build offers no install');
 	page.sandbox.requestInstall();
 	expect(page.payloads('install_release').length === 0, 'and posts none');
@@ -357,19 +357,19 @@ function checkLinuxAnnouncesItsContext() {
 			backup: {
 				id: 'pre-install-20260930-101500',
 				created_at: '2026-09-30T10:15:00Z',
-				tag: 'v0.0.0-dev.139'
+				tag: 'v1.4.1-dev.139'
 			}
 		}
 	});
-	page.select('v0.0.0-dev.141');
+	page.select('v1.4.1-dev.141');
 	expect(page.shown('btn-install'), 'the Linux context turns the buttons on');
 	expect(
-		page.row('v0.0.0-dev.140').className.split(' ').includes('installed'),
+		page.row('v1.4.1-dev.140').className.split(' ').includes('installed'),
 		'the Linux context marks the installed row'
 	);
 	expect(page.shown('restore-banner'), 'a restorable backup shows the restore banner');
 	expect(
-		page.el('restore-text').textContent.includes('v0.0.0-dev.139'),
+		page.el('restore-text').textContent.includes('v1.4.1-dev.139'),
 		'the banner names the release installed after the backup'
 	);
 	page.el('btn-restore').dispatch('click');
@@ -391,10 +391,10 @@ function checkLinuxAnnouncesItsContext() {
 			fill('changelog_window.restore_error_unexpected', { path: '/b/pre-restore' }),
 		'a failed restore names the backup of the configuration it replaced'
 	);
-	page.answer({ action: 'install_progress', tag: 'v0.0.0-dev.141', phase: 'installing' });
+	page.answer({ action: 'install_progress', tag: 'v1.4.1-dev.141', phase: 'installing' });
 	expect(
 		page.el('install-text').textContent ===
-			fill('changelog_window.install_installing', { tag: 'v0.0.0-dev.141' }),
+			fill('changelog_window.install_installing', { tag: 'v1.4.1-dev.141' }),
 		'Linux install progress reaches the panel'
 	);
 }
@@ -409,11 +409,11 @@ function checkLinuxAnnouncesItsContext() {
 // names no files and no digests (sparkle-handoff-2026-10-22).
 const FEED_TAGS = [
 	'v1.4.0',
-	'v0.0.0-dev.142',
+	'v1.4.1-dev.142',
 	'v1.3.0',
-	'v0.0.0-dev.141',
-	'v0.0.0-dev.140',
-	'v0.0.0-dev.139'
+	'v1.4.1-dev.141',
+	'v1.4.1-dev.140',
+	'v1.4.1-dev.139'
 ];
 const FEED = [
 	'<?xml version="1.0" encoding="UTF-8"?>',
@@ -459,10 +459,10 @@ function openFeedPage(globals) {
 function checkFeedNewestReleaseIsHandedToTheUpdater() {
 	const page = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
 	expect(
-		page.tags()[0] === 'v1.4.0' && page.tags().includes('v0.0.0-dev.142'),
+		page.tags()[0] === 'v1.4.0' && page.tags().includes('v1.4.1-dev.142'),
 		`the dev view lists the feed, newest first (got ${page.tags().join(', ')})`
 	);
-	page.select('v0.0.0-dev.142');
+	page.select('v1.4.1-dev.142');
 	expect(page.shown('btn-install'), 'the channel’s newest feed release carries the button');
 	expect(
 		page.el('btn-install').textContent === EN['changelog_window.install_release'] &&
@@ -478,7 +478,7 @@ function checkFeedNewestReleaseIsHandedToTheUpdater() {
 	const handoffs = page.payloads('install_through_updater');
 	expect(
 		handoffs.length === 1 &&
-			handoffs[0].tag === 'v0.0.0-dev.142' &&
+			handoffs[0].tag === 'v1.4.1-dev.142' &&
 			handoffs[0].channel === LEAST_STABLE &&
 			Object.keys(handoffs[0]).sort().join(',') === 'action,channel,tag',
 		`one click must post exactly install_through_updater with the tag and the channel (got ${JSON.stringify(handoffs)})`
@@ -487,17 +487,17 @@ function checkFeedNewestReleaseIsHandedToTheUpdater() {
 	expect(
 		page.shown('install-panel') &&
 			page.el('install-text').textContent ===
-				fill('changelog_window.install_handed_off', { tag: 'v0.0.0-dev.142' }),
+				fill('changelog_window.install_handed_off', { tag: 'v1.4.1-dev.142' }),
 		'the window says the updater checks the signature and asks in its own window'
 	);
 	expect(page.el('btn-install').disabled === true, 'the button waits for the host');
 	page.el('btn-install').dispatch('click');
 	expect(page.payloads('install_through_updater').length === 1, 'no second hand-off meanwhile');
 
-	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.142', phase: 'handed_off' });
+	page.sandbox.setInstallProgress({ tag: 'v1.4.1-dev.142', phase: 'handed_off' });
 	expect(
 		page.el('install-text').textContent ===
-			fill('changelog_window.install_handed_off', { tag: 'v0.0.0-dev.142' }) &&
+			fill('changelog_window.install_handed_off', { tag: 'v1.4.1-dev.142' }) &&
 			page.el('install-panel').className === '',
 		'the handed_off phase is shown as progress, not as a failure'
 	);
@@ -508,7 +508,7 @@ function checkFeedNewestReleaseIsHandedToTheUpdater() {
 	expect(!page.shown('btn-install-retry'), 'a hand-off offers no Retry');
 
 	page.sandbox.setInstallProgress({
-		tag: 'v0.0.0-dev.142',
+		tag: 'v1.4.1-dev.142',
 		phase: 'failed',
 		reason_key: 'changelog_window.install_error_handoff'
 	});
@@ -526,7 +526,7 @@ function checkFeedNewestReleaseIsHandedToTheUpdater() {
 
 function checkFeedOlderReleasesKeepTheWarning() {
 	const page = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
-	for (const tag of ['v1.4.0', 'v1.3.0', 'v0.0.0-dev.141', 'v0.0.0-dev.139']) {
+	for (const tag of ['v1.4.0', 'v1.3.0', 'v1.4.1-dev.141', 'v1.4.1-dev.139']) {
 		page.select(tag);
 		expect(
 			!page.shown('install-note') ||
@@ -569,7 +569,7 @@ function checkFeedOtherChannelOffersItsOwnNewest() {
 
 function checkFeedHandoffNeedsTheHostAndTheFeed() {
 	const noHost = openFeedPage({ __installed_version: INSTALLED });
-	noHost.select('v0.0.0-dev.142');
+	noHost.select('v1.4.1-dev.142');
 	noHost.el('btn-install').dispatch('click');
 	expect(
 		noHost.payloads('install_through_updater').length === 0 &&
@@ -578,7 +578,7 @@ function checkFeedHandoffNeedsTheHostAndTheFeed() {
 	);
 
 	const api = openPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
-	api.select('v0.0.0-dev.142');
+	api.select('v1.4.1-dev.142');
 	api.el('btn-install').dispatch('click');
 	expect(
 		api.payloads('install_through_updater').length === 0 &&
@@ -587,10 +587,10 @@ function checkFeedHandoffNeedsTheHostAndTheFeed() {
 	);
 
 	const upToDate = openFeedPage({
-		__installed_version: '0.0.0-dev.142',
+		__installed_version: '1.4.1-dev.142',
 		__feed_install_handoff: true
 	});
-	upToDate.select('v0.0.0-dev.141');
+	upToDate.select('v1.4.1-dev.141');
 	upToDate.el('btn-install').dispatch('click');
 	expect(
 		upToDate.payloads('install_through_updater').length === 0,
@@ -600,7 +600,7 @@ function checkFeedHandoffNeedsTheHostAndTheFeed() {
 	const failedLoad = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
 	failedLoad.sandbox.injectError('x');
 	failedLoad.sandbox.injectReleases(RELEASES, LEAST_STABLE);
-	failedLoad.select('v0.0.0-dev.142');
+	failedLoad.select('v1.4.1-dev.142');
 	failedLoad.el('btn-install').dispatch('click');
 	expect(
 		failedLoad.payloads('install_through_updater').length === 0,
