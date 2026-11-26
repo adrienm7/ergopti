@@ -273,6 +273,7 @@ function repository(name, branch) {
 		'tools/lib/paths.cjs',
 		'static/ergopti_plus/_shared/updater/data/defaults.json',
 		'static/ergopti_plus/_shared/updater/data/channels.json',
+		'static/ergopti_plus/_shared/updater/data/version.js',
 		'static/ergopti_plus/_shared/ui/update_channels.js'
 	]) {
 		const target = path.join(work, relative);
@@ -377,9 +378,11 @@ fs.writeFileSync(
 		'#!/usr/bin/env bash',
 		'url="${*: -1}"',
 		'printf \'%s\\n\' "$url" >> "$CURL_STUB_LOG"',
-		'if [ "$url" != "$CURL_STUB_URL" ]; then echo "curl stub: unexpected URL $url" >&2; exit 99; fi',
+		'case " $CURL_STUB_URLS " in *" $url "*) ;; *) echo "curl stub: unexpected URL $url" >&2; exit 99 ;; esac',
+		'feed="${url##*/}"',
+		'feed="${feed%%\\?*}"',
 		'case "$CURL_STUB_MODE" in',
-		'    origin) git --git-dir "$CURL_STUB_ORIGIN" show "sparkle-appcasts:appcast-$CURL_STUB_CHANNEL.xml" ;;',
+		'    origin) git --git-dir "$CURL_STUB_ORIGIN" show "sparkle-appcasts:$feed" ;;',
 		'    stale) echo "<appcast>a stale edge copy</appcast>" ;;',
 		'    *) echo "curl stub: no mode" >&2; exit 97 ;;',
 		'esac',
@@ -2056,67 +2059,88 @@ check('an unreadable prerelease flag creates nothing', () => {
 const feedScript = scriptOf(pipeline.step(releaseJob, PUBLISH_FEED), PUBLISH_FEED);
 const feedOrigin = path.join(scratch, 'runner-origin.git');
 
+/** What the feed branch of origin holds for one feed, or null. */
+function feedOnOrigin(feed) {
+	const shown = spawnSync('git', ['--git-dir', feedOrigin, 'show', `sparkle-appcasts:${feed}`], {
+		env: GIT_ENV,
+		encoding: 'utf8'
+	});
+	return shown.status === 0 ? shown.stdout.trim() : null;
+}
+
 /**
- * Publishes the dev feed from `artifact`, the appcast this attempt downloaded,
- * with curl reading back `served`; returns the result and what origin holds.
+ * Publishes the feeds of `tag` from `artifact`, the appcast of its channel this
+ * attempt downloaded, with curl reading back `served` and answering only the
+ * URLs of `feeds`; returns the result and what origin holds for each feed.
  */
-function publishFeed(artifact, { resumed = false, served = 'origin', published = '' } = {}) {
+function publishFeed(
+	artifact,
+	{
+		tag = 'v0.0.0-dev.18',
+		channel = 'dev',
+		feeds = ['appcast-dev.xml'],
+		resumed = false,
+		served = 'origin',
+		published = ''
+	} = {}
+) {
 	const assets = path.join(runner, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
-	fs.writeFileSync(path.join(assets, 'appcast-dev.xml'), `${artifact}\n`);
+	fs.writeFileSync(path.join(assets, `appcast-${channel}.xml`), `${artifact}\n`);
 	const temp = path.join(scratch, `feed-temp-${runCount + 1}`);
 	fs.mkdirSync(temp);
 	const curlLog = stubLog('curl');
 	const ghLog = stubLog('gh');
-	const url = `https://raw.githubusercontent.com/${REPOSITORY}/sparkle-appcasts/appcast-dev.xml?release=${head}`;
+	const urls = feeds.map(
+		(feed) =>
+			`https://raw.githubusercontent.com/${REPOSITORY}/sparkle-appcasts/${feed}?release=${head}`
+	);
 	const result = runScript(
 		feedScript,
 		runner,
 		{
-			ERGOPTI_CHANNEL: 'dev',
-			TAG: 'v0.0.0-dev.14',
+			ERGOPTI_CHANNEL: channel,
+			TAG: tag,
 			RESUMED: resumed ? 'true' : 'false',
 			GITHUB_SHA: head,
 			GITHUB_REPOSITORY: REPOSITORY,
 			RUNNER_TEMP: bashPath(temp),
 			GH_TOKEN: 'stub-token',
 			GH_STUB_LOG: bashPath(ghLog),
-			GH_STUB_TAG: 'v0.0.0-dev.14',
+			GH_STUB_TAG: tag,
 			GH_STUB_REPO: REPOSITORY,
-			GH_STUB_CHANNEL: 'dev',
+			GH_STUB_CHANNEL: channel,
 			GH_STUB_PUBLISHED_FEED: published,
 			CURL_STUB_LOG: bashPath(curlLog),
-			CURL_STUB_URL: url,
+			CURL_STUB_URLS: urls.join(' '),
 			CURL_STUB_MODE: served,
-			CURL_STUB_ORIGIN: bashPath(feedOrigin),
-			CURL_STUB_CHANNEL: 'dev'
+			CURL_STUB_ORIGIN: bashPath(feedOrigin)
 		},
 		STUB_PATH
 	);
-	const onOrigin = spawnSync(
-		'git',
-		['--git-dir', feedOrigin, 'show', 'sparkle-appcasts:appcast-dev.xml'],
-		{ env: GIT_ENV, encoding: 'utf8' }
-	);
 	return {
 		...result,
-		onOrigin: onOrigin.status === 0 ? onOrigin.stdout.trim() : null,
+		onOrigin: feedOnOrigin('appcast-dev.xml'),
+		mainOnOrigin: feedOnOrigin('appcast-main.xml'),
 		curlCalls: linesOf(curlLog),
 		ghCalls: linesOf(ghLog)
 	};
 }
 
+pushTag('v0.0.0-dev.18', head);
+
 check('a first release pushes its appcast to the feed branch and reads it back', () => {
-	const result = publishFeed('<appcast>dev.14</appcast>');
+	const result = publishFeed('<appcast>dev.18</appcast>');
 	assert.equal(result.status, 0, result.stdout + result.stderr);
-	assert.equal(result.onOrigin, '<appcast>dev.14</appcast>');
+	assert.equal(result.onOrigin, '<appcast>dev.18</appcast>');
+	assert.equal(result.mainOnOrigin, null, 'a prerelease is not in the main view');
 	assert.equal(result.curlCalls.length, 1);
 	assert.deepEqual(result.ghCalls, [], 'a first attempt publishes its own artifact');
 });
 
 check('a feed that does not read back as pushed fails the step', () => {
-	const result = publishFeed('<appcast>dev.14 again</appcast>', { served: 'stale' });
+	const result = publishFeed('<appcast>dev.18 again</appcast>', { served: 'stale' });
 	assert.notEqual(result.status, 0, 'a published copy that differs must fail the verification');
 });
 
@@ -2132,6 +2156,72 @@ check(
 		assert.equal(result.ghCalls.length, 1);
 	}
 );
+
+// Field report 2026-11-26: v1.0.10 replaced only appcast-main.xml, so Sparkle
+// on the dev channel kept offering v1.0.10-dev.179. A stable release is in the
+// dev view and outranks every prerelease of its version.
+pushTag('v1.0.10-dev.179', head);
+pushTag('v1.0.10', head);
+
+check('a stable release replaces the dev feed too, the newest of the dev view', () => {
+	const result = publishFeed('<appcast>v1.0.10</appcast>', {
+		tag: 'v1.0.10',
+		channel: 'main',
+		feeds: ['appcast-main.xml', 'appcast-dev.xml']
+	});
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(result.mainOnOrigin, '<appcast>v1.0.10</appcast>');
+	assert.equal(result.onOrigin, '<appcast>v1.0.10</appcast>');
+	assert.equal(result.curlCalls.length, 2, 'each replaced feed is read back');
+});
+
+check('a prerelease of a version already released stable replaces no feed', () => {
+	pushTag('v1.0.10-dev.180', head);
+	const result = publishFeed('<appcast>v1.0.10-dev.180</appcast>', {
+		tag: 'v1.0.10-dev.180',
+		feeds: []
+	});
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.match(result.stdout, /no Sparkle feed changes/);
+	assert.equal(result.onOrigin, '<appcast>v1.0.10</appcast>', 'the stable stays the dev feed');
+	assert.equal(result.mainOnOrigin, '<appcast>v1.0.10</appcast>');
+	assert.deepEqual(result.curlCalls, []);
+});
+
+check('the next prerelease replaces only the dev feed', () => {
+	pushTag('v1.0.11-dev.181', head);
+	const result = publishFeed('<appcast>v1.0.11-dev.181</appcast>', { tag: 'v1.0.11-dev.181' });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(result.onOrigin, '<appcast>v1.0.11-dev.181</appcast>');
+	assert.equal(result.mainOnOrigin, '<appcast>v1.0.10</appcast>');
+	assert.equal(result.curlCalls.length, 1);
+});
+
+check('a resumed stable release behind a newer prerelease replaces only the main feed', () => {
+	const result = publishFeed('<appcast>a rebuilt v1.0.10</appcast>', {
+		tag: 'v1.0.10',
+		channel: 'main',
+		feeds: ['appcast-main.xml'],
+		resumed: true,
+		published: '<appcast>v1.0.10 again</appcast>'
+	});
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.equal(result.mainOnOrigin, '<appcast>v1.0.10 again</appcast>');
+	assert.equal(result.onOrigin, '<appcast>v1.0.11-dev.181</appcast>');
+});
+
+// The preflight cases below read the dev series of this origin: these feed
+// tags would be newer than every tag they plan.
+for (const tag of [
+	'v0.0.0-dev.18',
+	'v1.0.10-dev.179',
+	'v1.0.10',
+	'v1.0.10-dev.180',
+	'v1.0.11-dev.181'
+]) {
+	git(runner, 'push', '--quiet', 'origin', `:refs/tags/${tag}`);
+	git(runner, 'tag', '-d', tag);
+}
 
 // The existing actual preflight must distinguish missing new output from an
 // already published historical inventory, without guessing release existence.

@@ -431,6 +431,29 @@ jobs:
           fi
           test -s "$feed"
 
+          # Each feed carries its channel's latest release, picked by the rule
+          # the in-app updaters apply: a channel's view lists its own releases
+          # and every more stable channel's, and a stable release outranks every
+          # prerelease of its version. So a stable release replaces the dev feed
+          # too (Sparkle on dev kept offering v1.0.10-dev.179 after v1.0.10),
+          # and a release older than one already tagged replaces no feed.
+          # Assignments, not process substitutions, so a failed listing or
+          # resolver fails the step instead of publishing to no feed.
+          refs=$(git ls-remote --tags --refs origin 'refs/tags/v*')
+          listed=()
+          while read -r _ ref; do
+              if [ -n "$ref" ]; then listed+=("${ref#refs/tags/}"); fi
+          done <<< "$refs"
+          resolved=$(node tools/build/release-channel.cjs feeds "$TAG" "${listed[@]}")
+          targets=()
+          while read -r target; do
+              if [ -n "$target" ]; then targets+=("$target"); fi
+          done <<< "$resolved"
+          if [ "${#targets[@]}" -eq 0 ]; then
+              echo "::notice::A release tagged after $TAG is newer in every channel that lists it: no Sparkle feed changes."
+              exit 0
+          fi
+
           # Published releases are immutable, so a permanent release asset
           # cannot be refreshed for the next channel version. Keep the signed
           # appcasts on a dedicated mutable branch instead; the release assets
@@ -443,28 +466,34 @@ jobs:
               git -C "$worktree" rm -rf --ignore-unmatch .
           fi
 
-          cp "$feed" "$worktree/appcast-${ERGOPTI_CHANNEL}.xml"
           git -C "$worktree" config user.name "github-actions[bot]"
           git -C "$worktree" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C "$worktree" add -- "appcast-${ERGOPTI_CHANNEL}.xml"
+          # The appcast names no channel, so the release's own file is every
+          # target feed, byte for byte.
+          for target in "${targets[@]}"; do
+              cp "$feed" "$worktree/$target"
+              git -C "$worktree" add -- "$target"
+          done
           if ! git -C "$worktree" diff --cached --quiet; then
-              git -C "$worktree" commit -m "chore(release): update ${ERGOPTI_CHANNEL} appcast"
+              git -C "$worktree" commit -m "chore(release): update ${targets[*]} for $TAG"
               node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
               node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
               git -C "$worktree" push origin "HEAD:refs/heads/${branch}"
           fi
 
-          published="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/appcast-${ERGOPTI_CHANNEL}.xml?release=${GITHUB_SHA}"
-          # The git ref becomes visible before raw.githubusercontent.com's edge
-          # cache necessarily observes a newly-created branch. Retry every HTTP
-          # failure for a bounded minute so that transient post-push 404s do not
-          # turn a successfully published feed into a red release job.
-          curl --fail --silent --show-error --location \
-              --retry 12 --retry-delay 5 --retry-max-time 90 --retry-all-errors \
-              "$published" \
-              > "$RUNNER_TEMP/published-appcast.xml"
-          cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
-          echo "Published and verified $published"
+          for target in "${targets[@]}"; do
+              published="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/${target}?release=${GITHUB_SHA}"
+              # The git ref becomes visible before raw.githubusercontent.com's edge
+              # cache necessarily observes a newly-created branch. Retry every HTTP
+              # failure for a bounded minute so that transient post-push 404s do not
+              # turn a successfully published feed into a red release job.
+              curl --fail --silent --show-error --location \
+                  --retry 12 --retry-delay 5 --retry-max-time 90 --retry-all-errors \
+                  "$published" \
+                  > "$RUNNER_TEMP/published-appcast.xml"
+              cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
+              echo "Published and verified $published"
+          done
 
       # The tap's cask names one exact release and its checksum (Homebrew has no
       # install-time URL and GitHub no stable URL for the newest prerelease),

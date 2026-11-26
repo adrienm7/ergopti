@@ -281,9 +281,14 @@ if (!/git -C "\$worktree" push origin "HEAD:refs\/heads\/\$\{branch\}"/.test(fee
 } else if (/gh release (?:create|upload) sparkle-feed/.test(feedPublishStep)) {
 	errors.push('an immutable GitHub release cannot own a channel feed that changes every release');
 } else if (
-	!feedPublishStep.includes('raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/appcast-')
+	!feedPublishStep.includes(
+		'raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/${target}?'
+	) ||
+	!feedPublishStep.includes('node tools/build/release-channel.cjs feeds "$TAG"')
 ) {
-	errors.push('publication verification must read the same raw branch URL stamped into SUFeedURL');
+	errors.push(
+		'publication verification must read the same raw branch URL stamped into SUFeedURL, for every feed the registry names'
+	);
 } else if (
 	!feedPublishStep.includes('--retry-all-errors') ||
 	!feedPublishStep.includes('--retry-max-time 90') ||
