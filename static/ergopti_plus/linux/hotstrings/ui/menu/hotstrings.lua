@@ -13,7 +13,6 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local LabelValue = require("core.i18n.engine.label_value")
-local Labels = require("menu.engine.labels")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
@@ -38,10 +37,6 @@ local show_error = require("menu.ui.builder.dialogs").show_error
 local ask_yes_no = require("menu.ui.builder.dialogs").ask_yes_no
 
 local LOG = "hotstrings.ui.menu.hotstrings"
-
--- The categories and sections already reported without a name, each once per
--- process: the tray rebuilds on every toggle.
-local _unnamed_reported = {}
 
 --- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
@@ -167,6 +162,9 @@ local function _manifest_hotstring_rows(ctx, config)
 		return set
 	end
 
+	-- Each unnamed entry is reported once per tray build.
+	local unnamed_reported = {}
+
 	--- What a category or section without a name in its file is called: a
 	--- translated « no name » with an error naming the id for the log, never
 	--- the id itself, which reads as a defect in the menu (AGENTS.md: no silent
@@ -176,8 +174,8 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return string
 	local function unnamed(kind, id)
 		local key = kind .. ":" .. tostring(id)
-		if not _unnamed_reported[key] then
-			_unnamed_reported[key] = true
+		if not unnamed_reported[key] then
+			unnamed_reported[key] = true
 			Logger.error(LOG, "Hotstring %s '%s' has no description in its file; the tray names it as unnamed.",
 				kind, tostring(id))
 		end
@@ -488,8 +486,10 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- every entry it would have had.
 			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category))
 				.. (personal and not current_source() and (" — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")) or ""),
-			-- Never « checked (0) »: the gate stays the submenu's first row.
-			checked = Labels.family_checked(on == true, active_count(id, category)),
+			-- Never « checked (0) »: the gate stays the submenu's first row. The
+			-- rule of menu.engine.labels family_checked, written inline because the
+			-- composed tray root admits a closed import table.
+			checked = on == true and active_count(id, category) > 0,
 			submenu = rendered,
 		}
 	end
@@ -1236,7 +1236,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- description key and has no translation of its own, so it would have
 				-- rendered as the raw string.
 				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
-				checked = Labels.family_checked(on == true, count),
+				checked = on,
 				submenu = rendered,
 			}
 			return rows
