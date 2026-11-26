@@ -969,7 +969,7 @@ function M.build(ctx)
 			local mode = require("modules.keymap.layout_emulation").status().active and GameKeys.MODE_EMULATION
 				or GameKeys.MODE_INSTALLED
 			return EmulationRows.game_keys_rows({
-				t = i18n.get, settings = settings, app = app, app_name = front and front.name or nil,
+				t = i18n.get, settings = settings, app = app, app_name = front and require("platform.focus.window_info").frontmost_application_name() or nil,
 				app_choice = overridden and own or nil,
 				route = function(choice, game) return GameKeys.route("macos", mode, choice, { game = game }) end,
 				choose = function(choice) emulation_changed(Preferences.set_game_keys(state, save_prefs, nil, choice)) end,
