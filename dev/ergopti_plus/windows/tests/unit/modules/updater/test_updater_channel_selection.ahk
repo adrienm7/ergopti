@@ -22,10 +22,10 @@ _UpdChanSel_List() {
 	; GitHub lists by publish date: the newest dev build comes first, the only
 	; stable release is older, and a foreign family must be ignored.
 	return '['
-		. '{"tag_name":"v0.0.0-dev.134","prerelease":true,"body":"dev 134"},'
+		. '{"tag_name":"v1.2.1-dev.134","prerelease":true,"body":"dev 134"},'
 		. '{"tag_name":"v1.2.0","prerelease":false,"body":"stable 1.2.0"},'
 		. '{"tag_name":"v1.3.0-beta.1","prerelease":true,"body":"beta"},'
-		. '{"tag_name":"v0.0.0-dev.133","prerelease":true,"body":"dev 133"},'
+		. '{"tag_name":"v1.2.1-dev.133","prerelease":true,"body":"dev 133"},'
 		. '{"tag_name":"v1.1.0","prerelease":false,"body":"stable 1.1.0"}'
 		. ']'
 }
@@ -35,8 +35,13 @@ _UpdChanSel_SelectsTheChannelsLatest() {
 	NoRelease := _UpdaterTest_ResolveFunction("_Updater_JsonIsNoChannelRelease")
 	AssertEqual("v1.2.0", Updater_ParseTagName(Select.Call(_UpdChanSel_List(), "main")),
 		"the stable channel must keep its latest stable release, not the newest publication")
-	AssertEqual("v0.0.0-dev.134", Updater_ParseTagName(Select.Call(_UpdChanSel_List(), "dev")),
+	AssertEqual("v1.2.1-dev.134", Updater_ParseTagName(Select.Call(_UpdChanSel_List(), "dev")),
 		"the dev channel must keep its latest dev build")
+	; Field report 2026-11-26: the dev channel lists the stable release, which
+	; outranks every prerelease of its version.
+	StableAfterDev := '[{"tag_name":"v1.2.0","prerelease":false},{"tag_name":"v1.2.0-dev.130","prerelease":true}]'
+	AssertEqual("v1.2.0", Updater_ParseTagName(Select.Call(StableAfterDev, "dev")),
+		"the dev channel must offer the stable release over its own prereleases")
 	OnlyDev := '[{"tag_name":"v0.0.0-dev.134","prerelease":true},{"tag_name":"v0.0.0-dev.133","prerelease":true}]'
 	Empty := Select.Call(OnlyDev, "main")
 	AssertTrue(NoRelease.Call(Empty),

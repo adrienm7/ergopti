@@ -357,7 +357,7 @@ helpers.describe("updater bounded pagination", function()
 	local function page(first, count)
 		local entries = {}
 		for i = first, first + count - 1 do
-			entries[#entries + 1] = { tag_name = i == 99 and "v9.9.9" or "v0.0.0-dev." .. i, assets = {}, body = string.rep("x", 25000) }
+			entries[#entries + 1] = { tag_name = i == 99 and "v9.9.9" or "v9.9.10-dev." .. i, assets = {}, body = string.rep("x", 25000) }
 		end
 		return Json.encode(entries)
 	end
@@ -396,9 +396,9 @@ helpers.describe("updater bounded pagination", function()
 		helpers.assert_eq(requests, 10)
 		helpers.assert_eq(completions, 2)
 		helpers.assert_eq(#result, 100)
-		helpers.assert_eq(result[100].tag_name, "v0.0.0-dev.100")
+		helpers.assert_eq(result[100].tag_name, "v9.9.10-dev.100")
 		helpers.assert_contains(M._select_channel_release(Json.encode(result), "main"), "v9.9.9")
-		helpers.assert_contains(M._select_channel_release(Json.encode(result), "dev"), "v0.0.0-dev.100")
+		helpers.assert_contains(M._select_channel_release(Json.encode(result), "dev"), "v9.9.10-dev.100")
 	end)
 
 	helpers.it("refuses incomplete invalid and cancelled lists without partial success or duplicate callbacks", function()

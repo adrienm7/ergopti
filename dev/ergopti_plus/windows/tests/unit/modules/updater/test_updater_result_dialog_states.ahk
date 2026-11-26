@@ -409,18 +409,23 @@ _TUCD_OtherChannelsOnManualChecks() {
 	_TUCD_Run(_TUCD_OtherChannelsCase)
 }
 _TUCD_OtherChannelsCase() {
-	global UPDATER_REQUEST_ORIGIN_BACKGROUND
-	List := '[{"tag_name":"v1.0.0","published_at":"2026-09-03T00:00:00Z","prerelease":false},'
-		. '{"tag_name":"v0.0.0-dev.150","published_at":"2026-09-02T00:00:00Z","prerelease":true}]'
-	Manual := _TUCD_Request()
-	Json := _Updater_InterpretResponse(200, List, "", "dev", "https://example.invalid/releases", Manual)
-	AssertEqual("v0.0.0-dev.150", Updater_ParseTagName(Json), "the checked channel's release is selected")
+	global UPDATER_REQUEST_ORIGIN_BACKGROUND, UPDATER_REQUEST_ORIGIN_MANUAL
+	List := '[{"tag_name":"v1.0.1-dev.150","published_at":"2026-09-03T00:00:00Z","prerelease":true},'
+		. '{"tag_name":"v1.0.0","published_at":"2026-09-02T00:00:00Z","prerelease":false}]'
+	Manual := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false, "main")
+	Json := _Updater_InterpretResponse(200, List, "", "main", "https://example.invalid/releases", Manual)
+	AssertEqual("v1.0.0", Updater_ParseTagName(Json), "the checked channel's release is selected")
 	Others := _Updater_RequestOtherChannels(Manual)
-	AssertEqual(1, Others.Length, "the newer stable release is kept for the window")
-	AssertEqual("main", Others[1]["channel"])
-	AssertEqual("v1.0.0", Others[1]["tag"])
-	Background := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND, false, "dev")
-	_Updater_InterpretResponse(200, List, "", "dev", "https://example.invalid/releases", Background)
+	AssertEqual(1, Others.Length, "the newer dev prerelease is kept for the window")
+	AssertEqual("dev", Others[1]["channel"])
+	AssertEqual("v1.0.1-dev.150", Others[1]["tag"])
+	; The dev view lists main's releases, so a dev check never suggests main.
+	DevCheck := _TUCD_Request()
+	_Updater_InterpretResponse(200, List, "", "dev", "https://example.invalid/releases", DevCheck)
+	AssertEqual(0, _Updater_RequestOtherChannels(DevCheck).Length,
+		"a dev check offers the stable release itself, never a switch to main")
+	Background := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND, false, "main")
+	_Updater_InterpretResponse(200, List, "", "main", "https://example.invalid/releases", Background)
 	AssertFalse(Background.HasProp("OtherChannels"), "a background check keeps nothing for a window")
 	AssertEqual(0, _Updater_RequestOtherChannels(Background).Length)
 }

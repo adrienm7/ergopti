@@ -75,6 +75,36 @@ _TKP_Edits() {
 }
 Test("anti-sleep presets: the port replays every corpus edit (keep-awake-presets-vectors)", _TKP_Edits)
 
+; A saved document keeps a copy of a starter the starters file no longer ships,
+; named after its id once its translated name is gone.
+_TKP_Loads() {
+	Corpus := _TKP_Json("tests\corpus\keep_awake\keep_awake_presets_vectors.json")
+	Starters := _TKP_Json("shortcuts\data\keep_awake_presets.json")
+	Checked := 0
+	for Vector in Corpus["loads"] {
+		Reason := ""
+		Doc := KeepAwakePresetsLoad(Starters, Vector["saved"], &Reason)
+		AssertTrue(IsObject(Doc), Vector["id"] . " loads: " . Reason)
+		AssertEqual(Vector["expect_active"], Doc["active"], Vector["id"] . " active")
+		Ids := ""
+		for Preset in Doc["presets"]
+			Ids .= (Ids = "" ? "" : ",") . Preset["id"]
+		Expected := ""
+		for Id in Vector["expect_ids"]
+			Expected .= (Expected = "" ? "" : ",") . Id
+		AssertEqual(Expected, Ids, Vector["id"] . " ids")
+		for Name in Vector["expect_names"] {
+			Preset := KeepAwakePresetsGet(Doc, Name["id"])
+			AssertEqual(Name.Get("name", ""), Preset.Get("name", ""), Vector["id"] . " " . Name["id"] . " name")
+			AssertEqual(Name.Get("name_key", ""), Preset.Get("name_key", ""), Vector["id"] . " " . Name["id"] . " name_key")
+		}
+		AssertTrue(IsObject(KeepAwakePresetsLoad(Starters, Doc)), Vector["id"] . " the loaded document reloads")
+		Checked += 1
+	}
+	AssertTrue(Checked >= 1, "expected the load vectors, found " . Checked)
+}
+Test("anti-sleep presets: the port replays every corpus load (keep-awake-presets-vectors)", _TKP_Loads)
+
 _TKP_Plans() {
 	Corpus := _TKP_Json("tests\corpus\keep_awake\keep_awake_presets_vectors.json")
 	Starters := _TKP_Json("shortcuts\data\keep_awake_presets.json")

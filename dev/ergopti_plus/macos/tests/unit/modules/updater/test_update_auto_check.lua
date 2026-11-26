@@ -33,8 +33,8 @@ local function load_module()
 	return require("modules.updater.auto_check")
 end
 
-local LIST = '[{"tag_name":"v0.0.0-dev.150","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]},'
-	.. '{"tag_name":"v0.0.0-dev.149","prerelease":true,"published_at":"2026-09-01T00:00:00Z","assets":[]}]'
+local LIST = '[{"tag_name":"v1.0.1-dev.150","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v1.0.1-dev.149","prerelease":true,"published_at":"2026-09-01T00:00:00Z","assets":[]}]'
 
 --- Builds an owner over recording ports. ctx: owner, timers, requests,
 --- storage (values), clock, announced, state, saves.
@@ -109,7 +109,7 @@ local function build(opts)
 		http = transport(), manual_http = transport(),
 		failure_contract = AutoCheck.failure_contract(),
 		now = function() return ctx.clock.now end,
-		current_version = function() return "0.0.0-dev.140" end,
+		current_version = function() return "1.0.1-dev.140" end,
 		installed_channel = function() return "dev" end,
 	})
 	return ctx
@@ -135,7 +135,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_true(tostring(err):find("exact storage read", 1, true) ~= nil)
 	end)
 	helpers.it("retains the stored check record across an unavailable read", function()
-		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.150" }
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v1.0.1-dev.150" }
 		local ctx = build({ now = T0, record = original, defer = true })
 		ctx.record_read_error = true
 		helpers.assert_true(ctx.owner.start())
@@ -195,7 +195,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		ctx.pending[1]({ ok = true, status = 200, body = LIST, headers = {} })
 		ctx.pending[1]({ ok = false, status = 0, error = "late failure" })
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0, "one request has one terminal result")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150")
 	end)
 
 	helpers.it("transport exceptions are recorded and allow a retry (updater-owner-boundary)", function()
@@ -317,7 +317,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 			ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
 			fire(ctx)
 			helpers.assert_eq(#ctx.announced, 2, "the next successful check must retry the announcement")
-			helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v0.0.0-dev.150")
+			helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v1.0.1-dev.150")
 		end
 	end)
 
@@ -347,12 +347,12 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(#ctx.requests, 1, "the overdue check is sent")
 		helpers.assert_eq(ctx.requests[1].url, URL, "the shared release list")
 		helpers.assert_nil(ctx.requests[1].headers["If-None-Match"], "a session without the list sends a full request")
-		helpers.assert_eq(ctx.announced, { "v0.0.0-dev.150" }, "the dev channel's latest release is announced")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "and offered by the About row")
+		helpers.assert_eq(ctx.announced, { "v1.0.1-dev.150" }, "the dev channel's latest release is announced")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150", "and offered by the About row")
 		local saved = ctx.values[ctx.state_key]
 		helpers.assert_eq(saved.last_check_at, ctx.clock.now)
 		helpers.assert_eq(saved.failures, 0)
-		helpers.assert_eq(saved.last_notified_tag, "v0.0.0-dev.150", "the announcement is persisted")
+		helpers.assert_eq(saved.last_notified_tag, "v1.0.1-dev.150", "the announcement is persisted")
 
 		ctx.clock.now = ctx.clock.now + 2 * 86400
 		ctx.owner.on_wake()
@@ -360,7 +360,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		fire(ctx)
 		helpers.assert_eq(#ctx.requests, 2, "the next check is sent")
 		helpers.assert_eq(ctx.requests[2].headers["If-None-Match"], 'W/"abc"', "the second request is conditional")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "a 304 keeps the release this session read")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150", "a 304 keeps the release this session read")
 		helpers.assert_eq(#ctx.announced, 1, "a release is announced once")
 	end)
 
@@ -518,9 +518,9 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		}
 		local ok, err = pcall(function()
 			local AutoCheck = load_module()
-			helpers.assert_true(AutoCheck.announce({ tag = "v0.0.0-dev.150%", channel = "dev" }))
+			helpers.assert_true(AutoCheck.announce({ tag = "v1.0.1-dev.150%", channel = "dev" }))
 			helpers.assert_eq(#sent, 1, "one notification")
-			helpers.assert_true(sent[1].body:find("v0.0.0-dev.150%", 1, true) ~= nil,
+			helpers.assert_true(sent[1].body:find("v1.0.1-dev.150%", 1, true) ~= nil,
 				"the body names the release, a % included")
 			-- Notify only: Sparkle hears of the release on the click, never before.
 			helpers.assert_eq(#checks, 0, "nothing asks Sparkle for the release before the click")
@@ -543,11 +543,11 @@ end)
 -- A list where the installed dev.140 is listed, dev.150 is newer on its own
 -- channel and a stable release was published after the installed build.
 local MIXED = '[{"tag_name":"v1.0.0","prerelease":false,"published_at":"2026-09-03T00:00:00Z","assets":[]},'
-	.. '{"tag_name":"v0.0.0-dev.150","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]},'
-	.. '{"tag_name":"v0.0.0-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]}]'
+	.. '{"tag_name":"v1.0.1-dev.150","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v1.0.1-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]}]'
 
-local UP_TO_DATE = '[{"tag_name":"v0.0.0-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]},'
-	.. '{"tag_name":"v0.0.0-dev.139","prerelease":true,"published_at":"2026-07-31T00:00:00Z","assets":[]}]'
+local UP_TO_DATE = '[{"tag_name":"v1.0.1-dev.140","prerelease":true,"published_at":"2026-08-01T00:00:00Z","assets":[]},'
+	.. '{"tag_name":"v1.0.1-dev.139","prerelease":true,"published_at":"2026-07-31T00:00:00Z","assets":[]}]'
 
 --- Runs one manual check and returns its answers.
 local function check_now(ctx, channel)
@@ -558,12 +558,12 @@ end
 
 helpers.describe("updater.auto_check (macOS): the manual check answers the update-check window", function()
 	helpers.it("answers a manual check without overwriting an unreadable record", function()
-		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v0.0.0-dev.149" }
+		local original = { seed = SEED, last_check_at = T0 - 120, last_notified_tag = "v1.0.1-dev.149" }
 		local ctx = build({ now = T0, record = original,
 			responses = { { ok = true, status = 200, body = MIXED, headers = {} } } })
 		ctx.record_read_error = true
 		local answers = check_now(ctx, "dev")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150")
 		helpers.assert_eq(ctx.values[ctx.state_key], original)
 	end)
 	helpers.it("a late automatic check cannot overwrite a newer manual check", function()
@@ -573,9 +573,9 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		fire(ctx)
 		local manual = check_now(ctx, "dev")
 		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
-		helpers.assert_eq(manual[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(manual[1].latest, "v1.0.1-dev.150")
 		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150")
 		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"')
 		helpers.assert_eq(#ctx.announced, 0)
 	end)
@@ -588,8 +588,8 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		fire(ctx)
 		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
 		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
-		helpers.assert_eq(manual[1].latest, "v0.0.0-dev.140")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150")
+		helpers.assert_eq(manual[1].latest, "v1.0.1-dev.140")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150")
 		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"')
 	end)
 	helpers.it("a late older manual check cannot replace the latest result", function()
@@ -597,10 +597,10 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		local older = check_now(ctx, "dev")
 		local newer = check_now(ctx, "dev")
 		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
-		helpers.assert_eq(newer[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(newer[1].latest, "v1.0.1-dev.150")
 		ctx.pending[1]({ ok = true, status = 200, body = UP_TO_DATE, headers = { etag = '"old"' } })
-		helpers.assert_eq(older[1].latest, "v0.0.0-dev.140", "the older window still gets its own answer")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the newer check owns the About row")
+		helpers.assert_eq(older[1].latest, "v1.0.1-dev.140", "the older window still gets its own answer")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150", "the newer check owns the About row")
 		helpers.assert_eq(ctx.values[ctx.list_key].etag, '"new"', "the older response cannot replace the list cache")
 	end)
 	helpers.it("a late older failure cannot replace a newer successful check record", function()
@@ -611,7 +611,7 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		ctx.pending[1]({ ok = true, status = 200, body = "[", headers = {} })
 		helpers.assert_eq(older[1].reason_key, "updater.parse_failed")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0)
-		helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v0.0.0-dev.150")
+		helpers.assert_eq(ctx.values[ctx.state_key].last_notified_tag, "v1.0.1-dev.150")
 	end)
 	helpers.it("pairs each 304 with the list used by its own request", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true,
@@ -620,9 +620,9 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		local second = check_now(ctx, "dev")
 		helpers.assert_eq(ctx.requests[1].headers["If-None-Match"], '"old"')
 		ctx.pending[2]({ ok = true, status = 200, body = MIXED, headers = { etag = '"new"' } })
-		helpers.assert_eq(second[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(second[1].latest, "v1.0.1-dev.150")
 		ctx.pending[1]({ ok = false, status = 304, headers = {} })
-		helpers.assert_eq(first[1].latest, "v0.0.0-dev.140", "304 answers only its own validator")
+		helpers.assert_eq(first[1].latest, "v1.0.1-dev.140", "304 answers only its own validator")
 	end)
 	helpers.it("does not answer an unconditional 304 from another request's cache", function()
 		local ctx = build({ now = T0, record = { seed = SEED }, defer = true })
@@ -731,15 +731,15 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_true(dispatched, "the manual check is dispatched")
 		helpers.assert_eq(#answers, 1, "one answer")
 		helpers.assert_eq(answers[1].state, "available")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
-		helpers.assert_eq(answers[1].current, "0.0.0-dev.140")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150")
+		helpers.assert_eq(answers[1].current, "1.0.1-dev.140")
 		helpers.assert_eq(answers[1].channel, "dev")
-		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } },
-			"the stable release published after the installed build is listed")
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the About row names the offered release")
+		helpers.assert_eq(answers[1].others, {},
+			"the dev view lists main's releases itself: no switch to main is suggested")
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150", "the About row names the offered release")
 		helpers.assert_eq(#ctx.announced, 0, "the window shows it: no notification")
 		local record = ctx.values[ctx.state_key]
-		helpers.assert_eq(record.last_notified_tag, "v0.0.0-dev.150", "no later announcement of the same release")
+		helpers.assert_eq(record.last_notified_tag, "v1.0.1-dev.150", "no later announcement of the same release")
 		helpers.assert_eq(record.last_check_at, T0, "the manual check is recorded")
 		helpers.assert_eq(record.failures, 0)
 	end)
@@ -765,20 +765,35 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		ctx.channel = "dev"
 		ctx.owner.on_channel_changed()
 		ctx.pending[1]({ ok = true, status = 200, body = MIXED, headers = {} })
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150", "the original window still gets its result")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150", "the original window still gets its result")
 		helpers.assert_nil(ctx.owner.latest(), "a previous channel epoch cannot republish the About row")
 		helpers.assert_nil(ctx.values[ctx.state_key].last_notified_tag)
 	end)
 
-	helpers.it("says up to date and still lists newer releases of other channels", function()
+	-- Field report 2026-11-26: on dev, v1.0.10-dev.179 was offered and v1.0.10
+	-- only as a switch to the main channel.
+	helpers.it("offers on dev a stable release newer than every prerelease, without a switch", function()
+		local list = '[{"tag_name":"v1.0.1","prerelease":false,"published_at":"2026-09-04T00:00:00Z","assets":[]},'
+			.. MIXED:sub(2)
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = list, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].channel, "dev", "the check stays on the subscribed channel")
+		helpers.assert_eq(answers[1].latest, "v1.0.1")
+		helpers.assert_eq(answers[1].others, {})
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1", "the About row offers the stable release")
+	end)
+
+	helpers.it("says up to date and suggests no more stable channel", function()
 		local list = UP_TO_DATE:gsub("^%[", '[{"tag_name":"v1.0.0","prerelease":false,'
 			.. '"published_at":"2026-08-05T00:00:00Z","assets":[]},')
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = list, headers = {} } } })
 		local answers = check_now(ctx, "dev")
 		helpers.assert_eq(answers[1].state, "up_to_date")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.140")
-		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } })
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.140")
+		helpers.assert_eq(answers[1].others, {}, "an older stable is neither offered nor suggested")
 		helpers.assert_nil(ctx.owner.latest(), "nothing to install on the subscribed channel")
 	end)
 
@@ -811,7 +826,7 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(copy.etag, '"v1"')
 		local kept = Json.decode(copy.body)
 		helpers.assert_eq(#kept, 2)
-		helpers.assert_eq(kept[1].tag_name, "v0.0.0-dev.150")
+		helpers.assert_eq(kept[1].tag_name, "v1.0.1-dev.150")
 		helpers.assert_eq(kept[1].published_at, "2026-09-02T00:00:00Z")
 		helpers.assert_eq(kept[1].prerelease, true)
 		helpers.assert_nil(kept[1].assets, "asset lists and notes are not kept")
@@ -826,7 +841,7 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		local answers = check_now(ctx, "dev")
 		helpers.assert_eq(ctx.requests[1].headers["If-None-Match"], '"v1"')
 		helpers.assert_eq(answers[1].state, "available")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150")
 	end)
 
 	helpers.it("does not cache or send a malformed release ETag", function()
@@ -857,7 +872,7 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 	end)
 
 	helpers.it("drops a damaged stored list before sending a conditional request", function()
-		for _, body in ipairs({ '[{"tag_name":"v0.0.0-dev.150"', '[{}]' }) do
+		for _, body in ipairs({ '[{"tag_name":"v1.0.1-dev.150"', '[{}]' }) do
 			local ctx = build({ now = T0, record = { seed = SEED },
 				list_copy = { url = URL, etag = '"v1"', body = body },
 				responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
@@ -943,10 +958,10 @@ local function feed_entry(repo, tag, updated)
 end
 
 local FEED = '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
-	.. feed_entry("adrienm7/ergopti", "v0.0.0-dev.150", "2026-09-02T00:00:00Z")
+	.. feed_entry("adrienm7/ergopti", "v1.0.1-dev.150", "2026-09-02T00:00:00Z")
 	.. feed_entry("someone/else", "v9.9.9", "2026-09-03T00:00:00Z")
 	.. feed_entry("adrienm7/ergopti", "v1.0.0", "2026-08-05T00:00:00Z")
-	.. feed_entry("adrienm7/ergopti", "v0.0.0-dev.149", "2026-09-01T00:00:00Z")
+	.. feed_entry("adrienm7/ergopti", "v1.0.1-dev.149", "2026-09-01T00:00:00Z")
 	.. '</feed>'
 
 local RATE_LIMITED = { ok = false, status = 403,
@@ -957,9 +972,9 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		local ReleaseSources = require("updater.engine.release_sources")
 		local list = assert(ReleaseSources.feed_release_list(FEED, "adrienm7", "ergopti"))
 		helpers.assert_eq(Json.decode(list), {
-			{ tag_name = "v0.0.0-dev.150", published_at = "2026-09-02T00:00:00Z" },
+			{ tag_name = "v1.0.1-dev.150", published_at = "2026-09-02T00:00:00Z" },
 			{ tag_name = "v1.0.0", published_at = "2026-08-05T00:00:00Z" },
-			{ tag_name = "v0.0.0-dev.149", published_at = "2026-09-01T00:00:00Z" },
+			{ tag_name = "v1.0.1-dev.149", published_at = "2026-09-01T00:00:00Z" },
 		}, "another repository's entry is dropped")
 		local encoded = assert(ReleaseSources.feed_release_list('<feed>'
 			.. feed_entry("adrienm7/ergopti", "v1.0.0%2Bbuild", '"broken"') .. '</feed>', "adrienm7", "ergopti"))
@@ -978,9 +993,9 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		helpers.assert_eq(ctx.requests[2].headers.Accept, "application/atom+xml")
 		helpers.assert_eq(#answers, 1, "one answer")
 		helpers.assert_eq(answers[1].state, "available", "the user can update: Sparkle installs from the appcast")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
-		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } })
-		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the About row names it too")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150")
+		helpers.assert_eq(answers[1].others, {})
+		helpers.assert_eq(ctx.owner.latest().tag, "v1.0.1-dev.150", "the About row names it too")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0, "a check the feed answered succeeded")
 		helpers.assert_nil(ctx.values[ctx.list_key], "the feed never replaces the API copy and its ETag")
 	end)
@@ -1008,7 +1023,7 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		helpers.assert_eq(#ctx.requests, 2, "the API, then the feed")
 		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
 		helpers.assert_eq(answers[1].state, "available")
-		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(answers[1].latest, "v1.0.1-dev.150")
 	end)
 
 	helpers.it("a cut array stays a list that could not be read, with no feed (upd1-captive-portal)", function()
@@ -1042,7 +1057,7 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		fire(ctx)
 		helpers.assert_eq(#ctx.requests, 2)
 		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
-		helpers.assert_eq(ctx.announced, { "v0.0.0-dev.150" })
+		helpers.assert_eq(ctx.announced, { "v1.0.1-dev.150" })
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0)
 		helpers.assert_true(ctx.owner.stop())
 	end)

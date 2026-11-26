@@ -17,7 +17,10 @@
 			"-",
 			"— Accessibility —",
 			"Font of the windows and menus: Default",
-			"Text spacing of the windows: Default"
+			"Text spacing of the windows: Default",
+			"-",
+			"— Sleep —",
+			"Keep awake"
 		],
 		"linux_children": {
 			"Font of the windows and menus: Default": "Font of the windows (menus follow the desktop theme): Default"
@@ -41,7 +44,10 @@
 			"-",
 			"— Accessibilité —",
 			"Police des fenêtres et menus : Par défaut",
-			"Espacement du texte des fenêtres : Par défaut"
+			"Espacement du texte des fenêtres : Par défaut",
+			"-",
+			"— Mise en veille —",
+			"Anti-veille"
 		],
 		"linux_children": {
 			"Police des fenêtres et menus : Par défaut": "Police des fenêtres (les menus suivent le thème du bureau) : Par défaut"

@@ -273,38 +273,66 @@
 		}
 
 		/**
-		 * Decides whether an update check offers a candidate. A deliberate switch
-		 * to another channel offers that channel's latest release even when
-		 * semver orders it below the installed build; within one channel only a
-		 * strictly newer release is offered.
+		 * Decides whether an update check offers a candidate from the selected
+		 * channel's view (its own releases and every more stable channel's). A
+		 * deliberate switch to another channel offers that channel's own latest
+		 * release even when semver orders it below the installed build; any
+		 * other candidate, a more stable channel's release included, is offered
+		 * only when strictly newer, so a stable release never downgrades a dev
+		 * build.
 		 * @param {Function} compare - Shared semver comparison (version.js).
 		 */
 		function shouldOffer(latest, current, selected, installed, compare) {
-			if (!known(selected) || !matches(selected, latest)) return false;
-			if (selected !== installed) return known(installed);
+			if (!visibleIn(selected, latest)) return false;
+			if (selected !== installed) {
+				if (!known(installed)) return false;
+				if (matches(selected, latest)) return true;
+			}
 			return compare(latest, current) > 0;
 		}
 
 		/**
-		 * Returns the index of a channel's latest tag in a list (semver order,
-		 * first occurrence on a tie), or -1. GitHub lists by publish date, so a
-		 * later stable must not hide a higher prerelease and vice versa.
+		 * Returns the index of the semver-highest tag `admit` accepts (first
+		 * occurrence on a tie), or -1.
+		 * @param {string[]} tags - Release tags.
+		 * @param {Function} admit - Tag predicate.
 		 * @param {Function} compare - Shared semver comparison (version.js).
+		 * @return {number}
 		 */
-		function pickLatest(tags, id, compare) {
-			if (!known(id) || !Array.isArray(tags)) return -1;
+		function pickHighest(tags, admit, compare) {
 			var best = -1;
 			for (var i = 0; i < tags.length; i += 1) {
-				if (!matches(id, tags[i])) continue;
+				if (!admit(tags[i])) continue;
 				if (best === -1 || compare(tags[i], tags[best]) > 0) best = i;
 			}
 			return best;
 		}
 
 		/**
+		 * Returns the index of a channel's latest tag in a list, or -1: the
+		 * semver-highest release its view lists (first occurrence on a tie), so
+		 * a stable release outranks every prerelease of its version (1.0.10 >
+		 * 1.0.10-dev.179) and the dev channel offers whichever is newer. GitHub
+		 * lists by publish date, so a later stable must not hide a higher
+		 * prerelease and vice versa.
+		 * @param {Function} compare - Shared semver comparison (version.js).
+		 */
+		function pickLatest(tags, id, compare) {
+			if (!known(id) || !Array.isArray(tags)) return -1;
+			return pickHighest(
+				tags,
+				function (tag) {
+					return visibleIn(id, tag);
+				},
+				compare
+			);
+		}
+
+		/**
 		 * Lists, in registry order, every channel other than the checked one
-		 * whose latest release was published strictly after the installed build.
-		 * The installed build's time is that of the first listed release of the
+		 * whose own latest release was published strictly after the installed
+		 * build. A more stable channel is never listed: the checked view already
+		 * offers its releases. The installed build's time is that of the first listed release of the
 		 * same version; a build that is not listed (older than the list, or a
 		 * source checkout), or listed without a valid time, predates the list.
 		 * @param {{tag: string, published_at: string}[]} releases - The release list.
@@ -329,8 +357,14 @@
 			}
 			var found = [];
 			tables.order.forEach(function (record) {
-				if (record.id === selected) return;
-				var index = pickLatest(tags, record.id, compare);
+				if (record.rank <= byId[selected].rank) return;
+				var index = pickHighest(
+					tags,
+					function (tag) {
+						return matches(record.id, tag);
+					},
+					compare
+				);
 				if (index === -1) return;
 				var at = releases[index].published_at;
 				if (typeof at !== 'string' || !PUBLISHED_AT.test(at)) return;
