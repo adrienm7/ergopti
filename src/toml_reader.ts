@@ -100,7 +100,7 @@ class Reader {
 
 	/** Advances past a character, counting lines. */
 	private advance(): string {
-		const ch = this.text[this.pos];
+		const ch = this.text[this.pos] as string;
 		this.pos += 1;
 		if (ch === '\n') this.line += 1;
 		return ch;
@@ -207,7 +207,7 @@ class Reader {
 
 	private arrayTable(path: string[]): void {
 		const parent = this.descend(this.doc.root, path.slice(0, -1));
-		const key = path[path.length - 1];
+		const key = path[path.length - 1]!;
 		const list = parent[key] ?? [];
 		if (!Array.isArray(list)) this.fail(`'${key}' is not an array of tables`);
 		const table = newTable();
@@ -220,7 +220,7 @@ class Reader {
 
 	private assign(table: TomlTable, path: string[], value: TomlValue, line: number): void {
 		const target = this.descend(table, path.slice(0, -1));
-		const key = path[path.length - 1];
+		const key = path[path.length - 1]!;
 		if (Object.hasOwn(target, key)) this.fail(`key '${key}' is defined twice`);
 		target[key] = value;
 		let lines = this.doc.keyLines.get(target);
@@ -256,7 +256,7 @@ class Reader {
 
 	private escape(): string {
 		const ch = this.advance();
-		if (Object.hasOwn(ESCAPES, ch)) return ESCAPES[ch];
+		if (Object.hasOwn(ESCAPES, ch)) return ESCAPES[ch]!;
 		if (ch === 'u' || ch === 'U') {
 			const width = ch === 'u' ? 4 : 8;
 			const hex = this.text.slice(this.pos, this.pos + width);

@@ -118,7 +118,7 @@ describe('HotstringEditor', () => {
 		const root = render({ hotstrings: [btw], onchange });
 		expect(root.textContent).toContain('common');
 		const link = root.querySelector('a[download]') as HTMLAnchorElement;
-		expect(decodeURIComponent(link.href.split(',')[1])).toBe(serializeHotstrings([btw]));
+		expect(decodeURIComponent(link.href.split(',')[1]!)).toBe(serializeHotstrings([btw]));
 		button(root, 'Edit').click();
 		flushSync();
 		expect(byLabel(root, 'Trigger').value).toBe('btw');
