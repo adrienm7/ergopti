@@ -144,7 +144,7 @@ function conform(output: string, typed: string, lower: string): string | null {
 	if (typed === lower) return output;
 	const points = codePoints(lower);
 	const title = points[0].toUpperCase() + points.slice(1).join('');
-	if (typed === title && title !== lower) return titleOutput(output);
+	if (typed === title) return titleOutput(output);
 	if (typed === lower.toUpperCase()) return upperOutput(output);
 	return null;
 }
@@ -257,7 +257,8 @@ export class HotstringMatcher {
 		if (entry.mode === 'exact') {
 			if (typed === entry.compared) output = hotstring.output;
 		} else if (entry.mode === 'fold') {
-			if (foldCase(typed) === entry.compared) output = hotstring.output;
+			// The trie walk compared the folded trigger already.
+			output = hotstring.output;
 		} else if (lowerCase(typed) === entry.compared) {
 			output = conform(hotstring.output, typed, entry.compared);
 		}
