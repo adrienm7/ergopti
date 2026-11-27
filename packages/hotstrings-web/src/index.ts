@@ -2,7 +2,8 @@
 
 /**
  * The public entry of @ergopti/hotstrings-web: types, TOML files,
- * placeholders, matcher, Backspace undo and the editor model.
+ * placeholders, matcher, Backspace undo and the editor model. The Svelte
+ * editor is its own entry: `@ergopti/hotstrings-web/HotstringEditor.svelte`.
  */
 
 export type { ExpandMode, Expansion, Hotstring, TerminatorMode } from './types.js';
@@ -35,3 +36,19 @@ export {
 	type UndoEdit,
 	type UndoRecord
 } from './undo.js';
+export {
+	DEFAULT_LABELS,
+	emptyDraft,
+	errorLabel,
+	exportToml,
+	importToml,
+	normalizeDraft,
+	parseTags,
+	problemLabel,
+	removeAt,
+	saveDraft,
+	validateDraft,
+	type DraftProblem,
+	type EditorLabels,
+	type ImportResult
+} from './editor_model.js';
