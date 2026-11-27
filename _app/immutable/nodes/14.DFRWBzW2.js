@@ -1,1 +1,0 @@
-import"../chunks/CFanQ2AK.js";import"../chunks/DrgYvoPP.js";import{t as e}from"../chunks/os6ZYka6.js";function t(t){e(t,{from:`/ergopti/utilisation`})}export{t as component};

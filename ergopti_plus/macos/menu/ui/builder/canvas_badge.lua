@@ -14,6 +14,13 @@
 ---    centred in its own image sat left of the menu's middle (field photo of
 ---    dev.178, 2026-11-24: about 30 % to 52 % of the menu's width). The pill is
 ---    centred on the whole menu width those columns frame (M.layout).
+--- 4. Measured As Drawn: the image must span the real title column, so the
+---    widest row is measured with the title the menu finally draws, the
+---    shortcut hint of « Suspendre », « Recharger » and « Quitter » included
+---    (prepend_to's drawn_titles). Measured without it, the title column was
+---    about 37 points wider than the image, and a 62-point arrow column had
+---    been calibrated to make up for that gap (field photo of v1.0.10,
+---    2026-11-26: the pill stood about 11 points right of the middle).
 --- ==============================================================================
 
 local M = {}
@@ -26,9 +33,13 @@ local LOG    = "canvas_badge"
 --- column every row keeps before its title or image; `trailing` the inset
 --- after the title column, widened by `submenu_arrow` once any root row opens
 --- a submenu; `font` the row font size the root titles are measured in.
---- Calibrated on the dev.178 photo of 2026-11-24, where the pill centred in
---- its image stood about 31 points left of the menu's middle.
-local MENU_COLUMNS = { left = 22, trailing = 22, submenu_arrow = 62, font = 14 }
+--- Calibrated on the v1.0.10 photo of 2026-11-26 (menu 1205 px wide, pill of
+--- 74 points 320 px wide, 47 px right of the middle, so 11 points): with the
+--- 62-point arrow column the pill moved 31 points right, and the unmeasured
+--- hint of « ⏸︎ Suspendre    Opt droit + Entrée », about 37 points wider than
+--- « 🌐 Dispositions et émulation », moved it about 18 points left. The right
+--- columns therefore exceed the left one by 62 - 2 × 11 - 37 ≈ 3 points.
+local MENU_COLUMNS = { left = 22, trailing = 22, submenu_arrow = 3, font = 14 }
 
 -- The system font NSMenu draws its rows in.
 local MENU_FONT_NAME = ".AppleSystemUIFont"
@@ -100,11 +111,12 @@ end
 --- Computes the badge image and the pill inside it so the pill sits in the
 --- middle of the whole menu. The image starts after the left column and the
 --- menu ends the trailing columns after the widest title or image, so the
---- pill's centre in the image is half of (image + trailing - left).
---- @param widest number Widest root title, in points.
+--- pill's centre in the image is half of (image + trailing - left). The text
+--- frame is the pill's own, so the caption is centred inside the pill.
+--- @param widest number Widest root title, as the menu draws it, in points.
 --- @param has_submenu boolean Whether a root row opens a submenu.
 --- @param text_w number Width of the pill's text.
---- @return table geometry { canvas_w, pill_w, pill_h, pill_x }
+--- @return table geometry { canvas_w, pill_w, pill_h, pill_x, text_x, text_w }
 function M.layout(widest, has_submenu, text_w)
 	local columns = MENU_COLUMNS
 	local trailing = columns.trailing + (has_submenu and columns.submenu_arrow or 0)
@@ -115,14 +127,17 @@ function M.layout(widest, has_submenu, text_w)
 	-- enough to hold the pill at its shifted place when it is the widest row.
 	local canvas_w = math.max(math.ceil(widest), pill_w + math.abs(shift))
 	local pill_x = (canvas_w + shift - pill_w) / 2
-	return { canvas_w = canvas_w, pill_w = pill_w, pill_h = pill_h, pill_x = pill_x }
+	return { canvas_w = canvas_w, pill_w = pill_w, pill_h = pill_h, pill_x = pill_x, text_x = pill_x, text_w = pill_w }
 end
 
 --- Builds the pill badge menu item for the macOS menu bar title.
 --- @param items table The items list to prepend the badge into (modified in place).
 --- @param ctx table Menu context, used for ctx.paused and ctx.script_control.
 --- @param on_click function Callback invoked when the badge is clicked.
-function M.prepend_to(items, ctx, on_click)
+--- @param drawn_titles table|nil Row -> the title the menu finally draws for it
+---   when it differs from row.title (a shortcut hint row), so the image spans
+---   the real title column.
+function M.prepend_to(items, ctx, on_click, drawn_titles)
 	if not release_canvas() then return false end
 	local paused = ctx and ctx.paused
 	local frame = ManifestMenu.template_rows("macos_canvas_badge_frame", {}, {
@@ -146,11 +161,13 @@ function M.prepend_to(items, ctx, on_click)
 	local widest, has_submenu = 0, false
 	for _, item in ipairs(items) do
 		if item.menu ~= nil then has_submenu = true end
-		local width = title_width(item.title)
+		local drawn = type(drawn_titles) == "table" and drawn_titles[item] or nil
+		local width = title_width(drawn ~= nil and drawn or item.title)
 		if width and width > widest then widest = width end
 	end
 	local geometry = M.layout(widest, has_submenu, text_w)
 	local canvas_w, pill_w, pill_h, pill_x = geometry.canvas_w, geometry.pill_w, geometry.pill_h, geometry.pill_x
+	local text_x, text_box_w = geometry.text_x, geometry.text_w
 	local pad_y = PILL_PAD_Y
 
 	local is_dark = hs.host.interfaceStyle() == "Dark"
@@ -200,7 +217,7 @@ function M.prepend_to(items, ctx, on_click)
 				textSize      = PILL_TEXT_SIZE,
 				textFont      = "Helvetica-Bold",
 				-- Adjust Y slightly (pad_y - 2) to account for font baseline rendering
-				frame         = { x = pill_x, y = pad_y - 2, w = pill_w, h = pill_h }
+				frame         = { x = text_x, y = pad_y - 2, w = text_box_w, h = pill_h }
 			}
 		)
 

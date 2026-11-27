@@ -1216,8 +1216,11 @@ end
 --- The others, keyed by the owner's stable reasons (runtime_owner.lua REASON):
 --- the runtime is not installed or its jobs are not loaded, a user Karabiner
 --- runs while the consent row below is unticked, Karabiner's own quit was
---- refused, or the pinned artifact could not be downloaded. Without these rows
---- the tap-holds were simply off, with nothing saying why.
+--- refused, the pinned artifact could not be downloaded, or the capture could
+--- not start, which a build without its signed capture module causes (v1.0.10:
+--- the status was red with no explanation). Without these rows the tap-holds
+--- were simply off, with nothing saying why. None falls back to the shared
+--- runtime (platform/remap/init.lua M._owned.reconcile).
 -- Literal template names, so the menu parity gate sees each publication.
 local NOT_INSTALLED = function() return ManifestMenu.template_rows("tap_hold_owned_not_installed_rows", {}) end
 local SERVICE_STOPPED = function() return ManifestMenu.template_rows("tap_hold_owned_service_stopped_rows", {}) end
@@ -1233,6 +1236,7 @@ local BLOCK_ROWS = {
 	close_other_failed = CLOSE_FAILED,
 	other_karabiner_still_running = CLOSE_FAILED,
 	artifact_fetch_failed = function() return ManifestMenu.template_rows("tap_hold_owned_fetch_failed_rows", {}) end,
+	capture_start_refused = function() return ManifestMenu.template_rows("tap_hold_owned_capture_refused_rows", {}) end,
 }
 
 --- The reasons this menu explains, so a test can hold them to the owner's

@@ -154,6 +154,18 @@ KeepAwakePresetsLoad(Starters, Saved, &Reason := "") {
 		Seen[Preset["id"]] := true
 	}
 	Doc := KeepAwakePresetsCopy(Saved)
+	; A copy of a starter the starters file no longer ships (« teams », removed
+	; 2026-11-26) is the user's data and stays, active or not; only its name
+	; pointed at shipped text, whose key is gone, so it takes its id as its name.
+	Shipped := Map()
+	for Preset in Starters["presets"]
+		Shipped[Preset["name_key"]] := true
+	for Preset in Doc["presets"] {
+		if !Preset.Has("name") && !Shipped.Has(Preset["name_key"]) {
+			Preset["name"] := Preset["id"]
+			Preset.Delete("name_key")
+		}
+	}
 	if !Doc.Has("active") || !_KeepAwakeIndexOf(Doc, Doc["active"])
 		Doc["active"] := Doc["presets"][1]["id"]
 	return Doc

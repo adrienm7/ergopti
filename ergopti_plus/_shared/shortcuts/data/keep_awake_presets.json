@@ -1,5 +1,5 @@
 {
-	"_comment": "Starter presets of the anti-sleep mode (Ctrl+M), read by _shared/shortcuts/engine/keep_awake/presets.lua and its Windows twin. A preset is the allowed apps per OS (bundle ids on macOS, executable names on Windows, WM classes on Linux), its targets (library images by file, text captions with their variants), and its options: keep_awake (the inhibitor or the activity simulation) and auto_click. A user's presets live in the configuration folder (auto_click/presets.json) and start as a copy of these; a starter is never edited in place. default_active is the preset Ctrl+M uses before the user picks one: the plain keep-awake, as before the auto-clicker existed.",
+	"_comment": "Starter presets of the anti-sleep mode (Ctrl+M), read by _shared/shortcuts/engine/keep_awake/presets.lua and its Windows twin. A preset is the allowed apps per OS (bundle ids on macOS, executable names on Windows, WM classes on Linux), its targets (library images by file, text captions with their variants), and its options: keep_awake (the inhibitor or the activity simulation) and auto_click. A user's presets live in the configuration folder (auto_click/presets.json) and start as a copy of these; a starter is never edited in place. default_active is the preset Ctrl+M uses before the user picks one: the plain keep-awake, as before the auto-clicker existed. A starter removed from this file (« teams », 2026-11-26: it did what « simple » does) stays in the user documents that copied it; its name_key no longer resolves, so presets.lua names such a copy after its id.",
 	"version": 1,
 	"default_active": "simple",
 	"presets": [
@@ -35,19 +35,6 @@
 					"enabled": true
 				}
 			]
-		},
-		{
-			"id": "teams",
-			"name_key": "keepawake.preset.teams",
-			"keep_awake": true,
-			"auto_click": false,
-			"allowed_apps": {
-				"macos": ["com.microsoft.teams2", "com.microsoft.teams"],
-				"windows": ["ms-teams.exe", "Teams.exe"],
-				"linux": ["teams-for-linux"]
-			},
-			"images": [],
-			"texts": []
 		}
 	]
 }

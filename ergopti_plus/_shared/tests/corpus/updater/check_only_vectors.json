@@ -1,5 +1,5 @@
 {
-	"_comment": "Vectors of the check-only answer: the public releases Atom feed (releases_feed.atom in this folder) read as a release list, then classified by _shared/updater/engine/check_result.lua with check_only set. The feed names tags only, so an available release is announced but never installable. Replayed by the Linux and macOS Lua suites. The foreign entry of the feed (another repository) never counts.",
+	"_comment": "Vectors of the check-only answer: the public releases Atom feed (releases_feed.atom in this folder) read as a release list, then classified by _shared/updater/engine/check_result.lua with check_only set. The feed names tags only, so an available release is announced but never installable. Replayed by the Linux and macOS Lua suites. The foreign entry of the feed (another repository) never counts. The dev view lists the stable v2.4.0 too, which outranks the feed's v0.0.0-dev.N prereleases.",
 	"feed": "releases_feed.atom",
 	"owner": "adrienm7",
 	"repo": "ergopti",
@@ -28,16 +28,16 @@
 			"current": "0.0.0-dev.129",
 			"installed": "dev",
 			"state": "available",
-			"latest": "v0.0.0-dev.130",
+			"latest": "v2.4.0",
 			"check_only": true
 		},
 		{
 			"id": "dev-up-to-date",
 			"channel": "dev",
-			"current": "0.0.0-dev.130",
+			"current": "2.4.1-dev.131",
 			"installed": "dev",
 			"state": "up_to_date",
-			"latest": "v0.0.0-dev.130",
+			"latest": "v2.4.0",
 			"check_only": false
 		}
 	]

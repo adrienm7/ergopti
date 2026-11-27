@@ -112,7 +112,13 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 				:gsub("{2}", i18n.get("menu.configuration.reading_font.default"))),
 			(i18n.get("common.label_value"):gsub("{1}", i18n.get("menu.configuration.reading_spacing"))
 				:gsub("{2}", i18n.get("menu.configuration.reading_spacing.default"))),
+			-- The « Anti-veille » submenu, moved here from the top level (2026-11-26).
+			"-",
+			title("menu.configuration.header_sleep"),
+			i18n.get("menu.keep_awake.title"),
 		}, " | "), "Uninstall moved to the Version / Updates submenu; the download proxy moved here from Debug")
+		helpers.assert_true(type(rows[#rows].menu) == "table" and #rows[#rows].menu > 0,
+			"the « Anti-veille » row opens its submenu")
 		-- The folders editor, as on the other two drivers, not the file manager.
 		local folder = rows[7]
 		local fn = folder.fn or folder.action

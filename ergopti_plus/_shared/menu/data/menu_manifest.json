@@ -343,13 +343,6 @@
 			"boot_deferred": true
 		},
 		{
-			"type": "group",
-			"id": "keep_awake",
-			"i18n": "menu.keep_awake.title",
-			"rows": [],
-			"boot_deferred": true
-		},
-		{
 			"id": "---"
 		},
 		{
@@ -1354,6 +1347,18 @@
 					"i18n": "menu.configuration.reading_spacing.wide"
 				}
 			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.configuration.header_sleep"
+		},
+		{
+			"type": "group",
+			"id": "keep_awake",
+			"i18n": "menu.keep_awake.title"
 		}
 	],
 	"debug_menu": [
@@ -1961,6 +1966,17 @@
 			"type": "label",
 			"id": "tap_hold_owned_fetch_failed",
 			"i18n": "menu.tapholds.owned_fetch_failed",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"tap_hold_owned_capture_refused_rows": [
+		{
+			"type": "label",
+			"id": "tap_hold_owned_capture_refused",
+			"i18n": "menu.tapholds.owned_capture_refused",
 			"platforms": [
 				"hs"
 			],

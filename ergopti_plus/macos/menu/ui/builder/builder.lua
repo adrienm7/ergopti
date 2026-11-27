@@ -754,7 +754,6 @@ function M.generate(ctx, menu_mods, actions)
 			return row and { row } or {}
 		end,
 		["apps"]            = function() return module_rows("apps") end,
-		["keep_awake"]      = function() return module_rows("keep_awake") end,
 		["configuration"]   = function()
 			local root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")
 			if root == nil then return {} end
@@ -788,7 +787,15 @@ function M.generate(ctx, menu_mods, actions)
 			-- A pause stops typing, not configuration (EDD-1, maintainer decision
 			-- 2026-11-12): every row stays live while paused, the restore, the
 			-- clear and the unused-key clean included.
-			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
+			-- The « Anti-veille » submenu hangs here since 2026-11-26 (maintainer);
+			-- its rows are the keep-awake module's, unchanged. No rows, no submenu.
+			local configuration_groups = {
+				keep_awake = function()
+					local keep_awake_rows = module_rows("keep_awake")
+					return #keep_awake_rows > 0 and keep_awake_rows or nil
+				end,
+			}
+			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, configuration_groups, cfg_ctx)
 			if not configuration_dense(rows, true) then return {} end
 			local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")
 			if not rawequal(root, current_root) or not rawequal(top, current_top)
@@ -1006,12 +1013,19 @@ function M.generate(ctx, menu_mods, actions)
 	--
 	-- Its native owner captures the badge image after sizing the completed root.
 	-- Canonical completed-row composition then owns badge/boundary/body order.
+	-- The pill measures the rows as drawn: the hints come after the badge (the
+	-- compositions admit string titles only), so it measures their preview.
+	local ok_preview, drawn_titles = pcall(ShortcutHint.preview, rendered, ctx.script_control)
+	if not ok_preview then
+		Logger.error(LOG, string.format("Error previewing the tray shortcut hints: %s.", tostring(drawn_titles)))
+		drawn_titles = nil
+	end
 	local ok_badge, badge_err = pcall(CanvasBadge.prepend_to, rendered, ctx, function()
 		if ctx and ctx.script_control then
 			if type(ctx.script_control.toggle_script_control) == "function" then pcall(ctx.script_control.toggle_script_control) end
 			if type(ctx.script_control.toggle) == "function" then pcall(ctx.script_control.toggle) end
 		end
-	end)
+	end, drawn_titles)
 	if not ok_badge then
 		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
 	end

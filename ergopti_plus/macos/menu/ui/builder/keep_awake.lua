@@ -3,15 +3,17 @@
 --- ==============================================================================
 --- MODULE: macOS Menu « Anti-veille » Submenu
 --- DESCRIPTION:
---- Builds the menu-bar « Anti-veille » submenu: the presets list and the active
---- preset's options list are modules/shortcuts/actions/auto_click.lua's row
---- providers; this part renders them through the manifest's keep_awake_menu.
+--- Builds the rows of the « Anti-veille » submenu of Configuration: the presets
+--- list and the active preset's options list are
+--- modules/shortcuts/actions/auto_click.lua's row providers; this part renders
+--- them through the manifest's keep_awake_menu, and the Configuration builder
+--- hangs them under its keep_awake group.
 --- ==============================================================================
 
 local M = {}
 
---- Builds the « Anti-veille » submenu row.
---- @return table|nil row
+--- Builds the rows of the « Anti-veille » submenu.
+--- @return table|nil rows
 function M.build()
 	-- Required at build time: loading the renderer with the menu module would
 	-- create it before i18n is ready.
@@ -33,8 +35,7 @@ function M.build()
 		["keep_awake_status"] = function() return Mode.status_rows() end,
 	})
 	if not admitted then return nil end
-	local rendered = ManifestMenu.render_rows(admitted, "keep_awake_menu")
-	return ManifestMenu.group_row("top_level", "keep_awake", rendered, getters)
+	return ManifestMenu.render_rows(admitted, "keep_awake_menu")
 end
 
 return M

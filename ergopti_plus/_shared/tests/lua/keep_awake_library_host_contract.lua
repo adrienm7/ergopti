@@ -140,7 +140,8 @@ function M.register(helpers, shared)
 			local imported = w.last("onImported")
 			helpers.assert_eq(imported.ok, true, "the file imports")
 			helpers.assert_eq(imported.id, "vscode_2", "a taken id gets a fresh one")
-			local preset = w.library.document().presets[4]
+			-- Appended after the two starters.
+			local preset = w.library.document().presets[3]
 			helpers.assert_eq(preset.id, "vscode_2", "the preset is added")
 			helpers.assert_eq(w.files["/cfg/auto_click/images/" .. preset.images[1].file], PNG,
 				"its image is copied into the library")

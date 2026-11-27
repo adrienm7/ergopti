@@ -1,11 +1,11 @@
 {
-	"_comment": "Edits of the anti-sleep presets document (_shared/shortcuts/engine/keep_awake/presets.lua and its Windows twin), each vector starting from the starters of _shared/shortcuts/data/keep_awake_presets.json. steps call one edit (op and its args); ok and reason pin its answer; expect_active and expect_ids pin the document after the steps. plan vectors pin what one OS runs for a starter.",
+	"_comment": "Edits of the anti-sleep presets document (_shared/shortcuts/engine/keep_awake/presets.lua and its Windows twin), each vector starting from the starters of _shared/shortcuts/data/keep_awake_presets.json. steps call one edit (op and its args); ok and reason pin its answer; expect_active and expect_ids pin the document after the steps. plan vectors pin what one OS runs for a starter. load vectors start from a saved document instead: expect_names pins each preset's name or name_key after the load.",
 	"edits": [
 		{
 			"id": "starters_are_the_first_document",
 			"steps": [],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams"]
+			"expect_ids": ["simple", "vscode"]
 		},
 		{
 			"id": "choose_a_preset",
@@ -17,7 +17,7 @@
 				}
 			],
 			"expect_active": "vscode",
-			"expect_ids": ["simple", "vscode", "teams"]
+			"expect_ids": ["simple", "vscode"]
 		},
 		{
 			"id": "unknown_preset_refused",
@@ -30,7 +30,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams"]
+			"expect_ids": ["simple", "vscode"]
 		},
 		{
 			"id": "switch_auto_click",
@@ -48,7 +48,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams"],
+			"expect_ids": ["simple", "vscode"],
 			"expect_switch": {
 				"id": "simple",
 				"auto_click": true
@@ -75,7 +75,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams", "vscode_copy"],
+			"expect_ids": ["simple", "vscode", "vscode_copy"],
 			"expect_name": {
 				"id": "vscode_copy",
 				"name": "VS Code perso"
@@ -86,17 +86,17 @@
 			"steps": [
 				{
 					"op": "set_active",
-					"args": ["teams"],
+					"args": ["vscode"],
 					"ok": true
 				},
 				{
 					"op": "remove",
-					"args": ["teams"],
+					"args": ["vscode"],
 					"ok": true
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode"]
+			"expect_ids": ["simple"]
 		},
 		{
 			"id": "last_preset_stays",
@@ -104,11 +104,6 @@
 				{
 					"op": "remove",
 					"args": ["vscode"],
-					"ok": true
-				},
-				{
-					"op": "remove",
-					"args": ["teams"],
 					"ok": true
 				},
 				{
@@ -180,7 +175,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams"]
+			"expect_ids": ["simple", "vscode"]
 		},
 		{
 			"id": "apps_per_os",
@@ -204,7 +199,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams"]
+			"expect_ids": ["simple", "vscode"]
 		},
 		{
 			"id": "add_an_imported_preset",
@@ -273,7 +268,7 @@
 				}
 			],
 			"expect_active": "simple",
-			"expect_ids": ["simple", "vscode", "teams", "imported"]
+			"expect_ids": ["simple", "vscode", "imported"]
 		}
 	],
 	"plans": [
@@ -304,6 +299,72 @@
 				"templates": 0,
 				"text_targets": 0
 			}
+		}
+	],
+	"loads": [
+		{
+			"id": "retired_starter_copy_stays_active",
+			"saved": {
+				"version": 1,
+				"active": "teams",
+				"presets": [
+					{
+						"id": "simple",
+						"name_key": "keepawake.preset.simple",
+						"keep_awake": true,
+						"auto_click": false,
+						"allowed_apps": {
+							"macos": [],
+							"windows": [],
+							"linux": []
+						},
+						"images": [],
+						"texts": []
+					},
+					{
+						"id": "teams",
+						"name_key": "keepawake.preset.teams",
+						"keep_awake": true,
+						"auto_click": false,
+						"allowed_apps": {
+							"macos": [],
+							"windows": [],
+							"linux": []
+						},
+						"images": [],
+						"texts": []
+					},
+					{
+						"id": "mine",
+						"name": "Mon préréglage",
+						"keep_awake": true,
+						"auto_click": true,
+						"allowed_apps": {
+							"macos": [],
+							"windows": [],
+							"linux": []
+						},
+						"images": [],
+						"texts": []
+					}
+				]
+			},
+			"expect_active": "teams",
+			"expect_ids": ["simple", "teams", "mine"],
+			"expect_names": [
+				{
+					"id": "simple",
+					"name_key": "keepawake.preset.simple"
+				},
+				{
+					"id": "teams",
+					"name": "teams"
+				},
+				{
+					"id": "mine",
+					"name": "Mon préréglage"
+				}
+			]
 		}
 	]
 }
