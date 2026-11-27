@@ -58,7 +58,7 @@ function resolve(body: string, ctx: PlaceholderContext): string | { cursor: true
 	if (body.startsWith('value:')) {
 		const name = body.slice(6);
 		const values = ctx.values ?? {};
-		return Object.hasOwn(values, name) ? values[name] : null;
+		return Object.hasOwn(values, name) ? values[name]! : null;
 	}
 	return null;
 }

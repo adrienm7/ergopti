@@ -143,7 +143,7 @@ function titleOutput(output: string): string {
 function conform(output: string, typed: string, lower: string): string | null {
 	if (typed === lower) return output;
 	const points = codePoints(lower);
-	const title = points[0].toUpperCase() + points.slice(1).join('');
+	const title = points[0]!.toUpperCase() + points.slice(1).join('');
 	if (typed === title) return titleOutput(output);
 	if (typed === lower.toUpperCase()) return upperOutput(output);
 	return null;
@@ -205,10 +205,11 @@ export class HotstringMatcher {
 		let node = this.root;
 		const points = codePoints(foldCase(hotstring.trigger));
 		for (let i = points.length - 1; i >= 0; i -= 1) {
-			let child = node.children.get(points[i]);
+			const point = points[i]!;
+			let child = node.children.get(point);
 			if (!child) {
 				child = newNode();
-				node.children.set(points[i], child);
+				node.children.set(point, child);
 			}
 			node = child;
 		}
@@ -239,7 +240,7 @@ export class HotstringMatcher {
 			levels.push({ node, start });
 		}
 		for (let depth = levels.length; depth > 0; depth -= 1) {
-			const level = levels[depth - 1];
+			const level = levels[depth - 1]!;
 			const typed = text.slice(level.start);
 			const prev =
 				level.start > 0 ? text.slice(previousStart(text, level.start), level.start) : null;

@@ -144,7 +144,7 @@ describe('end_character_vectors.json', () => {
 		it(v.id, () => {
 			const matcher = new HotstringMatcher(v.mappings.map((m) => fromMapping(m)));
 			const before = v.typed.slice(0, -1).join('');
-			const e = matcher.match(before, v.typed[v.typed.length - 1]);
+			const e = matcher.match(before, v.typed[v.typed.length - 1]!);
 			if (!v.expected.fires) {
 				expect(e).toBeNull();
 				return;

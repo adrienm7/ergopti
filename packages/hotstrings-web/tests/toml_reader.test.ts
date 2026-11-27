@@ -1,7 +1,7 @@
 // packages/hotstrings-web/tests/toml_reader.test.ts
 
 import { describe, expect, it } from 'vitest';
-import { readToml } from '../src/toml_reader.js';
+import { readToml, type TomlTable } from '../src/toml_reader.js';
 
 /** Reads and turns the tables into plain objects for comparison. */
 function plain(text: string) {
@@ -94,10 +94,10 @@ describe('readToml values', () => {
 			a: { b: { x: 1 } },
 			list: [{ n: 1, sub: { m: 2 } }, { n: 2 }]
 		});
-		const list = doc.root.list as never[];
-		expect(doc.tableLines.get(list[0])).toBe(3);
-		expect(doc.tableLines.get(list[1])).toBe(7);
-		expect(doc.keyLines.get(list[1])?.get('n')).toBe(8);
+		const list = doc.root.list as unknown as TomlTable[];
+		expect(doc.tableLines.get(list[0]!)).toBe(3);
+		expect(doc.tableLines.get(list[1]!)).toBe(7);
+		expect(doc.keyLines.get(list[1]!)?.get('n')).toBe(8);
 	});
 
 	it('keeps __proto__ as plain data', () => {
