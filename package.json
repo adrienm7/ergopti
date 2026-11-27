@@ -10,6 +10,7 @@
 		"test:windows-key-combination-cohorts": "node ./tools/test/test-windows-key-combination-cohorts.cjs",
 		"test:lease-silence-xctest-evidence": "node ./tools/test/test-lease-silence-xctest-evidence.cjs",
 		"test:web-text-admission": "node ./tools/test/test-web-text-admission.cjs",
+		"test:hotstrings-web": "npm --prefix packages/hotstrings-web ci && npm --prefix packages/hotstrings-web run coverage",
 		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
 		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",
 		"test:linux-managed-phase-late-term": "node ./tools/test/test-linux-managed-phase-late-term.cjs",
