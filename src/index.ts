@@ -30,12 +30,7 @@ export {
 	lowerCase,
 	type MatcherOptions
 } from './matcher.js';
-export {
-	DEFAULT_UNDO_WINDOW_MS,
-	ExpansionUndo,
-	type UndoEdit,
-	type UndoRecord
-} from './undo.js';
+export { DEFAULT_UNDO_WINDOW_MS, ExpansionUndo, type UndoEdit, type UndoRecord } from './undo.js';
 export {
 	DEFAULT_LABELS,
 	emptyDraft,

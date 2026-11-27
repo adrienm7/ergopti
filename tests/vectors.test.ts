@@ -11,7 +11,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ExpansionUndo, HotstringMatcher, lowerCase, type Hotstring } from '../src/index.js';
 
-const CORPUS = new URL('../../../static/ergopti_plus/_shared/tests/corpus/hotstrings/', import.meta.url);
+const CORPUS = new URL(
+	'../../../static/ergopti_plus/_shared/tests/corpus/hotstrings/',
+	import.meta.url
+);
 
 function corpus(name: string): Record<string, unknown[]> {
 	return JSON.parse(readFileSync(new URL(name, CORPUS), 'utf8'));

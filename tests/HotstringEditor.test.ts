@@ -8,7 +8,12 @@ import { emptyDraft } from '../src/editor_model.js';
 import { serializeHotstrings } from '../src/toml.js';
 import type { Hotstring } from '../src/types.js';
 
-const btw: Hotstring = { ...emptyDraft(), trigger: 'btw', output: 'by the way', description: 'common' };
+const btw: Hotstring = {
+	...emptyDraft(),
+	trigger: 'btw',
+	output: 'by the way',
+	description: 'common'
+};
 let app: Record<string, unknown> | null = null;
 
 afterEach(() => {
@@ -25,14 +30,20 @@ function render(props: Record<string, unknown> = {}) {
 }
 
 function byLabel(root: HTMLElement, text: string): HTMLInputElement {
-	const label = Array.from(root.querySelectorAll('label')).find((l) => l.textContent?.trim().startsWith(text));
+	const label = Array.from(root.querySelectorAll('label')).find((l) =>
+		l.textContent?.trim().startsWith(text)
+	);
 	if (!label) throw new Error(`no label ${text}`);
-	const control = label.htmlFor ? root.querySelector(`#${label.htmlFor}`) : label.querySelector('input');
+	const control = label.htmlFor
+		? root.querySelector(`#${label.htmlFor}`)
+		: label.querySelector('input');
 	return control as HTMLInputElement;
 }
 
 function button(root: HTMLElement, text: string): HTMLButtonElement {
-	return Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.trim().startsWith(text)) as HTMLButtonElement;
+	return Array.from(root.querySelectorAll('button')).find((b) =>
+		b.textContent?.trim().startsWith(text)
+	) as HTMLButtonElement;
 }
 
 function type(control: HTMLInputElement, value: string) {
@@ -141,7 +152,10 @@ describe('HotstringEditor', () => {
 			flushSync();
 		};
 		await load(serializeHotstrings([{ ...btw, trigger: 'omw' }]) + 'bad = ?\n');
-		expect(Array.from(root.querySelectorAll('code')).map((c) => c.textContent)).toEqual(['btw', 'omw']);
+		expect(Array.from(root.querySelectorAll('code')).map((c) => c.textContent)).toEqual([
+			'btw',
+			'omw'
+		]);
 		expect(root.querySelector('[role=alert]')?.textContent).toContain('Line');
 		tick(byLabel(root, 'Replace the list'), true);
 		await load(serializeHotstrings([{ ...btw, trigger: 'new' }]));
@@ -150,7 +164,13 @@ describe('HotstringEditor', () => {
 	});
 
 	it('renders a label a caller left undefined as empty text', () => {
-		const blank = { importToml: undefined, importReplace: undefined, caseSensitive: undefined, conformCase: undefined, wordStart: undefined };
+		const blank = {
+			importToml: undefined,
+			importReplace: undefined,
+			caseSensitive: undefined,
+			conformCase: undefined,
+			wordStart: undefined
+		};
 		const root = render({ labels: blank });
 		button(root, 'New hotstring').click();
 		flushSync();

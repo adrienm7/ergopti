@@ -117,7 +117,11 @@ function sameTrigger(a: Hotstring, b: Hotstring): boolean {
  * @param index The index being edited, or null for a new hotstring.
  * @returns The problems, empty when the draft can be saved.
  */
-export function validateDraft(draft: Hotstring, list: Hotstring[], index: number | null): DraftProblem[] {
+export function validateDraft(
+	draft: Hotstring,
+	list: Hotstring[],
+	index: number | null
+): DraftProblem[] {
 	const problems: DraftProblem[] = [];
 	if (draft.trigger === '') problems.push('trigger-empty');
 	else if (list.some((other, i) => i !== index && sameTrigger(other, draft))) {
@@ -165,7 +169,10 @@ export interface ImportResult {
 /** Imports a TOML file (v1 or v2), replacing the list or appending to it. */
 export function importToml(list: Hotstring[], text: string, replace: boolean): ImportResult {
 	const parsed = parseHotstrings(text);
-	return { list: replace ? parsed.hotstrings : [...list, ...parsed.hotstrings], errors: parsed.errors };
+	return {
+		list: replace ? parsed.hotstrings : [...list, ...parsed.hotstrings],
+		errors: parsed.errors
+	};
 }
 
 /** Exports the list as TOML v2. */

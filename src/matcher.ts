@@ -241,7 +241,8 @@ export class HotstringMatcher {
 		for (let depth = levels.length; depth > 0; depth -= 1) {
 			const level = levels[depth - 1];
 			const typed = text.slice(level.start);
-			const prev = level.start > 0 ? text.slice(previousStart(text, level.start), level.start) : null;
+			const prev =
+				level.start > 0 ? text.slice(previousStart(text, level.start), level.start) : null;
 			for (const entry of pick(level.node)) {
 				const output = this.decide(entry, typed, prev);
 				if (output !== null) return { entry, output, typed, depth };
