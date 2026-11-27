@@ -129,7 +129,8 @@ class Reader {
 	private endOfLine(): void {
 		this.skipBlank(false);
 		if (this.startsWith('\r\n')) this.pos += 1;
-		if (this.pos < this.text.length && this.peek() !== '\n') this.fail('expected the end of the line');
+		if (this.pos < this.text.length && this.peek() !== '\n')
+			this.fail('expected the end of the line');
 	}
 
 	private statement(): void {
@@ -261,7 +262,8 @@ class Reader {
 			const hex = this.text.slice(this.pos, this.pos + width);
 			if (!new RegExp(`^[0-9A-Fa-f]{${width}}$`).test(hex)) this.fail('invalid unicode escape');
 			const code = parseInt(hex, 16);
-			if (code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) this.fail('invalid unicode escape');
+			if (code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
+				this.fail('invalid unicode escape');
 			this.pos += width;
 			return String.fromCodePoint(code);
 		}

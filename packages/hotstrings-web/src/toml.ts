@@ -142,7 +142,7 @@ function v2Entry(table: TomlTable): Hotstring {
 	if (trigger === '') throw new EntryError("'trigger' must not be empty");
 	const expand = fields.choice('expand', EXPAND_MODES, 'terminator');
 	const key = fields.string('key', false);
-	if (expand === 'key' && !key) throw new EntryError("expand = \"key\" needs a 'key'");
+	if (expand === 'key' && !key) throw new EntryError('expand = "key" needs a \'key\'');
 	const hotstring: Hotstring = {
 		trigger,
 		output: fields.string('output', true) as string,

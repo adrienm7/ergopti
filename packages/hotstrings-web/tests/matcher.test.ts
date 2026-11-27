@@ -88,8 +88,16 @@ describe('terminator expansion', () => {
 
 	it('consumes the terminator for a consume hotstring and for the magic key', () => {
 		const consume = new HotstringMatcher([hs('btw', 'by the way', { terminator: 'consume' })]);
-		expect(consume.match('btw', ' ')).toMatchObject({ insert: 'by the way', consumedKey: true, restore: 'btw' });
-		expect(matcher.match('btw', '★')).toMatchObject({ insert: 'by the way', consumedKey: true, restore: 'btw' });
+		expect(consume.match('btw', ' ')).toMatchObject({
+			insert: 'by the way',
+			consumedKey: true,
+			restore: 'btw'
+		});
+		expect(matcher.match('btw', '★')).toMatchObject({
+			insert: 'by the way',
+			consumedKey: true,
+			restore: 'btw'
+		});
 		const other = new HotstringMatcher([hs('btw', 'x')], { consumed: '!' });
 		expect(other.match('btw', '!')?.insert).toBe('x');
 		expect(other.match('btw', '★')?.insert).toBe('x★');
@@ -120,11 +128,17 @@ describe('end-key modes', () => {
 	});
 
 	it('lets a named key do its own work when echoed, and swallows it when consumed', () => {
-		expect(matcher.match('dd', 'F2')).toMatchObject({ insert: 'date', consumedKey: false, restore: 'dd' });
+		expect(matcher.match('dd', 'F2')).toMatchObject({
+			insert: 'date',
+			consumedKey: false,
+			restore: 'dd'
+		});
 		expect(matcher.match('dd', 'F3')).toBeNull();
 		expect(matcher.match('nl', 'Enter')?.insert).toBe('newline\n');
 		expect(matcher.match('kk', '\n')).toMatchObject({ insert: 'kay', consumedKey: true });
-		const named = new HotstringMatcher([hs('dd', 'date', { expand: 'key', key: 'F2', terminator: 'consume' })]);
+		const named = new HotstringMatcher([
+			hs('dd', 'date', { expand: 'key', key: 'F2', terminator: 'consume' })
+		]);
 		expect(named.match('dd', 'F2')).toMatchObject({ insert: 'date', consumedKey: true });
 	});
 });
@@ -143,7 +157,9 @@ describe('immediate expansion', () => {
 	});
 
 	it('keeps the restore whole without a magic key', () => {
-		const matcher = new HotstringMatcher([hs('td★', 'today', { expand: 'immediate' })], { magicKey: '' });
+		const matcher = new HotstringMatcher([hs('td★', 'today', { expand: 'immediate' })], {
+			magicKey: ''
+		});
 		expect(matcher.match('td', '★')?.restore).toBe('td★');
 	});
 
@@ -153,7 +169,10 @@ describe('immediate expansion', () => {
 			hs('xba', 'ENDING')
 		]);
 		expect(matcher.match('xba', '.')?.insert).toBe('ENDING.');
-		const tie = new HotstringMatcher([hs('b.', 'IMMEDIATE', { expand: 'immediate' }), hs('xb', 'ENDING')]);
+		const tie = new HotstringMatcher([
+			hs('b.', 'IMMEDIATE', { expand: 'immediate' }),
+			hs('xb', 'ENDING')
+		]);
 		expect(tie.match('xb', '.')?.insert).toBe('IMMEDIATE');
 	});
 });
@@ -216,7 +235,9 @@ describe('case rules', () => {
 });
 
 describe('word start and no-op', () => {
-	const matcher = new HotstringMatcher([hs('the', 'THE', { wordStart: true, caseSensitive: true })]);
+	const matcher = new HotstringMatcher([
+		hs('the', 'THE', { wordStart: true, caseSensitive: true })
+	]);
 
 	it('fires at the line start and after a separator, not inside a word', () => {
 		expect(matcher.match('the', ' ')).not.toBeNull();
@@ -259,7 +280,9 @@ describe('performance', () => {
 			if (ch === '\n') before = '';
 		}
 		const perKey = (performance.now() - started) / text.length;
-		console.info(`hotstring match: ${(perKey * 1000).toFixed(2)} µs per keystroke over ${text.length} keys`);
+		console.info(
+			`hotstring match: ${(perKey * 1000).toFixed(2)} µs per keystroke over ${text.length} keys`
+		);
 		expect(perKey).toBeLessThan(1);
 	});
 });

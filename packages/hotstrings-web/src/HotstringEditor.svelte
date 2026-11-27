@@ -159,7 +159,9 @@
 				<option value="consume">{text.terminatorConsume}</option>
 			</select>
 
-			<label><input type="checkbox" bind:checked={draft.caseSensitive} /> {text.caseSensitive}</label>
+			<label
+				><input type="checkbox" bind:checked={draft.caseSensitive} /> {text.caseSensitive}</label
+			>
 			{#if !draft.caseSensitive}
 				<label>
 					<input

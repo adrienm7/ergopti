@@ -64,7 +64,7 @@ describe('readToml values', () => {
 			'   three"""',
 			'b = """x\\ty""""',
 			"c = '''",
-			"raw \\n",
+			'raw \\n',
 			"line'''",
 			"d = '''q'''''",
 			'e = """\r\nwin"""'
@@ -79,9 +79,16 @@ describe('readToml values', () => {
 	});
 
 	it('reads tables, arrays of tables and sub-tables of their last element', () => {
-		const text = ['[a.b]', 'x = 1', '[[list]]', 'n = 1', '[list.sub]', 'm = 2', '[[list]]', 'n = 2'].join(
-			'\n'
-		);
+		const text = [
+			'[a.b]',
+			'x = 1',
+			'[[list]]',
+			'n = 1',
+			'[list.sub]',
+			'm = 2',
+			'[[list]]',
+			'n = 2'
+		].join('\n');
 		const doc = readToml(text);
 		expect(JSON.parse(JSON.stringify(doc.root))).toEqual({
 			a: { b: { x: 1 } },

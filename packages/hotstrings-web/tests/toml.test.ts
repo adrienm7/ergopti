@@ -42,13 +42,24 @@ describe('serializeHotstrings and parseHotstrings v2', () => {
 	});
 
 	it('writes an empty list as a header only, and reads it back', () => {
-		expect(parseHotstrings(serializeHotstrings([]))).toEqual({ version: 2, hotstrings: [], errors: [] });
+		expect(parseHotstrings(serializeHotstrings([]))).toEqual({
+			version: 2,
+			hotstrings: [],
+			errors: []
+		});
 	});
 
 	it('applies the defaults of omitted fields', () => {
 		const text = `format = "${FORMAT_V2}"\n[[hotstring]]\ntrigger = "a"\noutput = "b"\n`;
 		expect(parseHotstrings(text).hotstrings).toEqual([
-			{ trigger: 'a', output: 'b', expand: 'terminator', terminator: 'echo', caseSensitive: false, wordStart: true }
+			{
+				trigger: 'a',
+				output: 'b',
+				expand: 'terminator',
+				terminator: 'echo',
+				caseSensitive: false,
+				wordStart: true
+			}
 		]);
 	});
 
@@ -118,9 +129,14 @@ describe('serializeHotstrings and parseHotstrings v2', () => {
 	});
 
 	it('reports unknown top-level keys and a hotstring key that is no array of tables', () => {
-		const text = [`format = "${FORMAT_V2}"`, 'extra = 1', 'hotstring = 3', '[meta]', 'a = 1', '[[other]]'].join(
-			'\n'
-		);
+		const text = [
+			`format = "${FORMAT_V2}"`,
+			'extra = 1',
+			'hotstring = 3',
+			'[meta]',
+			'a = 1',
+			'[[other]]'
+		].join('\n');
 		expect(parseHotstrings(text).errors).toEqual([
 			{ line: 2, message: "unknown key 'extra'" },
 			{ line: 3, message: "'hotstring' must be an array of tables ([[hotstring]])" },
@@ -131,7 +147,9 @@ describe('serializeHotstrings and parseHotstrings v2', () => {
 
 	it('locates a bad inline hotstring table on its key line', () => {
 		const text = `format = "${FORMAT_V2}"\n\nhotstring = [{ trigger = "a" }]`;
-		expect(parseHotstrings(text).errors).toEqual([{ line: 3, message: "'output' must be a string" }]);
+		expect(parseHotstrings(text).errors).toEqual([
+			{ line: 3, message: "'output' must be a string" }
+		]);
 	});
 
 	it('refuses an unknown format and passes reader errors through, sorted', () => {
@@ -174,9 +192,35 @@ describe('parseHotstrings v1 (personal_hotstrings.toml)', () => {
 			version: 1,
 			errors: [],
 			hotstrings: [
-				{ trigger: 'btw', output: 'by the way', expand: 'terminator', terminator: 'echo', caseSensitive: false, wordStart: true, tags: ['mail'] },
-				{ trigger: 'adn', output: 'ADN', expand: 'immediate', terminator: 'echo', caseSensitive: false, conformCase: false, wordStart: false, priority: 60, tags: ['mail'] },
-				{ trigger: 'BTW', output: 'B', expand: 'terminator', terminator: 'echo', caseSensitive: true, wordStart: false, tags: ['mail'] }
+				{
+					trigger: 'btw',
+					output: 'by the way',
+					expand: 'terminator',
+					terminator: 'echo',
+					caseSensitive: false,
+					wordStart: true,
+					tags: ['mail']
+				},
+				{
+					trigger: 'adn',
+					output: 'ADN',
+					expand: 'immediate',
+					terminator: 'echo',
+					caseSensitive: false,
+					conformCase: false,
+					wordStart: false,
+					priority: 60,
+					tags: ['mail']
+				},
+				{
+					trigger: 'BTW',
+					output: 'B',
+					expand: 'terminator',
+					terminator: 'echo',
+					caseSensitive: true,
+					wordStart: false,
+					tags: ['mail']
+				}
 			]
 		});
 	});
@@ -209,7 +253,11 @@ describe('parseHotstrings v1 (personal_hotstrings.toml)', () => {
 		expect(parsed.version).toBe(1);
 		expect(parsed.errors).toEqual([]);
 		expect(parsed.hotstrings.length).toBeGreaterThan(3);
-		expect(parsed.hotstrings[0]).toMatchObject({ trigger: 'helo★', output: 'Hello, world!', tags: ['greetings'] });
+		expect(parsed.hotstrings[0]).toMatchObject({
+			trigger: 'helo★',
+			output: 'Hello, world!',
+			tags: ['greetings']
+		});
 		const again = parseHotstrings(serializeHotstrings(parsed.hotstrings));
 		expect(again).toEqual({ version: 2, hotstrings: parsed.hotstrings, errors: [] });
 	});

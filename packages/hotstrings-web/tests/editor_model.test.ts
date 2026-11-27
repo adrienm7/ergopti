@@ -49,7 +49,9 @@ describe('drafts', () => {
 
 	it('labels each problem', () => {
 		expect(problemLabel('trigger-empty', DEFAULT_LABELS)).toBe(DEFAULT_LABELS.errorTriggerEmpty);
-		expect(problemLabel('trigger-duplicate', DEFAULT_LABELS)).toBe(DEFAULT_LABELS.errorTriggerDuplicate);
+		expect(problemLabel('trigger-duplicate', DEFAULT_LABELS)).toBe(
+			DEFAULT_LABELS.errorTriggerDuplicate
+		);
 		expect(problemLabel('key-missing', DEFAULT_LABELS)).toBe(DEFAULT_LABELS.errorKeyMissing);
 	});
 
@@ -57,9 +59,19 @@ describe('drafts', () => {
 		expect(
 			normalizeDraft({ ...btw, key: 'F2', conformCase: true, description: '', tags: [] })
 		).toEqual(btw);
-		const used = { ...btw, expand: 'key' as const, key: 'F2', conformCase: false, description: 'd', tags: ['t'] };
+		const used = {
+			...btw,
+			expand: 'key' as const,
+			key: 'F2',
+			conformCase: false,
+			description: 'd',
+			tags: ['t']
+		};
 		expect(normalizeDraft(used)).toEqual(used);
-		expect(normalizeDraft({ ...btw, caseSensitive: true, conformCase: false })).toEqual({ ...btw, caseSensitive: true });
+		expect(normalizeDraft({ ...btw, caseSensitive: true, conformCase: false })).toEqual({
+			...btw,
+			caseSensitive: true
+		});
 	});
 });
 
@@ -76,7 +88,9 @@ describe('list edits', () => {
 		const text = exportToml([btw]);
 		expect(importToml([btw], text, false).list).toEqual([btw, btw]);
 		expect(importToml([btw], text, true)).toEqual({ list: [btw], errors: [] });
-		expect(importToml([], 'a = ?', true).errors).toEqual([{ line: 1, message: 'unsupported value' }]);
+		expect(importToml([], 'a = ?', true).errors).toEqual([
+			{ line: 1, message: 'unsupported value' }
+		]);
 	});
 
 	it('formats an import error', () => {
